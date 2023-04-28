@@ -25,7 +25,7 @@
             path: "/dev/class/power",
         },
         {
-            protocol: [ "fuchsia.hardware.power.Source" ],
+            protocol: [ "fuchsia.hardware.powersource.Source" ],
         },
     ],
     expose: [

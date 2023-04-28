@@ -5,7 +5,7 @@
 executable("lspwr") {
   sources = [ "lspwr.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
   ]

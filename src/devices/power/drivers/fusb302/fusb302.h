@@ -6,7 +6,7 @@
 #define SRC_DEVICES_POWER_DRIVERS_FUSB302_FUSB302_H_
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/timer.h>
@@ -31,7 +31,8 @@
 namespace fusb302 {
 
 class Fusb302;
-using DeviceType = ddk::Device<Fusb302, ddk::Messageable<fuchsia_hardware_power::Source>::Mixin>;
+using DeviceType =
+    ddk::Device<Fusb302, ddk::Messageable<fuchsia_hardware_powersource::Source>::Mixin>;
 
 // Fusb302: Device that keeps track of the state of the HW, services FIDL requests, and runs the IRQ
 // thread, which in turn runs StateMachine when called on.

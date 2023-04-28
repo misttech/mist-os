@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.acpi/cpp/markers.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire_types.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <zircon/types.h>
 
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.hardware.acpi/cpp/markers.h"
-#include "fidl/fuchsia.hardware.power/cpp/wire_types.h"
 #include "lib/async-loop/cpp/loop.h"
 #include "lib/inspect/cpp/hierarchy.h"
 #include "src/devices/acpi/drivers/acpi-battery/acpi_battery.h"
@@ -62,7 +62,7 @@ class AcpiBatteryTest : public InspectTestHelper, public zxtest::Test {
     device_ = ptr->zxdev();
 
     // Start the FIDL server.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Source>();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_powersource::Source>();
     ASSERT_OK(endpoints.status_value());
     fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), ptr);
     source_client_.Bind(std::move(endpoints->client));
@@ -161,7 +161,7 @@ class AcpiBatteryTest : public InspectTestHelper, public zxtest::Test {
   async::Loop loop_;
   zx_device* device_;
   fidl::WireSyncClient<fuchsia_hardware_acpi::NotifyHandler> notify_client_;
-  fidl::WireSyncClient<fuchsia_hardware_power::Source> source_client_;
+  fidl::WireSyncClient<fuchsia_hardware_powersource::Source> source_client_;
 };
 
 TEST_F(AcpiBatteryTest, CheckBatteryInfo) { ASSERT_NO_FATAL_FAILURE(CheckInfo()); }

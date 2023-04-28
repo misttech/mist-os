@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_MCU_DRIVERS_CHROMIUMOS_EC_CORE_USB_PD_H_
 #define SRC_DEVICES_MCU_DRIVERS_CHROMIUMOS_EC_CORE_USB_PD_H_
 
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/zx/event.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
@@ -20,8 +20,8 @@ namespace chromiumos_ec_core::usb_pd {
 class AcpiCrOsEcUsbPdDevice;
 
 using AcpiCrOsEcUsbPdDeviceType =
-    ddk::Device<AcpiCrOsEcUsbPdDevice, ddk::Messageable<fuchsia_hardware_power::Source>::Mixin,
-                ddk::Initializable>;
+    ddk::Device<AcpiCrOsEcUsbPdDevice,
+                ddk::Messageable<fuchsia_hardware_powersource::Source>::Mixin, ddk::Initializable>;
 
 enum PortState {
   kCharging,

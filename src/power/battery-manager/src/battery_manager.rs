@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_hardware_power as hpower, fidl_fuchsia_power_battery as fpower,
+    fidl_fuchsia_hardware_powersource as hpower, fidl_fuchsia_power_battery as fpower,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{lock::Mutex, TryStreamExt},
     std::sync::{Arc, RwLock},

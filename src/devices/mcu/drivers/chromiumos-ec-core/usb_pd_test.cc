@@ -45,7 +45,7 @@ class ChromiumosEcUsbPdTest : public ChromiumosEcTestBase {
         [&] { ASSERT_OK(usbpd_dev->WaitUntilInitReplyCalled(zx::time::infinite())); });
     device_ = usbpd_dev->GetDeviceContext<AcpiCrOsEcUsbPdDevice>();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Source>();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_powersource::Source>();
     ASSERT_OK(endpoints.status_value());
 
     fidl::BindServer(dispatcher(), std::move(endpoints->server), device_);
@@ -107,7 +107,7 @@ class ChromiumosEcUsbPdTest : public ChromiumosEcTestBase {
  protected:
   usb_power_roles role_ = USB_PD_PORT_POWER_SINK_NOT_CHARGING;
   AcpiCrOsEcUsbPdDevice* device_;
-  fidl::WireSyncClient<fuchsia_hardware_power::Source> client_;
+  fidl::WireSyncClient<fuchsia_hardware_powersource::Source> client_;
 };
 
 TEST_F(ChromiumosEcUsbPdTest, PowerInfo) {
@@ -115,8 +115,9 @@ TEST_F(ChromiumosEcUsbPdTest, PowerInfo) {
     auto result = client_->GetPowerInfo();
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(result.value().status, ZX_OK);
-    EXPECT_EQ(result.value().info.type, fuchsia_hardware_power::wire::PowerType::kAc);
-    EXPECT_EQ(result.value().info.state, fuchsia_hardware_power::wire::kPowerStateDischarging);
+    EXPECT_EQ(result.value().info.type, fuchsia_hardware_powersource::wire::PowerType::kAc);
+    EXPECT_EQ(result.value().info.state,
+              fuchsia_hardware_powersource::wire::kPowerStateDischarging);
   });
 }
 
@@ -127,8 +128,8 @@ TEST_F(ChromiumosEcUsbPdTest, PowerInfoCharging) {
     auto result = client_->GetPowerInfo();
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(result.value().status, ZX_OK);
-    EXPECT_EQ(result.value().info.type, fuchsia_hardware_power::wire::PowerType::kAc);
-    EXPECT_EQ(result.value().info.state, fuchsia_hardware_power::wire::kPowerStateCharging);
+    EXPECT_EQ(result.value().info.type, fuchsia_hardware_powersource::wire::PowerType::kAc);
+    EXPECT_EQ(result.value().info.state, fuchsia_hardware_powersource::wire::kPowerStateCharging);
   });
 }
 
@@ -160,7 +161,7 @@ TEST_F(ChromiumosEcUsbPdTest, StateChangeEvent) {
     auto result = client_->GetPowerInfo();
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(result.value().status, ZX_OK);
-    EXPECT_EQ(result.value().info.state, fuchsia_hardware_power::wire::kPowerStateCharging);
+    EXPECT_EQ(result.value().info.state, fuchsia_hardware_powersource::wire::kPowerStateCharging);
 
     // Signal is cleared by call to GetPowerInfo.
     event.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(0)), &signals);

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,11 +21,11 @@
 #include <fbl/vector.h>
 
 using pwrdev_t = struct {
-  fuchsia_hardware_power::wire::PowerType type;
+  fuchsia_hardware_powersource::wire::PowerType type;
   std::string name;
   uint8_t state;
   zx::event events;
-  fidl::WireSyncClient<fuchsia_hardware_power::Source> fidl_channel;
+  fidl::WireSyncClient<fuchsia_hardware_powersource::Source> fidl_channel;
 };
 
 struct arg_data {
@@ -35,8 +35,8 @@ struct arg_data {
 
 constexpr const char* type_to_string[] = {"AC", "battery"};
 
-zx::result<fuchsia_hardware_power::wire::SourceInfo> get_source_info(
-    const fidl::WireSyncClient<fuchsia_hardware_power::Source>& client) {
+zx::result<fuchsia_hardware_powersource::wire::SourceInfo> get_source_info(
+    const fidl::WireSyncClient<fuchsia_hardware_powersource::Source>& client) {
   const fidl::WireResult result = client->GetPowerInfo();
   if (!result.ok()) {
     fprintf(stderr, "GetPowerInfo failed (transport: %s)\n", result.status_string());
@@ -67,7 +67,8 @@ const char* get_state_string(uint32_t state, fbl::StringBuffer<256>* buf) {
   return (buf->length() > 0) ? buf->c_str() : state_offline;
 }
 
-zx_status_t get_battery_info(const fidl::WireSyncClient<fuchsia_hardware_power::Source>& client) {
+zx_status_t get_battery_info(
+    const fidl::WireSyncClient<fuchsia_hardware_powersource::Source>& client) {
   const fidl::WireResult result = client->GetBatteryInfo();
   if (!result.ok()) {
     fprintf(stderr, "GetBatteryInfo failed (transport: %s)\n", result.status_string());
@@ -78,14 +79,14 @@ zx_status_t get_battery_info(const fidl::WireSyncClient<fuchsia_hardware_power::
     fprintf(stderr, "GetBatteryInfo failed (operation: %s)\n", zx_status_get_string(status));
     return status;
   }
-  fuchsia_hardware_power::wire::BatteryInfo binfo = response.info;
+  fuchsia_hardware_powersource::wire::BatteryInfo binfo = response.info;
 
   const char* unit;
   switch (binfo.unit) {
-    case fuchsia_hardware_power::wire::BatteryUnit::kMw:
+    case fuchsia_hardware_powersource::wire::BatteryUnit::kMw:
       unit = "mW";
       break;
-    case fuchsia_hardware_power::wire::BatteryUnit::kMa:
+    case fuchsia_hardware_powersource::wire::BatteryUnit::kMa:
       unit = "mA";
       break;
   }
@@ -130,7 +131,7 @@ void handle_event(pwrdev_t& interface) {
   if (result.is_error()) {
     exit(EXIT_FAILURE);
   }
-  fuchsia_hardware_power::wire::SourceInfo info = result.value();
+  fuchsia_hardware_powersource::wire::SourceInfo info = result.value();
 
   fbl::StringBuffer<256> old_buf;
   fbl::StringBuffer<256> new_buf;
@@ -139,8 +140,8 @@ void handle_event(pwrdev_t& interface) {
          get_state_string(interface.state, &old_buf), interface.state,
          get_state_string(info.state, &new_buf), info.state);
 
-  if (interface.type == fuchsia_hardware_power::wire::PowerType::kBattery &&
-      (info.state & fuchsia_hardware_power::wire::kPowerStateOnline)) {
+  if (interface.type == fuchsia_hardware_powersource::wire::PowerType::kBattery &&
+      (info.state & fuchsia_hardware_powersource::wire::kPowerStateOnline)) {
     if (get_battery_info(interface.fidl_channel) != ZX_OK) {
       exit(EXIT_FAILURE);
     }
@@ -182,7 +183,7 @@ int main(int argc, char** argv) {
   fbl::Vector<pwrdev_t> interfaces;
   for (auto const& dir_entry : std::filesystem::directory_iterator{"/dev/class/power"}) {
     zx::result client_end =
-        component::Connect<fuchsia_hardware_power::Source>(dir_entry.path().c_str());
+        component::Connect<fuchsia_hardware_powersource::Source>(dir_entry.path().c_str());
     if (client_end.is_error()) {
       printf("failed to connect to %s: %s; skipping\n", dir_entry.path().c_str(),
              client_end.status_string());
@@ -196,14 +197,14 @@ int main(int argc, char** argv) {
              result.status_string());
       continue;
     }
-    fuchsia_hardware_power::wire::SourceInfo pinfo = result.value();
+    fuchsia_hardware_powersource::wire::SourceInfo pinfo = result.value();
 
     printf("[%s] type: %s, state: %s (%#x)\n", dir_entry.path().c_str(),
            type_to_string[fidl::ToUnderlying(pinfo.type)],
            get_state_string(pinfo.state, &state_str), pinfo.state);
 
-    if (pinfo.type == fuchsia_hardware_power::wire::PowerType::kBattery &&
-        (pinfo.state & fuchsia_hardware_power::wire::kPowerStateOnline)) {
+    if (pinfo.type == fuchsia_hardware_powersource::wire::PowerType::kBattery &&
+        (pinfo.state & fuchsia_hardware_powersource::wire::kPowerStateOnline)) {
       if (zx_status_t status = get_battery_info(client); status != ZX_OK) {
         printf("failed to read battery info from %s: %s; skipping\n", dir_entry.path().c_str(),
                zx_status_get_string(status));

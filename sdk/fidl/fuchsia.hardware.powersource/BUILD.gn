@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.hardware.power") {
-  sources = [ "power.fidl" ]
+fidl("fuchsia.hardware.powersource") {
+  sources = [ "powersource.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

@@ -92,7 +92,7 @@ source_set("usb-pd") {
 
   public_deps = [
     ":core",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
   ]
 }
 

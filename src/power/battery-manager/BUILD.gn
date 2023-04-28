@@ -12,7 +12,7 @@ rustc_binary("bin") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_rust",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_rust",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery.test_rust",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_rust",
     "//src/lib/fdio/rust:fdio",

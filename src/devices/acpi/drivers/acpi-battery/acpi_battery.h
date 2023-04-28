@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_ACPI_DRIVERS_ACPI_BATTERY_ACPI_BATTERY_H_
 #define SRC_DEVICES_ACPI_DRIVERS_ACPI_BATTERY_ACPI_BATTERY_H_
 
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <ddktl/device.h>
@@ -14,7 +14,7 @@
 
 namespace acpi_battery {
 
-namespace fpower = fuchsia_hardware_power::wire;
+namespace fpower = fuchsia_hardware_powersource::wire;
 
 // Fields in _BIF, per ACPI Spec 6.4 section 10.2.2.2, "_BIF (Battery Information)".
 enum BifFields {
@@ -61,7 +61,7 @@ constexpr zx::duration kAcpiEventNotifyLimit = zx::msec(10);
 
 class AcpiBattery;
 using DeviceType = ddk::Device<AcpiBattery, ddk::Initializable,
-                               ddk::Messageable<fuchsia_hardware_power::Source>::Mixin>;
+                               ddk::Messageable<fuchsia_hardware_powersource::Source>::Mixin>;
 // Note that we don't use ddk::Messageable for NotifyHandler because we only use it directly with
 // ACPI.
 class AcpiBattery : public DeviceType,

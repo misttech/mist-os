@@ -5,7 +5,7 @@
 #include "src/devices/acpi/drivers/acpi-battery/acpi_battery.h"
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>

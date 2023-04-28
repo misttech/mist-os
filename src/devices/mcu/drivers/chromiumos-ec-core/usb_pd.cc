@@ -181,10 +181,10 @@ void AcpiCrOsEcUsbPdDevice::GetPowerInfo(GetPowerInfoCompleter::Sync& completer)
           }
         }
 
-        fuchsia_hardware_power::wire::SourceInfo info = {
-            .type = fuchsia_hardware_power::wire::PowerType::kAc,
-            .state = charging ? fuchsia_hardware_power::wire::kPowerStateCharging
-                              : fuchsia_hardware_power::wire::kPowerStateDischarging,
+        fuchsia_hardware_powersource::wire::SourceInfo info = {
+            .type = fuchsia_hardware_powersource::wire::PowerType::kAc,
+            .state = charging ? fuchsia_hardware_powersource::wire::kPowerStateCharging
+                              : fuchsia_hardware_powersource::wire::kPowerStateDischarging,
         };
 
         // Reading state clears the signal

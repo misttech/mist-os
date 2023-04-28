@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Error};
 use fdio::{self, clone_channel};
-use fidl_fuchsia_hardware_power as hpower;
+use fidl_fuchsia_hardware_powersource as hpower;
 use fuchsia_async as fasync;
 use fuchsia_fs::directory as vfs_watcher;
 use fuchsia_fs::OpenFlags;
