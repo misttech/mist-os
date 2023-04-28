@@ -628,15 +628,9 @@ void SimpleAudioStream::GetSupportedFormats(
     ZX_ASSERT(formats.size() >= 1);
     for (utils::Format& j : formats) {
       fbl::Vector<uint32_t> rates;
-      // Ignore flags if min and max are equal.
-      if (i.range.min_frames_per_second == i.range.max_frames_per_second) {
-        rates.push_back(i.range.min_frames_per_second);
-      } else {
-        ZX_ASSERT(!(i.range.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS));
-        audio::utils::FrameRateEnumerator enumerator(i.range);
-        for (uint32_t rate : enumerator) {
-          rates.push_back(rate);
-        }
+      audio::utils::FrameRateEnumerator enumerator(i.range);
+      for (uint32_t rate : enumerator) {
+        rates.push_back(rate);
       }
 
       fbl::Vector<uint8_t> number_of_channels;

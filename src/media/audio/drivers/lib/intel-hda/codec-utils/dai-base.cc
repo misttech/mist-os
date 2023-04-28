@@ -158,15 +158,9 @@ void IntelHDADaiBase::GetRingBufferFormats(
     ZX_ASSERT(!formats.empty());
     for (auto& j : formats) {
       fbl::Vector<uint32_t> rates;
-      // Ignore flags if min and max are equal.
-      if (i.min_frames_per_second == i.max_frames_per_second) {
-        rates.push_back(i.min_frames_per_second);
-      } else {
-        ZX_DEBUG_ASSERT(!(i.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS));
-        audio::utils::FrameRateEnumerator enumerator(i);
-        for (uint32_t rate : enumerator) {
-          rates.push_back(rate);
-        }
+      audio::utils::FrameRateEnumerator enumerator(i);
+      for (uint32_t rate : enumerator) {
+        rates.push_back(rate);
       }
 
       fbl::Vector<uint8_t> number_of_channels;

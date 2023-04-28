@@ -7,6 +7,21 @@
 
 namespace audio::utils {
 
+TEST(FormatUtil, EnumerationRatesSingleRate) {
+  audio_stream_format_range_t range = {
+      .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,
+      .min_frames_per_second = 16'000,
+      .max_frames_per_second = 16'000,
+      .min_channels = 1,
+      .max_channels = 8,
+      .flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
+  };
+  FrameRateEnumerator enumerator(range);
+  std::vector<uint32_t> rates(enumerator.begin(), enumerator.end());
+  EXPECT_EQ(1, rates.size());
+  EXPECT_EQ(16'000, rates[0]);
+}
+
 TEST(FormatUtil, EnumerationRatesSingleFamily48kHz) {
   audio_stream_format_range_t range = {
       .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,

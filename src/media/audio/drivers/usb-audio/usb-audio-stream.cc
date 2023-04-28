@@ -348,15 +348,9 @@ void UsbAudioStream::GetSupportedFormats(
     ZX_ASSERT(formats.size() >= 1);
     for (utils::Format& j : formats) {
       fbl::Vector<uint32_t> rates;
-      // Ignore flags if min and max are equal.
-      if (i.range_.min_frames_per_second == i.range_.max_frames_per_second) {
-        rates.push_back(i.range_.min_frames_per_second);
-      } else {
-        ZX_DEBUG_ASSERT(!(i.range_.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS));
-        audio::utils::FrameRateEnumerator enumerator(i.range_);
-        for (uint32_t rate : enumerator) {
-          rates.push_back(rate);
-        }
+      audio::utils::FrameRateEnumerator enumerator(i.range_);
+      for (uint32_t rate : enumerator) {
+        rates.push_back(rate);
       }
 
       fbl::Vector<uint8_t> number_of_channels;

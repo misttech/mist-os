@@ -117,7 +117,7 @@ audio_sample_format_t GetSampleFormat(uint8_t bits_per_sample, uint8_t bits_per_
   audio_sample_format_t sample_format = 0;
   if (bits_per_sample == bits_per_channel) {
     switch (bits_per_sample) {
-      // clang-format off
+        // clang-format off
       case 8:  sample_format = AUDIO_SAMPLE_FORMAT_8BIT;         break;
       case 16: sample_format = AUDIO_SAMPLE_FORMAT_16BIT;        break;
       case 24: sample_format = AUDIO_SAMPLE_FORMAT_24BIT_PACKED; break;
@@ -215,6 +215,12 @@ void FrameRateEnumerator::InsertRates(const audio_stream_format_range_t& range,
 }
 
 FrameRateEnumerator::FrameRateEnumerator(const audio_stream_format_range_t& range) {
+  // If the range is just one frames per second value, use it and return.
+  if (range.min_frames_per_second == range.max_frames_per_second) {
+    rates_.insert(range.min_frames_per_second);
+    return;
+  }
+
   // Sanity check our range first.  If it is continuous, or invalid in any
   // way, then we are not going to enumerate any valid frame rates, just return.
   if ((range.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS) || !(range.flags & DISCRETE_FLAGS) ||
