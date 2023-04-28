@@ -1290,6 +1290,10 @@
 
                 // socket_bind_to_device_test
                 "BindToDeviceTest*",
+
+                // partial_bad_buffer_test
+                // Passes in debian image, remove.
+                "PartialBadBufferTest*",
             ],
         },
     ],
