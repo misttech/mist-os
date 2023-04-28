@@ -36,6 +36,7 @@ use crate::{
     transport::tcp::{
         self,
         socket::{isn::IsnGenerator, Sockets},
+        state::DEFAULT_MAX_SYN_RETRIES,
     },
 };
 
@@ -263,6 +264,8 @@ pub struct SocketOptions {
     /// The period of time after with a dangling FIN_WAIT2 state should be
     /// reclaimed.
     pub fin_wait2_timeout: Option<Duration>,
+    /// The maximum SYN retransmissions before aborting a connection.
+    pub max_syn_retries: NonZeroU8,
 }
 
 impl Default for SocketOptions {
@@ -286,6 +289,7 @@ impl Default for SocketOptions {
             // More context: https://news.ycombinator.com/item?id=10607422
             delayed_ack: false,
             fin_wait2_timeout: Some(DEFAULT_FIN_WAIT2_TIMEOUT),
+            max_syn_retries: DEFAULT_MAX_SYN_RETRIES,
         }
     }
 }

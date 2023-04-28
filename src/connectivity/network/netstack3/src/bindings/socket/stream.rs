@@ -1563,11 +1563,21 @@ where
                 let count = self.with_socket_options(|so| so.keep_alive.count);
                 responder_send!(responder, &mut Ok(u32::from(u8::from(count))));
             }
-            fposix_socket::StreamSocketRequest::SetTcpSynCount { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetTcpSynCount { value, responder } => {
+                responder_send!(
+                    responder,
+                    &mut self.with_socket_options_mut(|so| {
+                        so.max_syn_retries = u8::try_from(value)
+                            .ok_checked::<TryFromIntError>()
+                            .and_then(NonZeroU8::new)
+                            .ok_or(fposix::Errno::Einval)?;
+                        Ok(())
+                    })
+                );
             }
             fposix_socket::StreamSocketRequest::GetTcpSynCount { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let syn_cnt = self.with_socket_options(|so| u32::from(so.max_syn_retries.get()));
+                responder_send!(responder, &mut Ok(syn_cnt));
             }
             fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs, responder } => {
                 const MAX_FIN_WAIT2_TIMEOUT_SECS: u32 = 120;

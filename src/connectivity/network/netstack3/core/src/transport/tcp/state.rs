@@ -44,6 +44,11 @@ pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
 
+/// Default maximum SYN's to send before giving up an attempt to connect.
+// TODO(https://fxbug.dev/126318): Make these constants configurable.
+pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(6_u8);
+const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(5_u8);
+
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
 const ACK_DELAY_THRESHOLD: Duration = Duration::from_millis(500);
@@ -95,14 +100,26 @@ impl Closed<Initial> {
         buffer_sizes: BufferSizes,
         device_mss: Mss,
         default_mss: Mss,
-        user_timeout: Option<NonZeroDuration>,
+        SocketOptions {
+            keep_alive: _,
+            nagle_enabled: _,
+            user_timeout,
+            delayed_ack: _,
+            fin_wait2_timeout: _,
+            max_syn_retries,
+        }: &SocketOptions,
     ) -> (SynSent<I, ActiveOpen>, Segment<()>) {
         let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
         (
             SynSent {
                 iss,
                 timestamp: Some(now),
-                retrans_timer: RetransTimer::new(now, Estimator::RTO_INIT, user_timeout),
+                retrans_timer: RetransTimer::new(
+                    now,
+                    Estimator::RTO_INIT,
+                    user_timeout,
+                    *max_syn_retries,
+                ),
                 active_open,
                 buffer_sizes,
                 device_mss,
@@ -231,7 +248,12 @@ impl Listen {
                     iss,
                     irs: seq,
                     timestamp: Some(now),
-                    retrans_timer: RetransTimer::new(now, Estimator::RTO_INIT, user_timeout),
+                    retrans_timer: RetransTimer::new(
+                        now,
+                        Estimator::RTO_INIT,
+                        user_timeout,
+                        DEFAULT_MAX_SYNACK_RETRIES,
+                    ),
                     simultaneous_open: None,
                     buffer_sizes,
                     smss,
@@ -444,6 +466,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                         now,
                                         Estimator::RTO_INIT,
                                         user_timeout_until.duration_since(now),
+                                        DEFAULT_MAX_SYNACK_RETRIES,
                                     ),
                                     simultaneous_open: Some(active_open.take()),
                                     buffer_sizes,
@@ -562,11 +585,11 @@ struct RetransTimer<I> {
 }
 
 impl<I: Instant> RetransTimer<I> {
-    fn new(now: I, rto: Duration, user_timeout: Duration) -> Self {
+    fn new(now: I, rto: Duration, user_timeout: Duration, max_retries: NonZeroU8) -> Self {
         let wakeup_after = rto.min(user_timeout);
         let at = now.add(wakeup_after);
         let user_timeout_until = now.add(user_timeout);
-        Self { at, rto, user_timeout_until, remaining_retries: Some(DEFAULT_MAX_RETRIES) }
+        Self { at, rto, user_timeout_until, remaining_retries: Some(max_retries) }
     }
 
     fn backoff(&mut self, now: I) {
@@ -765,6 +788,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             user_timeout,
             delayed_ack: _,
             fin_wait2_timeout: _,
+            max_syn_retries: _,
         }: &SocketOptions,
     ) -> Option<Segment<SendPayload<'_>>> {
         let Self {
@@ -864,6 +888,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     now,
                     rtt_estimator.rto(),
                     user_timeout,
+                    DEFAULT_MAX_RETRIES,
                 )))
             }
             return None;
@@ -935,6 +960,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     now,
                     rtt_estimator.rto(),
                     user_timeout,
+                    DEFAULT_MAX_RETRIES,
                 )))
             }
         }
@@ -1364,6 +1390,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             user_timeout: _,
             delayed_ack,
             fin_wait2_timeout,
+            max_syn_retries: _,
         }: &SocketOptions,
         defunct: bool,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>)
@@ -1921,6 +1948,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             user_timeout: _,
             delayed_ack: _,
             fin_wait2_timeout: _,
+            max_syn_retries: _,
         }: &SocketOptions,
     ) -> bool {
         let timed_out = match self {
@@ -1933,11 +1961,26 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 snd.timed_out(now, keep_alive)
             }
             State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
-            State::SynSent(_)
-            | State::SynRcvd(_)
-            | State::Closed(_)
-            | State::Listen(_)
-            | State::TimeWait(_) => false,
+            State::SynSent(SynSent {
+                iss: _,
+                timestamp: _,
+                retrans_timer,
+                active_open: _,
+                buffer_sizes: _,
+                device_mss: _,
+                default_mss: _,
+            })
+            | State::SynRcvd(SynRcvd {
+                iss: _,
+                irs: _,
+                timestamp: _,
+                retrans_timer,
+                simultaneous_open: _,
+                buffer_sizes: _,
+                smss: _,
+            }) => retrans_timer.timed_out(now),
+
+            State::Closed(_) | State::Listen(_) | State::TimeWait(_) => false,
             State::FinWait2(FinWait2 { last_seq: _, rcv: _, timeout_at }) => {
                 timeout_at.map(|at| now >= at).unwrap_or(false)
             }
@@ -2593,7 +2636,12 @@ mod test {
             iss: ISS_1,
             irs: ISS_2,
             timestamp: Some(FakeInstant::from(RTT)),
-            retrans_timer: RetransTimer::new(FakeInstant::from(RTT), Estimator::RTO_INIT, DEFAULT_USER_TIMEOUT - RTT),
+            retrans_timer: RetransTimer::new(
+                FakeInstant::from(RTT),
+                Estimator::RTO_INIT,
+                DEFAULT_USER_TIMEOUT - RTT,
+                DEFAULT_MAX_SYNACK_RETRIES
+            ),
             simultaneous_open: Some(()),
             buffer_sizes: BufferSizes::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -2625,6 +2673,7 @@ mod test {
                 FakeInstant::default(),
                 Estimator::RTO_INIT,
                 DEFAULT_USER_TIMEOUT,
+                DEFAULT_MAX_RETRIES,
             ),
             active_open: (),
             buffer_sizes: BufferSizes::default(),
@@ -2644,7 +2693,12 @@ mod test {
                 iss: ISS_1,
                 irs: ISS_2,
                 timestamp: Some(FakeInstant::default()),
-                retrans_timer: RetransTimer::new(FakeInstant::default(), Estimator::RTO_INIT, DEFAULT_USER_TIMEOUT),
+                retrans_timer: RetransTimer::new(
+                    FakeInstant::default(),
+                    Estimator::RTO_INIT,
+                    DEFAULT_USER_TIMEOUT,
+                    DEFAULT_MAX_SYNACK_RETRIES,
+                ),
                 simultaneous_open: None,
                 buffer_sizes: BufferSizes::default(),
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -2771,6 +2825,7 @@ mod test {
                 clock.now(),
                 Estimator::RTO_INIT,
                 DEFAULT_USER_TIMEOUT,
+                DEFAULT_MAX_RETRIES,
             ),
             simultaneous_open: Some(()),
             buffer_sizes: Default::default(),
@@ -3097,7 +3152,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            None,
+            &SocketOptions::default(),
         );
         assert_eq!(
             syn_seg,
@@ -3115,7 +3170,8 @@ mod test {
                 retrans_timer: RetransTimer::new(
                     clock.now(),
                     Estimator::RTO_INIT,
-                    DEFAULT_USER_TIMEOUT
+                    DEFAULT_USER_TIMEOUT,
+                    DEFAULT_MAX_SYN_RETRIES,
                 ),
                 active_open: (),
                 buffer_sizes: BufferSizes::default(),
@@ -3149,7 +3205,12 @@ mod test {
             iss: ISS_2,
             irs: ISS_1,
             timestamp: Some(clock.now()),
-            retrans_timer: RetransTimer::new(clock.now(), Estimator::RTO_INIT, DEFAULT_USER_TIMEOUT),
+            retrans_timer: RetransTimer::new(
+                clock.now(),
+                Estimator::RTO_INIT,
+                DEFAULT_USER_TIMEOUT,
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
             simultaneous_open: None,
             buffer_sizes: Default::default(),
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
@@ -3229,7 +3290,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            None,
+            &SocketOptions::default(),
         );
         let (syn_sent2, syn2) = Closed::<Initial>::connect(
             ISS_2,
@@ -3238,7 +3299,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            None,
+            &SocketOptions::default(),
         );
 
         assert_eq!(
@@ -3295,7 +3356,12 @@ mod test {
             iss: ISS_1,
             irs: ISS_2,
             timestamp: Some(clock.now()),
-            retrans_timer: RetransTimer::new(clock.now(), Estimator::RTO_INIT, DEFAULT_USER_TIMEOUT - elapsed),
+            retrans_timer: RetransTimer::new(
+                clock.now(),
+                Estimator::RTO_INIT,
+                DEFAULT_USER_TIMEOUT - elapsed,
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
             simultaneous_open: Some(()),
             buffer_sizes: BufferSizes::default(),
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
@@ -3304,7 +3370,12 @@ mod test {
             iss: ISS_2,
             irs: ISS_1,
             timestamp: Some(clock.now()),
-            retrans_timer: RetransTimer::new(clock.now(), Estimator::RTO_INIT, DEFAULT_USER_TIMEOUT - elapsed),
+            retrans_timer: RetransTimer::new(
+                clock.now(),
+                Estimator::RTO_INIT,
+                DEFAULT_USER_TIMEOUT - elapsed,
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
             simultaneous_open: Some(()),
             buffer_sizes: BufferSizes::default(),
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
@@ -3581,7 +3652,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            None,
+            &SocketOptions::default(),
         );
         let mut state = State::<_, RingBuffer, RingBuffer, ()>::SynSent(syn_sent);
         // Retransmission timer should be installed.
@@ -4692,7 +4763,7 @@ mod test {
             Default::default(),
             Mss(nonzero_ext::nonzero!(1_u16)),
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            None,
+            &SocketOptions::default(),
         );
         let mut state = State::<_, RingBuffer, RingBuffer, ()>::SynSent(syn_sent);
 
@@ -4804,8 +4875,12 @@ mod test {
     #[test]
     fn retrans_timer_backoff() {
         let mut clock = FakeInstantCtx::default();
-        let mut timer =
-            RetransTimer::new(clock.now(), Duration::from_secs(1), DEFAULT_USER_TIMEOUT);
+        let mut timer = RetransTimer::new(
+            clock.now(),
+            Duration::from_secs(1),
+            DEFAULT_USER_TIMEOUT,
+            DEFAULT_MAX_RETRIES,
+        );
         clock.sleep(DEFAULT_USER_TIMEOUT);
         timer.backoff(clock.now());
         assert_eq!(timer.at, FakeInstant::from(DEFAULT_USER_TIMEOUT));
@@ -5108,5 +5183,50 @@ mod test {
     }, FakeInstant::from(Duration::from_secs(1)) => true)]
     fn send_timed_out(timer: RetransTimer<FakeInstant>, now: FakeInstant) -> bool {
         timer.timed_out(now)
+    }
+
+    #[test_case(
+        State::SynSent(SynSent{
+            iss: ISS_1,
+            timestamp: Some(FakeInstant::default()),
+            retrans_timer: RetransTimer::new(
+                FakeInstant::default(),
+                Duration::from_millis(1),
+                Duration::from_secs(60),
+                DEFAULT_MAX_SYN_RETRIES,
+            ),
+            active_open: (),
+            buffer_sizes: Default::default(),
+            device_mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            default_mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+        })
+    => DEFAULT_MAX_SYN_RETRIES.get(); "syn_sent")]
+    #[test_case(
+        State::SynRcvd(SynRcvd{
+            iss: ISS_1,
+            irs: ISS_2,
+            timestamp: Some(FakeInstant::default()),
+            retrans_timer: RetransTimer::new(
+                FakeInstant::default(),
+                Duration::from_millis(1),
+                Duration::from_secs(60),
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
+            simultaneous_open: None,
+            buffer_sizes: BufferSizes::default(),
+            smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+        })
+    => DEFAULT_MAX_SYNACK_RETRIES.get(); "syn_rcvd")]
+    fn handshake_timeout(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) -> u8 {
+        let mut clock = FakeInstantCtx::default();
+        let mut retransmissions = 0;
+        clock.sleep(Duration::from_millis(1));
+        while let Some(_seg) = state.poll_send_with_default_options(u32::MAX, clock.now()) {
+            let deadline = state.poll_send_at().expect("must have a retransmission timer");
+            clock.sleep(deadline.duration_since(clock.now()));
+            retransmissions += 1;
+        }
+        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+        retransmissions
     }
 }
