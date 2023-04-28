@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashSet, pin::Pin};
+use std::{collections::HashSet, num::NonZeroU64, pin::Pin};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_ext::{FromExt as _, IntoExt as _};
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientExt as _, ClientProviderExt as _};
+use fidl_fuchsia_net_ext::FromExt as _;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
-use async_utils::{
-    hanging_get::client::HangingGetStream,
-    stream::{StreamMap, Tagged, WithTag as _},
-};
+use async_utils::stream::{StreamMap, Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
-use futures::stream::TryStreamExt as _;
-use net_declare::fidl_subnet;
-use net_types::{ip::Ipv4Addr, SpecifiedAddr, Witness as _};
-use tracing::{error, info, warn};
+use futures::stream::StreamExt as _;
+use net_types::{ip::Ipv4Addr, SpecifiedAddr};
+use tracing::{info, warn};
 
 use crate::{dns, errors};
 
@@ -31,24 +28,15 @@ pub(super) struct ClientState {
     routers: HashSet<SpecifiedAddr<Ipv4Addr>>,
 }
 
-pub(super) const DEFAULT_SUBNET: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
-
 pub(super) fn new_client_params() -> fnet_dhcp::NewClientParams {
-    fnet_dhcp::NewClientParams {
-        configuration_to_request: Some(fnet_dhcp::ConfigurationToRequest {
-            routers: Some(true),
-            dns_servers: Some(true),
-            ..fnet_dhcp::ConfigurationToRequest::EMPTY
-        }),
-        request_ip_address: Some(true),
-        ..fnet_dhcp::NewClientParams::EMPTY
-    }
+    fnet_dhcp_ext::default_new_client_params()
 }
 
-pub(super) type ConfigurationStreamMap = StreamMap<u64, InterfaceIdTaggedConfigurationStream>;
-pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<u64, ConfigurationStream>;
+pub(super) type ConfigurationStreamMap =
+    StreamMap<NonZeroU64, InterfaceIdTaggedConfigurationStream>;
+pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<NonZeroU64, ConfigurationStream>;
 pub(super) type ConfigurationStream =
-    HangingGetStream<fnet_dhcp::ClientProxy, fnet_dhcp::ClientWatchConfigurationResponse>;
+    futures::stream::BoxStream<'static, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>>;
 
 pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy) -> bool {
     match provider.check_presence().await {
@@ -59,52 +47,24 @@ pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy
 }
 
 pub(super) async fn update_configuration(
-    interface_id: u64,
+    interface_id: NonZeroU64,
     ClientState { client: _, routers: configured_routers }: &mut ClientState,
-    fnet_dhcp::ClientWatchConfigurationResponse {
-        address,
-        dns_servers: new_dns_servers,
-        routers: new_routers,
-        ..
-    }: fnet_dhcp::ClientWatchConfigurationResponse,
+    configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
     control: &fnet_interfaces_ext::admin::Control,
     stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
-    if let Some(fnet_dhcp::Address {
-        address, address_parameters, address_state_provider, ..
-    }) = address
-    {
-        let Some(address) = address else {
-            error!(
-                "ignoring DHCPv4 configuration for interface {} without address set",
-                interface_id,
-            );
-            return;
-        };
-        let Some(address_parameters) = address_parameters else {
-            error!(
-                "ignoring DHCPv4 configuration for interface {} without address_parameters set",
-                interface_id,
-            );
-            return;
-        };
-        let Some(address_state_provider) = address_state_provider else {
-            error!(
-                "ignoring DHCPv4 configuration for interface {} without address_state_provider set",
-                interface_id,
-            );
-            return;
-        };
-
-        match control.add_address(
-            &mut address.into_ext(),
-            address_parameters,
-            address_state_provider,
-        ) {
+    let fnet_dhcp_ext::Configuration {
+        address,
+        dns_servers: new_dns_servers,
+        routers: new_routers,
+        ..
+    } = configuration;
+    if let Some(address) = address {
+        match address.add_to(control) {
             Ok(()) => {}
-            Err(e) => {
+            Err((address, e)) => {
                 let fnet::Ipv4AddressWithPrefix { addr, prefix_len } = address;
                 warn!(
                     "error adding DHCPv4-acquired address {}/{} for interface {}: {}",
@@ -122,96 +82,44 @@ pub(super) async fn update_configuration(
     dns::update_servers(
         lookup_admin,
         dns_servers,
-        DnsServersUpdateSource::Dhcpv4 { interface_id },
+        DnsServersUpdateSource::Dhcpv4 { interface_id: interface_id.get() },
         new_dns_servers
-            .map(|servers| {
-                servers.into_iter().map(|address| fnet_name::DnsServer_ {
-                    address: Some(fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-                        address,
-                        port: DEFAULT_DNS_PORT,
-                    })),
-                    source: Some(fnet_name::DnsServerSource::Dhcp(
-                        fnet_name::DhcpDnsServerSource {
-                            source_interface: Some(interface_id),
-                            ..fnet_name::DhcpDnsServerSource::EMPTY
-                        },
-                    )),
-                    ..fnet_name::DnsServer_::EMPTY
-                })
+            .iter()
+            .map(|&address| fnet_name::DnsServer_ {
+                address: Some(fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                    address,
+                    port: DEFAULT_DNS_PORT,
+                })),
+                source: Some(fnet_name::DnsServerSource::Dhcp(fnet_name::DhcpDnsServerSource {
+                    source_interface: Some(interface_id.get()),
+                    ..fnet_name::DhcpDnsServerSource::default()
+                })),
+                ..fnet_name::DnsServer_::default()
             })
-            .into_iter()
-            .flatten()
             .collect(),
     )
     .await;
 
-    let new_routers = HashSet::from_iter(
-        new_routers
-            .into_iter()
-            .flatten()
-            .filter_map(|fnet::Ipv4Address { addr }| SpecifiedAddr::new(Ipv4Addr::new(addr))),
-    );
-
-    let fwd_entry = |next_hop: &SpecifiedAddr<Ipv4Addr>| fnet_stack::ForwardingEntry {
-        subnet: DEFAULT_SUBNET,
-        device_id: interface_id,
-        next_hop: Some(Box::new(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
-            addr: next_hop.get().ipv4_bytes(),
-        }))),
-        metric: fnet_stack::UNSPECIFIED_METRIC,
-    };
-
-    for router in new_routers.difference(configured_routers) {
-        stack
-            .add_forwarding_entry(&mut fwd_entry(router))
-            .await
-            .expect("send add forwarding entry request")
-            .unwrap_or_else(|e| {
-                warn!(
-                    "error adding route for DHCPv4-learned router {} on interface {}: {:?}",
-                    router, interface_id, e,
-                )
-            })
-    }
-
-    for router in configured_routers.difference(&new_routers) {
-        stack
-            .del_forwarding_entry(&mut fwd_entry(router))
-            .await
-            .expect("send del forwarding entry request")
-            .unwrap_or_else(|e| {
-                warn!(
-                    "error deleting route for DHCPv4-learned router {} on interface {}: {:?}",
-                    router, interface_id, e,
-                )
-            })
-    }
-
-    *configured_routers = new_routers;
+    fnet_dhcp_ext::apply_new_routers(interface_id, stack, configured_routers, new_routers)
+        .await
+        .unwrap_or_else(|e| {
+            warn!("error applying new DHCPv4-acquired router configuration: {:?}", e);
+        })
 }
 
 pub(super) fn start_client(
-    interface_id: u64,
+    interface_id: NonZeroU64,
     interface_name: &str,
     client_provider: &fnet_dhcp::ClientProviderProxy,
     configuration_streams: &mut ConfigurationStreamMap,
 ) -> ClientState {
     info!("starting DHCPv4 client for {} (id={})", interface_name, interface_id);
 
-    let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>()
-        .expect("create DHCPv4 client fidl endpoints");
-
-    client_provider
-        .new_client(interface_id, new_client_params(), server)
-        .expect("create new DHCPv4 client");
+    let client = client_provider.new_client_ext(interface_id, new_client_params());
 
     if let Some(stream) = configuration_streams.insert(
         interface_id,
-        ConfigurationStream::new_eager_with_fn_ptr(
-            client.clone(),
-            fnet_dhcp::ClientProxy::watch_configuration,
-        )
-        .tagged(interface_id),
+        fnet_dhcp_ext::configuration_stream(client.clone()).boxed().tagged(interface_id),
     ) {
         let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> = stream;
         unreachable!("only one DHCPv4 client may exist on {} (id={})", interface_name, interface_id)
@@ -221,7 +129,7 @@ pub(super) fn start_client(
 }
 
 pub(super) async fn stop_client(
-    interface_id: u64,
+    interface_id: NonZeroU64,
     interface_name: &str,
     mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,
@@ -235,7 +143,7 @@ pub(super) async fn stop_client(
     update_configuration(
         interface_id,
         &mut state,
-        fnet_dhcp::ClientWatchConfigurationResponse::EMPTY,
+        fnet_dhcp_ext::Configuration::default(),
         dns_servers,
         control,
         stack,
@@ -253,40 +161,12 @@ pub(super) async fn stop_client(
             )
         });
 
-    client.shutdown().unwrap_or_else(|e| {
+    client.shutdown_ext(client.take_event_stream()).await.unwrap_or_else(|e| {
         warn!(
             "error shutting down DHCPv4 client for {} (id={}): {:?}",
             interface_name, interface_id, e,
         )
     });
-
-    let stream = client.take_event_stream().try_filter_map(|event| async move {
-        match event {
-            fnet_dhcp::ClientEvent::OnExit { reason } => Ok(match reason {
-                fnet_dhcp::ClientExitReason::ClientAlreadyExistsOnInterface
-                | fnet_dhcp::ClientExitReason::WatchConfigurationAlreadyPending
-                | fnet_dhcp::ClientExitReason::InvalidInterface
-                | fnet_dhcp::ClientExitReason::InvalidParams
-                | fnet_dhcp::ClientExitReason::NetworkUnreachable
-                | fnet_dhcp::ClientExitReason::UnableToOpenSocket => {
-                    warn!(
-                        "unexpected exit reason when shutting down DHCPv4 client \
-                                 for {} (id={}); got = {:?}",
-                        interface_name, interface_id, reason,
-                    );
-                    None
-                }
-                fnet_dhcp::ClientExitReason::GracefulShutdown => Some(()),
-            }),
-        }
-    });
-    futures::pin_mut!(stream);
-    stream.try_next().await.expect("wait for client to gracefully exit").unwrap_or_else(|| {
-        warn!(
-            "DHCPv4 client for {} (id={}) exited without graceful shutdown event",
-            interface_name, interface_id,
-        )
-    })
 }
 
 /// Start the DHCP server.

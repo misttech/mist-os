@@ -14,7 +14,9 @@ use ::dhcpv4::protocol::FromFidlExt as _;
 use std::{
     boxed::Box,
     collections::{hash_map::Entry, HashMap, HashSet},
-    fs, io, path,
+    fs, io,
+    num::NonZeroU64,
+    path,
     pin::Pin,
     str::FromStr,
 };
@@ -23,6 +25,7 @@ use fidl::endpoints::{RequestStream as _, Responder as _};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
+use fidl_fuchsia_net_dhcp_ext as fnet_dhcp_ext;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_ext::{self as fnet_ext, DisplayExt as _, IpExt as _};
 use fidl_fuchsia_net_filter as fnet_filter;
@@ -441,7 +444,7 @@ impl InterfaceState {
                 }
 
                 NetCfg::handle_dhcpv4_client_start(
-                    properties.id,
+                    NonZeroU64::new(properties.id).expect("interface ID should be nonzero"),
                     &properties.name,
                     dhcpv4_client,
                     dhcpv4_client_provider,
@@ -921,7 +924,7 @@ impl<'a> NetCfg<'a> {
             ),
             RequestStream(Option<RequestStream>),
             Dhcpv4Configuration(
-                Option<(u64, Result<fnet_dhcp::ClientWatchConfigurationResponse, fidl::Error>)>,
+                Option<(NonZeroU64, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
             ),
             Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
             Dhcpv6PrefixControlRequest(
@@ -1134,7 +1137,7 @@ impl<'a> NetCfg<'a> {
     }
 
     async fn handle_dhcpv4_client_stop(
-        id: u64,
+        id: NonZeroU64,
         name: &str,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
@@ -1160,7 +1163,7 @@ impl<'a> NetCfg<'a> {
     }
 
     fn handle_dhcpv4_client_start(
-        id: u64,
+        id: NonZeroU64,
         name: &str,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
@@ -1171,7 +1174,7 @@ impl<'a> NetCfg<'a> {
     }
 
     async fn handle_dhcpv4_client_update(
-        id: u64,
+        id: NonZeroU64,
         name: &str,
         online: bool,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
@@ -1336,7 +1339,7 @@ impl<'a> NetCfg<'a> {
                     }) => {
                         if previous_online.is_some() {
                             Self::handle_dhcpv4_client_update(
-                                *id,
+                                NonZeroU64::new(*id).expect("interface ID should be nonzero"),
                                 name,
                                 *online,
                                 dhcpv4_client,
@@ -1489,7 +1492,7 @@ impl<'a> NetCfg<'a> {
                                 dhcpv6_pd_config: _,
                             }) => {
                                 Self::handle_dhcpv4_client_stop(
-                                    *id,
+                                    NonZeroU64::new(*id).expect("interface ID should be nonzero"),
                                     name,
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
@@ -2408,8 +2411,8 @@ impl<'a> NetCfg<'a> {
 
     async fn handle_dhcpv4_configuration(
         &mut self,
-        interface_id: u64,
-        res: Result<fnet_dhcp::ClientWatchConfigurationResponse, fidl::Error>,
+        interface_id: NonZeroU64,
+        res: Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>,
     ) {
         let configuration = match res {
             Ok(o) => o,
@@ -2426,7 +2429,7 @@ impl<'a> NetCfg<'a> {
         let (dhcpv4_client, control) = {
             let InterfaceState { config, control, device_class: _ } = self
                 .interface_states
-                .get_mut(&interface_id)
+                .get_mut(&interface_id.get())
                 .unwrap_or_else(|| panic!("interface {} not found", interface_id));
 
             match config {
@@ -3167,7 +3170,7 @@ mod tests {
                     control_handle: _,
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID);
-                    assert_eq!(params, dhcpv4::new_client_params(),);
+                    assert_eq!(params, dhcpv4::new_client_params());
                     request.into_stream().expect("error converting client server end to stream")
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
@@ -3182,7 +3185,7 @@ mod tests {
         let check_fwd_entry =
             |fnet_stack::ForwardingEntry { subnet, device_id, next_hop, metric },
              routers: &mut HashSet<_>| {
-                assert_eq!(subnet, dhcpv4::DEFAULT_SUBNET);
+                assert_eq!(subnet, fnet_dhcp_ext::DEFAULT_SUBNET);
                 assert_eq!(device_id, INTERFACE_ID);
                 assert_eq!(metric, 0);
                 assert!(routers.insert(*next_hop.expect("specified next hop")))
@@ -3213,7 +3216,7 @@ mod tests {
                 .next()
                 .await
                 .expect("DHCPv4 configuration streams should never be exhausted");
-            assert_eq!(got_interface_id, INTERFACE_ID);
+            assert_eq!(got_interface_id.get(), INTERFACE_ID);
 
             let dns_servers = dns_servers
                 .into_iter()
@@ -3405,7 +3408,7 @@ mod tests {
                 control_handle: _,
             } => {
                 assert_eq!(interface_id, INTERFACE_ID);
-                assert_eq!(params, dhcpv4::new_client_params(),);
+                assert_eq!(params, dhcpv4::new_client_params());
                 request.into_stream().expect("error converting client server end to stream")
             }
             fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {

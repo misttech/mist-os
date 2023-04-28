@@ -16,6 +16,7 @@ group("tests") {
   testonly = true
 
   public_deps = [
+    "fidl_fuchsia_net_dhcp_ext:tests",
     "fidl_fuchsia_net_ext:fidl-fuchsia-net-ext-tests",
     "fidl_fuchsia_net_interfaces_ext:tests",
     "fidl_fuchsia_net_routes_ext:tests",
