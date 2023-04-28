@@ -39,10 +39,7 @@ struct CoordinatorPixelFormat {
   // fields used in FIDL fuchsia.hardware.display interface.
   fuchsia_images2::wire::PixelFormat ToFidl() const;
 
-  // TODO(fxbug.dev/126114): During pixel_format migration, the underlying
-  // format may be either `zx_pixel_format_t` or `fuchsia.images2.PixelFormat`.
-  // The type of the underlying `format` reflects this.
-  AnyPixelFormat format;
+  fuchsia_images2::wire::PixelFormat format;
 };
 
 constexpr bool operator==(const CoordinatorPixelFormat& lhs, const CoordinatorPixelFormat& rhs) {

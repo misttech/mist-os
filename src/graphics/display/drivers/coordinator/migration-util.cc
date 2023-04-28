@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -22,8 +23,7 @@ namespace display {
 // static
 CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(
     fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format) {
-  // fuchsia.images2.PixelFormat can be cast into AnyPixelFormat safely.
-  return {.format = static_cast<AnyPixelFormat>(banjo_pixel_format)};
+  return {.format = static_cast<fuchsia_images2::wire::PixelFormat>(banjo_pixel_format)};
 }
 
 // static
@@ -42,13 +42,7 @@ CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
   return zx::ok(std::move(result));
 }
 
-fuchsia_images2::wire::PixelFormat CoordinatorPixelFormat::ToFidl() const {
-  zx::result<fuchsia_images2::wire::PixelFormat> convert_result =
-      AnyPixelFormatToImages2PixelFormat(format);
-  ZX_ASSERT(convert_result.is_ok());
-  ZX_ASSERT(!convert_result->IsUnknown());
-  return convert_result.value();
-}
+fuchsia_images2::wire::PixelFormat CoordinatorPixelFormat::ToFidl() const { return format; }
 
 // static
 CoordinatorCursorInfo CoordinatorCursorInfo::FromBanjo(const cursor_info_t& banjo_cursor_info) {
