@@ -50,7 +50,7 @@ use crate::{
             },
             DequeueState, TransmitQueueFrameError,
         },
-        socket::{BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, DeviceSockets},
+        socket::{BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets},
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
@@ -491,10 +491,10 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicSta
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DeviceSockets>
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DeviceSockets>
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {

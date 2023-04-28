@@ -260,10 +260,20 @@ impl<T> IdMap<T> {
     /// Like [`IdMap::push`] except that it returns an entry instead of an
     /// index.
     pub fn push_entry(&mut self, item: T) -> OccupiedEntry<'_, usize, T> {
+        self.push_with(|_: usize| item)
+    }
+
+    /// Creates an `item` in the `IdMap` via functor.
+    ///
+    /// Like [`IdMap::push`] except that the item is constructed by the provided
+    /// function, which is passed its index.
+    pub fn push_with(&mut self, make_item: impl FnOnce(Key) -> T) -> OccupiedEntry<'_, usize, T> {
         if let Some(FreeList { head, .. }) = self.freelist.as_mut() {
             let ret = *head;
-            let old =
-                core::mem::replace(self.data.get_mut(ret).unwrap(), IdMapEntry::Allocated(item));
+            let old = core::mem::replace(
+                self.data.get_mut(ret).unwrap(),
+                IdMapEntry::Allocated(make_item(ret)),
+            );
             let old_link = old
                 .as_free_or_none()
                 .unwrap_or_else(|| panic!("freelist head node {} is not free", head));
@@ -283,7 +293,7 @@ impl<T> IdMap<T> {
             // If we run out of freelist, we simply push a new entry into the
             // underlying vector.
             let key = self.data.len();
-            self.data.push(IdMapEntry::Allocated(item));
+            self.data.push(IdMapEntry::Allocated(make_item(key)));
             OccupiedEntry { key, id_map: self }
         }
     }

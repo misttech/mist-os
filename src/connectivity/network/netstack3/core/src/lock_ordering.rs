@@ -137,7 +137,9 @@ pub(crate) struct IpStateRoutingTable<I>(PhantomData<I>, Never);
 
 pub(crate) enum DeviceLayerStateOrigin {}
 pub(crate) enum DeviceLayerState {}
+pub(crate) enum AllDeviceSockets {}
 pub(crate) enum AnyDeviceSockets {}
+pub(crate) enum DeviceSocketState {}
 pub(crate) enum DeviceSockets {}
 pub(crate) struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
 pub(crate) enum EthernetDeviceStaticState {}
@@ -191,7 +193,8 @@ impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
+impl_lock_after!(IpState<Ipv6> => AllDeviceSockets);
+impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => LoopbackTxQueue);
 impl_lock_after!(AnyDeviceSockets => EthernetTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
@@ -214,3 +217,4 @@ impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceRetransTimeout);
 impl_lock_after!(Ipv6DeviceRetransTimeout => EthernetDeviceDynamicState);
 
 impl_lock_after!(DeviceLayerState => DeviceSockets);
+impl_lock_after!(DeviceSockets => DeviceSocketState);

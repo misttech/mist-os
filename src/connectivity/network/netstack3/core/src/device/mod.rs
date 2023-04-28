@@ -54,7 +54,7 @@ use crate::{
             rx::ReceiveQueueHandler,
             tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
         },
-        socket::Sockets,
+        socket::HeldSockets,
         state::IpLinkDeviceState,
     },
     error::{ExistsError, NotFoundError, NotSupportedError},
@@ -1479,7 +1479,7 @@ pub(crate) struct Devices<C: DeviceLayerTypes> {
 pub(crate) struct DeviceLayerState<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> {
     devices: RwLock<Devices<C>>,
     origin: OriginTracker,
-    shared_sockets: RwLock<Sockets<C::SocketState, WeakDeviceId<C>>>,
+    shared_sockets: HeldSockets<C>,
 }
 
 impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState>
@@ -1516,22 +1516,6 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>>
     }
 }
 
-impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>>
-    RwLockFor<crate::lock_ordering::AnyDeviceSockets> for DeviceLayerState<C>
-{
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Sockets<C::SocketState, WeakDeviceId<C>>>
-        where
-            Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Sockets<C::SocketState, WeakDeviceId<C>>>
-        where
-            Self: 'l ;
-    fn read_lock(&self) -> Self::ReadData<'_> {
-        self.shared_sockets.read()
-    }
-    fn write_lock(&self) -> Self::WriteData<'_> {
-        self.shared_sockets.write()
-    }
-}
 /// Light-weight tracker for recording the source of some instance.
 ///
 /// This should be held as a field in a parent type that is cloned into each

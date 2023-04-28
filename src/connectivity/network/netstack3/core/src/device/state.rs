@@ -5,7 +5,7 @@
 //! State maintained by the device layer.
 
 use crate::{
-    device::{socket::DeviceSockets, DeviceLayerTypes, OriginTracker},
+    device::{socket::HeldDeviceSockets, DeviceLayerTypes, OriginTracker},
     ip::device::state::DualStackIpDeviceState,
     sync::RwLock,
 };
@@ -18,7 +18,7 @@ pub(crate) struct IpLinkDeviceState<C: DeviceLayerTypes, S, D> {
     pub link: D,
     pub(super) external_state: S,
     pub(super) origin: OriginTracker,
-    pub(super) sockets: RwLock<DeviceSockets>,
+    pub(super) sockets: RwLock<HeldDeviceSockets<C>>,
 }
 
 impl<C: DeviceLayerTypes, S, D> IpLinkDeviceState<C, S, D> {
@@ -29,7 +29,7 @@ impl<C: DeviceLayerTypes, S, D> IpLinkDeviceState<C, S, D> {
             link,
             external_state,
             origin,
-            sockets: RwLock::new(DeviceSockets::default()),
+            sockets: RwLock::new(HeldDeviceSockets::default()),
         }
     }
 }

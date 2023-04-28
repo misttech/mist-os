@@ -36,6 +36,13 @@ impl<T> Mutex<T> {
     pub fn lock(&self) -> LockGuard<'_, T> {
         lock_guard::LockGuard::new(self, |Self(m)| m.lock().expect("unexpectedly poisoned"))
     }
+
+    /// Consumes this mutex, returning the underlying data.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        let Self(mutex) = self;
+        mutex.into_inner().expect("unexpectedly poisoned")
+    }
 }
 
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.

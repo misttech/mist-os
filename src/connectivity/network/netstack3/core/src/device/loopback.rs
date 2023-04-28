@@ -36,7 +36,7 @@ use crate::{
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
-        socket::{DatagramHeader, DeviceSocketMetadata, DeviceSockets},
+        socket::{DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets},
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceLayerTypes, DeviceSendFrameError, FrameDestination,
@@ -278,10 +278,10 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DeviceSockets>
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DeviceSockets>
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<C>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
