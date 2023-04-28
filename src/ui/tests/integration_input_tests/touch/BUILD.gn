@@ -165,7 +165,6 @@ group("tests") {
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
     "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider",
-    "//src/ui/bin/text:text_manager",
     "//src/ui/tests/integration_input_tests/touch/one-chromium",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client",
     "//src/ui/tests/integration_input_tests/touch/touch-gfx-client",
