@@ -16,14 +16,13 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
     \"data\": {
         "name": "Platform version map",
         "type": "version_history",
-        "versions": [
-            {
-                "api_level": "1",
-                "abi_revision": "0x201665C5B012BA43"
+        "api_levels": {
+            "1" : {
+                "abi_revision": "0x1"
             }
-        ]
+        }
     },
-    "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+    "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
 }
 """
 
@@ -103,16 +102,15 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
     def _version_history_contains_entry_for_api_level(self, api_level):
         with open(self.fake_version_history_file, "r") as f:
             version_history = json.load(f)
-            versions = version_history['data']['versions']
-            return any(
-                version['api_level'] == str(api_level) for version in versions)
+            versions = version_history['data']['api_levels']
+            return str(api_level) in versions
 
     def test_update_version_history(self):
         self.assertFalse(
             self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
         self.assertTrue(
             update_platform_version.update_version_history(
-                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH ))
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
         self.assertTrue(
             self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
         self.assertFalse(
@@ -129,7 +127,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
 
         self.assertTrue(
             update_platform_version.update_platform_version(
-                NEW_API_LEVEL, update_platform_version.PLATFORM_VERSION_PATH ))
+                NEW_API_LEVEL, update_platform_version.PLATFORM_VERSION_PATH))
 
         pv = self._get_platform_version()
         self.assertEqual(NEW_API_LEVEL, pv['in_development_api_level'])
@@ -146,7 +144,8 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
 
         self.assertTrue(
             update_platform_version.update_fidl_compatibility_doc(
-                NEW_API_LEVEL, update_platform_version.FIDL_COMPATIBILITY_DOC_PATH))
+                NEW_API_LEVEL,
+                update_platform_version.FIDL_COMPATIBILITY_DOC_PATH))
 
         with open(self.fake_fidl_compability_doc_file) as f:
             lines = f.readlines()

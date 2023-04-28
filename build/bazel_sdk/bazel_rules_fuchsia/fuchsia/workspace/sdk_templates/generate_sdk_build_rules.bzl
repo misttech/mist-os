@@ -58,7 +58,7 @@ def _get_starlark_dict(entries):
         if type(v) == "list":
             v_str = "[" + _get_starlark_list(v).replace("\n", "") + "]"
         else:
-            v_str = "\"" + v + "\""
+            v_str = "\"" + str(v) + "\""
         entries_str += "    \"" + k + "\": " + v_str + ",\n"
     return "{" + entries_str + "}"
 
@@ -228,14 +228,10 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
     tmpl = ctx.path(ctx.attr._api_version_template)
     versions = []
     max_api = -1
-    if "data" in meta and "versions" in meta["data"]:
-        versions = []
-        for v in meta["data"]["versions"]:
-            versions.append({
-                "abi_revision": v["abi_revision"],
-                "api_level": v["api_level"],
-            })
-            max_api = max(max_api, int(v["api_level"]))
+    if "data" in meta and "api_levels" in meta["data"]:
+        for api_level, value in meta["data"]["api_levels"].items():
+            versions.append({"abi_revision": value["abi_revision"], "api_level": api_level})
+            max_api = max(max_api, int(api_level))
 
     # unlike other template rules that affect the corresponding BUILD.bazel file,
     # the api_version template creates a api_version.bzl file that is loaded in

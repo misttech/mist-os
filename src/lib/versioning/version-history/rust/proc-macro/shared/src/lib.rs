@@ -7,8 +7,10 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
+use std::collections::BTreeMap;
+
 const VERSION_HISTORY_BYTES: &[u8] = include_bytes!(env!("SDK_VERSION_HISTORY"));
-const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-ef02ef45.json";
+const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-3349aec7.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
 
@@ -49,10 +51,14 @@ impl<'de> Deserialize<'de> for AbiRevision {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
-pub struct Version {
-    #[serde(with = "serde_u64")]
-    pub api_level: u64,
+struct ApiLevel {
     pub abi_revision: AbiRevision,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+pub struct Version {
+    pub abi_revision: AbiRevision,
+    pub api_level: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -60,7 +66,7 @@ struct VersionHistoryData {
     name: String,
     #[serde(rename = "type")]
     element_type: String,
-    versions: Vec<Version>,
+    api_levels: BTreeMap<String, ApiLevel>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -94,34 +100,19 @@ fn parse_version_history(bytes: &[u8]) -> Result<Vec<Version>, serde_json::Error
         ));
     }
 
-    Ok(v.data.versions)
-}
+    let mut versions = Vec::new();
 
-// Helpers to serialize and deserialize integer strings into u64s.
-mod serde_u64 {
-    use {
-        serde::{
-            de::{Error, Unexpected},
-            Deserialize, Deserializer, Serialize, Serializer,
-        },
-        std::str::FromStr,
-    };
+    for (key, value) in v.data.api_levels {
+        let api_level = key
+            .parse()
+            .map_err(|_| serde::de::Error::invalid_value(Unexpected::Str(&key), &"an integer"))?;
 
-    pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        format!("{}", value).serialize(serializer)
+        versions.push(Version { api_level, abi_revision: value.abi_revision });
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        u64::from_str(&s)
-            .map_err(|_| D::Error::invalid_value(Unexpected::Str(&s), &"an unsigned integer"))
-    }
+    versions.sort_by_key(|s| s.api_level);
+
+    Ok(versions)
 }
 
 #[cfg(test)]
@@ -143,18 +134,16 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "version_history",
-                "versions": [
-                    {
-                        "api_level": "1",
-                        "abi_revision": "10"
+                "api_levels": {
+                    "1":{
+                        "abi_revision":"10"
                     },
-                    {
-                        "api_level": "2",
-                        "abi_revision": "0x20"
+                    "2":{
+                        "abi_revision":"0x20"
                     }
-                ]
+                }
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
         }"#;
 
         assert_eq!(
@@ -172,14 +161,14 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "version_history",
-                "versions": []
+                "api_levels": {}
             },
             "schema_id": "some-schema"
         }"#;
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-ef02ef45.json"
+            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-3349aec7.json"
         );
     }
 
@@ -189,9 +178,9 @@ mod tests {
             "data": {
                 "name": "some-name",
                 "type": "version_history",
-                "versions": []
+                "api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
         }"#;
 
         assert_eq!(
@@ -206,9 +195,9 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "some-type",
-                "versions": []
+                "api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
         }"#;
 
         assert_eq!(
@@ -223,34 +212,33 @@ mod tests {
             (
                 "some-version",
                 "1",
-                "invalid value: string \"some-version\", expected an unsigned integer at line 1 column 123",
+                "invalid value: string \"some-version\", expected an integer",
             ),
             (
                 "-1",
                 "1",
-                 "invalid value: string \"-1\", expected an unsigned integer at line 1 column 113",
+                 "invalid value: string \"-1\", expected an integer",
             ),
             (
                 "1",
                 "some-revision",
-                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 107",
+                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 59",
             ),
             (
                 "1",
                 "-1",
-                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 96",
+                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 48",
             ),
         ] {
             let expected_bytes = serde_json::to_vec(&serde_json::json!({
                 "data": {
                     "name": VERSION_HISTORY_NAME,
                     "type": VERSION_HISTORY_TYPE,
-                    "versions": [
-                        {
-                            "api_level": api_level,
-                            "abi_revision": abi_revision,
-                        },
-                    ],
+                    "api_levels": {
+                        api_level:{
+                            "abi_revision": abi_revision
+                        }
+                    },
                 },
                 "schema_id": VERSION_HISTORY_SCHEMA_ID,
             }))

@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 )
 
@@ -15,7 +16,7 @@ import (
 var versionHistoryBytes []byte
 var versions []Version
 
-const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-3349aec7.json"
 const versionHistoryName string = "Platform version map"
 const versionHistoryType string = "version_history"
 
@@ -30,13 +31,12 @@ type versionHistory struct {
 }
 
 type versionHistoryData struct {
-	Name     string                  `json:"name"`
-	Type     string                  `json:"type"`
-	Versions []versionHistoryVersion `json:"versions"`
+	Name      string              `json:"name"`
+	Type      string              `json:"type"`
+	APILevels map[string]apiLevel `json:"api_levels"`
 }
 
-type versionHistoryVersion struct {
-	APILevel    string `json:"api_level"`
+type apiLevel struct {
 	ABIRevision string `json:"abi_revision"`
 }
 
@@ -61,13 +61,13 @@ func parseVersionHistory(b []byte) ([]Version, error) {
 	}
 
 	vs := []Version{}
-	for _, version := range vh.Data.Versions {
-		apiLevel, err := strconv.ParseUint(version.APILevel, 10, 64)
+	for k, v := range vh.Data.APILevels {
+		apiLevel, err := strconv.ParseUint(k, 10, 64)
 		if err != nil {
 			return []Version{}, fmt.Errorf("failed to parse API level as an integer: %w", err)
 		}
 
-		abiRevision, err := strconv.ParseUint(version.ABIRevision, 0, 64)
+		abiRevision, err := strconv.ParseUint(v.ABIRevision, 0, 64)
 		if err != nil {
 			return []Version{}, fmt.Errorf("failed to parse ABI revision as an integer: %w", err)
 		}
@@ -77,6 +77,8 @@ func parseVersionHistory(b []byte) ([]Version, error) {
 			ABIRevision: uint64(abiRevision),
 		})
 	}
+
+	sort.Slice(vs, func(i, j int) bool { return vs[i].APILevel < vs[j].APILevel })
 
 	return vs, nil
 }

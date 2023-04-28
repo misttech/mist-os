@@ -88,23 +88,18 @@ def update_version_history(fuchsia_api_level, version_history_path):
     try:
         with open(version_history_path, "r+") as f:
             version_history = json.load(f)
-            versions = version_history['data']['versions']
-            if [version for version in versions
-                    if version['api_level'] == str(fuchsia_api_level)]:
+            versions = version_history['data']['api_levels']
+            if str(fuchsia_api_level) in versions:
                 print(
                     "error: Fuchsia API level {fuchsia_api_level} is already defined."
                     .format(fuchsia_api_level=fuchsia_api_level),
                     file=sys.stderr)
                 return False
             abi_revision = generate_random_abi_revision()
-            while [version for version in versions
-                   if version['abi_revision'] == abi_revision]:
+            while any(version.get('abi_revision') == abi_revision
+                      for version in versions.values()):
                 abi_revision = generate_random_abi_revision()
-            versions.append(
-                {
-                    'api_level': str(fuchsia_api_level),
-                    'abi_revision': abi_revision,
-                })
+            versions[str(fuchsia_api_level)] = {'abi_revision': abi_revision}
             f.seek(0)
             json.dump(version_history, f, indent=4)
             f.truncate()
