@@ -322,6 +322,12 @@ impl<T> IdMap<T> {
         IntoIterator::into_iter(self)
     }
 
+    /// Consumes the `IdMap` and returns an iterator over the contained items
+    /// and their associated keys.
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIterator::into_iter(self)
+    }
+
     /// Gets the given key's corresponding entry in the map for in-place
     /// manipulation.
     pub fn entry(&mut self, key: usize) -> Entry<'_, usize, T> {
@@ -429,6 +435,30 @@ impl<T> IdMap<T> {
 impl<T> Default for IdMap<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// An iterator over the keys and values stored in an [`IdMap`].
+pub struct IntoIter<T>(core::iter::Enumerate<alloc::vec::IntoIter<IdMapEntry<T>>>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = (Key, T);
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self(it) = self;
+        it.filter_map(|(k, v)| match v {
+            IdMapEntry::Allocated(t) => Some((k, t)),
+            IdMapEntry::Free(_) => None,
+        })
+        .next()
+    }
+}
+
+impl<T> IntoIterator for IdMap<T> {
+    type Item = (Key, T);
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.data.into_iter().enumerate())
     }
 }
 
@@ -911,6 +941,15 @@ mod tests {
             ]
         );
         assert_eq!(freelist, &Some(FreeList { head: 0, tail: 5 }));
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let mut map = IdMap::new();
+        assert_eq!(map.insert(1, 0), None);
+        assert_eq!(map.insert(3, 1), None);
+        assert_eq!(map.insert(6, 2), None);
+        assert_eq!(map.into_iter().collect::<Vec<_>>(), &[(1, 0), (3, 1), (6, 2)]);
     }
 
     #[test]
