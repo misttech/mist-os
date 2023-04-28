@@ -8,37 +8,28 @@ ctf_executable("memfs-cts-test") {
   output_name = "memfs-cts-test"
   deps = [
     "//sdk/lib/fdio",
-    "//src/lib/fxl/test:gtest_main",
     "//src/storage/memfs:memfs",
-    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl:fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
   ]
   sources = [ "memfs_tests.cc" ]
   testonly = true
 }
 
 ctf_fuchsia_component("memfs-component") {
-  component_name = "memfs-cts-test"
   deps = [ ":memfs-cts-test" ]
   manifest = "meta/memfs-cts-test.cml"
   testonly = true
 }
 
-ctf_fuchsia_component("memfs-test-root") {
-  manifest = "meta/memfs-cts-test-root.cml"
-  testonly = true
-}
-
 ctf_fuchsia_test_package("memfs-test-package") {
   package_name = "memfs-test-package"
-  test_components = [ ":memfs-test-root" ]
-  subpackages = GTEST_SUBPACKAGES
-  deps = [ ":memfs-component" ]
+  test_components = [ ":memfs-component" ]
 }
 
 group("tests") {
