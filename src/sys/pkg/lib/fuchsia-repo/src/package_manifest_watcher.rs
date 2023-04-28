@@ -40,7 +40,10 @@ pub struct ManifestEvent {
     pub end_time: Instant,
 
     /// Which package manifests were changed.
-    pub paths: HashSet<Utf8PathBuf>,
+    pub changed_manifests: HashSet<Utf8PathBuf>,
+
+    /// Paths we are no longer watching.
+    pub unwatched_manifests: HashSet<Utf8PathBuf>,
 }
 
 #[derive(Default, Debug)]
@@ -243,28 +246,40 @@ impl PackageManifestWatcher {
 
             self.last_event_time = now;
 
-            ManifestEvent { start_time: now, end_time: now, paths: self.rescan() }
+            ManifestEvent {
+                start_time: now,
+                end_time: now,
+                changed_manifests: self.rescan(),
+                unwatched_manifests: HashSet::new(),
+            }
         } else {
             self.last_event_time = event.end_time;
+
+            let ManifestEventPaths { changed_manifests, unwatched_manifests } =
+                self.handle_changed_paths(event.paths);
 
             ManifestEvent {
                 start_time: event.start_time,
                 end_time: event.end_time,
-                paths: self.handle_changed_paths(event.paths),
+                changed_manifests,
+                unwatched_manifests,
             }
         };
 
         // Don't bother sending along an empty list.
-        if manifest_event.paths.is_empty() {
+        if manifest_event.changed_manifests.is_empty()
+            && manifest_event.unwatched_manifests.is_empty()
+        {
             None
         } else {
             Some(manifest_event)
         }
     }
 
-    // Returns paths of the changed watched package manifests files.
-    fn handle_changed_paths(&mut self, paths: HashSet<PathBuf>) -> HashSet<Utf8PathBuf> {
-        let mut changed_manifest_paths = HashSet::new();
+    // Returns paths of the changed and unwatched package manifest files.
+    fn handle_changed_paths(&mut self, paths: HashSet<PathBuf>) -> ManifestEventPaths {
+        let mut changed_manifests = HashSet::new();
+        let mut unwatched_manifests = HashSet::new();
 
         for path in paths {
             let path = match Utf8PathBuf::try_from(path) {
@@ -279,8 +294,9 @@ impl PackageManifestWatcher {
             // of it. Otherwise let the caller know which package manifests changed.
             if let Some(old_manifests) = self.watched_list_to_manifests.get_mut(&path) {
                 match self.file_watcher.update_package_manifest_list(&path, old_manifests) {
-                    Ok(changes) => {
-                        changed_manifest_paths.extend(changes);
+                    Ok(manifest_paths) => {
+                        changed_manifests.extend(manifest_paths.changed_manifests);
+                        unwatched_manifests.extend(manifest_paths.unwatched_manifests);
                     }
                     Err(err) => {
                         error!("error processing list {}: {:?}", path, err);
@@ -290,7 +306,7 @@ impl PackageManifestWatcher {
                 // Otherwise, treat it as a package manifest.
                 match self.file_watcher.update_package_manifest(&path) {
                     Ok(true) => {
-                        changed_manifest_paths.insert(path);
+                        changed_manifests.insert(path);
                     }
                     Ok(false) => {}
                     Err(err) => {
@@ -300,8 +316,13 @@ impl PackageManifestWatcher {
             }
         }
 
-        changed_manifest_paths
+        ManifestEventPaths { changed_manifests, unwatched_manifests }
     }
+}
+
+struct ManifestEventPaths {
+    changed_manifests: HashSet<Utf8PathBuf>,
+    unwatched_manifests: HashSet<Utf8PathBuf>,
 }
 
 impl Stream for PackageManifestWatcher {
@@ -460,12 +481,13 @@ impl ManifestFileWatcher {
     }
 
     /// Reads a package manifest list from `path`, watches any new manifests, unwatches any removed
-    /// manifests, and returns any the new manifests.
+    /// manifests, and returns any the new manifests. Returns any added
+    /// manifests, and any manifests we are unwatching.
     fn update_package_manifest_list(
         &mut self,
         path: &Utf8Path,
         old_manifests: &mut HashSet<Utf8PathBuf>,
-    ) -> Result<HashSet<Utf8PathBuf>> {
+    ) -> Result<ManifestEventPaths> {
         let new_manifests = read_package_manifest_list(path)?;
 
         let added_manifests =
@@ -476,17 +498,20 @@ impl ManifestFileWatcher {
             self.update_package_manifest(path)?;
         }
 
+        let mut unwatched_manifests = HashSet::new();
         for path in old_manifests.difference(&new_manifests) {
             if self.unwatch_path(path)? {
                 // If we actually unwatched the path, we can remove this path from our hashes map,
                 // so we don't leak space over time.
                 self.manifest_hashes.remove(path);
+
+                unwatched_manifests.insert(path.clone());
             }
         }
 
         *old_manifests = new_manifests;
 
-        Ok(added_manifests)
+        Ok(ManifestEventPaths { changed_manifests: added_manifests, unwatched_manifests })
     }
 }
 
@@ -551,14 +576,7 @@ mod tests {
     const TEST_BATCH_WATCHER_TIMEOUT: Duration = Duration::from_millis(100);
 
     async fn create_watcher(builder: PackageManifestWatcherBuilder) -> PackageManifestWatcher {
-        let mut watcher = builder.batch_timeout(TEST_BATCH_WATCHER_TIMEOUT).watch().unwrap();
-
-        // Some notify backends can observe file system events that occurred before the watcher
-        // is set up (for example, with FSEvents and OSX). To avoid this from confusing the
-        // tests, ignore if any files are observed.
-        watcher.next().on_timeout(TEST_BATCH_WATCHER_TIMEOUT * 2, || None).await;
-
-        watcher
+        builder.batch_timeout(TEST_BATCH_WATCHER_TIMEOUT).watch().unwrap()
     }
 
     fn create_populated_manifest_list<'a>(
@@ -640,20 +658,20 @@ mod tests {
                 let result = $watcher.next().await;
                 panic!("should not have received: {result:?}");
             }
-            .on_timeout(TEST_BATCH_WATCHER_TIMEOUT * 2, || ())
+            .on_timeout(TEST_BATCH_WATCHER_TIMEOUT * 10, || ())
             .await;
         }};
     }
 
     /// Read changed paths from the watcher. It's possible events can be distributed across batches,
     /// so try to coalesce them.
-    async fn check_changed_paths(
+    async fn check_changed_manifests(
         watcher: &mut PackageManifestWatcher,
         expected: HashSet<Utf8PathBuf>,
     ) {
         let mut actual = HashSet::new();
 
-        let deadline = Instant::now() + (TEST_BATCH_WATCHER_TIMEOUT * 10);
+        let deadline = Instant::now() + Duration::from_secs(10);
         while let Some(duration) = deadline.checked_duration_since(Instant::now()) {
             if let Some(event) = watcher
                 .next()
@@ -662,7 +680,7 @@ mod tests {
                 })
                 .await
             {
-                actual.extend(event.paths);
+                actual.extend(event.changed_manifests);
 
                 if actual.len() >= expected.len() {
                     break;
@@ -673,6 +691,32 @@ mod tests {
         }
 
         assert_eq!(actual, expected);
+    }
+
+    async fn wait_for_manifests_to_be_unwatched(
+        watcher: &mut PackageManifestWatcher,
+        mut expected: HashSet<Utf8PathBuf>,
+    ) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while let Some(duration) = deadline.checked_duration_since(Instant::now()) {
+            if let Some(event) = watcher
+                .next()
+                .on_timeout(duration, || {
+                    panic!("timed out waiting for paths to be unwatched: {expected:#?}");
+                })
+                .await
+            {
+                for path in event.unwatched_manifests {
+                    expected.remove(&path);
+                }
+
+                if expected.is_empty() {
+                    break;
+                }
+            } else {
+                panic!("received unexpected end of stream")
+            };
+        }
     }
 
     #[fuchsia::test]
@@ -715,15 +759,17 @@ mod tests {
         let mut watcher =
             create_watcher(PackageManifestWatcher::builder().package_list(list_path.clone())).await;
 
-        // Overwrite the package with the same content. This should not be observed.
+        // Overwrite the package with the same content. This should not be
+        // observed because the contents were not changed.
         create_package_manifest_with_content(&dir, 1, "1");
 
         // Make sure we don't read any events from the stream.
         check_no_events_were_emitted!(&mut watcher);
 
-        // Overwrite the package with the same content. This should be observed.
+        // Overwrite the package with the same content. This should be observed
+        // because the contents changed.
         create_package_manifest_with_content(&dir, 1, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path])).await;
     }
 
     #[fuchsia::test]
@@ -743,19 +789,19 @@ mod tests {
 
         // Next, write to the file and make sure we observe an event
         create_package_manifest_with_content(&dir, 1, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path1.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path1.clone()])).await;
 
         // Next, write to another file and make sure we observe an event.
         create_package_manifest_with_content(&dir, 2, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
 
         // Next, delete a file and make sure we observe an event.
         std::fs::remove_file(&manifest_path2).unwrap();
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
 
         // Next, re-create a file and make sure we observe an event.
         create_package_manifest_with_content(&dir, 2, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
     }
 
     #[fuchsia::test]
@@ -782,7 +828,7 @@ mod tests {
 
         update_manifest_list(&list_path1, [manifest_path1.as_path(), manifest_path2.as_path()]);
 
-        check_changed_paths(
+        check_changed_manifests(
             &mut watcher,
             HashSet::from([manifest_path1.clone(), manifest_path2.clone()]),
         )
@@ -798,7 +844,7 @@ mod tests {
         update_manifest_list(&list_path1, [manifest_path3.as_path()]);
         update_manifest_list(&list_path2, [manifest_path4.as_path()]);
 
-        check_changed_paths(
+        check_changed_manifests(
             &mut watcher,
             HashSet::from([manifest_path3.clone(), manifest_path4.clone()]),
         )
@@ -809,7 +855,7 @@ mod tests {
 
         create_package_manifest_with_content(&dir, 3, "2");
 
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path3.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path3.clone()])).await;
 
         ///////////////////////////////////////////////////////////////////////
         // Updating multiple manifests files should be observed.
@@ -817,7 +863,8 @@ mod tests {
         create_package_manifest_with_content(&dir, 3, "3");
         create_package_manifest_with_content(&dir, 4, "3");
 
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path3, manifest_path4])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path3, manifest_path4]))
+            .await;
     }
 
     #[fuchsia::test]
@@ -838,10 +885,15 @@ mod tests {
             create_watcher(PackageManifestWatcher::builder().package_list(list_path1.clone()))
                 .await;
 
-        // Remove the manifest list, which we should not observe.
+        // Remove the manifest list.
         std::fs::remove_file(&list_path1).unwrap();
 
-        check_no_events_were_emitted!(&mut watcher);
+        // We should observe the package manifests were unwatched.
+        wait_for_manifests_to_be_unwatched(
+            &mut watcher,
+            HashSet::from([manifest_path1, manifest_path2.clone()]),
+        )
+        .await;
 
         // Next, write to manifest file which is no longer watched.
         create_package_manifest_with_content(&dir, 1, "2");
@@ -869,17 +921,19 @@ mod tests {
         let mut watcher =
             create_watcher(PackageManifestWatcher::builder().package_list(list_path.clone())).await;
 
-        // Delete the manifest list, which should not emit any events.
+        // Delete the manifest list.
         std::fs::remove_file(&list_path).unwrap();
-        check_no_events_were_emitted!(&mut watcher);
+
+        // We should observe the package manifest being unwatched.
+        wait_for_manifests_to_be_unwatched(&mut watcher, HashSet::from([manifest_path1])).await;
 
         // Next, recreate manifest list and make sure we observe an event.
         create_manifest_list(&list_path, [manifest_path2.as_path()]);
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
 
         // Next, write to now-watched file and make sure we observe an event.
         create_package_manifest_with_content(&dir, 2, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path2.clone()])).await;
     }
 
     #[fuchsia::test]
@@ -902,17 +956,18 @@ mod tests {
         )
         .await;
 
-        // Delete first manifest list and make sure we observe an event.
+        // Delete first manifest list. We shouldn't observe an event because the
+        // file is still watched in the second list.
         std::fs::remove_file(&list_path1).unwrap();
         check_no_events_were_emitted!(&mut watcher);
 
         // Next, write to shared file and make sure we observe an event.
         create_package_manifest_with_content(&dir, 1, "2");
-        check_changed_paths(&mut watcher, HashSet::from([manifest_path.clone()])).await;
+        check_changed_manifests(&mut watcher, HashSet::from([manifest_path.clone()])).await;
 
         // Delete second manifest list and make sure we observe an event.
         std::fs::remove_file(&list_path2).unwrap();
-        check_no_events_were_emitted!(&mut watcher);
+        wait_for_manifests_to_be_unwatched(&mut watcher, HashSet::from([manifest_path])).await;
 
         // Next, write to shared file, which should not be observed.
         create_package_manifest_with_content(&dir, 1, "3");

@@ -74,7 +74,7 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         cmd.package_manifests.clear();
 
         // Log which packages we intend to publish.
-        for path in event.paths {
+        for path in event.changed_manifests {
             let Ok(file) = File::open(&path) else {
                 continue;
             };
@@ -88,10 +88,15 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
             cmd.package_manifests.push(path);
         }
 
+        for path in event.unwatched_manifests {
+            info!("stopped watching {path}");
+        }
+
         if let Err(err) = repo_publish(cmd).await {
             warn!("Repo publish failed: {:#}", err);
         }
     }
+
     Ok(())
 }
 
