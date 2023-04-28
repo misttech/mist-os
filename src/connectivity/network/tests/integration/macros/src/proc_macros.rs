@@ -439,6 +439,42 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 ],
             },
             Variant {
+                trait_bound: str_to_syn_path("DhcpClient"),
+                implementations: &[
+                    Implementation {
+                        type_name: str_to_syn_path("netstack_testing_common::realms::InStack"),
+                        suffix: "dhcp_in_stack",
+                    },
+                    Implementation {
+                        type_name: str_to_syn_path("netstack_testing_common::realms::OutOfStack"),
+                        suffix: "dhcp_out_of_stack",
+                    },
+                ],
+            },
+            Variant {
+                trait_bound: str_to_syn_path("NetstackAndDhcpClient"),
+                implementations: &[
+                    Implementation {
+                        type_name: str_to_syn_path(
+                            "netstack_testing_common::realms::Netstack2AndInStackDhcpClient",
+                        ),
+                        suffix: "ns2_with_dhcp_in_stack",
+                    },
+                    Implementation {
+                        type_name: str_to_syn_path(
+                            "netstack_testing_common::realms::Netstack2AndOutOfStackDhcpClient",
+                        ),
+                        suffix: "ns2_with_dhcp_out_of_stack",
+                    },
+                    Implementation {
+                        type_name: str_to_syn_path(
+                            "netstack_testing_common::realms::Netstack3AndOutOfStackDhcpClient",
+                        ),
+                        suffix: "ns3_with_dhcp_out_of_stack",
+                    },
+                ],
+            },
+            Variant {
                 trait_bound: str_to_syn_path("Manager"),
                 implementations: &[
                     Implementation {

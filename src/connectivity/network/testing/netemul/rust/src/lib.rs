@@ -9,11 +9,13 @@
 /// Methods for creating and interacting with virtualized guests in netemul tests.
 pub mod guest;
 
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, ops::DerefMut as _, path::Path};
 
 use fidl_fuchsia_hardware_network as fnetwork;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
+use fidl_fuchsia_net_dhcp as fnet_dhcp;
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientExt, ClientProviderExt};
+use fidl_fuchsia_net_ext::{self as fnet_ext};
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -25,7 +27,9 @@ use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
+use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use net_types::{ip::Ipv4Addr, SpecifiedAddr};
 
 use anyhow::{anyhow, Context as _};
 use futures::{
@@ -902,8 +906,44 @@ impl<'a> TestEndpoint<'a> {
             .add_to_stack(realm, if_config)
             .await
             .with_context(|| format!("failed to add {} to realm {}", self.name, realm.name))?;
-        Ok(TestInterface { endpoint: self, id, realm: realm.clone(), control, device_control })
+        Ok(TestInterface {
+            endpoint: self,
+            id,
+            realm: realm.clone(),
+            control,
+            device_control,
+            dhcp_client_task: futures::lock::Mutex::default(),
+        })
     }
+}
+
+/// The DHCP client version.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum DhcpClientVersion {
+    /// The in-Netstack2 DHCP client.
+    InStack,
+    /// The out-of-stack DHCP client.
+    OutOfStack,
+}
+
+/// Abstraction for how DHCP client functionality is provided.
+pub trait DhcpClient {
+    /// The DHCP client version to be used.
+    const DHCP_CLIENT_VERSION: DhcpClientVersion;
+}
+
+/// The in-Netstack2 DHCP client.
+pub enum InStack {}
+
+impl DhcpClient for InStack {
+    const DHCP_CLIENT_VERSION: DhcpClientVersion = DhcpClientVersion::InStack;
+}
+
+/// The out-of-stack DHCP client.
+pub enum OutOfStack {}
+
+impl DhcpClient for OutOfStack {
+    const DHCP_CLIENT_VERSION: DhcpClientVersion = DhcpClientVersion::OutOfStack;
 }
 
 /// A [`TestEndpoint`] that is installed in a realm's Netstack.
@@ -918,11 +958,18 @@ pub struct TestInterface<'a> {
     id: u64,
     control: fnet_interfaces_ext::admin::Control,
     device_control: Option<fnet_interfaces_admin::DeviceControlProxy>,
+    dhcp_client_task: futures::lock::Mutex<Option<DhcpClientTask>>,
+}
+
+struct DhcpClientTask {
+    client: fnet_dhcp::ClientProxy,
+    task: fasync::Task<()>,
 }
 
 impl<'a> std::fmt::Debug for TestInterface<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let Self { endpoint, id, realm: _, control: _, device_control: _ } = self;
+        let Self { endpoint, id, realm: _, control: _, device_control: _, dhcp_client_task: _ } =
+            self;
         f.debug_struct("TestInterface")
             .field("endpoint", endpoint)
             .field("id", id)
@@ -1085,13 +1132,107 @@ impl<'a> TestInterface<'a> {
     }
 
     /// Starts DHCP on this interface.
-    pub async fn start_dhcp(&self) -> Result<()> {
+    pub async fn start_dhcp<D: DhcpClient>(&self) -> Result<()> {
+        match D::DHCP_CLIENT_VERSION {
+            DhcpClientVersion::InStack => self.start_dhcp_in_stack().await,
+            DhcpClientVersion::OutOfStack => self.start_dhcp_client_out_of_stack().await,
+        }
+    }
+
+    async fn start_dhcp_in_stack(&self) -> Result<()> {
         self.set_dhcp_client_enabled(true).await.context("failed to start dhcp client")
     }
 
+    async fn start_dhcp_client_out_of_stack(&self) -> Result<()> {
+        let Self { endpoint: _, realm, id, control, device_control: _, dhcp_client_task } = self;
+        let id = NonZeroU64::new(*id).expect("interface ID should be nonzero");
+        let mut dhcp_client_task = dhcp_client_task.lock().await;
+        let dhcp_client_task = dhcp_client_task.deref_mut();
+
+        let provider = realm
+            .connect_to_protocol::<fnet_dhcp::ClientProviderMarker>()
+            .expect("get fuchsia.net.dhcp.ClientProvider");
+
+        provider.check_presence().await.expect("check presence should succeed");
+
+        let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
+
+        let control = control.clone();
+
+        let stack = self.connect_stack().expect("connect stack");
+
+        let task = DhcpClientTask {
+            client: client.clone(),
+            task: fasync::Task::spawn(async move {
+                let mut final_routers = fnet_dhcp_ext::configuration_stream(client)
+                    .try_fold(
+                        HashSet::<SpecifiedAddr<Ipv4Addr>>::new(),
+                        |mut routers,
+                         fnet_dhcp_ext::Configuration {
+                             address,
+                             dns_servers: _,
+                             routers: new_routers,
+                         }| {
+                            let control = &control;
+                            let stack = &stack;
+                            async move {
+                                address
+                                    .expect("should have address")
+                                    .add_to(control)
+                                    .expect("add address should succeed");
+
+                                fnet_dhcp_ext::apply_new_routers(
+                                    id,
+                                    stack,
+                                    &mut routers,
+                                    new_routers,
+                                )
+                                .await
+                                .expect("applying new routers should succeed");
+                                Ok(routers)
+                            }
+                        },
+                    )
+                    .await
+                    .expect("watch_configuration should succeed");
+
+                // DHCP client is being shut down, so we should remove all the routers.
+                fnet_dhcp_ext::apply_new_routers(id, &stack, &mut final_routers, Vec::new())
+                    .await
+                    .expect("removing all routers should succeed");
+            }),
+        };
+
+        *dhcp_client_task = Some(task);
+        Ok(())
+    }
+
     /// Stops DHCP on this interface.
-    pub async fn stop_dhcp(&self) -> Result<()> {
+    pub async fn stop_dhcp<D: DhcpClient>(&self) -> Result<()> {
+        match D::DHCP_CLIENT_VERSION {
+            DhcpClientVersion::InStack => self.stop_dhcp_in_stack().await,
+            DhcpClientVersion::OutOfStack => {
+                self.stop_dhcp_out_of_stack().await;
+                Ok(())
+            }
+        }
+    }
+
+    async fn stop_dhcp_in_stack(&self) -> Result<()> {
         self.set_dhcp_client_enabled(false).await.context("failed to stop dhcp client")
+    }
+
+    async fn stop_dhcp_out_of_stack(&self) {
+        let Self { endpoint: _, realm: _, id: _, control: _, device_control: _, dhcp_client_task } =
+            self;
+        let mut dhcp_client_task = dhcp_client_task.lock().await;
+        if let Some(DhcpClientTask { client, task }) = dhcp_client_task.deref_mut().take() {
+            client
+                .shutdown_ext(client.take_event_stream())
+                .await
+                .expect("client shutdown should succeed");
+            task.await;
+        }
     }
 
     /// Adds an address, waiting until the address assignment state is
@@ -1279,6 +1420,7 @@ impl<'a> TestInterface<'a> {
             realm: _,
             control,
             device_control,
+            dhcp_client_task: _,
         } = self;
         // For Network Devices, the `control` handle  is tied to the lifetime of
         // the interface; dropping it triggers interface removal in the
@@ -1300,6 +1442,7 @@ impl<'a> TestInterface<'a> {
             realm: _,
             control,
             device_control,
+            dhcp_client_task: _,
         } = self;
         std::mem::drop(endpoint);
         (control, device_control)
@@ -1313,6 +1456,7 @@ impl<'a> TestInterface<'a> {
             id: _,
             realm: _,
             control,
+            dhcp_client_task: _,
             // Keep this alive, we don't want to trigger removal.
             device_control: _device_control,
         } = self;

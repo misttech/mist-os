@@ -14,6 +14,7 @@ use diagnostics_hierarchy::Property;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
+use netemul::InStack;
 use netstack_testing_common::{
     constants, get_inspect_data,
     realms::{KnownServiceProvider, Netstack, Netstack2, TestSandboxExt as _},
@@ -441,7 +442,7 @@ async fn inspect_dhcp<N: Netstack>(
     // that we receive all DHCP messages sent by the client.
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
     let eth = realm.join_network(&network, "ep1").await.expect("failed to join network");
-    eth.start_dhcp().await.expect("failed to start DHCP");
+    eth.start_dhcp::<InStack>().await.expect("failed to start DHCP");
 
     // Wait for a DHCP message here to ensure that the client is ready to receive
     // incoming packets.

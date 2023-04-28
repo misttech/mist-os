@@ -23,6 +23,7 @@ use net_types::{
     self,
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
 };
+use netemul::InStack;
 use netstack_testing_common::{
     interfaces,
     realms::{Netstack, Netstack2, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
@@ -251,7 +252,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
         .expect("failed to connect to netstack");
 
     let ep = realm.join_network(&net, "host").await.expect("host failed to join network");
-    ep.start_dhcp().await.expect("failed to start DHCP");
+    ep.start_dhcp::<InStack>().await.expect("failed to start DHCP");
 
     let routes = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes::StateMarker>()

@@ -4,12 +4,11 @@
 
 #![cfg(test)]
 
-use {
-    fidl_fuchsia_netemul_network as _,
-    net_declare::fidl_subnet,
-    netstack_testing_common::{interfaces, realms::Netstack2, setup_network},
-    netstack_testing_macros::netstack_test,
-};
+use fidl_fuchsia_netemul_network as _;
+use net_declare::fidl_subnet;
+use netemul::InStack;
+use netstack_testing_common::{interfaces, realms::Netstack2, setup_network};
+use netstack_testing_macros::netstack_test;
 
 #[netstack_test]
 async fn acquires_address(name: &str) {
@@ -40,7 +39,7 @@ async fn acquires_address(name: &str) {
         .await
         .expect("exec failed");
 
-    let () = iface.start_dhcp().await.expect("failed to start DHCP");
+    let () = iface.start_dhcp::<InStack>().await.expect("failed to start DHCP");
 
     // The IPv4 address the client is expected to acquire is the only address
     // the DHCPv4 server assigns to clients as found in

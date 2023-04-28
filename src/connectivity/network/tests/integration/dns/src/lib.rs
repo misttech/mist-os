@@ -28,7 +28,7 @@ use futures::{
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_ip_v6, fidl_subnet, std_ip_v6, std_socket_addr};
 use net_types::ip as net_types_ip;
-use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
+use netemul::{InStack, RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     interfaces,
@@ -262,7 +262,7 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
         .join_network(&network, "client-ep")
         .await
         .expect("failed to configure client networking");
-    client_iface.start_dhcp().await.expect("failed to start DHCP");
+    client_iface.start_dhcp::<InStack>().await.expect("failed to start DHCP");
 
     // Send a Router Advertisement with DNS server configurations.
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");

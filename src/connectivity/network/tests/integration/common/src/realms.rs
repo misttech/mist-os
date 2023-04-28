@@ -635,6 +635,44 @@ impl Manager for NetCfgAdvanced {
     const MANAGEMENT_AGENT: ManagementAgent = ManagementAgent::NetCfg(NetCfgVersion::Advanced);
 }
 
+pub use netemul::{DhcpClient, DhcpClientVersion, InStack, OutOfStack};
+
+/// A combination of Netstack and DhcpClient guaranteed to be compatible with
+/// each other.
+pub trait NetstackAndDhcpClient: Copy + Clone {
+    /// The netstack to be used.
+    type Netstack: Netstack;
+    /// The DHCP client to be used.
+    type DhcpClient: DhcpClient;
+}
+
+/// Netstack2 with the in-stack DHCP client.
+#[derive(Copy, Clone)]
+pub enum Netstack2AndInStackDhcpClient {}
+
+impl NetstackAndDhcpClient for Netstack2AndInStackDhcpClient {
+    type Netstack = Netstack2;
+    type DhcpClient = InStack;
+}
+
+/// Netstack2 with the out-of-stack DHCP client.
+#[derive(Copy, Clone)]
+pub enum Netstack2AndOutOfStackDhcpClient {}
+
+impl NetstackAndDhcpClient for Netstack2AndOutOfStackDhcpClient {
+    type Netstack = Netstack2;
+    type DhcpClient = OutOfStack;
+}
+
+/// Netstack3 with the out-of-stack DHCP client.
+#[derive(Copy, Clone)]
+pub enum Netstack3AndOutOfStackDhcpClient {}
+
+impl NetstackAndDhcpClient for Netstack3AndOutOfStackDhcpClient {
+    type Netstack = Netstack3;
+    type DhcpClient = OutOfStack;
+}
+
 /// Helpers for `netemul::TestSandbox`.
 #[async_trait]
 pub trait TestSandboxExt {

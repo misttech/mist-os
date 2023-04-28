@@ -14,7 +14,7 @@ use fuchsia_zircon as zx;
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _};
 
 use assert_matches::assert_matches;
-use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
+use netemul::{InStack, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     dhcpv4, interfaces, ndp,
@@ -152,7 +152,7 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         }
     };
 
-    client_if.start_dhcp().await.expect("start DHCPv4 client");
+    client_if.start_dhcp::<InStack>().await.expect("start DHCPv4 client");
 
     let server_v4 = {
         let dhcpv4::TestConfig { server_addr: fnet::Ipv4Address { addr }, managed_addrs: _ } =
