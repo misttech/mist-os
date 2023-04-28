@@ -5,7 +5,7 @@
     program: {
         args: [
             "--font-manifest",
-            "/config/data/test_fonts_small.font_manifest.json",
+            "/config/data/assets/test-fonts-small-collection_all.hermetic_assets.font_manifest.json",
         ],
     },
 }

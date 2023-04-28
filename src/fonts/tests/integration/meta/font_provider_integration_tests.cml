@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        // Depends on config_data which is a system capability.
-        "sys/testing/system-test.shard.cml",
-    ],
     children: [
         {
             name: "font_resolver",
@@ -25,11 +21,11 @@
 
         // Some components run under test get fonts from /config/data.
         {
-            directory: "config-data",
-            from: "parent",
+            directory: "pkg",
+            from: "framework",
             as: "config-data",
             to: "#driver",
-            subdir: "fonts",
+            subdir: "data",
         },
         {
             protocol: [ "fuchsia.logger.LogSink" ],
