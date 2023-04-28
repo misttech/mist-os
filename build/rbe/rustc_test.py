@@ -96,7 +96,8 @@ class RustActionTests(unittest.TestCase):
         output = Path('foo.rlib')
         for opt in ('-h', '--help', '-halp-ignore=foo'):
             with mock.patch.object(sys, 'exit') as mock_exit:
-                r = rustc.RustAction(_strs([compiler, opt, source, '-o', output]))
+                r = rustc.RustAction(
+                    _strs([compiler, opt, source, '-o', output]))
                 self.assertEqual(r.compiler, compiler)
             mock_exit.assert_not_called()
 

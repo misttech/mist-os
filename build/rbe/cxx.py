@@ -415,9 +415,10 @@ class CxxAction(object):
           C-preprocessing command, and
           modified compile command using preprocessed input
         """
-        return (list(self._preprocess_only_command()),
-                list(self._compile_with_preprocessed_input_command()),
-                )
+        return (
+            list(self._preprocess_only_command()),
+            list(self._compile_with_preprocessed_input_command()),
+        )
 
 
 # TODO: write a main() routine just for printing debug info about a compile

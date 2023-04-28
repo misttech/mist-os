@@ -119,9 +119,9 @@ class RelativizePathTest(unittest.TestCase):
         with mock.patch.object(Path, 'exists',
                                return_value=False) as mock_exists:
             self.assertEqual(
-                relativize_args.relativize_path("/Foo", Path("/p/q/z")),
-                "/Foo")
+                relativize_args.relativize_path("/Foo", Path("/p/q/z")), "/Foo")
         mock_exists.assert_called_with()
+
 
 class RelativizeCommandTest(unittest.TestCase):
 

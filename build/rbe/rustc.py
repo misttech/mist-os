@@ -363,7 +363,8 @@ class RustAction(object):
         # Returning str instead of Path because caller most likely
         # wants to append something to the result to form a Path name.
         if not self.output_file:
-            raise RuntimeError('Cannot infer stem name without a named -o output file')
+            raise RuntimeError(
+                'Cannot infer stem name without a named -o output file')
         return str(self.output_file.parent / self.output_file.stem)
 
     @property

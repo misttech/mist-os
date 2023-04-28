@@ -36,7 +36,6 @@ _SCRIPT_BASENAME = Path(__file__).name
 
 PROJECT_ROOT = fuchsia.project_root_dir()
 
-
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
 _REMOTE_PROJECT_ROOT = Path('/b/f/w')
