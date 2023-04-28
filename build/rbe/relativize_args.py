@@ -80,7 +80,9 @@ def relativize_path(arg: str, start: Path) -> str:
     try_path = Path(arg)
     # Windows-style flags look like absolute paths, e.g. /Foo
     # so we leave those alone by checking for existence.
-    if try_path.is_absolute() and try_path.exists():
+    # Only check the existence of the greatest parent, because some paths
+    # may refer to outputs that do not exist yet.
+    if try_path.is_absolute() and greatest_path_parent(try_path).exists():
         # Can't use Path.relative_to() because arguments
         # aren't guaranteed to be subdir of the other.
         return os.path.relpath(arg, start=start_abs)

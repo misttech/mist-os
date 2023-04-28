@@ -74,6 +74,18 @@ class LexicallyRewriteTokenTest(unittest.TestCase):
                 '--foo=file1,file2', transform), '--foo=tmp-file1,tmp-file2')
 
 
+class GreatestPathParentTest(unittest.TestCase):
+
+    def test_one_component(self):
+        self.assertEqual(
+            relativize_args.greatest_path_parent(Path('/root')), Path('/root'))
+
+    def test_multiple_components(self):
+        self.assertEqual(
+            relativize_args.greatest_path_parent(
+                Path('/root/for/the/home/team')), Path('/root'))
+
+
 class RelativizePathTest(unittest.TestCase):
 
     def test_abspath(self):
