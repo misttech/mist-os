@@ -46,7 +46,8 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
  public:
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
     std::shared_ptr new_node =
-        std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager, dispatcher());
+        std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager, dispatcher(),
+                                     inspect.CreateDevice(name, zx::vmo(), 0));
     new_node->AddToDevfsForTesting(root_devnode.value());
     return new_node;
   }
@@ -56,6 +57,7 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
       [&bind_was_called = this->bind_was_called](auto& node) { bind_was_called = true; }};
   dfv2::CompositeDeviceManager manager{&node_manager, dispatcher(), []() {}};
 
+  InspectManager inspect{dispatcher()};
   std::shared_ptr<dfv2::Node> node;
   std::optional<Devnode> root_devnode;
   std::optional<Devfs> devfs;

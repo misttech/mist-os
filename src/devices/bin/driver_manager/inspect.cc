@@ -239,6 +239,10 @@ DeviceInspect::~DeviceInspect() {
   }
 }
 
+DeviceInspect DeviceInspect::CreateChild(std::string name, zx::vmo vmo, uint32_t protocol_id) {
+  return DeviceInspect(info_, std::move(name), std::move(vmo), protocol_id);
+}
+
 zx::result<> DeviceInspect::Publish() {
   if (!vmo_file_.has_value()) {
     return zx::ok();
@@ -253,8 +257,9 @@ zx::result<> DeviceInspect::Publish() {
 
 void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
                                     const std::string& type, uint32_t flags,
-                                    const fbl::Array<const zx_device_prop_t>& properties,
+                                    const cpp20::span<const zx_device_prop_t>& properties,
                                     const std::string& driver_url) {
+  protocol_id_ = protocol_id;
   device_node_.CreateString("topological_path", topological_path, &static_values_);
   device_node_.CreateUint("protocol_id", protocol_id, &static_values_);
   device_node_.CreateString("type", type, &static_values_);

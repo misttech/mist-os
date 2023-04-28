@@ -290,7 +290,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   }
 
  protected:
-  inspect::Inspector& inspector() { return inspector_; }
+  InspectManager& inspect() { return inspect_; }
   TestRealm& realm() { return realm_; }
   TestDirectory& driver_dir() { return driver_dir_; }
   TestDriverHost& driver_host() { return driver_host_; }
@@ -473,7 +473,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   fidl::BindingSet<fdh::Driver> driver_bindings_;
 
   std::optional<Devfs> devfs_;
-  inspect::Inspector inspector_;
+  InspectManager inspect_{dispatcher()};
   sys::testing::ComponentContextProvider provider_{dispatcher()};
 };
 
@@ -482,7 +482,7 @@ TEST_F(DriverRunnerTest, StartRootDriver) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
 
@@ -513,7 +513,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_DriverStopBeforeComponentExit) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
 
@@ -557,7 +557,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -593,7 +593,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -639,7 +639,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild_DuplicateNames) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -681,7 +681,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -715,7 +715,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -756,7 +756,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -796,7 +796,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -828,7 +828,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingName) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -860,7 +860,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -957,7 +957,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1058,7 +1058,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
       });
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1130,7 +1130,7 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1213,7 +1213,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1262,7 +1262,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
       });
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1324,7 +1324,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindSecondNode) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1383,7 +1383,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_CloseSecondDriver) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1448,7 +1448,7 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
                                });
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1542,7 +1542,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindRootNode) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1598,7 +1598,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootNode) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1670,7 +1670,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootDriver) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1725,7 +1725,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BlockOnSecondDriver) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -1798,7 +1798,7 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
 
@@ -1935,7 +1935,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });
@@ -2012,7 +2012,7 @@ TEST_F(DriverRunnerTest, TestTearDownNodeTreeWithManyChildren) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
                              &LoaderFactory, dispatcher());
   SetupDevfs(driver_runner);
   auto defer = fit::defer([this] { Unbind(); });

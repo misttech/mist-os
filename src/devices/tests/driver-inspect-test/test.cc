@@ -28,6 +28,12 @@ class InspectTestCase : public InspectTestHelper, public zxtest::Test {
   void SetUp() override {
     IsolatedDevmgr::Args args;
 
+#ifdef DFV2
+    args.use_driver_framework_v2 = true;
+#else
+    args.use_driver_framework_v2 = false;
+#endif
+
     args.device_list.push_back({
         .vid = PDEV_VID_TEST,
         .pid = PDEV_PID_INSPECT_TEST,

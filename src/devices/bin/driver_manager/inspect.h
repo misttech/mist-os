@@ -106,7 +106,10 @@ class InspectManager {
 
 class DeviceInspect {
  public:
+  DeviceInspect(DeviceInspect&& other) = default;
   ~DeviceInspect();
+
+  DeviceInspect CreateChild(std::string name, zx::vmo vmo, uint32_t protocol_id);
 
   // Publish this Device. The device will be automatically unpublished when it is destructed.
   zx::result<> Publish();
@@ -115,7 +118,7 @@ class DeviceInspect {
   // This should only be called once, calling it more than once will create duplicate entries.
   void SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
                        const std::string& type, uint32_t flags,
-                       const fbl::Array<const zx_device_prop_t>& properties,
+                       const cpp20::span<const zx_device_prop_t>& properties,
                        const std::string& driver_url);
 
   void set_state(const std::string& state) { state_.Set(state); }

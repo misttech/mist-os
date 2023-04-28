@@ -191,19 +191,20 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
 }  // namespace
 
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
-                           fidl::ClientEnd<fdi::DriverIndex> driver_index,
-                           inspect::Inspector& inspector,
+                           fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
                            LoaderServiceFactory loader_service_factory,
                            async_dispatcher_t* dispatcher)
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
-      root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
+      root_node_(
+          std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher,
+                                 inspect.CreateDevice(std::string(kRootDeviceName), zx::vmo(), 0))),
       composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphans(); }),
       composite_node_spec_manager_(this),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)) {
-  inspector.GetRoot().CreateLazyNode(
-      "driver_runner", [this] { return Inspect(); }, &inspector);
+  inspect.inspector().GetRoot().CreateLazyNode(
+      "driver_runner", [this] { return Inspect(); }, &inspect.inspector());
 
   // Pick a non-zero starting id so that folks cannot rely on the driver host process names being
   // stable.

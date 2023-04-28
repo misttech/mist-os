@@ -71,6 +71,10 @@ type DevfsAddArgs = resource table {
     /// If `class_name` does not exist under /dev/class/ it will be created.
     /// Optional: If this is not provided then the node will only be added via topological path.
     2: class_name string:fuchsia.io.MAX_NAME_LENGTH;
+
+    /// This is a vmo of inspect data that will be installed in devfs.
+    /// Optional: If this is not provided then the devfs's inspect data will be empty.
+    3: inspect zx.Handle:VMO;
 };
 
 /// Arguments for adding a node.

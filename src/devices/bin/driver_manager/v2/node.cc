@@ -96,6 +96,20 @@ bool NodeStateIsExiting(NodeState node_state) {
   }
 }
 
+uint32_t GetProtocolId(const std::vector<fdf::wire::NodeProperty>& properties) {
+  uint32_t protocol_id = 0;
+  for (const fdf::wire::NodeProperty& property : properties) {
+    if (!property.key.is_int_value()) {
+      continue;
+    }
+    if (property.key.int_value() != BIND_PROTOCOL) {
+      continue;
+    }
+    protocol_id = property.value.int_value();
+  }
+  return protocol_id;
+}
+
 fit::result<fdf::wire::NodeError, fdecl::Offer> AddOfferToNodeOffer(fdecl::Offer add_offer,
                                                                     fdecl::Ref source) {
   auto has_source_name =
@@ -304,12 +318,13 @@ void BindResultTracker::Complete(size_t current) {
 }
 
 Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-           async_dispatcher_t* dispatcher, uint32_t primary_index)
+           async_dispatcher_t* dispatcher, DeviceInspect inspect, uint32_t primary_index)
     : name_(name),
       parents_(std::move(parents)),
       primary_index_(primary_index),
       node_manager_(node_manager),
-      dispatcher_(dispatcher) {
+      dispatcher_(dispatcher),
+      inspect_(std::move(inspect)) {
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
@@ -320,12 +335,13 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
 }
 
 Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-           async_dispatcher_t* dispatcher, DriverHost* driver_host)
+           async_dispatcher_t* dispatcher, DeviceInspect inspect, DriverHost* driver_host)
     : name_(name),
       parents_(std::move(parents)),
       node_manager_(node_manager),
       dispatcher_(dispatcher),
-      driver_host_(driver_host) {}
+      driver_host_(driver_host),
+      inspect_(std::move(inspect)) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
@@ -337,8 +353,10 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto composite = std::make_shared<Node>(node_name, std::move(parents), driver_binder, dispatcher,
-                                          primary_index);
+  DeviceInspect inspect =
+      parents[primary_index]->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
+  std::shared_ptr composite = std::make_shared<Node>(node_name, std::move(parents), driver_binder,
+                                                     dispatcher, std::move(inspect), primary_index);
   composite->parents_names_ = std::move(parents_names);
 
   for (auto& prop : properties) {
@@ -346,6 +364,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     auto new_prop = fidl::ToWire(composite->arena_, std::move(natural));
     composite->properties_.push_back(new_prop);
   }
+  composite->SetAndPublishInspect();
 
   Node* primary = composite->GetPrimaryParent();
   // We know that our device has a parent because we're creating it.
@@ -684,7 +703,13 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       return fit::as_error(fdf::wire::NodeError::kNameAlreadyExists);
     }
   };
-  auto child = std::make_shared<Node>(name, std::vector<Node*>{this}, *node_manager_, dispatcher_);
+  zx::vmo inspect_vmo;
+  if (args.devfs_args().has_value() && args.devfs_args()->inspect().has_value()) {
+    inspect_vmo = std::move(args.devfs_args()->inspect().value());
+  }
+  DeviceInspect inspect = inspect_.CreateChild(std::string(name), std::move(inspect_vmo), 0);
+  std::shared_ptr child = std::make_shared<Node>(name, std::vector<Node*>{this}, *node_manager_,
+                                                 dispatcher_, std::move(inspect));
 
   if (args.offers().has_value()) {
     child->offers_.reserve(args.offers().value().size());
@@ -721,6 +746,8 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   // We set a property for DFv2 devices.
   child->properties_.emplace_back(
       fdf::MakeProperty(child->arena_, "fuchsia.driver.framework.dfv2", true));
+
+  child->SetAndPublishInspect();
 
   if (args.symbols().has_value()) {
     auto is_valid = ValidateSymbols(args.symbols().value());
@@ -1028,5 +1055,28 @@ Node::DriverComponent::DriverComponent(
           }),
       driver(std::move(driver), node.dispatcher_, &node),
       driver_url(std::move(url)) {}
+
+void Node::SetAndPublishInspect() {
+  constexpr char kDeviceTypeString[] = "Device";
+  constexpr char kCompositeDeviceTypeString[] = "Composite Device";
+
+  std::vector<zx_device_prop_t> property_vector;
+  for (auto& property : properties_) {
+    if (property.key.is_int_value() && property.value.is_int_value()) {
+      property_vector.push_back(zx_device_prop_t{
+          .id = static_cast<uint16_t>(property.key.int_value()),
+          .value = property.value.int_value(),
+      });
+    }
+  }
+
+  inspect_.SetStaticValues(MakeTopologicalPath(), GetProtocolId(properties_),
+                           IsComposite() ? kCompositeDeviceTypeString : kDeviceTypeString, 0,
+                           property_vector, "");
+  if (zx::result result = inspect_.Publish(); result.is_error()) {
+    LOGF(ERROR, "%s: Failed to publish inspect: %s", MakeTopologicalPath().c_str(),
+         result.status_string());
+  }
+}
 
 }  // namespace dfv2

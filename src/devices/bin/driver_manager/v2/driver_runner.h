@@ -29,6 +29,7 @@
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
+#include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/v2/composite_assembler.h"
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
@@ -51,7 +52,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
  public:
   DriverRunner(fidl::ClientEnd<fuchsia_component::Realm> realm,
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
-               inspect::Inspector& inspector, LoaderServiceFactory loader_service_factory,
+               InspectManager& inspect, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher);
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>

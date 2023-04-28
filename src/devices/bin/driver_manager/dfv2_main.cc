@@ -89,8 +89,7 @@ int RunDfv2(driver_manager_config::Config config,
   auto loader_service =
       DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
   dfv2::DriverRunner driver_runner(
-      std::move(realm_result.value()), std::move(driver_index_result.value()),
-      inspect_manager.inspector(),
+      std::move(realm_result.value()), std::move(driver_index_result.value()), inspect_manager,
       [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
         zx::result client = loader_service->Connect();
         if (client.is_error()) {

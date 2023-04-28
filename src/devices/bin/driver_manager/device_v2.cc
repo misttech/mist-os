@@ -9,7 +9,7 @@
 namespace dfv2 {
 
 zx::result<std::unique_ptr<Device>> Device::CreateAndServe(
-    std::string topological_path, std::string name, uint64_t device_symbol,
+    std::string topological_path, std::string name, uint64_t device_symbol, DeviceInspect inspect,
     async_dispatcher_t* dispatcher, component::OutgoingDirectory* outgoing,
     compat::DeviceServer server, dfv2::NodeManager* manager, dfv2::DriverHost* driver_host) {
   auto device = std::make_unique<Device>();
@@ -18,8 +18,9 @@ zx::result<std::unique_ptr<Device>> Device::CreateAndServe(
   device->server_->Serve(dispatcher, outgoing);
 
   // Create the node.
-  device->node_ = std::make_shared<dfv2::Node>(topological_path, std::vector<dfv2::Node*>(),
-                                               manager, dispatcher, driver_host);
+  device->node_ =
+      std::make_shared<dfv2::Node>(topological_path, std::vector<dfv2::Node*>(), manager,
+                                   dispatcher, std::move(inspect), driver_host);
 
   // Manually make the offer for the compat service, because we need to set the
   // source to "driver_manager".

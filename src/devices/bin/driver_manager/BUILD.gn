@@ -81,6 +81,22 @@ source_set("driver") {
   ]
 }
 
+source_set("inspect") {
+  visibility = [ "*" ]
+  sources = [
+    "inspect.cc",
+    "inspect.h",
+  ]
+  public_deps = [
+    "//sdk/lib/inspect/service/cpp",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-deprecated-binding-headers",
+    "//src/lib/storage/vfs/cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  deps = [ "//sdk/lib/inspect/component/cpp:inspect_component_cpp" ]
+}
+
 # Common source files and dependencies between :coordinator and :test
 source_set("lib") {
   visibility = [ ":*" ]
@@ -109,7 +125,6 @@ source_set("lib") {
     "driver_host_loader_service.h",
     "driver_loader.cc",
     "driver_loader.h",
-    "inspect.cc",
     "package_resolver.cc",
     "system_instance.cc",
     "system_instance.h",
@@ -139,6 +154,7 @@ source_set("lib") {
   public_deps = [
     ":binding",
     ":driver",
+    ":inspect",
     ":manifest_parser",
     "composite_node_spec:lib",
     "devfs",

@@ -351,7 +351,8 @@ void Device::InitializeInspectValues() {
   } else if (is_composite()) {
     type = std::string("Composite device");
   }
-  inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id_, type, flags, props(),
+  inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id_, type, flags,
+                           cpp20::span<const zx_device_prop_t>{props().data(), props().size()},
                            parent_driver_url());
 }
 
@@ -1067,9 +1068,10 @@ zx::result<std::shared_ptr<dfv2::Node>> Device::CreateDFv2Device() {
     }
   }
 
-  auto dfv2_device =
-      dfv2::Device::CreateAndServe(topo_path, name, dfv2_device_symbol_, coordinator->dispatcher(),
-                                   &coordinator->outgoing(), std::move(server), this, host().get());
+  DeviceInspect inspect = inspect_.CreateChild(name, zx::vmo(), protocol_id_);
+  auto dfv2_device = dfv2::Device::CreateAndServe(
+      topo_path, name, dfv2_device_symbol_, std::move(inspect), coordinator->dispatcher(),
+      &coordinator->outgoing(), std::move(server), this, host().get());
   if (dfv2_device.is_error()) {
     return dfv2_device.take_error();
   }

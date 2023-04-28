@@ -17,6 +17,7 @@
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
+#include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 
 namespace dfv2 {
@@ -118,9 +119,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public std::enable_shared_from_this<Node> {
  public:
   Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-       async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
+       async_dispatcher_t* dispatcher, DeviceInspect inspect, uint32_t primary_index = 0);
   Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-       async_dispatcher_t* dispatcher, DriverHost* driver_host);
+       async_dispatcher_t* dispatcher, DeviceInspect inspect, DriverHost* driver_host);
 
   ~Node() override;
 
@@ -181,7 +182,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void SetupDevfsForRootNode(
       std::optional<Devfs>& devfs,
       std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {}) {
-    devfs.emplace(devfs_device_.topological_node());
+    devfs.emplace(devfs_device_.topological_node(), std::move(diagnostics));
   }
 
   // This is exposed for testing. Setup this node's devfs nodes.
@@ -267,6 +268,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
       fidl::ServerEnd<fuchsia_driver_framework::Node> node);
 
+  // Set the inspect data and publish it. This should be called once as the node is being created.
+  void SetAndPublishInspect();
+
   std::string name_;
 
   // If this is a composite device, this stores the list of each parent's names.
@@ -299,6 +303,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<DriverComponent> driver_component_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
+
+  // The device's inspect information.
+  DeviceInspect inspect_;
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;

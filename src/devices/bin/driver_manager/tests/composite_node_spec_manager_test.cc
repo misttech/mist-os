@@ -79,7 +79,13 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
     return composite_node_spec_manager_->AddSpec(fidl_spec, std::move(spec));
   }
 
+  std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
+    return std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr, nullptr,
+                                        inspect_.CreateDevice(name, zx::vmo(), 0));
+  }
+
   std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
+  InspectManager inspect_ = InspectManager(nullptr);
   FakeDeviceManagerBridge bridge_;
 };
 
@@ -251,8 +257,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
       .node_names = {{"node-0", "node-1"}},
   }});
 
-  std::shared_ptr<dfv2::Node> node =
-      std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr, nullptr);
+  std::shared_ptr node = CreateNode("node");
 
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
                                                          std::weak_ptr<dfv2::Node>(node)));
@@ -354,11 +359,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
       .node_names = {{"node-0"}},
   }});
 
-  std::shared_ptr<dfv2::Node> node_1 =
-      std::make_shared<dfv2::Node>("node_1", std::vector<dfv2::Node*>{}, nullptr, nullptr);
-
-  std::shared_ptr<dfv2::Node> node_2 =
-      std::make_shared<dfv2::Node>("node_2", std::vector<dfv2::Node*>{}, nullptr, nullptr);
+  std::shared_ptr node_1 = CreateNode("node_1");
+  std::shared_ptr node_2 = CreateNode("node_2");
 
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
                                                          std::weak_ptr<dfv2::Node>(node_1), false));

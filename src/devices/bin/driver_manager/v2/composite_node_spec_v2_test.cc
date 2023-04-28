@@ -19,7 +19,16 @@ class FakeNodeManager : public dfv2::NodeManager {
           callback) override {}
 };
 
-class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {};
+class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {
+ public:
+  std::shared_ptr<dfv2::Node> CreateNode(const char* name, dfv2::NodeManager* manager) {
+    return std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), manager, dispatcher(),
+                                        inspect_.CreateDevice(name, zx::vmo(), 0));
+  }
+
+ private:
+  InspectManager inspect_{dispatcher()};
+};
 
 TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   FakeNodeManager node_manager;
@@ -41,8 +50,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   Devfs devfs = Devfs(root_devnode);
 
   // Bind the first node.
-  auto parent_1 =
-      std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_1", {}, &node_manager, dispatcher()));
+  std::shared_ptr parent_1 = CreateNode("spec_parent_1", &node_manager);
   parent_1->AddToDevfsForTesting(root_devnode.value());
   auto matched_parent_1 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",
@@ -57,8 +65,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   ASSERT_FALSE(result.value());
 
   // Bind the second node.
-  auto parent_2 =
-      std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_2", {}, &node_manager, dispatcher()));
+  std::shared_ptr parent_2 = CreateNode("spec_parent_2", &node_manager);
   parent_2->AddToDevfsForTesting(root_devnode.value());
   auto matched_parent_2 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",

@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/drivers/driver_compat_test.gni")
 import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
@@ -50,9 +51,7 @@ fuchsia_driver_component("driver") {
   manifest = "meta/driver.cml"
 }
 
-test("tests") {
-  output_name = "driver-inspect-test"
-
+driver_compat_test("inspect-test") {
   testonly = true
   sources = [ "test.cc" ]
   deps = [
@@ -71,10 +70,21 @@ test("tests") {
   visibility = [ ":*" ]
 }
 
-fuchsia_unittest_package("driver-inspect-test") {
+fuchsia_unittest_component("inspect-test-dfv1") {
+  deps = [ ":inspect-test_dfv1" ]
+}
+
+fuchsia_unittest_component("inspect-test-dfv2") {
+  deps = [ ":inspect-test_dfv2" ]
+}
+
+fuchsia_test_package("driver-inspect-test") {
+  test_components = [
+    ":inspect-test-dfv1",
+    ":inspect-test-dfv2",
+  ]
   deps = [
     ":driver",
-    ":tests",
     "//src/devices/board/drivers/integration-test",
     "//src/devices/bus/drivers/platform",
   ]

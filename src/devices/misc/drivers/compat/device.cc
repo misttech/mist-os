@@ -533,6 +533,16 @@ zx_status_t Device::CreateNode() {
     if (!class_name.empty()) {
       devfs_args.class_name(class_name);
     }
+    if (inspect_vmo_file_.has_value()) {
+      zx::vmo inspect;
+      zx_status_t status =
+          inspect_vmo_file_.value()->vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &inspect);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to duplicate inspect vmo: %s", zx_status_get_string(status));
+      } else {
+        devfs_args.inspect(std::move(inspect));
+      }
+    }
     args_builder.devfs_args(devfs_args.Build());
   }
 
