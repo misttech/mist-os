@@ -342,7 +342,8 @@ class ObjectCache<T, Option::Single, Allocator> {
   static_assert(sizeof(SlabControl) <= kSlabControlMaxSize);
 
   static constexpr ssize_t kEntriesPerSlab =
-      (Allocator::kSlabSize - fbl::round_up(sizeof(SlabControl), alignof(Entry))) / sizeof(Entry);
+      (Allocator::kSlabSize - fbl::round_up(sizeof(SlabControl), alignof(SlabControl))) /
+      sizeof(Entry);
   static_assert(kEntriesPerSlab > 0);
 
   // A slab of objects in the object cache. Constructed on a raw block of power
@@ -509,12 +510,9 @@ class ObjectCache<T, Option::Single, Allocator> {
       DEBUG_ASSERT(should_release == false);
     }
 
-    SlabControl control;
     ktl::array<Entry, kEntriesPerSlab> entries{};
+    SlabControl control;
   };
-#ifdef __clang__
-  static_assert(offsetof(Slab, control) == 0);
-#endif
   static_assert(sizeof(Slab) <= Allocator::kSlabSize);
 
   // Returns a reference to a slab with at least one available entry. Allocates
