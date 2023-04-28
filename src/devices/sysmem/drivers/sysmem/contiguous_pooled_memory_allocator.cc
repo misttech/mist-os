@@ -398,9 +398,28 @@ zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous
     return status;
   }
 
-  contiguous_vmo_ = std::move(local_contiguous_vmo);
-  can_decommit_ = (ZX_INFO_VMO_TYPE(info.flags) == ZX_INFO_VMO_TYPE_PAGED);
+  // Assume cannot decommit until proven otherwise.
+  can_decommit_ = false;
+  if (ZX_INFO_VMO_TYPE(info.flags) == ZX_INFO_VMO_TYPE_PAGED) {
+    // Paged VMOs might support decommit depending on whether it was enabled by the kernel cmdline
+    // flag or not. Probe support for this by attempting a decommit.
+    status =
+        local_contiguous_vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, zx_system_get_page_size(), nullptr, 0);
+    if (status == ZX_OK) {
+      // Decommit succeeded, commit the page back before continuing.
+      status =
+          local_contiguous_vmo.op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0);
+      if (status != ZX_OK) {
+        LOG(ERROR,
+            "ZX_VMO_OP_COMMIT failed on contiguous vmo where ZX_VMO_OP_DECOMMIT succeeded - status: %d",
+            status);
+        return status;
+      }
+      can_decommit_ = true;
+    }
+  }
 
+  contiguous_vmo_ = std::move(local_contiguous_vmo);
   ralloc_region_t region = {0, size_};
   region_allocator_.AddRegion(region);
   return ZX_OK;
