@@ -152,7 +152,7 @@ impl PackageManifest {
         meta_far_hash: Hash,
         out_manifest_dir: &Path,
     ) -> Result<Self, PackageManifestError> {
-        let meta_far_path = blobs_dir.join(meta_far_hash.to_string()).canonicalize()?;
+        let meta_far_path = blobs_dir.join(meta_far_hash.to_string());
 
         let mut meta_far_file = File::open(&meta_far_path)?;
         let meta_far_size = meta_far_file.metadata()?.len();
@@ -213,7 +213,7 @@ impl PackageManifest {
         });
 
         for (blob_path, merkle) in meta_contents.into_iter() {
-            let source_path = blobs_dir.join(merkle.to_string()).canonicalize()?;
+            let source_path = blobs_dir.join(merkle.to_string());
 
             if !source_path.exists() {
                 return Err(PackageManifestError::IoErrorWithPath {
@@ -250,21 +250,23 @@ impl PackageManifest {
 
     /// Extract the package blobs from `archive_path` into the `blobs_dir` directory and
     /// extracts all the JSON representations of the subpackages' PackageManifests and
-    /// top level PackageManifest into `manifest_dir`.
+    /// top level PackageManifest into `out_manifest_dir`.
     ///
     /// Returns an in-memory `PackageManifest` for these files.
     pub fn from_archive(
         archive_path: &Path,
         blobs_dir: &Path,
-        manifest_dir: &Path,
+        out_manifest_dir: &Path,
     ) -> Result<Self, PackageManifestError> {
         let archive_file = File::open(archive_path)?;
         let mut archive_reader = Utf8Reader::new(&archive_file)?;
 
         let far_paths =
             archive_reader.list().map(|entry| entry.path().to_owned()).collect::<Vec<_>>();
+
         for path in far_paths {
             let blob_path = blobs_dir.join(&path);
+
             if &path != "meta.far" && !blob_path.as_path().exists() {
                 let contents = archive_reader.read_file(&path)?;
                 let mut tmp = tempfile::NamedTempFile::new_in(blobs_dir)?;
@@ -281,7 +283,7 @@ impl PackageManifest {
         tmp.write_all(&meta_far)?;
         tmp.persist(meta_far_path)?;
 
-        PackageManifest::from_blobs_dir(blobs_dir, meta_far_hash, manifest_dir)
+        PackageManifest::from_blobs_dir(blobs_dir, meta_far_hash, out_manifest_dir)
     }
 
     pub(crate) fn from_package(
@@ -1005,19 +1007,19 @@ mod tests {
                 },
                 blobs: vec![
                     BlobInfo {
-                        source_path: meta_far_path.canonicalize_utf8().unwrap().to_string(),
+                        source_path: meta_far_path.to_string(),
                         path: PackageManifest::META_FAR_BLOB_PATH.into(),
                         merkle: meta_far_hash,
                         size: 12288,
                     },
                     BlobInfo {
-                        source_path: file1_path.canonicalize_utf8().unwrap().to_string(),
+                        source_path: file1_path.to_string(),
                         path: "file-1".into(),
                         merkle: file1_hash,
                         size: 6,
                     },
                     BlobInfo {
-                        source_path: file2_path.canonicalize_utf8().unwrap().to_string(),
+                        source_path: file2_path.to_string(),
                         path: "file-2".into(),
                         merkle: file2_hash,
                         size: 6,
