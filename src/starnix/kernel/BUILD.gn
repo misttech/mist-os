@@ -24,7 +24,7 @@ declare_args() {
 }
 
 group("kernel") {
-  deps = [ ":starnix_kernel_bin" ]
+  deps = [ ":starnix_kernel_package" ]
 }
 
 group("tests") {
