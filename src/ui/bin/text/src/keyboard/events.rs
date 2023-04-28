@@ -235,7 +235,7 @@ mod test {
                     | ui_input3::Modifiers::NUM_LOCK
                     | ui_input3::Modifiers::SCROLL_LOCK,
             ),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(&event, HashSet::new())?;
@@ -265,7 +265,7 @@ mod test {
                     | ui_input3::Modifiers::NUM_LOCK
                     | ui_input3::Modifiers::SCROLL_LOCK,
             ),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(
@@ -310,7 +310,7 @@ mod test {
         let event = ui_input3::KeyEvent {
             key: Some(input::Key::C),
             type_: Some(ui_input3::KeyEventType::Pressed),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(&event, HashSet::new())?;
@@ -416,7 +416,7 @@ mod test {
         let event = ui_input3::KeyEvent {
             key: Some(input::Key::D),
             type_: Some(ui_input3::KeyEventType::Released),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(&event, HashSet::new())?;
@@ -440,7 +440,7 @@ mod test {
     fn key_or_meaning_required() -> Result<(), Error> {
         let event = ui_input3::KeyEvent {
             type_: Some(ui_input3::KeyEventType::Pressed),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(&event, HashSet::new());
@@ -465,7 +465,7 @@ mod test {
 
     #[test]
     fn type_required() -> Result<(), Error> {
-        let event = ui_input3::KeyEvent { key: Some(input::Key::E), ..ui_input3::KeyEvent::EMPTY };
+        let event = ui_input3::KeyEvent { key: Some(input::Key::E), ..Default::default() };
 
         let key_event = KeyEvent::new(&event, HashSet::new());
         assert!(key_event.is_err());
@@ -477,7 +477,7 @@ mod test {
         let event = ui_input3::KeyEvent {
             type_: Some(ui_input3::KeyEventType::Sync),
             key: Some(input::Key::E),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event = KeyEvent::new(&event, HashSet::new());
@@ -490,7 +490,7 @@ mod test {
         let event = ui_input3::KeyEvent {
             type_: Some(ui_input3::KeyEventType::Cancel),
             key: Some(input::Key::E),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
         let key_event = KeyEvent::new(&event, HashSet::new());
         assert!(key_event.is_err());
@@ -502,7 +502,7 @@ mod test {
         let event = ui_input3::KeyEvent {
             key: Some(input::Key::F),
             type_: Some(ui_input3::KeyEventType::Pressed),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         };
 
         let key_event =
@@ -565,7 +565,7 @@ mod test {
             let event = ui_input3::KeyEvent {
                 key: Some(key1),
                 type_: Some(ui_input3::KeyEventType::Pressed),
-                ..ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             };
 
             let key_event = KeyEvent::new(&event, HashSet::new())?;

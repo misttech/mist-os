@@ -61,7 +61,7 @@ impl SingleSessionTrace {
         let config = TraceConfig {
             buffer_size_megabytes_hint: Some(BUFFER_SIZE_MB),
             categories: Some(categories),
-            ..TraceConfig::EMPTY
+            ..Default::default()
         };
 
         trace_controller.initialize_tracing(config, write_socket)?;
@@ -83,7 +83,7 @@ impl SingleSessionTrace {
             .controller
             .as_ref()
             .ok_or_else(|| format_err!("No trace session has been initialized"))?;
-        match trace_controller.start_tracing(StartOptions::EMPTY).await? {
+        match trace_controller.start_tracing(StartOptions::default()).await? {
             Ok(_) => Ok(()),
             Err(e) => match e {
                 StartErrorCode::NotInitialized => {
@@ -106,7 +106,7 @@ impl SingleSessionTrace {
             .controller
             .as_ref()
             .ok_or_else(|| format_err!("No trace session has been initialized"))?;
-        trace_controller.stop_tracing(StopOptions::EMPTY).await?;
+        trace_controller.stop_tracing(StopOptions::default()).await?;
         Ok(())
     }
 
@@ -118,7 +118,7 @@ impl SingleSessionTrace {
             Some(controller) => controller,
             None => app::client::connect_to_protocol::<ControllerMarker>()?,
         };
-        let options = TerminateOptions { write_results: Some(true), ..TerminateOptions::EMPTY };
+        let options = TerminateOptions { write_results: Some(true), ..Default::default() };
         let terminate_fut = controller.terminate_tracing(options).map_err(Error::from);
         let data_socket = self.status.write().data_socket.take();
         let drain_fut = drain_socket(data_socket);

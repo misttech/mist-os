@@ -33,13 +33,13 @@ async fn test_ephemeral_get_typeface(factory: &ProviderFactory) -> Result<(), Er
         code_points: None,
         languages: None,
         fallback_family: None,
-        ..fonts::TypefaceQuery::EMPTY
+        ..Default::default()
     });
     let request = fonts::TypefaceRequest {
         query,
         flags: None,
         cache_miss_policy: None,
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
 
     let response = font_provider.get_typeface(request).await?;

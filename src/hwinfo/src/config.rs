@@ -86,7 +86,7 @@ impl Into<fidl_fuchsia_hwinfo::DeviceInfo> for DeviceInfo {
             serial_number: self.serial_number,
             is_retail_demo: Some(self.is_retail_demo),
             retail_sku: self.retail_sku,
-            ..fidl_fuchsia_hwinfo::DeviceInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -149,7 +149,7 @@ impl Into<fidl_fuchsia_hwinfo::BoardInfo> for BoardInfo {
                 Some(val) => Some(Architecture::into(val)),
                 _ => None,
             },
-            ..fidl_fuchsia_hwinfo::BoardInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -320,10 +320,7 @@ impl Into<fidl_fuchsia_hwinfo::ProductInfo> for ProductInfo {
             regulatory_domain: if self.country_code.is_none() {
                 None
             } else {
-                Some(RegulatoryDomain {
-                    country_code: self.country_code,
-                    ..RegulatoryDomain::EMPTY
-                })
+                Some(RegulatoryDomain { country_code: self.country_code, ..Default::default() })
             },
             locale_list: if locale_list.is_empty() { None } else { Some(locale_list) },
             name: self.name,
@@ -338,7 +335,7 @@ impl Into<fidl_fuchsia_hwinfo::ProductInfo> for ProductInfo {
             emmc_storage: self.emmc_storage,
             microphone: self.microphone,
             audio_amplifier: self.audio_amplifier,
-            ..fidl_fuchsia_hwinfo::ProductInfo::EMPTY
+            ..Default::default()
         }
     }
 }

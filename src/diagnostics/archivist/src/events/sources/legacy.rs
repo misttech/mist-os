@@ -123,7 +123,7 @@ mod tests {
                 component_url: Some(MOCK_URL.clone()),
                 component_name: Some(other.component_name),
                 instance_id: Some(other.instance_id),
-                ..SourceIdentity::EMPTY
+                ..Default::default()
             }
         }
     }

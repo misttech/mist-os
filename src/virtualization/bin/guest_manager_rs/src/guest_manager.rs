@@ -161,7 +161,7 @@ impl GuestManager {
             config_path,
             status: GuestStatus::NotStarted,
             last_error: None,
-            guest_descriptor: GuestDescriptor::EMPTY,
+            guest_descriptor: GuestDescriptor::default(),
             start_time: zx::Time::INFINITE_PAST,
             stop_time: zx::Time::INFINITE_PAST,
         }
@@ -370,7 +370,7 @@ impl GuestManager {
             } else {
                 None
             },
-            ..GuestInfo::EMPTY
+            ..Default::default()
         };
 
         match self.status {
@@ -391,7 +391,7 @@ impl GuestManager {
         // Connect to interface watcher.
         let state_proxy = connect_to_protocol::<ninterfaces::StateMarker>()?;
         let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>()?;
-        state_proxy.get_watcher(ninterfaces::WatcherOptions::EMPTY, watcher_server)?;
+        state_proxy.get_watcher(ninterfaces::WatcherOptions::default(), watcher_server)?;
 
         // Collect interface state events until Idle is received, indicating the end of current
         // events at the time of the query.
@@ -503,7 +503,7 @@ impl GuestManager {
             sound: config.virtio_sound,
             networks: config.net_devices.clone(),
             mem: config.virtio_mem,
-            ..GuestDescriptor::EMPTY
+            ..Default::default()
         }
     }
 
@@ -727,7 +727,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn config_applies_defaults() {
-        let config = GuestConfig { default_net: Some(true), ..GuestConfig::EMPTY };
+        let config = GuestConfig { default_net: Some(true), ..Default::default() };
         let manager = ManagerFixture::new_with_defaults();
         let merged = manager.manager().get_merged_config(config).unwrap();
         assert_eq!(merged.cpus, Some(get_default_num_cpus()));
@@ -744,7 +744,7 @@ mod tests {
         let config = r#"{"cmdline": "firstarg"}"#;
         let userconfig = GuestConfig {
             cmdline_add: Some(Vec::from(["secondarg", "thirdarg"].map(String::from))),
-            ..GuestConfig::EMPTY
+            ..Default::default()
         };
 
         let manager = ManagerFixture::new(config);
@@ -761,7 +761,7 @@ mod tests {
                 Listener { port: 2011, acceptor: listener_client },
                 Listener { port: 2011, acceptor: listener_client2 },
             ]),
-            ..GuestConfig::EMPTY
+            ..Default::default()
         };
 
         let manager = ManagerFixture::new_with_defaults();
@@ -780,7 +780,7 @@ mod tests {
                 Listener { port: 2011, acceptor: listener_client },
                 Listener { port: 2022, acceptor: listener_client2 },
             ]),
-            ..GuestConfig::EMPTY
+            ..Default::default()
         };
 
         let merged = manager.manager().get_merged_config(user_config).unwrap();
@@ -816,7 +816,7 @@ mod tests {
             _ = run_fut => {
                 panic!("run should not complete")
             }
-            result = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end),
+            result = join(manager_proxy.launch(GuestConfig::default(), guest_server_end),
                           vmm.run_launch()).fuse()
                 => {
                     assert!(result.0.is_ok());
@@ -852,7 +852,7 @@ mod tests {
             _ = run_fut => {
                 panic!("run should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end).fuse() => {
                 assert_eq!(result.unwrap(), Err(GuestManagerError::BadConfig));
             }
         }
@@ -874,7 +874,7 @@ mod tests {
             _ = run_fut => {
                 panic!("run should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end).fuse() => {
                 assert_eq!(result.unwrap(), Err(GuestManagerError::BadConfig));
             }
         }
@@ -900,7 +900,7 @@ mod tests {
             _ = manager.run_vmm().fuse() => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end1).fuse() => {
                 assert!(result.is_ok());
             }
         }
@@ -913,7 +913,7 @@ mod tests {
             _ = manager.run_vmm().fuse() => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end2).fuse() => {
                 assert_eq!(result.unwrap(), Err(GuestManagerError::AlreadyRunning));
             }
         }
@@ -931,17 +931,18 @@ mod tests {
             fidl::endpoints::create_endpoints::<GuestMarker>();
 
         // Launch Guest and fail to start the VMM
-        let launch_fut = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1), async {
-            match manager.vmm.borrow_mut().next().await {
-                GuestLifecycleRequest::Create { guest_config, responder } => {
-                    responder
-                        .send(&mut Err(GuestError::InternalError))
-                        .expect("stream should not be closed");
+        let launch_fut =
+            join(manager_proxy.launch(GuestConfig::default(), guest_server_end1), async {
+                match manager.vmm.borrow_mut().next().await {
+                    GuestLifecycleRequest::Create { guest_config, responder } => {
+                        responder
+                            .send(&mut Err(GuestError::InternalError))
+                            .expect("stream should not be closed");
+                    }
+                    req => panic!("vmm: expected create, got {:?}", req),
                 }
-                req => panic!("vmm: expected create, got {:?}", req),
-            }
-        })
-        .fuse();
+            })
+            .fuse();
         futures::pin_mut!(launch_fut);
         select! {
             _ = run_fut => {
@@ -960,7 +961,7 @@ mod tests {
             _ = manager.run_vmm().fuse() => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end2).fuse() => {
                 assert!(result.is_ok());
             }
         }
@@ -996,7 +997,7 @@ mod tests {
             _ = manager.run_vmm().fuse() => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end).fuse() => {
                 assert!(result.is_ok());
             }
         }
@@ -1016,7 +1017,7 @@ mod tests {
         let descriptor = GuestDescriptor {
             num_cpus: Some(get_default_num_cpus()),
             guest_memory: Some(get_default_guest_memory()),
-            ..GuestDescriptor::EMPTY
+            ..Default::default()
         };
         assert_eq!(guest_info.guest_descriptor, Some(descriptor));
         assert_eq!(
@@ -1030,7 +1031,7 @@ mod tests {
         let manager =
             ManagerFixture::new(r#"{"virtio-gpu": false, "virtio-balloon": false, "cpus": 4}"#);
         let user_config =
-            GuestConfig { virtio_gpu: Some(true), cpus: Some(8), ..GuestConfig::EMPTY };
+            GuestConfig { virtio_gpu: Some(true), cpus: Some(8), ..Default::default() };
 
         let (guest_client_end, guest_server_end) =
             fidl::endpoints::create_endpoints::<GuestMarker>();
@@ -1123,7 +1124,7 @@ mod tests {
             _ = vmm_fut => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end).fuse() => {
                 assert!(result.is_ok());
             }
         }
@@ -1172,7 +1173,7 @@ mod tests {
             _ = run_fut => {
                 panic!("run should not complete");
             }
-            result = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end),
+            result = join(manager_proxy.launch(GuestConfig::default(), guest_server_end),
                           vmm.run_launch()).fuse()
                 => {
                     assert!(result.0.is_ok());
@@ -1237,7 +1238,7 @@ mod tests {
             _ = manager.run_vmm().fuse() => {
                 panic!("vmm should not complete");
             }
-            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end_launch).fuse() => {
+            result = manager_proxy.launch(GuestConfig::default(), guest_server_end_launch).fuse() => {
                 assert!(result.is_ok());
             }
         }
@@ -1263,7 +1264,7 @@ mod tests {
         let manager = ManagerFixture::new_with_defaults();
         let mut guest_manager = manager.manager.borrow_mut();
         guest_manager.guest_descriptor =
-            GuestDescriptor { networks: guest_networks, ..GuestDescriptor::EMPTY };
+            GuestDescriptor { networks: guest_networks, ..Default::default() };
 
         guest_manager.guest_network_state(host_state)
     }

@@ -29,12 +29,9 @@ pub async fn create_child_component(
         url: Some(child_url.to_string()),
         startup: Some(fdecl::StartupMode::Lazy), // Dynamic children can only be started lazily.
         environment: None,
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
-    let child_args = fcomponent::CreateChildArgs {
-        numbered_handles: None,
-        ..fcomponent::CreateChildArgs::EMPTY
-    };
+    let child_args = fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
     realm
         .create_child(&mut collection_ref, child_decl, child_args)
         .await

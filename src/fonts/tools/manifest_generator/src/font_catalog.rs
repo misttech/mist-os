@@ -271,7 +271,7 @@ mod tests {
                     slant: None,
                     weight: None,
                     width: Some(Width::Condensed),
-                    ..FidlStyle::EMPTY
+                    ..Default::default()
                 },
                 iter::empty::<String>(),
             )?,
@@ -282,7 +282,7 @@ mod tests {
                     slant: None,
                     weight: None,
                     width: Some(Width::Condensed),
-                    ..FidlStyle::EMPTY
+                    ..Default::default()
                 },
                 iter::empty::<String>(),
             )?,
@@ -310,7 +310,7 @@ mod tests {
             FontFamilyAliasSet::without_overrides(vec!["Def"])?,
             FontFamilyAliasSet::new(
                 vec!["Def"],
-                FidlStyle { slant: None, weight: None, width: None, ..FidlStyle::EMPTY },
+                FidlStyle { slant: None, weight: None, width: None, ..Default::default() },
                 vec!["en", "es"],
             )?,
         ];

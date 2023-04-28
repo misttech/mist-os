@@ -30,13 +30,13 @@ async fn test_stable_api() -> Result<(), Error> {
     let res = font_provider.get_family_info("Roboto").await?;
     assert_matches!(res, None);
 
-    let res = font_provider.get_typeface(fonts::TypefaceRequest::EMPTY).await?;
-    assert_eq!(res, fonts::TypefaceResponse::EMPTY);
+    let res = font_provider.get_typeface(fonts::TypefaceRequest::default()).await?;
+    assert_eq!(res, fonts::TypefaceResponse::default());
 
     let res = font_provider
         .get_font_family_info(&mut fonts::FamilyName { name: "Roboto".to_string() })
         .await?;
-    assert_eq!(res, fonts::FontFamilyInfo::EMPTY);
+    assert_eq!(res, fonts::FontFamilyInfo::default());
 
     Ok(())
 }
@@ -50,8 +50,9 @@ async fn test_experimental_api() -> Result<(), Error> {
     assert_matches!(res, Err(fonts_exp::Error::NotFound));
 
     let (_client_end, server_end) = fidl::endpoints::create_endpoints();
-    let res =
-        font_provider.list_typefaces(fonts_exp::ListTypefacesRequest::EMPTY, server_end).await?;
+    let res = font_provider
+        .list_typefaces(fonts_exp::ListTypefacesRequest::default(), server_end)
+        .await?;
     assert_matches!(res, Err(fonts_exp::Error::NotFound));
 
     let res = font_provider

@@ -836,7 +836,7 @@ impl GfxSceneManager {
             .focuser
             .set_auto_focus(ui_views::FocuserSetAutoFocusRequest {
                 view_ref: Some(view_ref),
-                ..ui_views::FocuserSetAutoFocusRequest::EMPTY
+                ..Default::default()
             })
             .await;
         match auto_focus_result {

@@ -251,7 +251,7 @@ impl VulkanRenderer {
         .await
         .expect("failed to allocated sysmem-backed VkImages");
 
-        let fence_create_info = vk::FenceCreateInfo { ..Default::default() };
+        let fence_create_info = vk::FenceCreateInfo::default();
         let fence = unsafe {
             device.create_fence(&fence_create_info, None).expect("couldn't create fence")
         };
@@ -442,7 +442,7 @@ impl VulkanRenderer {
             let args = fland::RegisterBufferCollectionArgs {
                 export_token: Some(import_export_tokens.export_token),
                 buffer_collection_token: Some(buffer_collection_token),
-                ..fland::RegisterBufferCollectionArgs::EMPTY
+                ..Default::default()
             };
             // Two possible errors here:
             //   - FIDL transport error (outer error)

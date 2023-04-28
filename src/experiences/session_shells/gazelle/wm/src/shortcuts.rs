@@ -88,9 +88,5 @@ pub(crate) fn all_shortcuts() -> Vec<ui_shortcut2::Shortcut> {
 }
 
 fn create_shortcut(id: u32, keys: Vec<KeyMeaning>) -> ui_shortcut2::Shortcut {
-    ui_shortcut2::Shortcut {
-        id,
-        key_meanings: keys,
-        options: ui_shortcut2::Options { ..ui_shortcut2::Options::EMPTY },
-    }
+    ui_shortcut2::Shortcut { id, key_meanings: keys, options: ui_shortcut2::Options::default() }
 }

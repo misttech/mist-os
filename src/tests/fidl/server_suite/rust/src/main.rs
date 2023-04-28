@@ -136,7 +136,7 @@ async fn run_closed_target_server(
                 responder
                     .send(ClosedTargetTwoWayTablePayloadResponse {
                         v: payload.v,
-                        ..ClosedTargetTwoWayTablePayloadResponse::EMPTY
+                        ..Default::default()
                     })
                     .expect("failed to send two way payload response");
             }

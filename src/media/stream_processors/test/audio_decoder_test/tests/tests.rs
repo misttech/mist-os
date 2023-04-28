@@ -46,7 +46,7 @@ fn sbc_decode() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..FormatDetails::EMPTY
+        ..Default::default()
     };
 
     let stream = Rc::new(TimestampedStream {
@@ -89,7 +89,7 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..FormatDetails::EMPTY
+        ..Default::default()
     };
 
     let large_input_chunk_stream = Rc::new(TimestampedStream {
@@ -132,7 +132,7 @@ fn cvsd_simple_decode() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..FormatDetails::EMPTY
+        ..Default::default()
     };
 
     let cvsd_tests = AudioDecoderTestCase {

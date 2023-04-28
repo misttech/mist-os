@@ -845,10 +845,7 @@ mod tests {
     }
 
     fn create_account_request(id: u64) -> AccountHandlerControlCreateAccountRequest {
-        AccountHandlerControlCreateAccountRequest {
-            id: Some(id),
-            ..AccountHandlerControlCreateAccountRequest::EMPTY
-        }
+        AccountHandlerControlCreateAccountRequest { id: Some(id), ..Default::default() }
     }
 
     #[derive(TypedBuilder)]
@@ -1044,7 +1041,7 @@ mod tests {
                         }
                     });
                     proxy
-                        .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                        .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                         .await??;
                     assert_data_tree!(inspector, root: {
                         account_handler: contains {
@@ -1074,11 +1071,11 @@ mod tests {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
                     proxy.lock_account().await??;
                     proxy
-                        .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                        .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                         .await??;
                     proxy.lock_account().await??;
                     proxy
-                        .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                        .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                         .await??;
                     Ok(())
                 })
@@ -1097,7 +1094,7 @@ mod tests {
                 .test_fn(|proxy| async move {
                     assert_eq!(
                         proxy
-                            .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                            .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                             .await?,
                         Err(ApiError::FailedPrecondition)
                     );
@@ -1284,7 +1281,7 @@ mod tests {
 
                         // Check that further operations fail
                         assert!(proxy
-                            .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                            .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                             .await
                             .is_err());
                         assert!(proxy.terminate().is_err());
@@ -1309,7 +1306,7 @@ mod tests {
                     proxy.preload(&pre_auth_state).await??;
                     assert_eq!(
                         proxy
-                            .unlock_account(AccountHandlerControlUnlockAccountRequest::EMPTY)
+                            .unlock_account(AccountHandlerControlUnlockAccountRequest::default())
                             .await?,
                         Err(ApiError::NotFound)
                     );
@@ -1331,7 +1328,7 @@ mod tests {
                         proxy
                             .create_account(AccountHandlerControlCreateAccountRequest {
                                 id: Some(TEST_ACCOUNT_ID_UINT),
-                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                                ..Default::default()
                             })
                             .await?,
                         Err(ApiError::Internal)
@@ -1355,7 +1352,7 @@ mod tests {
                         proxy
                             .create_account(AccountHandlerControlCreateAccountRequest {
                                 id: Some(TEST_ACCOUNT_ID_UINT),
-                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                                ..Default::default()
                             })
                             .await?,
                         Err(ApiError::Internal)
@@ -1379,7 +1376,7 @@ mod tests {
                         proxy
                             .create_account(AccountHandlerControlCreateAccountRequest {
                                 id: Some(TEST_ACCOUNT_ID_UINT),
-                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                                ..Default::default()
                             })
                             .await?,
                         Err(ApiError::Internal)
@@ -1477,7 +1474,7 @@ mod tests {
                     // Send the invalid request
                     assert_eq!(
                         account_handler_proxy
-                            .create_account(AccountHandlerControlCreateAccountRequest::EMPTY)
+                            .create_account(AccountHandlerControlCreateAccountRequest::default())
                             .await?,
                         Err(ApiError::InvalidRequest)
                     );

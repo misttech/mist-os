@@ -182,7 +182,7 @@ mod tests {
                         responder
                             .send(&mut Ok(AccountMetadata {
                                 name: Some(self.response_name.to_string()),
-                                ..AccountMetadata::EMPTY
+                                ..Default::default()
                             }))
                             .context("Failed to send response")
                     }

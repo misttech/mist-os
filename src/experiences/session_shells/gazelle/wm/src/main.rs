@@ -213,14 +213,14 @@ async fn launch_shell_views(sender: EventSender) -> Result<(), Error> {
             ViewCreationTokenPair::new()?;
         view_provider.create_view2(ui_app::CreateView2Args {
             view_creation_token: Some(view_creation_token),
-            ..ui_app::CreateView2Args::EMPTY
+            ..Default::default()
         })?;
 
         let name_annotation = shell_view_name_annotation(shell_view);
         let view_spec = felement::ViewSpec {
             viewport_creation_token: Some(viewport_creation_token),
             annotations: Some(vec![name_annotation]),
-            ..felement::ViewSpec::EMPTY
+            ..Default::default()
         };
 
         sender.send(Event::SystemEvent {

@@ -126,7 +126,7 @@ impl ModularFacade {
     async fn launch_session(&self, session_url: &str) -> Result<(), Error> {
         let config = fsession::LaunchConfiguration {
             session_url: Some(session_url.to_string()),
-            ..fsession::LaunchConfiguration::EMPTY
+            ..Default::default()
         };
         self.session_launcher
             .launch(config)
@@ -237,11 +237,11 @@ mod tests {
                                 resolved_url: Some("fake".to_string()),
                                 execution_info: Some(fsys::ExecutionInfo {
                                     start_reason: Some("fake".to_string()),
-                                    ..fsys::ExecutionInfo::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fsys::ResolvedInfo::EMPTY
+                                ..Default::default()
                             }),
-                            ..fsys::Instance::EMPTY
+                            ..Default::default()
                         })
                     } else {
                         Ok(fsys::Instance {
@@ -249,7 +249,7 @@ mod tests {
                             url: Some("fake".to_string()),
                             instance_id: None,
                             resolved_info: None,
-                            ..fsys::Instance::EMPTY
+                            ..Default::default()
                         })
                     };
                     let _ = responder.send(&mut result);

@@ -624,7 +624,7 @@ mod tests {
                     client_selector_configuration: Some(ClientSelectorConfiguration::Selectors(
                         vec![SelectorArgument::RawSelector("foo:root/bar:baz".to_string()),]
                     )),
-                    ..StreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server_end
             )
@@ -646,7 +646,7 @@ mod tests {
                     client_selector_configuration: Some(ClientSelectorConfiguration::Selectors(
                         vec![SelectorArgument::RawSelector("foo:root".to_string()),]
                     )),
-                    ..StreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server_end
             )
@@ -682,7 +682,7 @@ mod tests {
                             SelectorArgument::RawSelector("valid:root".to_string()),
                         ]
                     )),
-                    ..StreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server_end
             )

@@ -60,7 +60,7 @@ async fn main() -> Result<(), Error> {
     let filename_str =
         filename.to_str().ok_or(anyhow!("Failed to convert filename from OsStr to str"))?;
 
-    let mut mount_options = MountOptions::EMPTY;
+    let mut mount_options = MountOptions::default();
     mount_options.read_only = opt.read_only;
     mount_options.verbose = opt.verbose;
     mount_options.write_compression_algorithm = opt.compression;

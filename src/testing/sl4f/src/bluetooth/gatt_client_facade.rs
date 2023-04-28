@@ -119,8 +119,8 @@ impl GattClientFacade {
             .clone();
 
         let options = ScanOptions {
-            filters: Some(vec![filter.unwrap_or(Filter::EMPTY)]),
-            ..ScanOptions::EMPTY
+            filters: Some(vec![filter.unwrap_or(Filter::default())]),
+            ..Default::default()
         };
 
         let (watcher_proxy, watcher_server) =
@@ -262,7 +262,7 @@ impl GattClientFacade {
     ) -> Result<(), Error> {
         let mut handle = Handle { value: id };
         let options =
-            WriteOptions { offset: Some(offset), write_mode: Some(mode), ..WriteOptions::EMPTY };
+            WriteOptions { offset: Some(offset), write_mode: Some(mode), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("No active service"))?
@@ -333,7 +333,7 @@ impl GattClientFacade {
             ReadOptions::LongRead(LongReadOptions {
                 offset: Some(offset),
                 max_bytes: Some(max_bytes),
-                ..LongReadOptions::EMPTY
+                ..Default::default()
             }),
         )
         .await
@@ -393,7 +393,7 @@ impl GattClientFacade {
             ReadOptions::LongRead(LongReadOptions {
                 offset: Some(offset),
                 max_bytes: Some(max_bytes),
-                ..LongReadOptions::EMPTY
+                ..Default::default()
             }),
         )
         .await
@@ -410,7 +410,7 @@ impl GattClientFacade {
         write_value: Vec<u8>,
     ) -> Result<(), Error> {
         let mut handle = Handle { value: id };
-        let options = WriteOptions { offset: Some(offset), ..WriteOptions::EMPTY };
+        let options = WriteOptions { offset: Some(offset), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
@@ -621,7 +621,7 @@ impl GattClientFacade {
         GattClientFacade::set_central_proxy(self.inner.clone());
 
         let (conn_proxy, conn_server_end) = fidl::endpoints::create_proxy()?;
-        let options = ConnectionOptions { bondable_mode: Some(true), ..ConnectionOptions::EMPTY };
+        let options = ConnectionOptions { bondable_mode: Some(true), ..Default::default() };
         self.inner
             .read()
             .central

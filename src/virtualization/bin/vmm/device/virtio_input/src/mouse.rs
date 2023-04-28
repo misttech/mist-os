@@ -384,11 +384,7 @@ mod tests {
     }
 
     fn default_device_info() -> Option<MouseDeviceInfo> {
-        Some(MouseDeviceInfo {
-            id: Some(3),
-            buttons: Some(vec![1, 2, 3]),
-            ..MouseDeviceInfo::EMPTY
-        })
+        Some(MouseDeviceInfo { id: Some(3), buttons: Some(vec![1, 2, 3]), ..Default::default() })
     }
 
     #[test]
@@ -410,9 +406,9 @@ mod tests {
                 device_id: Some(5),
                 position_in_viewport: Some([50.0, 50.0]),
                 pressed_buttons: Some(vec![1]),
-                ..MousePointerSample::EMPTY
+                ..Default::default()
             }),
-            ..MouseEvent::EMPTY
+            ..Default::default()
         }];
         let expected_events = [
             wire::VirtioInputEvent {
@@ -441,39 +437,39 @@ mod tests {
             MouseEvent {
                 timestamp: Some(0),
                 view_parameters: default_view_parameters(),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(1),
                 device_info: default_device_info(),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(2),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     position_in_viewport: Some([50.0, 50.0]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(3),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     pressed_buttons: Some(vec![1]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(4),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     pressed_buttons: None,
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
         ];
         let expected_events = [
@@ -514,18 +510,18 @@ mod tests {
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     position_in_viewport: Some([50.0, 50.0]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(1),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     position_in_viewport: Some([25.0, 75.0]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
         ];
         let expected_events = [
@@ -565,17 +561,17 @@ mod tests {
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     pressed_buttons: Some(vec![2]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(1),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
         ];
         let expected_events = [
@@ -605,18 +601,18 @@ mod tests {
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     position_in_viewport: Some([0.0, 0.0]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(3),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     pressed_buttons: Some(vec![1]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(5),
@@ -626,18 +622,18 @@ mod tests {
                     device_id: Some(3),
                     position_in_viewport: Some([50.0, 50.0]),
                     pressed_buttons: Some(vec![1]),
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
             MouseEvent {
                 timestamp: Some(8),
                 pointer_sample: Some(MousePointerSample {
                     device_id: Some(3),
                     pressed_buttons: None,
-                    ..MousePointerSample::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseEvent::EMPTY
+                ..Default::default()
             },
         ];
         let expected_events = [

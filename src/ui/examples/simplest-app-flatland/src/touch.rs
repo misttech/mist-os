@@ -18,7 +18,7 @@ use {
 fn generate_touch_event_responses(events: Iter<'_, TouchEvent>) -> Vec<TouchResponse> {
     events
         .map(|evt| {
-            let mut response = TouchResponse::EMPTY;
+            let mut response = TouchResponse::default();
             if evt.pointer_sample.is_some() {
                 response.response_type = Some(fptr::TouchResponseType::Yes);
             }

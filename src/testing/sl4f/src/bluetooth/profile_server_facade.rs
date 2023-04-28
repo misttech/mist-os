@@ -314,7 +314,7 @@ impl ProfileServerFacade {
                 name,
                 description,
                 provider,
-                ..Information::EMPTY
+                ..Default::default()
             });
         }
         Ok(info_list)
@@ -573,7 +573,7 @@ impl ProfileServerFacade {
             },
             information: Some(information),
             additional_attributes,
-            ..ServiceDefinition::EMPTY
+            ..Default::default()
         }];
 
         let (connect_client, connect_requests) =

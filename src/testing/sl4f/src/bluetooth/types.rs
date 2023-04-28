@@ -286,7 +286,7 @@ impl From<CustomPlayStatus> for PlayStatus {
             song_length: status.song_length,
             song_position: status.song_position,
             playback_status: playback_status,
-            ..PlayStatus::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -735,13 +735,13 @@ impl From<CustomPlayerApplicationSettings> for PlayerApplicationSettings {
                                 None => None,
                             },
                             current_value: custom_settings.current_value,
-                            ..CustomPlayerApplicationSetting::EMPTY
+                            ..Default::default()
                         })
                         .collect(),
                 ),
                 None => None,
             },
-            ..PlayerApplicationSettings::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -1008,7 +1008,7 @@ impl TryInto<AdvertisingData> for FacadeArg {
             manufacturer_data,
             uris: uris,
             include_tx_power_level,
-            ..AdvertisingData::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -1040,7 +1040,7 @@ impl TryInto<AdvertisingParameters> for FacadeArg {
             Some(ConnectionOptions {
                 bondable_mode: Some(true),
                 service_filter: None,
-                ..ConnectionOptions::EMPTY
+                ..Default::default()
             })
         } else {
             None
@@ -1051,7 +1051,7 @@ impl TryInto<AdvertisingParameters> for FacadeArg {
             scan_response: scan_response,
             mode_hint: Some(AdvertisingModeHint::VeryFast),
             connection_options: conn_opts,
-            ..AdvertisingParameters::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -1062,7 +1062,7 @@ impl TryInto<Filter> for FacadeArg {
         let value = self.value.get("filter").ok_or(format_err!("Scan filter missing."))?.clone();
         let name = value["name_substring"].as_str().map(String::from);
         // For now, no scan profile, so default to empty Filter
-        Ok(Filter { name, ..Filter::EMPTY })
+        Ok(Filter { name, ..Default::default() })
     }
 }
 
@@ -1083,7 +1083,7 @@ impl TryInto<ServiceInfo> for FacadeArg {
             kind: Some(kind),
             type_: Some(type_),
             // TODO(fxbug.dev/883): Add support for GATT characteristics and includes
-            ..ServiceInfo::EMPTY
+            ..Default::default()
         })
     }
 }

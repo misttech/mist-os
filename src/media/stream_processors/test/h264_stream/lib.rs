@@ -54,7 +54,7 @@ impl ElementaryStream for H264Stream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h264")),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 
@@ -175,7 +175,7 @@ impl ElementaryStream for H264AVCCStream {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h264")),
             oob_bytes: Some(self.oob_data.clone()),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 

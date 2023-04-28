@@ -91,7 +91,7 @@ async fn run_context_server(
                     .send(ui_test_context::ContextGetDisplayDimensionsResponse {
                         width_in_physical_px: Some(dimensions.width),
                         height_in_physical_px: Some(dimensions.height),
-                        ..ui_test_context::ContextGetDisplayDimensionsResponse::EMPTY
+                        ..Default::default()
                     })
                     .expect("failed to respond to get display dimensions request");
             }
@@ -106,7 +106,7 @@ async fn run_context_server(
                     .expect("failed to create root view token pair");
                 let present_view_request = test_scene::ControllerPresentClientViewRequest {
                     viewport_creation_token: Some(root_view_token_pair.viewport_creation_token),
-                    ..test_scene::ControllerPresentClientViewRequest::EMPTY
+                    ..Default::default()
                 };
                 scene_controller
                     .present_client_view(present_view_request)

@@ -49,8 +49,8 @@ pub(crate) fn setup_proxies_and_data() -> SetupData {
 
     // Create default, disabled light groups.
     let light_groups = vec![
-        LightGroupFidl { name: Some(String::from(LED1_NAME)), ..LightGroupFidl::EMPTY },
-        LightGroupFidl { name: Some(String::from(LED2_NAME)), ..LightGroupFidl::EMPTY },
+        LightGroupFidl { name: Some(String::from(LED1_NAME)), ..Default::default() },
+        LightGroupFidl { name: Some(String::from(LED2_NAME)), ..Default::default() },
     ];
 
     SetupData {

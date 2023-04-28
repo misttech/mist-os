@@ -306,7 +306,7 @@ where
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
                                 subdir: Some(netemul::NETDEVICE_DEVFS_PATH.to_string()),
-                                ..fidl_fuchsia_netemul::DevfsDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::ChildDep(
@@ -318,7 +318,7 @@ where
                                             .to_string(),
                                     ),
                                 ),
-                                ..fidl_fuchsia_netemul::ChildDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::ChildDep(
@@ -329,7 +329,7 @@ where
                                         fidl_fuchsia_logger::LogMarker::PROTOCOL_NAME.to_string(),
                                     ),
                                 ),
-                                ..fidl_fuchsia_netemul::ChildDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::ChildDep(
@@ -341,7 +341,7 @@ where
                                             .to_string(),
                                     ),
                                 ),
-                                ..fidl_fuchsia_netemul::ChildDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::ChildDep(
@@ -352,13 +352,13 @@ where
                                         fidl_fuchsia_paver::PaverMarker::PROTOCOL_NAME.to_string(),
                                     ),
                                 ),
-                                ..fidl_fuchsia_netemul::ChildDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::LogSink(fidl_fuchsia_netemul::Empty {}),
                     ])),
                     eager: Some(true),
-                    ..fidl_fuchsia_netemul::ChildDef::EMPTY
+                    ..Default::default()
                 },
                 fidl_fuchsia_netemul::ChildDef {
                     source: Some(fidl_fuchsia_netemul::ChildSource::Component(
@@ -370,7 +370,7 @@ where
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
                                 subdir: Some(netemul::NETDEVICE_DEVFS_PATH.to_string()),
-                                ..fidl_fuchsia_netemul::DevfsDep::EMPTY
+                                ..Default::default()
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::LogSink(fidl_fuchsia_netemul::Empty {}),
@@ -378,12 +378,12 @@ where
                     exposes: Some(vec![
                         fidl_fuchsia_device::NameProviderMarker::PROTOCOL_NAME.to_string()
                     ]),
-                    ..fidl_fuchsia_netemul::ChildDef::EMPTY
+                    ..Default::default()
                 },
                 fidl_fuchsia_netemul::ChildDef {
                     source: Some(fidl_fuchsia_netemul::ChildSource::Mock(mock_dir)),
                     name: Some(MOCK_SERVICES_NAME.to_string()),
-                    ..fidl_fuchsia_netemul::ChildDef::EMPTY
+                    ..Default::default()
                 },
             ],
         )

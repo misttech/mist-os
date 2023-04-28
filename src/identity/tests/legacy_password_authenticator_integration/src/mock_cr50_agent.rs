@@ -77,7 +77,7 @@ impl MockCr50AgentBuilder {
             root_hash: Some(root_hash),
             mac: Some(mac),
             cred_metadata: Some(cred_metadata),
-            ..InsertLeafResponse::EMPTY
+            ..Default::default()
         };
         self.responses.push_back(MockResponse::InsertLeaf { response });
         self
@@ -100,7 +100,7 @@ impl MockCr50AgentBuilder {
             root_hash: Some(root_hash),
             cred_metadata: Some(cred_metadata),
             mac: Some(mac),
-            ..TryAuthSuccess::EMPTY
+            ..Default::default()
         };
         self.responses
             .push_back(MockResponse::TryAuth { response: TryAuthResponse::Success(success) });
@@ -118,7 +118,7 @@ impl MockCr50AgentBuilder {
             root_hash: Some(root_hash),
             cred_metadata: Some(cred_metadata),
             mac: Some(mac),
-            ..TryAuthFailed::EMPTY
+            ..Default::default()
         };
         self.responses
             .push_back(MockResponse::TryAuth { response: TryAuthResponse::Failed(failed) });
@@ -128,7 +128,7 @@ impl MockCr50AgentBuilder {
     /// Adds a rate limited TryAuth response.
     pub(crate) fn add_try_auth_rate_limited_response(mut self, time_to_wait: i64) -> Self {
         let ratelimited =
-            TryAuthRateLimited { time_to_wait: Some(time_to_wait), ..TryAuthRateLimited::EMPTY };
+            TryAuthRateLimited { time_to_wait: Some(time_to_wait), ..Default::default() };
         self.responses.push_back(MockResponse::TryAuth {
             response: TryAuthResponse::RateLimited(ratelimited),
         });

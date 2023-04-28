@@ -23,7 +23,7 @@ use {
 // possible value.
 
 pub fn minimum_auth_state() -> AuthState {
-    AuthState { summary: Some(AuthStateSummary::StorageLocked), ..AuthState::EMPTY }
+    AuthState { summary: Some(AuthStateSummary::StorageLocked), ..Default::default() }
 }
 
 /// Events emitted on account listeners

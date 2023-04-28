@@ -39,14 +39,14 @@ pub fn create_keyboard_input_report(
         event_time: Some(event_time),
         keyboard: Some(fidl_input_report::KeyboardInputReport {
             pressed_keys3: Some(pressed_keys),
-            ..fidl_input_report::KeyboardInputReport::EMPTY
+            ..Default::default()
         }),
         mouse: None,
         touch: None,
         sensor: None,
         consumer_control: None,
         trace_id: None,
-        ..fidl_input_report::InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -233,10 +233,10 @@ pub fn create_consumer_control_input_report(
         sensor: None,
         consumer_control: Some(fidl_input_report::ConsumerControlInputReport {
             pressed_buttons: Some(buttons),
-            ..fidl_input_report::ConsumerControlInputReport::EMPTY
+            ..Default::default()
         }),
         trace_id: None,
-        ..fidl_input_report::InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -307,9 +307,9 @@ pub fn create_mouse_input_report_absolute(
             scroll_v,
             scroll_h,
             pressed_buttons: Some(buttons),
-            ..fidl_input_report::MouseInputReport::EMPTY
+            ..Default::default()
         }),
-        ..fidl_input_report::InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -339,13 +339,13 @@ pub fn create_mouse_input_report_relative(
             scroll_v: scroll_v,
             scroll_h: scroll_h,
             pressed_buttons: Some(buttons),
-            ..fidl_input_report::MouseInputReport::EMPTY
+            ..Default::default()
         }),
         touch: None,
         sensor: None,
         consumer_control: None,
         trace_id: None,
-        ..fidl_input_report::InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -461,14 +461,14 @@ pub fn create_mouse_pointer_sample_event_with_wheel_physical_pixel(
         is_precision_scroll,
         pressed_buttons: Some(buttons),
         relative_motion,
-        ..pointerinjector::PointerSample::EMPTY
+        ..Default::default()
     };
     let data = pointerinjector::Data::PointerSample(pointer_sample);
 
     pointerinjector::Event {
         timestamp: Some(event_time.into_nanos()),
         data: Some(data),
-        ..pointerinjector::Event::EMPTY
+        ..Default::default()
     }
 }
 
@@ -524,12 +524,12 @@ pub fn create_touch_input_report(
         touch: Some(fidl_input_report::TouchInputReport {
             contacts: Some(contacts),
             pressed_buttons,
-            ..fidl_input_report::TouchInputReport::EMPTY
+            ..Default::default()
         }),
         sensor: None,
         consumer_control: None,
         trace_id: None,
-        ..fidl_input_report::InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -663,7 +663,7 @@ pub fn create_touch_pointer_sample_event(
         scroll_v: None,
         scroll_h: None,
         pressed_buttons: None,
-        ..pointerinjector::PointerSample::EMPTY
+        ..Default::default()
     };
     let data = pointerinjector::Data::PointerSample(pointer_sample);
 
@@ -671,7 +671,7 @@ pub fn create_touch_pointer_sample_event(
         timestamp: Some(event_time.into_nanos()),
         data: Some(data),
         trace_flow_id: Some(fuchsia_trace::Id::new().into()),
-        ..pointerinjector::Event::EMPTY
+        ..Default::default()
     }
 }
 

@@ -716,7 +716,7 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                     };
                     options.selectors.push(LogInterestSelector {
                         selector,
-                        interest: Interest { min_severity, ..Interest::EMPTY },
+                        interest: Interest { min_severity, ..Default::default() },
                     });
                 }
 
@@ -1838,7 +1838,7 @@ mod tests {
                     &"foo.cmx".to_string(),
                 )
                 .unwrap(),
-                interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY },
+                interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.filter.min_severity = LogLevelFilter::Debug;
             parse_flag_test_helper(&args, Some(&expected));
@@ -1856,7 +1856,7 @@ mod tests {
                     &"foo.cmx".to_string(),
                 )
                 .unwrap(),
-                interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY },
+                interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.filter.min_severity = LogLevelFilter::Info;
             parse_flag_test_helper(&args, Some(&expected));
@@ -1873,14 +1873,14 @@ mod tests {
                     &"foo.cmx".to_string(),
                 )
                 .unwrap(),
-                interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY },
+                interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.selectors.push(LogInterestSelector {
                 selector: selectors::parse_component_selector::<VerboseError>(
                     &"core/bar".to_string(),
                 )
                 .unwrap(),
-                interest: Interest { min_severity: Some(Severity::Warn), ..Interest::EMPTY },
+                interest: Interest { min_severity: Some(Severity::Warn), ..Default::default() },
             });
             expected.filter.min_severity = LogLevelFilter::Debug;
             parse_flag_test_helper(&args, Some(&expected));
@@ -1897,7 +1897,7 @@ mod tests {
                     &"foo.cmx".to_string(),
                 )
                 .unwrap(),
-                interest: Interest { min_severity: None, ..Interest::EMPTY },
+                interest: Interest { min_severity: None, ..Default::default() },
             });
             parse_flag_test_helper(&args, Some(&expected));
         }

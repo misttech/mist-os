@@ -125,7 +125,7 @@ mod tests {
                 fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 },
             ))
             .await
@@ -138,7 +138,7 @@ mod tests {
                     build_id: Some(fheapdump_client::BuildId {
                         value: FAKE_REGION_BUILD_ID.to_vec(),
                     }),
-                    ..fheapdump_client::ExecutableRegion::EMPTY
+                    ..Default::default()
                 },
             ))
             .await
@@ -151,7 +151,7 @@ mod tests {
                         size: Some(*size),
                         stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
                         timestamp: Some(FAKE_TIMESTAMP),
-                        ..fheapdump_client::Allocation::EMPTY
+                        ..Default::default()
                     },
                 ))
                 .await

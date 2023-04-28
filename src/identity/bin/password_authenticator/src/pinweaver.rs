@@ -179,7 +179,7 @@ impl CredManager for ManagerProxy {
             le_secret: Some(le_secret.to_vec()),
             delay_schedule: Some(DELAY_SCHEDULE.to_vec()),
             he_secret: Some(he_secret.to_vec()),
-            ..fcred::AddCredentialParams::EMPTY
+            ..Default::default()
         };
 
         self.add_credential(params)
@@ -202,7 +202,7 @@ impl CredManager for ManagerProxy {
         let params = fcred::CheckCredentialParams {
             le_secret: Some(le_secret.to_vec()),
             label: Some(cred_label),
-            ..fcred::CheckCredentialParams::EMPTY
+            ..Default::default()
         };
 
         self.check_credential(params)

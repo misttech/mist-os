@@ -44,7 +44,7 @@ pub mod tests {
         let realm = RealmBuilder::new().await?;
         let _ = realm.driver_test_realm_setup().await?;
         let instance = realm.build().await?;
-        instance.driver_test_realm_start(fidl_fuchsia_driver_test::RealmArgs::EMPTY).await?;
+        instance.driver_test_realm_start(fidl_fuchsia_driver_test::RealmArgs::default()).await?;
         let dev = instance.driver_test_realm_connect_to_dev()?;
         let dir =
             fuchsia_fs::directory::open_directory(&dev, dev_dir, fio::OpenFlags::empty()).await?;

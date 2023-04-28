@@ -68,7 +68,7 @@ impl VirtualCameraFacade {
 
         // Set up StreamConfig struct.
         let stream_config =
-            { StreamConfig { width: config_width, height: config_height, ..StreamConfig::EMPTY } };
+            { StreamConfig { width: config_width, height: config_height, ..Default::default() } };
 
         // Call the FIDL method.
         info!("Stream Config specifications {:?}", stream_config);
@@ -147,7 +147,7 @@ mod tests {
                         StreamConfig {
                             width: Some(test_width),
                             height: Some(test_height),
-                            ..StreamConfig::EMPTY
+                            ..Default::default()
                         }
                     );
                 }

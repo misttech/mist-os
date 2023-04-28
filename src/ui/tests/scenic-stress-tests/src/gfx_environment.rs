@@ -141,7 +141,7 @@ impl Environment for GfxEnvironment {
             let viewport = pointerinjector::Viewport {
                 extents: Some([[0.0, 0.0], [DISPLAY_WIDTH as f32, DISPLAY_HEIGHT as f32]]),
                 viewport_to_context_transform: Some(identity_matrix),
-                ..pointerinjector::Viewport::EMPTY
+                ..Default::default()
             };
             let config = pointerinjector::Config {
                 device_id: Some(0),
@@ -153,7 +153,7 @@ impl Environment for GfxEnvironment {
                 scroll_v_range: None,
                 scroll_h_range: None,
                 buttons: None,
-                ..pointerinjector::Config::EMPTY
+                ..Default::default()
             };
             let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>()
                 .expect("Failed to create DeviceProxy.");

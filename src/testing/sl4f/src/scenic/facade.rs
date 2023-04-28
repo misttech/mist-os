@@ -26,7 +26,7 @@ impl ScenicFacade {
 
         let gnf_args = ui_comp::ScreenshotTakeRequest {
             format: Some(ui_comp::ScreenshotFormat::BgraRaw),
-            ..ui_comp::ScreenshotTakeRequest::EMPTY
+            ..Default::default()
         };
 
         let screenshot_response: ui_comp::ScreenshotTakeResponse;

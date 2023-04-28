@@ -102,7 +102,7 @@ mod test {
     fn validate_stream_buffer_constraints() {
         let invalid_version_ordinal = StreamBufferConstraints {
             buffer_constraints_version_ordinal: Some(0),
-            ..StreamBufferConstraints::EMPTY
+            ..Default::default()
         };
 
         let err = ValidStreamBufferConstraints::try_from(invalid_version_ordinal);
@@ -111,7 +111,7 @@ mod test {
 
         let invalid_single_buffer = StreamBufferConstraints {
             buffer_constraints_version_ordinal: Some(0),
-            ..StreamBufferConstraints::EMPTY
+            ..Default::default()
         };
 
         let err = ValidStreamBufferConstraints::try_from(invalid_single_buffer);
@@ -120,7 +120,7 @@ mod test {
 
         let invalid_continuous = StreamBufferConstraints {
             buffer_constraints_version_ordinal: Some(0),
-            ..StreamBufferConstraints::EMPTY
+            ..Default::default()
         };
 
         let err = ValidStreamBufferConstraints::try_from(invalid_continuous);

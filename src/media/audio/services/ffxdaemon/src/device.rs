@@ -54,7 +54,7 @@ impl Device {
                 supported_formats,
                 gain_state,
                 plug_state,
-                ..DeviceInfo::EMPTY
+                ..Default::default()
             }),
             Err(e) => Err(e.into()),
         }

@@ -43,7 +43,7 @@ pub async fn get_typeface_info_detailed(
     let typeface = font_provider.get_typeface(request.clone()).await?;
 
     assert!(
-        typeface != fonts::TypefaceResponse::EMPTY,
+        typeface != fonts::TypefaceResponse::default(),
         "Received empty response for {:?}",
         request
     );
@@ -82,11 +82,11 @@ pub async fn get_typeface_info(
                         .collect()
                 }),
                 fallback_family: None,
-                ..fonts::TypefaceQuery::EMPTY
+                ..Default::default()
             }),
             flags: Some(fonts::TypefaceRequestFlags::empty()),
             cache_miss_policy: None,
-            ..fonts::TypefaceRequest::EMPTY
+            ..Default::default()
         },
     )
     .await?;

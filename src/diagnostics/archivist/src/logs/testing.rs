@@ -55,16 +55,16 @@ pub fn create_log_sink_requested_event(
             moniker: Some(target_moniker),
             component_url: Some(target_url),
             timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-            ..fcomponent::EventHeader::EMPTY
+            ..Default::default()
         }),
         payload: Some(fcomponent::EventPayload::CapabilityRequested(
             fcomponent::CapabilityRequestedPayload {
                 name: Some(LogSinkMarker::PROTOCOL_NAME.into()),
                 capability: Some(capability),
-                ..fcomponent::CapabilityRequestedPayload::EMPTY
+                ..Default::default()
             },
         )),
-        ..fcomponent::Event::EMPTY
+        ..Default::default()
     }
 }
 

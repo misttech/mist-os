@@ -141,7 +141,7 @@ fn init_scene(
     let args = fuicomposition::RegisterBufferCollectionArgs {
         export_token: Some(buffer_tokens.export_token),
         buffer_collection_token: Some(sysmem_buffer_collection_token),
-        ..fuicomposition::RegisterBufferCollectionArgs::EMPTY
+        ..Default::default()
     };
 
     allocator
@@ -155,7 +155,7 @@ fn init_scene(
 
     let image_props = fuicomposition::ImageProperties {
         size: Some(fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT }),
-        ..fuicomposition::ImageProperties::EMPTY
+        ..Default::default()
     };
     flatland
         .create_image(&mut IMAGE_ID.clone(), &mut buffer_tokens.import_token, 0, image_props)
@@ -257,7 +257,7 @@ fn start_presenting(server: Arc<FramebufferServer>) {
                     acquire_fences: None,
                     release_fences: None,
                     unsquashable: Some(present_parameters.unsquashable),
-                    ..fuicomposition::PresentArgs::EMPTY
+                    ..Default::default()
                 })
                 .unwrap_or(());
 

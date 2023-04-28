@@ -45,7 +45,7 @@ impl RequestExt for fonts::Request {
             weight: Some(self.weight as u16),
             slant: Some(self.slant),
             width: Width::from_primitive(self.width),
-            ..Style2::EMPTY
+            ..Default::default()
         });
 
         let languages: Option<Vec<intl::LocaleId>> = self.language.map(|languages| {
@@ -70,11 +70,11 @@ impl RequestExt for fonts::Request {
                     _ => None,
                 },
                 fallback_family: self.fallback_group.to_generic_font_family(),
-                ..TypefaceQuery::EMPTY
+                ..Default::default()
             }),
             flags: Some(flags),
             cache_miss_policy: None,
-            ..TypefaceRequest::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -112,7 +112,7 @@ pub trait TypefaceResponseExt {
 
 impl TypefaceResponseExt for TypefaceResponse {
     fn into_font_response(self) -> Option<fonts::Response> {
-        if self == Self::EMPTY {
+        if self == Self::default() {
             None
         } else {
             Some(fonts::Response {
@@ -131,7 +131,7 @@ pub trait FontFamilyInfoExt {
 
 impl FontFamilyInfoExt for FontFamilyInfo {
     fn into_family_info(self) -> Option<fonts::FamilyInfo> {
-        if self == Self::EMPTY {
+        if self == Self::default() {
             None
         } else {
             Some(fonts::FamilyInfo {
@@ -154,7 +154,7 @@ pub trait Style2Ext {
 
 impl Style2Ext for Style2 {
     fn into_style(self) -> Option<fonts::Style> {
-        if self == Self::EMPTY {
+        if self == Self::default() {
             None
         } else {
             Some(fonts::Style {

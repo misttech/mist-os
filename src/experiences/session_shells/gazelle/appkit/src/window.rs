@@ -76,7 +76,7 @@ impl Presenter {
         self.present_credits -= 1;
         self.can_update = self.present_credits > 0;
 
-        self.flatland.present(ui_comp::PresentArgs::EMPTY)?;
+        self.flatland.present(ui_comp::PresentArgs::default())?;
         Ok(())
     }
 }
@@ -357,7 +357,7 @@ impl Window {
             view_focuser: Some(view_focuser_request),
             mouse_source: Some(mouse_request),
             touch_source: Some(touch_request),
-            ..ui_comp::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
 
         self.flatland = Some(flatland);
@@ -546,7 +546,7 @@ impl Window {
             ViewSpecHolder {
                 view_spec: felement::ViewSpec {
                     viewport_creation_token: Some(viewport_creation_token),
-                    ..felement::ViewSpec::EMPTY
+                    ..Default::default()
                 },
                 annotation_controller: None,
                 view_controller_request: None,
@@ -741,7 +741,7 @@ async fn serve_touch_source_watcher(
                         view_parameters = event.view_parameters.clone().or(view_parameters.clone());
                         device_info = event.device_info.clone().or(device_info.clone());
 
-                        let mut response = fptr::TouchResponse::EMPTY;
+                        let mut response = fptr::TouchResponse::default();
                         if let Some(fptr::TouchPointerSample {
                             interaction: Some(interaction),
                             phase: Some(phase),
@@ -827,7 +827,7 @@ async fn present_to_graphical_presenter(
         viewport_creation_token: Some(viewport_creation_token),
         view_ref: Some(view_ref),
         annotations: annotations,
-        ..felement::ViewSpec::EMPTY
+        ..Default::default()
     };
     let _result = graphical_presenter
         .present_view(

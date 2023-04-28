@@ -36,7 +36,7 @@ pub fn create_network_info(
     wlan_policy::NetworkConfig {
         id: Some(network_id),
         credential: Some(credential),
-        ..wlan_policy::NetworkConfig::EMPTY
+        ..Default::default()
     }
 }
 
@@ -231,7 +231,7 @@ mod tests {
             wlan_policy::NetworkConfig {
                 id: Some(network_id()),
                 credential: Some(wlan_policy::Credential::Password(vec![66, 66, 66, 66])),
-                ..wlan_policy::NetworkConfig::EMPTY
+                ..Default::default()
             }
         }
 
@@ -255,9 +255,9 @@ mod tests {
                                     id: Some(network_id()),
                                     state: Some(wlan_policy::ConnectionState::Connecting),
                                     status: None,
-                                    ..wlan_policy::NetworkState::EMPTY
+                                    ..Default::default()
                                 }]),
-                                ..wlan_policy::ClientStateSummary::EMPTY
+                                ..Default::default()
                             })
                             .await
                             .expect("sending client state update");
@@ -268,9 +268,9 @@ mod tests {
                                     id: Some(network_id()),
                                     state: Some(wlan_policy::ConnectionState::Connected),
                                     status: None,
-                                    ..wlan_policy::NetworkState::EMPTY
+                                    ..Default::default()
                                 }]),
-                                ..wlan_policy::ClientStateSummary::EMPTY
+                                ..Default::default()
                             })
                             .await
                             .expect("sending client state update");
@@ -300,7 +300,7 @@ mod tests {
             wlan_policy::NetworkConfig {
                 id: Some(network_id()),
                 credential: Some(wlan_policy::Credential::Password(vec![66, 66, 66, 66])),
-                ..wlan_policy::NetworkConfig::EMPTY
+                ..Default::default()
             }
         }
 
@@ -324,9 +324,9 @@ mod tests {
                                     id: Some(network_id()),
                                     state: Some(wlan_policy::ConnectionState::Connecting),
                                     status: None,
-                                    ..wlan_policy::NetworkState::EMPTY
+                                    ..Default::default()
                                 }]),
-                                ..wlan_policy::ClientStateSummary::EMPTY
+                                ..Default::default()
                             })
                             .await
                             .expect("sending client state update");
@@ -337,9 +337,9 @@ mod tests {
                                     id: Some(network_id()),
                                     state: Some(wlan_policy::ConnectionState::Disconnected),
                                     status: None,
-                                    ..wlan_policy::NetworkState::EMPTY
+                                    ..Default::default()
                                 }]),
-                                ..wlan_policy::ClientStateSummary::EMPTY
+                                ..Default::default()
                             })
                             .await
                             .expect("sending client state update");

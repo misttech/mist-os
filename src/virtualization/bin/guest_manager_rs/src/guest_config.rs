@@ -184,7 +184,7 @@ pub fn parse_config(data: &str, dir: &Path) -> Result<GuestConfig, Error> {
         virtio_vsock: conf.virtio_vsock,
         virtio_sound: conf.virtio_sound,
         virtio_sound_input: conf.virtio_sound_input,
-        ..GuestConfig::EMPTY
+        ..Default::default()
     })
 }
 
@@ -261,7 +261,7 @@ mod tests {
     // Parse empty but valid JSON.
     #[fuchsia::test]
     async fn parse_empty_config() {
-        assert_eq!(GuestConfig::EMPTY, parse_config("{}", Path::new("")).unwrap());
+        assert_eq!(GuestConfig::default(), parse_config("{}", Path::new("")).unwrap());
     }
 
     // Attempt to read files from incorrect guest directory.
@@ -411,7 +411,7 @@ mod tests {
             cmdline: Some("root=/dev/vda rw systemd.log_target=kmsg".to_string()),
             default_net: Some(false),
             guest_memory: Some(4294967296),
-            ..GuestConfig::EMPTY
+            ..Default::default()
         };
         let cfgoverride = GuestConfig {
             default_net: Some(true),
@@ -419,7 +419,7 @@ mod tests {
             kernel: Some(open_as_client_end::<fio::FileMarker>(
                 tmpdir.path().join(kernel).to_str().unwrap(),
             )?),
-            ..GuestConfig::EMPTY
+            ..Default::default()
         };
 
         let cfgmerge = merge_configs(cfgbase, cfgoverride);
@@ -438,8 +438,8 @@ mod tests {
         // Merge two configs with repeated fields appended.
         let mut args1 = Vec::from(["cmdline", "args"].map(String::from));
         let args2 = Vec::from(["and", "more", "args"].map(String::from));
-        let cfgbase = GuestConfig { cmdline_add: Some(args1.clone()), ..GuestConfig::EMPTY };
-        let cfgoverride = GuestConfig { cmdline_add: Some(args2.clone()), ..GuestConfig::EMPTY };
+        let cfgbase = GuestConfig { cmdline_add: Some(args1.clone()), ..Default::default() };
+        let cfgoverride = GuestConfig { cmdline_add: Some(args2.clone()), ..Default::default() };
 
         let cfgmerge = merge_configs(cfgbase, cfgoverride);
         args1.extend(args2);

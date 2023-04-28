@@ -778,15 +778,15 @@ mod tests {
                             buttons: Some(vec![0]),
                             position_x: None,
                             position_y: None,
-                            ..fidl_fuchsia_input_report::MouseInputDescriptor::EMPTY
+                            ..Default::default()
                         }),
-                        ..fidl_fuchsia_input_report::MouseDescriptor::EMPTY
+                        ..Default::default()
                     }),
                     sensor: None,
                     touch: None,
                     keyboard: None,
                     consumer_control: None,
-                    ..fidl_fuchsia_input_report::DeviceDescriptor::EMPTY
+                    ..Default::default()
                 });
             }
             _ => {}

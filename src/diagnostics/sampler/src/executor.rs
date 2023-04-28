@@ -460,7 +460,7 @@ impl ProjectSampler {
         if project_id != 0 {
             let (metric_logger_proxy, metrics_server_end) =
                 fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
-            let mut project_spec = ProjectSpec::EMPTY;
+            let mut project_spec = ProjectSpec::default();
             project_spec.customer_id = Some(customer_id);
             project_spec.project_id = Some(project_id);
             metric_logger_factory
@@ -475,7 +475,7 @@ impl ProjectSampler {
                 if metric_loggers.get(&metric_project_id).is_none() {
                     let (metric_logger_proxy, metrics_server_end) =
                         fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
-                    let mut project_spec = ProjectSpec::EMPTY;
+                    let mut project_spec = ProjectSpec::default();
                     project_spec.customer_id = Some(customer_id);
                     project_spec.project_id = Some(metric_project_id);
                     metric_logger_factory

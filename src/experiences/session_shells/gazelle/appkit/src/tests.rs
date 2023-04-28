@@ -220,7 +220,7 @@ async fn start_view_provider(
         let _view_ref_koid = scene_controller
             .attach_client_view(ui_test_scene::ControllerAttachClientViewRequest {
                 view_provider: Some(view_provider),
-                ..ui_test_scene::ControllerAttachClientViewRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("failed to attach root client view");
@@ -286,7 +286,7 @@ async fn create_child_view_spec(
         ViewCreationTokenPair::new()?;
     let view_spec = felement::ViewSpec {
         viewport_creation_token: Some(viewport_creation_token),
-        ..felement::ViewSpec::EMPTY
+        ..Default::default()
     };
     let (view_controller_proxy, view_controller_request) =
         create_proxy::<felement::ViewControllerMarker>()?;
@@ -299,7 +299,7 @@ async fn create_child_view_spec(
     input_registry
         .register_keyboard(ui_test_input::RegistryRegisterKeyboardRequest {
             device: Some(keyboard_server),
-            ..ui_test_input::RegistryRegisterKeyboardRequest::EMPTY
+            ..Default::default()
         })
         .await?;
 
@@ -307,7 +307,7 @@ async fn create_child_view_spec(
     input_registry
         .register_mouse(ui_test_input::RegistryRegisterMouseRequest {
             device: Some(mouse_server),
-            ..ui_test_input::RegistryRegisterMouseRequest::EMPTY
+            ..Default::default()
         })
         .await?;
 
@@ -432,7 +432,7 @@ fn inject_text(text: String, keyboard: ui_test_input::KeyboardProxy) {
         keyboard
             .simulate_us_ascii_text_entry(ui_test_input::KeyboardSimulateUsAsciiTextEntryRequest {
                 text: Some(text),
-                ..ui_test_input::KeyboardSimulateUsAsciiTextEntryRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("Failed to inject text using fuchsia.ui.test.input.Keyboard");
@@ -445,14 +445,12 @@ fn tap(mouse: ui_test_input::MouseProxy) {
         mouse
             .simulate_mouse_event(ui_test_input::MouseSimulateMouseEventRequest {
                 pressed_buttons: Some(vec![ui_test_input::MouseButton::First]),
-                ..ui_test_input::MouseSimulateMouseEventRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("Failed to tap using fuchsia.ui.test.input.Mouse");
         mouse
-            .simulate_mouse_event(ui_test_input::MouseSimulateMouseEventRequest {
-                ..ui_test_input::MouseSimulateMouseEventRequest::EMPTY
-            })
+            .simulate_mouse_event(ui_test_input::MouseSimulateMouseEventRequest::default())
             .await
             .expect("Failed to tap using fuchsia.ui.test.input.Mouse");
     })
@@ -460,11 +458,7 @@ fn tap(mouse: ui_test_input::MouseProxy) {
 }
 
 fn create_shortcut(id: u32, keys: Vec<KeyMeaning>) -> ui_shortcut2::Shortcut {
-    ui_shortcut2::Shortcut {
-        id,
-        key_meanings: keys,
-        options: ui_shortcut2::Options { ..ui_shortcut2::Options::EMPTY },
-    }
+    ui_shortcut2::Shortcut { id, key_meanings: keys, options: ui_shortcut2::Options::default() }
 }
 
 type Histogram = HashMap<u32, u32>;
@@ -475,7 +469,7 @@ async fn take_screenshot(screenshot: ui_comp::ScreenshotProxy) -> Result<Histogr
     let data = screenshot
         .take(ui_comp::ScreenshotTakeRequest {
             format: Some(ui_comp::ScreenshotFormat::BgraRaw),
-            ..ui_comp::ScreenshotTakeRequest::EMPTY
+            ..Default::default()
         })
         .await?;
     let vmo = data.vmo.unwrap();

@@ -268,7 +268,7 @@ mod test {
 
     impl Into<OutputPacket> for TestSpec {
         fn into(self) -> OutputPacket {
-            let mut format_details = FormatDetails::EMPTY;
+            let mut format_details = FormatDetails::default();
             format_details.domain = Some(DomainFormat::Video(VideoFormat::Uncompressed(
                 new_video_uncompressed_format(ImageFormat2 {
                     pixel_format: PixelFormat {

@@ -229,7 +229,7 @@ mod tests {
             .propose_element(
                 felement::Spec {
                     component_url: Some(component_url.to_string()),
-                    ..felement::Spec::EMPTY
+                    ..Default::default()
                 },
                 None,
             )

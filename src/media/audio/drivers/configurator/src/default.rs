@@ -172,7 +172,7 @@ impl StreamConfig {
         match request {
             StreamConfigRequest::GetHealthState { responder } => {
                 tracing::trace!("StreamConfig get health state");
-                responder.send(HealthState::EMPTY)?;
+                responder.send(HealthState::default())?;
             }
 
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
@@ -231,7 +231,7 @@ impl StreamConfig {
                     muted: Some(false),
                     agc_enabled: Some(false),
                     gain_db: Some(0.0f32),
-                    ..GainState::EMPTY
+                    ..Default::default()
                 };
                 state.gain_state_first_watch_replied = true;
                 responder.send(gain_state)?
@@ -244,7 +244,7 @@ impl StreamConfig {
                 let plug_state = PlugState {
                     plugged: Some(state.plugged),
                     plug_state_time: Some(time),
-                    ..PlugState::EMPTY
+                    ..Default::default()
                 };
                 tracing::trace!("StreamConfig watch plug state: {:?}", plug_state.plugged);
                 if state.plug_state_updated {
@@ -469,7 +469,7 @@ impl DefaultConfigurator {
                 let plug_state = PlugState {
                     plugged: Some(stream_config_state.plugged),
                     plug_state_time: Some(stream_config_state.plugged_time),
-                    ..PlugState::EMPTY
+                    ..Default::default()
                 };
                 match responder.send(plug_state) {
                     Ok(()) => continue,
@@ -543,10 +543,10 @@ impl Configurator for DefaultConfigurator {
                                     type_specific: Some(TypeSpecificElementState::Gain(
                                         GainElementState {
                                             gain: Some(0.0f32),
-                                            ..GainElementState::EMPTY
+                                            ..Default::default()
                                         },
                                     )),
-                                    ..ElementState::EMPTY
+                                    ..Default::default()
                                 };
                                 signal.set_element_state(id, state).await?;
                             }
@@ -828,7 +828,7 @@ impl Configurator for DefaultConfigurator {
             clock_domain: Some(0u32),
             manufacturer: Some("Google".to_string()),
             product: Some(configurator_product),
-            ..StreamProperties::EMPTY
+            ..Default::default()
         };
         let control_handle = request_stream.control_handle().clone();
         let stream_config = StreamConfig {
@@ -1026,7 +1026,7 @@ mod tests {
             valid_bits_per_sample: 16,
             bytes_per_sample: 2,
         };
-        let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Format::EMPTY };
+        let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
@@ -1084,7 +1084,7 @@ mod tests {
             valid_bits_per_sample: 16,
             bytes_per_sample: 2,
         };
-        let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Format::EMPTY };
+        let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
@@ -1329,7 +1329,7 @@ mod tests {
             clock_domain: Some(0u32),
             manufacturer: Some("Test Manufacturer".to_string()),
             product: Some("Test Product".to_string()),
-            ..StreamProperties::EMPTY
+            ..Default::default()
         };
         let stream_config = StreamConfig {
             control_handle: control_handle,
@@ -1487,7 +1487,7 @@ mod tests {
                         product: Some("testy".to_string()),
                         is_input: Some(self.is_input),
                         plug_detect_capabilities: Some(PlugDetectCapabilities::Hardwired),
-                        ..CodecProperties::EMPTY
+                        ..Default::default()
                     };
                     responder.send(info)?;
                 }
@@ -1513,7 +1513,7 @@ mod tests {
                     responder.send(PlugState {
                         plugged: Some(TEST_CODEC_PLUGGED),
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
-                        ..PlugState::EMPTY
+                        ..Default::default()
                     })?;
                 }
                 CodecRequest::SignalProcessingConnect { protocol, control_handle } => {
@@ -1545,9 +1545,9 @@ mod tests {
                             min_gain: Some(0.0f32),
                             max_gain: Some(0.0f32),
                             min_gain_step: Some(0.0f32),
-                            ..Gain::EMPTY
+                            ..Default::default()
                         })),
-                        ..Element::EMPTY
+                        ..Default::default()
                     };
                     let mut ret = Ok(vec![pe]);
                     responder.send(&mut ret)?;
@@ -1577,9 +1577,9 @@ mod tests {
                         let state = ElementState {
                             type_specific: Some(TypeSpecificElementState::Gain(GainElementState {
                                 gain: Some(TEST_CODEC_GAIN),
-                                ..GainElementState::EMPTY
+                                ..Default::default()
                             })),
-                            ..ElementState::EMPTY
+                            ..Default::default()
                         };
                         return Ok(responder.send(state)?);
                     }
@@ -1894,7 +1894,7 @@ mod tests {
                     responder.send(PlugState {
                         // A plug state with missing plugged field is bad.
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
-                        ..PlugState::EMPTY
+                        ..Default::default()
                     })?;
                 }
                 r => panic!("{:?} Not covered by test", r),

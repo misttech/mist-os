@@ -100,7 +100,9 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender
+                .unbounded_send(InputReport::default())
+                .expect("sending empty InputReport");
             let reports_fut = proxy.read_input_reports();
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
             std::mem::drop(report_sender); // Drop `report_sender` to terminate `report_receiver`.
@@ -126,7 +128,7 @@ mod tests {
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
             for _ in 0..max_reports {
                 report_sender
-                    .unbounded_send(InputReport::EMPTY)
+                    .unbounded_send(InputReport::default())
                     .expect("sending empty InputReport");
             }
             let reports_fut = proxy.read_input_reports();
@@ -155,7 +157,7 @@ mod tests {
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
             for _ in 0..max_reports + 1 {
                 report_sender
-                    .unbounded_send(InputReport::EMPTY)
+                    .unbounded_send(InputReport::default())
                     .expect("sending empty InputReport");
             }
             pin_mut!(reader_fut);
@@ -207,7 +209,9 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender
+                .unbounded_send(InputReport::default())
+                .expect("sending empty InputReport");
             let _reports_fut = proxy.read_input_reports();
             std::mem::drop(report_sender); // Drop `report_sender` to terminate `report_receiver`.
             assert_matches!(reader_fut.await, Ok(()));
@@ -223,7 +227,9 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender
+                .unbounded_send(InputReport::default())
+                .expect("sending empty InputReport");
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
             assert_matches!(reader_fut.await, Err(_));
             Ok(())
@@ -237,7 +243,9 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender
+                .unbounded_send(InputReport::default())
+                .expect("sending empty InputReport");
             std::mem::drop(report_sender); // Drop `report_sender` to terminate `report_receiver`.
             client_end
                 .into_channel()
@@ -256,7 +264,7 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender.unbounded_send(InputReport::default()).expect("sending empty InputReport");
             let result_fut = proxy.read_input_reports(); // Send query.
             std::mem::drop(result_fut); // Close handle to channel.
             std::mem::drop(proxy); // Close other handle to channel.
@@ -297,7 +305,9 @@ mod tests {
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
-            report_sender.unbounded_send(InputReport::EMPTY).expect("sending empty InputReport");
+            report_sender
+                .unbounded_send(InputReport::default())
+                .expect("sending empty InputReport");
             let reports_fut = proxy.read_input_reports();
             std::mem::drop(report_sender); // Drop `report_sender` to terminate `report_receiver`.
 
@@ -326,7 +336,7 @@ mod tests {
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
             for _ in 0..max_reports + 1 {
                 report_sender
-                    .unbounded_send(InputReport::EMPTY)
+                    .unbounded_send(InputReport::default())
                     .expect("sending empty InputReport");
             }
             let first_reports_fut = proxy.read_input_reports();
@@ -358,10 +368,10 @@ mod tests {
         let (report_sender, report_receiver) = futures::channel::mpsc::unbounded::<InputReport>();
         let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
         report_sender
-            .unbounded_send(InputReport { event_time: Some(1), ..InputReport::EMPTY })
+            .unbounded_send(InputReport { event_time: Some(1), ..Default::default() })
             .expect("sending first InputReport");
         report_sender
-            .unbounded_send(InputReport { event_time: Some(2), ..InputReport::EMPTY })
+            .unbounded_send(InputReport { event_time: Some(2), ..Default::default() })
             .expect("sending second InputReport");
 
         let reports_fut = proxy.read_input_reports();

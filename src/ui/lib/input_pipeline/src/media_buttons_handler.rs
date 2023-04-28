@@ -176,7 +176,7 @@ impl MediaButtonsHandler {
             mic_mute: Some(false),
             pause: Some(false),
             camera_disable: Some(false),
-            ..fidl_ui_input::MediaButtonsEvent::EMPTY
+            ..Default::default()
         };
         for button in &event.pressed_buttons {
             match button {
@@ -318,7 +318,7 @@ mod tests {
             mic_mute,
             pause,
             camera_disable,
-            ..fidl_ui_input::MediaButtonsEvent::EMPTY
+            ..Default::default()
         }
     }
 

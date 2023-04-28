@@ -399,7 +399,7 @@ fn attach_to_scene_manager(
     if let Err(e) =
         scene_provider.present_client_view(ui_test_scene::ControllerPresentClientViewRequest {
             viewport_creation_token: Some(viewport_creation_token),
-            ..ui_test_scene::ControllerPresentClientViewRequest::EMPTY
+            ..Default::default()
         })
     {
         error!("Failed to present viewport_creation_token to test SceneProvider: {:?}", e);
@@ -427,7 +427,7 @@ fn add_child_view(
     let view_spec = felement::ViewSpec {
         viewport_creation_token: Some(viewport_creation_token),
         annotations: annotation.map(|a| vec![a]),
-        ..felement::ViewSpec::EMPTY
+        ..Default::default()
     };
     parent_sender.send(Event::SystemEvent {
         event: SystemEvent::PresentViewSpec {

@@ -163,7 +163,7 @@ fn create_key_event(
         lock_state: event.get_lock_state(),
         key_meaning,
         repeat_sequence,
-        ..fidl_ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     }
 }
 
@@ -320,7 +320,7 @@ mod tests {
             key: Some(fidl_input::Key::A),
             // A key "A" without shift is a lowercase 'a'.
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
-            ..fidl_ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         }];
 
         handle_events(ime_handler, input_events);
@@ -355,7 +355,7 @@ mod tests {
             type_: Some(fidl_ui_input3::KeyEventType::Released),
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
-            ..fidl_ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         }];
 
         handle_events(ime_handler, input_events);
@@ -418,28 +418,28 @@ mod tests {
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::A),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
                 type_: Some(fidl_ui_input3::KeyEventType::Released),
                 key: Some(fidl_input::Key::A),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::B),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(98)),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::C),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(42)),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -507,7 +507,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::CapsLock,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -516,7 +516,7 @@ mod tests {
                 modifiers: Some(fidl_ui_input3::Modifiers::CAPS_LOCK),
                 lock_state: Some(fidl_ui_input3::LockState::CAPS_LOCK),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(65)),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -526,7 +526,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::CapsLock,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -586,7 +586,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Enter,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -595,7 +595,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Tab,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -605,7 +605,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Backspace,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -646,7 +646,7 @@ mod tests {
             key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                 fidl_ui_input3::NonPrintableKey::Tab,
             )),
-            ..fidl_ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         }];
 
         handle_events(ime_handler, input_events);
@@ -702,7 +702,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Shift,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -712,7 +712,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Shift,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -720,7 +720,7 @@ mod tests {
                 key: Some(fidl_input::Key::A),
                 modifiers: Some(Modifiers::RIGHT_SHIFT | Modifiers::LEFT_SHIFT | Modifiers::SHIFT),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(65)), // "A"
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -768,7 +768,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Control,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
                 timestamp: Some(event_time_i64),
@@ -777,7 +777,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Tab,
                 )),
-                ..fidl_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -794,7 +794,7 @@ mod tests {
             type_: Some(fidl_ui_input3::KeyEventType::Pressed),
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
-            ..fidl_ui_input3::KeyEvent::EMPTY}; "basic value copy")]
+            ..Default::default()}; "basic value copy")]
     #[test_case(
         keyboard_binding::KeyboardEvent::new(
             fidl_input::Key::A,
@@ -806,7 +806,7 @@ mod tests {
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
             repeat_sequence: Some(13),
-            ..fidl_ui_input3::KeyEvent::EMPTY}; "repeat_sequence is honored")]
+            ..Default::default()}; "repeat_sequence is honored")]
     fn test_create_key_event(
         event: keyboard_binding::KeyboardEvent,
         event_time: zx::Time,

@@ -257,7 +257,7 @@ mod test {
         let mut lookup_table = MockLookupTable::new();
         let mut storage = MockHashTreeStorage::new();
         pinweaver.expect_get_log().times(1).returning(|&hash| {
-            Ok(vec![fcr50::LogEntry { root_hash: Some(hash), ..fcr50::LogEntry::EMPTY }])
+            Ok(vec![fcr50::LogEntry { root_hash: Some(hash), ..Default::default() }])
         });
         storage.expect_load().times(1).returning(|| {
             Ok(HashTree::new(TREE_HEIGHT, CHILDREN_PER_NODE).expect("unable to create hash tree"))
@@ -286,8 +286,8 @@ mod test {
         let mut storage = MockHashTreeStorage::new();
         pinweaver.expect_get_log().times(1).returning(|&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some([1; 32]), ..fcr50::LogEntry::EMPTY },
-                fcr50::LogEntry { root_hash: Some([2; 32]), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some([1; 32]), ..Default::default() },
+                fcr50::LogEntry { root_hash: Some([2; 32]), ..Default::default() },
             ])
         });
         storage.expect_load().times(1).returning(|| {
@@ -327,7 +327,7 @@ mod test {
         let mut lookup_table = MockLookupTable::new();
         let mut storage = MockHashTreeStorage::new();
         pinweaver.expect_get_log().times(1).returning(|&_| {
-            Ok(vec![fcr50::LogEntry { root_hash: Some([1; 32]), ..fcr50::LogEntry::EMPTY }])
+            Ok(vec![fcr50::LogEntry { root_hash: Some([1; 32]), ..Default::default() }])
         });
         storage.expect_load().times(1).returning(|| {
             let mut hash_tree =
@@ -354,11 +354,11 @@ mod test {
         let root_hash = *hash_tree.get_root_hash().unwrap();
         pinweaver.expect_get_log().times(1).returning(move |&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some(root_hash), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some(root_hash), ..Default::default() },
                 fcr50::LogEntry {
                     root_hash: Some(root_hash),
                     message_type: Some(fcr50::MessageType::ResetTree),
-                    ..fcr50::LogEntry::EMPTY
+                    ..Default::default()
                 },
             ])
         });
@@ -389,16 +389,16 @@ mod test {
 
         pinweaver.expect_get_log().times(1).returning(move |&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some(root_hash), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some(root_hash), ..Default::default() },
                 fcr50::LogEntry {
                     root_hash: Some(expected_root_hash),
                     message_type: Some(fcr50::MessageType::InsertLeaf),
                     label: Some(expected_label.value()),
                     entry_data: Some(fcr50::EntryData {
                         leaf_hmac: Some(expected_leaf_hmac),
-                        ..fcr50::EntryData::EMPTY
+                        ..Default::default()
                     }),
-                    ..fcr50::LogEntry::EMPTY
+                    ..Default::default()
                 },
             ])
         });
@@ -436,12 +436,12 @@ mod test {
 
         pinweaver.expect_get_log().times(1).returning(move |&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some(root_hash), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some(root_hash), ..Default::default() },
                 fcr50::LogEntry {
                     root_hash: Some(expected_root_hash),
                     message_type: Some(fcr50::MessageType::RemoveLeaf),
                     label: Some(expected_label.value()),
-                    ..fcr50::LogEntry::EMPTY
+                    ..Default::default()
                 },
             ])
         });
@@ -494,17 +494,17 @@ mod test {
             Ok(fcr50::LogReplayResponse {
                 cred_metadata: Some(vec![1; 32]),
                 leaf_hash: Some(expected_leaf_hmac_after_auth),
-                ..fcr50::LogReplayResponse::EMPTY
+                ..Default::default()
             })
         });
         pinweaver.expect_get_log().times(1).returning(move |&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some(root_hash), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some(root_hash), ..Default::default() },
                 fcr50::LogEntry {
                     root_hash: Some(expected_root_hash),
                     message_type: Some(fcr50::MessageType::TryAuth),
                     label: Some(expected_label.value()),
-                    ..fcr50::LogEntry::EMPTY
+                    ..Default::default()
                 },
             ])
         });
@@ -525,11 +525,11 @@ mod test {
         let root_hash = *hash_tree.get_root_hash().unwrap();
         pinweaver.expect_get_log().times(1).returning(move |&_| {
             Ok(vec![
-                fcr50::LogEntry { root_hash: Some(root_hash), ..fcr50::LogEntry::EMPTY },
+                fcr50::LogEntry { root_hash: Some(root_hash), ..Default::default() },
                 fcr50::LogEntry {
                     root_hash: Some([1; 32]),
                     message_type: Some(fcr50::MessageType::ResetTree),
-                    ..fcr50::LogEntry::EMPTY
+                    ..Default::default()
                 },
             ])
         });

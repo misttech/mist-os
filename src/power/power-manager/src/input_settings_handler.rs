@@ -263,11 +263,11 @@ mod tests {
                         } else {
                             fsettings::ToggleStateFlags::MUTED
                         }),
-                        ..fsettings::DeviceState::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsettings::InputDevice::EMPTY
+                    ..Default::default()
                 }]),
-                ..fsettings::InputSettings::EMPTY
+                ..Default::default()
             }
         }
 

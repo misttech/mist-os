@@ -101,7 +101,7 @@ async fn demux_fidl(
                     interest_listener = Some(responder);
                 } else {
                     info!("Unblocking component by sending an empty interest.");
-                    responder.send(&mut Ok(Interest::EMPTY))?;
+                    responder.send(&mut Ok(Interest::default()))?;
                     got_initial_interest_request = true;
                 }
             }
@@ -437,7 +437,7 @@ where
             puppet.proxy.emit_log(&mut record).await?;
         };
     }
-    let interest = Interest { min_severity: Some(Severity::Warn), ..Interest::EMPTY };
+    let interest = Interest { min_severity: Some(Severity::Warn), ..Default::default() };
     listener.send(&mut Ok(interest))?;
     info!("Waiting for interest....");
     assert_eq!(
@@ -455,7 +455,7 @@ where
         .await
         .unwrap();
     info!("Got interest");
-    let interest = Interest { min_severity: Some(Severity::Trace), ..Interest::EMPTY };
+    let interest = Interest { min_severity: Some(Severity::Trace), ..Default::default() };
     let listener = wait_for_severity(stream).await?;
     listener.send(&mut Ok(interest))?;
     assert_eq!(
@@ -478,7 +478,7 @@ where
     .await
     .unwrap();
 
-    let interest = Interest::EMPTY;
+    let interest = Interest::default();
     let listener = wait_for_severity(stream).await?;
     listener.send(&mut Ok(interest))?;
     info!("Waiting for reset interest....");
@@ -514,7 +514,7 @@ where
     } else {
         // Reset severity to TRACE so we get all messages
         // in later tests.
-        let interest = Interest { min_severity: Some(Severity::Trace), ..Interest::EMPTY };
+        let interest = Interest { min_severity: Some(Severity::Trace), ..Default::default() };
         let listener = wait_for_severity(stream).await?;
         listener.send(&mut Ok(interest))?;
         info!("Waiting for interest to change back....");

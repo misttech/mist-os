@@ -1229,7 +1229,7 @@ mod tests {
                         file.close().await.expect("FIDL call failed").map_err(Status::from_raw),
                         Ok(())
                     );
-                    root.unlink("foo", fio::UnlinkOptions::EMPTY)
+                    root.unlink("foo", fio::UnlinkOptions::default())
                         .await
                         .expect("FIDL call failed")
                         .expect("unlink failed");

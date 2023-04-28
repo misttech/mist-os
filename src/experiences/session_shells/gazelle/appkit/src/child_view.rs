@@ -78,7 +78,7 @@ impl ChildView {
             &mut viewport_creation_token,
             ui_comp::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width, height }),
-                ..ui_comp::ViewportProperties::EMPTY
+                ..Default::default()
             },
             child_view_watcher_request,
         )?;
@@ -146,7 +146,7 @@ impl ChildView {
             &mut self.viewport_content_id,
             ui_comp::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width, height }),
-                ..ui_comp::ViewportProperties::EMPTY
+                ..Default::default()
             },
         )?;
         Ok(())

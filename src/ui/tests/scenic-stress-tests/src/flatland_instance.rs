@@ -49,7 +49,7 @@ async fn create_instance(
         .create_view2(
             &mut token,
             &mut view_identity,
-            flatland::ViewBoundProtocols::EMPTY,
+            flatland::ViewBoundProtocols::default(),
             parent_viewport_watcher_request,
         )
         .expect("Failure creating view");
@@ -81,7 +81,7 @@ fn create_viewport(
                     width: DISPLAY_WIDTH as u32,
                     height: DISPLAY_HEIGHT as u32,
                 }),
-                ..flatland::ViewportProperties::EMPTY
+                ..Default::default()
             },
             child_view_watcher,
         )
@@ -114,7 +114,7 @@ async fn safe_present(
     instance: &flatland::FlatlandProxy,
     stream: &mut flatland::FlatlandEventStream,
 ) {
-    instance.present(flatland::PresentArgs::EMPTY).expect("Present call failed");
+    instance.present(flatland::PresentArgs::default()).expect("Present call failed");
     let mut frame_presented = false;
     let mut next_frame_begun = false;
     loop {
@@ -273,7 +273,7 @@ impl FlatlandInstance {
             .expect("failed to create TouchSource channels");
         let protocols = flatland::ViewBoundProtocols {
             touch_source: Some(touch_source_request),
-            ..flatland::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
         flatland_instance
             .create_view2(

@@ -111,7 +111,7 @@ where
             oob_bytes: None,
             pass_through_parameters: None,
             timebase: self.timebase,
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 

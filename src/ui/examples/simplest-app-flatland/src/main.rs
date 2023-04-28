@@ -80,10 +80,8 @@ impl<'a> AppModel<'a> {
         // Set up the protocols we care about (currently just touch).
         let (touch, touch_request) =
             create_proxy::<fptr::TouchSourceMarker>().expect("failed to create TouchSource");
-        let view_bound_protocols = fland::ViewBoundProtocols {
-            touch_source: Some(touch_request),
-            ..fland::ViewBoundProtocols::EMPTY
-        };
+        let view_bound_protocols =
+            fland::ViewBoundProtocols { touch_source: Some(touch_request), ..Default::default() };
 
         // Create the view.
         let fuchsia_scenic::flatland::ViewCreationTokenPair {
@@ -104,14 +102,16 @@ impl<'a> AppModel<'a> {
 
         // TODO(fxbug.dev/104411): `flatland.present()` is required before
         // calling `present_view()` to avoid scenic deadlock.
-        self.flatland.present(fland::PresentArgs::EMPTY).expect("flatland present");
+        self.flatland.present(fland::PresentArgs::default()).expect("flatland present");
 
         // Connect to graphical presenter to get the view displayed.
         let (view_controller_proxy, view_controller_request) =
             create_proxy::<ViewControllerMarker>().unwrap();
         self.view_controller = Some(view_controller_proxy);
-        let view_spec =
-            ViewSpec { viewport_creation_token: Some(viewport_creation_token), ..ViewSpec::EMPTY };
+        let view_spec = ViewSpec {
+            viewport_creation_token: Some(viewport_creation_token),
+            ..Default::default()
+        };
         self.graphical_presenter
             .present_view(view_spec, None, Some(view_controller_request))
             .await
@@ -248,7 +248,7 @@ async fn main() {
                     // Present all pending updates with a trace flow into Scenic based on
                     // present_count.
                     trace::flow_begin!("gfx", "Flatland::Present", present_count.into());
-                    flatland.present(fland::PresentArgs::EMPTY).expect("Present call failed");
+                    flatland.present(fland::PresentArgs::default()).expect("Present call failed");
                     present_count += 1;
                   }
                   InternalMessage::TouchEvent{ phase, trace_id } => {

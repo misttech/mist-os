@@ -76,7 +76,7 @@ impl fidl_contrib::protocol_connector::ConnectedProtocol for CobaltConnectedServ
                 .create_metric_event_logger(
                     fidl_fuchsia_metrics::ProjectSpec {
                         project_id: Some(power_metrics_registry::PROJECT_ID),
-                        ..fidl_fuchsia_metrics::ProjectSpec::EMPTY
+                        ..Default::default()
                     },
                     server_end,
                 )

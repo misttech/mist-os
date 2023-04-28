@@ -42,7 +42,7 @@ async fn main() -> Result<(), Error> {
     let device_path = opt.device_path;
     let filesystem = opt.filesystem;
 
-    let mut format_options = FormatOptions::EMPTY;
+    let mut format_options = FormatOptions::default();
     format_options.verbose = opt.verbose;
     format_options.fvm_data_slices = opt.fvm_data_slices;
 

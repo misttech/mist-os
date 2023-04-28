@@ -92,7 +92,7 @@ async fn create_session(
     let endpoints = fscenic::SessionEndpoints {
         session: Some(session_server),
         session_listener: Some(listener_client),
-        ..fscenic::SessionEndpoints::EMPTY
+        ..Default::default()
     };
 
     scenic

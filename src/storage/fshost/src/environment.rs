@@ -819,7 +819,7 @@ impl FilesystemLauncher {
                 program_name: Some(format.as_str().to_owned()),
                 crash_signature: Some(format!("fuchsia-{}-corruption", format.as_str())),
                 is_fatal: Some(false),
-                ..fidl_fuchsia_feedback::CrashReport::EMPTY
+                ..Default::default()
             };
             if let Err(e) = proxy.file_report(report).await {
                 tracing::error!(?e, "Failed to file crash report");

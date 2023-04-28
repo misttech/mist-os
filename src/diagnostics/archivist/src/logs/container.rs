@@ -403,8 +403,8 @@ impl LogsArtifactsContainer {
         interest_selectors: impl Iterator<Item = &LogInterestSelector>,
         previous_selectors: &[LogInterestSelector],
     ) {
-        let mut new_interest = FidlInterest::EMPTY;
-        let mut remove_interest = FidlInterest::EMPTY;
+        let mut new_interest = FidlInterest::default();
+        let mut remove_interest = FidlInterest::default();
         for selector in interest_selectors {
             if selectors::match_moniker_against_component_selector(
                 self.identity.relative_moniker.iter(),
@@ -432,7 +432,7 @@ impl LogsArtifactsContainer {
         // Unfortunately we cannot use a match statement since `FidlInterest` doesn't derive Eq.
         // It does derive PartialEq though. All these branches will send an interest update if the
         // minimum interest changes after performing the required actions.
-        if new_interest == FidlInterest::EMPTY && remove_interest != FidlInterest::EMPTY {
+        if new_interest == FidlInterest::default() && remove_interest != FidlInterest::default() {
             // Undo the previous interest. There's no new interest to add.
             state
                 .maybe_send_updates(
@@ -442,7 +442,9 @@ impl LogsArtifactsContainer {
                     &self.identity,
                 )
                 .await;
-        } else if new_interest != FidlInterest::EMPTY && remove_interest == FidlInterest::EMPTY {
+        } else if new_interest != FidlInterest::default()
+            && remove_interest == FidlInterest::default()
+        {
             // Apply the new interest. There's no previous interest to remove.
             state
                 .maybe_send_updates(
@@ -452,7 +454,9 @@ impl LogsArtifactsContainer {
                     &self.identity,
                 )
                 .await;
-        } else if new_interest != FidlInterest::EMPTY && remove_interest != FidlInterest::EMPTY {
+        } else if new_interest != FidlInterest::default()
+            && remove_interest != FidlInterest::default()
+        {
             // Remove the previous interest and insert the new one.
             state
                 .maybe_send_updates(
@@ -550,7 +554,7 @@ impl ContainerState {
         let prev_min_interest = self.min_interest();
         action(self);
         let new_min_interest = self.min_interest();
-        if prev_min_interest == FidlInterest::EMPTY
+        if prev_min_interest == FidlInterest::default()
             || compare_fidl_interest(&new_min_interest, &prev_min_interest) != Ordering::Equal
         {
             debug!(%identity, ?new_min_interest, "Updating interest.");
@@ -565,7 +569,7 @@ impl ContainerState {
 
     /// Pushes the given `interest` to the set.
     fn push_interest(&mut self, interest: FidlInterest) {
-        if interest != FidlInterest::EMPTY {
+        if interest != FidlInterest::default() {
             let count = self.interests.entry(interest.into()).or_insert(0);
             *count += 1;
         }
@@ -587,7 +591,7 @@ impl ContainerState {
     /// returned.
     fn min_interest(&self) -> FidlInterest {
         // btreemap: keys are sorted and ascending.
-        self.interests.keys().next().map(|i| i.0.clone()).unwrap_or(FidlInterest::EMPTY)
+        self.interests.keys().next().map(|i| i.0.clone()).unwrap_or(FidlInterest::default())
     }
 }
 
@@ -812,7 +816,7 @@ mod tests {
         container.reset_interest(&[interest(&["foo", "bar"], Some(Severity::Error))]).await;
         assert_eq!(
             log_sink.wait_for_interest_change().await.unwrap().unwrap(),
-            FidlInterest::EMPTY
+            FidlInterest::default()
         );
 
         assert_interests(&container, []).await;
@@ -824,9 +828,9 @@ mod tests {
                 moniker_segments: Some(
                     moniker.iter().map(|s| StringSelector::ExactMatch(s.to_string())).collect(),
                 ),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             },
-            interest: FidlInterest { min_severity, ..FidlInterest::EMPTY },
+            interest: FidlInterest { min_severity, ..Default::default() },
         }
     }
 
@@ -843,7 +847,7 @@ mod tests {
     ) {
         let mut expected_map = BTreeMap::new();
         expected_map.extend(IntoIterator::into_iter(severities).map(|(s, c)| {
-            let interest = FidlInterest { min_severity: Some(s), ..FidlInterest::EMPTY };
+            let interest = FidlInterest { min_severity: Some(s), ..Default::default() };
             (interest.into(), c)
         }));
         assert_eq!(expected_map, container.state.lock().await.interests);

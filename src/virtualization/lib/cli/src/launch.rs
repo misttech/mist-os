@@ -71,8 +71,8 @@ pub async fn handle_launch<P: PlatformServices>(
 }
 
 fn parse_vmm_args(arguments: &arguments::launch_args::LaunchArgs) -> GuestConfig {
-    // FIDL requires we make a GuestConfig::EMPTY before trying to update fields
-    let mut guest_config = GuestConfig::EMPTY;
+    // FIDL requires we make a GuestConfig::default() before trying to update fields
+    let mut guest_config = GuestConfig::default();
 
     if !arguments.cmdline_add.is_empty() {
         guest_config.cmdline_add = Some(arguments.cmdline_add.clone())

@@ -189,7 +189,7 @@ where
                         buffer: Some(buffer),
                         buffer_id: Some(typeface.asset_id.into()),
                         font_index: Some(typeface.font_index),
-                        ..fonts::TypefaceResponse::EMPTY
+                        ..Default::default()
                     })
                 })
                 .ok(),
@@ -200,7 +200,7 @@ where
             warn!("Unfulfilled request {:?}", &TypefaceRequestFormatter(&request));
         }
 
-        let typeface_response = typeface_response.unwrap_or(fonts::TypefaceResponse::EMPTY);
+        let typeface_response = typeface_response.unwrap_or(fonts::TypefaceResponse::default());
 
         debug!("Response: {:?}", &TypefaceResponseFormatter(&typeface_response));
 
@@ -264,13 +264,14 @@ where
     fn get_family_info(&self, family_name: fonts::FamilyName) -> fonts::FontFamilyInfo {
         let family_name = UniCase::new(family_name.name);
         let family = self.match_family(&family_name);
-        family.map_or(fonts::FontFamilyInfo::EMPTY, |FontFamilyMatch { family, overrides: _ }| {
-            fonts::FontFamilyInfo {
+        family.map_or(
+            fonts::FontFamilyInfo::default(),
+            |FontFamilyMatch { family, overrides: _ }| fonts::FontFamilyInfo {
                 name: Some(fonts::FamilyName { name: family.name.clone() }),
                 styles: Some(family.faces.get_styles().collect()),
-                ..fonts::FontFamilyInfo::EMPTY
-            }
-        })
+                ..Default::default()
+            },
+        )
     }
 
     async fn get_typeface_by_id(
@@ -284,7 +285,7 @@ where
                     buffer: Some(buffer),
                     buffer_id: Some(id.into()),
                     font_index: None,
-                    ..fonts::TypefaceResponse::EMPTY
+                    ..Default::default()
                 };
                 Ok(response)
             }
@@ -307,10 +308,8 @@ where
             .map(|matched| matched.family)
             .ok_or(fonts_exp::Error::NotFound)?;
         let faces = family.extract_faces().map_into().collect();
-        let response = fonts_exp::TypefaceInfoResponse {
-            results: Some(faces),
-            ..fonts_exp::TypefaceInfoResponse::EMPTY
-        };
+        let response =
+            fonts_exp::TypefaceInfoResponse { results: Some(faces), ..Default::default() };
         Ok(response)
     }
 
@@ -441,7 +440,7 @@ where
                             let chunk = results.drain(..split_at).collect_vec();
                             let response = fonts_exp::TypefaceInfoResponse {
                                 results: Some(chunk),
-                                ..fonts_exp::TypefaceInfoResponse::EMPTY
+                                ..Default::default()
                             };
                             responder.send(response)?;
                         }

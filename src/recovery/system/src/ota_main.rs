@@ -55,7 +55,7 @@ where
         .render2(ProgressRendererRender2Request {
             status: Some(Status::Active),
             percent_complete: Some(0.0),
-            ..ProgressRendererRender2Request::EMPTY
+            ..Default::default()
         })
         .await
         .map_err(to_render2_error)?;
@@ -79,7 +79,7 @@ where
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Active),
                     percent_complete: Some(progress as f32),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await;
             progress += 1;
@@ -99,7 +99,7 @@ where
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Complete),
                     percent_complete: Some(100.0),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .map_err(to_render2_error)
@@ -109,7 +109,7 @@ where
             ota_progress_proxy
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Error),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .map_err(to_render2_error)?;

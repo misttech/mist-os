@@ -150,7 +150,7 @@ impl GattServerFacade {
                 handle: Some(handle),
                 value: Some(vec![0x02, 0x00]),
                 peer_ids: Some(vec![peer_id.into()]),
-                ..ValueChangedParameters::EMPTY
+                ..Default::default()
             };
             // Ignore the confirmation.
             let (confirmation, _) = fidl::EventPair::create();
@@ -160,7 +160,7 @@ impl GattServerFacade {
                 handle: Some(handle),
                 value: Some(vec![0x01, 0x00]),
                 peer_ids: Some(vec![peer_id.into()]),
-                ..ValueChangedParameters::EMPTY
+                ..Default::default()
             };
             let _ = control_handle.send_on_notify_value(value);
         }
@@ -381,7 +381,7 @@ impl GattServerFacade {
                 encryption_required: Some(update_encryption_required),
                 authentication_required: Some(update_authentication_required),
                 authorization_required: Some(update_authorization_required),
-                ..SecurityRequirements::EMPTY
+                ..Default::default()
             })
         } else {
             None
@@ -392,7 +392,7 @@ impl GattServerFacade {
                 encryption_required: Some(read_encryption_required),
                 authentication_required: Some(read_authentication_required),
                 authorization_required: Some(read_authorization_required),
-                ..SecurityRequirements::EMPTY
+                ..Default::default()
             })
         } else {
             None
@@ -403,7 +403,7 @@ impl GattServerFacade {
                 encryption_required: Some(write_encryption_required),
                 authentication_required: Some(write_authentication_required),
                 authorization_required: Some(write_authorization_required),
-                ..SecurityRequirements::EMPTY
+                ..Default::default()
             })
         } else {
             None
@@ -413,7 +413,7 @@ impl GattServerFacade {
             read: read_sec_requirement,
             write: write_sec_requirement,
             update: update_sec_requirement,
-            ..AttributePermissions::EMPTY
+            ..Default::default()
         }
     }
 
@@ -494,7 +494,7 @@ impl GattServerFacade {
                 handle: Some(Handle { value: descriptor_id }),
                 type_: Some(descriptor_uuid.into()),
                 permissions: Some(desc_permission_attributes),
-                ..Descriptor::EMPTY
+                ..Default::default()
             };
 
             descriptors.push(fidl_descriptor);
@@ -575,7 +575,7 @@ impl GattServerFacade {
                 properties: Some(characteristic_properties),
                 permissions: Some(characteristic_permissions),
                 descriptors: Some(fidl_descriptors),
-                ..Characteristic::EMPTY
+                ..Default::default()
             };
 
             characteristics.push(fidl_characteristic);
@@ -608,7 +608,7 @@ impl GattServerFacade {
             kind: Some(service_kind),
             type_: Some(service_uuid.into()),
             characteristics: Some(characteristics),
-            ..ServiceInfo::EMPTY
+            ..Default::default()
         })
     }
 

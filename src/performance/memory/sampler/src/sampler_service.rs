@@ -104,16 +104,16 @@ mod test {
                         start_address: Some(2000),
                         relative_address: Some(0),
                         size: Some(1000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                     ExecutableSegment {
                         start_address: Some(4000),
                         relative_address: Some(2000),
                         size: Some(2000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
             ModuleMap {
                 build_id: Some(vec![3, 4, 5, 6]),
@@ -121,20 +121,20 @@ mod test {
                     start_address: Some(3000),
                     relative_address: Some(1000),
                     size: Some(100),
-                    ..ExecutableSegment::EMPTY
+                    ..Default::default()
                 }]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
         ];
         let allocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![1000, 1500]), ..StackTrace::EMPTY };
+            StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
         let deallocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![3000, 3001]), ..StackTrace::EMPTY };
+            StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 
         client.set_process_info(SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map),
-            ..SamplerSetProcessInfoRequest::EMPTY
+            ..Default::default()
         })?;
         client.record_allocation(0x100, allocation_stack_trace.clone(), 100)?;
         client.record_allocation(0x200, allocation_stack_trace, 1000)?;
@@ -164,16 +164,16 @@ mod test {
                         start_address: Some(2000),
                         relative_address: Some(0),
                         size: Some(1000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                     ExecutableSegment {
                         start_address: Some(4000),
                         relative_address: Some(2000),
                         size: Some(2000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
             ModuleMap {
                 build_id: Some(vec![3, 4, 5, 6]),
@@ -181,16 +181,16 @@ mod test {
                     start_address: Some(3000),
                     relative_address: Some(1000),
                     size: Some(100),
-                    ..ExecutableSegment::EMPTY
+                    ..Default::default()
                 }]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
         ];
 
         client.set_process_info(SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map),
-            ..SamplerSetProcessInfoRequest::EMPTY
+            ..Default::default()
         })?;
         drop(client);
 
@@ -215,16 +215,16 @@ mod test {
                         start_address: Some(2000),
                         relative_address: Some(0),
                         size: Some(1000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                     ExecutableSegment {
                         start_address: Some(4000),
                         relative_address: Some(2000),
                         size: Some(2000),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
             ModuleMap {
                 build_id: Some(vec![3, 4, 5, 6]),
@@ -232,21 +232,21 @@ mod test {
                     start_address: Some(3000),
                     relative_address: Some(1000),
                     size: Some(100),
-                    ..ExecutableSegment::EMPTY
+                    ..Default::default()
                 }]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
         ];
 
         client.set_process_info(SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map.clone()),
-            ..SamplerSetProcessInfoRequest::EMPTY
+            ..Default::default()
         })?;
         client.set_process_info(SamplerSetProcessInfoRequest {
             process_name: Some("other test process".to_string()),
             module_map: Some(module_map),
-            ..SamplerSetProcessInfoRequest::EMPTY
+            ..Default::default()
         })?;
         drop(client);
 
@@ -264,7 +264,7 @@ mod test {
         let profile_future = process_sampler_requests(request_stream);
 
         let allocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![1000, 1500]), ..StackTrace::EMPTY };
+            StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
 
         client.record_allocation(0x100, allocation_stack_trace, 100)?;
         drop(client);
@@ -282,7 +282,7 @@ mod test {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
         let profile_future = process_sampler_requests(request_stream);
 
-        let stack_trace = StackTrace { stack_frames: Some(vec![3000, 3001]), ..StackTrace::EMPTY };
+        let stack_trace = StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 
         client.record_deallocation(0x100, stack_trace)?;
         drop(client);

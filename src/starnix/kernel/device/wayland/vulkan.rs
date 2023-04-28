@@ -395,7 +395,7 @@ fn register_buffer_collection_with_scenic(
     let args = fuicomp::RegisterBufferCollectionArgs {
         export_token: Some(export_token),
         buffer_collection_token: Some(buffer_collection_token),
-        ..fuicomp::RegisterBufferCollectionArgs::EMPTY
+        ..Default::default()
     };
 
     scenic_allocator

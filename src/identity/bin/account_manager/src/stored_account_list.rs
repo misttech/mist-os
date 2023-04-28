@@ -90,7 +90,7 @@ impl TryFrom<FidlAccountMetadata> for AccountMetadata {
 
 impl<'a> Into<FidlAccountMetadata> for &'a AccountMetadata {
     fn into(self) -> FidlAccountMetadata {
-        FidlAccountMetadata { name: Some(self.name.to_string()), ..FidlAccountMetadata::EMPTY }
+        FidlAccountMetadata { name: Some(self.name.to_string()), ..Default::default() }
     }
 }
 

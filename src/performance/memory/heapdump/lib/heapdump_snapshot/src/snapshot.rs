@@ -235,7 +235,7 @@ mod tests {
                 fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
                     fheapdump_client::ExecutableRegion {
@@ -245,20 +245,20 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_1_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
                     fheapdump_client::ExecutableRegion {
@@ -268,7 +268,7 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_2_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
@@ -276,12 +276,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_2_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -333,7 +333,7 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_2_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
@@ -341,12 +341,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -361,7 +361,7 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_2_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
                     fheapdump_client::ExecutableRegion {
@@ -371,18 +371,18 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_1_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -441,7 +441,7 @@ mod tests {
             size: Some(FAKE_ALLOCATION_1_SIZE),
             stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
             timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-            ..fheapdump_client::Allocation::EMPTY
+            ..Default::default()
         };
 
         // Set one of the fields to None, according to the case being tested.
@@ -454,7 +454,7 @@ mod tests {
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -487,7 +487,7 @@ mod tests {
         let mut stack_trace = fheapdump_client::StackTrace {
             stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
             program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-            ..fheapdump_client::StackTrace::EMPTY
+            ..Default::default()
         };
 
         // Set one of the fields to None, according to the case being tested.
@@ -530,7 +530,7 @@ mod tests {
             size: Some(FAKE_REGION_1_SIZE),
             file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
             build_id: Some(fheapdump_client::BuildId { value: FAKE_REGION_1_BUILD_ID.to_vec() }),
-            ..fheapdump_client::ExecutableRegion::EMPTY
+            ..Default::default()
         };
 
         // Set one of the fields to None, according to the case being tested.
@@ -567,7 +567,7 @@ mod tests {
         let mut block_contents = fheapdump_client::BlockContents {
             address: Some(FAKE_ALLOCATION_1_ADDRESS),
             contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
-            ..fheapdump_client::BlockContents::EMPTY
+            ..Default::default()
         };
 
         // Set one of the fields to None, according to the case being tested.
@@ -582,12 +582,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -616,19 +616,19 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -663,7 +663,7 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_1_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
@@ -674,7 +674,7 @@ mod tests {
                         build_id: Some(fheapdump_client::BuildId {
                             value: FAKE_REGION_1_BUILD_ID.to_vec(),
                         }),
-                        ..fheapdump_client::ExecutableRegion::EMPTY
+                        ..Default::default()
                     },
                 ),
             ]
@@ -708,17 +708,17 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(contents_with_wrong_size),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -750,12 +750,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(vec![]),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -786,12 +786,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(vec![1111, 2222]),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -803,7 +803,7 @@ mod tests {
             &mut [fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                 stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                 program_addresses: Some(vec![3333]),
-                ..fheapdump_client::StackTrace::EMPTY
+                ..Default::default()
             })]
             .iter_mut(),
         );
@@ -833,17 +833,17 @@ mod tests {
                     size: Some(0),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(vec![]),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -878,17 +878,17 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(content_first_chunk.to_vec()),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),
@@ -901,7 +901,7 @@ mod tests {
                 fheapdump_client::BlockContents {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     contents: Some(contents_second_chunk.to_vec()),
-                    ..fheapdump_client::BlockContents::EMPTY
+                    ..Default::default()
                 },
             )]
             .iter_mut(),
@@ -932,12 +932,12 @@ mod tests {
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..fheapdump_client::Allocation::EMPTY
+                    ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..fheapdump_client::StackTrace::EMPTY
+                    ..Default::default()
                 }),
             ]
             .iter_mut(),

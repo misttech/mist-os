@@ -87,7 +87,7 @@ impl From<&ClipboardItem> for fclip::ClipboardItem {
         fclip::ClipboardItem {
             mime_type_hint: Some(src.mime_type_hint.to_owned()),
             payload: Some((&src.payload).into()),
-            ..fclip::ClipboardItem::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -158,7 +158,7 @@ mod tests {
         let src = fclip::ClipboardItem {
             mime_type_hint: Some("text/json".to_string()),
             payload: None,
-            ..fclip::ClipboardItem::EMPTY
+            ..Default::default()
         };
         let actual: Result<ClipboardItem, ClipboardError> = src.try_into();
         assert_matches!(actual, Err(ClipboardError::InvalidRequest));

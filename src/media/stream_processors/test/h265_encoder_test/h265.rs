@@ -33,7 +33,7 @@ impl ElementaryStream for H265Stream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h265")),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 

@@ -58,7 +58,7 @@ async fn register_interest() {
     // 2. Interest registration with min_severity = debug
     let mut interests = vec![LogInterestSelector {
         selector: selector.clone(),
-        interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Interest::EMPTY },
+        interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Default::default() },
     }];
     log_settings.register_interest(&mut interests.iter_mut()).expect("registered interest");
 
@@ -68,7 +68,7 @@ async fn register_interest() {
     // 4. Interest registration with min_severity = warn
     let mut interests = vec![LogInterestSelector {
         selector,
-        interest: Interest { min_severity: Some(FidlSeverity::Warn), ..Interest::EMPTY },
+        interest: Interest { min_severity: Some(FidlSeverity::Warn), ..Default::default() },
     }];
     log_settings.register_interest(&mut interests.iter_mut()).expect("registered interest");
 
@@ -102,7 +102,7 @@ async fn set_interest_before_startup() {
     .unwrap();
     let mut interests = vec![LogInterestSelector {
         selector,
-        interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Interest::EMPTY },
+        interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Default::default() },
     }];
     log_settings.set_interest(&mut interests.iter_mut()).await.expect("set interest");
 

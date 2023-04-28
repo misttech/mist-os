@@ -32,7 +32,7 @@ async fn unlink_file_with_sufficient_rights() {
         .await;
 
         src_dir
-            .unlink("file.txt", fio::UnlinkOptions::EMPTY)
+            .unlink("file.txt", fio::UnlinkOptions::default())
             .await
             .expect("unlink fidl failed")
             .expect("unlink failed");
@@ -68,7 +68,7 @@ async fn unlink_file_with_insufficient_rights() {
 
         assert_eq!(
             src_dir
-                .unlink("file.txt", fio::UnlinkOptions::EMPTY)
+                .unlink("file.txt", fio::UnlinkOptions::default())
                 .await
                 .expect("unlink fidl failed")
                 .expect_err("unlink succeeded"),
@@ -93,7 +93,7 @@ async fn unlink_directory_with_sufficient_rights() {
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
-        dir.unlink("src", fio::UnlinkOptions::EMPTY)
+        dir.unlink("src", fio::UnlinkOptions::default())
             .await
             .expect("unlink fidl failed")
             .expect("unlink failed");
@@ -114,7 +114,7 @@ async fn unlink_directory_with_insufficient_rights() {
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
         assert_eq!(
-            dir.unlink("src", fio::UnlinkOptions::EMPTY)
+            dir.unlink("src", fio::UnlinkOptions::default())
                 .await
                 .expect("unlink fidl failed")
                 .expect_err("unlink succeeded"),
@@ -136,7 +136,7 @@ async fn unlink_must_be_directory() {
 
     let must_be_directory = fio::UnlinkOptions {
         flags: Some(fio::UnlinkFlags::MUST_BE_DIRECTORY),
-        ..fio::UnlinkOptions::EMPTY
+        ..Default::default()
     };
     test_dir
         .unlink("dir", must_be_directory.clone())

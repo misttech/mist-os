@@ -67,18 +67,18 @@ pub fn make_typeface_request<'a>(
                 weight: weight.into(),
                 width: width.into(),
                 slant: slant.into(),
-                ..Style2::EMPTY
+                ..Default::default()
             }),
             code_points: None,
             languages: languages
                 .into()
                 .map(|l| l.iter().map(|s| LocaleId { id: s.to_string() }).collect()),
             fallback_family: fallback_family.into(),
-            ..TypefaceQuery::EMPTY
+            ..Default::default()
         }),
         flags: Some(flags),
         cache_miss_policy: None,
-        ..TypefaceRequest::EMPTY
+        ..Default::default()
     }
 }
 

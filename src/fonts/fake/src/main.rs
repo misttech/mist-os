@@ -58,10 +58,12 @@ async fn handle_stream_stable(mut stream: fonts::ProviderRequestStream) -> Resul
                 responder.send(None).context("send GetFamilyInfo")?;
             }
             GetTypeface { request: _, responder } => {
-                responder.send(fonts::TypefaceResponse::EMPTY).context("send GetTypeface")?;
+                responder.send(fonts::TypefaceResponse::default()).context("send GetTypeface")?;
             }
             GetFontFamilyInfo { family: _, responder } => {
-                responder.send(fonts::FontFamilyInfo::EMPTY).context("send GetFontFamilyInfo")?;
+                responder
+                    .send(fonts::FontFamilyInfo::default())
+                    .context("send GetFontFamilyInfo")?;
             }
             RegisterFontSetEventListener { listener: _, responder: _ } => {
                 // Not yet supported in the real font server

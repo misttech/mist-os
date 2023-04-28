@@ -105,10 +105,10 @@ pub fn generate_kernel_config(
             subdir: Some(kernel_name.clone()),
             dependency_type: Some(fdecl::DependencyType::Strong),
             availability: Some(fdecl::Availability::Required),
-            ..fdecl::OfferDirectory::EMPTY
+            ..Default::default()
         })]),
         numbered_handles: Some(numbered_handles),
-        ..fcomponent::CreateChildArgs::EMPTY
+        ..Default::default()
     };
 
     Ok(KernelStartInfo { args, name: kernel_name })

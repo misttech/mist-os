@@ -47,7 +47,7 @@ impl SetUiFacade {
             Err(e) => bail!("Failed to connect to Setup service {:?}.", e),
         };
 
-        let mut settings = SetupSettings::EMPTY;
+        let mut settings = SetupSettings::default();
 
         match network_type {
             NetworkType::Ethernet => {
@@ -173,7 +173,7 @@ impl SetUiFacade {
         let settings = DisplaySettings {
             auto_brightness: Some(false),
             brightness_value: Some(brightness),
-            ..DisplaySettings::EMPTY
+            ..Default::default()
         };
         match display_proxy.set(settings).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
@@ -201,13 +201,15 @@ impl SetUiFacade {
         let stream_settings = AudioStreamSettings {
             stream: Some(AudioRenderUsage::Media),
             source: Some(AudioStreamSettingSource::User),
-            user_volume: Some(Volume { level: Some(volume), muted: Some(false), ..Volume::EMPTY }),
-            ..AudioStreamSettings::EMPTY
+            user_volume: Some(Volume {
+                level: Some(volume),
+                muted: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
-        let settings = fsettings::AudioSettings {
-            streams: Some(vec![stream_settings]),
-            ..fsettings::AudioSettings::EMPTY
-        };
+        let settings =
+            fsettings::AudioSettings { streams: Some(vec![stream_settings]), ..Default::default() };
 
         info!("Setting audio settings {:?}", settings);
         match audio_proxy.set(settings).await? {
@@ -257,16 +259,16 @@ impl SetUiFacade {
             device_type: Some(fsettings::DeviceType::Microphone),
             state: Some(DeviceState {
                 toggle_flags: Some(fsettings::ToggleStateFlags::AVAILABLE),
-                ..DeviceState::EMPTY
+                ..Default::default()
             }),
-            ..InputState::EMPTY
+            ..Default::default()
         };
 
         // Change DeviceState if microphone should be muted- dependent on input enum.
         if mute_mic {
             input_states.state = Some(DeviceState {
                 toggle_flags: Some(fsettings::ToggleStateFlags::MUTED),
-                ..DeviceState::EMPTY
+                ..Default::default()
             });
         }
 
@@ -340,7 +342,7 @@ mod tests {
                         DisplaySettings {
                             auto_brightness: Some(false),
                             brightness_value: Some(brightness),
-                            ..DisplaySettings::EMPTY
+                            ..Default::default()
                         }
                     );
                     responder.send(&mut Ok(())).unwrap();
@@ -382,9 +384,9 @@ mod tests {
                             user_volume: Some(Volume {
                                 level: Some(volume),
                                 muted: Some(false),
-                                ..Volume::EMPTY
+                                ..Default::default()
                             }),
-                            ..AudioStreamSettings::EMPTY
+                            ..Default::default()
                         }
                     );
                     responder.send(&mut Ok(())).unwrap();
@@ -424,13 +426,13 @@ mod tests {
                         mutable_toggle_state: None,
                         state: Some(DeviceState {
                             toggle_flags: Some(fsettings::ToggleStateFlags::AVAILABLE),
-                            ..DeviceState::EMPTY
+                            ..Default::default()
                         }),
-                        ..InputDevice::EMPTY
+                        ..Default::default()
                     };
                     let settings = fsettings::InputSettings {
                         devices: Some(vec![device]),
-                        ..fsettings::InputSettings::EMPTY
+                        ..Default::default()
                     };
                     responder.send(settings).unwrap();
                 }
@@ -445,9 +447,9 @@ mod tests {
                             device_type: Some(fsettings::DeviceType::Microphone),
                             state: Some(DeviceState {
                                 toggle_flags: Some(fsettings::ToggleStateFlags::MUTED),
-                                ..DeviceState::EMPTY
+                                ..Default::default()
                             }),
-                            ..InputState::EMPTY
+                            ..Default::default()
                         }
                     );
                     responder.send(&mut Ok(())).unwrap();
@@ -486,13 +488,13 @@ mod tests {
                         mutable_toggle_state: None,
                         state: Some(DeviceState {
                             toggle_flags: Some(fsettings::ToggleStateFlags::MUTED),
-                            ..DeviceState::EMPTY
+                            ..Default::default()
                         }),
-                        ..InputDevice::EMPTY
+                        ..Default::default()
                     };
                     let settings = fsettings::InputSettings {
                         devices: Some(vec![device]),
-                        ..fsettings::InputSettings::EMPTY
+                        ..Default::default()
                     };
                     responder.send(settings).unwrap();
                 }
@@ -533,13 +535,13 @@ mod tests {
                         mutable_toggle_state: None,
                         state: Some(DeviceState {
                             toggle_flags: Some(fsettings::ToggleStateFlags::MUTED),
-                            ..DeviceState::EMPTY
+                            ..Default::default()
                         }),
-                        ..InputDevice::EMPTY
+                        ..Default::default()
                     };
                     let settings = fsettings::InputSettings {
                         devices: Some(vec![device]),
-                        ..fsettings::InputSettings::EMPTY
+                        ..Default::default()
                     };
                     responder.send(settings).unwrap();
                 }

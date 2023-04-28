@@ -168,7 +168,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             he_secret: params.he_secret.clone(),
             reset_secret: params.reset_secret.clone(),
             delay_schedule: Some(convert_delay_schedule(&params.delay_schedule)?),
-            ..fcr50::InsertLeafParams::EMPTY
+            ..Default::default()
         };
         let response = self.proxy.insert_leaf(insert_leaf_params).await?;
         self.diagnostics.pinweaver_outcome(
@@ -195,7 +195,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             label: Some(label.value()),
             mac: Some(mac),
             h_aux: Some(h_aux),
-            ..fcr50::RemoveLeafParams::EMPTY
+            ..Default::default()
         };
         let response = self.proxy.remove_leaf(remove_leaf_params).await?.map(|_| ());
         self.diagnostics.pinweaver_outcome(PinweaverMethod::RemoveLeaf, response);
@@ -214,7 +214,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             le_secret: Some(le_secret.to_vec()),
             h_aux: Some(h_aux),
             cred_metadata: Some(cred_metadata),
-            ..fcr50::TryAuthParams::EMPTY
+            ..Default::default()
         };
         let response = self.proxy.try_auth(try_auth_params).await?;
         self.diagnostics.pinweaver_outcome(
@@ -250,7 +250,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             root_hash: Some(root_hash),
             h_aux: Some(h_aux),
             cred_metadata: Some(cred_metadata),
-            ..fcr50::LogReplayParams::EMPTY
+            ..Default::default()
         };
         let response = self.proxy.log_replay(log_replay_params).await?;
         self.diagnostics.pinweaver_outcome(

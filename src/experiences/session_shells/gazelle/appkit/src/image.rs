@@ -36,7 +36,7 @@ impl Image {
             image_data.vmo_index,
             ui_comp::ImageProperties {
                 size: Some(fmath::SizeU { width: image_data.width, height: image_data.height }),
-                ..ui_comp::ImageProperties::EMPTY
+                ..Default::default()
             },
         )?;
 
@@ -150,7 +150,7 @@ pub async fn load_image_from_bytes_using_allocators(
     let args = ui_comp::RegisterBufferCollectionArgs {
         export_token: Some(buffer_collection_token_pair.export_token),
         buffer_collection_token: Some(buffer_collection_token_for_flatland),
-        ..ui_comp::RegisterBufferCollectionArgs::EMPTY
+        ..Default::default()
     };
     let _ = flatland_allocator.register_buffer_collection(args).await?;
 

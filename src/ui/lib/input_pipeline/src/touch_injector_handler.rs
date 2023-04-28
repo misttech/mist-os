@@ -235,7 +235,7 @@ impl TouchInjectorHandler {
             scroll_v_range: None,
             scroll_h_range: None,
             buttons: None,
-            ..pointerinjector::Config::EMPTY
+            ..Default::default()
         };
 
         // Keep track of the injector.
@@ -336,7 +336,7 @@ impl TouchInjectorHandler {
             scroll_v: None,
             scroll_h: None,
             pressed_buttons: None,
-            ..pointerinjector::PointerSample::EMPTY
+            ..Default::default()
         };
         let data = pointerinjector::Data::PointerSample(pointer_sample);
 
@@ -345,7 +345,7 @@ impl TouchInjectorHandler {
             timestamp: Some(event_time.into_nanos()),
             data: Some(data),
             trace_flow_id: Some(trace_flow_id.into()),
-            ..pointerinjector::Event::EMPTY
+            ..Default::default()
         };
 
         fuchsia_trace::flow_begin!("input", "dispatch_event_to_scenic", trace_flow_id);
@@ -416,7 +416,7 @@ impl TouchInjectorHandler {
                             timestamp: Some(fuchsia_async::Time::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
-                            ..pointerinjector::Event::EMPTY
+                            ..Default::default()
                         }]
                         .into_iter();
                         injector.inject(events).await.expect("Failed to inject updated viewport.");
@@ -567,7 +567,7 @@ mod tests {
         pointerinjector::Viewport {
             extents: Some([[min, min], [max, max]]),
             viewport_to_context_transform: None,
-            ..pointerinjector::Viewport::EMPTY
+            ..Default::default()
         }
     }
 

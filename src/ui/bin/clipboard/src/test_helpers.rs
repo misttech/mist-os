@@ -45,7 +45,7 @@ pub fn make_writer_request(
     let req = fclip::FocusedWriterRegistryRequestWriterRequest {
         view_ref: Some(view_ref),
         writer_request: Some(server_end),
-        ..fclip::FocusedWriterRegistryRequestWriterRequest::EMPTY
+        ..Default::default()
     };
 
     Ok((req, client_end.into_proxy()?))
@@ -78,7 +78,7 @@ pub fn make_reader_request(
     let req = fclip::FocusedReaderRegistryRequestReaderRequest {
         view_ref: Some(view_ref),
         reader_request: Some(server_end),
-        ..fclip::FocusedReaderRegistryRequestReaderRequest::EMPTY
+        ..Default::default()
     };
 
     Ok((req, client_end.into_proxy()?))
@@ -93,7 +93,7 @@ pub fn make_clipboard_item(
     fclip::ClipboardItem {
         mime_type_hint: mime_type_hint.into(),
         payload: text.into().map(|text| fclip::ClipboardItemData::Text(text)),
-        ..fclip::ClipboardItem::EMPTY
+        ..Default::default()
     }
 }
 

@@ -165,7 +165,7 @@ impl Facade for BluetoothSysFacade {
                         le_background_scan,
                         bredr_connectable_mode,
                         le_security_mode,
-                        ..Settings::EMPTY
+                        ..Default::default()
                     })
                     .await?;
                 Ok(to_value(result)?)
@@ -778,7 +778,7 @@ impl Facade for HfpFacade {
                 let result = self
                     .update_network_information(NetworkInformation {
                         service_available,
-                        ..NetworkInformation::EMPTY
+                        ..Default::default()
                     })
                     .await?;
                 Ok(to_value(result)?)
@@ -788,7 +788,7 @@ impl Facade for HfpFacade {
                 let result = self
                     .update_network_information(NetworkInformation {
                         roaming,
-                        ..NetworkInformation::EMPTY
+                        ..Default::default()
                     })
                     .await?;
                 Ok(to_value(result)?)
@@ -807,7 +807,7 @@ impl Facade for HfpFacade {
                 let result = self
                     .update_network_information(NetworkInformation {
                         signal_strength,
-                        ..NetworkInformation::EMPTY
+                        ..Default::default()
                     })
                     .await?;
                 Ok(to_value(result)?)

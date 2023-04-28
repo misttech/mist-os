@@ -338,7 +338,7 @@ mod test {
                 serve_mock_manager(Some(GuestInfo {
                     guest_status: Some(GuestStatus::Running),
                     uptime: Some(std::time::Duration::from_secs(123).as_nanos() as i64),
-                    ..GuestInfo::EMPTY
+                    ..Default::default()
                 })),
             ),
         ];
@@ -364,7 +364,7 @@ mod test {
         let manager = serve_mock_manager(Some(GuestInfo {
             guest_status: Some(GuestStatus::Stopped),
             uptime: Some(std::time::Duration::from_secs(5).as_nanos() as i64),
-            ..GuestInfo::EMPTY
+            ..Default::default()
         }));
 
         let actual = format!(
@@ -388,7 +388,7 @@ mod test {
             guest_status: Some(GuestStatus::Stopped),
             uptime: Some(std::time::Duration::from_secs(65).as_nanos() as i64),
             stop_error: Some(GuestError::InternalError),
-            ..GuestInfo::EMPTY
+            ..Default::default()
         }));
 
         let actual = format!(
@@ -429,13 +429,13 @@ mod test {
                 rng: Some(true),
                 vsock: Some(true),
                 sound: Some(false),
-                ..GuestDescriptor::EMPTY
+                ..Default::default()
             }),
             detected_problems: Some(vec![
                 "Host is experiencing heavy memory pressure".to_string(),
                 "No bridge between guest and host network interaces".to_string(),
             ]),
-            ..GuestInfo::EMPTY
+            ..Default::default()
         }));
 
         let actual = format!(

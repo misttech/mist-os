@@ -128,14 +128,14 @@ impl<'a> KeySimulator<'a> {
             timestamp: Some(0),
             type_: Some(ui_input3::KeyEventType::Pressed),
             key: Some(key),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         })
         .await?;
         self.dispatch(ui_input3::KeyEvent {
             timestamp: Some(0),
             type_: Some(ui_input3::KeyEventType::Released),
             key: Some(key),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         })
         .await?;
         Ok(())
@@ -161,7 +161,7 @@ impl<'a> KeySimulator<'a> {
                     timestamp: Some(0),
                     type_: Some(type_),
                     key: Some(key),
-                    ..ui_input3::KeyEvent::EMPTY
+                    ..Default::default()
                 })
                 .map(|_| ())
             })
@@ -284,6 +284,6 @@ pub fn create_key_event(
         key: key.into(),
         modifiers: modifiers.into(),
         key_meaning: key_meaning.into(),
-        ..ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     }
 }

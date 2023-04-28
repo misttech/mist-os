@@ -148,7 +148,7 @@ impl KeyboardService {
                         key,
                         key_meaning,
                         type_: Some(ui_input3::KeyEventType::Cancel),
-                        ..ui_input3::KeyEvent::EMPTY
+                        ..Default::default()
                     }
                 });
 
@@ -185,7 +185,7 @@ impl KeyboardService {
                 key,
                 key_meaning,
                 type_: Some(ui_input3::KeyEventType::Sync),
-                ..ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             }
         });
 
@@ -493,7 +493,7 @@ mod tests {
             key: Some(key),
             modifiers: Some(modifiers),
             type_: Some(ui_input3::KeyEventType::Pressed),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         }
     }
 
@@ -783,7 +783,7 @@ mod tests {
                 timestamp: Some(0),
                 key: Some(key),
                 type_: Some(ui_input3::KeyEventType::Released),
-                ..ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             })
             .await?;
 
@@ -796,7 +796,7 @@ mod tests {
                 timestamp: Some(0),
                 key: Some(input::Key::LeftShift),
                 type_: Some(ui_input3::KeyEventType::Sync),
-                ..ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             })
             .await?;
 
@@ -812,7 +812,7 @@ mod tests {
                 timestamp: Some(0),
                 key: Some(input::Key::LeftShift),
                 type_: Some(ui_input3::KeyEventType::Cancel),
-                ..ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             })
             .await?;
 

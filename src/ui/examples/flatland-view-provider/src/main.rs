@@ -127,7 +127,7 @@ impl<'a> AppModel<'a> {
         // used to register the BufferCollectionToken with the Scenic Allocator.
         let image_props = fland::ImageProperties {
             size: Some(fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT }),
-            ..fland::ImageProperties::EMPTY
+            ..Default::default()
         };
         // TODO(fxbug.dev/76640): generated FIDL methods currently expect "&mut" args.  This will
         // change; according to fxbug.dev/65845 the generated FIDL will use "&" instead (at least
@@ -182,7 +182,7 @@ impl<'a> AppModel<'a> {
             view_ref_focused: Some(focused_request),
             touch_source: Some(touch_request),
             mouse_source: Some(mouse_request),
-            ..fland::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
 
         // NOTE: it isn't necessary to call maybe_present() for this to take effect, because we will
@@ -504,7 +504,7 @@ async fn main() {
                     acquire_fences: None,
                     release_fences: None,
                     unsquashable: Some(present_parameters.unsquashable),
-                    ..fland::PresentArgs::EMPTY
+                    ..Default::default()
                 })
                 .unwrap_or(());
           }

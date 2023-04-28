@@ -704,7 +704,7 @@ mod tests {
         let view_spec = ViewSpec {
             view_holder_token: Some(view_token_pair.view_holder_token),
             view_ref: Some(view_ref_pair.view_ref),
-            ..ViewSpec::EMPTY
+            ..Default::default()
         };
         let _ = proxy
             .present_view(
@@ -745,7 +745,7 @@ mod tests {
             view_creation_token_pair.viewport_creation_token.value.get_koid();
         let view_spec = ViewSpec {
             viewport_creation_token: Some(view_creation_token_pair.viewport_creation_token),
-            ..ViewSpec::EMPTY
+            ..Default::default()
         };
 
         let _ = proxy

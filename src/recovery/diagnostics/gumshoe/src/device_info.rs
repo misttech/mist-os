@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn product_values_present_when_provided() {
-        let device = DeviceInfoImpl::new(None, None, Some(ProductInfo::EMPTY), None);
+        let device = DeviceInfoImpl::new(None, None, Some(ProductInfo::default()), None);
 
         // Gumshoe extracts 14 fields from ProductInfo.
         assert_eq!(14, device.product_info.len());

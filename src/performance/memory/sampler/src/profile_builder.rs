@@ -88,7 +88,7 @@ mod test {
     fn test_allocate() {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
-        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..StackTrace::EMPTY };
+        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..Default::default() };
         let size = 10;
 
         builder.allocate(address, stack_trace.clone(), size);
@@ -104,7 +104,7 @@ mod test {
     fn test_deallocate_mismatch() {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
-        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..StackTrace::EMPTY };
+        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..Default::default() };
 
         builder.deallocate(address, stack_trace);
 
@@ -118,9 +118,9 @@ mod test {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
         let allocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![1, 2]), ..StackTrace::EMPTY };
+            StackTrace { stack_frames: Some(vec![1, 2]), ..Default::default() };
         let deallocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![3, 4]), ..StackTrace::EMPTY };
+            StackTrace { stack_frames: Some(vec![3, 4]), ..Default::default() };
         let size = 10;
 
         builder.allocate(address, allocation_stack_trace.clone(), size);
@@ -149,9 +149,9 @@ mod test {
                 start_address: Some(0),
                 size: Some(10),
                 relative_address: Some(100),
-                ..ExecutableSegment::EMPTY
+                ..Default::default()
             }]),
-            ..ModuleMap::EMPTY
+            ..Default::default()
         }];
 
         builder.set_process_info(Some(process_name.clone()), module_map.clone().into_iter());

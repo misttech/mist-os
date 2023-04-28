@@ -54,7 +54,7 @@ const ACCOUNT_LABEL: &str = "account";
 /// Convenience function to create an account metadata table
 /// with the supplied name.
 fn create_account_metadata(name: &str) -> AccountMetadata {
-    AccountMetadata { name: Some(name.to_string()), ..AccountMetadata::EMPTY }
+    AccountMetadata { name: Some(name.to_string()), ..Default::default() }
 }
 
 /// Calls provision_new_account on the supplied account_manager, returning an error on any
@@ -83,7 +83,7 @@ async fn provision_new_account_with_metadata(
                 lifetime: Some(lifetime),
                 interaction: interaction_server_end_opt,
                 metadata,
-                ..AccountManagerProvisionNewAccountRequest::EMPTY
+                ..Default::default()
             })
             .await?
             .map_err(|error| format_err!("ProvisionNewAccount returned error: {:?}", error))
@@ -141,7 +141,7 @@ async fn get_account(
                 id: Some(account_id),
                 account: Some(account_server_end),
                 interaction: Some(interaction_server_end),
-                ..AccountManagerGetAccountRequest::EMPTY
+                ..Default::default()
             })
             .await
     });
@@ -342,7 +342,7 @@ async fn create_account_manager() -> Result<Arc<Mutex<NestedAccountManagerProxy>
 
     let args = fidl_fuchsia_driver_test::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
-        ..fidl_fuchsia_driver_test::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
 
@@ -773,7 +773,7 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
                 lifetime: Some(Lifetime::Persistent),
                 interaction: Some(interaction_server_end),
                 metadata: None,
-                ..AccountManagerProvisionNewAccountRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("Error while invoking provision_new_account")
@@ -790,8 +790,8 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
             .provision_new_account(AccountManagerProvisionNewAccountRequest {
                 lifetime: Some(Lifetime::Persistent),
                 interaction: Some(interaction_server_end),
-                metadata: Some(AccountMetadata::EMPTY),
-                ..AccountManagerProvisionNewAccountRequest::EMPTY
+                metadata: Some(AccountMetadata::default()),
+                ..Default::default()
             })
             .await
             .expect("Error while invoking provision_new_account")

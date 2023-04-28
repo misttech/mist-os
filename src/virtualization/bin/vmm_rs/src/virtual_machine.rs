@@ -146,7 +146,7 @@ mod tests {
     fn test_create_virtual_machine_hypervisor_failure() {
         let hypervisor = MockHypervisor::new();
         hypervisor.on_guest_create(MockBehavior::ReturnError(zx::Status::NO_RESOURCES));
-        let config = GuestConfig::EMPTY;
+        let config = GuestConfig::default();
 
         let vm = VirtualMachine::new(hypervisor.clone(), config);
 
@@ -157,7 +157,7 @@ mod tests {
     #[fuchsia::test]
     fn test_create_virtual_machine_no_memory_in_config() {
         let hypervisor = MockHypervisor::new();
-        let config = GuestConfig::EMPTY;
+        let config = GuestConfig::default();
 
         let vm = VirtualMachine::new(hypervisor.clone(), config);
 
@@ -178,7 +178,7 @@ mod tests {
         pub fn new() -> Self {
             Self::with_config(GuestConfig {
                 guest_memory: Some(Self::DEFAULT_MEMORY),
-                ..GuestConfig::EMPTY
+                ..Default::default()
             })
         }
 
@@ -205,7 +205,7 @@ mod tests {
     #[fuchsia::test]
     fn test_create_virtual_machine() {
         let hypervisor = MockHypervisor::new();
-        let mut config = GuestConfig::EMPTY;
+        let mut config = GuestConfig::default();
         config.guest_memory = Some(4 * 1024 * 1024 * 1024);
 
         let vm = VirtualMachine::new(hypervisor.clone(), config);

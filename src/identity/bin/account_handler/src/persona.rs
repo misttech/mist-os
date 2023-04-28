@@ -218,9 +218,9 @@ mod tests {
                         initial_state: Some(true),
                         granularity: Some(AuthChangeGranularity {
                             summary_changes: Some(true),
-                            ..AuthChangeGranularity::EMPTY
+                            ..Default::default()
                         }),
-                        ..AuthTargetRegisterAuthListenerRequest::EMPTY
+                        ..Default::default()
                     })
                     .await?,
                 Err(ApiError::UnsupportedOperation)

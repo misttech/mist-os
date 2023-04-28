@@ -184,7 +184,7 @@ async fn file_get_backing_memory_exact_same_koid() {
     let vmofile_object = io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
         name: Some(TEST_FILE.to_string()),
         vmo: Some(vmo),
-        ..io_test::VmoFile::EMPTY
+        ..Default::default()
     });
 
     let (vmo, _) = create_file_and_get_backing_memory(

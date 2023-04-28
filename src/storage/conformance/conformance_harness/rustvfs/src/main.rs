@@ -126,7 +126,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // TODO(fxbug.dev/72801): SetAttr should work, investigate why the test fails.
                     supports_set_attr: Some(false),
 
-                    ..Io1Config::EMPTY
+                    ..Default::default()
                 };
                 responder.send(config)?;
                 continue;

@@ -536,11 +536,11 @@ mod tests {
                                         fidl_input_report::ConsumerControlButton::VolumeUp,
                                         fidl_input_report::ConsumerControlButton::VolumeDown,
                                     ]),
-                                    ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::ConsumerControlDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -578,15 +578,15 @@ mod tests {
                                     scroll_v: None,
                                     scroll_h: None,
                                     buttons: None,
-                                    ..fidl_input_report::MouseInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::MouseDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             sensor: None,
                             touch: None,
                             keyboard: None,
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -621,7 +621,7 @@ mod tests {
                             touch: None,
                             keyboard: None,
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -659,13 +659,13 @@ mod tests {
                                     max_contacts: None,
                                     touch_type: None,
                                     buttons: None,
-                                    ..fidl_input_report::TouchInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::TouchDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             keyboard: None,
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -700,7 +700,7 @@ mod tests {
                             touch: None,
                             keyboard: None,
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -736,13 +736,13 @@ mod tests {
                             keyboard: Some(fidl_input_report::KeyboardDescriptor {
                                 input: Some(fidl_input_report::KeyboardInputDescriptor {
                                     keys3: None,
-                                    ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
                                 output: None,
-                                ..fidl_input_report::KeyboardDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -777,7 +777,7 @@ mod tests {
                             touch: None,
                             keyboard: None,
                             consumer_control: None,
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
@@ -815,9 +815,9 @@ mod tests {
                                     scroll_v: None,
                                     scroll_h: None,
                                     buttons: None,
-                                    ..fidl_input_report::MouseInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::MouseDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             sensor: None,
                             touch: Some(fidl_input_report::TouchDescriptor {
@@ -826,17 +826,17 @@ mod tests {
                                     max_contacts: None,
                                     touch_type: None,
                                     buttons: None,
-                                    ..fidl_input_report::TouchInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::TouchDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             keyboard: Some(fidl_input_report::KeyboardDescriptor {
                                 input: Some(fidl_input_report::KeyboardInputDescriptor {
                                     keys3: None,
-                                    ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
                                 output: None,
-                                ..fidl_input_report::KeyboardDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             consumer_control: Some(fidl_input_report::ConsumerControlDescriptor {
                                 input: Some(fidl_input_report::ConsumerControlInputDescriptor {
@@ -844,11 +844,11 @@ mod tests {
                                         fidl_input_report::ConsumerControlButton::VolumeUp,
                                         fidl_input_report::ConsumerControlButton::VolumeDown,
                                     ]),
-                                    ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fidl_input_report::ConsumerControlDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                            ..Default::default()
                         });
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),

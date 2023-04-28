@@ -215,7 +215,7 @@ impl KeyboardEvent {
             lock_state: self.lock_state,
             repeat_sequence: Some(self.repeat_sequence),
             key_meaning: self.key_meaning,
-            ..fidl_ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -788,7 +788,7 @@ mod tests {
                 key_meaning: Some(KeyMeaning::NonPrintableKey(NonPrintableKey::Tab)),
                 repeat_sequence: Some(42),
                 lock_state: Some(LockState::all()),
-                ..fidl_fuchsia_ui_input3::KeyEvent::EMPTY
+                ..Default::default()
             }
         );
     }

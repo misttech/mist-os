@@ -31,7 +31,7 @@ async fn get_connection_info_file() {
 
         assert_eq!(
             file.get_connection_info().await.unwrap(),
-            fio::ConnectionInfo { rights: Some(expected_operations), ..fio::ConnectionInfo::EMPTY }
+            fio::ConnectionInfo { rights: Some(expected_operations), ..Default::default() }
         );
     }
 }
@@ -48,10 +48,7 @@ async fn get_connection_info_file_node_reference() {
     // TODO(http://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
     assert_eq!(
         file.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo {
-            rights: Some(fio::Operations::GET_ATTRIBUTES),
-            ..fio::ConnectionInfo::EMPTY
-        }
+        fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }
     );
 }
 
@@ -74,7 +71,7 @@ async fn get_connection_info_directory() {
                         | fio::Operations::ENUMERATE
                         | fio::Operations::TRAVERSE
                 ),
-                ..fio::ConnectionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -92,9 +89,6 @@ async fn get_connection_info_directory_node_reference() {
     // TODO(http://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
     assert_eq!(
         dir.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo {
-            rights: Some(fio::Operations::GET_ATTRIBUTES),
-            ..fio::ConnectionInfo::EMPTY
-        }
+        fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }
     );
 }

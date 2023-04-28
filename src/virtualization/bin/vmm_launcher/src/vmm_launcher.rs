@@ -53,9 +53,9 @@ impl VmmLauncher {
             url: Some(self.vmm_component_url.clone()),
             startup: Some(cdecl::StartupMode::Lazy),
             on_terminate: Some(cdecl::OnTerminate::None),
-            ..cdecl::Child::EMPTY
+            ..Default::default()
         };
-        let args = CreateChildArgs::EMPTY;
+        let args = CreateChildArgs::default();
         let realm_result = self.realm.create_child(&mut collection_ref, decl, args).await;
         match realm_result {
             Err(fidl_error) => {

@@ -203,7 +203,7 @@ mod tests {
         .await?;
         assert!(conn
             .proxy()
-            .create_account(AccountHandlerControlCreateAccountRequest::EMPTY)
+            .create_account(AccountHandlerControlCreateAccountRequest::default())
             .await
             .unwrap()
             .is_ok());
@@ -219,7 +219,7 @@ mod tests {
         .await?;
         assert_eq!(
             conn.proxy()
-                .create_account(AccountHandlerControlCreateAccountRequest::EMPTY)
+                .create_account(AccountHandlerControlCreateAccountRequest::default())
                 .await
                 .unwrap()
                 .unwrap_err(),
@@ -238,7 +238,7 @@ mod tests {
         assert!(conn.proxy().terminate().is_ok());
         assert!(conn
             .proxy()
-            .create_account(AccountHandlerControlCreateAccountRequest::EMPTY)
+            .create_account(AccountHandlerControlCreateAccountRequest::default())
             .await
             .unwrap_err()
             .is_closed());

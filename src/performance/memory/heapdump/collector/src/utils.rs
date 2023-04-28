@@ -78,7 +78,7 @@ extern "C" fn callback(
         size: Some(size),
         file_offset: Some(file_offset),
         build_id: Some(fheapdump_client::BuildId { value: build_id }),
-        ..fheapdump_client::ExecutableRegion::EMPTY
+        ..Default::default()
     })
 }
 

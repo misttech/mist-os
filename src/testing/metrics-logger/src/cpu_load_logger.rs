@@ -436,11 +436,11 @@ pub mod tests {
         let (proxy, task) = setup_fake_cpu_stats_service(move || CpuStats {
             actual_num_cpus: 5,
             per_cpu_stats: Some(vec![
-                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[0]), ..PerCpuStats::EMPTY },
-                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[1]), ..PerCpuStats::EMPTY },
-                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[2]), ..PerCpuStats::EMPTY },
-                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[3]), ..PerCpuStats::EMPTY },
-                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[4]), ..PerCpuStats::EMPTY },
+                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[0]), ..Default::default() },
+                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[1]), ..Default::default() },
+                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[2]), ..Default::default() },
+                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[3]), ..Default::default() },
+                PerCpuStats { idle_time: Some(cpu_idle_time_clone.get()[4]), ..Default::default() },
             ]),
         });
         tasks.push(task);

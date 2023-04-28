@@ -50,7 +50,7 @@ fn h265_stream_output_generated() -> Result<()> {
                 bit_rate: Some(1000000),
                 frame_rate: Some(30),
                 gop_size: Some(2),
-                ..HevcEncoderSettings::EMPTY
+                ..Default::default()
             })
         }),
         expected_key_frames: Some(3),

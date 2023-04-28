@@ -274,12 +274,12 @@ mod tests {
                         size: Some(FAKE_ALLOCATION_SIZE),
                         stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
                         timestamp: Some(FAKE_ALLOCATION_TIMESTAMP),
-                        ..fheapdump_client::Allocation::EMPTY
+                        ..Default::default()
                     }),
                     fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                         stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
                         program_addresses: Some(FAKE_ALLOCATION_STACK_TRACE.to_vec()),
-                        ..fheapdump_client::StackTrace::EMPTY
+                        ..Default::default()
                     }),
                 ]
                 .iter_mut(),
@@ -292,7 +292,7 @@ mod tests {
                         fheapdump_client::BlockContents {
                             address: Some(FAKE_ALLOCATION_ADDRESS),
                             contents: Some(FAKE_ALLOCATION_CONTENTS.to_vec()),
-                            ..fheapdump_client::BlockContents::EMPTY
+                            ..Default::default()
                         },
                     )]
                     .iter_mut(),
@@ -429,7 +429,7 @@ mod tests {
         let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
             process_selector,
             with_contents,
-            ..fheapdump_client::CollectorTakeLiveSnapshotRequest::EMPTY
+            ..Default::default()
         };
         let result = proxy.take_live_snapshot(request).await.expect("FIDL channel error");
 

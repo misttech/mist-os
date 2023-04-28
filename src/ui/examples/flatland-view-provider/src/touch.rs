@@ -22,10 +22,10 @@ fn generate_touch_event_responses(events: Iter<'_, TouchEvent>) -> Vec<TouchResp
                 return TouchResponse {
                     response_type: Some(fptr::TouchResponseType::Yes),
                     trace_flow_id: evt.trace_flow_id,
-                    ..TouchResponse::EMPTY
+                    ..Default::default()
                 };
             }
-            TouchResponse::EMPTY
+            TouchResponse::default()
         })
         .collect()
 }
@@ -246,9 +246,9 @@ mod tests {
                 interaction,
                 phase: Some(phase),
                 position_in_viewport: Some([x, y]),
-                ..fptr::TouchPointerSample::EMPTY
+                ..Default::default()
             }),
-            ..TouchEvent::EMPTY
+            ..Default::default()
         }
     }
 
@@ -261,7 +261,7 @@ mod tests {
         TouchEvent {
             timestamp: Some(timestamp),
             interaction_result: Some(fptr::TouchInteractionResult { interaction, status }),
-            ..TouchEvent::EMPTY
+            ..Default::default()
         }
     }
 

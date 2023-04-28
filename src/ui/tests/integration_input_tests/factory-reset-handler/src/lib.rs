@@ -150,7 +150,7 @@ fn default_viewport() -> pointerinjector::Viewport {
     pointerinjector::Viewport {
         extents: Some([[0.0, 0.0], [100.0, 100.0]]),
         viewport_to_context_transform: Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]),
-        ..pointerinjector::Viewport::EMPTY
+        ..Default::default()
     }
 }
 

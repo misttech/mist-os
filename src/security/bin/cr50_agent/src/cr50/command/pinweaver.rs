@@ -725,7 +725,7 @@ mod tests {
         let he_secret: Vec<u8> = vec![0xbb; HASH_SIZE as usize];
         let reset_secret: Vec<u8> = vec![0xcc; HASH_SIZE as usize];
         let mut serializer = Serializer::new();
-        let mut params = InsertLeafParams::EMPTY;
+        let mut params = InsertLeafParams::default();
         params.label = Some(1);
         params.delay_schedule =
             Some(vec![FidlDelayScheduleEntry { attempt_count: 5, time_delay: 10_000_000_000 }]);
@@ -793,7 +793,7 @@ mod tests {
     #[fuchsia::test]
     fn test_try_auth() {
         let mut serializer = Serializer::new();
-        let mut params = TryAuthParams::EMPTY;
+        let mut params = TryAuthParams::default();
         params.le_secret = Some(vec![0xaa; LE_SECRET_MAX_SIZE as usize]);
         params.cred_metadata = Some(vec![0xbb; 32]); // artificially reduced to 32 bytes to make test readable.
         params.h_aux = Some(vec![[0xcc; HASH_SIZE as usize], [0xdd; HASH_SIZE as usize]]);
@@ -916,7 +916,7 @@ mod tests {
     #[fuchsia::test]
     fn test_remove_leaf() {
         let mut serializer = Serializer::new();
-        let mut params = RemoveLeafParams::EMPTY;
+        let mut params = RemoveLeafParams::default();
         params.label = Some(0x11d1f);
         params.mac = Some([0xab; MAC_SIZE as usize]);
         params.h_aux = Some(vec![[0xcc; HASH_SIZE as usize], [0xab; HASH_SIZE as usize]]);
@@ -1023,7 +1023,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_replay() {
         let mut serializer = Serializer::new();
-        let mut params = LogReplayParams::EMPTY;
+        let mut params = LogReplayParams::default();
         params.h_aux = Some(vec![[0xab; 32], [0xac; 32]]);
         params.root_hash = Some([0xcc; 32]);
         params.cred_metadata = Some(vec![0xdd; 8]);

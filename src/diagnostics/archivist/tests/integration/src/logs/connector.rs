@@ -127,7 +127,7 @@ async fn serve_mocks(
                     "fuchsia-pkg://fuchsia.com/test-logs-connector#meta/test-logs-connector.cm"
                         .to_string(),
                 ),
-                ..SourceIdentity::EMPTY
+                ..Default::default()
             };
             listener
                 .on_new_connection(&mut LogConnection { log_request, source_identity })

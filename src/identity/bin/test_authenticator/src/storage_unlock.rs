@@ -113,7 +113,7 @@ impl StorageUnlockMechanism {
             enrollment_id: Some(id),
             updated_enrollment_data: None,
             prekey_material: Some(prekey_material.to_vec()),
-            ..AttemptedEvent::EMPTY
+            ..Default::default()
         })
     }
 

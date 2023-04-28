@@ -460,7 +460,7 @@ async fn perform_update(update_url: &str) {
                 initiator: Some(Initiator::Service),
                 allow_attach_to_existing_attempt: Some(false),
                 should_write_recovery: Some(false),
-                ..Options::EMPTY
+                ..Default::default()
             },
             monitor_client_end,
             Some(reboot_controller_server_end),

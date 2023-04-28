@@ -315,7 +315,7 @@ where
                 self.update_credential(&label, mac, cred_metadata, pending_commits).await?;
                 Ok(fcred::CheckCredentialResponse {
                     he_secret: response.he_secret,
-                    ..fcred::CheckCredentialResponse::EMPTY
+                    ..Default::default()
                 })
             }
             TryAuthResponse::Failed(response) => {
@@ -503,7 +503,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -542,7 +542,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await;
         assert_matches!(result, Ok(_));
@@ -572,7 +572,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await;
         assert_matches!(
@@ -599,7 +599,7 @@ mod test {
                 reset_secret: Some(vec![3; 32]),
                 cred_metadata: Some(vec![4; 32]),
                 mac: Some(Hash::default()),
-                ..TryAuthSuccess::EMPTY
+                ..Default::default()
             }))
         });
 
@@ -620,7 +620,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -628,7 +628,7 @@ mod test {
             .check_credential(&fcred::CheckCredentialParams {
                 label: Some(label),
                 le_secret: Some(vec![1; 32]),
-                ..fcred::CheckCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("check credential");
@@ -651,7 +651,7 @@ mod test {
         params.pinweaver.expect_try_auth().times(1).returning(|_, _, _| {
             Ok(TryAuthResponse::RateLimited(TryAuthRateLimited {
                 time_to_wait: Some(32),
-                ..TryAuthRateLimited::EMPTY
+                ..Default::default()
             }))
         });
 
@@ -672,7 +672,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -681,7 +681,7 @@ mod test {
             .check_credential(&fcred::CheckCredentialParams {
                 label: Some(label),
                 le_secret: Some(vec![1; 32]),
-                ..fcred::CheckCredentialParams::EMPTY
+                ..Default::default()
             })
             .await;
         assert_matches!(
@@ -708,7 +708,7 @@ mod test {
                 root_hash: Some(Hash::default()),
                 cred_metadata: Some(vec![4; 32]),
                 mac: Some(Hash::default()),
-                ..TryAuthFailed::EMPTY
+                ..Default::default()
             }))
         });
 
@@ -729,7 +729,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -738,7 +738,7 @@ mod test {
             .check_credential(&fcred::CheckCredentialParams {
                 label: Some(label),
                 le_secret: Some(vec![1; 32]),
-                ..fcred::CheckCredentialParams::EMPTY
+                ..Default::default()
             })
             .await;
         assert_matches!(
@@ -775,7 +775,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -816,7 +816,7 @@ mod test {
                     attempt_count: 20,
                     time_delay: 64,
                 }]),
-                ..fcred::AddCredentialParams::EMPTY
+                ..Default::default()
             })
             .await
             .expect("added credential");
@@ -868,7 +868,7 @@ mod test {
                         attempt_count: 20,
                         time_delay: 64,
                     }]),
-                    ..fcred::AddCredentialParams::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .expect("send add_credential should succeed")

@@ -139,7 +139,7 @@ async fn handle_run(
                 ftest::StdHandles {
                     out: Some(stdout_rx),
                     err: Some(stderr_rx),
-                    ..ftest::StdHandles::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             )
@@ -153,7 +153,7 @@ async fn handle_run(
                 ftest::Status::Failed
             }
         };
-        case_proxy.finished(ftest::Result_ { status: Some(status), ..ftest::Result_::EMPTY }).ok();
+        case_proxy.finished(ftest::Result_ { status: Some(status), ..Default::default() }).ok();
     }
 
     listener.on_finished().ok();
@@ -235,7 +235,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
                 client_selector_configuration: Some(ClientSelectorConfiguration::Selectors(vec![
                     SelectorArgument::RawSelector(format!("{}:root", moniker)),
                 ])),
-                ..StreamParameters::EMPTY
+                ..Default::default()
             },
             result_stream,
         )?;
@@ -323,7 +323,7 @@ async fn get_test_cases(rid: RequestId) -> Result<Vec<ftest::Case>, Error> {
             ret.push(ftest::Case {
                 name: Some(value.moniker),
                 enabled: Some(true),
-                ..ftest::Case::EMPTY
+                ..Default::default()
             });
         }
     }

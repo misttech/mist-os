@@ -103,7 +103,7 @@ fn create_key_down_event(key: input::Key, modifiers: ui_input3::Modifiers) -> ui
         key: Some(key),
         modifiers: Some(modifiers),
         type_: Some(ui_input3::KeyEventType::Pressed),
-        ..ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     }
 }
 
@@ -113,7 +113,7 @@ fn create_key_up_event(key: input::Key, modifiers: ui_input3::Modifiers) -> ui_i
         key: Some(key),
         modifiers: Some(modifiers),
         type_: Some(ui_input3::KeyEventType::Released),
-        ..ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     }
 }
 
@@ -274,13 +274,13 @@ async fn test_sync_cancel_with_connections(
         timestamp: Some(0),
         key: Some(key1),
         type_: Some(ui_input3::KeyEventType::Pressed),
-        ..ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     };
     let event1_release = ui_input3::KeyEvent {
         timestamp: Some(0),
         key: Some(key1),
         type_: Some(ui_input3::KeyEventType::Released),
-        ..ui_input3::KeyEvent::EMPTY
+        ..Default::default()
     };
 
     // Focus client A.
@@ -307,7 +307,7 @@ async fn test_sync_cancel_with_connections(
             timestamp: Some(0i64),
             key: Some(input::Key::A),
             type_: Some(ui_input3::KeyEventType::Cancel),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         },
         client_a_event
     );
@@ -317,7 +317,7 @@ async fn test_sync_cancel_with_connections(
             timestamp: Some(0i64),
             key: Some(input::Key::A),
             type_: Some(ui_input3::KeyEventType::Sync),
-            ..ui_input3::KeyEvent::EMPTY
+            ..Default::default()
         },
         client_b_event
     );

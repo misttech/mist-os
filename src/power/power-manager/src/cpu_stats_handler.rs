@@ -349,7 +349,7 @@ pub mod tests {
                 syscalls: None,
                 reschedule_ipis: None,
                 generic_ipis: None,
-                ..fstats::PerCpuStats::EMPTY
+                ..Default::default()
             });
         }
 

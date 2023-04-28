@@ -47,7 +47,7 @@ async fn main() {
     view_provider
         .create_view2(ui_app::CreateView2Args {
             view_creation_token: Some(link_token_pair.view_creation_token),
-            ..ui_app::CreateView2Args::EMPTY
+            ..Default::default()
         })
         .expect("Cannot invoke create_view2");
     let _root_view_created =

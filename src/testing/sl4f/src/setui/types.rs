@@ -87,7 +87,7 @@ impl From<fidl_fuchsia_settings::IntlSettings> for IntlInfo {
 /// Conversion from IntlInfo to IntlSettings
 impl Into<fidl_fuchsia_settings::IntlSettings> for IntlInfo {
     fn into(self) -> IntlSettings {
-        let mut intl_settings = IntlSettings::EMPTY;
+        let mut intl_settings = IntlSettings::default();
 
         intl_settings.locales = self
             .locales

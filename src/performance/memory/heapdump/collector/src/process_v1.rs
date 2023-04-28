@@ -157,7 +157,7 @@ impl Snapshot for SnapshotV1 {
                         size: Some(block.size),
                         stack_trace_key: Some(block.stack_trace_key.into_raw() as u64),
                         timestamp: Some(block.timestamp),
-                        ..fheapdump_client::Allocation::EMPTY
+                        ..Default::default()
                     },
                 ))
                 .await?;
@@ -177,7 +177,7 @@ impl Snapshot for SnapshotV1 {
                         fheapdump_client::StackTrace {
                             stack_trace_key: Some(stack_trace_key.into_raw() as u64),
                             program_addresses: Some(chunk.to_vec()),
-                            ..fheapdump_client::StackTrace::EMPTY
+                            ..Default::default()
                         },
                     ))
                     .await?;
@@ -201,7 +201,7 @@ impl Snapshot for SnapshotV1 {
                         fheapdump_client::BlockContents {
                             address: Some(*block_address),
                             contents: Some(chunk.to_vec()),
-                            ..fheapdump_client::BlockContents::EMPTY
+                            ..Default::default()
                         },
                     ))
                     .await?;

@@ -350,7 +350,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                             responder.send(resp).context("Error responding")?;
                         }
                         None => {
-                            let mut resp = ResponseTable::EMPTY;
+                            let mut resp = ResponseTable::default();
                             resp.value = payload.value;
                             responder.send(resp).context("Error responding")?;
                         }
@@ -374,7 +374,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                                         payload.result_err.unwrap(),
                                     )
                                 } else {
-                                    let mut resp = ResponseTable::EMPTY;
+                                    let mut resp = ResponseTable::default();
                                     resp.value = payload.value;
                                     EchoEchoTablePayloadWithErrorResult::Ok(resp)
                                 };
@@ -383,7 +383,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     }
                 }
                 EchoRequest::EchoTablePayloadNoRetVal { mut payload, control_handle } => {
-                    let mut resp = ResponseTable::EMPTY;
+                    let mut resp = ResponseTable::default();
                     let forward_to_server = payload.forward_to_server.take();
                     match forward_to_server {
                         Some(_forward_to_server) => {

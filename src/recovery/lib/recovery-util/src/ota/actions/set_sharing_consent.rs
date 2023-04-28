@@ -32,7 +32,7 @@ impl SetSharingConsentAction {
             return;
         }
         let task = async move {
-            let mut privacy_settings = PrivacySettings::EMPTY;
+            let mut privacy_settings = PrivacySettings::default();
             privacy_settings.user_data_sharing_consent = Some(desired == Allow);
             #[cfg(feature = "debug_logging")]
             println!("Setting privacy to {:?}", privacy_settings);

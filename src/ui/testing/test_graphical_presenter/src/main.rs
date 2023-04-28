@@ -84,7 +84,7 @@ impl TestGraphicalPresenter {
                 ParentViewportWatcherProxy::get_layout,
             ),
             parent_viewport_request: Some(parent_viewport_request),
-            root_layout_info: LayoutInfo::EMPTY,
+            root_layout_info: LayoutInfo::default(),
             child_view: None,
             present_credits: 1,
             need_present: false,
@@ -109,7 +109,7 @@ impl TestGraphicalPresenter {
                                 let view_bound_protocols = ViewBoundProtocols {
                                     view_focuser: self.view_focuser_request.take(),
                                     view_ref_focused: Some(view_focused),
-                                    ..ViewBoundProtocols::EMPTY
+                                    ..Default::default()
                                 };
                                 self.flatland.create_view2(
                                     &mut token,
@@ -297,7 +297,7 @@ impl TestGraphicalPresenter {
         if self.present_credits > 0 {
             self.present_credits -= 1;
             self.need_present = false;
-            self.flatland.present(PresentArgs::EMPTY).context("Failed to present")?;
+            self.flatland.present(PresentArgs::default()).context("Failed to present")?;
         } else {
             self.need_present = true;
         }
@@ -312,7 +312,7 @@ impl TestGraphicalPresenter {
         // The child view will take up the entire size of our root view.
         let viewport_properties = ViewportProperties {
             logical_size: self.root_layout_info.logical_size,
-            ..ViewportProperties::EMPTY
+            ..Default::default()
         };
 
         // Now set the content and present the new viewport.

@@ -606,7 +606,7 @@ impl BluetoothSysFacade {
             le_security_level: pairing_security_level,
             bondable_mode: Some(bondable_mode),
             transport: Some(transport),
-            ..PairingOptions::EMPTY
+            ..Default::default()
         };
 
         let proxy = match &self.inner.read().access_proxy {

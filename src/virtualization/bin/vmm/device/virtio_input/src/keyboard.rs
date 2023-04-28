@@ -535,7 +535,7 @@ mod tests {
         let events = translate_keyboard_event(input3::KeyEvent {
             type_: Some(input3::KeyEventType::Pressed),
             key: Some(TEST_KEY),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         })
         .unwrap();
 
@@ -559,7 +559,7 @@ mod tests {
             type_: Some(input3::KeyEventType::Pressed),
             key: Some(TEST_KEY),
             repeat_sequence: Some(1),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         })
         .unwrap();
 
@@ -582,7 +582,7 @@ mod tests {
         let events = translate_keyboard_event(input3::KeyEvent {
             type_: Some(input3::KeyEventType::Released),
             key: Some(TEST_KEY),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         })
         .unwrap();
 
@@ -605,7 +605,7 @@ mod tests {
             translate_keyboard_event(input3::KeyEvent {
                 type_: Some(input3::KeyEventType::Pressed),
                 key: Some(key),
-                ..input3::KeyEvent::EMPTY
+                ..Default::default()
             })
             .unwrap_or_else(|| panic!("Unable to translate fuchsia key {:?}", key));
         }
@@ -657,7 +657,7 @@ mod tests {
         let event = input3::KeyEvent {
             type_: Some(input3::KeyEventType::Pressed),
             key: Some(Key::W),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         };
         // We need to select on both device.run and our proxy call because the device needs to be
         // polled to service the request.
@@ -722,7 +722,7 @@ mod tests {
         let event = input3::KeyEvent {
             type_: Some(input3::KeyEventType::Pressed),
             key: Some(Key::P),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         };
         // We need to select on both device.run and our proxy call because the device needs to be
         // polled to service the request.
@@ -750,7 +750,7 @@ mod tests {
         let event = input3::KeyEvent {
             type_: Some(input3::KeyEventType::Pressed),
             key: Some(Key::Q),
-            ..input3::KeyEvent::EMPTY
+            ..Default::default()
         };
         let result = select! {
             result = keyboard_proxy.on_key_event(event.clone()).fuse() => result.unwrap(),

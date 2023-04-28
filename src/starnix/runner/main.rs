@@ -107,7 +107,7 @@ async fn create_new_kernel(
                 name: Some(kernel_start_info.name.clone()),
                 url: Some(KERNEL_URL.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             },
             kernel_start_info.args,
         )

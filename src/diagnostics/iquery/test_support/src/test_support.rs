@@ -32,7 +32,7 @@ use std::sync::Arc;
 ///       target: Some(Ref::Self_(SelfRef)),
 ///       source_name: Some("src".to_owned()),
 ///       target_name: Some("fuchsia.io.SomeOtherThing".to_owned()),
-///       ..ExposeProtocol::EMPTY
+///       ..Default::default()
 ///   })])
 ///   .add() // Finish building the result.
 ///   .when("some/thing") // Start another build.
@@ -127,14 +127,14 @@ impl MockRealmQueryBuilderInner {
             instance_id: None,
             resolved_info: Some(fsys2::ResolvedInfo {
                 resolved_url: Some("".to_owned()),
-                ..fsys2::ResolvedInfo::EMPTY
+                ..Default::default()
             }),
-            ..fsys2::Instance::EMPTY
+            ..Default::default()
         }
     }
 
     fn to_manifest(&self) -> Component {
-        Component { exposes: Some(self.exposes.clone()), ..Component::EMPTY }
+        Component { exposes: Some(self.exposes.clone()), ..Default::default() }
     }
 }
 
@@ -181,7 +181,7 @@ impl Default for MockRealmQuery {
                 target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_owned()),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             })])
             .svc_dir_entry("fuchsia.some.GarbageAccessor")
             .out_dir_entry("fuchsia.diagnostics.WorkingAccessor")
@@ -194,7 +194,7 @@ impl Default for MockRealmQuery {
                 target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.io.SomeOtherThing".to_owned()),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             })])
             .add()
             .when("other/component")
@@ -204,7 +204,7 @@ impl Default for MockRealmQuery {
                 target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.io.MagicStuff".to_owned()),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             })])
             .svc_dir_entry("fuchsia.diagnostics.MagicArchiveAccessor")
             .diagnostics_dir_entry("fuchsia.inspect.Tree")
@@ -216,7 +216,7 @@ impl Default for MockRealmQuery {
                 target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             })])
             .add()
             .when("foo/bar/thing")
@@ -226,7 +226,7 @@ impl Default for MockRealmQuery {
                 target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             })])
             .add()
             .build()

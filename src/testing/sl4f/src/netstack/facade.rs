@@ -241,7 +241,7 @@ impl NetstackFacade {
         let (watcher, server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()?;
         let () = interfaces_state
-            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::EMPTY, server)?;
+            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)?;
 
         loop {
             match watcher.watch().await? {
@@ -358,16 +358,13 @@ mod tests {
         fn expect_get_ipv6_addresses(self, result: Vec<fnet::Subnet>) -> Self {
             let addresses = result
                 .into_iter()
-                .map(|addr| finterfaces::Address {
-                    addr: Some(addr),
-                    ..finterfaces::Address::EMPTY
-                })
+                .map(|addr| finterfaces::Address { addr: Some(addr), ..Default::default() })
                 .collect();
             self.push_state(move |req| match req {
                 finterfaces::WatcherRequest::Watch { responder } => responder
                     .send(&mut finterfaces::Event::Existing(finterfaces::Properties {
                         addresses: Some(addresses),
-                        ..finterfaces::Properties::EMPTY
+                        ..Default::default()
                     }))
                     .unwrap(),
             })

@@ -126,7 +126,7 @@ mod tests {
             component_name: Some("testing".to_string()),
             instance_id: Some("0".to_string()),
             component_url: Some("fuchsia-pkg://test".to_string()),
-            ..SourceIdentity::EMPTY
+            ..Default::default()
         };
         log_connection_listener
             .on_new_connection(&mut LogConnection { log_request, source_identity })

@@ -28,7 +28,7 @@ impl StreamProcessorFactory for EncoderFactory {
                 CreateEncoderParams {
                     input_details: Some(stream.format_details(format_details_version_ordinal)),
                     require_hw: Some(false),
-                    ..CreateEncoderParams::EMPTY
+                    ..Default::default()
                 },
                 encoder_request,
             )?;

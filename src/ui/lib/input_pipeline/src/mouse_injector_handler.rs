@@ -287,7 +287,7 @@ impl MouseInjectorHandler {
             scroll_v_range: mouse_descriptor.wheel_v_range.clone(),
             scroll_h_range: mouse_descriptor.wheel_h_range.clone(),
             buttons: mouse_descriptor.buttons.clone(),
-            ..pointerinjector::Config::EMPTY
+            ..Default::default()
         };
 
         // Register the new injector.
@@ -487,13 +487,13 @@ impl MouseInjectorHandler {
             },
             pressed_buttons: Some(Vec::from_iter(mouse_event.pressed_buttons.iter().cloned())),
             relative_motion,
-            ..pointerinjector::PointerSample::EMPTY
+            ..Default::default()
         };
         pointerinjector::Event {
             timestamp: Some(event_time.into_nanos()),
             data: Some(pointerinjector::Data::PointerSample(pointer_sample)),
             trace_flow_id: None,
-            ..pointerinjector::Event::EMPTY
+            ..Default::default()
         }
     }
 
@@ -522,7 +522,7 @@ impl MouseInjectorHandler {
                             timestamp: Some(fuchsia_async::Time::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
-                            ..pointerinjector::Event::EMPTY
+                            ..Default::default()
                         }]
                         .into_iter();
                         injector.inject(events).await.expect("Failed to inject updated viewport.");
@@ -730,7 +730,7 @@ mod tests {
         pointerinjector::Viewport {
             extents: Some([[min, min], [max, max]]),
             viewport_to_context_transform: None,
-            ..pointerinjector::Viewport::EMPTY
+            ..Default::default()
         }
     }
 

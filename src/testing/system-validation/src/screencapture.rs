@@ -22,7 +22,7 @@ pub async fn take_screenshot() {
     let data = screenshot
         .take(ScreenshotTakeRequest {
             format: Some(ScreenshotFormat::BgraRaw),
-            ..ScreenshotTakeRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("cannot take screenshot using scenic");

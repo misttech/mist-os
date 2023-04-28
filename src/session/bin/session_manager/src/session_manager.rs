@@ -475,7 +475,7 @@ mod tests {
         assert!(launcher
             .launch(LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
-                ..LaunchConfiguration::EMPTY
+                ..Default::default()
             })
             .await
             .is_ok());
@@ -523,7 +523,7 @@ mod tests {
         assert!(launcher
             .launch(LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
-                ..LaunchConfiguration::EMPTY
+                ..Default::default()
             })
             .await
             .expect("could not call Launch")
@@ -598,7 +598,7 @@ mod tests {
                 .propose_element(
                     felement::Spec {
                         component_url: Some(element_url.to_string()),
-                        ..felement::Spec::EMPTY
+                        ..Default::default()
                     },
                     None,
                 )

@@ -362,7 +362,7 @@ impl TouchBinding {
                     Err(e) => return Err(format_err!("get_feature_report failed: {}", e)),
                 };
                 let mut touch =
-                    report.touch.unwrap_or(fidl_input_report::TouchFeatureReport::EMPTY);
+                    report.touch.unwrap_or(fidl_input_report::TouchFeatureReport::default());
                 touch.input_mode = match enable {
                             true => Some(fidl_input_report::TouchConfigurationInputMode::WindowsPrecisionTouchpadCollection),
                             false => Some(fidl_input_report::TouchConfigurationInputMode::MouseCollection),
@@ -734,7 +734,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let reports = vec![create_touch_input_report(
             vec![contact],
@@ -780,7 +780,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let reports = vec![
             create_touch_input_report(
@@ -843,7 +843,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let second_contact = fidl_fuchsia_input_report::ContactInputReport {
             contact_id: Some(TOUCH_ID),
@@ -852,7 +852,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
 
         let reports = vec![
@@ -911,7 +911,7 @@ mod tests {
             contact_id: Some(222),
             position_x: Some(333),
             position_y: Some(444),
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let report =
             create_touch_input_report(vec![contact], /* pressed_buttons= */ None, report_time);
@@ -950,9 +950,9 @@ mod tests {
                                 input_mode: Some(
                                     fidl_input_report::TouchConfigurationInputMode::MouseCollection,
                                 ),
-                                ..fidl_input_report::TouchFeatureReport::EMPTY
+                                ..Default::default()
                             }),
-                            ..fidl_input_report::FeatureReport::EMPTY
+                            ..Default::default()
                         }));
                     }
                     fidl_input_report::InputDeviceRequest::SetFeatureReport {
@@ -1021,9 +1021,9 @@ mod tests {
                     let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {
                         touch: Some(fidl_input_report::TouchFeatureReport {
                             input_mode: touch_input_mode,
-                            ..fidl_input_report::TouchFeatureReport::EMPTY
+                            ..Default::default()
                         }),
-                        ..fidl_input_report::FeatureReport::EMPTY
+                        ..Default::default()
                     }));
                 }
                 fidl_input_report::InputDeviceRequest::SetFeatureReport { responder, .. } => {
@@ -1068,9 +1068,9 @@ mod tests {
                                 input_mode: Some(
                                     fidl_input_report::TouchConfigurationInputMode::MouseCollection,
                                 ),
-                                ..fidl_input_report::TouchFeatureReport::EMPTY
+                                ..Default::default()
                             }),
-                            ..fidl_input_report::FeatureReport::EMPTY
+                            ..Default::default()
                         }));
                     }
                     fidl_input_report::InputDeviceRequest::SetFeatureReport {
@@ -1133,9 +1133,9 @@ mod tests {
         let want_feature_report = Some(fidl_input_report::FeatureReport {
             touch: Some(fidl_input_report::TouchFeatureReport {
                 input_mode: Some(want_touch_configuration_input_mode),
-                ..fidl_input_report::TouchFeatureReport::EMPTY
+                ..Default::default()
             }),
-            ..fidl_input_report::FeatureReport::EMPTY
+            ..Default::default()
         });
         pretty_assertions::assert_eq!(want_feature_report, got_feature_report);
     }
@@ -1147,7 +1147,7 @@ mod tests {
     ) -> fidl_fuchsia_input_report::DeviceDescriptor {
         fidl_input_report::DeviceDescriptor {
             mouse: match has_mouse_descriptor {
-                true => Some(fidl_input_report::MouseDescriptor::EMPTY),
+                true => Some(fidl_input_report::MouseDescriptor::default()),
                 false => None,
             },
             touch: Some(fidl_input_report::TouchDescriptor {
@@ -1188,13 +1188,13 @@ mod tests {
                                 exponent: 100,
                             },
                         }),
-                        ..fidl_input_report::ContactInputDescriptor::EMPTY
+                        ..Default::default()
                     }]),
-                    ..fidl_input_report::TouchInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..fidl_input_report::TouchDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..fidl_input_report::DeviceDescriptor::EMPTY
+            ..Default::default()
         }
     }
 
@@ -1216,7 +1216,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let reports = vec![create_touch_input_report(
             vec![contact],
@@ -1257,7 +1257,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let contact2 = fidl_fuchsia_input_report::ContactInputReport {
             contact_id: Some(TOUCH_ID_2),
@@ -1266,7 +1266,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let reports = vec![
             create_touch_input_report(
@@ -1317,7 +1317,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let contact2 = fidl_fuchsia_input_report::ContactInputReport {
             contact_id: Some(TOUCH_ID),
@@ -1326,7 +1326,7 @@ mod tests {
             pressure: None,
             contact_width: None,
             contact_height: None,
-            ..fidl_fuchsia_input_report::ContactInputReport::EMPTY
+            ..Default::default()
         };
         let reports = vec![
             create_touch_input_report(

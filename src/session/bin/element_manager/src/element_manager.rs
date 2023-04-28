@@ -265,7 +265,7 @@ impl ElementManager {
         let mut view_spec = felement::ViewSpec {
             annotations: Some(initial_annotations),
             view_ref: Some(view_ref_dup),
-            ..felement::ViewSpec::EMPTY
+            ..Default::default()
         };
 
         if self.scenic_uses_flatland {
@@ -273,7 +273,7 @@ impl ElementManager {
 
             view_provider.create_view2(fuiapp::CreateView2Args {
                 view_creation_token: Some(link_token_pair.view_creation_token),
-                ..fuiapp::CreateView2Args::EMPTY
+                ..Default::default()
             })?;
 
             view_spec.viewport_creation_token = Some(link_token_pair.viewport_creation_token);

@@ -77,7 +77,7 @@ impl<'a> Resource2D<'a> {
         let flatland_registration_args = RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
             buffer_collection_token: Some(buffer_collection_token_for_flatland),
-            ..RegisterBufferCollectionArgs::EMPTY
+            ..Default::default()
         };
         let allocator =
             connect_to_protocol::<AllocatorMarker>().expect("error connecting to Scenic allocator");

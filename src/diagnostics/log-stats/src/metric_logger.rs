@@ -68,7 +68,7 @@ pub const COBALT_BACKOFF_SECONDS: u64 = 60;
 
 // Establishes a channel to Cobalt.
 async fn connect_to_cobalt(specs: &MetricSpecs) -> Result<MetricEventLoggerProxy, anyhow::Error> {
-    let mut project_spec = ProjectSpec::EMPTY;
+    let mut project_spec = ProjectSpec::default();
     project_spec.customer_id = Some(specs.customer_id);
     project_spec.project_id = Some(specs.project_id);
 

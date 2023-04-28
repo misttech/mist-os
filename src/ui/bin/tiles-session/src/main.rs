@@ -148,7 +148,7 @@ async fn main() -> Result<(), Error> {
                 .propose_element(
                     element::Spec {
                         component_url: Some(config.main_element_url),
-                        ..element::Spec::EMPTY
+                        ..Default::default()
                     },
                     None,
                 )

@@ -228,7 +228,7 @@ async fn main() -> Result<(), Error> {
                     let result = shell_automator
                         .launch(fermine::ShellAutomatorLaunchRequest {
                             app_name: Some(app_name),
-                            ..fermine::ShellAutomatorLaunchRequest::EMPTY
+                            ..Default::default()
                         })
                         .await?;
                     match result {

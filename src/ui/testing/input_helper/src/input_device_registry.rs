@@ -62,7 +62,7 @@ impl InputDeviceRegistry {
                                 range: Range { min: min_y, max: max_y },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
-                            ..ContactInputDescriptor::EMPTY
+                            ..Default::default()
                         })
                         .take(
                             usize::try_from(TOUCH_MAX_CONTACTS)
@@ -73,11 +73,11 @@ impl InputDeviceRegistry {
                     max_contacts: Some(TOUCH_MAX_CONTACTS),
                     touch_type: Some(TouchType::Touchscreen),
                     buttons: Some(vec![]),
-                    ..TouchInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..TouchDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -99,11 +99,11 @@ impl InputDeviceRegistry {
                         ConsumerControlButton::Reboot,
                         ConsumerControlButton::CameraDisable,
                     ]),
-                    ..ConsumerControlInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..ConsumerControlDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -131,11 +131,11 @@ impl InputDeviceRegistry {
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
                     keys3: Some(all_keys),
-                    ..KeyboardInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..KeyboardDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -174,11 +174,11 @@ impl InputDeviceRegistry {
                     ),
                     position_x: None,
                     position_y: None,
-                    ..MouseInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 

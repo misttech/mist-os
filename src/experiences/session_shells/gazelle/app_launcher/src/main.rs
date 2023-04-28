@@ -169,7 +169,7 @@ fn launch_element(element_manager: felement::ManagerProxy, component_url: String
     fasync::Task::local(async move {
         let component_url_clone = component_url.clone();
         let component_url = Some(component_url);
-        let spec = felement::Spec { component_url, ..felement::Spec::EMPTY };
+        let spec = felement::Spec { component_url, ..Default::default() };
         match element_manager.propose_element(spec, None).await {
             Ok(_) => info!("Launching {:?}", component_url_clone),
             Err(e) => error!("Failed to launch {:?} error {:?}", component_url_clone, e),

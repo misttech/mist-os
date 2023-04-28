@@ -28,7 +28,7 @@ impl ElementaryStream for CvsdStream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("audio/cvsd")),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 

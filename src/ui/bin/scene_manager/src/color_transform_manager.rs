@@ -122,7 +122,7 @@ impl ColorTransformManager {
                 coefficients: Some(transform.matrix),
                 preoffsets: Some(transform.pre_offset),
                 postoffsets: Some(transform.post_offset),
-                ..fidl_color::ConversionProperties::EMPTY
+                ..Default::default()
             })
             .await;
         match res {
@@ -399,15 +399,16 @@ mod tests {
         client
     }
 
-    const COLOR_TRANSFORM_CONFIGURATION: ColorTransformConfiguration =
+    fn color_transform_configuration() -> ColorTransformConfiguration {
         ColorTransformConfiguration {
             color_inversion_enabled: Some(true),
             color_correction: Some(ColorCorrectionMode::CorrectProtanomaly),
             color_adjustment_matrix: Some([1.; 9]),
             color_adjustment_pre_offset: Some([2.; 3]),
             color_adjustment_post_offset: Some([3.; 3]),
-            ..ColorTransformConfiguration::EMPTY
-        };
+            ..Default::default()
+        }
+    }
 
     #[fuchsia::test]
     async fn test_backlight() -> Result<()> {
@@ -449,7 +450,7 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
-            .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
+            .set_color_transform_configuration(color_transform_configuration())
             .await?;
         let properties = converter.expect_set_values().await;
         assert_eq!(properties.coefficients, Some([1.; 9]));
@@ -466,13 +467,13 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
-            .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
+            .set_color_transform_configuration(color_transform_configuration())
             .await?;
         converter.expect_set_values().await;
 
         // Setting the same value again is debounced.
         color_transform_proxy
-            .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
+            .set_color_transform_configuration(color_transform_configuration())
             .await?;
         converter.expect_no_requests().await;
 
@@ -480,7 +481,7 @@ mod tests {
         color_transform_proxy
             .set_color_transform_configuration(ColorTransformConfiguration {
                 color_adjustment_matrix: Some([0.; 9]),
-                ..COLOR_TRANSFORM_CONFIGURATION
+                ..color_transform_configuration()
             })
             .await?;
         converter.expect_set_values().await;
@@ -497,7 +498,7 @@ mod tests {
         color_transform_proxy
             .set_color_transform_configuration(ColorTransformConfiguration {
                 color_adjustment_matrix: None,
-                ..COLOR_TRANSFORM_CONFIGURATION
+                ..color_transform_configuration()
             })
             .await?;
         converter.expect_no_requests().await;
@@ -505,7 +506,7 @@ mod tests {
         color_transform_proxy
             .set_color_transform_configuration(ColorTransformConfiguration {
                 color_adjustment_pre_offset: None,
-                ..COLOR_TRANSFORM_CONFIGURATION
+                ..color_transform_configuration()
             })
             .await?;
         converter.expect_no_requests().await;
@@ -513,7 +514,7 @@ mod tests {
         color_transform_proxy
             .set_color_transform_configuration(ColorTransformConfiguration {
                 color_adjustment_post_offset: None,
-                ..COLOR_TRANSFORM_CONFIGURATION
+                ..color_transform_configuration()
             })
             .await?;
         converter.expect_no_requests().await;
@@ -529,7 +530,7 @@ mod tests {
 
         color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
             matrix: Some([1.; 9]),
-            ..ColorAdjustmentTable::EMPTY
+            ..Default::default()
         })?;
 
         let properties = converter.expect_set_values_sync(&mut exec);
@@ -547,7 +548,7 @@ mod tests {
         let (manager, converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
-        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable::EMPTY)?;
+        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable::default())?;
 
         converter.expect_no_requests_sync(&mut exec);
         Ok(())
@@ -560,14 +561,14 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
-        let _ =
-            color_transform_proxy.set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION);
+        let _ = color_transform_proxy
+            .set_color_transform_configuration(color_transform_configuration());
         converter.expect_set_values_sync(&mut exec);
 
         // SetColorAdjustment is a no-op because a11y settings are active.
         color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
             matrix: Some([4.; 9]),
-            ..ColorAdjustmentTable::EMPTY
+            ..Default::default()
         })?;
         converter.expect_no_requests_sync(&mut exec);
 
@@ -579,14 +580,14 @@ mod tests {
                 color_adjustment_matrix: Some([0.; 9]),
                 color_adjustment_pre_offset: Some([0.; 3]),
                 color_adjustment_post_offset: Some([0.; 3]),
-                ..ColorTransformConfiguration::EMPTY
+                ..Default::default()
             });
         converter.expect_set_values_sync(&mut exec);
 
         // Now SetColorAdjustment has an effect.
         color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
             matrix: Some([5.; 9]),
-            ..ColorAdjustmentTable::EMPTY
+            ..Default::default()
         })?;
         converter.expect_set_values_sync(&mut exec);
 
@@ -609,7 +610,7 @@ mod tests {
         // Calling SetColorTransformConfiguration should also trigger a call to
         // scene_manager.present_root_view.
         color_transform_proxy
-            .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
+            .set_color_transform_configuration(color_transform_configuration())
             .await?;
         converter.expect_set_values().await;
 

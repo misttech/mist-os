@@ -121,7 +121,7 @@ impl CrashReportHandlerBuilder {
             )?;
             let product_config = fidl_feedback::CrashReportingProduct {
                 name: Some(CRASH_PRODUCT_NAME.to_string()),
-                ..fidl_feedback::CrashReportingProduct::EMPTY
+                ..Default::default()
             };
             config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), product_config).await?;
         }
@@ -196,7 +196,7 @@ impl CrashReportHandler {
             program_name: Some(CRASH_PROGRAM_NAME.to_string()),
             crash_signature: Some(payload.signature),
             is_fatal: Some(false),
-            ..fidl_feedback::CrashReport::EMPTY
+            ..Default::default()
         };
 
         let result =
@@ -240,7 +240,7 @@ mod tests {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
                     crash_signature: Some(crash_report_signature.to_string()),
                     is_fatal: Some(false),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {
@@ -292,14 +292,14 @@ mod tests {
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
+            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
                     crash_signature: Some("TestCrash1".to_string()),
                     is_fatal: Some(false),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {
@@ -311,14 +311,14 @@ mod tests {
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
+            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
                     crash_signature: Some("TestCrash2".to_string()),
                     is_fatal: Some(false),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {

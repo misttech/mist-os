@@ -179,13 +179,13 @@ impl CryptService {
             name: Some(component_name.clone()),
             url: Some("#meta/fxfs-crypt.cm".to_string()),
             startup: Some(fdecl::StartupMode::Lazy),
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
 
         let realm_proxy = connect_to_protocol::<RealmMarker>()?;
 
         realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await?
             .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
 

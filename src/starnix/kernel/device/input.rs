@@ -432,9 +432,9 @@ fn make_response_for_fidl_event(fidl_event: &FidlTouchEvent) -> FidlTouchRespons
         FidlTouchEvent { pointer_sample: Some(_), .. } => FidlTouchResponse {
             response_type: Some(TouchResponseType::Yes), // Event consumed by Starnix.
             trace_flow_id: fidl_event.trace_flow_id,
-            ..FidlTouchResponse::EMPTY
+            ..Default::default()
         },
-        _ => FidlTouchResponse::EMPTY,
+        _ => FidlTouchResponse::default(),
     }
 }
 
@@ -549,9 +549,9 @@ mod test {
             pointer_sample: Some(TouchPointerSample {
                 position_in_viewport: Some([0.0, 0.0]),
                 phase: Some(phase),
-                ..TouchPointerSample::EMPTY
+                ..Default::default()
             }),
-            ..TouchEvent::EMPTY
+            ..Default::default()
         }
     }
 
@@ -562,9 +562,9 @@ mod test {
                 position_in_viewport: Some([x, y]),
                 // Default to `Change`, because that has the fewest side effects.
                 phase: Some(EventPhase::Change),
-                ..TouchPointerSample::EMPTY
+                ..Default::default()
             }),
-            ..TouchEvent::EMPTY
+            ..Default::default()
         }
     }
 
@@ -573,7 +573,7 @@ mod test {
             position_in_viewport: Some([0.0, 0.0]),
             // Default to `Change`, because that has the fewest side effects.
             phase: Some(EventPhase::Change),
-            ..TouchPointerSample::EMPTY
+            ..Default::default()
         }
     }
 
@@ -666,7 +666,7 @@ mod test {
     async fn later_watch_requests_have_responses_arg_matching_earlier_watch_replies() {
         // Set up resources.
         let (_input_file, mut touch_source_stream, relay_thread) = start_input();
-        let fake_touch_events = std::iter::repeat(TouchEvent::EMPTY);
+        let fake_touch_events = std::iter::repeat(TouchEvent::default());
 
         // Reply to first `Watch` with two `TouchEvent`s.
         match touch_source_stream.next().await {
@@ -924,7 +924,7 @@ mod test {
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above. Use an empty `TouchEvent`, to minimize the chance that this event
         // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::default()).await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(input_file, &file_object, &current_task);
@@ -1041,10 +1041,10 @@ mod test {
     #[test_case(TouchEvent {
         timestamp: Some(0),
         pointer_sample: Some(make_touch_pointer_sample()),
-        ..TouchEvent::EMPTY
+        ..Default::default()
       } => matches Some(TouchResponse { response_type: Some(_), ..});
       "event_with_sample_yields_some_response_type")]
-    #[test_case(TouchEvent::EMPTY => matches Some(TouchResponse { response_type: None, ..});
+    #[test_case(TouchEvent::default() => matches Some(TouchResponse { response_type: None, ..});
       "event_without_sample_yields_no_response_type")]
     #[::fuchsia::test]
     async fn sends_appropriate_reply_to_touch_source_server(

@@ -232,20 +232,20 @@ fn input_report_for_touch_contacts(contacts: Vec<(u32, math::Vec_)>) -> InputRep
             position_y: Some(location.y as i64),
             contact_width: Some(0),
             contact_height: Some(0),
-            ..ContactInputReport::EMPTY
+            ..Default::default()
         })
         .collect();
 
     let touch_input_report = TouchInputReport {
         contacts: Some(contact_input_reports),
         pressed_buttons: Some(vec![]),
-        ..TouchInputReport::EMPTY
+        ..Default::default()
     };
 
     InputReport {
         event_time: Some(fasync::Time::now().into_nanos()),
         touch: Some(touch_input_report),
-        ..InputReport::EMPTY
+        ..Default::default()
     }
 }
 
@@ -336,13 +336,13 @@ fn handle_media_buttons_device_request_stream(
                     if let Some(button) = payload.button {
                         let media_buttons_input_report = ConsumerControlInputReport {
                             pressed_buttons: Some(vec![button]),
-                            ..ConsumerControlInputReport::EMPTY
+                            ..Default::default()
                         };
 
                         let input_report = InputReport {
                             event_time: Some(fasync::Time::now().into_nanos()),
                             consumer_control: Some(media_buttons_input_report),
-                            ..InputReport::EMPTY
+                            ..Default::default()
                         };
 
                         media_buttons_device
@@ -356,9 +356,9 @@ fn handle_media_buttons_device_request_stream(
                             event_time: Some(fasync::Time::now().into_nanos()),
                             consumer_control: Some(ConsumerControlInputReport {
                                 pressed_buttons: Some(vec![]),
-                                ..ConsumerControlInputReport::EMPTY
+                                ..Default::default()
                             }),
-                            ..InputReport::EMPTY
+                            ..Default::default()
                         };
 
                         media_buttons_device
@@ -401,9 +401,9 @@ fn handle_keyboard_request_stream(
                                     pressed_keys3: Some(convert_keyboard_report_to_keys(
                                         &keyboard_report,
                                     )),
-                                    ..KeyboardInputReport::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..InputReport::EMPTY
+                                ..Default::default()
                             };
 
                             keyboard_device
@@ -444,7 +444,7 @@ fn handle_mouse_request_stream(
                         movement_y: payload.movement_y,
                         scroll_v: payload.scroll_v_detent,
                         scroll_h: payload.scroll_h_detent,
-                        ..MouseInputReport::EMPTY
+                        ..Default::default()
                     };
                     if let Some(pressed_buttons) = payload.pressed_buttons {
                         mouse_input_report.pressed_buttons = Some(
@@ -462,7 +462,7 @@ fn handle_mouse_request_stream(
                     let input_report = InputReport {
                         event_time: Some(fasync::Time::now().into_nanos()),
                         mouse: Some(mouse_input_report),
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     };
 
                     mouse_device

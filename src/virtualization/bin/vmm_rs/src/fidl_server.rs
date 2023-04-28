@@ -205,7 +205,7 @@ mod tests {
     };
 
     fn build_valid_guest_config() -> GuestConfig {
-        GuestConfig { guest_memory: Some(1 * 1024 * 1024 * 1024), ..GuestConfig::EMPTY }
+        GuestConfig { guest_memory: Some(1 * 1024 * 1024 * 1024), ..Default::default() }
     }
 
     fn setup_test() -> (mpsc::Sender<OutgoingService>, fasync::Task<()>) {

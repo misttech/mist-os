@@ -96,7 +96,12 @@ async fn test_aliases_with_style_overrides(factory: &ProviderFactory) -> Result<
     let a = get_typeface_info(
         &font_provider,
         Some("Alpha Sans".to_string()),
-        Some(Style2 { slant: None, weight: None, width: Some(Width::Condensed), ..Style2::EMPTY }),
+        Some(Style2 {
+            slant: None,
+            weight: None,
+            width: Some(Width::Condensed),
+            ..Default::default()
+        }),
         None,
         None,
     )
@@ -217,9 +222,9 @@ async fn test_postscript_and_full_name(factory: &ProviderFactory) -> Result<(), 
     let postscript_name_request = fonts::TypefaceRequest {
         query: Some(fonts::TypefaceQuery {
             postscript_name: Some("NotoSansCJKjp-Regular".to_string()),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let postscript_name_response =
         get_typeface_info_detailed(&font_provider, postscript_name_request).await?;
@@ -227,9 +232,9 @@ async fn test_postscript_and_full_name(factory: &ProviderFactory) -> Result<(), 
     let full_name_request = fonts::TypefaceRequest {
         query: Some(fonts::TypefaceQuery {
             full_name: Some("Noto Sans CJK JP".to_string()),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let full_name_response = get_typeface_info_detailed(&font_provider, full_name_request).await?;
 
@@ -245,9 +250,9 @@ async fn test_postscript_name_ignores_full_name(factory: &ProviderFactory) -> Re
     let postscript_name_request = fonts::TypefaceRequest {
         query: Some(fonts::TypefaceQuery {
             postscript_name: Some("NotoSansCJKjp-Regular".to_string()),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let postscript_name_response =
         get_typeface_info_detailed(&font_provider, postscript_name_request).await?;
@@ -256,9 +261,9 @@ async fn test_postscript_name_ignores_full_name(factory: &ProviderFactory) -> Re
         query: Some(fonts::TypefaceQuery {
             postscript_name: Some("NotoSansCJKjp-Regular".to_string()),
             full_name: Some("Roboto Slab".to_string()),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let contradictory_response =
         get_typeface_info_detailed(&font_provider, contradictory_request).await?;
@@ -277,9 +282,9 @@ async fn test_postscript_name_ignores_other_parameters(
     let postscript_name_request = fonts::TypefaceRequest {
         query: Some(fonts::TypefaceQuery {
             postscript_name: Some("Roboto-Regular".to_string()),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let postscript_name_response =
         get_typeface_info_detailed(&font_provider, postscript_name_request).await?;
@@ -289,9 +294,9 @@ async fn test_postscript_name_ignores_other_parameters(
             postscript_name: Some("Roboto-Regular".to_string()),
             languages: Some(vec![LocaleId { id: "ja".to_string() }]),
             code_points: Some(vec!['な' as u32]),
-            ..fonts::TypefaceQuery::EMPTY
+            ..Default::default()
         }),
-        ..fonts::TypefaceRequest::EMPTY
+        ..Default::default()
     };
     let contradictory_response =
         get_typeface_info_detailed(&font_provider, contradictory_request).await?;

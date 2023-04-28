@@ -167,7 +167,7 @@ where
             enrollment_id: Some(enrollment.id),
             updated_enrollment_data: None,
             prekey_material: Some(key.0),
-            ..AttemptedEvent::EMPTY
+            ..Default::default()
         })
     }
 

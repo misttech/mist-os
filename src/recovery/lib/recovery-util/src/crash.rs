@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use {
     fidl_fuchsia_feedback::{
-        Annotation, CrashReport, CrashReporterMarker, CrashReporterProxy, FileReportResults,
+        Annotation, CrashReporterMarker, CrashReporterProxy, FileReportResults,
     },
     fuchsia_component::client::connect_to_protocol,
 };
@@ -185,7 +185,7 @@ impl CrashReporter {
             crash_signature: Some(signature),
             annotations: Some(vec![Annotation { key: "context".into(), value: ctx }]),
             is_fatal: Some(false),
-            ..CrashReport::EMPTY
+            ..Default::default()
         };
         let result =
             proxy_fn()?.file_report(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
@@ -246,7 +246,7 @@ mod tests {
                         key: "context".into(),
                         value: "test context".into()
                     },]),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {
@@ -287,7 +287,7 @@ mod tests {
                         key: "context".into(),
                         value: gen_string('Z', ANNOTATION_MAX_LENGTH)
                     },]),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {

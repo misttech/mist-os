@@ -149,7 +149,7 @@ impl View {
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             touch_source: Some(touch_source_request),
             mouse_source: Some(mouse_source_request),
-            ..ui_comp::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
         let view_ref_pair = scenic::ViewRefPair::new().expect("failed to create view ref pair");
         let view_ref = scenic::duplicate_view_ref(&view_ref_pair.view_ref)
@@ -311,7 +311,7 @@ impl View {
                 &mut token_pair.viewport_creation_token,
                 ui_comp::ViewportProperties {
                     logical_size: view_bounds.size,
-                    ..ui_comp::ViewportProperties::EMPTY
+                    ..Default::default()
                 },
                 child_view_watcher_request,
             )
@@ -359,7 +359,7 @@ impl View {
                 &mut embedded_view.content_id,
                 ui_comp::ViewportProperties {
                     logical_size: view_bounds.size,
-                    ..ui_comp::ViewportProperties::EMPTY
+                    ..Default::default()
                 },
             )
             .expect("failed to set viewport properties");
@@ -449,7 +449,7 @@ impl View {
             phase: pointer_sample.phase,
             time_received: touch_event.timestamp,
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
-            ..test_input::TouchInputListenerReportTouchInputRequest::EMPTY
+            ..Default::default()
         }
     }
 
@@ -578,10 +578,10 @@ impl View {
                     return TouchResponse {
                         response_type: Some(ui_pointer::TouchResponseType::Yes),
                         trace_flow_id: evt.trace_flow_id,
-                        ..TouchResponse::EMPTY
+                        ..Default::default()
                     };
                 }
-                TouchResponse::EMPTY
+                TouchResponse::default()
             })
             .collect()
     }
@@ -641,7 +641,7 @@ impl View {
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
             wheel_x_physical_pixel: pointer_sample.scroll_h_physical_pixel,
             wheel_y_physical_pixel: pointer_sample.scroll_v_physical_pixel,
-            ..test_input::MouseInputListenerReportMouseInputRequest::EMPTY
+            ..Default::default()
         }
     }
 
@@ -697,7 +697,7 @@ impl View {
         };
         Some(test_input::KeyboardInputListenerReportTextInputRequest {
             text: Some(s),
-            ..test_input::KeyboardInputListenerReportTextInputRequest::EMPTY
+            ..Default::default()
         })
     }
 

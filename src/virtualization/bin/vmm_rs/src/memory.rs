@@ -631,7 +631,7 @@ mod tests {
     async fn bad_configs() {
         let hypervisor = MockHypervisor::new();
 
-        let mut config = GuestConfig::EMPTY;
+        let mut config = GuestConfig::default();
         assert_eq!(
             Memory::new_from_config(&config, hypervisor.clone()).err().unwrap(),
             MemoryError::NoMemoryRequested
@@ -657,7 +657,7 @@ mod tests {
         let hypervisor = MockHypervisor::new();
         hypervisor.on_allocate_memory(MockBehavior::ReturnError(zx::Status::NO_RESOURCES));
 
-        let mut config = GuestConfig::EMPTY;
+        let mut config = GuestConfig::default();
         config.guest_memory = Some(*PAGE_SIZE);
 
         let memory = Memory::new_from_config(&config, hypervisor.clone());

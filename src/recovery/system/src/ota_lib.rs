@@ -77,11 +77,11 @@ impl OtaManager for OtaComponent {
             name: Some(String::from(CHILD_NAME)),
             url: Some(String::from(OTA_COMPONENT_URL)),
             startup: Some(StartupMode::Lazy),
-            ..Child::EMPTY
+            ..Default::default()
         };
 
         self.realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
             .await
             .expect("create_child failed")
             .map_err(|e| format_err!("failed to start OTA child: {:?}", e))?;
@@ -290,7 +290,7 @@ mod tests {
                 assert_eq!(Some(CHILD_NAME.to_string()), decl.name);
                 assert_eq!(Some(OTA_COMPONENT_URL.to_string()), decl.url);
                 assert_eq!(Some(StartupMode::Lazy), decl.startup);
-                assert_eq!(CreateChildArgs::EMPTY, args);
+                assert_eq!(CreateChildArgs::default(), args);
                 responder.send(&mut Ok(())).unwrap();
             });
 
@@ -429,7 +429,7 @@ mod tests {
             assert_eq!(Some(CHILD_NAME.to_string()), decl.name);
             assert_eq!(Some(OTA_COMPONENT_URL.to_string()), decl.url);
             assert_eq!(Some(StartupMode::Lazy), decl.startup);
-            assert_eq!(CreateChildArgs::EMPTY, args);
+            assert_eq!(CreateChildArgs::default(), args);
             responder.send(&mut Ok(())).unwrap();
         });
 

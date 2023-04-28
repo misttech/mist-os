@@ -77,7 +77,7 @@ impl FlatlandInstance {
 
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(focuser_request),
-            ..ui_comp::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
 
         let mut view_identity = ui_views::ViewIdentityOnCreation::from(scenic::ViewRefPair::new()?);
@@ -252,7 +252,7 @@ impl SceneManager for FlatlandSceneManager {
         // viewport that we create below.
         view_provider.create_view2(ui_app::CreateView2Args {
             view_creation_token: Some(link_token_pair.view_creation_token),
-            ..ui_app::CreateView2Args::EMPTY
+            ..Default::default()
         })?;
 
         self.set_root_view_internal(link_token_pair.viewport_creation_token).await
@@ -503,7 +503,7 @@ impl FlatlandSceneManager {
 
             let link_properties = ui_comp::ViewportProperties {
                 logical_size: Some(client_viewport_size),
-                ..ui_comp::ViewportProperties::EMPTY
+                ..Default::default()
             };
 
             let (_, child_view_watcher_request) =
@@ -536,7 +536,7 @@ impl FlatlandSceneManager {
 
             let link_properties = ui_comp::ViewportProperties {
                 logical_size: Some(client_viewport_size),
-                ..ui_comp::ViewportProperties::EMPTY
+                ..Default::default()
             };
 
             flatland.create_viewport(
@@ -667,7 +667,7 @@ impl FlatlandSceneManager {
             let locked = self.scene_flatland.flatland.lock();
             let viewport_properties = ui_comp::ViewportProperties {
                 logical_size: Some(self.client_viewport_size),
-                ..ui_comp::ViewportProperties::EMPTY
+                ..Default::default()
             };
             locked.create_viewport(
                 &mut ids.content_id.clone(),

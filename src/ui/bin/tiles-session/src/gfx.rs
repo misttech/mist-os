@@ -85,7 +85,7 @@ impl TilesSession for GfxTilesSession {
                         .view_focuser
                         .set_auto_focus(ui_views::FocuserSetAutoFocusRequest {
                             view_ref: Some(view_ref),
-                            ..ui_views::FocuserSetAutoFocusRequest::EMPTY
+                            ..Default::default()
                         })
                         .await?;
                 } else {

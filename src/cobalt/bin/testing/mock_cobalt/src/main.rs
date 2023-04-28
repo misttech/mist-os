@@ -315,7 +315,7 @@ mod metrics_tests {
 
         factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(1234), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(1234), ..Default::default() },
                 server,
             )
             .await
@@ -348,7 +348,7 @@ mod metrics_tests {
 
         factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(123), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(123), ..Default::default() },
                 server,
             )
             .await
@@ -393,7 +393,7 @@ mod metrics_tests {
 
         factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(12), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(12), ..Default::default() },
                 server,
             )
             .await
@@ -447,7 +447,7 @@ mod metrics_tests {
 
         // Create a new logger for the requested project id
         let create_logger_fut = factory_proxy.create_metric_event_logger(
-            ProjectSpec { project_id: Some(123), ..ProjectSpec::EMPTY },
+            ProjectSpec { project_id: Some(123), ..Default::default() },
             server,
         );
         futures::pin_mut!(create_logger_fut);
@@ -503,7 +503,7 @@ mod metrics_tests {
         let test = async move {
             factory_proxy
                 .create_metric_event_logger(
-                    ProjectSpec { project_id: Some(123), ..ProjectSpec::EMPTY },
+                    ProjectSpec { project_id: Some(123), ..Default::default() },
                     server,
                 )
                 .await
@@ -538,7 +538,7 @@ mod metrics_tests {
 
         factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(project_id), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(project_id), ..Default::default() },
                 server,
             )
             .await
@@ -610,7 +610,7 @@ mod metrics_tests {
 
         factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(987), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(987), ..Default::default() },
                 server,
             )
             .await
@@ -673,7 +673,7 @@ mod metrics_tests {
         let mut create_logger = futures::future::select(
             services,
             factory_proxy.create_metric_event_logger(
-                ProjectSpec { project_id: Some(project_id), ..ProjectSpec::EMPTY },
+                ProjectSpec { project_id: Some(project_id), ..Default::default() },
                 logger_proxy_server_end,
             ),
         );

@@ -1512,7 +1512,7 @@ mod tests {
                     width: SCANOUT_WIDTH / 2,
                     height: SCANOUT_HEIGHT / 2,
                 }),
-                ..LayoutInfo::EMPTY
+                ..Default::default()
             })
             .await
             .unwrap();

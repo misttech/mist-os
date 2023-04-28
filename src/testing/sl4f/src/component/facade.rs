@@ -101,12 +101,10 @@ impl ComponentFacade {
             url: Some(url.to_string()),
             startup: Some(fcdecl::StartupMode::Lazy), // Dynamic children can only be started lazily.
             environment: None,
-            ..fcdecl::Child::EMPTY
+            ..Default::default()
         };
-        let child_args = fcomponent::CreateChildArgs {
-            numbered_handles: None,
-            ..fcomponent::CreateChildArgs::EMPTY
-        };
+        let child_args =
+            fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
         if let Err(err) = realm.create_child(&mut collection_ref, child_decl, child_args).await? {
             fx_err_and_bail!(&with_line!(tag), format_err!("Failed to create CFv2 child: {err:?}"));
         }

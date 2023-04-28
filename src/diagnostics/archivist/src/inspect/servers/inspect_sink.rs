@@ -205,7 +205,7 @@ mod tests {
                     proxy
                         .publish(InspectSinkPublishRequest {
                             tree: Some(tree),
-                            ..InspectSinkPublishRequest::EMPTY
+                            ..Default::default()
                         })
                         .unwrap();
                     return;

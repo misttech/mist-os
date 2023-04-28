@@ -135,7 +135,7 @@ impl CrashReportHandler {
             program_name: Some(CrashReportHandler::DEFAULT_PROGRAM_NAME.to_string()),
             crash_signature: Some(signature),
             is_fatal: Some(false),
-            ..fidl_feedback::CrashReport::EMPTY
+            ..Default::default()
         };
         let result = get_proxy_fn()?
             .file_report(report)
@@ -200,7 +200,7 @@ mod tests {
                     program_name: Some("device".to_string()),
                     crash_signature: Some(crash_report_signature.to_string()),
                     is_fatal: Some(false),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {
@@ -261,14 +261,14 @@ mod tests {
                 stream.try_next().await
             {
                 // Send a reply to allow the node to process the next crash report
-                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
+                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
                 assert_eq!(
                     report,
                     fidl_feedback::CrashReport {
                         program_name: Some("device".to_string()),
                         crash_signature: Some("TestCrash1".to_string()),
                         is_fatal: Some(false),
-                        ..fidl_feedback::CrashReport::EMPTY
+                        ..Default::default()
                     }
                 );
             } else {
@@ -280,14 +280,14 @@ mod tests {
                 stream.try_next().await
             {
                 // Send a reply to allow the node to process the next crash report
-                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
+                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
                 assert_eq!(
                     report,
                     fidl_feedback::CrashReport {
                         program_name: Some("device".to_string()),
                         crash_signature: Some("TestCrash2".to_string()),
                         is_fatal: Some(false),
-                        ..fidl_feedback::CrashReport::EMPTY
+                        ..Default::default()
                     }
                 );
             } else {
@@ -328,7 +328,7 @@ mod tests {
                     program_name: Some("device".to_string()),
                     crash_signature: Some("TestCrashReportSvcChannelClosure".to_string()),
                     is_fatal: Some(false),
-                    ..fidl_feedback::CrashReport::EMPTY
+                    ..Default::default()
                 }
             );
         } else {

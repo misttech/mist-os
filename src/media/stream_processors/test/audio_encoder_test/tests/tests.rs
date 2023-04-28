@@ -71,7 +71,7 @@ fn msbc_test_suite() -> Result<()> {
 
         let msbc_tests = AudioEncoderTestCase {
             input_framelength: (sub_bands * block_count) as usize,
-            settings: EncoderSettings::Msbc(MSbcEncoderSettings::EMPTY),
+            settings: EncoderSettings::Msbc(MSbcEncoderSettings::default()),
             channel_count: 1,
             frames_per_second: 16000,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
@@ -250,7 +250,7 @@ fn cvsd_simple_test_suite() -> Result<()> {
     with_large_stack(|| {
         let cvsd_tests = AudioEncoderTestCase {
             input_framelength: 8,
-            settings: EncoderSettings::Cvsd(CvsdEncoderSettings { ..CvsdEncoderSettings::EMPTY }),
+            settings: EncoderSettings::Cvsd(CvsdEncoderSettings::default()),
             channel_count: 1,
             frames_per_second: 64000,
             hash_tests: vec![AudioEncoderHashTest {

@@ -86,7 +86,7 @@ impl WlanApPolicyFacade {
                 NetworkConfig {
                     id: Some(network_id),
                     credential: Some(credential),
-                    ..NetworkConfig::EMPTY
+                    ..Default::default()
                 },
                 mode,
                 band,
@@ -146,7 +146,7 @@ impl WlanApPolicyFacade {
             .stop_access_point(NetworkConfig {
                 id: Some(network_id),
                 credential: Some(credential),
-                ..NetworkConfig::EMPTY
+                ..Default::default()
             })
             .await?
         {

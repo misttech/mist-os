@@ -140,7 +140,7 @@ async fn launch_session(session_url: &str, launcher: fsession::LauncherProxy) ->
     let result = launcher
         .launch(fsession::LaunchConfiguration {
             session_url: Some(session_url.to_string()),
-            ..fsession::LaunchConfiguration::EMPTY
+            ..Default::default()
         })
         .await?;
     result.map_err(|err: fsession::LaunchError| format_err!("{:?}", err))?;
@@ -174,7 +174,7 @@ async fn add_element(
     manager_proxy: felement::ManagerProxy,
 ) -> Result<(), Error> {
     let spec =
-        felement::Spec { component_url: Some(element_url.to_string()), ..felement::Spec::EMPTY };
+        felement::Spec { component_url: Some(element_url.to_string()), ..Default::default() };
     manager_proxy
         .propose_element(spec, None)
         .await?

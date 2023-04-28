@@ -203,11 +203,7 @@ async fn enters_active_state_with_mouse() {
     let _ = input_synthesis
         .send_input_report(
             mouse_id,
-            MouseInputReport {
-                movement_x: Some(10),
-                movement_y: Some(15),
-                ..MouseInputReport::EMPTY
-            },
+            MouseInputReport { movement_x: Some(10), movement_y: Some(15), ..Default::default() },
             Time::now().into_nanos().try_into().unwrap(),
         )
         .await
@@ -268,14 +264,14 @@ async fn enters_active_state_with_touchscreen(test_ui_stack_url: &str) {
     input_registry
         .register_touch_screen(RegistryRegisterTouchScreenRequest {
             device: Some(touchscreen_server),
-            ..RegistryRegisterTouchScreenRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("Failed to register touchscreen device.");
     touchscreen_proxy
         .simulate_tap(TouchScreenSimulateTapRequest {
             tap_location: Some(Vec_ { x: 0, y: 0 }),
-            ..TouchScreenSimulateTapRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("Failed to simulate tap at location (0, 0).");
@@ -335,14 +331,14 @@ async fn enters_active_state_with_media_buttons(test_ui_stack_url: &str) {
     input_registry
         .register_media_buttons_device(RegistryRegisterMediaButtonsDeviceRequest {
             device: Some(media_buttons_server),
-            ..RegistryRegisterMediaButtonsDeviceRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("Failed to register media buttons device.");
     media_buttons_proxy
         .simulate_button_press(MediaButtonsDeviceSimulateButtonPressRequest {
             button: Some(ConsumerControlButton::VolumeUp),
-            ..MediaButtonsDeviceSimulateButtonPressRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("Failed to simulate buttons press.");

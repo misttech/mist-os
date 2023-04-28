@@ -1419,7 +1419,7 @@ mod tests {
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Active),
                     percent_complete: Some(0.0),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();
@@ -1427,7 +1427,7 @@ mod tests {
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Complete),
                     percent_complete: Some(100.0),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();
@@ -1463,14 +1463,14 @@ mod tests {
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Active),
                     percent_complete: Some(0.0),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();
             progress_proxy
                 .render2(ProgressRendererRender2Request {
                     status: Some(Status::Error),
-                    ..ProgressRendererRender2Request::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();

@@ -108,7 +108,7 @@ impl CpuRenderer {
         let args = fland::RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
             buffer_collection_token: Some(sysmem_buffer_collection_token),
-            ..fland::RegisterBufferCollectionArgs::EMPTY
+            ..Default::default()
         };
 
         let scenic_allocator = connect_to_protocol::<fland::AllocatorMarker>()

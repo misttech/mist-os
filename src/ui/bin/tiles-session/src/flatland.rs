@@ -83,7 +83,7 @@ impl TilesSession for FlatlandTilesSession {
                 let viewport_content_id = self.id_generator.next_content_id();
                 let viewport_properties = ui_comp::ViewportProperties {
                     logical_size: Some(self.layout_info.logical_size.unwrap()),
-                    ..ui_comp::ViewportProperties::EMPTY
+                    ..Default::default()
                 };
                 self.flatland
                     .create_viewport(
@@ -116,7 +116,7 @@ impl TilesSession for FlatlandTilesSession {
                 self.flatland
                     .present(ui_comp::PresentArgs {
                         requested_presentation_time: Some(0),
-                        ..ui_comp::PresentArgs::EMPTY
+                        ..Default::default()
                     })
                     .context("GraphicalPresenterPresentView present")?;
 
@@ -250,7 +250,7 @@ impl FlatlandTilesSession {
         let mut view_identity = ui_views::ViewIdentityOnCreation::from(ViewRefPair::new()?);
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(view_focuser_request),
-            ..ui_comp::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
         flatland.create_view2(
             &mut view_creation_token,
@@ -262,7 +262,7 @@ impl FlatlandTilesSession {
         // Present the root scene.
         flatland.present(ui_comp::PresentArgs {
             requested_presentation_time: Some(0),
-            ..ui_comp::PresentArgs::EMPTY
+            ..Default::default()
         })?;
 
         // Get initial layout deterministically before proceeding.

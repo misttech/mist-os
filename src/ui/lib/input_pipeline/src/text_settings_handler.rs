@@ -247,11 +247,8 @@ mod tests {
             if let Ok(Some(fsettings::KeyboardRequest::Watch { responder, .. })) =
                 server_end.try_next().await
             {
-                let settings = fsettings::KeyboardSettings {
-                    keymap,
-                    autorepeat,
-                    ..fsettings::KeyboardSettings::EMPTY
-                };
+                let settings =
+                    fsettings::KeyboardSettings { keymap, autorepeat, ..Default::default() };
                 responder.send(settings).expect("response sent");
             }
         })

@@ -51,7 +51,7 @@ impl PointerState {
             pointer_id: Some(self.pointer_id),
             phase: Some(self.phase),
             position_in_viewport: Some([self.x as f32, self.y as f32]),
-            ..pointerinjector::PointerSample::EMPTY
+            ..Default::default()
         };
 
         // Update coordinates.
@@ -61,7 +61,7 @@ impl PointerState {
         pointerinjector::Event {
             timestamp: Some(Time::get_monotonic().into_nanos()),
             data: Some(pointerinjector::Data::PointerSample(pointer_sample)),
-            ..pointerinjector::Event::EMPTY
+            ..Default::default()
         }
     }
 }

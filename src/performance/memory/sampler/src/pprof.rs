@@ -287,10 +287,10 @@ mod test {
                         start_address: Some(0),
                         size: Some(100),
                         relative_address: Some(0),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     }]),
                     build_id: Some(vec![0, 0, 0, 0]),
-                    ..ModuleMap::EMPTY
+                    ..Default::default()
                 },
                 // Describes a module that lives between addresses 1000 and 2000.
                 ModuleMap {
@@ -299,17 +299,17 @@ mod test {
                             start_address: Some(1000),
                             size: Some(500),
                             relative_address: Some(0),
-                            ..ExecutableSegment::EMPTY
+                            ..Default::default()
                         },
                         ExecutableSegment {
                             start_address: Some(1500),
                             size: Some(500),
                             relative_address: Some(500),
-                            ..ExecutableSegment::EMPTY
+                            ..Default::default()
                         },
                     ]),
                     build_id: Some(vec![1, 0, 0, 0]),
-                    ..ModuleMap::EMPTY
+                    ..Default::default()
                 },
             ];
 
@@ -409,10 +409,10 @@ mod test {
                     start_address: Some(0),
                     size: Some(100),
                     relative_address: Some(0),
-                    ..ExecutableSegment::EMPTY
+                    ..Default::default()
                 }]),
                 build_id: Some(vec![0, 0, 0, 0]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
             // Describes a module that lives between addresses 1000 and 2000.
             ModuleMap {
@@ -421,30 +421,30 @@ mod test {
                         start_address: Some(1000),
                         size: Some(500),
                         relative_address: Some(0),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                     ExecutableSegment {
                         start_address: Some(1500),
                         size: Some(500),
                         relative_address: Some(500),
-                        ..ExecutableSegment::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 build_id: Some(vec![1, 0, 0, 0]),
-                ..ModuleMap::EMPTY
+                ..Default::default()
             },
         ];
 
         let live_allocations = vec![LiveAllocation {
             size: 10,
-            stack_trace: StackTrace { stack_frames: Some(vec![]), ..StackTrace::EMPTY },
+            stack_trace: StackTrace { stack_frames: Some(vec![]), ..Default::default() },
         }];
         let dead_allocations = vec![DeadAllocation {
             size: 20,
-            allocation_stack_trace: StackTrace { stack_frames: Some(vec![]), ..StackTrace::EMPTY },
+            allocation_stack_trace: StackTrace { stack_frames: Some(vec![]), ..Default::default() },
             deallocation_stack_trace: StackTrace {
                 stack_frames: Some(vec![]),
-                ..StackTrace::EMPTY
+                ..Default::default()
             },
         }];
 

@@ -2368,7 +2368,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
         self.run_file_request(fbinder::FileRequest {
             close_requests: Some(vec![fd.raw()]),
-            ..fbinder::FileRequest::EMPTY
+            ..Default::default()
         })
         .map(|_| ())
     }
@@ -2376,7 +2376,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
         let response = self.run_file_request(fbinder::FileRequest {
             get_requests: Some(vec![fd.raw()]),
-            ..fbinder::FileRequest::EMPTY
+            ..Default::default()
         })?;
         if let Some(mut files) = response.get_responses {
             // Validate that the server returned a single response, as a single fd was sent.
@@ -2400,7 +2400,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
         let handle = file.to_handle(&self.kernel)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
-            ..fbinder::FileRequest::EMPTY
+            ..Default::default()
         })?;
         if let Some(fds) = response.add_responses {
             // Validate that the server returned a single response, as a single file was sent.
@@ -6665,7 +6665,7 @@ pub mod tests {
                     responder.send(&mut Ok(vmo))?;
                 }
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
-                    let mut response = fbinder::FileResponse::EMPTY;
+                    let mut response = fbinder::FileResponse::default();
                     for fd in payload.close_requests.unwrap_or(vec![]) {
                         if fds.remove(&fd).is_none() {
                             responder.send(&mut Err(fposix::Errno::Ebadf))?;

@@ -632,7 +632,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         remote_controller
             .start(fbinder::RemoteControllerStartRequest {
                 dev_binder: Some(dev_binder_client_end.into()),
-                ..fbinder::RemoteControllerStartRequest::EMPTY
+                ..Default::default()
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
@@ -854,7 +854,7 @@ mod tests {
                 path: Some(b"/dev/binder".to_vec()),
                 process_accessor: Some(process_accessor_client_end),
                 binder: Some(binder_server_end),
-                ..fbinder::DevBinderOpenRequest::EMPTY
+                ..Default::default()
             })
             .expect("open");
 
@@ -865,7 +865,7 @@ mod tests {
         dev_binder
             .close(fbinder::DevBinderCloseRequest {
                 binder: Some(binder.into_channel().expect("into_channel").into_zx_channel().into()),
-                ..fbinder::DevBinderCloseRequest::EMPTY
+                ..Default::default()
             })
             .expect("close");
 

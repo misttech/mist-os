@@ -129,18 +129,18 @@ async fn led_watcher_updates_light_groups_on_watch() {
             enabled: Some(true),
             lights: Some(vec![LightState {
                 value: Some(LightValue::Brightness(NEW_LED1_VAL as f64)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroupFidl::EMPTY
+            ..Default::default()
         },
         LightGroupFidl {
             name: Some(String::from(LED2_NAME)),
             enabled: Some(true),
             lights: Some(vec![LightState {
                 value: Some(LightValue::Brightness(NEW_LED2_VAL as f64)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroupFidl::EMPTY
+            ..Default::default()
         },
     ];
     if let LightRequest::WatchLightGroups { responder } = light_request {

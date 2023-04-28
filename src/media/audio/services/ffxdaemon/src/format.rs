@@ -175,7 +175,7 @@ impl From<&Format> for fidl_fuchsia_hardware_audio::Format {
                 valid_bits_per_sample: item.valid_bits_per_sample() as u8,
                 frame_rate: item.frames_per_second,
             }),
-            ..fidl_fuchsia_hardware_audio::Format::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -344,7 +344,7 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType
                     fidl_fuchsia_audio_ffxdaemon::CustomClockInfo {
                         rate_adjust,
                         offset,
-                        ..fidl_fuchsia_audio_ffxdaemon::CustomClockInfo::EMPTY
+                        ..Default::default()
                     },
                 ))
             } else {

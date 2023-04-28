@@ -474,7 +474,7 @@ async fn build_info_server_mock(
                         // override_version will be used instead of this,
                         // but it still must be set for the component to work.
                         version: Some(String::new()),
-                        ..fbi::BuildInfo::EMPTY
+                        ..Default::default()
                     })
                     .expect("Error sending buildinfo response.");
             }
@@ -561,7 +561,7 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
         frui::ProgressRendererRender2Request {
             status: Some(frui::Status::Active),
             percent_complete: Some(0.0),
-            ..frui::ProgressRendererRender2Request::EMPTY
+            ..Default::default()
         }
     );
     assert_eq!(
@@ -569,7 +569,7 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
         frui::ProgressRendererRender2Request {
             status: Some(frui::Status::Complete),
             percent_complete: Some(100.0),
-            ..frui::ProgressRendererRender2Request::EMPTY
+            ..Default::default()
         }
     );
 
@@ -649,14 +649,14 @@ async fn test_ota_component_reports_error_when_omaha_broken() -> Result<(), Erro
         frui::ProgressRendererRender2Request {
             status: Some(frui::Status::Active),
             percent_complete: Some(0.0),
-            ..frui::ProgressRendererRender2Request::EMPTY
+            ..Default::default()
         }
     );
     assert_eq!(
         *result.progress_renderer_requests.last().unwrap(),
         frui::ProgressRendererRender2Request {
             status: Some(frui::Status::Error),
-            ..frui::ProgressRendererRender2Request::EMPTY
+            ..Default::default()
         },
     );
 

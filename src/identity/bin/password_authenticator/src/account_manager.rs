@@ -267,7 +267,7 @@ where
 
         Ok(faccount::AccountMetadata {
             name: Some(ams_metadata.name().to_string()),
-            ..faccount::AccountMetadata::EMPTY
+            ..Default::default()
         })
     }
 
@@ -862,10 +862,7 @@ mod test {
     }
 
     fn make_test_metadata() -> faccount::AccountMetadata {
-        faccount::AccountMetadata {
-            name: Some("Test Display Name".into()),
-            ..faccount::AccountMetadata::EMPTY
-        }
+        faccount::AccountMetadata { name: Some("Test Display Name".into()), ..Default::default() }
     }
     lazy_static! {
         pub static ref TEST_FACCOUNT_METADATA: faccount::AccountMetadata = make_test_metadata();
@@ -938,10 +935,7 @@ mod test {
             account_manager.get_account_metadata(GLOBAL_ACCOUNT_ID).await.unwrap();
         assert_eq!(
             account_metadata,
-            faccount::AccountMetadata {
-                name: Some(TEST_NAME.to_string()),
-                ..faccount::AccountMetadata::EMPTY
-            }
+            faccount::AccountMetadata { name: Some(TEST_NAME.to_string()), ..Default::default() }
         );
     }
 
@@ -1268,7 +1262,7 @@ mod test {
             cred_manager_provider,
             storage_manager_factory,
         );
-        let metadata = faccount::AccountMetadata { name: None, ..faccount::AccountMetadata::EMPTY };
+        let metadata = faccount::AccountMetadata { name: None, ..Default::default() };
         assert_eq!(
             account_manager.provision_new_account(&metadata, TEST_SCRYPT_PASSWORD).await,
             Err(faccount::Error::InvalidRequest)

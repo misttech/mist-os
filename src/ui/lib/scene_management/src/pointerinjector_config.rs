@@ -36,7 +36,7 @@ impl std::convert::From<InjectorViewportSpec> for ui_pointerinjector::Viewport {
                 spec.y_offset,
                 1.,
             ]),
-            ..ui_pointerinjector::Viewport::EMPTY
+            ..Default::default()
         }
     }
 }

@@ -46,7 +46,7 @@ struct TestHandles {
 }
 
 fn get_focus_koid_chain(proxy: &focus::FocusChainProviderProxy) -> FocusKoidChainFut {
-    proxy.watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::EMPTY)
+    proxy.watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
 }
 
 impl TestHandles {
@@ -196,8 +196,7 @@ impl TestHandles {
             .into_iter()
             .map(|vr| scenic::duplicate_view_ref(vr))
             .collect::<Result<Vec<_>, _>>()?;
-        let focus_chain =
-            focus::FocusChain { focus_chain: Some(chain), ..focus::FocusChain::EMPTY };
+        let focus_chain = focus::FocusChain { focus_chain: Some(chain), ..Default::default() };
         self.focus_chain_publisher.set_state_and_notify_if_changed(&focus_chain)?;
         self.next_focus_update().await?;
         Ok(())
@@ -307,8 +306,8 @@ async fn test_basic_copy_paste_across_different_view_refs() -> Result<(), Error>
 
         handles.set_focus_chain(vec![&view_ref_b]).await?;
 
-        let _ = reader_b.get_item(fclip::ReaderGetItemRequest::EMPTY).await?;
-        let _ = reader_b.watch(fclip::ReaderWatchRequest::EMPTY).await?;
+        let _ = reader_b.get_item(fclip::ReaderGetItemRequest::default()).await?;
+        let _ = reader_b.watch(fclip::ReaderWatchRequest::default()).await?;
 
         Ok(())
     }

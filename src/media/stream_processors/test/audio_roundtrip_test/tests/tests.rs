@@ -28,14 +28,14 @@ fn cvsd_test_suite() -> Result<()> {
                     channel_map: vec![AudioChannelId::Lf],
                 }),
             ))),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         };
 
         // For CVSD, we are comparing the transcoded PCM to the original input PCM data.
         // RMSE difference tolerance is arbitrarily set to 1% of the range of i16.
         let rmse_diff_tolerance = (i16::MAX as f64 - i16::MIN as f64) * 0.01;
         let cvsd_tests = RoundTripTestSuite::new(
-            EncoderSettings::Cvsd(CvsdEncoderSettings { ..CvsdEncoderSettings::EMPTY }),
+            EncoderSettings::Cvsd(CvsdEncoderSettings::default()),
             EncoderStream {
                 pcm_data: INPUT_TEST_S16LE64000MONO.to_vec(),
                 pcm_framelength: 8,

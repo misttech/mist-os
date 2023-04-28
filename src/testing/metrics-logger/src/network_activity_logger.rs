@@ -499,7 +499,7 @@ pub mod tests {
                 tx_bytes: Some(network_counters_clone.get()[1]),
                 rx_frames: Some(network_counters_clone.get()[2]),
                 tx_frames: Some(network_counters_clone.get()[3]),
-                ..fhwnet::PortGetCountersResponse::EMPTY
+                ..Default::default()
             });
             tasks.push(task);
 

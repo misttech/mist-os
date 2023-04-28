@@ -83,16 +83,16 @@ pub mod tests {
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-                    ..fcomponent::EventHeader::EMPTY
+                    ..Default::default()
                 }),
                 payload: Some(fcomponent::EventPayload::DirectoryReady(
                     fcomponent::DirectoryReadyPayload {
                         name: Some("diagnostics".to_string()),
                         node: Some(node),
-                        ..fcomponent::DirectoryReadyPayload::EMPTY
+                        ..Default::default()
                     },
                 )),
-                ..fcomponent::Event::EMPTY
+                ..Default::default()
             })
             .expect("send diagnostics ready event ok");
 
@@ -104,16 +104,16 @@ pub mod tests {
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-                    ..fcomponent::EventHeader::EMPTY
+                    ..Default::default()
                 }),
                 payload: Some(fcomponent::EventPayload::CapabilityRequested(
                     fcomponent::CapabilityRequestedPayload {
                         name: Some("fuchsia.logger.LogSink".to_string()),
                         capability: Some(zx::Channel::create().0),
-                        ..fcomponent::CapabilityRequestedPayload::EMPTY
+                        ..Default::default()
                     },
                 )),
-                ..fcomponent::Event::EMPTY
+                ..Default::default()
             })
             .expect("send diagnostics ready event ok");
 

@@ -134,7 +134,7 @@ mod tests {
                 frame_rate: 48000,
             };
             let ring_buffer_format =
-                Format { pcm_format: Some(ring_buffer_pcm_format), ..Format::EMPTY };
+                Format { pcm_format: Some(ring_buffer_pcm_format), ..Default::default() };
             let dai_format = DaiFormat {
                 number_of_channels: 2,
                 channels_to_use_bitmask: 3,

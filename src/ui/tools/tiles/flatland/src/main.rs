@@ -149,7 +149,7 @@ impl Service {
             create_proxy::<ui_views::FocuserMarker>().expect("failed to create Focuser endpoints");
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(focuser_request),
-            ..ui_comp::ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
         session
             .create_view2(
@@ -228,7 +228,7 @@ impl Service {
         view_provider
             .create_view2(ui_app::CreateView2Args {
                 view_creation_token: Some(view_creation_tokens.view_creation_token),
-                ..ui_app::CreateView2Args::EMPTY
+                ..Default::default()
             })
             .expect("fidl error");
 
@@ -241,7 +241,7 @@ impl Service {
             default_gridspec(tile_count + 1, self.logical_width, self.logical_height);
         let link_properties = flatland::ViewportProperties {
             logical_size: Some(fmath::SizeU { width: column_width, height: row_height }),
-            ..flatland::ViewportProperties::EMPTY
+            ..Default::default()
         };
 
         let (child_view_watcher, child_view_watcher_request) =
@@ -359,7 +359,7 @@ impl Service {
             let mut link_id = flatland::ContentId { value: id.clone().into() };
             let link_properties = flatland::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width: column_width, height: row_height }),
-                ..flatland::ViewportProperties::EMPTY
+                ..Default::default()
             };
             self.session
                 .set_viewport_properties(&mut link_id, link_properties)
@@ -380,7 +380,7 @@ impl Service {
                     acquire_fences: None,
                     release_fences: None,
                     unsquashable: Some(true),
-                    ..flatland::PresentArgs::EMPTY
+                    ..Default::default()
                 })
                 .expect("fidl error");
         }

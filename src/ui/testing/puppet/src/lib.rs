@@ -33,7 +33,7 @@ async fn run_puppet(request_stream: PuppetRequestStream, puppet_view: Rc<RefCell
                         .send(PuppetEmbedRemoteViewResponse {
                             result: Some(Result_::Success),
                             view_creation_token: Some(view_creation_token),
-                            ..PuppetEmbedRemoteViewResponse::EMPTY
+                            ..Default::default()
                         })
                         .expect("failed to respond to EmbedRemoteView request");
                 }
@@ -49,7 +49,7 @@ async fn run_puppet(request_stream: PuppetRequestStream, puppet_view: Rc<RefCell
                     responder
                         .send(PuppetSetEmbeddedViewPropertiesResponse {
                             result: Some(Result_::Success),
-                            ..PuppetSetEmbeddedViewPropertiesResponse::EMPTY
+                            ..Default::default()
                         })
                         .expect("failed to respond to SetEmbeddedViewProperties request");
                 }
@@ -107,7 +107,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                     responder
                         .send(PuppetFactoryCreateResponse {
                             result: Some(Result_::Success),
-                            ..PuppetFactoryCreateResponse::EMPTY
+                            ..Default::default()
                         })
                         .expect("failed to respond to PuppetFactoryRequest::Create");
 

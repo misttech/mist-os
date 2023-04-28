@@ -12,7 +12,7 @@ pub fn autolisten_touch(touch_source: fpointer::TouchSourceProxy) -> Task<()> {
             let responses: Vec<fpointer::TouchResponse> = returned_events
                 .iter()
                 .map(|event| {
-                    let mut response = fpointer::TouchResponse::EMPTY;
+                    let mut response = fpointer::TouchResponse::default();
                     if event.pointer_sample.is_some() {
                         response.response_type = Some(fpointer::TouchResponseType::Yes);
                     }

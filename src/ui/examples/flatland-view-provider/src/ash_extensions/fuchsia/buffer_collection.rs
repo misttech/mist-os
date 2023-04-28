@@ -90,7 +90,7 @@ impl BufferCollection {
         &self,
         collection: vk::BufferCollectionFUCHSIA,
     ) -> VkResult<vk::BufferCollectionPropertiesFUCHSIA> {
-        let mut props = vk::BufferCollectionPropertiesFUCHSIA { ..Default::default() };
+        let mut props = vk::BufferCollectionPropertiesFUCHSIA::default();
         (self.fp.get_buffer_collection_properties_fuchsia)(self.handle, collection, &mut props)
             .result_with_success(props)
     }

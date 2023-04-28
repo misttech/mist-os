@@ -48,7 +48,7 @@ async fn main() {
                         responder
                             .send(&mut Ok(LookupResult {
                                 addresses: Some(vec![localhost()]),
-                                ..LookupResult::EMPTY
+                                ..Default::default()
                             }))
                             .unwrap();
                     }

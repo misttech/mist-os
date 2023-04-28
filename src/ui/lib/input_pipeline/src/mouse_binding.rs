@@ -1014,13 +1014,13 @@ mod tests {
                 scroll_h: None,
                 scroll_v: None,
                 pressed_buttons: None,
-                ..fidl_input_report::MouseInputReport::EMPTY
+                ..Default::default()
             }),
             touch: None,
             sensor: None,
             consumer_control: None,
             trace_id: None,
-            ..fidl_input_report::InputReport::EMPTY
+            ..Default::default()
         }];
         let expected_events = vec![testing_utilities::create_mouse_event(
             expected_location,

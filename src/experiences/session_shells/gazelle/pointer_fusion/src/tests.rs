@@ -230,7 +230,7 @@ async fn test_scroll_event() {
 async fn test_touch_event_without_interaction_phase_position() {
     // Fusing touch event without interaction or phase or position should not result in a
     // PointerEvent.
-    let touch_event = InputEvent::TouchEvent(fptr::TouchEvent { ..fptr::TouchEvent::EMPTY });
+    let touch_event = InputEvent::TouchEvent(fptr::TouchEvent::default());
     let (sender, mut receiver) = pointer_fusion(1.0);
     sender.unbounded_send(touch_event).unwrap();
     let pointer_event = receiver.next().now_or_never();
@@ -338,7 +338,7 @@ trait TestPointerEvent {
 
 impl TestPointerEvent for InputEvent {
     fn mouse() -> Self {
-        InputEvent::MouseEvent(fptr::MouseEvent { ..fptr::MouseEvent::EMPTY })
+        InputEvent::MouseEvent(fptr::MouseEvent::default())
     }
 
     fn touch() -> Self {
@@ -351,9 +351,9 @@ impl TestPointerEvent for InputEvent {
                 interaction,
                 phase,
                 position_in_viewport,
-                ..fptr::TouchPointerSample::EMPTY
+                ..Default::default()
             }),
-            ..fptr::TouchEvent::EMPTY
+            ..Default::default()
         })
     }
 
@@ -384,12 +384,12 @@ impl TestPointerEvent for InputEvent {
                     id: Some(id),
                     buttons: Some([0, 1, 2].to_vec()),
                     relative_motion_range: None,
-                    ..fptr::MouseDeviceInfo::EMPTY
+                    ..Default::default()
                 });
             }
             InputEvent::TouchEvent(ref mut event) => {
                 event.device_info =
-                    Some(fptr::TouchDeviceInfo { id: Some(id), ..fptr::TouchDeviceInfo::EMPTY });
+                    Some(fptr::TouchDeviceInfo { id: Some(id), ..Default::default() });
             }
         }
         self
@@ -401,15 +401,12 @@ impl TestPointerEvent for InputEvent {
                 let device_id = event
                     .device_info
                     .as_ref()
-                    .unwrap_or(&fptr::MouseDeviceInfo {
-                        id: Some(0),
-                        ..fptr::MouseDeviceInfo::EMPTY
-                    })
+                    .unwrap_or(&fptr::MouseDeviceInfo { id: Some(0), ..Default::default() })
                     .id;
                 event.pointer_sample = Some(fptr::MousePointerSample {
                     device_id,
                     position_in_viewport: Some([x, y]),
-                    ..fptr::MousePointerSample::EMPTY
+                    ..Default::default()
                 });
             }
             InputEvent::TouchEvent(ref mut event) => {

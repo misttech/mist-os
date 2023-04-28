@@ -172,7 +172,7 @@ impl InputDevice {
                 }
             }
             Ok(InputDeviceRequest::GetFeatureReport { responder }) => {
-                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::EMPTY);
+                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::default());
                 match responder.send(&mut result) {
                     Ok(()) => None,
                     Err(e) => panic!("failed to send GetFeatureReport response: {e}"),
@@ -208,7 +208,7 @@ mod tests {
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
             let input_device_server_fut =
-                Box::new(InputDevice::new(request_stream, DeviceDescriptor::EMPTY)).flush();
+                Box::new(InputDevice::new(request_stream, DeviceDescriptor::default())).flush();
             let get_feature_report_fut = proxy.get_feature_report();
 
             // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
@@ -223,7 +223,10 @@ mod tests {
 
             let (_, get_feature_report_result) =
                 future::join(input_device_server_fut, get_feature_report_fut).await;
-            assert_eq!(get_feature_report_result.context("fidl error")?, Ok(FeatureReport::EMPTY));
+            assert_eq!(
+                get_feature_report_result.context("fidl error")?,
+                Ok(FeatureReport::default())
+            );
             Ok(())
         }
     }
@@ -297,7 +300,7 @@ mod tests {
                 .send_input_report(InputReport {
                     event_time: None,
                     touch: None,
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 })
                 .context("internal error queuing input event")?;
 
@@ -347,7 +350,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -368,7 +371,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -404,7 +407,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -442,7 +445,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -485,7 +488,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -504,7 +507,7 @@ mod tests {
                     .send_input_report(InputReport {
                         event_time: None,
                         touch: None,
-                        ..InputReport::EMPTY
+                        ..Default::default()
                     })
                     .expect("queuing input report");
 
@@ -532,7 +535,7 @@ mod tests {
                         .send_input_report(InputReport {
                             event_time: None,
                             touch: None,
-                            ..InputReport::EMPTY
+                            ..Default::default()
                         })
                         .expect("queuing input report");
                 });
@@ -555,7 +558,7 @@ mod tests {
                         .send_input_report(InputReport {
                             event_time: None,
                             touch: None,
-                            ..InputReport::EMPTY
+                            ..Default::default()
                         })
                         .expect("queuing input report");
                 });
@@ -604,7 +607,7 @@ mod tests {
                                     range: Range { min: -1000, max: 1000 },
                                     unit: Unit { type_: UnitType::Other, exponent: 0 },
                                 }),
-                                ..ContactInputDescriptor::EMPTY
+                                ..Default::default()
                             })
                             .take(10)
                             .collect(),
@@ -612,11 +615,11 @@ mod tests {
                         max_contacts: Some(10),
                         touch_type: Some(TouchType::Touchscreen),
                         buttons: Some(vec![]),
-                        ..TouchInputDescriptor::EMPTY
+                        ..Default::default()
                     }),
-                    ..TouchDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..DeviceDescriptor::EMPTY
+                ..Default::default()
             }
         }
 
@@ -631,8 +634,10 @@ mod tests {
             let (input_device_proxy, input_device_request_stream) =
                 endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                     .expect("creating InputDevice proxy and stream");
-            let input_device =
-                Box::new(InputDevice::new(input_device_request_stream, DeviceDescriptor::EMPTY));
+            let input_device = Box::new(InputDevice::new(
+                input_device_request_stream,
+                DeviceDescriptor::default(),
+            ));
             (input_device_proxy, input_device)
         }
 

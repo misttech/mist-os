@@ -588,7 +588,7 @@ impl AudioDaemon {
                     let response = AudioDaemonPlayResponse {
                         stdout: Some(stdout_remote),
                         stderr: Some(stderr_remote),
-                        ..AudioDaemonPlayResponse::EMPTY
+                        ..Default::default()
                     };
 
                     responder
@@ -611,7 +611,7 @@ impl AudioDaemon {
                     let response = AudioDaemonRecordResponse {
                         stdout: Some(stdout_remote),
                         stderr: Some(stderr_remote),
-                        ..AudioDaemonRecordResponse::EMPTY
+                        ..Default::default()
                     };
                     responder
                         .send(&mut Ok(response))
@@ -645,7 +645,7 @@ impl AudioDaemon {
 
                     let response = AudioDaemonListDevicesResponse {
                         devices: Some(input_entries),
-                        ..AudioDaemonListDevicesResponse::EMPTY
+                        ..Default::default()
                     };
                     responder
                         .send(&mut Ok(response))
@@ -673,7 +673,7 @@ impl AudioDaemon {
                                 Ok(info) => {
                                     let response = AudioDaemonDeviceInfoResponse {
                                         device_info: Some(info),
-                                        ..AudioDaemonDeviceInfoResponse::EMPTY
+                                        ..Default::default()
                                     };
                                     responder
                                         .send(&mut Ok(response))

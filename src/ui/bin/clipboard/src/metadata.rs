@@ -33,7 +33,7 @@ impl Into<fclip::ClipboardMetadata> for &ClipboardMetadata {
     fn into(self) -> fclip::ClipboardMetadata {
         fclip::ClipboardMetadata {
             last_modified: Some(self.last_modified.into_nanos()),
-            ..fclip::ClipboardMetadata::EMPTY
+            ..Default::default()
         }
     }
 }

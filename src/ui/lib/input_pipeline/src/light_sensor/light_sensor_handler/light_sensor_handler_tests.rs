@@ -159,9 +159,9 @@ fn get_mock_device_proxy_with_response(
                                             threshold_high: Some(vec![1]),
                                             threshold_low: Some(vec![1]),
                                             sampling_rate: Some(100),
-                                            ..SensorFeatureReport::EMPTY
+                                            ..Default::default()
                                         }),
-                                        ..FeatureReport::EMPTY
+                                        ..Default::default()
                                     },
                                 });
                                 &mut response

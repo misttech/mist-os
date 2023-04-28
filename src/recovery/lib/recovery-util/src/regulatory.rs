@@ -127,10 +127,10 @@ mod tests {
     async fn test_read_from_hwinfo_success() {
         // We need both the regulatory_domain and country_code fields to be populated for success.
         let expected_region_code = "AA".to_string();
-        let mut regulatory_domain = RegulatoryDomain::EMPTY;
+        let mut regulatory_domain = RegulatoryDomain::default();
         regulatory_domain.country_code = Some(expected_region_code.clone());
 
-        let mut product_info = hwinfo::ProductInfo::EMPTY;
+        let mut product_info = hwinfo::ProductInfo::default();
         product_info.regulatory_domain = Some(regulatory_domain);
 
         let proxy = create_mock_hwinfo_server(product_info).unwrap();
@@ -142,7 +142,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_from_hwinfo_no_regulatory_domain_returns_error() {
-        let product_info = hwinfo::ProductInfo::EMPTY;
+        let product_info = hwinfo::ProductInfo::default();
         let proxy = create_mock_hwinfo_server(product_info).unwrap();
 
         let result = read_region_code_from_factory(&proxy).await;
@@ -156,9 +156,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_from_hwinfo_no_country_code_returns_error() {
-        let regulatory_domain = RegulatoryDomain::EMPTY;
+        let regulatory_domain = RegulatoryDomain::default();
 
-        let mut product_info = hwinfo::ProductInfo::EMPTY;
+        let mut product_info = hwinfo::ProductInfo::default();
         product_info.regulatory_domain = Some(regulatory_domain);
         let proxy = create_mock_hwinfo_server(product_info).unwrap();
 

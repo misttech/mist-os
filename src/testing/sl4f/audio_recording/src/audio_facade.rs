@@ -374,7 +374,7 @@ impl VirtualOutput {
                 max_frames: frames_high,
                 modulo_frames: frames_modulo,
             }),
-            ..fidl_fuchsia_virtualaudio::Configuration::EMPTY
+            ..Default::default()
         };
 
         // Create the output.
@@ -767,7 +767,7 @@ impl VirtualInput {
                 max_frames: frames_high,
                 modulo_frames: frames_modulo,
             }),
-            ..fidl_fuchsia_virtualaudio::Configuration::EMPTY
+            ..Default::default()
         };
 
         // Create the input.

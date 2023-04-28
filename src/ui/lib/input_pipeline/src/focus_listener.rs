@@ -148,7 +148,7 @@ mod tests {
         focus_chain_provider_proxy: &focus::FocusChainProviderProxy,
     ) -> focus::FocusKoidChain {
         focus_chain_provider_proxy
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::EMPTY)
+            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_koid_chain")
     }
@@ -186,12 +186,12 @@ mod tests {
         // inside the `join!` statement below, concurrently with the update operation, it would end
         // up receiving the old value.
         let got_focus_koid_chain = expect_focus_koid_chain(&focus_chain_watcher).await;
-        assert_eq!(got_focus_koid_chain, focus::FocusKoidChain::EMPTY);
+        assert_eq!(got_focus_koid_chain, focus::FocusKoidChain::default());
 
         let view_ref = scenic::ViewRefPair::new()?.view_ref;
         let view_ref_dup = fuchsia_scenic::duplicate_view_ref(&view_ref)?;
         let focus_chain =
-            focus::FocusChain { focus_chain: Some(vec![view_ref]), ..focus::FocusChain::EMPTY };
+            focus::FocusChain { focus_chain: Some(vec![view_ref]), ..Default::default() };
 
         let (_, view_ref, got_focus_koid_chain) = join!(
             focus_chain_listener_client_end.on_focus_change(focus_chain.duplicate().unwrap()),

@@ -107,7 +107,7 @@ impl Into<MacAddressFilterItemDto> for MacAddressFilterItem {
 impl Into<MacAddressFilterItem> for MacAddressFilterItemDto {
     fn into(self) -> MacAddressFilterItem {
         let mac_address = self.mac_address.map(|octets| MacAddress { octets });
-        MacAddressFilterItem { mac_address, rssi: self.rssi, ..MacAddressFilterItem::EMPTY }
+        MacAddressFilterItem { mac_address, rssi: self.rssi, ..Default::default() }
     }
 }
 
@@ -122,7 +122,7 @@ impl Into<MacAddressFilterSettings> for MacAddressFilterSettingsDto {
                 Some(items) => Some(items.into_iter().map(|x| x.into()).collect()),
                 None => None,
             },
-            ..MacAddressFilterSettings::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -194,7 +194,7 @@ impl Into<NeighborInfo> for NeighborInfoDto {
             avg_rssi_in: self.avg_rssi_in,
             lqi_in: self.lqi_in,
             thread_mode: self.thread_mode,
-            ..NeighborInfo::EMPTY
+            ..Default::default()
         }
     }
 }

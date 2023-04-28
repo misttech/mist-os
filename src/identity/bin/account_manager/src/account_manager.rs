@@ -156,7 +156,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             .proxy()
             .unlock_account(AccountHandlerControlUnlockAccountRequest {
                 interaction,
-                ..AccountHandlerControlUnlockAccountRequest::EMPTY
+                ..Default::default()
             })
             .await
             .map_err(|_| ApiError::Resource)??;
@@ -239,7 +239,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             .create_account(AccountHandlerControlCreateAccountRequest {
                 id: account_id,
                 interaction,
-                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                ..Default::default()
             })
             .await
             .map_err(|err| {
@@ -333,7 +333,7 @@ mod tests {
 
     lazy_static! {
         static ref TEST_GRANULARITY: AuthChangeGranularity =
-            AuthChangeGranularity { summary_changes: Some(true), ..AuthChangeGranularity::EMPTY };
+            AuthChangeGranularity { summary_changes: Some(true), ..Default::default() };
         static ref ACCOUNT_PRE_AUTH_STATE: Vec<u8> = vec![1, 2, 3];
         static ref ACCOUNT_METADATA: AccountMetadata = AccountMetadata::new("test".to_string());
     }
@@ -520,7 +520,7 @@ mod tests {
                                         initial_state: Some(true),
                                         add_account: Some(true),
                                         remove_account: Some(true),
-                                        ..AccountManagerRegisterAccountListenerRequest::EMPTY
+                                        ..Default::default()
                                     }
                                 )
                                 .await
@@ -552,7 +552,7 @@ mod tests {
                             add_account: Some(true),
                             remove_account: Some(true),
                             granularity: Some(TEST_GRANULARITY.clone()),
-                            ..AccountManagerRegisterAccountListenerRequest::EMPTY
+                            ..Default::default()
                         })
                         .await?,
                     Err(ApiError::InvalidRequest)

@@ -143,7 +143,7 @@ impl Cr50 {
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
                     let mut fidl_result = result.ok().map(|response| {
-                        let mut table = InsertLeafResponse::EMPTY;
+                        let mut table = InsertLeafResponse::default();
                         table.root_hash = Some(response.root);
                         let data = response.data.as_ref().unwrap();
                         table.mac = Some(data.leaf_data.hmac);
@@ -185,7 +185,7 @@ impl Cr50 {
 
                     let mut fidl_result = match result.ok() {
                         Ok(_) => {
-                            let mut success = TryAuthSuccess::EMPTY;
+                            let mut success = TryAuthSuccess::default();
                             let data = result.data.as_ref().unwrap();
                             success.root_hash = Some(result.root);
                             success.he_secret = Some(data.high_entropy_secret.to_vec());
@@ -200,13 +200,13 @@ impl Cr50 {
                             Ok(TryAuthResponse::Success(success))
                         }
                         Err(PinWeaverError::RateLimitReached) => {
-                            let mut rate_limited = TryAuthRateLimited::EMPTY;
+                            let mut rate_limited = TryAuthRateLimited::default();
                             rate_limited.time_to_wait =
                                 Some(result.data.as_ref().unwrap().time_diff.into());
                             Ok(TryAuthResponse::RateLimited(rate_limited))
                         }
                         Err(PinWeaverError::LowentAuthFailed) => {
-                            let mut auth_failed = TryAuthFailed::EMPTY;
+                            let mut auth_failed = TryAuthFailed::default();
                             let data = result.data.as_ref().unwrap();
                             auth_failed.root_hash = Some(result.root);
                             // cred metadata is just the whole unimported_leaf_data.
@@ -240,10 +240,10 @@ impl Cr50 {
                             .into_iter()
                             .map(|v| {
                                 // Unpack the TPM type into the FIDL type.
-                                let mut entry = LogEntry::EMPTY;
+                                let mut entry = LogEntry::default();
                                 entry.root_hash = Some(v.root);
                                 entry.label = Some(v.label);
-                                let mut entry_data: EntryData = EntryData::EMPTY;
+                                let mut entry_data: EntryData = EntryData::default();
                                 entry.message_type = Some(match v.action {
                                     GetLogEntryData::InsertLeaf(hash) => {
                                         entry_data.leaf_hmac = Some(hash);
@@ -285,7 +285,7 @@ impl Cr50 {
 
                     let mut fidl_result = match exec_result.ok() {
                         Ok(_) => {
-                            let mut success = LogReplayResponse::EMPTY;
+                            let mut success = LogReplayResponse::default();
                             let data = exec_result.data.as_ref().unwrap();
                             // cred metadata is just the whole unimported_leaf_data.
                             let mut serializer = Serializer::new();

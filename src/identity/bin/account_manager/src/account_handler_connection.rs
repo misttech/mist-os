@@ -99,11 +99,11 @@ impl AccountHandlerConnection for AccountHandlerConnectionImpl {
             name: Some(account_handler_name.clone()),
             url: Some(account_handler_url),
             startup: Some(StartupMode::Lazy),
-            ..Child::EMPTY
+            ..Default::default()
         };
 
         realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
             .await
             .map_err(|err| {
                 warn!("Failed to create account_handler component instance: {:?}", err);

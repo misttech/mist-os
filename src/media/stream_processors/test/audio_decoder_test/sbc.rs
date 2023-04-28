@@ -37,7 +37,7 @@ impl ElementaryStream for SbcStream {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("audio/sbc")),
             oob_bytes: Some(self.oob_bytes.clone()),
-            ..FormatDetails::EMPTY
+            ..Default::default()
         }
     }
 

@@ -489,7 +489,7 @@ mod tests {
         component_id_index: component_id_index::Index,
     ) -> Zbi {
         let mut bootfs: HashMap<String, Vec<u8>> = HashMap::default();
-        let mut runtime_config = component_internal::Config::EMPTY;
+        let mut runtime_config = component_internal::Config::default();
         runtime_config.root_component_url = root_component_url;
         runtime_config.component_id_index_path = component_id_index_path.clone();
 

@@ -491,7 +491,7 @@ impl From<LightSensorData> for FidlLightSensorData {
             is_calibrated: Some(data.is_calibrated),
             calculated_lux: Some(data.calculated_lux),
             correlated_color_temperature: Some(data.correlated_color_temperature),
-            ..FidlLightSensorData::EMPTY
+            ..Default::default()
         }
     }
 }

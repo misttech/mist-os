@@ -183,7 +183,7 @@ mod tests {
         let realm = RealmBuilder::new().await.unwrap();
         let _ = realm.driver_test_realm_setup().await.unwrap();
         let realm = realm.build().await.expect("failed to build realm");
-        realm.driver_test_realm_start(fdt::RealmArgs::EMPTY).await.unwrap();
+        realm.driver_test_realm_start(fdt::RealmArgs::default()).await.unwrap();
         let out_dir = realm.driver_test_realm_connect_to_dev().unwrap();
 
         let driver_proxy = device_watcher::recursive_wait_and_open::<

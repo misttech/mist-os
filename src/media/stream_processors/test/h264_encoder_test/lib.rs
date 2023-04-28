@@ -50,7 +50,7 @@ fn h264_stream_output_generated() -> Result<()> {
                 bit_rate: Some(2000000),
                 frame_rate: Some(30),
                 gop_size: Some(2),
-                ..H264EncoderSettings::EMPTY
+                ..Default::default()
             })
         }),
         expected_nals: Some(vec![

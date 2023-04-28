@@ -92,7 +92,7 @@ impl Scanout for FlatlandScanout {
         // We need to improve this so that once we do get a credit we'll eventually flush any
         // changes to screen.
         if credits > 0 {
-            self.flatland.present(PresentArgs::EMPTY)?;
+            self.flatland.present(PresentArgs::default())?;
             self.present_credits.set(credits - 1);
         }
         Ok(())
@@ -206,7 +206,7 @@ impl FlatlandScanout {
         let view_ref_for_presenter = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let mut view_ref_for_keyboard = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let mut view_identity = ViewIdentityOnCreation::from(viewref_pair);
-        let view_bound_protocols = ViewBoundProtocols { mouse_source, ..ViewBoundProtocols::EMPTY };
+        let view_bound_protocols = ViewBoundProtocols { mouse_source, ..Default::default() };
         flatland
             .create_view2(
                 &mut view_token,
@@ -234,7 +234,7 @@ impl FlatlandScanout {
         let view_spec = ViewSpec {
             viewport_creation_token: Some(viewport_token),
             view_ref: Some(view_ref_for_presenter),
-            ..ViewSpec::EMPTY
+            ..Default::default()
         };
         let graphical_presenter = connect_to_protocol::<GraphicalPresenterMarker>()
             .context("failed to connect to GraphicalPresenter service")?;
@@ -291,7 +291,7 @@ impl FlatlandScanout {
             &mut BACKGROUND_COLOR.clone(),
             &mut initial_layout.logical_size.unwrap().clone(),
         )?;
-        flatland.present(PresentArgs::EMPTY)?;
+        flatland.present(PresentArgs::default())?;
 
         // Read events from the event streams to track the present credit count. We can only call
         // present if our counter is non-zero.
@@ -370,7 +370,7 @@ impl FlatlandScanout {
         let content_id = new_content_id(&mut self.next_flatland_id);
         let image_props = ImageProperties {
             size: Some(fmath::SizeU { width: resource.width(), height: resource.height() }),
-            ..ImageProperties::EMPTY
+            ..Default::default()
         };
 
         let mut import_token = resource
@@ -403,7 +403,7 @@ impl FakeScanout {
         mut command_sender: GpuCommandSender,
     ) -> Result<ScanoutController, Error> {
         let layout_info =
-            LayoutInfo { logical_size: Some(fmath::SizeU { width, height }), ..LayoutInfo::EMPTY };
+            LayoutInfo { logical_size: Some(fmath::SizeU { width, height }), ..Default::default() };
 
         let scanout = Box::new(Self { attached_resource: None, present_count: 0, layout_info });
         Ok(command_sender.attach_scanout(scanout).await?)

@@ -78,7 +78,7 @@ pub fn run_component_features(
                     fidl::endpoints::create_proxy().expect("failed to create TouchSourceProxy");
                 let view_bound_protocols = fuicomposition::ViewBoundProtocols {
                     touch_source: Some(touch_source_stream),
-                    ..fuicomposition::ViewBoundProtocols::EMPTY
+                    ..Default::default()
                 };
                 kernel.framebuffer.start_server(view_bound_protocols, outgoing_dir.take().unwrap());
                 kernel.input_file.start_relay(touch_source_proxy);

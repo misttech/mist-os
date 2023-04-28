@@ -240,7 +240,7 @@ mod test {
     async fn test_get_dir_proxy_selector_empty() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
         let selector =
-            Selector { component_selector: None, tree_selector: None, ..Selector::EMPTY };
+            Selector { component_selector: None, tree_selector: None, ..Default::default() };
         let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Err(_));
@@ -255,7 +255,7 @@ mod test {
                     StringSelector::ExactMatch("example".to_owned()),
                     StringSelector::ExactMatch("component".to_owned()),
                 ]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
@@ -265,7 +265,7 @@ mod test {
                     ),
                 })
             }),
-            ..Selector::EMPTY
+            ..Default::default()
         };
         let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
 
@@ -280,7 +280,7 @@ mod test {
                     StringSelector::ExactMatch("bad".to_owned()),
                     StringSelector::ExactMatch("component".to_owned()),
                 ]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
@@ -290,7 +290,7 @@ mod test {
                     ),
                 })
             }),
-            ..Selector::EMPTY
+            ..Default::default()
         };
         let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
 
@@ -306,7 +306,7 @@ mod test {
                     StringSelector::ExactMatch("example".to_owned()),
                     StringSelector::ExactMatch("component".to_owned()),
                 ]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
@@ -316,7 +316,7 @@ mod test {
                     ),
                 })
             }),
-            ..Selector::EMPTY
+            ..Default::default()
         };
         let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
 
@@ -332,7 +332,7 @@ mod test {
                     StringSelector::ExactMatch("example".to_owned()),
                     StringSelector::ExactMatch("component".to_owned()),
                 ]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             }),
             tree_selector: Some({
                 TreeSelector::PropertySelector(PropertySelector {
@@ -342,7 +342,7 @@ mod test {
                     ),
                 })
             }),
-            ..Selector::EMPTY
+            ..Default::default()
         };
         let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
 

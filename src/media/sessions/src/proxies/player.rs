@@ -395,11 +395,11 @@ impl Player {
                     .map(|media_image| MediaImage {
                         image_type: Some(media_image.image_type),
                         sizes: Some(media_image.sizes),
-                        ..MediaImage::EMPTY
+                        ..Default::default()
                     })
                     .collect()
             }),
-            ..SessionInfoDelta::EMPTY
+            ..Default::default()
         }
     }
 
@@ -407,7 +407,7 @@ impl Player {
         WatchOptions {
             only_active: Some(self.state.is_active().unwrap_or(false)),
             allowed_sessions: Some(vec![self.id.get()]),
-            ..WatchOptions::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -496,10 +496,7 @@ mod test {
         let player = Player::new(
             Id::new().expect("Creating id for test player"),
             player_client,
-            PlayerRegistration {
-                domain: Some(TEST_DOMAIN.to_string()),
-                ..PlayerRegistration::EMPTY
-            },
+            PlayerRegistration { domain: Some(TEST_DOMAIN.to_string()), ..Default::default() },
             inspector.root().create_child("test_player"),
             player_published_sink,
         )
@@ -547,7 +544,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(PlayerInfoDelta::EMPTY)?;
+        info_change_responder.send(PlayerInfoDelta::default())?;
 
         let mut player_stream = Pin::new(&mut player);
         let (_, event) = player_stream.next().await.expect("Polling player event").applicant;
@@ -561,7 +558,7 @@ mod test {
             SessionInfoDelta {
                 is_local: Some(true),
                 domain: Some(TEST_DOMAIN.to_string()),
-                ..SessionInfoDelta::EMPTY
+                ..Default::default()
             }
         );
         assert!(!player_stream.is_terminated());
@@ -597,8 +594,8 @@ mod test {
             .into_watch_info_change()
             .expect("Receiving info change responder");
         info_change_responder.send(PlayerInfoDelta {
-            player_capabilities: Some(PlayerCapabilities::EMPTY),
-            ..PlayerInfoDelta::EMPTY
+            player_capabilities: Some(PlayerCapabilities::default()),
+            ..Default::default()
         })?;
 
         let mut player_stream = Pin::new(&mut player);
@@ -624,9 +621,9 @@ mod test {
         let delta = PlayerInfoDelta {
             player_capabilities: Some(PlayerCapabilities {
                 flags: Some(PlayerCapabilityFlags::PLAY | PlayerCapabilityFlags::PAUSE),
-                ..PlayerCapabilities::EMPTY
+                ..Default::default()
             }),
-            ..PlayerInfoDelta::EMPTY
+            ..Default::default()
         };
 
         // Poll the stream so that it sends a watch request to the backing player.

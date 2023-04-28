@@ -239,7 +239,7 @@ pub fn root_directory(entries: Vec<io_test::DirectoryEntry>) -> io_test::Directo
     // Convert the simple vector of entries into the convoluted FIDL field type.
     let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
         entries.into_iter().map(|e| Some(Box::new(e))).collect();
-    io_test::Directory { name: None, entries: Some(entries), ..io_test::Directory::EMPTY }
+    io_test::Directory { name: None, entries: Some(entries), ..Default::default() }
 }
 
 /// Makes a subdirectory with a name and a set of entries.
@@ -258,7 +258,7 @@ pub fn remote_directory(name: &str, remote_dir: fio::DirectoryProxy) -> io_test:
     io_test::DirectoryEntry::RemoteDirectory(io_test::RemoteDirectory {
         name: Some(name.to_string()),
         remote_client: Some(remote_client),
-        ..io_test::RemoteDirectory::EMPTY
+        ..Default::default()
     })
 }
 
@@ -267,7 +267,7 @@ pub fn file(name: &str, contents: Vec<u8>) -> io_test::DirectoryEntry {
     io_test::DirectoryEntry::File(io_test::File {
         name: Some(name.to_string()),
         contents: Some(contents),
-        ..io_test::File::EMPTY
+        ..Default::default()
     })
 }
 
@@ -279,7 +279,7 @@ pub fn vmo_file(name: &str, contents: &[u8], capacity: u64) -> io_test::Director
     io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
         name: Some(name.to_string()),
         vmo: Some(vmo),
-        ..io_test::VmoFile::EMPTY
+        ..Default::default()
     })
 }
 
@@ -287,6 +287,6 @@ pub fn vmo_file(name: &str, contents: &[u8], capacity: u64) -> io_test::Director
 pub fn executable_file(name: &str) -> io_test::DirectoryEntry {
     io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile {
         name: Some(name.to_string()),
-        ..io_test::ExecutableFile::EMPTY
+        ..Default::default()
     })
 }

@@ -112,9 +112,9 @@ impl CryptKeeper {
                     url: Some(CRYPT_CM_URL.to_string()),
                     startup: Some(fdecl::StartupMode::Lazy),
                     environment: None,
-                    ..fdecl::Child::EMPTY
+                    ..Default::default()
                 },
-                fcomponent::CreateChildArgs::EMPTY,
+                fcomponent::CreateChildArgs::default(),
             )
             .await
             .log_warn_then("create_child FIDL failed", faccount::Error::Resource)?

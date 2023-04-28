@@ -639,7 +639,7 @@ mod tests {
         let handle_a = ObjectStore::open_object(
             &fs.object_manager().root_store(),
             SuperBlockInstance::A.object_id(),
-            HandleOptions { ..Default::default() },
+            HandleOptions::default(),
             None,
         )
         .await
@@ -648,7 +648,7 @@ mod tests {
         let handle_b = ObjectStore::open_object(
             &fs.object_manager().root_store(),
             SuperBlockInstance::B.object_id(),
-            HandleOptions { ..Default::default() },
+            HandleOptions::default(),
             None,
         )
         .await
