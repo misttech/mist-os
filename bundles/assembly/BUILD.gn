@@ -395,6 +395,9 @@ assembly_input_bundle("core_realm_development_access") {
     "//src/developer/remote-control:remote-control-package",
     "//src/developer/remote-control:pkg-diagnostics-bridge",
     "//src/connectivity/overnet/overnetstack",
+
+    # The developer snapshot tool.
+    "//src/developer/forensics/snapshot:pkg",
   ]
   config_data_labels = [ "//src/developer/remote-control:maps" ]
   compiled_packages = [
@@ -422,6 +425,10 @@ assembly_input_bundle("core_realm_development_access") {
         "remote_control_runner",
         "remote_control_bin",
       ]
+    },
+    {
+      package = "snapshot"
+      components = [ "snapshot" ]
     },
   ]
 }

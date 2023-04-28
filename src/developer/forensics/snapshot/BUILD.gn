@@ -16,7 +16,6 @@ group("snapshot") {
 # TODO(fxbug.dev/125505): Delete this once we include the snapshot tool based on
 # the build type.
 group("snapshot_deprecated") {
-  deps = [ ":pkg" ]
 }
 
 ###############################################################################
