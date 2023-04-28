@@ -21,7 +21,6 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
@@ -594,8 +593,11 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     image_constraints.max_coded_width = vout_->display_width();
     image_constraints.min_coded_height = vout_->display_height();
     image_constraints.max_coded_height = vout_->display_height();
-    image_constraints.min_bytes_per_row = ZX_ALIGN(
-        vout_->display_width() * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888), kBufferAlignment);
+    // Amlogic display capture engine (VDIN) outputs in formats with 3 bytes per
+    // pixel.
+    constexpr uint32_t kCaptureImageBytesPerPixel = 3;
+    image_constraints.min_bytes_per_row =
+        fbl::round_up(vout_->display_width() * kCaptureImageBytesPerPixel, kBufferAlignment);
     image_constraints.max_coded_width_times_coded_height =
         vout_->display_width() * vout_->display_height();
     buffer_name = "Display capture";
