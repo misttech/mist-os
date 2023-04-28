@@ -48,6 +48,13 @@ enum class Attributes {
   kAttributeCount = 0x30,
 };
 
+enum AttributeReferenceClock {
+  k19_2MHz = 0x0,
+  k26MHz = 0x1,
+  k38_4MHz = 0x2,
+  kObsolete = 0x3,
+};
+
 class ReadAttributeUpiu : public QueryReadRequestUpiu {
  public:
   explicit ReadAttributeUpiu(Attributes type)

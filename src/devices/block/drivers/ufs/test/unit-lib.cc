@@ -52,6 +52,7 @@ void UfsTest::SetUp() {
   auto driver = std::make_unique<Ufs>(fake_root_.get(), ddk::Pci{}, mock_device_->GetMmioBuffer(),
                                       fuchsia_hardware_pci::InterruptMode::kMsiX,
                                       std::move(irq_duplicated), mock_device_->GetFakeBti());
+  driver->SetHostControllerCallback(Ufs::NotifyEventCallback);
   ASSERT_OK(driver->AddDevice());
   [[maybe_unused]] auto unused = driver.release();
 

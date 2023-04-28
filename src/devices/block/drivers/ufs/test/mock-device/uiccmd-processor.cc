@@ -35,13 +35,75 @@ void UicCmdProcessor::HandleUicCmd(UicCommandOpcode value) {
   }
 }
 
-void UicCmdProcessor::DefaultDmeLinkStartUpHandler(UfsMockDevice& mock_device, uint32_t ucmdarg1,
+void UicCmdProcessor::DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                           uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  uint32_t mib_value = 0;
+  auto mib_attribute = UicCommandArgument1Reg::Get().FromValue(ucmdarg1).mib_attribute();
+  switch (mib_attribute) {
+    case PA_MaxRxHSGear:
+      mib_value = kMaxGear;
+      break;
+    case PA_ConnectedTxDataLanes:
+    case PA_ConnectedRxDataLanes:
+    case PA_AvailTxDataLanes:
+    case PA_AvailRxDataLanes:
+      mib_value = kConnectedDataLanes;
+      break;
+    // UFSHCI Specification Version 3.1, section 7.4 "UIC Power Mode Change".
+    case PA_ActiveTxDataLanes:
+    case PA_ActiveRxDataLanes:
+    case PA_TxGear:
+    case PA_RxGear:
+    case PA_TxTermination:
+    case PA_RxTermination:
+    case PA_HSSeries:
+    case PA_PWRModeUserData0:
+    case PA_TxHsAdaptType:
+    case PA_PWRMode:
+      zxlogf(ERROR, "UFS MOCK: Get power mode attribute 0x%x is not supported", mib_attribute);
+      break;
+    default:
+      zxlogf(ERROR, "UFS MOCK: Get attribute 0x%x is not supported", mib_attribute);
+      break;
+  }
+  UicCommandArgument3Reg::Get().FromValue(mib_value).WriteTo(mock_device.GetRegisters());
+}
+
+void UicCmdProcessor::DefaultDmeLinkStartUpHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
                                                    uint32_t ucmdarg2, uint32_t ucmdarg3) {
   HostControllerStatusReg::Get()
       .ReadFrom(mock_device.GetRegisters())
       .set_device_present(true)
       .set_utp_transfer_request_list_ready(true)
       .set_utp_task_management_request_list_ready(true)
+      .WriteTo(mock_device.GetRegisters());
+}
+
+void UicCmdProcessor::DefaultDmeHibernateEnterHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                                      uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  InterruptStatusReg::Get()
+      .ReadFrom(mock_device.GetRegisters())
+      .set_uic_hibernate_enter_status(true)
+      .set_uic_link_startup_status(false)
+      .WriteTo(mock_device.GetRegisters());
+
+  HostControllerStatusReg::Get()
+      .ReadFrom(mock_device.GetRegisters())
+      .set_uic_power_mode_change_request_status(HostControllerStatusReg::PowerModeStatus::kPowerOk)
+      .WriteTo(mock_device.GetRegisters());
+}
+
+void UicCmdProcessor::DefaultDmeHibernateExitHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                                     uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  InterruptStatusReg::Get()
+      .ReadFrom(mock_device.GetRegisters())
+      .set_uic_hibernate_exit_status(true)
+      .set_uic_link_startup_status(true)
+      .WriteTo(mock_device.GetRegisters());
+
+  HostControllerStatusReg::Get()
+      .ReadFrom(mock_device.GetRegisters())
+      .set_uic_power_mode_change_request_status(HostControllerStatusReg::PowerModeStatus::kPowerOk)
       .WriteTo(mock_device.GetRegisters());
 }
 

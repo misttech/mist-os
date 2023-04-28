@@ -30,16 +30,42 @@ class RegisterMmioProcessor {
 
   static const fdf::internal::MmioBufferOps& GetMmioOps() { return kMmioOps; }
 
+  static void NoOpHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultISHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultHCEHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultUTRLDBRHandler(UfsMockDevice& mock_device, uint32_t value);
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTRLRSR handler
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLDBR handler
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLRSR handler
   static void DefaultUICCMDHandler(UfsMockDevice& mock_device, uint32_t value);
+  static void DefaultUICCMDARG1Handler(UfsMockDevice& mock_device, uint32_t value);
+  static void DefaultUICCMDARG2Handler(UfsMockDevice& mock_device, uint32_t value);
+  static void DefaultUICCMDARG3Handler(UfsMockDevice& mock_device, uint32_t value);
 
   DEF_DEFAULT_HANDLER_BEGIN(RegisterMap, MmioWriteHandler)
-  DEF_DEFAULT_HANDLER(RegisterMap::kHCE, DefaultHCEHandler)
+  // Host Capabilities
+  DEF_DEFAULT_HANDLER(RegisterMap::kCAP, NoOpHandler)
+  DEF_DEFAULT_HANDLER(RegisterMap::kVER, NoOpHandler)
+  // Operation and Runtime
   DEF_DEFAULT_HANDLER(RegisterMap::kIS, DefaultISHandler)
+  // RegisterMap::kIE does not require a handler.
+  DEF_DEFAULT_HANDLER(RegisterMap::kHCS, NoOpHandler)
+  DEF_DEFAULT_HANDLER(RegisterMap::kHCE, DefaultHCEHandler)
+  // UTP Task Management
+  // RegisterMap::kUTRLBA does not require a handler.
+  // RegisterMap::kUTRLBAU does not require a handler.
   DEF_DEFAULT_HANDLER(RegisterMap::kUTRLDBR, DefaultUTRLDBRHandler)
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTRLRSR handler
+  // UTP Task Management
+  // RegisterMap::kUTMRLBA does not require a handler.
+  // RegisterMap::kUTMRLBAU does not require a handler.
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLDBR handler
+  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLRSR handler
+  // UIC Command
   DEF_DEFAULT_HANDLER(RegisterMap::kUICCMD, DefaultUICCMDHandler)
+  // RegisterMap::kUICCMDARG1 does not require a handler.
+  // RegisterMap::kUICCMDARG2 does not require a handler.
+  // RegisterMap::kUICCMDARG3 does not require a handler.
   DEF_DEFAULT_HANDLER_END()
 
  private:

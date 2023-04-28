@@ -31,6 +31,7 @@ source_set("shared") {
     "registers.h",
     "ufs.cc",
     "ufs.h",
+    "uic/uic_commands.cc",
     "uic/uic_commands.h",
     "upiu/attributes.h",
     "upiu/descriptors.h",
@@ -102,6 +103,8 @@ test("ufs-unit-tests-bin") {
     "test/mock-device/transfer-request-processor.cc",
     "test/mock-device/ufs-mock-device.cc",
     "test/mock-device/uiccmd-processor.cc",
+    "test/register-test.cc",
+    "test/uic-test.cc",
     "test/unit-lib.cc",
   ]
   deps = test_deps + [ ":shared" ]

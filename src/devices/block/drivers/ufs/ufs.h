@@ -24,6 +24,8 @@ namespace ufs {
 
 constexpr uint32_t kMaxLun = 8;
 
+constexpr uint32_t kHostControllerTimeoutUs = 1000;
+
 enum NotifyEvent {
   kInit = 0,
   kReset,
@@ -63,18 +65,34 @@ class Ufs : public UfsDeviceType {
   inspect::Inspector &inspector() { return inspector_; }
   inspect::Node &inspect_node() { return inspect_node_; }
 
+  fdf::MmioBuffer &GetMmio() { return mmio_; }
+
+  // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
+  // each host interface platform.
   void SetHostControllerCallback(HostControllerCallback callback) {
     host_controller_callback_ = std::move(callback);
   }
 
   bool IsDriverShutdown() const { return driver_shutdown_; }
 
-  // Defines a callback function to perform when a |NotifyEvent| occurs.
+  // Defines a callback function to perform when an |event| occurs.
   static zx::result<> NotifyEventCallback(NotifyEvent event, uint64_t data);
+  // The controller notifies the host controller when it takes the action defined in |event|.
+  zx::result<> Notify(NotifyEvent event, uint64_t data);
+
+  zx_status_t WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
+                              const fbl::String &timeout_message);
 
  private:
+  friend class UfsTest;
+
   // Initialize the UFS controller and bind the logical units.
   zx_status_t Init();
+  zx::result<> InitController();
+  zx::result<> InitDeviceInterface();
+
+  zx_status_t EnableHostController();
+  zx_status_t DisableHostController();
 
   ddk::Pci pci_;
   fdf::MmioBuffer mmio_;
@@ -83,6 +101,10 @@ class Ufs : public UfsDeviceType {
   zx::bti bti_;
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
+
+  // Controller internal information.
+  uint32_t number_of_utmr_slots_;
+  uint32_t number_of_utr_slots_;
 
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;

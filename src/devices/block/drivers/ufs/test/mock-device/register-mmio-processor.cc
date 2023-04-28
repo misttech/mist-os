@@ -37,6 +37,10 @@ uint32_t RegisterMmioProcessor::MmioRead(zx_off_t offset) {
   return mock_device_.GetRegisters()->Read<uint32_t>(offset);
 }
 
+void RegisterMmioProcessor::NoOpHandler(UfsMockDevice& mock_device, uint32_t value) {
+  // This is a read only register handler. Nothing to do.
+}
+
 void RegisterMmioProcessor::DefaultISHandler(UfsMockDevice& mock_device, uint32_t value) {
   uint32_t is = InterruptStatusReg::Get().ReadFrom(mock_device.GetRegisters()).reg_value();
   is &= (~value);
@@ -67,11 +71,11 @@ void RegisterMmioProcessor::DefaultUTRLDBRHandler(UfsMockDevice& mock_device, ui
            UtrListBaseAddressUpperReg::Get().ReadFrom(mock_device.GetRegisters()).address_upper())
        << 32) |
       UtrListBaseAddressReg::Get().ReadFrom(mock_device.GetRegisters()).reg_value();
-  zx::result<zx_vaddr_t> utrl_base_addr_or = mock_device.MapDmaPaddr(utrl_base_paddr);
-  ZX_ASSERT_MSG(utrl_base_addr_or.is_ok(), "Failed to map address.");
+  zx::result<zx_vaddr_t> utrl_base_addr = mock_device.MapDmaPaddr(utrl_base_paddr);
+  ZX_ASSERT_MSG(utrl_base_addr.is_ok(), "Failed to map address.");
 
   cpp20::span<TransferRequestDescriptor> utr_descriptors(
-      reinterpret_cast<TransferRequestDescriptor*>(utrl_base_addr_or.value()), mock_device.kNutrs);
+      reinterpret_cast<TransferRequestDescriptor*>(utrl_base_addr.value()), UfsMockDevice::kNutrs);
 
   std::bitset<32> slots = value;
   for (uint32_t slot = 0; slot < slots.size(); ++slot) {

@@ -14,17 +14,16 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
       (static_cast<zx_paddr_t>(utr_desc.utp_command_descriptor_base_address_upper()) << 32) |
       utr_desc.utp_command_descriptor_base_address();
 
-  zx::result<zx_vaddr_t> command_desc_base_addr_or =
-      mock_device_.MapDmaPaddr(command_desc_base_paddr);
-  ZX_ASSERT_MSG(command_desc_base_addr_or.is_ok(), "Failed to map address.");
+  zx::result<zx_vaddr_t> command_desc_base_addr = mock_device_.MapDmaPaddr(command_desc_base_paddr);
+  ZX_ASSERT_MSG(command_desc_base_addr.is_ok(), "Failed to map address.");
 
   CommandDescriptorData command_descriptor_data;
-  command_descriptor_data.command_upiu_base_addr = command_desc_base_addr_or.value();
+  command_descriptor_data.command_upiu_base_addr = command_desc_base_addr.value();
   command_descriptor_data.response_upiu_base_addr =
-      command_desc_base_addr_or.value() + utr_desc.response_upiu_offset() * sizeof(uint32_t);
+      command_desc_base_addr.value() + utr_desc.response_upiu_offset() * sizeof(uint32_t);
   command_descriptor_data.response_upiu_length = utr_desc.response_upiu_length() * sizeof(uint32_t);
   command_descriptor_data.prdt_base_addr =
-      command_desc_base_addr_or.value() + utr_desc.prdt_offset() * sizeof(uint32_t);
+      command_desc_base_addr.value() + utr_desc.prdt_offset() * sizeof(uint32_t);
   command_descriptor_data.prdt_length = utr_desc.prdt_length() * sizeof(uint32_t);
 
   UpiuHeader *command_upiu_header =

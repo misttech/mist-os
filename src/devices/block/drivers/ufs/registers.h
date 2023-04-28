@@ -62,9 +62,9 @@ class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t> {
   DEF_BIT(25, out_of_order_data_delivery_supported);
   DEF_BIT(24, _64_bit_addressing_supported);
   DEF_BIT(23, auto_hibernation_support);
-  DEF_FIELD(18, 16, number_of_utp_task_management_request_slots);
+  DEF_FIELD(18, 16, number_of_utp_task_management_request_slots);  // 0's based value
   DEF_FIELD(15, 8, number_of_outstanding_rtt_requests_supported);
-  DEF_FIELD(4, 0, number_of_utp_transfer_request_slots);
+  DEF_FIELD(4, 0, number_of_utp_transfer_request_slots);  // 0's based value
 
   static auto Get() { return hwreg::RegisterAddr<CapabilityReg>(RegisterMap::kCAP); }
 };
@@ -258,7 +258,7 @@ class UicCommandReg : public hwreg::RegisterBase<UicCommandReg, uint32_t> {
 // "Offset 94h: UICCMDARG1 – UIC Command Argument 1".
 class UicCommandArgument1Reg : public hwreg::RegisterBase<UicCommandArgument1Reg, uint32_t> {
  public:
-  DEF_FIELD(31, 24, mib_attribute);
+  DEF_FIELD(31, 16, mib_attribute);
   DEF_FIELD(15, 0, gen_selector_index);
 
   static auto Get() {

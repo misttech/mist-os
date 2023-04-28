@@ -69,8 +69,9 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
       scsi_command_processor_(*this) {
   VersionReg::Get()
       .ReadFrom(&registers_)
-      .set_major_version_number(0x3)
-      .set_minor_version_number(0x1)
+      .set_major_version_number(kMajorVersion)
+      .set_minor_version_number(kMinorVersion)
+      .set_version_suffix(kVersionSuffix)
       .WriteTo(&registers_);
   CapabilityReg::Get()
       .ReadFrom(&registers_)

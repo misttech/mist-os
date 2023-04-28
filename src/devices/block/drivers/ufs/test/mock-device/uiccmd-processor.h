@@ -28,11 +28,20 @@ class UicCmdProcessor {
 
   void HandleUicCmd(UicCommandOpcode value);
 
+  static void DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2,
+                                   uint32_t ucmdarg3);
   static void DefaultDmeLinkStartUpHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
                                            uint32_t ucmdarg2, uint32_t ucmdarg3);
+  static void DefaultDmeHibernateEnterHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                              uint32_t ucmdarg2, uint32_t ucmdarg3);
+  static void DefaultDmeHibernateExitHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                             uint32_t ucmdarg2, uint32_t ucmdarg3);
 
   DEF_DEFAULT_HANDLER_BEGIN(UicCommandOpcode, UicCmdHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeGet, DefaultDmeGetHandler)
   DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeLinkStartUp, DefaultDmeLinkStartUpHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeHibernateEnter, DefaultDmeHibernateEnterHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeHibernateExit, DefaultDmeHibernateExitHandler)
   DEF_DEFAULT_HANDLER_END()
 
  private:

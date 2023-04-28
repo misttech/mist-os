@@ -21,6 +21,9 @@ class UfsTest : public zxtest::Test {
 
   void TearDown() override;
 
+  zx_status_t DisableController() { return ufs_->DisableHostController(); }
+  zx_status_t EnableController() { return ufs_->EnableHostController(); }
+
  protected:
   std::shared_ptr<zx_device> fake_root_;
   zx_device* device_;

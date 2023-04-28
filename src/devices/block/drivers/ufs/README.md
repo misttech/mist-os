@@ -40,6 +40,7 @@ and provides reliable data transfer through the M-PHY physical layer.
 * Refactoring I/O queue
 * Support large size I/O
 * Support FLUSH command
+* Support FUA flag
 * Support TRIM command (unmap)
 * Support write booster
 * Support Power Mode

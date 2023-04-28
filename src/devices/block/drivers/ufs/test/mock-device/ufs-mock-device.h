@@ -26,6 +26,13 @@ constexpr uint64_t kMockBlockSizeShift = 12;
 constexpr uint64_t kMockBlockSize = (1 << kMockBlockSizeShift);
 constexpr uint64_t kMockTotalDeviceCapacity = (1 << 24);  // 16MB
 
+constexpr uint32_t kMajorVersion = 3;
+constexpr uint32_t kMinorVersion = 1;
+constexpr uint32_t kVersionSuffix = 2;
+
+constexpr uint32_t kMaxGear = 1;
+constexpr uint32_t kConnectedDataLanes = 1;
+
 class FakeRegisters final {
  public:
   FakeRegisters() { std::memset(registers_, 0, RegisterMap::kRegisterSize); }

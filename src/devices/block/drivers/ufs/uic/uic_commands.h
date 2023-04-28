@@ -5,6 +5,11 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_UIC_UIC_COMMANDS_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_UIC_UIC_COMMANDS_H_
 
+#include <lib/zx/result.h>
+#include <zircon/types.h>
+
+#include <optional>
+
 namespace ufs {
 
 // MIPI UniPro specification v2.0, section 5.8.1 "PHY Adapter Common Attributes"
@@ -15,6 +20,18 @@ namespace ufs {
 #define PA_ConnectedTxDataLanes 0x1561
 #define PA_ConnectedRxDataLanes 0x1581
 #define PA_MaxRxHSGear 0x1587
+
+// UFSHCI Specification Version 3.0, section 7.4 "UIC Power Mode Change".
+#define PA_ActiveTxDataLanes 0x1560
+#define PA_ActiveRxDataLanes 0x1580
+#define PA_TxGear 0x1568
+#define PA_RxGear 0x1583
+#define PA_TxTermination 0x1569
+#define PA_RxTermination 0x1584
+#define PA_HSSeries 0x156A
+#define PA_PWRModeUserData0 0x15B0
+#define PA_TxHsAdaptType 0x15D4
+#define PA_PWRMode 0x1571
 
 constexpr uint32_t kUicTimeoutUsec = 5000000;
 
@@ -48,7 +65,9 @@ class UicCommand {
         mbi_attribute_(mbi_attribute),
         gen_selector_index_(gen_selector_index) {}
 
-  virtual zx::result<std::optional<uint32_t>> SendCommand() = 0;
+  // Among the UIC commands, the DME_GET and DME_PEER_GET commands return the value of the attribute
+  // requested in the UICCMDARG3 register. The other commands do not return a value.
+  virtual zx::result<std::optional<uint32_t>> SendCommand();
 
   // For testing
   void SetTimeoutUsec(uint32_t time) { timeout_usec_ = time; }
@@ -56,13 +75,13 @@ class UicCommand {
  protected:
   zx::result<> SendUicCommand(uint32_t argument1, uint32_t argument2, uint32_t argument3);
 
-  const Ufs &GetController() const { return controller_; }
+  Ufs &GetController() { return controller_; }
   UicCommandOpcode GetOpcode() const { return opcode_; }
   uint16_t GetMbiAttribute() const { return mbi_attribute_; }
   uint16_t GetGenSelectorIndex() const { return gen_selector_index_; }
 
  private:
-  const Ufs &controller_;
+  Ufs &controller_;
   const UicCommandOpcode opcode_;
   const uint16_t mbi_attribute_ = 0;
   const uint16_t gen_selector_index_ = 0;
@@ -93,21 +112,19 @@ class DmeLinkStartUpUicCommand : public UicCommand {
  public:
   explicit DmeLinkStartUpUicCommand(Ufs &ufs)
       : UicCommand(ufs, UicCommandOpcode::kDmeLinkStartUp, 0, 0) {}
-  zx::result<std::optional<uint32_t>> SendCommand() override;
+  zx::result<std::optional<uint32_t>> SendCommandWithNotify();
 };
 
 class DmeHibernateEnterCommand : public UicCommand {
  public:
   explicit DmeHibernateEnterCommand(Ufs &ufs)
       : UicCommand(ufs, UicCommandOpcode::kDmeHibernateEnter, 0, 0) {}
-  zx::result<std::optional<uint32_t>> SendCommand() override;
 };
 
 class DmeHibernateExitCommand : public UicCommand {
  public:
   explicit DmeHibernateExitCommand(Ufs &ufs)
       : UicCommand(ufs, UicCommandOpcode::kDmeHibernateExit, 0, 0) {}
-  zx::result<std::optional<uint32_t>> SendCommand() override;
 };
 
 }  // namespace ufs
