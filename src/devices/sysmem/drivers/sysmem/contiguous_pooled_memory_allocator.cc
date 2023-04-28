@@ -1346,13 +1346,29 @@ void ContiguousPooledMemoryAllocator::OnRegionUnused(const ralloc_region_t& regi
           // previously loaned ranges, so we need to zero here to make it look as if the decommit
           // worked from a zeroing point of view.  If we also can't zero, we assert.  The decommit
           // is not expected to fail unless decommit of contiguous VMO pages is disabled via kernel
-          // command line flag.  The zero op is never expected to fail.
-          zero_status = contiguous_vmo_.op_range(ZX_VMO_OP_ZERO, loan_range.base, loan_range.size,
-                                                 nullptr, 0);
-          // We don't expect DECOMMIT or ZERO to ever fail.
-          ZX_ASSERT_MSG(zero_status == ZX_OK,
-                        "ZX_VMO_OP_DECOMMIT and ZX_VMO_OP_ZERO both failed - zero_status: %d\n",
-                        zero_status);
+          // command line flag. If the VMO is cached, i.e. is always cpu accessible, then we can
+          // ask the kernel to zero it, otherwise we must do it ourselves.
+          if (is_always_cpu_accessible_) {
+            zero_status = contiguous_vmo_.op_range(ZX_VMO_OP_ZERO, loan_range.base, loan_range.size,
+                                                   nullptr, 0);
+            // We don't expect DECOMMIT or ZERO to ever fail.
+            ZX_ASSERT_MSG(zero_status == ZX_OK,
+                          "ZX_VMO_OP_DECOMMIT and ZX_VMO_OP_ZERO both failed - zero_status: %d\n",
+                          zero_status);
+          } else {
+            ZX_DEBUG_ASSERT(mapping_);
+            // Although our zeroing loop only requires the range be word aligned we know that we
+            // should have only been asked to loan page aligned regions to begin with.
+            ZX_DEBUG_ASSERT(loan_range.base % zx_system_get_page_size() == 0);
+            ZX_DEBUG_ASSERT(loan_range.size % zx_system_get_page_size() == 0);
+            // Need to explicitly zero using a volatile word pointer since memset might use a
+            // non-word sized access, or the 'dc zva' instruction on aarch64, both of which are
+            // invalid on an uncached address.
+            volatile uint64_t* addr = reinterpret_cast<uint64_t*>(&mapping_[loan_range.base]);
+            for (size_t i = 0; i < loan_range.size / sizeof(uint64_t); i++) {
+              addr[i] = 0;
+            }
+          }
         }
       },
       /*zero_func=*/
