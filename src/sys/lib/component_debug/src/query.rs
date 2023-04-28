@@ -86,14 +86,14 @@ mod tests {
                 url: Some("#meta/1bar.cm".to_string()),
                 instance_id: Some("123456".to_string()),
                 resolved_info: None,
-                ..fsys::Instance::EMPTY
+                ..Default::default()
             },
             fsys::Instance {
                 moniker: Some("./core/boo".to_string()),
                 url: Some("#meta/2bar.cm".to_string()),
                 instance_id: Some("456789".to_string()),
                 resolved_info: None,
-                ..fsys::Instance::EMPTY
+                ..Default::default()
             },
         ])
     }

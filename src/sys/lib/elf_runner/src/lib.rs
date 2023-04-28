@@ -533,9 +533,9 @@ impl Runner for ScopedElfRunner {
                     .map(|job| ComponentDiagnostics {
                         tasks: Some(ComponentTasks {
                             component_task: Some(DiagnosticsTask::Job(job.into())),
-                            ..ComponentTasks::EMPTY
+                            ..Default::default()
                         }),
-                        ..ComponentDiagnostics::EMPTY
+                        ..Default::default()
                     })
                     .map_err(|error| {
                         warn!(%error, "Failed to copy job for diagnostics");
@@ -668,7 +668,7 @@ mod tests {
         let entries = vec![fcrunner::ComponentNamespaceEntry {
             path: Some("/svc".to_string()),
             directory: Some(client),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         Ok((dir, entries))
@@ -696,7 +696,7 @@ mod tests {
         let ns = vec![fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         fcrunner::ComponentStartInfo {
@@ -719,12 +719,12 @@ mod tests {
                         ))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             }),
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -749,7 +749,7 @@ mod tests {
         let ns = vec![fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         fcrunner::ComponentStartInfo {
@@ -776,12 +776,12 @@ mod tests {
                         value: Some(Box::new(fdata::DictionaryValue::Str("notify".to_string()))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             }),
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -1375,7 +1375,7 @@ mod tests {
         ns.push(fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         });
 
         fcrunner::ComponentStartInfo {
@@ -1399,12 +1399,12 @@ mod tests {
                         value: Some(Box::new(fdata::DictionaryValue::Str("log".to_string()))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             }),
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         }
     }
 

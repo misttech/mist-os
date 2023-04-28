@@ -183,7 +183,7 @@ mod tests {
         }
 
         fn build(self) -> fdata::Dictionary {
-            let mut ret = fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY };
+            let mut ret = fdata::Dictionary { entries: Some(vec![]), ..Default::default() };
 
             let mut add_value = |key: &str, value: fdata::DictionaryValue| {
                 ret.entries.as_mut().expect("entries exists").push(fdata::DictionaryEntry {
@@ -210,7 +210,7 @@ mod tests {
     fn empty_dictionary_fails() {
         assert_eq!(
             ComponentError::MissingRequiredKey("program"),
-            ProgramSpec::try_from(fdata::Dictionary { ..fdata::Dictionary::EMPTY }).unwrap_err()
+            ProgramSpec::try_from(fdata::Dictionary::default()).unwrap_err()
         );
     }
 

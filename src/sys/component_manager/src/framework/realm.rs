@@ -496,7 +496,7 @@ mod tests {
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
             on_terminate: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         }
     }
 
@@ -535,7 +535,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl(name),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap()
@@ -595,11 +595,15 @@ mod tests {
                 url: None,
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -612,11 +616,15 @@ mod tests {
                 url: Some("test:///a".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: Some("env".to_string()),
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -632,11 +640,15 @@ mod tests {
                 url: None,
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -651,11 +663,15 @@ mod tests {
                 url: None,
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect_err("unexpected success");
             // When exceeding the long max name length, the FIDL call itself
@@ -671,7 +687,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl("a"),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await;
             res.expect("fidl call failed").expect("failed to create child a");
@@ -681,7 +697,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl("a"),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .expect("fidl call failed")
@@ -697,7 +713,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl("a"),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .expect("fidl call failed")
@@ -713,11 +729,15 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Eager),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -730,7 +750,7 @@ mod tests {
                 source_name: Some("foo".to_string()),
                 target_name: Some("foo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })
         }
 
@@ -742,7 +762,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -753,7 +773,7 @@ mod tests {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Parent(
                             fdecl::ParentRef {},
                         ))]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -770,7 +790,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -783,9 +803,9 @@ mod tests {
                             source_name: Some("foo".to_string()),
                             target_name: Some("foo".to_string()),
                             // Note: has no `dependency_type`.
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         })]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -802,7 +822,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -816,7 +836,7 @@ mod tests {
                                 collection: None,
                             },
                         ))]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -833,7 +853,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -847,9 +867,9 @@ mod tests {
                             })),
                             source_name: Some("foo".to_string()),
                             target_name: Some("foo".to_string()),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         })]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -866,7 +886,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -880,7 +900,7 @@ mod tests {
                                 collection: Some("dynoff".to_string()),
                             },
                         ))]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -897,7 +917,7 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
@@ -911,7 +931,7 @@ mod tests {
                                 collection: Some("dynoff".to_string()),
                             },
                         ))]),
-                        ..fcomponent::CreateChildArgs::EMPTY
+                        ..Default::default()
                     },
                 )
                 .await
@@ -929,11 +949,15 @@ mod tests {
                 url: Some("test:///b".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             };
             let err = test
                 .realm_proxy
-                .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .create_child(
+                    &mut collection_ref,
+                    child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -967,7 +991,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl(name),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await;
             res.expect("fidl call failed")
@@ -1033,11 +1057,11 @@ mod tests {
             url: Some("test:///a_alt".to_string()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         let res = test
             .realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await;
         res.expect("fidl call failed").expect("failed to recreate child a");
 
@@ -1063,7 +1087,11 @@ mod tests {
         let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let res = test
             .realm_proxy
-            .create_child(&mut collection_ref, child_decl("a"), fcomponent::CreateChildArgs::EMPTY)
+            .create_child(
+                &mut collection_ref,
+                child_decl("a"),
+                fcomponent::CreateChildArgs::default(),
+            )
             .await;
         res.expect("fidl call failed").expect("failed to create child a");
 
@@ -1127,7 +1155,11 @@ mod tests {
         // Create child "a" in collection. Expect a Started event.
         let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         test.realm_proxy
-            .create_child(&mut collection_ref, child_decl("a"), fcomponent::CreateChildArgs::EMPTY)
+            .create_child(
+                &mut collection_ref,
+                child_decl("a"),
+                fcomponent::CreateChildArgs::default(),
+            )
             .await
             .unwrap()
             .unwrap();
@@ -1298,7 +1330,7 @@ mod tests {
             .create_child(
                 &mut collection_ref,
                 child_decl("system"),
-                fcomponent::CreateChildArgs::EMPTY,
+                fcomponent::CreateChildArgs::default(),
             )
             .await;
         res.expect("fidl call failed").expect("failed to create child system");

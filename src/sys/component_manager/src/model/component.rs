@@ -2710,9 +2710,9 @@ pub mod tests {
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),
                     dependency_type: Some(fdecl::DependencyType::Strong),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 })]),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -2821,9 +2821,9 @@ pub mod tests {
                     source_name: Some("dyn_offer2_source_name".to_string()),
                     target_name: Some("dyn_offer2_target_name".to_string()),
                     dependency_type: Some(fdecl::DependencyType::Strong),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 })]),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -2924,9 +2924,9 @@ pub mod tests {
                         source_name: Some("bar".to_string()),
                         target_name: Some("bar".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     })]),
-                    ..fcomponent::CreateChildArgs::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -2979,9 +2979,9 @@ pub mod tests {
                         source_name: Some("bar".to_string()),
                         target_name: Some("bar".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     })]),
-                    ..fcomponent::CreateChildArgs::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -3014,9 +3014,9 @@ pub mod tests {
                         target_name: Some("foo".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferDirectory::EMPTY
+                        ..Default::default()
                     })]),
-                    ..fcomponent::CreateChildArgs::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -3053,9 +3053,9 @@ pub mod tests {
                         })),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferDirectory::EMPTY
+                        ..Default::default()
                     })]),
-                    ..fcomponent::CreateChildArgs::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -3237,7 +3237,7 @@ pub mod tests {
                 target_name: Some("fuchsia.example.Echo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 availability: Some(fdecl::Availability::Required),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })])
             .await
             .expect("failed to validate/convert dynamic offers"),
@@ -3262,7 +3262,7 @@ pub mod tests {
                 target_name: Some("fuchsia.example.Echo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 availability: Some(fdecl::Availability::Optional),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })])
             .await
             .expect("failed to validate/convert dynamic offers"),
@@ -3291,7 +3291,7 @@ pub mod tests {
                         target_name: Some("fuchsia.example.Echo".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Optional),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     })
                 ])
                 .await

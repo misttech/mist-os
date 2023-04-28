@@ -107,7 +107,7 @@ mod test {
             match root_dir.try_next().await {
                 Ok(Some(fio::DirectoryRequest::Unlink { name: a, options: o, responder })) => {
                     assert_eq!(a, "foo");
-                    assert_eq!(o, fio::UnlinkOptions::EMPTY);
+                    assert_eq!(o, fio::UnlinkOptions::default());
                     responder.send(&mut Ok(())).unwrap();
                 }
                 request => {

@@ -165,7 +165,7 @@ async fn run_test_case(
         ftest::StdHandles {
             out: Some(stdout_client),
             err: Some(stderr_client),
-            ..ftest::StdHandles::EMPTY
+            ..Default::default()
         },
         case_listener,
     )?;
@@ -191,7 +191,7 @@ async fn handle_case_iterator(
     let mut cases_iter = vec![ftest::Case {
         name: Some(test_name.to_string()),
         enabled: Some(true),
-        ..ftest::Case::EMPTY
+        ..Default::default()
     }]
     .into_iter();
 
@@ -311,12 +311,9 @@ mod tests {
                 ftest::Invocation {
                     name: Some("".to_string()),
                     tag: Some("".to_string()),
-                    ..ftest::Invocation::EMPTY
+                    ..Default::default()
                 },
-                frunner::ComponentStartInfo {
-                    ns: Some(vec![]),
-                    ..frunner::ComponentStartInfo::EMPTY
-                },
+                frunner::ComponentStartInfo { ns: Some(vec![]), ..Default::default() },
                 &run_listener.into_proxy().expect("Couldn't create proxy."),
                 &starnix_kernel,
             )

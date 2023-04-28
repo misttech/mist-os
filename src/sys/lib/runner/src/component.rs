@@ -215,7 +215,7 @@ impl TryInto<Vec<fcrunner::ComponentNamespaceEntry>> for ComponentNamespace {
                 Ok(fcrunner::ComponentNamespaceEntry {
                     path: Some(path.clone()),
                     directory: Some(dir_channel.into()),
-                    ..fcrunner::ComponentNamespaceEntry::EMPTY
+                    ..Default::default()
                 })
             })
             .collect()
@@ -776,7 +776,7 @@ mod tests {
                 ns.push(fcrunner::ComponentNamespaceEntry {
                     path: Some(pkg_path),
                     directory: Some(pkg_handle),
-                    ..fcrunner::ComponentNamespaceEntry::EMPTY
+                    ..Default::default()
                 });
             }
 
@@ -785,7 +785,7 @@ mod tests {
                 ns.push(fcrunner::ComponentNamespaceEntry {
                     path: Some(path.to_string()),
                     directory: Some(client),
-                    ..fcrunner::ComponentNamespaceEntry::EMPTY
+                    ..Default::default()
                 });
             }
             ComponentNamespace::try_from(ns)

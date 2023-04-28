@@ -109,7 +109,8 @@ mod tests {
         let mock = Arc::new(MockVerifierService::new(|_| Ok(())));
         let (proxy, _server) = mock.spawn_blobfs_verifier_service();
 
-        let verify_result = proxy.verify(fidl::VerifyOptions::EMPTY).await.expect("made fidl call");
+        let verify_result =
+            proxy.verify(fidl::VerifyOptions::default()).await.expect("made fidl call");
 
         assert_eq!(verify_result, Ok(()));
     }
@@ -119,7 +120,8 @@ mod tests {
         let mock = Arc::new(MockVerifierService::new(|_| Err(VerifyError::Internal)));
         let (proxy, _server) = mock.spawn_blobfs_verifier_service();
 
-        let verify_result = proxy.verify(fidl::VerifyOptions::EMPTY).await.expect("made fidl call");
+        let verify_result =
+            proxy.verify(fidl::VerifyOptions::default()).await.expect("made fidl call");
 
         assert_eq!(verify_result, Err(VerifyError::Internal));
     }
@@ -134,7 +136,8 @@ mod tests {
         }));
         let (proxy, _server) = mock.spawn_blobfs_verifier_service();
 
-        let verify_result = proxy.verify(fidl::VerifyOptions::EMPTY).await.expect("made fidl call");
+        let verify_result =
+            proxy.verify(fidl::VerifyOptions::default()).await.expect("made fidl call");
 
         assert_eq!(verify_result, Ok(()));
         assert_eq!(called.load(Ordering::SeqCst), 1);

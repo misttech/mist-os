@@ -201,7 +201,7 @@ impl<O: OutputSink> Controller<O> {
             Err(fidl::Error::ClientChannelClosed { status, .. })
                 if status == zx::Status::PEER_CLOSED =>
             {
-                return Ok(fuzz::Status { ..fuzz::Status::EMPTY })
+                return Ok(fuzz::Status::default())
             }
             Err(e) => bail!("`fuchsia.fuzzer.Controller/GetStatus` failed: {:?}", e),
             Ok(fuzz_status) => Ok(fuzz_status),
@@ -349,7 +349,7 @@ impl<O: OutputSink> Controller<O> {
         let watch_fut = || async move {
             loop {
                 let artifact = self.proxy.watch_artifact().await?;
-                if artifact != FidlArtifact::EMPTY {
+                if artifact != FidlArtifact::default() {
                     return Ok(artifact);
                 }
             }
@@ -363,7 +363,7 @@ impl<O: OutputSink> Controller<O> {
         let timer_fut = timer_fut.fuse();
         pin_mut!(watch_fut, forward_fut, timer_fut);
         let mut remaining = 2;
-        let mut fidl_artifact = FidlArtifact::EMPTY;
+        let mut fidl_artifact = FidlArtifact::default();
         // If `fidl_fut` completes with e.g. `Ok(zx::Status::CANCELED)`, drop
         // the `send_fut` and `forward_fut` futures.
         while remaining > 0 {
@@ -376,7 +376,7 @@ impl<O: OutputSink> Controller<O> {
                             }
                             fidl_artifact
                         }
-                        Err(ClientChannelClosed { status, .. }) if status == zx::Status::PEER_CLOSED => FidlArtifact { error: Some(zx::Status::CANCELED.into_raw()), ..FidlArtifact::EMPTY },
+                        Err(ClientChannelClosed { status, .. }) if status == zx::Status::PEER_CLOSED => FidlArtifact { error: Some(zx::Status::CANCELED.into_raw()), ..Default::default() },
                         Err(e) => bail!("fuchsia.fuzzer/Controller.WatchArtifact: {:?}", e),
                     };
                     remaining -= 1;
@@ -457,7 +457,7 @@ mod tests {
             detect_leaks: Some(false),
             death_exitcode: Some(2),
             debug: Some(true),
-            ..fuzz::Options::EMPTY
+            ..Default::default()
         };
         controller.configure(expected.clone()).await?;
         let actual = fake.get_options();
@@ -483,7 +483,7 @@ mod tests {
             mutation_depth: Some(20),
             malloc_limit: Some(200),
             malloc_exitcode: Some(2),
-            ..fuzz::Options::EMPTY
+            ..Default::default()
         };
         fake.set_options(expected.clone());
         let actual = controller.get_options().await?;
@@ -566,7 +566,7 @@ mod tests {
             corpus_num_inputs: Some(5),
             corpus_total_size: Some(6),
             process_stats: None,
-            ..fuzz::Status::EMPTY
+            ..Default::default()
         };
         fake.set_status(expected.clone());
         let actual = controller.get_status().await?;
@@ -609,7 +609,7 @@ mod tests {
         let (fake, proxy, _task) = perform_test_setup(&test)?;
         let controller = Controller::new(proxy, test.writer());
 
-        let options = fuzz::Options { runs: Some(10), ..fuzz::Options::EMPTY };
+        let options = fuzz::Options { runs: Some(10), ..Default::default() };
         controller.configure(options).await?;
         controller.fuzz().await?;
         let artifact = controller.watch_artifact().await?;

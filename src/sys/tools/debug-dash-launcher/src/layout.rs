@@ -202,7 +202,7 @@ mod tests {
         vec![fcrunner::ComponentNamespaceEntry {
             path: Some("/ns_subdir".to_string()),
             directory: Some(ns_subdir),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }]
     }
 

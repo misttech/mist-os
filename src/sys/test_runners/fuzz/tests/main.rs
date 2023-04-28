@@ -24,7 +24,7 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<()>
     let fuzz_manager =
         connect_to_protocol::<fuzz::ManagerMarker>().expect("failed to connect fuzz-manager");
     let (controller, log_task) = connect(&fuzz_manager).await;
-    let options = fuzz::Options { seed: Some(1), ..fuzz::Options::EMPTY };
+    let options = fuzz::Options { seed: Some(1), ..Default::default() };
     let response = controller
         .configure(options)
         .await
@@ -219,7 +219,7 @@ async fn test_reconnect() -> Result<()> {
     // Set an option.
     let (controller1, log_task1) = connect(&fuzz_manager).await;
     let test1 = || async move {
-        let options = fuzz::Options { dictionary_level: Some(13), ..fuzz::Options::EMPTY };
+        let options = fuzz::Options { dictionary_level: Some(13), ..Default::default() };
         let response =
             controller1.configure(options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)
@@ -262,7 +262,7 @@ async fn test_stop() -> Result<()> {
 async fn test_configure() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
-        let options = fuzz::Options { max_input_size: Some(1024), ..fuzz::Options::EMPTY };
+        let options = fuzz::Options { max_input_size: Some(1024), ..Default::default() };
         let response = controller.configure(options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)?;
 
@@ -293,7 +293,7 @@ async fn test_fuzz_until_runs() -> Result<()> {
             seed: Some(1),
             runs: Some(100),
             max_input_size: Some(4),
-            ..fuzz::Options::EMPTY
+            ..Default::default()
         };
         let response = controller.configure(options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)?;

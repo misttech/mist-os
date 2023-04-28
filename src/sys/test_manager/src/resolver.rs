@@ -265,7 +265,7 @@ mod tests {
                         "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm"
                         | "fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm"
                         | "fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm" => {
-                            responder.send(&mut Ok(fresolution::Component::EMPTY))
+                            responder.send(&mut Ok(fresolution::Component::default()))
                         }
                         "fuchsia-pkg://fuchsia.com/package-two#meta/comp.cm" => responder
                             .send(&mut Err(fresolution::ResolverError::ResourceUnavailable)),
@@ -280,7 +280,7 @@ mod tests {
                 } => {
                     match component_url.as_str() {
                         "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm" | "name#resource" => {
-                            responder.send(&mut Ok(fresolution::Component::EMPTY))
+                            responder.send(&mut Ok(fresolution::Component::default()))
                         }
                         _ => responder.send(&mut Err(fresolution::ResolverError::PackageNotFound)),
                     }
@@ -361,7 +361,7 @@ mod tests {
                 .resolve("fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm")
                 .await
                 .unwrap(),
-            Ok(fresolution::Component::EMPTY)
+            Ok(fresolution::Component::default())
         );
         let mut mock_context = fresolution::Context { bytes: vec![0] };
         assert_eq!(
@@ -369,7 +369,7 @@ mod tests {
                 .resolve_with_context("name#resource", &mut mock_context)
                 .await
                 .unwrap(),
-            Ok(fresolution::Component::EMPTY)
+            Ok(fresolution::Component::default())
         );
         assert_eq!(
             hermetic_resolver_proxy
@@ -386,7 +386,7 @@ mod tests {
                 )
                 .await
                 .unwrap(),
-            Ok(fresolution::Component::EMPTY)
+            Ok(fresolution::Component::default())
         );
     }
 
@@ -474,7 +474,7 @@ mod tests {
                 .resolve("fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm")
                 .await
                 .unwrap(),
-            Ok(fresolution::Component::EMPTY)
+            Ok(fresolution::Component::default())
         );
 
         assert_eq!(
@@ -482,7 +482,7 @@ mod tests {
                 .resolve("fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm")
                 .await
                 .unwrap(),
-            Ok(fresolution::Component::EMPTY)
+            Ok(fresolution::Component::default())
         );
 
         assert_eq!(

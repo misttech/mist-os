@@ -221,7 +221,7 @@ pub async fn run_test_manager_query_server(
                                                         responder.send(&mut names.into_iter().map(
                                                             |s| ftest_manager::Case {
                                                                 name: Some(s.into()),
-                                                                ..ftest_manager::Case::EMPTY
+                                                                ..Default::default()
                                                             },
                                                         ));
                                                 }

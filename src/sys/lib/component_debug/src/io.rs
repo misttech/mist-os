@@ -201,7 +201,7 @@ impl Directory {
     // Remove the given `filename` from the directory. Note that while the file will be removed from
     // the directory, it will be destroyed only if there are no other references to it.
     pub async fn remove(&self, filename: &str) -> Result<()> {
-        let options = fio::UnlinkOptions::EMPTY;
+        let options = fio::UnlinkOptions::default();
         match self.proxy.unlink(filename, options).await {
             Ok(r) => match r {
                 Ok(()) => Ok(()),

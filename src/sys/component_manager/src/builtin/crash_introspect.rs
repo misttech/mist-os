@@ -86,7 +86,7 @@ mod tests {
             Ok(fsys::ComponentCrashInfo {
                 url: Some(url.clone()),
                 moniker: Some(moniker.to_string()),
-                ..fsys::ComponentCrashInfo::EMPTY
+                ..Default::default()
             }),
             crash_records_proxy.find_component_by_thread_koid(koid_raw).await?,
         );

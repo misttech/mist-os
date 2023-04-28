@@ -43,11 +43,11 @@ impl ActorInstance {
             name: Some(name.clone()),
             url: Some(url),
             startup: Some(StartupMode::Lazy),
-            ..Child::EMPTY
+            ..Default::default()
         };
         let mut collection = CollectionRef { name: ACTOR_COLLECTION_NAME.to_string() };
         realm_proxy
-            .create_child(&mut collection, decl, CreateChildArgs::EMPTY)
+            .create_child(&mut collection, decl, CreateChildArgs::default())
             .await
             .context("Could not send FIDL request to Realm.CreateChild")?
             .map_err(|e| {

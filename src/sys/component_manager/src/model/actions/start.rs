@@ -291,7 +291,7 @@ async fn make_execution_runtime(
         numbered_handles,
         encoded_config,
         break_on_start: Some(break_on_start_left),
-        ..fcrunner::ComponentStartInfo::EMPTY
+        ..Default::default()
     };
 
     Ok((runtime, start_info, controller_server, break_on_start_right))

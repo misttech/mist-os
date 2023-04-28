@@ -215,9 +215,9 @@ mod test {
                 decl_type: Some(fsys::DeclType::Use),
                 error: Some(fsys::RouteError {
                     summary: Some("Access denied".into()),
-                    ..fsys::RouteError::EMPTY
+                    ..Default::default()
                 }),
-                ..fsys::RouteReport::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -252,7 +252,7 @@ mod test {
                     decl_type: Some(fsys::DeclType::Use),
                     source_moniker: Some("./src".into()),
                     error: None,
-                    ..fsys::RouteReport::EMPTY
+                    ..Default::default()
                 },
                 fsys::RouteReport {
                     capability: Some("fuchsia.foo.baz".into()),
@@ -263,17 +263,17 @@ mod test {
                             instance_name: Some("1234abcd".into()),
                             child_name: Some("a".into()),
                             child_instance_name: Some("default".into()),
-                            ..fsys::ServiceInstance::EMPTY
+                            ..Default::default()
                         },
                         fsys::ServiceInstance {
                             instance_name: Some("abcd1234".into()),
                             child_name: Some("b".into()),
                             child_instance_name: Some("other".into()),
-                            ..fsys::ServiceInstance::EMPTY
+                            ..Default::default()
                         },
                     ]),
                     error: None,
-                    ..fsys::RouteReport::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -336,7 +336,7 @@ mod test {
             vec![],
             vec![
                 // Don't set any fields
-                fsys::RouteReport::EMPTY,
+                fsys::RouteReport::default(),
             ],
         );
 

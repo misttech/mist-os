@@ -65,7 +65,7 @@ fn test_no_rtc_start_clock_from_time_source() {
                 utc: Some(VALID_TIME.into_nanos()),
                 monotonic: Some(sample_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -137,7 +137,7 @@ fn test_invalid_rtc_start_clock_from_time_source() {
                     utc: Some(VALID_TIME.into_nanos()),
                     monotonic: Some(sample_monotonic.into_nanos()),
                     standard_deviation: Some(STD_DEV.into_nanos()),
-                    ..TimeSample::EMPTY
+                    ..Default::default()
                 })
                 .await;
 
@@ -228,7 +228,7 @@ fn test_start_clock_from_rtc() {
                     utc: Some(VALID_TIME.into_nanos()),
                     monotonic: Some(sample_monotonic.into_nanos()),
                     standard_deviation: Some(STD_DEV.into_nanos()),
-                    ..TimeSample::EMPTY
+                    ..Default::default()
                 })
                 .await;
             poll_until(|| {
@@ -311,7 +311,7 @@ fn test_reject_before_backstop() {
                 utc: Some(BEFORE_BACKSTOP_TIME.into_nanos()),
                 monotonic: Some(zx::Time::get_monotonic().into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -351,7 +351,7 @@ fn test_slew_clock() {
                 utc: Some(sample_1_utc.into_nanos()),
                 monotonic: Some(sample_1_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -370,7 +370,7 @@ fn test_slew_clock() {
                 utc: Some(sample_2_utc.into_nanos()),
                 monotonic: Some(sample_2_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -398,7 +398,7 @@ fn test_step_clock() {
                 utc: Some(sample_1_utc.into_nanos()),
                 monotonic: Some(sample_1_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -419,7 +419,7 @@ fn test_step_clock() {
                 utc: Some(sample_2_utc.into_nanos()),
                 monotonic: Some(sample_2_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
         poll_until(|| clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks)
@@ -460,7 +460,7 @@ fn test_restart_crashed_time_source() {
                 utc: Some(sample_1_utc.into_nanos()),
                 monotonic: Some(sample_1_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
 
@@ -477,7 +477,7 @@ fn test_restart_crashed_time_source() {
                 utc: Some(sample_2_utc.into_nanos()),
                 monotonic: Some(sample_2_monotonic.into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
         poll_until(|| clock.get_details().unwrap().generation_counter != last_generation_counter)

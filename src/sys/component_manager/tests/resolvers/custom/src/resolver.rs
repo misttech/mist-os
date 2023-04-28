@@ -38,12 +38,12 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                         package: Some(fresolution::Package {
                             url: Some("fuchsia-pkg://fuchsia.com/component-manager-test-resolver".to_string()),
                             directory: Some(client),
-                            ..fresolution::Package::EMPTY
+                            ..Default::default()
                         }),
                         // component-manager-test-resolver only resolves test://trigger
                         resolution_context: None,
                         abi_revision: Some(version_history::LATEST_VERSION.abi_revision.into()),
-                        ..fresolution::Component::EMPTY
+                        ..Default::default()
                     })).with_context(|| format!("failed to send response to resolve request for component URL {}", component_url))?;
                 } else {
                     responder
@@ -80,7 +80,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
 }
 
 fn build_decl() -> fmem::Data {
-    let mut component_decl = fdecl::Component::EMPTY;
+    let mut component_decl = fdecl::Component::default();
     component_decl.program = Some(fdecl::Program {
         runner: Some("elf".to_string()),
         info: Some(fdata::Dictionary {
@@ -90,21 +90,21 @@ fn build_decl() -> fmem::Data {
                     "bin/component_manager_test_trigger_bin".to_string(),
                 ))),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         }),
-        ..fdecl::Program::EMPTY
+        ..Default::default()
     });
     component_decl.capabilities = Some(vec![fdecl::Capability::Protocol(fdecl::Protocol {
         name: Some("fidl.test.components.Trigger".to_string()),
         source_path: Some("/svc/fidl.test.components.Trigger".to_string()),
-        ..fdecl::Protocol::EMPTY
+        ..Default::default()
     })]);
     component_decl.exposes = Some(vec![fdecl::Expose::Protocol(fdecl::ExposeProtocol {
         source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
         source_name: Some("fidl.test.components.Trigger".to_string()),
         target_name: Some("fidl.test.components.Trigger".to_string()),
-        ..fdecl::ExposeProtocol::EMPTY
+        ..Default::default()
     })]);
     fmem::Data::Bytes(fidl::encoding::persist(&component_decl).expect("encoded"))
 }

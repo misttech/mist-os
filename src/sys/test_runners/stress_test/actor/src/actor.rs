@@ -35,7 +35,7 @@ pub struct Action<D> {
 impl<D> Action<D> {
     /// Converts the rust object into its FIDL equivalent to be sent across the wire.
     fn to_fidl(&self) -> FidlAction {
-        FidlAction { name: Some(self.name.to_string()), ..FidlAction::EMPTY }
+        FidlAction { name: Some(self.name.to_string()), ..Default::default() }
     }
 }
 

@@ -39,11 +39,11 @@ fn default_event_offers() -> Vec<fdecl::Offer> {
     vec![
         fdecl::Offer::EventStream(fdecl::OfferEventStream {
             target_name: Some("capability_requested".to_string()),
-            ..fdecl::OfferEventStream::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::EventStream(fdecl::OfferEventStream {
             target_name: Some("directory_ready".to_string()),
-            ..fdecl::OfferEventStream::EMPTY
+            ..Default::default()
         }),
     ]
 }
@@ -60,7 +60,7 @@ async fn run_test_in_echo_test_realm(
         source: None,
         target: None,
         dependency_type: None,
-        ..fdecl::OfferProtocol::EMPTY
+        ..Default::default()
     }));
     run_single_test(realm, &mut offers.iter_mut(), ECHO_TEST_COL, test_url, run_options).await
 }

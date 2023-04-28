@@ -221,7 +221,7 @@ impl TestServer {
                 ftest::StdHandles {
                     out: Some(stdout_client),
                     err: Some(stderr_client),
-                    ..ftest::StdHandles::EMPTY
+                    ..Default::default()
                 },
                 listener,
             )
@@ -238,7 +238,7 @@ impl TestServer {
         if let Err(e) = TestServer::validate_args(&user_passed_args) {
             test_stderr.write_str(&format!("{}", e)).await?;
             case_listener_proxy
-                .finished(TestResult { status: Some(Status::Failed), ..TestResult::EMPTY })
+                .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
                 .map_err(RunTestError::SendFinish)?;
             return Ok(());
         }
@@ -339,7 +339,7 @@ impl TestServer {
         if process_info.return_code != 0 && process_info.return_code != 1 {
             test_stderr.write_str("Test exited abnormally\n").await?;
             case_listener_proxy
-                .finished(TestResult { status: Some(Status::Failed), ..TestResult::EMPTY })
+                .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
                 .map_err(RunTestError::SendFinish)?;
             return Ok(());
         }
@@ -352,7 +352,7 @@ impl TestServer {
             Status::Passed
         };
         case_listener_proxy
-            .finished(TestResult { status: Some(status), ..TestResult::EMPTY })
+            .finished(TestResult { status: Some(status), ..Default::default() })
             .map_err(RunTestError::SendFinish)?;
         debug!("test finish {}", test);
         Ok(())
@@ -608,7 +608,7 @@ mod tests {
                 include_disabled_tests: Some(false),
                 parallel: Some(1),
                 arguments: Some(vec!["-my_custom_flag_2".to_owned()]),
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -618,42 +618,42 @@ mod tests {
             ListenerEvent::start_test("TestCrashing"),
             ListenerEvent::finish_test(
                 "TestCrashing",
-                TestResult { status: Some(Status::Failed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Failed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPassing"),
             ListenerEvent::finish_test(
                 "TestPassing",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestFailing"),
             ListenerEvent::finish_test(
                 "TestFailing",
-                TestResult { status: Some(Status::Failed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Failed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPrefix"),
             ListenerEvent::finish_test(
                 "TestPrefix",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestSkipped"),
             ListenerEvent::finish_test(
                 "TestSkipped",
-                TestResult { status: Some(Status::Skipped), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Skipped), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPrefixExtra"),
             ListenerEvent::finish_test(
                 "TestPrefixExtra",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestCustomArg"),
             ListenerEvent::finish_test(
                 "TestCustomArg",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestCustomArg2"),
             ListenerEvent::finish_test(
                 "TestCustomArg2",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::finish_all_test(),
         ];
@@ -677,7 +677,7 @@ mod tests {
                 include_disabled_tests: Some(false),
                 parallel: Some(4),
                 arguments: None,
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -687,32 +687,32 @@ mod tests {
             ListenerEvent::start_test("TestCrashing"),
             ListenerEvent::finish_test(
                 "TestCrashing",
-                TestResult { status: Some(Status::Failed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Failed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPassing"),
             ListenerEvent::finish_test(
                 "TestPassing",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestFailing"),
             ListenerEvent::finish_test(
                 "TestFailing",
-                TestResult { status: Some(Status::Failed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Failed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPrefix"),
             ListenerEvent::finish_test(
                 "TestPrefix",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("TestSkipped"),
             ListenerEvent::finish_test(
                 "TestSkipped",
-                TestResult { status: Some(Status::Skipped), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Skipped), ..Default::default() },
             ),
             ListenerEvent::start_test("TestPrefixExtra"),
             ListenerEvent::finish_test(
                 "TestPrefixExtra",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::finish_all_test(),
         ];
@@ -732,7 +732,7 @@ mod tests {
                 include_disabled_tests: Some(false),
                 parallel: Some(1),
                 arguments: None,
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -752,7 +752,7 @@ mod tests {
                 include_disabled_tests: Some(false),
                 parallel: Some(1),
                 arguments: None,
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -762,7 +762,7 @@ mod tests {
             ListenerEvent::start_test("TestPassing"),
             ListenerEvent::finish_test(
                 "TestPassing",
-                TestResult { status: Some(Status::Passed), ..TestResult::EMPTY },
+                TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::finish_all_test(),
         ];

@@ -93,7 +93,7 @@ mod test {
             url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),
             instance_id: None,
             resolved_info: None,
-            ..fsys::Instance::EMPTY
+            ..Default::default()
         }]);
         let response =
             destroy_cmd("test".to_string(), lifecycle_controller, realm_query, &mut output).await;

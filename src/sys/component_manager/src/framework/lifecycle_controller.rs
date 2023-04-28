@@ -526,9 +526,9 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap(),
@@ -598,9 +598,9 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap(),
@@ -618,9 +618,9 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap(),
@@ -638,9 +638,9 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap(),
@@ -658,9 +658,9 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap(),

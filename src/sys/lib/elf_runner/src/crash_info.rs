@@ -21,7 +21,7 @@ impl Into<fsys::ComponentCrashInfo> for ComponentCrashInfo {
         fsys::ComponentCrashInfo {
             url: Some(self.url),
             moniker: Some(self.moniker.to_string()),
-            ..fsys::ComponentCrashInfo::EMPTY
+            ..Default::default()
         }
     }
 }

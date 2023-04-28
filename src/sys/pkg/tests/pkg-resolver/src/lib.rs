@@ -264,12 +264,12 @@ impl Mounts {
                             PersistentEagerPackage {
                                 url: Some(pkg_url),
                                 cup: Some(cup.into()),
-                                ..PersistentEagerPackage::EMPTY
+                                ..Default::default()
                             }
                         })
                         .collect(),
                 ),
-                ..PersistentEagerPackages::EMPTY
+                ..Default::default()
             };
 
             let data = persist(&packages).unwrap();

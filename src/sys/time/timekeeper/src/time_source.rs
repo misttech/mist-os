@@ -161,12 +161,12 @@ impl TimeSourceLauncher {
             name: Some(self.name.clone()),
             url: Some(self.component_url.clone()),
             startup: Some(StartupMode::Lazy),
-            ..Child::EMPTY
+            ..Default::default()
         };
         let mut collection_ref = CollectionRef { name: String::from(TIMESOURCE_COLLECTION_NAME) };
 
         realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
             .await
             .context("realm.create_child failed")?
             .map_err(|e| anyhow!("failed to create child: {:?}", e))?;
@@ -585,7 +585,7 @@ mod test {
                             utc: Some(SAMPLE_1_UTC_NANOS),
                             monotonic: Some(SAMPLE_1_MONO_NANOS),
                             standard_deviation: Some(SAMPLE_1_STD_DEV_NANOS),
-                            ..ftexternal::TimeSample::EMPTY
+                            ..Default::default()
                         };
                         responder.send(sample).unwrap();
                     }

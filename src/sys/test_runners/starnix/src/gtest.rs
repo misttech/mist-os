@@ -96,7 +96,7 @@ pub async fn handle_case_iterator_for_gtests(
     let mut iter = tests.iter().map(|TestCaseInfo { name, enabled }| ftest::Case {
         name: Some(name.clone()),
         enabled: Some(*enabled),
-        ..ftest::Case::EMPTY
+        ..Default::default()
     });
 
     while let Some(event) = stream.try_next().await? {
@@ -152,12 +152,12 @@ pub async fn run_gtest_cases(
         ftest::Invocation {
             name: Some(start_info.resolved_url.clone().unwrap_or_default()),
             tag: None,
-            ..ftest::Invocation::EMPTY
+            ..Default::default()
         },
         ftest::StdHandles {
             out: Some(stdout_client),
             err: Some(stderr_client),
-            ..ftest::StdHandles::EMPTY
+            ..Default::default()
         },
         overall_test_listener,
     )?;
@@ -171,7 +171,7 @@ pub async fn run_gtest_cases(
         let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
         run_listener_proxy.on_test_case_started(
             test,
-            ftest::StdHandles { ..ftest::StdHandles::EMPTY },
+            ftest::StdHandles::default(),
             case_listener,
         )?;
 
@@ -201,7 +201,7 @@ pub async fn run_gtest_cases(
     let component_controller = start_test_component(start_info, starnix_kernel)?;
     let _ = read_result(component_controller.take_event_stream()).await;
     overall_test_listener_proxy
-        .finished(TestResult { status: Some(Status::Passed), ..TestResult::EMPTY })?;
+        .finished(TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
     // Parse test results.
     let mut read_content = read_file(&output_dir, &output_file_name)
@@ -229,7 +229,7 @@ pub async fn run_gtest_cases(
                 .remove(&name)
                 .unwrap_or_else(|| panic!("No case listener for test case {name}"));
             case_listener_proxy
-                .finished(TestResult { status: Some(status), ..TestResult::EMPTY })?;
+                .finished(TestResult { status: Some(status), ..Default::default() })?;
         }
     }
 
@@ -237,7 +237,7 @@ pub async fn run_gtest_cases(
     for (name, case_listener_proxy) in run_listener_proxies {
         tracing::warn!("Did not receive result for {name}. Marking as failed.");
         case_listener_proxy
-            .finished(TestResult { status: Some(Status::Failed), ..TestResult::EMPTY })?;
+            .finished(TestResult { status: Some(Status::Failed), ..Default::default() })?;
     }
 
     Ok(())

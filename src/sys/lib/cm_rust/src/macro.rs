@@ -274,7 +274,7 @@ fn generate_struct(struct_ident: Ident, fidl_type: Type, fields: Vec<StructField
             fn native_into_fidl(self) -> #fidl_type {
                 #fidl_type {
                     #( #native_into_fidl_lines, )*
-                    ..<#fidl_type>::EMPTY
+                    ..<#fidl_type>::default()
                 }
             }
         }

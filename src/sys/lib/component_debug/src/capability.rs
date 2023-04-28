@@ -105,9 +105,9 @@ mod tests {
                 resolved_info: Some(fsys::ResolvedInfo {
                     resolved_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/foo.cm".to_string()),
                     execution_info: None,
-                    ..fsys::ResolvedInfo::EMPTY
+                    ..Default::default()
                 }),
-                ..fsys::Instance::EMPTY
+                ..Default::default()
             }],
             HashMap::from([(
                 "./my_foo".to_string(),

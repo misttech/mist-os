@@ -60,7 +60,7 @@ pub fn do_health_verification<'a>(
         .map(|proxy| async {
             let now = Instant::now();
             proxy
-                .call_verify(VerifyOptions::EMPTY)
+                .call_verify(VerifyOptions::default())
                 .map(|res| {
                     let res = res.map_err(VerifyFailureReason::Fidl)?;
                     res.map_err(VerifyFailureReason::Verify)

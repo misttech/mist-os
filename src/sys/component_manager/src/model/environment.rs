@@ -503,7 +503,11 @@ mod tests {
                 model.start_instance(&vec!["a"].try_into().unwrap(), &StartReason::Eager).await?;
             let child_decl = ChildDeclBuilder::new_lazy_child("b").build();
             parent
-                .add_dynamic_child("coll".into(), &child_decl, fcomponent::CreateChildArgs::EMPTY)
+                .add_dynamic_child(
+                    "coll".into(),
+                    &child_decl,
+                    fcomponent::CreateChildArgs::default(),
+                )
                 .await
                 .expect("failed to add child");
         }

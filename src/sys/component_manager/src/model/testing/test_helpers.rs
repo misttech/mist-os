@@ -480,7 +480,7 @@ impl ActionsTest {
     /// component that our proxy member variable corresponds to. Passes no
     /// `CreateChildArgs`.
     pub async fn create_dynamic_child(&self, coll: &str, name: &str) {
-        self.create_dynamic_child_with_args(coll, name, fcomponent::CreateChildArgs::EMPTY)
+        self.create_dynamic_child_with_args(coll, name, fcomponent::CreateChildArgs::default())
             .await
             .expect("failed to create child")
     }
@@ -523,7 +523,7 @@ pub fn create_fs_with_mock_logsink(
     let entries = vec![fcrunner::ComponentNamespaceEntry {
         path: Some("/svc".to_string()),
         directory: Some(client),
-        ..fcrunner::ComponentNamespaceEntry::EMPTY
+        ..Default::default()
     }];
 
     Ok((dir, entries))

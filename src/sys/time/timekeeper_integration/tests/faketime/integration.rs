@@ -76,7 +76,7 @@ fn test_restart_inactive_time_source_that_claims_healthy() {
                 utc: Some(VALID_TIME.into_nanos()),
                 monotonic: Some(fake_time.get_monotonic().await.expect("Failed to get time")),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)
@@ -130,7 +130,7 @@ fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() {
                 utc: Some(VALID_TIME.into_nanos()),
                 monotonic: Some(fake_time.get_monotonic().await.expect("Failed to get time")),
                 standard_deviation: Some(STD_DEV.into_nanos()),
-                ..TimeSample::EMPTY
+                ..Default::default()
             })
             .await;
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)

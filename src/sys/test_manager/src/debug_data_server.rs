@@ -232,7 +232,7 @@ pub(crate) async fn serve_iterator(
                 Ok(ftest_manager::DebugData {
                     file: Some(ClientEnd::new(file.into_channel())),
                     name: file_name.into(),
-                    ..ftest_manager::DebugData::EMPTY
+                    ..Default::default()
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;

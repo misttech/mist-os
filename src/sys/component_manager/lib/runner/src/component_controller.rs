@@ -123,8 +123,8 @@ mod tests {
         stream
             .control_handle()
             .send_on_publish_diagnostics(fdiagnostics::ComponentDiagnostics {
-                tasks: Some(fdiagnostics::ComponentTasks::EMPTY),
-                ..fdiagnostics::ComponentDiagnostics::EMPTY
+                tasks: Some(fdiagnostics::ComponentTasks::default()),
+                ..Default::default()
             })
             .expect("sent diagnostics");
         assert_matches!(

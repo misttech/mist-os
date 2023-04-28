@@ -354,7 +354,7 @@ mod tests {
                 key: key.to_owned(),
                 value: Some(Box::new(value)),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         }
     }
 

@@ -132,7 +132,7 @@ where
                 ftest::StdHandles {
                     out: Some(stdout_client),
                     err: Some(stderr_client),
-                    ..ftest::StdHandles::EMPTY
+                    ..Default::default()
                 },
                 listener,
             )
@@ -174,7 +174,7 @@ where
             _ => Status::Failed,
         };
         case_listener_proxy
-            .finished(TestResult { status: Some(status), ..TestResult::EMPTY })
+            .finished(TestResult { status: Some(status), ..Default::default() })
             .map_err(RunTestError::SendFinish)?;
         Ok(())
     }

@@ -23,10 +23,10 @@ async fn main() {
             url: Some("#meta/trigger_realm.cm".to_string()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await
             .unwrap_or_else(|e| panic!("create_child failed: {:?}", e))
             .unwrap_or_else(|e| panic!("failed to create child: {:?}", e));

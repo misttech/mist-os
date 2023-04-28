@@ -160,7 +160,7 @@ mod tests {
                 timeout: None,
                 case_filters_to_run: None,
                 log_iterator: None,
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
             controller: controller_stream,
             resolver: resolver_proxy,

@@ -27,7 +27,7 @@ pub async fn run_test(
                 timeout: None,
                 case_filters_to_run: None,
                 log_iterator: None,
-                ..RunOptions::EMPTY
+                ..Default::default()
             },
         )
         .await

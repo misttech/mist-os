@@ -182,11 +182,11 @@ impl FuchsiaBootResolver {
                 // This call just strips the boot_url of the resource.
                 url: Some(boot_url.root_url().to_string()),
                 directory: Some(ClientEnd::new(proxy.into_channel().unwrap().into_zx_channel())),
-                ..fresolution::Package::EMPTY
+                ..Default::default()
             }),
             config_values,
             abi_revision,
-            ..fresolution::Component::EMPTY
+            ..Default::default()
         })
     }
 
@@ -475,7 +475,7 @@ mod tests {
                         value: Some(Box::new(fdata::DictionaryValue::Str("log".to_string()))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             },
         });
 
@@ -532,17 +532,17 @@ mod tests {
                 }
                 .native_into_fidl(),
             ),
-            ..fdecl::Component::EMPTY
+            ..Default::default()
         };
         let values_data = fconfig::ValuesData {
             values: Some(vec![fconfig::ValueSpec {
                 value: Some(fconfig::Value::Single(fconfig::SingleValue::String(
                     "hello, world!".to_string(),
                 ))),
-                ..fconfig::ValueSpec::EMPTY
+                ..Default::default()
             }]),
             checksum: Some(fake_checksum.clone().native_into_fidl()),
-            ..fconfig::ValuesData::EMPTY
+            ..Default::default()
         };
         let manifest_encoded = persist(&manifest).unwrap();
         let values_data_encoded = persist(&values_data).unwrap();
@@ -604,7 +604,7 @@ mod tests {
                 }
                 .native_into_fidl(),
             ),
-            ..fdecl::Component::EMPTY
+            ..Default::default()
         };
         let manifest_encoded = persist(&manifest).unwrap();
         let root = pseudo_directory! {
@@ -647,10 +647,10 @@ mod tests {
         let manifest_encoded = persist(&fdecl::Component {
             program: Some(fdecl::Program {
                 runner: None,
-                info: Some(fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY }),
-                ..fdecl::Program::EMPTY
+                info: Some(fdata::Dictionary { entries: Some(vec![]), ..Default::default() }),
+                ..Default::default()
             }),
-            ..fdecl::Component::EMPTY
+            ..Default::default()
         })
         .unwrap();
         let root = pseudo_directory! {

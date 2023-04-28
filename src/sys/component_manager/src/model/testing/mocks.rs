@@ -517,9 +517,9 @@ impl MockController {
             .send_on_publish_diagnostics(ComponentDiagnostics {
                 tasks: Some(ComponentTasks {
                     component_task: Some(DiagnosticsTask::Job(job_dup)),
-                    ..ComponentTasks::EMPTY
+                    ..Default::default()
                 }),
-                ..ComponentDiagnostics::EMPTY
+                ..Default::default()
             })
             .unwrap_or_else(|e| {
                 warn!("sending diagnostics failed: {:?}", e);

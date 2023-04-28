@@ -92,7 +92,7 @@ impl From<&Options> for fidl_fuchsia_update_installer::Options {
             initiator: Some(options.initiator.into()),
             allow_attach_to_existing_attempt: Some(options.allow_attach_to_existing_attempt),
             should_write_recovery: Some(options.should_write_recovery),
-            ..Self::EMPTY
+            ..Default::default()
         }
     }
 }

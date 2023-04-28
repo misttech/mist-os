@@ -95,7 +95,7 @@ mod tests {
         let fidl_artifact = FidlArtifact {
             result: Some(FuzzResult::Crash),
             input: Some(fidl_input),
-            ..FidlArtifact::EMPTY
+            ..Default::default()
         };
         let save_fut = save_artifact(fidl_artifact, &saved_dir);
         let results = join!(send_fut, save_fut);

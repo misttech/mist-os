@@ -369,11 +369,11 @@ mod tests {
                         resolved_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/foo.cm".to_string()),
                         execution_info: Some(fsys::ExecutionInfo {
                             start_reason: Some("Debugging Workflow".to_string()),
-                            ..fsys::ExecutionInfo::EMPTY
+                            ..Default::default()
                         }),
-                        ..fsys::ResolvedInfo::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsys::Instance::EMPTY
+                    ..Default::default()
                 },
                 fsys::Instance {
                     moniker: Some("./core/appmgr".to_string()),
@@ -385,11 +385,11 @@ mod tests {
                         ),
                         execution_info: Some(fsys::ExecutionInfo {
                             start_reason: Some("Debugging Workflow".to_string()),
-                            ..fsys::ExecutionInfo::EMPTY
+                            ..Default::default()
                         }),
-                        ..fsys::ResolvedInfo::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsys::Instance::EMPTY
+                    ..Default::default()
                 },
             ],
             HashMap::from([(
@@ -401,16 +401,16 @@ mod tests {
                         target_path: Some("/svc/fuchsia.foo.bar".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseProtocol::EMPTY
+                        ..Default::default()
                     })]),
                     exposes: Some(vec![fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                         source: Some(fdecl::Ref::Self_(fdecl::SelfRef)),
                         source_name: Some("fuchsia.bar.baz".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
                         target_name: Some("fuchsia.bar.baz".to_string()),
-                        ..fdecl::ExposeProtocol::EMPTY
+                        ..Default::default()
                     })]),
-                    ..fdecl::Component::EMPTY
+                    ..Default::default()
                 },
             )]),
             HashMap::from([(

@@ -15,12 +15,10 @@ use {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_run_hugetest() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/huge_gtest.cm";
-    let (events, _logs) = run_test(
-        test_url,
-        ftest_manager::RunOptions { parallel: Some(100), ..ftest_manager::RunOptions::EMPTY },
-    )
-    .await
-    .unwrap();
+    let (events, _logs) =
+        run_test(test_url, ftest_manager::RunOptions { parallel: Some(100), ..Default::default() })
+            .await
+            .unwrap();
     let events = events.into_iter().group_by_test_case_unordered();
 
     let mut expected_events = vec![RunEvent::suite_started()];

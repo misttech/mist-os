@@ -647,7 +647,7 @@ mod tests {
         let fidl_package = fresolution::Package {
             url: Some(url.clone()),
             directory: Some(dir_client),
-            ..fresolution::Package::EMPTY
+            ..Default::default()
         };
         let resolved_package = ResolvedPackage::try_from(fidl_package).unwrap();
         assert_eq!(resolved_package.url, url);

@@ -16,12 +16,12 @@ async fn main() {
         url: Some(String::from("#meta/simple.cm")),
         startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
     let realm = connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
 
     realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();

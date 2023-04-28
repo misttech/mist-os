@@ -39,7 +39,7 @@ pub async fn run_starnix_benchmark(
         ftest::StdHandles {
             out: Some(stdout_client),
             err: Some(stderr_client),
-            ..ftest::StdHandles::EMPTY
+            ..Default::default()
         },
         case_listener,
     )?;
@@ -123,7 +123,7 @@ pub fn clone_start_info(
         numbered_handles: Some(vec![]),
         encoded_config: None,
         break_on_start: None,
-        ..frunner::ComponentStartInfo::EMPTY
+        ..Default::default()
     })
 }
 
@@ -164,7 +164,7 @@ impl TestKernel {
                     name: Some(kernel_start_info.name.clone()),
                     url: Some(runner_url.to_string()),
                     startup: Some(fdecl::StartupMode::Lazy),
-                    ..fdecl::Child::EMPTY
+                    ..Default::default()
                 },
                 kernel_start_info.args,
             )
@@ -239,9 +239,9 @@ pub async fn read_result(
 
     match component_epitaph {
         zx::Status::OK => {
-            ftest::Result_ { status: Some(ftest::Status::Passed), ..ftest::Result_::EMPTY }
+            ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
         }
-        _ => ftest::Result_ { status: Some(ftest::Status::Failed), ..ftest::Result_::EMPTY },
+        _ => ftest::Result_ { status: Some(ftest::Status::Failed), ..Default::default() },
     }
 }
 
@@ -268,7 +268,7 @@ pub fn add_output_dir_to_namespace(
     start_info.ns.as_mut().ok_or(anyhow!("Missing namespace."))?.push(ComponentNamespaceEntry {
         path: Some("/test_data".to_string()),
         directory: Some(data_dir),
-        ..ComponentNamespaceEntry::EMPTY
+        ..Default::default()
     });
 
     Ok(test_data_dir)

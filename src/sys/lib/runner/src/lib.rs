@@ -206,7 +206,7 @@ mod tests {
             ns: None,
             outgoing_dir: None,
             runtime_dir: None,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(get_resolved_url(&start_info), expected,);
     }
@@ -255,7 +255,7 @@ mod tests {
                 key: ENVIRON_KEY.to_owned(),
                 value: Some(Box::new(value)),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(get_environ(&program), expected);
@@ -268,7 +268,7 @@ mod tests {
             outgoing_dir: None,
             runtime_dir: None,
             resolved_url: None,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -278,7 +278,7 @@ mod tests {
                 key: key.to_owned(),
                 value: Some(Box::new(fdata::DictionaryValue::Str(value.to_owned()))),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         }
     }
 
@@ -288,7 +288,7 @@ mod tests {
                 key: key.to_owned(),
                 value: Some(Box::new(fdata::DictionaryValue::StrVec(values))),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         }
     }
 }

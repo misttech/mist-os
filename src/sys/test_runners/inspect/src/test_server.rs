@@ -187,7 +187,7 @@ impl TestServer {
                             let mut names = spec.test_names().into_iter().map(|n| ftest::Case {
                                 name: Some(n),
                                 enabled: Some(true),
-                                ..ftest::Case::EMPTY
+                                ..Default::default()
                             });
                             let mut done_fut = done_fut.clone();
                             fasync::Task::spawn(async move {
@@ -239,7 +239,7 @@ impl TestServer {
                                             test,
                                             ftest::StdHandles {
                                                 out: Some(stdout_end),
-                                                ..ftest::StdHandles::EMPTY
+                                                ..Default::default()
                                             },
                                             case_listener,
                                         )
@@ -253,7 +253,7 @@ impl TestServer {
 
                                     let result = ftest::Result_ {
                                         status: Some(status),
-                                        ..ftest::Result_::EMPTY
+                                        ..Default::default()
                                     };
 
                                     case_listener_proxy

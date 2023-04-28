@@ -261,9 +261,9 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/root#meta/root.cm".to_string(),
                         ),
                         execution_info: None,
-                        ..fsys::ResolvedInfo::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsys::Instance::EMPTY
+                    ..Default::default()
                 },
                 fsys::Instance {
                     moniker: Some("./core".to_string()),
@@ -275,11 +275,11 @@ mod tests {
                         ),
                         execution_info: Some(fsys::ExecutionInfo {
                             start_reason: Some("Debugging Workflow".to_string()),
-                            ..fsys::ExecutionInfo::EMPTY
+                            ..Default::default()
                         }),
-                        ..fsys::ResolvedInfo::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsys::Instance::EMPTY
+                    ..Default::default()
                 },
                 fsys::Instance {
                     moniker: Some("./core/appmgr".to_string()),
@@ -291,11 +291,11 @@ mod tests {
                         ),
                         execution_info: Some(fsys::ExecutionInfo {
                             start_reason: Some("Debugging Workflow".to_string()),
-                            ..fsys::ExecutionInfo::EMPTY
+                            ..Default::default()
                         }),
-                        ..fsys::ResolvedInfo::EMPTY
+                        ..Default::default()
                     }),
-                    ..fsys::Instance::EMPTY
+                    ..Default::default()
                 },
             ],
             HashMap::new(),

@@ -130,10 +130,10 @@ impl RunningSuite {
             url: Some(test_url.into()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         test_realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
@@ -378,7 +378,7 @@ impl RunningSuite {
                         token: event_client,
                     }),
                     component_moniker: Some(moniker_relative_to_test_root.to_string()),
-                    ..ftest_manager::CustomArtifact::EMPTY
+                    ..Default::default()
                 })
                 .into()))
                 .await
@@ -531,7 +531,7 @@ pub(crate) async fn enumerate_test_cases(
                 invocations.push(Invocation {
                     name: Some(case_name),
                     tag: None,
-                    ..Invocation::EMPTY
+                    ..Default::default()
                 });
             }
         }
@@ -906,7 +906,7 @@ fn get_invocation_options(options: ftest_manager::RunOptions) -> ftest::RunOptio
         include_disabled_tests: options.run_disabled_tests,
         parallel: options.parallel,
         arguments: options.arguments,
-        ..ftest::RunOptions::EMPTY
+        ..Default::default()
     }
 }
 

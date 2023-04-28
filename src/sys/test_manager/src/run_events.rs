@@ -30,7 +30,7 @@ impl Into<FidlRunEvent> for RunEvent {
                 payload: Some(FidlRunEventPayload::Artifact(ftest_manager::Artifact::DebugData(
                     client,
                 ))),
-                ..FidlRunEvent::EMPTY
+                ..Default::default()
             },
         }
     }
@@ -77,14 +77,14 @@ impl Into<FidlSuiteEvent> for SuiteEvents {
                     test_case_name: name,
                     identifier,
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CaseStarted(identifier) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::CaseStarted(ftest_manager::CaseStarted {
                     identifier,
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CaseStopped(identifier, status) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
@@ -92,14 +92,14 @@ impl Into<FidlSuiteEvent> for SuiteEvents {
                     identifier,
                     status,
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CaseFinished(identifier) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::CaseFinished(ftest_manager::CaseFinished {
                     identifier,
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CaseStdout(identifier, socket) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
@@ -107,7 +107,7 @@ impl Into<FidlSuiteEvent> for SuiteEvents {
                     identifier,
                     artifact: ftest_manager::Artifact::Stdout(socket),
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CaseStderr(identifier, socket) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
@@ -115,33 +115,33 @@ impl Into<FidlSuiteEvent> for SuiteEvents {
                     identifier,
                     artifact: ftest_manager::Artifact::Stderr(socket),
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::CustomArtifact(custom) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::SuiteArtifact(ftest_manager::SuiteArtifact {
                     artifact: ftest_manager::Artifact::Custom(custom),
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::SuiteSyslog(syslog) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::SuiteArtifact(ftest_manager::SuiteArtifact {
                     artifact: ftest_manager::Artifact::Log(syslog),
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::SuiteStarted => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::SuiteStarted(ftest_manager::SuiteStarted {})),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
             SuiteEventPayload::SuiteStopped(status) => FidlSuiteEvent {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::SuiteStopped(ftest_manager::SuiteStopped {
                     status,
                 })),
-                ..FidlSuiteEvent::EMPTY
+                ..Default::default()
             },
         }
     }

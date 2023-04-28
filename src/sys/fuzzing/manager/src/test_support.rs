@@ -438,7 +438,7 @@ async fn serve_suite_controller(
                                 .map(|payload| SuiteEvent {
                                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                                     payload: Some(payload),
-                                    ..SuiteEvent::EMPTY
+                                    ..Default::default()
                                 })
                                 .collect();
                             Ok(suite_events)
@@ -490,7 +490,7 @@ async fn serve_run_controller(
                         .map(|payload| RunEvent {
                             timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                             payload: Some(payload),
-                            ..RunEvent::EMPTY
+                            ..Default::default()
                         })
                         .collect();
                     match responder.send(run_events) {

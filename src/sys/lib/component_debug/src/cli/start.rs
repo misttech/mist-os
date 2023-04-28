@@ -74,7 +74,7 @@ mod test {
             url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),
             instance_id: None,
             resolved_info: None,
-            ..fsys::Instance::EMPTY
+            ..Default::default()
         }]);
         start_cmd(
             "/core/ffx-laboratory:test".to_string(),

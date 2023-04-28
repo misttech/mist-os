@@ -273,7 +273,7 @@ pub async fn get_instance(
                     let start_reason = runtime.start_reason.to_string();
                     let execution_info = Some(fsys::ExecutionInfo {
                         start_reason: Some(start_reason),
-                        ..fsys::ExecutionInfo::EMPTY
+                        ..Default::default()
                     });
                     execution_info
                 } else {
@@ -283,7 +283,7 @@ pub async fn get_instance(
                 let resolved_info = Some(fsys::ResolvedInfo {
                     resolved_url: Some(url),
                     execution_info,
-                    ..fsys::ResolvedInfo::EMPTY
+                    ..Default::default()
                 });
 
                 resolved_info
@@ -298,7 +298,7 @@ pub async fn get_instance(
         environment: instance.environment().name().map(|n| n.to_string()),
         instance_id: instance_id.map(|id| id.to_string()),
         resolved_info,
-        ..fsys::Instance::EMPTY
+        ..Default::default()
     })
 }
 
@@ -579,7 +579,7 @@ async fn get_fidl_instance_and_children(
                     let start_reason = runtime.start_reason.to_string();
                     let execution_info = Some(fsys::ExecutionInfo {
                         start_reason: Some(start_reason),
-                        ..fsys::ExecutionInfo::EMPTY
+                        ..Default::default()
                     });
                     execution_info
                 } else {
@@ -589,7 +589,7 @@ async fn get_fidl_instance_and_children(
                 let resolved_info = Some(fsys::ResolvedInfo {
                     resolved_url: Some(url),
                     execution_info,
-                    ..fsys::ResolvedInfo::EMPTY
+                    ..Default::default()
                 });
                 (resolved_info, children)
             }
@@ -604,7 +604,7 @@ async fn get_fidl_instance_and_children(
             environment: instance.environment().name().map(|n| n.to_string()),
             instance_id: instance_id.map(|id| id.to_string()),
             resolved_info,
-            ..fsys::Instance::EMPTY
+            ..Default::default()
         },
         children,
     )

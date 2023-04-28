@@ -166,11 +166,11 @@ async fn resolve_from_package(
                     .into_zx_channel()
                     .into(),
             ),
-            ..fcomponent_resolution::Package::EMPTY
+            ..Default::default()
         }),
         config_values,
         abi_revision,
-        ..fcomponent_resolution::Component::EMPTY
+        ..Default::default()
     })
 }
 

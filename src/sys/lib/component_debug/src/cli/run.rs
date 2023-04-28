@@ -166,7 +166,7 @@ pub async fn run_cmd<W: std::io::Write>(
             Some(stdio),
             Some(fcomponent::CreateChildArgs {
                 numbered_handles: Some(numbered_handles),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             }),
         )
     } else {

@@ -257,10 +257,10 @@ mod tests {
             header: Some(fcomponent::EventHeader {
                 event_type: Some(fcomponent::EventType::Started),
                 moniker: Some(moniker.into()),
-                ..fcomponent::EventHeader::EMPTY
+                ..Default::default()
             }),
-            payload: Some(fcomponent::EventPayload::Started(fcomponent::StartedPayload::EMPTY)),
-            ..fcomponent::Event::EMPTY
+            payload: Some(fcomponent::EventPayload::Started(fcomponent::StartedPayload::default())),
+            ..Default::default()
         }
     }
 

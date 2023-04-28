@@ -338,7 +338,7 @@ async fn create_event_result(
         EventPayload::Stopped { status } => {
             Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
                 status: Some(status.into_raw()),
-                ..fcomponent::StoppedPayload::EMPTY
+                ..Default::default()
             }))
         }
         EventPayload::DebugStarted { runtime_dir, break_on_start } => {
@@ -346,19 +346,19 @@ async fn create_event_result(
         }
         payload => Ok(match payload.event_type() {
             EventType::Discovered => {
-                fcomponent::EventPayload::Discovered(fcomponent::DiscoveredPayload::EMPTY)
+                fcomponent::EventPayload::Discovered(fcomponent::DiscoveredPayload::default())
             }
             EventType::Destroyed => {
-                fcomponent::EventPayload::Destroyed(fcomponent::DestroyedPayload::EMPTY)
+                fcomponent::EventPayload::Destroyed(fcomponent::DestroyedPayload::default())
             }
             EventType::Resolved => {
-                fcomponent::EventPayload::Resolved(fcomponent::ResolvedPayload::EMPTY)
+                fcomponent::EventPayload::Resolved(fcomponent::ResolvedPayload::default())
             }
             EventType::Unresolved => {
-                fcomponent::EventPayload::Unresolved(fcomponent::UnresolvedPayload::EMPTY)
+                fcomponent::EventPayload::Unresolved(fcomponent::UnresolvedPayload::default())
             }
             EventType::Started => {
-                fcomponent::EventPayload::Started(fcomponent::StartedPayload::EMPTY)
+                fcomponent::EventPayload::Started(fcomponent::StartedPayload::default())
             }
             _ => unreachable!("Unsupported event type"),
         }),
@@ -380,11 +380,8 @@ fn create_directory_ready_payload(
         Some(node_client_end)
     };
 
-    let payload = fcomponent::DirectoryReadyPayload {
-        name: Some(name),
-        node,
-        ..fcomponent::DirectoryReadyPayload::EMPTY
-    };
+    let payload =
+        fcomponent::DirectoryReadyPayload { name: Some(name), node, ..Default::default() };
     Ok(fcomponent::EventPayload::DirectoryReady(payload))
 }
 
@@ -396,7 +393,7 @@ async fn create_capability_requested_payload(
     let payload = fcomponent::CapabilityRequestedPayload {
         name: Some(name),
         capability,
-        ..fcomponent::CapabilityRequestedPayload::EMPTY
+        ..Default::default()
     };
     fcomponent::EventPayload::CapabilityRequested(payload)
 }
@@ -413,7 +410,7 @@ fn create_debug_started_payload(
                 .into()
         }),
         break_on_start: break_on_start.duplicate_handle(zx::Rights::SAME_RIGHTS).ok(),
-        ..fcomponent::DebugStartedPayload::EMPTY
+        ..Default::default()
     })
 }
 
@@ -437,14 +434,10 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
         moniker: Some(moniker_string),
         component_url: Some(event.event.component_url.clone()),
         timestamp: Some(event.event.timestamp.into_nanos()),
-        ..fcomponent::EventHeader::EMPTY
+        ..Default::default()
     };
     let payload = create_event_result(&event.event.payload).await?;
-    Ok(fcomponent::Event {
-        header: Some(header),
-        payload: Some(payload),
-        ..fcomponent::Event::EMPTY
-    })
+    Ok(fcomponent::Event { header: Some(header), payload: Some(payload), ..Default::default() })
 }
 
 #[cfg(test)]

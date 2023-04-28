@@ -113,7 +113,7 @@ async fn run_test(
     let suite_instance = run_builder
         .add_suite(
             test_url,
-            RunOptions { run_disabled_tests: Some(false), parallel: Some(1), ..RunOptions::EMPTY },
+            RunOptions { run_disabled_tests: Some(false), parallel: Some(1), ..Default::default() },
         )
         .await
         .context("Cannot create suite instance")?;

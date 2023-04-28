@@ -27,7 +27,7 @@ pub fn default_run_option() -> ftest_manager::RunOptions {
         timeout: None,
         case_filters_to_run: None,
         log_iterator: None,
-        ..ftest_manager::RunOptions::EMPTY
+        ..Default::default()
     }
 }
 
@@ -117,7 +117,7 @@ impl TestBuilder {
         self.proxy
             .with_scheduling_options(ftest_manager::SchedulingOptions {
                 accumulate_debug_data: Some(accumulate_debug_data),
-                ..ftest_manager::SchedulingOptions::EMPTY
+                ..Default::default()
             })
             .map_err(Error::from)
     }

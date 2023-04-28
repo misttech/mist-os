@@ -93,7 +93,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                     let std_handles = ftest::StdHandles {
                         out: None,
                         err: Some(stderr_server),
-                        ..ftest::StdHandles::EMPTY
+                        ..Default::default()
                     };
                     listener.on_test_case_started(invocation, std_handles, server_end)?;
 
@@ -104,15 +104,9 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                                 status, e
                             )
                         }
-                        ftest::Result_ {
-                            status: Some(ftest::Status::Failed),
-                            ..ftest::Result_::EMPTY
-                        }
+                        ftest::Result_ { status: Some(ftest::Status::Failed), ..Default::default() }
                     } else {
-                        ftest::Result_ {
-                            status: Some(ftest::Status::Passed),
-                            ..ftest::Result_::EMPTY
-                        }
+                        ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
                     };
 
                     case_listener.finished(result)?;
@@ -129,7 +123,7 @@ async fn serve_case_iterator(iterator: ServerEnd<ftest::CaseIteratorMarker>) -> 
     let cases = vec![ftest::Case {
         name: Some("stress_test".to_string()),
         enabled: Some(true),
-        ..ftest::Case::EMPTY
+        ..Default::default()
     }];
     let mut iter = cases.into_iter();
 

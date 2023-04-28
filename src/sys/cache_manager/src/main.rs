@@ -265,22 +265,22 @@ mod tests {
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(10),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(50),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(0),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(0),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
             ],
             chan: server_end,
@@ -345,27 +345,27 @@ mod tests {
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(10),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(50),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(50),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(50),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
                 fsys::StorageStatus {
                     total_size: Some(100),
                     used_size: Some(50),
-                    ..fsys::StorageStatus::EMPTY
+                    ..Default::default()
                 },
             ],
             chan: server_end,

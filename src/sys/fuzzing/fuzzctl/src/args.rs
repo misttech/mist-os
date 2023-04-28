@@ -209,7 +209,7 @@ impl RunLibFuzzerSubcommand {
             purge_interval: self.purge_allocator_interval.map(|s| (s as i64) * NANOS_PER_SECOND),
             print_final_stats: self.print_final_stats,
             use_value_profile: self.use_value_profile,
-            ..fuzz::Options::EMPTY
+            ..Default::default()
         }
     }
 }

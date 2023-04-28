@@ -53,22 +53,22 @@ impl From<State> for Option<update::State> {
             version_available: state.version_available,
             urgent: state.urgent,
             download_size: None,
-            ..UpdateInfo::EMPTY
+            ..Default::default()
         });
         let installation_progress = Some(InstallationProgress {
             fraction_completed: state.install_progress,
-            ..InstallationProgress::EMPTY
+            ..Default::default()
         });
         match state.manager_state {
             state_machine::State::Idle => None,
             state_machine::State::CheckingForUpdates(_) => {
-                Some(update::State::CheckingForUpdates(CheckingForUpdatesData::EMPTY))
+                Some(update::State::CheckingForUpdates(CheckingForUpdatesData::default()))
             }
             state_machine::State::ErrorCheckingForUpdate => {
-                Some(update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::EMPTY))
+                Some(update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::default()))
             }
             state_machine::State::NoUpdateAvailable => {
-                Some(update::State::NoUpdateAvailable(NoUpdateAvailableData::EMPTY))
+                Some(update::State::NoUpdateAvailable(NoUpdateAvailableData::default()))
             }
             state_machine::State::InstallationDeferredByPolicy => {
                 Some(update::State::InstallationDeferredByPolicy(InstallationDeferredData {
@@ -77,28 +77,28 @@ impl From<State> for Option<update::State> {
                     // the StateMachine type parameters, consider modifying the binary to support
                     // multiple deferral reasons.
                     deferral_reason: Some(InstallationDeferralReason::CurrentSystemNotCommitted),
-                    ..InstallationDeferredData::EMPTY
+                    ..Default::default()
                 }))
             }
             state_machine::State::InstallingUpdate => {
                 Some(update::State::InstallingUpdate(InstallingData {
                     update,
                     installation_progress,
-                    ..InstallingData::EMPTY
+                    ..Default::default()
                 }))
             }
             state_machine::State::WaitingForReboot => {
                 Some(update::State::WaitingForReboot(InstallingData {
                     update,
                     installation_progress,
-                    ..InstallingData::EMPTY
+                    ..Default::default()
                 }))
             }
             state_machine::State::InstallationError => {
                 Some(update::State::InstallationError(InstallationErrorData {
                     update,
                     installation_progress,
-                    ..InstallationErrorData::EMPTY
+                    ..Default::default()
                 }))
             }
         }
@@ -1034,7 +1034,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(false),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, None).await.unwrap();
         assert_matches!(result, Ok(()));
@@ -1047,7 +1047,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(false),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let (client_end, mut request_stream) =
             fidl::endpoints::create_request_stream().expect("create_request_stream");
@@ -1064,8 +1064,8 @@ mod tests {
         assert_eq!(
             events,
             [
-                update::State::CheckingForUpdates(CheckingForUpdatesData::EMPTY),
-                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::EMPTY),
+                update::State::CheckingForUpdates(CheckingForUpdatesData::default()),
+                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::default()),
             ]
         );
     }
@@ -1078,7 +1078,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: None,
             allow_attaching_to_existing_update_check: None,
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, Some(client_end)).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::InvalidOptions));
@@ -1097,7 +1097,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: None,
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, None).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::AlreadyInProgress));
@@ -1115,7 +1115,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: None,
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, None).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::Throttled));
@@ -1129,13 +1129,13 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
         let expected_states = [
-            update::State::CheckingForUpdates(CheckingForUpdatesData::EMPTY),
-            update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::EMPTY),
+            update::State::CheckingForUpdates(CheckingForUpdatesData::default()),
+            update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::default()),
         ];
         let mut expected_states = expected_states.iter();
         while let Some(event) = stream.try_next().await.unwrap() {
@@ -1157,7 +1157,7 @@ mod tests {
         let check_options_1 = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
 
         let (attempt_client_end, mut attempt_request_stream) =
@@ -1175,8 +1175,8 @@ mod tests {
         assert_eq!(
             events,
             [
-                update::State::CheckingForUpdates(CheckingForUpdatesData::EMPTY),
-                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::EMPTY),
+                update::State::CheckingForUpdates(CheckingForUpdatesData::default()),
+                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::default()),
             ]
         );
 
@@ -1184,7 +1184,7 @@ mod tests {
         let check_options_2 = update::CheckOptions {
             initiator: Some(Initiator::Service),
             allow_attaching_to_existing_update_check: Some(true),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         assert_matches!(proxy.check_now(check_options_2, None).await.unwrap(), Ok(()));
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
@@ -1197,8 +1197,8 @@ mod tests {
         assert_eq!(
             events,
             [
-                update::State::CheckingForUpdates(CheckingForUpdatesData::EMPTY),
-                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::EMPTY),
+                update::State::CheckingForUpdates(CheckingForUpdatesData::default()),
+                update::State::ErrorCheckingForUpdate(ErrorCheckingForUpdateData::default()),
             ]
         );
     }
@@ -1212,7 +1212,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
@@ -1231,7 +1231,7 @@ mod tests {
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
-            ..update::CheckOptions::EMPTY
+            ..Default::default()
         };
         let result = proxy.check_now(options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));

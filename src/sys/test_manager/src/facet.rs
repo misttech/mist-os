@@ -143,22 +143,21 @@ mod test {
         const TEST_FACET: &str = "fuchsia.test";
 
         // test that default hermetic value is true
-        let mut decl = fdecl::Component::EMPTY;
+        let mut decl = fdecl::Component::default();
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
         // empty facet
-        decl.facets =
-            Some(fdata::Dictionary { entries: vec![].into(), ..fdata::Dictionary::EMPTY });
+        decl.facets = Some(fdata::Dictionary { entries: vec![].into(), ..Default::default() });
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
         // empty facet
-        decl.facets = Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY });
+        decl.facets = Some(fdata::Dictionary { entries: None, ..Default::default() });
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
         // make sure that the func can handle some other facet key
         decl.facets = Some(fdata::Dictionary {
             entries: vec![fdata::DictionaryEntry { key: "somekey".into(), value: None }].into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
@@ -172,7 +171,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
@@ -189,7 +188,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, HERMETIC_TESTS_COLLECTION);
 
@@ -206,7 +205,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, SYSTEM_TESTS_COLLECTION);
 
@@ -223,7 +222,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, CTS_TESTS_COLLECTION);
 
@@ -240,7 +239,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, VULKAN_TESTS_COLLECTION);
 
@@ -257,7 +256,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, CHROMIUM_TESTS_COLLECTION);
 
@@ -275,7 +274,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let _ = parse_facet(&decl).expect_err("this should have failed");
 
@@ -289,7 +288,7 @@ mod test {
                 fdata::DictionaryEntry { key: TEST_TYPE_FACET_KEY.into(), value: None },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let _ = parse_facet(&decl).expect_err("this should have failed");
     }
@@ -298,25 +297,24 @@ mod test {
     fn parse_allowed_packages_works() {
         const TEST_FACET: &str = "fuchsia.test";
 
-        let mut decl = fdecl::Component::EMPTY;
+        let mut decl = fdecl::Component::default();
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, None);
 
         // empty facet
-        decl.facets =
-            Some(fdata::Dictionary { entries: vec![].into(), ..fdata::Dictionary::EMPTY });
+        decl.facets = Some(fdata::Dictionary { entries: vec![].into(), ..Default::default() });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, None);
 
         // empty facet
-        decl.facets = Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY });
+        decl.facets = Some(fdata::Dictionary { entries: None, ..Default::default() });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, None);
 
         // make sure that the func can handle some other facet key
         decl.facets = Some(fdata::Dictionary {
             entries: vec![fdata::DictionaryEntry { key: "somekey".into(), value: None }].into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, None);
@@ -331,7 +329,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, None);
@@ -355,7 +353,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(
@@ -376,7 +374,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(facet.deprecated_allowed_packages, Some(vec![]));
@@ -400,7 +398,7 @@ mod test {
                 },
             ]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let facet = parse_facet(&decl).unwrap();
         assert_eq!(
@@ -414,7 +412,7 @@ mod test {
                 value: Some(fdata::DictionaryValue::Str("something".into()).into()),
             }]
             .into(),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         });
         let _ = parse_facet(&decl).expect_err("this should have failed");
     }

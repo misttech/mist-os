@@ -267,7 +267,7 @@ mod tests {
             ns: vec![fcrunner::ComponentNamespaceEntry {
                 path: Some("/pkg".into()),
                 directory: Some(ClientEnd::new(pkg.into_channel().unwrap().into_zx_channel())),
-                ..fcrunner::ComponentNamespaceEntry::EMPTY
+                ..Default::default()
             }]
             .try_into()
             .unwrap(),

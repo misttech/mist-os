@@ -217,7 +217,7 @@ fn add_pkg_directory(
     ns.push(fcrunner::ComponentNamespaceEntry {
         path: Some(PKG_PATH.to_str().unwrap().to_string()),
         directory: Some(cloned_dir),
-        ..fcrunner::ComponentNamespaceEntry::EMPTY
+        ..Default::default()
     });
     Ok(())
 }
@@ -312,7 +312,7 @@ fn add_directory_helper(
     ns.push(fcrunner::ComponentNamespaceEntry {
         path: Some(target_path.clone()),
         directory: Some(client_end),
-        ..fcrunner::ComponentNamespaceEntry::EMPTY
+        ..Default::default()
     });
 }
 
@@ -506,7 +506,7 @@ fn serve_and_install_svc_dirs(
         ns.push(fcrunner::ComponentNamespaceEntry {
             path: Some(target_dir_path),
             directory: Some(client_end),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         });
     }
 }
@@ -651,7 +651,7 @@ pub mod test {
         let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
             path: Some("/".to_string()),
             directory: Some(dir_client),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
@@ -679,7 +679,7 @@ pub mod test {
         let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
             path: Some("/".to_string()),
             directory: Some(dir_client),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
@@ -713,12 +713,12 @@ pub mod test {
             fcrunner::ComponentNamespaceEntry {
                 path: Some("/svc".to_string()),
                 directory: Some(dir_client),
-                ..fcrunner::ComponentNamespaceEntry::EMPTY
+                ..Default::default()
             },
             fcrunner::ComponentNamespaceEntry {
                 path: Some("/sv".to_string()),
                 directory: Some(extra_dir_client),
-                ..fcrunner::ComponentNamespaceEntry::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -766,7 +766,7 @@ pub mod test {
         let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
             path: Some("/not-the-svc-dir".to_string()),
             directory: Some(dir_client),
-            ..fcrunner::ComponentNamespaceEntry::EMPTY
+            ..Default::default()
         }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, false).await;

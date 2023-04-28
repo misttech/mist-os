@@ -51,14 +51,14 @@ impl Stressor {
             name: Some(child_name.clone()),
             url: Some(url),
             startup: Some(fdecl::StartupMode::Lazy),
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         self.lifecycle_controller
             .create_instance(
                 parent_moniker,
                 &mut collection_ref,
                 decl,
-                fcomponent::CreateChildArgs::EMPTY,
+                fcomponent::CreateChildArgs::default(),
             )
             .await
             .unwrap()

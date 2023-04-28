@@ -76,12 +76,12 @@ impl From<SourceConfig> for fidl::RepositoryConfig {
                 [fidl::MirrorConfig {
                     mirror_url: Some(config.RepoURL),
                     subscribe: Some(config.Auto),
-                    ..fidl::MirrorConfig::EMPTY
+                    ..Default::default()
                 }]
                 .to_vec()
             }),
             storage_type: Some(config.RepoStorageType.into()),
-            ..fidl::RepositoryConfig::EMPTY
+            ..Default::default()
         }
     }
 }

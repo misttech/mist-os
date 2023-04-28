@@ -348,7 +348,7 @@ async fn aggregate_open_as_not_directory_test() {
         target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
         renamed_instances: None,
         source_instance_filter: Some(vec!["default".to_string()]),
-        ..fdecl::OfferService::EMPTY
+        ..Default::default()
     };
     let offer_service_decl_1 = fdecl::OfferService {
         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -359,7 +359,7 @@ async fn aggregate_open_as_not_directory_test() {
         target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
         renamed_instances: None,
         source_instance_filter: Some(vec!["goodbye".to_string()]),
-        ..fdecl::OfferService::EMPTY
+        ..Default::default()
     };
 
     let dynamic_offers = vec![
@@ -420,7 +420,7 @@ async fn aggregate_instances_test() {
         target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
         renamed_instances: None,
         source_instance_filter: Some(vec!["default".to_string()]),
-        ..fdecl::OfferService::EMPTY
+        ..Default::default()
     };
     let offer_service_decl_1 = fdecl::OfferService {
         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -431,7 +431,7 @@ async fn aggregate_instances_test() {
         target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
         renamed_instances: None,
         source_instance_filter: Some(vec!["goodbye".to_string()]),
-        ..fdecl::OfferService::EMPTY
+        ..Default::default()
     };
 
     let dynamic_offers = vec![
@@ -505,7 +505,7 @@ async fn aggregate_instances_renamed_test() {
                 target_name: "default_from_a".to_string(),
             }]),
             source_instance_filter: Some(vec!["default_from_a".to_string()]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::Service(fdecl::OfferService {
             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -519,7 +519,7 @@ async fn aggregate_instances_renamed_test() {
                 target_name: "hello_from_dynamic".to_string(),
             }]),
             source_instance_filter: Some(vec!["hello_from_dynamic".to_string()]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
     ];
     create_dynamic_service_client_from_offers(dynamic_child_name, offers)
@@ -599,7 +599,7 @@ async fn aggregate_static_instances_test() {
                 "default_from_a".to_string(),
                 "hello_from_a".to_string(),
             ]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::Service(fdecl::OfferService {
             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -622,7 +622,7 @@ async fn aggregate_static_instances_test() {
                 "default_from_b".to_string(),
                 "hello_from_b".to_string(),
             ]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
     ];
     create_dynamic_service_client_from_offers(dynamic_child_name, offers)
@@ -720,7 +720,7 @@ async fn aggregate_instances_multiple_service_instances_renamed_test() {
                 },
             ]),
             source_instance_filter: Some(vec!["default".to_string(), "hello_v1".to_string()]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::Service(fdecl::OfferService {
             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -735,7 +735,7 @@ async fn aggregate_instances_multiple_service_instances_renamed_test() {
                 target_name: "hello_v2".to_string(),
             }]),
             source_instance_filter: Some(vec!["hello_v2".to_string()]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::Service(fdecl::OfferService {
             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -751,7 +751,7 @@ async fn aggregate_instances_multiple_service_instances_renamed_test() {
                 target_name: "goodbye".to_string(),
             }]),
             source_instance_filter: Some(vec!["goodbye".to_string()]),
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
     ];
     create_dynamic_service_client_from_offers(dynamic_child_name, offers)
@@ -826,7 +826,7 @@ async fn aggregate_service_fails_without_filter_test() {
             target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
             renamed_instances: None,
             source_instance_filter: None,
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
         fdecl::Offer::Service(fdecl::OfferService {
             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -837,7 +837,7 @@ async fn aggregate_service_fails_without_filter_test() {
             target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
             renamed_instances: None,
             source_instance_filter: None,
-            ..fdecl::OfferService::EMPTY
+            ..Default::default()
         }),
     ];
     let create_child_result =
@@ -932,7 +932,7 @@ async fn create_dynamic_service_client_from_offers(
         url: Some(CLIENT_COMPONENT_URL.to_string()),
         //url: Some("".to_string()),
         startup: Some(fdecl::StartupMode::Lazy),
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
     realm
         .create_child(
@@ -941,7 +941,7 @@ async fn create_dynamic_service_client_from_offers(
             fcomponent::CreateChildArgs {
                 numbered_handles: None,
                 dynamic_offers: Some(dynamic_offers),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             },
         )
         .await
@@ -960,7 +960,7 @@ async fn create_dynamic_service_client(
         target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
         renamed_instances,
         source_instance_filter,
-        ..fdecl::OfferService::EMPTY
+        ..Default::default()
     };
 
     let dynamic_offers = vec![fdecl::Offer::Service(offer_service_decl)];
@@ -977,14 +977,10 @@ async fn create_dynamic_service_provider(child_name: &str) {
         name: Some(child_name.to_string()),
         url: Some(PROVIDER_COMPONENT_URL.to_string()),
         startup: Some(fdecl::StartupMode::Lazy),
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
     let _ = realm
-        .create_child(
-            &mut collection_ref,
-            child_decl,
-            fcomponent::CreateChildArgs { ..fcomponent::CreateChildArgs::EMPTY },
-        )
+        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
         .await
         .expect("Failed to create dynamic child service client.");
 }

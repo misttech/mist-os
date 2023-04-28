@@ -28,10 +28,10 @@ async fn collections() {
             url: Some(format!("#meta/trigger_{}.cm", name)),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await
             .unwrap_or_else(|e| panic!("create_child {} failed: {:?}", name, e))
             .unwrap_or_else(|e| panic!("failed to create child {}: {:?}", name, e));
@@ -90,10 +90,10 @@ async fn collections() {
             url: Some("#meta/trigger_realm.cm".to_string()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
             .await
             .expect("second create_child a failed")
             .expect("failed to create second child a");
@@ -130,13 +130,13 @@ async fn child_args() {
             url: Some(format!("#meta/trigger_{}.cm", name)),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         let (_, socket) = zx::Socket::create_stream();
         let numbered_handles = vec![fprocess::HandleInfo { handle: socket.into_handle(), id: 0 }];
         let child_args = fcomponent::CreateChildArgs {
             numbered_handles: Some(numbered_handles),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         };
         let res = realm
             .create_child(&mut collection_ref, child_decl, child_args)
@@ -153,7 +153,7 @@ async fn child_args() {
             url: Some("#meta/write_startup_socket.cm".to_owned()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         let (their_socket, our_socket) = zx::Socket::create_stream();
         let numbered_handles = vec![fprocess::HandleInfo {
@@ -163,7 +163,7 @@ async fn child_args() {
         }];
         let child_args = fcomponent::CreateChildArgs {
             numbered_handles: Some(numbered_handles),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         };
         realm
             .create_child(&mut collection_ref, child_decl, child_args)
@@ -197,7 +197,7 @@ async fn child_args() {
             url: Some("#meta/write_startup_socket.cm".to_owned()),
             startup: Some(fdecl::StartupMode::Lazy),
             environment: None,
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
         let (their_socket, our_socket) = zx::Socket::create_stream();
         let job =
@@ -217,7 +217,7 @@ async fn child_args() {
         ];
         let child_args = fcomponent::CreateChildArgs {
             numbered_handles: Some(numbered_handles),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         };
         let result = realm
             .create_child(&mut collection_ref, child_decl, child_args)

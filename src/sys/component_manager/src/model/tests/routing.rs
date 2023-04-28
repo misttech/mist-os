@@ -635,9 +635,9 @@ async fn dynamic_offer_from_parent() {
                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
                 target_name: Some("hippo_svc".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -753,9 +753,9 @@ async fn dynamic_offer_siblings_same_collection() {
                 })),
                 target_name: Some("hippo_svc".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -854,9 +854,9 @@ async fn dynamic_offer_siblings_cross_collection() {
                 source_name: Some("hippo_svc".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 target_name: Some("hippo_svc".to_string()),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -952,9 +952,9 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 })),
                 target_name: Some("hippo_svc".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -1077,9 +1077,9 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 })),
                 target_name: Some("hippo_data".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferDirectory::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -1202,9 +1202,9 @@ async fn dynamic_offer_to_static_offer() {
                 })),
                 target_name: Some("hippo_svc".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                ..fdecl::OfferProtocol::EMPTY
+                ..Default::default()
             })]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         },
     )
     .await;
@@ -2208,7 +2208,7 @@ async fn use_resolver_from_parent_environment() {
                                 abi_revision: Some(
                                     version_history::LATEST_VERSION.abi_revision.into(),
                                 ),
-                                ..fresolution::Component::EMPTY
+                                ..Default::default()
                             }))
                             .expect("failed to send resolve response");
                     }
@@ -2315,7 +2315,7 @@ async fn use_resolver_from_grandparent_environment() {
                                 abi_revision: Some(
                                     version_history::LATEST_VERSION.abi_revision.into(),
                                 ),
-                                ..fresolution::Component::EMPTY
+                                ..Default::default()
                             }))
                             .expect("failed to send resolve response");
                     }
@@ -2421,7 +2421,7 @@ async fn resolver_is_not_available() {
                                 abi_revision: Some(
                                     version_history::LATEST_VERSION.abi_revision.into(),
                                 ),
-                                ..fresolution::Component::EMPTY
+                                ..Default::default()
                             }))
                             .expect("failed to send resolve response");
                     }
@@ -2518,10 +2518,10 @@ async fn resolver_component_decl_is_validated() {
                                         exposes: Some(vec![fdecl::Expose::Protocol(
                                             fdecl::ExposeProtocol {
                                                 source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                                                ..fdecl::ExposeProtocol::EMPTY
+                                                ..Default::default()
                                             },
                                         )]),
-                                        ..fdecl::Component::EMPTY
+                                        ..Default::default()
                                     };
                                     fidl::encoding::persist(&fidl).unwrap()
                                 })),
@@ -2531,7 +2531,7 @@ async fn resolver_component_decl_is_validated() {
                                 abi_revision: Some(
                                     version_history::LATEST_VERSION.abi_revision.into(),
                                 ),
-                                ..fresolution::Component::EMPTY
+                                ..Default::default()
                             }))
                             .expect("failed to send resolve response");
                     }

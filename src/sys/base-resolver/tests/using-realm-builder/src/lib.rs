@@ -339,15 +339,12 @@ async fn resolve_component() {
             value_source: Some(fcomponent_decl::ConfigValueSource::PackagePath(
                 "meta/config-data.cvf".to_string(),
             )),
-            ..fcomponent_decl::ConfigSchema::EMPTY
+            ..Default::default()
         }),
-        ..fcomponent_decl::Component::EMPTY
+        ..Default::default()
     })
     .unwrap();
-    let config_data = fidl::encoding::persist(&fcomponent_config::ValuesData {
-        ..fcomponent_config::ValuesData::EMPTY
-    })
-    .unwrap();
+    let config_data = fidl::encoding::persist(&fcomponent_config::ValuesData::default()).unwrap();
     let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
         .abi_revision(version_history::AbiRevision::new(0x601665c5b1a89c7f))
         .add_resource_at("meta/manifest.cm", &*manifest)
@@ -382,7 +379,7 @@ async fn resolve_component() {
 
 #[fuchsia::test]
 async fn resolve_with_context_component() {
-    let manifest = fidl::encoding::persist(&fcomponent_decl::Component::EMPTY.clone()).unwrap();
+    let manifest = fidl::encoding::persist(&fcomponent_decl::Component::default().clone()).unwrap();
     let sub_sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-sub-sub-package")
         .add_resource_at("meta/manifest.cm", &*manifest)
         .build()

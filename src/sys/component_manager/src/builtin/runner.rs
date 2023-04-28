@@ -152,7 +152,7 @@ mod tests {
             ns: Some(vec![]),
             outgoing_dir: None,
             runtime_dir: None,
-            ..fcrunner::ComponentStartInfo::EMPTY
+            ..Default::default()
         }
     }
 

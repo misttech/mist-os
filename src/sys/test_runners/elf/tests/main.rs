@@ -12,7 +12,7 @@ use {
 };
 
 fn default_options() -> RunOptions {
-    RunOptions { ..RunOptions::EMPTY }
+    RunOptions::default()
 }
 
 pub async fn run_test(test_url: &str, run_options: RunOptions) -> Result<Vec<RunEvent>, Error> {

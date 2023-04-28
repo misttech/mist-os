@@ -74,7 +74,7 @@ impl MockCrashReporterService {
                     let res = self.call_hook.file(report).await;
                     match res {
                         Err(_) => responder.send(&mut Err(FilingError::InvalidArgsError)).unwrap(),
-                        Ok(_) => responder.send(&mut Ok(FileReportResults::EMPTY)).unwrap(),
+                        Ok(_) => responder.send(&mut Ok(FileReportResults::default())).unwrap(),
                     }
                 }
             }
@@ -123,7 +123,7 @@ mod tests {
         let mock = Arc::new(MockCrashReporterService::new(|_| Ok(())));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result = proxy.file(CrashReport::EMPTY).await.expect("made fidl call");
+        let file_result = proxy.file(CrashReport::default()).await.expect("made fidl call");
 
         assert_eq!(file_result, Ok(()));
     }
@@ -133,8 +133,11 @@ mod tests {
         let mock = Arc::new(MockCrashReporterService::new(|_| Err(Status::NOT_FOUND)));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result =
-            proxy.file(CrashReport::EMPTY).await.expect("made fidl call").map_err(Status::from_raw);
+        let file_result = proxy
+            .file(CrashReport::default())
+            .await
+            .expect("made fidl call")
+            .map_err(Status::from_raw);
 
         assert_eq!(file_result, Err(Status::NOT_FOUND));
     }
@@ -149,7 +152,7 @@ mod tests {
         }));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result = proxy.file(CrashReport::EMPTY).await.expect("made fidl call");
+        let file_result = proxy.file(CrashReport::default()).await.expect("made fidl call");
 
         assert_eq!(file_result, Ok(()));
         assert_eq!(called.load(Ordering::SeqCst), 1);

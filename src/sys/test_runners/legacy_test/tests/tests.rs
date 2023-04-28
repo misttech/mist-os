@@ -35,7 +35,7 @@ fn default_options() -> ftest_manager::RunOptions {
         timeout: None,
         case_filters_to_run: None,
         log_iterator: None,
-        ..ftest_manager::RunOptions::EMPTY
+        ..Default::default()
     }
 }
 

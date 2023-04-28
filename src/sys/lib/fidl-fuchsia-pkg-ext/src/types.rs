@@ -233,7 +233,7 @@ impl From<CupData> for fidl::CupData {
             nonce: Some(c.nonce),
             response: Some(c.response),
             signature: Some(c.signature),
-            ..fidl::CupData::EMPTY
+            ..Default::default()
         }
     }
 }

@@ -31,7 +31,7 @@ async fn routing_succeeds_with_dynamic_offer() {
             dependency_type: Some(fdecl::DependencyType::Strong),
             availability: Some(fdecl::Availability::Required),
             // It is important that `target` is not set
-            ..fdecl::OfferProtocol::EMPTY
+            ..Default::default()
         })])
         .await;
 
@@ -186,11 +186,11 @@ async fn realm_user(
                 name: Some("child_realm".to_string()),
                 url: Some(child_realm_url),
                 startup: Some(fdecl::StartupMode::Lazy),
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             },
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(dynamic_offers),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             },
         )
         .await

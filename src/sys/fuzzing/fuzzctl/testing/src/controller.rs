@@ -40,8 +40,8 @@ pub struct FakeController {
 impl FakeController {
     /// Creates a fake fuzzer that can serve `fuchsia.fuzzer.Controller`.
     pub fn new() -> Self {
-        let status = fuzz::Status { running: Some(false), ..fuzz::Status::EMPTY };
-        let mut options = fuzz::Options::EMPTY;
+        let status = fuzz::Status { running: Some(false), ..Default::default() };
+        let mut options = fuzz::Options::default();
         add_defaults(&mut options);
         Self {
             corpus_type: Rc::new(RefCell::new(fuzz::Corpus::Seed)),
@@ -211,12 +211,12 @@ pub async fn serve_controller(
     mut test: Test,
 ) -> Result<()> {
     let fake = test.controller();
-    let mut artifact = Some(FidlArtifact::EMPTY);
+    let mut artifact = Some(FidlArtifact::default());
     let mut watcher: Option<fuzz::ControllerWatchArtifactResponder> = None;
     // Helper function to send an empty artifact when a workflow is starting.
     fn reset_artifact(mut watcher: Option<fuzz::ControllerWatchArtifactResponder>) -> Result<()> {
         if let Some(watcher) = watcher.take() {
-            watcher.send(FidlArtifact::EMPTY)?;
+            watcher.send(FidlArtifact::default())?;
         }
         Ok(())
     }
@@ -285,7 +285,7 @@ pub async fn serve_controller(
                         artifact = Some(FidlArtifact {
                             result: Some(fuzz_result),
                             input: Some(fidl_input),
-                            ..FidlArtifact::EMPTY
+                            ..Default::default()
                         });
                         responder.send(&mut Ok(()))?;
                         input.send().await?;
@@ -305,7 +305,7 @@ pub async fn serve_controller(
                         artifact = Some(FidlArtifact {
                             result: Some(fuzz_result),
                             input: None,
-                            ..FidlArtifact::EMPTY
+                            ..Default::default()
                         });
                         responder.send(&mut Ok(()))?;
                         fake.send_output(fuzz::DONE_MARKER).await?;
@@ -325,7 +325,7 @@ pub async fn serve_controller(
                 artifact = Some(FidlArtifact {
                     result: Some(FuzzResult::Minimized),
                     input: Some(fidl_input),
-                    ..FidlArtifact::EMPTY
+                    ..Default::default()
                 });
                 responder.send(&mut Ok(()))?;
                 input.send().await?;
@@ -341,7 +341,7 @@ pub async fn serve_controller(
                 artifact = Some(FidlArtifact {
                     result: Some(FuzzResult::Cleansed),
                     input: Some(fidl_input),
-                    ..FidlArtifact::EMPTY
+                    ..Default::default()
                 });
                 responder.send(&mut Ok(()))?;
                 input.send().await?;
@@ -353,7 +353,7 @@ pub async fn serve_controller(
                 artifact = Some(FidlArtifact {
                     result: Some(FuzzResult::Merged),
                     input: None,
-                    ..FidlArtifact::EMPTY
+                    ..Default::default()
                 });
                 responder.send(&mut Ok(()))?;
                 fake.send_output(fuzz::DONE_MARKER).await?;

@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         root_driver: Some("#meta/cpp_driver_receiver.cm".to_string()),
         use_driver_framework_v2: Some(true),
         exposes: Some(exposes),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     info!("about to start driver test realm");
     realm.driver_test_realm_start(args).await?;

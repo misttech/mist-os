@@ -82,7 +82,7 @@ pub async fn create_instance_in_collection(
         url: Some(url.to_string()),
         startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
 
     lifecycle_controller
@@ -90,7 +90,7 @@ pub async fn create_instance_in_collection(
             &parent.to_string(),
             &mut collection_ref,
             decl,
-            child_args.unwrap_or(fcomponent::CreateChildArgs::EMPTY),
+            child_args.unwrap_or(fcomponent::CreateChildArgs::default()),
         )
         .await
         .map_err(|e| ActionError::Fidl(e))?
@@ -438,7 +438,7 @@ mod test {
                 fprocess::HandleInfo { handle: left.into_handle(), id: 0x10 },
                 fprocess::HandleInfo { handle: right.into_handle(), id: 0x11 },
             ]),
-            ..fcomponent::CreateChildArgs::EMPTY
+            ..Default::default()
         };
         create_instance_in_collection(&lc, &parent, "foo", "bar", &url, Some(child_args))
             .await

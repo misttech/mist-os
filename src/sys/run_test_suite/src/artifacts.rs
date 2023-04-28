@@ -316,7 +316,7 @@ mod file_tests {
             served_files.push(ftest_manager::DebugData {
                 name: Some(path.to_string()),
                 file: Some(ClientEnd::new(file.into_channel().unwrap().into_zx_channel())),
-                ..ftest_manager::DebugData::EMPTY
+                ..Default::default()
             });
         });
 

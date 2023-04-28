@@ -147,9 +147,9 @@ mod test {
                 decl_type: Some(fsys::DeclType::Use),
                 error: Some(fsys::RouteError {
                     summary: Some("Access denied".to_string()),
-                    ..fsys::RouteError::EMPTY
+                    ..Default::default()
                 }),
-                ..fsys::RouteReport::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -175,7 +175,7 @@ mod test {
                 capability: Some("fuchsia.foo.bar".to_string()),
                 decl_type: Some(fsys::DeclType::Use),
                 error: None,
-                ..fsys::RouteReport::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -207,7 +207,7 @@ mod test {
             "./test",
             vec![
                 // Don't set any fields
-                fsys::RouteReport::EMPTY,
+                fsys::RouteReport::default(),
             ],
         );
 

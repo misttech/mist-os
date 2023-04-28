@@ -45,9 +45,9 @@ async fn create_provider(
                 url: Some(url.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             },
-            fcomponent::CreateChildArgs::EMPTY,
+            fcomponent::CreateChildArgs::default(),
         )
         .await
         .context("failed to call CreateChild")?

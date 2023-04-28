@@ -154,15 +154,15 @@ impl RouteValidator {
                         error: None,
                         source_moniker: Some(source_moniker),
                         service_instances,
-                        ..fsys::RouteReport::EMPTY
+                        ..Default::default()
                     }
                 }
                 Err(e) => {
                     let error = Some(fsys::RouteError {
                         summary: Some(e.to_string()),
-                        ..fsys::RouteError::EMPTY
+                        ..Default::default()
                     });
-                    fsys::RouteReport { capability, decl_type, error, ..fsys::RouteReport::EMPTY }
+                    fsys::RouteReport { capability, decl_type, error, ..Default::default() }
                 }
             }
         });
@@ -343,7 +343,7 @@ impl RouteValidator {
                             instance_name: Some(e.name.clone()),
                             child_name: Some(child_name),
                             child_instance_name: Some(e.service_instance.to_string()),
-                            ..fsys::ServiceInstance::EMPTY
+                            ..Default::default()
                         }
                     })
                     .collect();
@@ -440,17 +440,12 @@ async fn validate_uses(
         let decl_type = Some(fsys::DeclType::Use);
         if let Some(route_request) = routing::request_for_namespace_capability_use(use_) {
             let error = if let Err(e) = route_request.route(&instance).await {
-                Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
+                Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
             } else {
                 None
             };
 
-            reports.push(fsys::RouteReport {
-                capability,
-                decl_type,
-                error,
-                ..fsys::RouteReport::EMPTY
-            })
+            reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
         }
     }
     reports
@@ -466,17 +461,12 @@ async fn validate_exposes(
         let decl_type = Some(fsys::DeclType::Expose);
         if let Some(route_request) = routing::request_for_namespace_capability_expose(expose) {
             let error = if let Err(e) = route_request.route(instance).await {
-                Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
+                Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
             } else {
                 None
             };
 
-            reports.push(fsys::RouteReport {
-                capability,
-                decl_type,
-                error,
-                ..fsys::RouteReport::EMPTY
-            })
+            reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
         }
     }
     reports
@@ -1255,7 +1245,7 @@ mod tests {
                 .create_child(
                     &mut collection_ref,
                     child_decl(name),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .unwrap()
@@ -1338,7 +1328,7 @@ mod tests {
             name: Some(name.to_owned()),
             url: Some(format!("test:///{}", name)),
             startup: Some(fdecl::StartupMode::Lazy),
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         }
     }
 

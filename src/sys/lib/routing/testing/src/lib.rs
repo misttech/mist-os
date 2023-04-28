@@ -66,7 +66,7 @@ pub fn default_directory_capability() -> CapabilityPath {
 
 /// Returns an empty component decl for an executable component.
 pub fn default_component_decl() -> ComponentDecl {
-    ComponentDecl { ..Default::default() }
+    ComponentDecl::default()
 }
 
 /// Returns an empty component decl set up to have a non-empty program and to use the "test_runner"
@@ -75,7 +75,7 @@ pub fn component_decl_with_test_runner() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
             runner: Some(TEST_RUNNER_NAME.into()),
-            info: fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY },
+            info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         ..Default::default()
     }
@@ -86,7 +86,7 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
             runner: Some(TEST_RUNNER_NAME.into()),
-            info: fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY },
+            info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
@@ -374,7 +374,7 @@ macro_rules! instantiate_common_routing_tests {
         #[fuchsia_async::run_singlethreaded(test)]
         async fn $test() {
             fuchsia::init_logging_for_component_with_executor(
-                || {}, &[], fuchsia::Interest::EMPTY)();
+                || {}, &[], fuchsia::Interest::default())();
 
             $crate::CommonRoutingTest::<$builder_impl>::new().$test().await
         }

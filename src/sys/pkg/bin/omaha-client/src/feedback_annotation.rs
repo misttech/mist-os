@@ -41,7 +41,7 @@ async fn publish_ids_to_feedback_impl(
                     value: app_set.get_system_product_id().into(),
                 },
             ]),
-            ..ComponentData::EMPTY
+            ..Default::default()
         }
     };
 

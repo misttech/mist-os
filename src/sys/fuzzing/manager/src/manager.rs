@@ -98,7 +98,7 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         let (suite_proxy, suite_controller) = create_proxy::<SuiteControllerMarker>()
             .context("failed to create fuchsia.test_manager.SuiteController")?;
         let run_options =
-            RunOptions { arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]), ..RunOptions::EMPTY };
+            RunOptions { arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]), ..Default::default() };
         run_builder
             .add_suite(url.as_str(), run_options, suite_controller)
             .map_err(Error::msg)

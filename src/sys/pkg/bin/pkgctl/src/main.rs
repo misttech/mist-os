@@ -421,7 +421,7 @@ async fn fetch_url<T: Into<String>>(url_string: T) -> Result<Vec<u8>, anyhow::Er
         headers: None,
         body: None,
         deadline: None,
-        ..http::Request::EMPTY
+        ..Default::default()
     };
 
     let response =

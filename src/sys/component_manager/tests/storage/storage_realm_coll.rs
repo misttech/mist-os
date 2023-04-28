@@ -20,11 +20,11 @@ async fn main() {
         url: Some(String::from("#meta/storage_user.cm")),
         startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
 
     realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();

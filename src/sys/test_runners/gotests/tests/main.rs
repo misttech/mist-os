@@ -25,7 +25,7 @@ pub async fn run_test(
         run_disabled_tests: Some(run_disabled_tests),
         parallel,
         arguments: Some(test_args),
-        ..RunOptions::EMPTY
+        ..Default::default()
     };
     let suite_instance =
         builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;

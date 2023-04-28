@@ -494,34 +494,34 @@ mod tests {
             values: Some(vec![
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Single(fconfig::SingleValue::Bool(false))),
-                    ..fconfig::ValueSpec::EMPTY
+                    ..Default::default()
                 },
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(5))),
-                    ..fconfig::ValueSpec::EMPTY
+                    ..Default::default()
                 },
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Single(fconfig::SingleValue::String(
                         "hello!".to_string(),
                     ))),
-                    ..fconfig::ValueSpec::EMPTY
+                    ..Default::default()
                 },
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(vec![
                         true, false,
                     ]))),
-                    ..fconfig::ValueSpec::EMPTY
+                    ..Default::default()
                 },
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(vec![
                         "hello!".to_string(),
                         "world!".to_string(),
                     ]))),
-                    ..fconfig::ValueSpec::EMPTY
+                    ..Default::default()
                 },
             ]),
             checksum: Some(fdecl::ConfigChecksum::Sha256([0; 32])),
-            ..fconfig::ValuesData::EMPTY
+            ..Default::default()
         };
         let config_values = cm_rust::ValuesData {
             values: vec![

@@ -568,7 +568,7 @@ mod test {
     /// This isn't representative of an actual event from test framework, but is sufficient
     /// to assert events are routed correctly.
     fn create_empty_event(timestamp: i64) -> ftest_manager::SuiteEvent {
-        ftest_manager::SuiteEvent { timestamp: Some(timestamp), ..ftest_manager::SuiteEvent::EMPTY }
+        ftest_manager::SuiteEvent { timestamp: Some(timestamp), ..Default::default() }
     }
 
     macro_rules! assert_empty_events_eq {

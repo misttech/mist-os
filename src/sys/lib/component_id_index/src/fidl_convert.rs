@@ -82,15 +82,15 @@ impl From<Index> for fcomponent_internal::ComponentIdIndex {
                                 url: Some(appmgr_moniker.url),
                                 realm_path: Some(appmgr_moniker.realm_path),
                                 transitional_realm_paths: appmgr_moniker.transitional_realm_paths,
-                                ..fcomponent_internal::AppmgrMoniker::EMPTY
+                                ..Default::default()
                             }
                         }),
                         moniker: entry.moniker.map(|abs_moniker| abs_moniker.to_string()),
-                        ..fcomponent_internal::InstanceIdEntry::EMPTY
+                        ..Default::default()
                     })
                     .collect(),
             ),
-            ..fcomponent_internal::ComponentIdIndex::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -113,12 +113,12 @@ mod tests {
                         "realm".to_string(),
                         "path".to_string(),
                     ]]),
-                    ..fcomponent_internal::AppmgrMoniker::EMPTY
+                    ..Default::default()
                 }),
                 moniker: Some("/a/b/c".to_string()),
-                ..fcomponent_internal::InstanceIdEntry::EMPTY
+                ..Default::default()
             }]),
-            ..fcomponent_internal::ComponentIdIndex::EMPTY
+            ..Default::default()
         };
 
         let native_index = Index {
@@ -146,7 +146,7 @@ mod tests {
     fn missing_appmgr_restrict_isolated_persistent_storage() {
         assert_eq!(
             Some(FidlConversionError::MissingAppmgrRestrictIsolatedPersistentStorage),
-            Index::try_from(fcomponent_internal::ComponentIdIndex::EMPTY).err()
+            Index::try_from(fcomponent_internal::ComponentIdIndex::default()).err()
         );
     }
 
@@ -156,7 +156,7 @@ mod tests {
             Some(FidlConversionError::MissingInstances),
             Index::try_from(fcomponent_internal::ComponentIdIndex {
                 appmgr_restrict_isolated_persistent_storage: Some(true),
-                ..fcomponent_internal::ComponentIdIndex::EMPTY
+                ..Default::default()
             })
             .err()
         );
@@ -172,11 +172,11 @@ mod tests {
                     instance_id: Some("abc".to_string()),
                     appmgr_moniker: Some(fcomponent_internal::AppmgrMoniker {
                         url: None,
-                        ..fcomponent_internal::AppmgrMoniker::EMPTY
+                        ..Default::default()
                     }),
-                    ..fcomponent_internal::InstanceIdEntry::EMPTY
+                    ..Default::default()
                 }]),
-                ..fcomponent_internal::ComponentIdIndex::EMPTY
+                ..Default::default()
             })
             .err()
         );
@@ -192,11 +192,11 @@ mod tests {
                     instance_id: Some("abc".to_string()),
                     appmgr_moniker: Some(fcomponent_internal::AppmgrMoniker {
                         url: Some("abc".to_string()),
-                        ..fcomponent_internal::AppmgrMoniker::EMPTY
+                        ..Default::default()
                     }),
-                    ..fcomponent_internal::InstanceIdEntry::EMPTY
+                    ..Default::default()
                 }]),
-                ..fcomponent_internal::ComponentIdIndex::EMPTY
+                ..Default::default()
             })
             .err()
         );

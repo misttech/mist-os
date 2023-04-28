@@ -60,7 +60,7 @@ impl<S: ServiceConnect> CurrentChannelNotifier<S> {
             let cobalt = Self::connect(service_connector).await;
             let distribution_info = SoftwareDistributionInfo {
                 current_channel: Some(current_channel.clone()),
-                ..SoftwareDistributionInfo::EMPTY
+                ..Default::default()
             };
 
             info!("calling cobalt.SetSoftwareDistributionInfo(\"{:?}\")", distribution_info);

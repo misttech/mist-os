@@ -68,9 +68,9 @@ async fn dynamic_child() {
                 name: Some("dynamic_echo_server".to_string()),
                 url: Some("#meta/echo_server.cm".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             },
-            fcomp::CreateChildArgs::EMPTY,
+            fcomp::CreateChildArgs::default(),
         )
         .await
         .unwrap()

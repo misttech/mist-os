@@ -14,7 +14,7 @@ pub async fn run_test(test_url: &str) -> Result<(Vec<RunEvent>, Vec<String>), Er
     let run_builder = test_runners_test_lib::connect_to_test_manager().await?;
     let builder = test_manager_test_lib::TestBuilder::new(run_builder);
     let suite_instance = builder
-        .add_suite(test_url, RunOptions::EMPTY)
+        .add_suite(test_url, RunOptions::default())
         .await
         .context("Cannot create suite instance")?;
     let builder_run = fasync::Task::spawn(async move { builder.run().await });

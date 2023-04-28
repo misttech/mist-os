@@ -81,7 +81,7 @@ impl ComponentDeclBuilder {
         assert!(self.result.program.is_none(), "tried to add program twice");
         self.result.program = Some(cm_rust::ProgramDecl {
             runner: Some(runner.into()),
-            info: fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY },
+            info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         });
         self
     }

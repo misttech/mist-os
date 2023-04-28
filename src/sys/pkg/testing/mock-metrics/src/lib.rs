@@ -126,7 +126,7 @@ mod tests {
             .create_metric_event_logger(
                 ProjectSpec {
                     project_id: Some(cobalt_sw_delivery_registry::PROJECT_ID),
-                    ..ProjectSpec::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             )

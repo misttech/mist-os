@@ -816,7 +816,7 @@ mod tests {
             root_component_url: None,
             component_id_index_path: None,
             reboot_on_terminate_enabled: None,
-            ..component_internal::Config::EMPTY
+            ..Default::default()
         }, RuntimeConfig::default()),
         all_leaf_nodes_none => (component_internal::Config {
             debug: Some(false),
@@ -829,10 +829,10 @@ mod tests {
                     main_process_critical: None,
                     ambient_mark_vmo_exec: None,
                     create_raw_processes: None,
-                    ..component_internal::JobPolicyAllowlists::EMPTY
+                    ..Default::default()
                 }),
                 capability_policy: None,
-                ..component_internal::SecurityPolicy::EMPTY
+                ..Default::default()
             }),
             num_threads: Some(10),
             namespace_capabilities: None,
@@ -842,7 +842,7 @@ mod tests {
             log_destination: None,
             log_all_events: None,
             reboot_on_terminate_enabled: None,
-            ..component_internal::Config::EMPTY
+            ..Default::default()
         }, RuntimeConfig {
             debug: false,
             enable_introspection: false,
@@ -863,7 +863,7 @@ mod tests {
                         main_process_critical: Some(vec!["/something/important".to_string()]),
                         ambient_mark_vmo_exec: Some(vec!["/".to_string(), "/foo/bar".to_string()]),
                         create_raw_processes: Some(vec!["/another/thing".to_string()]),
-                        ..component_internal::JobPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
                     capability_policy: Some(component_internal::CapabilityPolicyAllowlists {
                         allowlist: Some(vec![
@@ -871,75 +871,75 @@ mod tests {
                             source_moniker: Some("<component_manager>".to_string()),
                             source_name: Some("fuchsia.kernel.RootResource".to_string()),
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                            capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::default())),
                             target_monikers: Some(vec![
                                 "/bootstrap".to_string(),
                                 "/core/**".to_string(),
                                 "/core/test_manager/tests:**".to_string()
                             ]),
-                            ..component_internal::CapabilityAllowlistEntry::EMPTY
+                            ..Default::default()
                         },
-                    ]), ..component_internal::CapabilityPolicyAllowlists::EMPTY}),
+                    ]), ..Default::default()}),
                     debug_registration_policy: Some(component_internal::DebugRegistrationPolicyAllowlists{
                         allowlist: Some(vec![
                             component_internal::DebugRegistrationAllowlistEntry {
                                 source_moniker: Some("/foo/bar/baz".to_string()),
                                 source_name: Some("fuchsia.foo.bar".to_string()),
-                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
                                 target_moniker: Some("/foo/bar".to_string()),
                                 environment_name: Some("bar_env1".to_string()),
-                                ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+                                ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
                                 source_moniker: Some("/foo/bar/baz".to_string()),
                                 source_name: Some("fuchsia.foo.bar".to_string()),
-                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
                                 target_moniker: Some("/foo".to_string()),
                                 environment_name: Some("foo_env1".to_string()),
-                                ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+                                ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
                                 source_moniker: Some("/foo/bar/**".to_string()),
                                 source_name: Some("fuchsia.foo.baz".to_string()),
-                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
                                 target_moniker: Some("/foo/**".to_string()),
                                 environment_name: Some("foo_env2".to_string()),
-                                ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+                                ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
                                 source_moniker: Some("/foo/bar/coll:**".to_string()),
                                 source_name: Some("fuchsia.foo.baz".to_string()),
-                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                                debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
                                 target_moniker: Some("/root".to_string()),
                                 environment_name: Some("root_env".to_string()),
-                                ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+                                ..Default::default()
                             },
-                        ]), ..component_internal::DebugRegistrationPolicyAllowlists::EMPTY}),
+                        ]), ..Default::default()}),
                     child_policy: Some(component_internal::ChildPolicyAllowlists {
                         reboot_on_terminate: Some(vec!["/something/important".to_string()]),
-                        ..component_internal::ChildPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
-                    ..component_internal::SecurityPolicy::EMPTY
+                    ..Default::default()
                 }),
                 num_threads: Some(24),
                 namespace_capabilities: Some(vec![
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("foo_svc".into()),
                         source_path: Some("/svc/foo".into()),
-                        ..fdecl::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
                         name: Some("bar_dir".into()),
                         source_path: Some("/bar".into()),
                         rights: Some(fio::Operations::CONNECT),
-                        ..fdecl::Directory::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 builtin_capabilities: Some(vec![
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("foo_protocol".into()),
                         source_path: None,
-                        ..fdecl::Protocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 root_component_url: Some(FOO_PKG_URL.to_string()),
@@ -950,7 +950,7 @@ mod tests {
                 reboot_on_terminate_enabled: Some(true),
                 realm_builder_resolver_and_runner: Some(component_internal::RealmBuilderResolverAndRunner::None),
                 abi_revision_policy: Some(component_internal::AbiRevisionPolicy::AllowAll),
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
             RuntimeConfig {
                 abi_revision_policy: AbiRevisionPolicy::AllowAll,
@@ -1092,10 +1092,10 @@ mod tests {
                         main_process_critical: None,
                         ambient_mark_vmo_exec: Some(vec!["/".to_string(), "bad".to_string()]),
                         create_raw_processes: None,
-                        ..component_internal::JobPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
                     capability_policy: None,
-                    ..component_internal::SecurityPolicy::EMPTY
+                    ..Default::default()
                 }),
                 num_threads: None,
                 namespace_capabilities: None,
@@ -1103,7 +1103,7 @@ mod tests {
                 root_component_url: None,
                 component_id_index_path: None,
                 reboot_on_terminate_enabled: None,
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
             AllowlistEntryParseError,
             AllowlistEntryParseError::NoLeadingSlash(
@@ -1127,18 +1127,18 @@ mod tests {
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
                             capability: None,
                             target_monikers: Some(vec!["/core".to_string()]),
-                            ..component_internal::CapabilityAllowlistEntry::EMPTY
+                            ..Default::default()
                         }]),
-                        ..component_internal::CapabilityPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
-                    ..component_internal::SecurityPolicy::EMPTY
+                    ..Default::default()
                 }),
                 num_threads: None,
                 namespace_capabilities: None,
                 builtin_capabilities: None,
                 root_component_url: None,
                 component_id_index_path: None,
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
             PolicyConfigError,
             PolicyConfigError::EmptyAllowlistedCapability
@@ -1157,13 +1157,13 @@ mod tests {
                         component_internal::CapabilityAllowlistEntry {
                             source_moniker: None,
                             source_name: Some("fuchsia.kernel.RootResource".to_string()),
-                            capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::EMPTY)),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::default())),
                             target_monikers: Some(vec!["/core".to_string()]),
-                            ..component_internal::CapabilityAllowlistEntry::EMPTY
+                            ..Default::default()
                         }]),
-                        ..component_internal::CapabilityPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
-                    ..component_internal::SecurityPolicy::EMPTY
+                    ..Default::default()
                 }),
                 num_threads: None,
                 namespace_capabilities: None,
@@ -1171,7 +1171,7 @@ mod tests {
                 root_component_url: None,
                 component_id_index_path: None,
                 reboot_on_terminate_enabled: None,
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
             PolicyConfigError,
             PolicyConfigError::EmptySourceMoniker
@@ -1190,7 +1190,7 @@ mod tests {
                 root_component_url: Some("invalid url".to_string()),
                 component_id_index_path: None,
                 reboot_on_terminate_enabled: None,
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
             ParseError,
             ParseError::InvalidComponentUrl {
@@ -1238,7 +1238,7 @@ mod tests {
                 use_builtin_process_launcher: None,
                 num_threads: None,
                 root_component_url: Some(FOO_PKG_URL.to_string()),
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             },
         )?;
         let expected = RuntimeConfig {

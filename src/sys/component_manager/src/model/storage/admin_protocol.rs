@@ -513,7 +513,7 @@ impl StorageAdmin {
         Ok(fsys::StorageStatus {
             total_size: Some(total_bytes),
             used_size: Some(filesystem_info.used_bytes),
-            ..fsys::StorageStatus::EMPTY
+            ..Default::default()
         })
     }
 
@@ -629,7 +629,7 @@ impl StorageAdmin {
                     }
                 }
                 ffs_dir::DirentKind::Symlink | ffs_dir::DirentKind::File => {
-                    match dir.unlink(&entry.name, fio::UnlinkOptions::EMPTY).await {
+                    match dir.unlink(&entry.name, fio::UnlinkOptions::default()).await {
                         Err(e) => errors.push(DeletionErrorCause::FileRequest(e)),
                         Ok(Err(e)) => errors.push(DeletionErrorCause::File(e)),
                         _ => {}

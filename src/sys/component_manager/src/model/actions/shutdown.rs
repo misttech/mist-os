@@ -2882,9 +2882,9 @@ mod tests {
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),
                     dependency_type: Some(fdecl::DependencyType::Strong),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 })]),
-                ..fcomponent::CreateChildArgs::EMPTY
+                ..Default::default()
             },
         )
         .await

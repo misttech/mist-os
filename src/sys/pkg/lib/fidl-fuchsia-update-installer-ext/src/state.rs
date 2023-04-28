@@ -632,66 +632,66 @@ pub enum RequiredStateField {
 impl From<State> for fidl::State {
     fn from(state: State) -> Self {
         match state {
-            State::Prepare => fidl::State::Prepare(fidl::PrepareData::EMPTY),
+            State::Prepare => fidl::State::Prepare(fidl::PrepareData::default()),
             State::Stage(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::Stage(fidl::StageData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::StageData::EMPTY
+                    ..Default::default()
                 })
             }
             State::Fetch(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::Fetch(fidl::FetchData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::FetchData::EMPTY
+                    ..Default::default()
                 })
             }
             State::Commit(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::Commit(fidl::CommitData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::CommitData::EMPTY
+                    ..Default::default()
                 })
             }
             State::WaitToReboot(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::WaitToReboot(fidl::WaitToRebootData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::WaitToRebootData::EMPTY
+                    ..Default::default()
                 })
             }
             State::Reboot(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::Reboot(fidl::RebootData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::RebootData::EMPTY
+                    ..Default::default()
                 })
             }
             State::DeferReboot(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::DeferReboot(fidl::DeferRebootData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::DeferRebootData::EMPTY
+                    ..Default::default()
                 })
             }
             State::Complete(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::Complete(fidl::CompleteData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::CompleteData::EMPTY
+                    ..Default::default()
                 })
             }
             State::FailPrepare(reason) => fidl::State::FailPrepare(fidl::FailPrepareData {
                 reason: Some(reason.into()),
-                ..fidl::FailPrepareData::EMPTY
+                ..Default::default()
             }),
             State::FailStage(FailStageData { info_and_progress, reason }) => {
                 fidl::State::FailStage(fidl::FailStageData {
                     info: Some(info_and_progress.info.into()),
                     progress: Some(info_and_progress.progress.into()),
                     reason: Some(reason.into()),
-                    ..fidl::FailStageData::EMPTY
+                    ..Default::default()
                 })
             }
             State::FailFetch(FailFetchData { info_and_progress, reason }) => {
@@ -699,14 +699,14 @@ impl From<State> for fidl::State {
                     info: Some(info_and_progress.info.into()),
                     progress: Some(info_and_progress.progress.into()),
                     reason: Some(reason.into()),
-                    ..fidl::FailFetchData::EMPTY
+                    ..Default::default()
                 })
             }
             State::FailCommit(UpdateInfoAndProgress { info, progress }) => {
                 fidl::State::FailCommit(fidl::FailCommitData {
                     info: Some(info.into()),
                     progress: Some(progress.into()),
-                    ..fidl::FailCommitData::EMPTY
+                    ..Default::default()
                 })
             }
         }
@@ -805,7 +805,7 @@ impl From<UpdateInfo> for fidl::UpdateInfo {
     fn from(info: UpdateInfo) -> Self {
         fidl::UpdateInfo {
             download_size: none_or_some_nonzero(info.download_size),
-            ..fidl::UpdateInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -842,7 +842,7 @@ impl From<Progress> for fidl::InstallationProgress {
         fidl::InstallationProgress {
             fraction_completed: Some(progress.fraction_completed),
             bytes_downloaded: none_or_some_nonzero(progress.bytes_downloaded),
-            ..fidl::InstallationProgress::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -1240,7 +1240,7 @@ mod tests {
     #[test]
     fn progress_fraction_completed_required() {
         assert_eq!(
-            Progress::try_from(fidl::InstallationProgress::EMPTY),
+            Progress::try_from(fidl::InstallationProgress::default()),
             Err(DecodeProgressError::MissingField(RequiredProgressField::FractionCompleted)),
         );
     }

@@ -293,7 +293,7 @@ where
                 size: Some(size),
                 hash: Some(meta_far_hash),
                 modified: meta_far_modified,
-                ..RepositoryPackage::EMPTY
+                ..Default::default()
             });
         }
 
@@ -377,14 +377,14 @@ where
             hash: Some(hash),
             size: Some(size),
             modified,
-            ..PackageEntry::EMPTY
+            ..Default::default()
         }];
 
         entries.extend(archive.list().map(|item| PackageEntry {
             path: Some(item.path().to_string()),
             size: Some(item.length()),
             modified,
-            ..PackageEntry::EMPTY
+            ..Default::default()
         }));
 
         match archive.read_file("meta/contents").await {
@@ -408,7 +408,7 @@ where
                         hash: Some(hash_string),
                         size: Some(size),
                         modified,
-                        ..PackageEntry::EMPTY
+                        ..Default::default()
                     });
                 }
             }
@@ -678,7 +678,7 @@ mod tests {
                     size: Some(24603),
                     modified: Some(pkg1_modified),
                     entries: None,
-                    ..RepositoryPackage::EMPTY
+                    ..Default::default()
                 },
                 RepositoryPackage {
                     name: Some("package2/0".into()),
@@ -686,7 +686,7 @@ mod tests {
                     size: Some(24603),
                     modified: Some(pkg2_modified),
                     entries: None,
-                    ..RepositoryPackage::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -724,17 +724,17 @@ mod tests {
                             hash: None,
                             size: Some(11),
                             modified: Some(pkg1_modified),
-                            ..PackageEntry::EMPTY
+                            ..Default::default()
                         },
                         PackageEntry {
                             path: Some("meta/package1.cmx".into()),
                             hash: None,
                             size: Some(12),
                             modified: Some(pkg1_modified),
-                            ..PackageEntry::EMPTY
+                            ..Default::default()
                         },
                     ]),
-                    ..RepositoryPackage::EMPTY
+                    ..Default::default()
                 },
                 RepositoryPackage {
                     name: Some("package2/0".into()),
@@ -747,17 +747,17 @@ mod tests {
                             hash: None,
                             size: Some(11),
                             modified: Some(pkg2_modified),
-                            ..PackageEntry::EMPTY
+                            ..Default::default()
                         },
                         PackageEntry {
                             path: Some("meta/package2.cmx".into()),
                             hash: None,
                             size: Some(12),
                             modified: Some(pkg2_modified),
-                            ..PackageEntry::EMPTY
+                            ..Default::default()
                         },
                     ]),
-                    ..RepositoryPackage::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -835,56 +835,56 @@ mod tests {
                     hash: Some(PKG1_BIN_HASH.into()),
                     size: Some(15),
                     modified: Some(bin_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("lib/package1".into()),
                     hash: Some(PKG1_LIB_HASH.into()),
                     size: Some(12),
                     modified: Some(lib_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta.far".into()),
                     hash: Some(PKG1_HASH.into()),
                     size: Some(24576),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta/contents".into()),
                     hash: None,
                     size: Some(156),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta/fuchsia.abi/abi-revision".into()),
                     hash: None,
                     size: Some(8),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta/package".into()),
                     hash: None,
                     size: Some(33),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta/package1.cm".into()),
                     hash: None,
                     size: Some(11),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
                 PackageEntry {
                     path: Some("meta/package1.cmx".into()),
                     hash: None,
                     size: Some(12),
                     modified: Some(meta_far_modified),
-                    ..PackageEntry::EMPTY
+                    ..Default::default()
                 },
             ]
         );

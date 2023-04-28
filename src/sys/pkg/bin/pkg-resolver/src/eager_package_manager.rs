@@ -359,11 +359,11 @@ impl<T: Resolver> EagerPackageManager<T> {
             .map(|(url, package)| PersistentEagerPackage {
                 url: Some(fpkg::PackageUrl { url: url.to_string() }),
                 cup: package.cup.clone().map(Into::into),
-                ..PersistentEagerPackage::EMPTY
+                ..Default::default()
             })
             .collect();
         let mut packages =
-            PersistentEagerPackages { packages: Some(packages), ..PersistentEagerPackages::EMPTY };
+            PersistentEagerPackages { packages: Some(packages), ..Default::default() };
 
         let temp_path = &format!("{EAGER_PACKAGE_PERSISTENT_FIDL_NAME}.new");
         crate::util::do_with_atomic_file(
@@ -878,11 +878,11 @@ mod tests {
                     .map(|(url, cup)| PersistentEagerPackage {
                         url: Some(fpkg::PackageUrl { url: url.to_string() }),
                         cup: Some(cup.into()),
-                        ..PersistentEagerPackage::EMPTY
+                        ..Default::default()
                     })
                     .collect(),
             ),
-            ..PersistentEagerPackages::EMPTY
+            ..Default::default()
         };
         fuchsia_fs::file::write_fidl(&file_proxy, &mut packages).await.unwrap();
     }

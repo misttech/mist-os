@@ -107,7 +107,7 @@ async fn file_report(proxy: &CrashReporterProxy, signature: &str) {
             // Need to do syscall because `std::time::Instant` cannot be converted into nanos.
             program_uptime: Some(zx::Time::get_monotonic().into_nanos()),
             is_fatal: Some(false),
-            ..CrashReport::EMPTY
+            ..Default::default()
         })
         .await
     {

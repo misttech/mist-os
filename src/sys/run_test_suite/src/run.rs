@@ -32,7 +32,7 @@ async fn request_scheduling_options(
     let scheduling_options = ftest_manager::SchedulingOptions {
         max_parallel_suites: run_params.experimental_parallel_execution,
         accumulate_debug_data: Some(run_params.accumulate_debug_data),
-        ..ftest_manager::SchedulingOptions::EMPTY
+        ..Default::default()
     };
     builder_proxy.with_scheduling_options(scheduling_options)?;
     Ok(())
@@ -137,7 +137,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             case_filters_to_run: params.test_filters,
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
             log_interest: Some(combined_log_interest),
-            ..fidl_fuchsia_test_manager::RunOptions::EMPTY
+            ..Default::default()
         };
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;
         suite.set_tags(params.tags);
@@ -569,14 +569,14 @@ mod test {
                 payload: Some(ftest_manager::SuiteEventPayload::SuiteStarted(
                     ftest_manager::SuiteStarted,
                 )),
-                ..ftest_manager::SuiteEvent::EMPTY
+                ..Default::default()
             },
             ftest_manager::SuiteEvent {
                 timestamp: Some(2000),
                 payload: Some(ftest_manager::SuiteEventPayload::SuiteStopped(
                     ftest_manager::SuiteStopped { status: ftest_manager::SuiteStatus::Passed },
                 )),
-                ..ftest_manager::SuiteEvent::EMPTY
+                ..Default::default()
             },
         ]
     }
@@ -697,10 +697,10 @@ mod test {
                         directory: directory_client,
                         token: pair_2,
                     }),
-                    ..ftest_manager::CustomArtifact::EMPTY
+                    ..Default::default()
                 }),
             )),
-            ..ftest_manager::RunEvent::EMPTY
+            ..Default::default()
         }];
 
         let fake_fut = fake_running_all_suites_and_return_run_events(
@@ -760,14 +760,14 @@ mod test {
                                 ftest_manager::SuiteStarted,
                             ),
                         ),
-                        ..ftest_manager::SuiteEvent::EMPTY
+                        ..Default::default()
                     },
                     ftest_manager::SuiteEvent {
                         timestamp: Some(2000),
                         payload: Some(ftest_manager::SuiteEventPayload::SuiteStopped(
                             ftest_manager::SuiteStopped { status: ftest_manager::SuiteStatus::InternalError },
                         )),
-                        ..ftest_manager::SuiteEvent::EMPTY
+                        ..Default::default()
                     },
                 ],
                 "fuchsia-pkg://fuchsia.com/nothing#meta/nothing.cm" => create_empty_suite_events()
@@ -840,7 +840,7 @@ mod test {
             let mut data = vec![ftest_manager::DebugData {
                 name: Some("test_file.profraw".to_string()),
                 file: Some(file_client),
-                ..ftest_manager::DebugData::EMPTY
+                ..Default::default()
             }];
             while let Ok(Some(request)) = service.try_next().await {
                 match request {
@@ -854,7 +854,7 @@ mod test {
             payload: Some(ftest_manager::RunEventPayload::Artifact(
                 ftest_manager::Artifact::DebugData(debug_client),
             )),
-            ..ftest_manager::RunEvent::EMPTY
+            ..Default::default()
         }];
 
         let fake_fut = fake_running_all_suites_and_return_run_events(

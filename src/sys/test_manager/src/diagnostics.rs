@@ -101,7 +101,7 @@ impl IsolatedLogsProvider {
             format: Some(Format::Json),
             client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
             batch_retrieval_timeout_seconds: batch_timeout,
-            ..StreamParameters::EMPTY
+            ..Default::default()
         };
         self.accessor.stream_diagnostics(stream_parameters, iterator).map_err(|err| {
             warn!(%err, "Failed to subscribe to isolated logs");
