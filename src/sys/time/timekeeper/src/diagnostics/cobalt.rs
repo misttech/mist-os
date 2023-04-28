@@ -335,6 +335,11 @@ mod test {
 
     const TEST_EXPERIMENT: Experiment = Experiment::B;
     const MONITOR_OFFSET: zx::Duration = zx::Duration::from_seconds(444);
+    // The allowed half-interval of the offset error. Due to the non-determinism
+    // in timing, this interval may sometimes be too small and cause flaky
+    // tests. The flake rate for 10ms was 0.15 flakes/day, this should be
+    // somewhat better.
+    const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(20);
 
     fn create_clock(time: zx::Time) -> Arc<zx::Clock> {
         let clk = zx::Clock::create(zx::ClockOpts::empty(), None).unwrap();
@@ -604,8 +609,14 @@ mod test {
         assert_eq!(event.event_codes, vec![Direction::Positive as u32, TEST_EXPERIMENT as u32]);
         match event.payload {
             MetricEventPayload::IntegerValue(value) => {
-                assert_geq!(value, MONITOR_OFFSET.into_micros() - 10000);
-                assert_leq!(value, MONITOR_OFFSET.into_micros() + 10000);
+                assert_geq!(
+                    value,
+                    MONITOR_OFFSET.into_micros() - MONITOR_OFFSET_ERROR.into_micros()
+                );
+                assert_leq!(
+                    value,
+                    MONITOR_OFFSET.into_micros() + MONITOR_OFFSET_ERROR.into_micros()
+                );
             }
             _ => panic!("monitor clock update did not produce event count payload"),
         }
