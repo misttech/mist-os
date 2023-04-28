@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <inttypes.h>
-#include <zircon/pixelformat.h>
 
 #include <fbl/algorithm.h>
 

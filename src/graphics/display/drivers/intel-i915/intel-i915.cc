@@ -69,14 +69,21 @@ namespace i915 {
 
 namespace {
 
-constexpr zx_pixel_format_t kSupportedFormats[4] = {
-    ZX_PIXEL_FORMAT_ARGB_8888, ZX_PIXEL_FORMAT_RGB_x888, ZX_PIXEL_FORMAT_ABGR_8888,
-    ZX_PIXEL_FORMAT_BGR_888x};
+constexpr any_pixel_format_t kSupportedFormats[] = {
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
 
 constexpr cursor_info_t kCursorInfos[3] = {
-    {.width = 64, .height = 64, .format = ZX_PIXEL_FORMAT_ARGB_8888},
-    {.width = 128, .height = 128, .format = ZX_PIXEL_FORMAT_ARGB_8888},
-    {.width = 256, .height = 256, .format = ZX_PIXEL_FORMAT_ARGB_8888},
+    {.width = 64,
+     .height = 64,
+     .format = static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32)},
+    {.width = 128,
+     .height = 128,
+     .format = static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32)},
+    {.width = 256,
+     .height = 256,
+     .format = static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32)},
 };
 constexpr uint32_t kImageTypes[4] = {
     IMAGE_TYPE_SIMPLE,

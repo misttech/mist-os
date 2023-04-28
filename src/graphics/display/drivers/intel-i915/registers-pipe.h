@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <zircon/assert.h>
-#include <zircon/pixelformat.h>
 
 #include <hwreg/bitfields.h>
 

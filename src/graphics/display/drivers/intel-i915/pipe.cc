@@ -11,6 +11,7 @@
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <math.h>
+#include <zircon/pixelformat.h>
 
 #include <cstdint>
 #include <memory>
