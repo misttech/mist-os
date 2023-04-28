@@ -12,10 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/126190): Remove these once Netstack3
-                // pads as expected
-                "device_minimum_tx_frame_size_ns3::network_header_only",
-                "device_minimum_tx_frame_size_ns3::network_no_padding",
                 "ping_succeeds_with_expected_payload_ns3::fragmented",
                 "ping_succeeds_with_expected_payload_ns3::fully_used_mtu",
             ],

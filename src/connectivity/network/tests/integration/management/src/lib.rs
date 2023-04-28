@@ -986,7 +986,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     assert_eq!(dropped, 0);
                     let mut data = &data[..];
 
-                    let eth = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::Check)
+                    let eth = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::NoCheck)
                         .expect("error parsing ethernet frame");
 
                     if eth.ethertype() != Some(EtherType::Ipv6) {

@@ -11,7 +11,9 @@ use futures::{future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _}
 use net_types::{ip::Ip as _, Witness as _};
 use packet::serialize::{InnerPacketBuilder, Serializer};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
+    ethernet::{
+        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     icmp::{
         ndp::{
             options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
@@ -122,16 +124,21 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
                     _,
                     NeighborSolicitation,
                     _,
-                >(&data, |p| assert_eq!(p.body().iter().count(), 0))
-                .map_or(None, |(_src_mac, dst_mac, src_ip, dst_ip, ttl, message, _code)| {
-                    // If the NS is not for the address we just added, this is for some
-                    // other address. We ignore it as it is not relevant to our test.
-                    if message.target_address() != &constants::ipv6::LINK_LOCAL_ADDR {
-                        return None;
-                    }
+                >(&data, EthernetFrameLengthCheck::Check, |p| {
+                    assert_eq!(p.body().iter().count(), 0)
+                })
+                .map_or(
+                    None,
+                    |(_src_mac, dst_mac, src_ip, dst_ip, ttl, message, _code)| {
+                        // If the NS is not for the address we just added, this is for some
+                        // other address. We ignore it as it is not relevant to our test.
+                        if message.target_address() != &constants::ipv6::LINK_LOCAL_ADDR {
+                            return None;
+                        }
 
-                    Some((dst_mac, src_ip, dst_ip, ttl))
-                }),
+                        Some((dst_mac, src_ip, dst_ip, ttl))
+                    },
+                ),
             )
         })
         .try_next()

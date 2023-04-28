@@ -29,7 +29,9 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
+    ethernet::{
+        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, MessageBody as _},
     ip::{Ipv4Proto, Ipv6Proto},
     ipv4::Ipv4PacketBuilder,
@@ -101,7 +103,7 @@ fn reply_if_echo_request(
         _,
         IcmpEchoRequest,
         _,
-    >(&frame, |p| {
+    >(&frame, EthernetFrameLengthCheck::Check, |p| {
         icmp_body.extend(p.body().bytes());
     });
     match r {
@@ -151,7 +153,7 @@ fn reply_if_echo_request(
         _,
         IcmpEchoRequest,
         _,
-    >(&frame, |p| {
+    >(&frame, EthernetFrameLengthCheck::Check, |p| {
         icmp_body.extend(p.body().bytes());
     });
     match r {

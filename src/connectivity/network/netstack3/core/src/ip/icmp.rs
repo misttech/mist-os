@@ -3032,6 +3032,7 @@ mod tests {
     use net_types::ip::{Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
     use packet::{Buf, Serializer};
     use packet_formats::{
+        ethernet::EthernetFrameLengthCheck,
         icmp::{
             mld::MldPacket, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacket,
             IcmpUnusedCode, Icmpv4TimestampRequest, MessageBody,
@@ -3215,6 +3216,7 @@ mod tests {
             let (src_mac, dst_mac, src_ip, dst_ip, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<I, _, M, _>(
                     &non_sync_ctx.frames_sent()[0].1,
+                    EthernetFrameLengthCheck::NoCheck,
                     f,
                 )
                 .unwrap();

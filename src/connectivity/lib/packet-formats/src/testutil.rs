@@ -167,8 +167,11 @@ pub fn verify_tcp_segment(segment: &TcpSegment<&[u8]>, expected: TestPacket<TcpS
 ///
 /// `parse_ethernet_frame` parses an ethernet frame, returning the body along
 /// with some important header fields.
-pub fn parse_ethernet_frame(mut buf: &[u8]) -> ParseResult<(&[u8], Mac, Mac, Option<EtherType>)> {
-    let frame = (&mut buf).parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::Check)?;
+pub fn parse_ethernet_frame(
+    mut buf: &[u8],
+    ethernet_length_check: EthernetFrameLengthCheck,
+) -> ParseResult<(&[u8], Mac, Mac, Option<EtherType>)> {
+    let frame = (&mut buf).parse_with::<_, EthernetFrame<_>>(ethernet_length_check)?;
     let src_mac = frame.src_mac();
     let dst_mac = frame.dst_mac();
     let ethertype = frame.ethertype();
@@ -235,8 +238,9 @@ where
 #[allow(clippy::type_complexity)]
 pub fn parse_ip_packet_in_ethernet_frame<I: IpExt>(
     buf: &[u8],
+    ethernet_length_check: EthernetFrameLengthCheck,
 ) -> IpParseResult<I, (&[u8], Mac, Mac, I::Addr, I::Addr, I::Proto, u8)> {
-    let (body, src_mac, dst_mac, ethertype) = parse_ethernet_frame(buf)?;
+    let (body, src_mac, dst_mac, ethertype) = parse_ethernet_frame(buf, ethernet_length_check)?;
     if ethertype != Some(I::ETHER_TYPE) {
         debug!("unexpected ethertype: {:?}", ethertype);
         return Err(ParseError::NotExpected.into());
@@ -260,6 +264,7 @@ pub fn parse_icmp_packet_in_ip_packet_in_ethernet_frame<
     F: for<'a> FnOnce(&IcmpPacket<I, &'a [u8], M>),
 >(
     buf: &[u8],
+    ethernet_length_check: EthernetFrameLengthCheck,
     f: F,
 ) -> IpParseResult<I, (Mac, Mac, I::Addr, I::Addr, u8, M, C)>
 where
@@ -267,7 +272,7 @@ where
         ParsablePacket<&'a [u8], IcmpParseArgs<I::Addr>, Error = ParseError>,
 {
     let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-        parse_ip_packet_in_ethernet_frame::<I>(buf)?;
+        parse_ip_packet_in_ethernet_frame::<I>(buf, ethernet_length_check)?;
     if proto != I::ICMP_IP_PROTO {
         debug!("unexpected IP protocol: {} (wanted {})", proto, I::ICMP_IP_PROTO);
         return Err(ParseError::NotExpected.into());
@@ -354,7 +359,7 @@ mod tests {
     fn test_parse_ethernet_frame() {
         use crate::testdata::arp_request::*;
         let (body, src_mac, dst_mac, ethertype) =
-            parse_ethernet_frame(ETHERNET_FRAME.bytes).unwrap();
+            parse_ethernet_frame(ETHERNET_FRAME.bytes, EthernetFrameLengthCheck::Check).unwrap();
         assert_eq!(body, &ETHERNET_FRAME.bytes[14..]);
         assert_eq!(src_mac, ETHERNET_FRAME.metadata.src_mac);
         assert_eq!(dst_mac, ETHERNET_FRAME.metadata.dst_mac);
@@ -385,7 +390,11 @@ mod tests {
     fn test_parse_ip_packet_in_ethernet_frame() {
         use crate::testdata::tls_client_hello_v4::*;
         let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-            parse_ip_packet_in_ethernet_frame::<Ipv4>(ETHERNET_FRAME.bytes).unwrap();
+            parse_ip_packet_in_ethernet_frame::<Ipv4>(
+                ETHERNET_FRAME.bytes,
+                EthernetFrameLengthCheck::Check,
+            )
+            .unwrap();
         assert_eq!(body, &IPV4_PACKET.bytes[IPV4_PACKET.body_range]);
         assert_eq!(src_mac, ETHERNET_FRAME.metadata.src_mac);
         assert_eq!(dst_mac, ETHERNET_FRAME.metadata.dst_mac);
@@ -417,6 +426,7 @@ mod tests {
         let (src_mac, dst_mac, src_ip, dst_ip, _, _, _) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv4, _, IcmpEchoReply, _>(
                 &REPLY_ETHERNET_FRAME_BYTES,
+                EthernetFrameLengthCheck::Check,
                 |_| {},
             )
             .unwrap();

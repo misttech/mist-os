@@ -1483,7 +1483,12 @@ mod tests {
 
     fn bench_parse_inner<B: Bencher>(b: &mut B) {
         use crate::testdata::tls_client_hello_v4::*;
-        let bytes = parse_ip_packet_in_ethernet_frame::<Ipv4>(ETHERNET_FRAME.bytes).unwrap().0;
+        let bytes = parse_ip_packet_in_ethernet_frame::<Ipv4>(
+            ETHERNET_FRAME.bytes,
+            EthernetFrameLengthCheck::Check,
+        )
+        .unwrap()
+        .0;
 
         b.iter(|| {
             let buf = bytes;

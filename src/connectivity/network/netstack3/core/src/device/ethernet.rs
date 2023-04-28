@@ -23,7 +23,7 @@ use packet_formats::{
     arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
     ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
-        ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG,
+        ETHERNET_HDR_LEN_NO_TAG,
     },
     icmp::{
         ndp::{options::NdpOptionBuilder, NeighborSolicitation, OptionSequenceBuilder},
@@ -271,12 +271,20 @@ fn send_as_ethernet_frame_to_dst<
     body: S,
     ether_type: EtherType,
 ) -> Result<(), S> {
+    /// The minimum body length for the Ethernet frame.
+    ///
+    /// Using a frame length of 0 improves efficiency by avoiding unnecessary
+    /// padding at this layer. The expectation is that the implementation of
+    /// [`DeviceLayerEventDispatcher::send_frame`] will add any padding required
+    /// by the implementation.
+    const MIN_BODY_LEN: usize = 0;
+
     let local_mac = get_mac(sync_ctx, device_id);
     let frame = body.encapsulate(EthernetFrameBuilder::new(
         local_mac.get(),
         dst_mac,
         ether_type,
-        ETHERNET_MIN_BODY_LEN_NO_TAG,
+        MIN_BODY_LEN,
     ));
     send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|frame| frame.into_inner())
 }
@@ -1601,7 +1609,7 @@ mod tests {
                         _,
                         IcmpDestUnreachable,
                         _,
-                    >(buf, |_| {})
+                    >(buf, EthernetFrameLengthCheck::NoCheck, |_| {})
                     .unwrap();
                 }
                 IpVersion::V6 => {
@@ -1610,7 +1618,7 @@ mod tests {
                         _,
                         IcmpDestUnreachable,
                         _,
-                    >(buf, |_| {})
+                    >(buf, EthernetFrameLengthCheck::NoCheck, |_| {})
                     .unwrap();
                 }
             }
@@ -1676,7 +1684,11 @@ mod tests {
         );
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         let (packet_buf, _, _, packet_src_ip, packet_dst_ip, proto, ttl) =
-            parse_ip_packet_in_ethernet_frame::<I>(&non_sync_ctx.frames_sent()[0].1[..]).unwrap();
+            parse_ip_packet_in_ethernet_frame::<I>(
+                &non_sync_ctx.frames_sent()[0].1[..],
+                EthernetFrameLengthCheck::NoCheck,
+            )
+            .unwrap();
         assert_eq!(src_ip.get(), packet_src_ip);
         assert_eq!(config.remote_ip.get(), packet_dst_ip);
         assert_eq!(proto, IpProto::Tcp.into());

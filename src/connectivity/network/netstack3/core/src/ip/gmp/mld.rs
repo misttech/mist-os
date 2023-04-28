@@ -457,6 +457,7 @@ mod tests {
     use net_types::ethernet::Mac;
     use packet::ParseBuffer;
     use packet_formats::{
+        ethernet::EthernetFrameLengthCheck,
         icmp::{
             mld::{MulticastListenerDone, MulticastListenerQuery, MulticastListenerReport},
             IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet,
@@ -1294,7 +1295,7 @@ mod tests {
                     _,
                     MulticastListenerReport,
                     _,
-                >(frame, |icmp| {
+                >(frame, EthernetFrameLengthCheck::NoCheck, |icmp| {
                     assert_eq!(icmp.body().group_addr, snmc_addr.get());
                 })
                 .unwrap();
@@ -1304,6 +1305,9 @@ mod tests {
                 src_ip,
                 if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
             );
+            assert_eq!(dst_ip, snmc_addr.get());
+            assert_eq!(ttl, 1);
+            assert_eq!(code, IcmpUnusedCode);
             assert_eq!(dst_ip, snmc_addr.get());
             assert_eq!(ttl, 1);
             assert_eq!(code, IcmpUnusedCode);
@@ -1319,7 +1323,7 @@ mod tests {
                             _,
                             MulticastListenerDone,
                             _,
-                        >(frame, |icmp| {
+                        >(frame, EthernetFrameLengthCheck::NoCheck, |icmp| {
                             assert_eq!(icmp.body().group_addr, snmc_addr.get());
                         }).unwrap();
             assert_eq!(src_mac, local_mac.get());

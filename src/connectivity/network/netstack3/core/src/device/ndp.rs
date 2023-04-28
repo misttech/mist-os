@@ -40,6 +40,7 @@ mod tests {
     use nonzero_ext::nonzero;
     use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
+        ethernet::EthernetFrameLengthCheck,
         icmp::{
             ndp::{
                 options::{NdpOption, NdpOptionBuilder, PrefixInformation},
@@ -1087,8 +1088,11 @@ mod tests {
                 Buf::new(vec![0; 10], ..),
             )
             .unwrap();
-            let (buf, _, _, _) =
-                parse_ethernet_frame(&ctx.frames_sent()[frame_offset].1[..]).unwrap();
+            let (buf, _, _, _) = parse_ethernet_frame(
+                &ctx.frames_sent()[frame_offset].1[..],
+                EthernetFrameLengthCheck::NoCheck,
+            )
+            .unwrap();
             // Packet's hop limit should be 100.
             assert_eq!(buf[7], hop_limit);
         }
@@ -1274,6 +1278,7 @@ mod tests {
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[0].1,
+                EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
             .unwrap();
@@ -1289,6 +1294,7 @@ mod tests {
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[1].1,
+                EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
             .unwrap();
@@ -1313,6 +1319,7 @@ mod tests {
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[2].1,
+                EthernetFrameLengthCheck::NoCheck,
                 |p| {
                     // We should have a source link layer option now because we
                     // have a source IP address set.
@@ -1378,6 +1385,7 @@ mod tests {
             let (src_mac, _, src_ip, _, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                     &f.1,
+                    EthernetFrameLengthCheck::NoCheck,
                     |_| {},
                 )
                 .unwrap();
@@ -1445,6 +1453,7 @@ mod tests {
         let (_, _dst_mac, _, _, _, _, _) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[0].1,
+                EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
             .unwrap();
@@ -1478,6 +1487,7 @@ mod tests {
         assert_matches!(
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[1].1,
+                EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             ),
             Ok((_, _, _, _, _, _, _))

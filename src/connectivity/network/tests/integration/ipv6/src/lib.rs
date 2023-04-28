@@ -235,7 +235,7 @@ async fn sends_router_solicitations<N: Netstack>(
                         _,
                         RouterSolicitation,
                         _,
-                    >(&data, |p| {
+                    >(&data, EthernetFrameLengthCheck::Check, |p| {
                         for option in p.body().iter() {
                             if let NdpOption::SourceLinkLayerAddress(a) = option {
                                 let mut mac_bytes = [0; 6];
@@ -343,7 +343,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
                     _,
                     RouterSolicitation,
                     _,
-                >(&data, |_| {})
+                >(&data, EthernetFrameLengthCheck::Check, |_| {})
                 .map_or(None, |_| Some(())),
             )
         })
@@ -777,7 +777,7 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
                         _,
                         NeighborSolicitation,
                         _,
-                    >(&data, |p| assert_eq!(p.body().iter().count(), 0))
+                    >(&data, EthernetFrameLengthCheck::Check, |p| assert_eq!(p.body().iter().count(), 0))
                         .map_or(None, |(_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, message, _code)| {
                             // If the NS target_address does not have the prefix we have advertised,
                             // this is for some other address. We ignore it as it is not relevant to
@@ -1085,7 +1085,7 @@ async fn sends_mld_reports<N: Netstack>(
                 assert_eq!(dropped, 0);
                 let mut data = &data[..];
 
-                let eth = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::Check)
+                let eth = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::NoCheck)
                     .expect("error parsing ethernet frame");
 
                 if eth.ethertype() != Some(EtherType::Ipv6) {

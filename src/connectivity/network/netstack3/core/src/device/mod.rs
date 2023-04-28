@@ -1650,9 +1650,10 @@ pub trait DeviceLayerEventDispatcher: DeviceLayerTypes + Sized {
     /// Send a frame to a device driver.
     ///
     /// If there was an MTU error while attempting to serialize the frame, the
-    /// original serializer is returned in the `Err` variant. All other errors
-    /// (for example, errors in allocating a buffer) are silently ignored and
-    /// reported as success.
+    /// original buffer is returned in the `Err` variant. All other errors (for
+    /// example, errors in allocating a buffer) are silently ignored and
+    /// reported as success. Implementations are expected to gracefully handle
+    /// non-conformant but correctable input, e.g. by padding too-small frames.
     fn send_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,

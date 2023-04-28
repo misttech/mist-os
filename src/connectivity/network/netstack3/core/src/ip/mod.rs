@@ -3877,6 +3877,7 @@ mod tests {
         let (_, _, _, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, Icmpv6PacketTooBig, _>(
                 buf,
+                EthernetFrameLengthCheck::NoCheck,
                 move |packet| {
                     // Size of the ICMP message body should be size of the
                     // MTU without IP and ICMP headers.
@@ -4356,12 +4357,13 @@ mod tests {
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_dest_unreachable"), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         let buf = &non_sync_ctx.frames_sent()[0].1[..];
-        let (_, _, _, _, _, _, code) =
-            parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv4, _, IcmpDestUnreachable, _>(
-                buf,
-                |_| {},
-            )
-            .unwrap();
+        let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+            Ipv4,
+            _,
+            IcmpDestUnreachable,
+            _,
+        >(buf, EthernetFrameLengthCheck::NoCheck, |_| {})
+        .unwrap();
         assert_eq!(code, Icmpv4DestUnreachableCode::DestProtocolUnreachable);
     }
 

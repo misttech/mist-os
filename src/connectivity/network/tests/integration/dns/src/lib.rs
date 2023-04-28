@@ -374,7 +374,7 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
             let mut data = data.as_slice();
 
             future::ready((|| {
-                let ethernet = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::Check)
+                let ethernet = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::NoCheck)
                     .expect("parse ethernet");
 
                 // DHCPv6 messages are held in IPv6 packets.

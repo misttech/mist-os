@@ -18,7 +18,7 @@ use packet::ParsablePacket as _;
 pub fn parse_dhcpv6(mut buf: &[u8]) -> Option<packet_formats_dhcp::v6::Message<'_, &[u8]>> {
     let eth = packet_formats::ethernet::EthernetFrame::parse(
         &mut buf,
-        packet_formats::ethernet::EthernetFrameLengthCheck::Check,
+        packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
     )
     .expect("failed to parse ethernet frame");
 

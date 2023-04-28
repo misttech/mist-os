@@ -24,6 +24,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParseBuffer as _;
+use packet_formats::ethernet::EthernetFrameLengthCheck;
 use test_case::test_case;
 use tracing::info;
 
@@ -556,7 +557,7 @@ async fn dhcpv4_client_started<N: Netstack>(name: &str) {
             futures::future::ready(
                 match packet_formats::testutil::parse_ip_packet_in_ethernet_frame::<
                     net_types::ip::Ipv4,
-                >(&buf)
+                >(&buf, EthernetFrameLengthCheck::Check)
                 {
                     Ok((mut body, _src_mac, _dst_mac, src_ip, dst_ip, _proto, _ttl)) => {
                         match (&mut body).parse_with::<_, packet_formats::udp::UdpPacket<_>>(

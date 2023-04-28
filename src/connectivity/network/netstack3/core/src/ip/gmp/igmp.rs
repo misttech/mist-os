@@ -547,6 +547,7 @@ mod tests {
         ParsablePacket as _,
     };
     use packet_formats::{
+        ethernet::EthernetFrameLengthCheck,
         igmp::messages::IgmpMembershipQueryV2,
         testutil::{parse_ip_packet, parse_ip_packet_in_ethernet_frame},
     };
@@ -1352,7 +1353,8 @@ mod tests {
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
+                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame, EthernetFrameLengthCheck::NoCheck)
+                    .unwrap();
             assert_eq!(src_mac, local_mac.get());
             assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS));
             assert_eq!(src_ip, MY_ADDR.get());
@@ -1373,7 +1375,8 @@ mod tests {
 
             assert_eq!(egress_device, &eth_device_id);
             let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
+                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame, EthernetFrameLengthCheck::NoCheck)
+                    .unwrap();
             assert_eq!(src_mac, local_mac.get());
             assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS));
             assert_eq!(src_ip, MY_ADDR.get());
