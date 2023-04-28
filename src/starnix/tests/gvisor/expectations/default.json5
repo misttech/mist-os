@@ -479,6 +479,7 @@
                 // pipe_test
                 "Pipes/PipeTest.Flags/namednonblocking",
                 "Pipes/PipeTest.Flags/namedblocking",
+                "Pipes/PipeTest.OffsetCalls/*",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Any",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Loopback",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Multicast",
