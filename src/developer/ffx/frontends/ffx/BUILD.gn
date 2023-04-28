@@ -60,42 +60,47 @@ ffx("ffx") {
   ]
 }
 
+_ffx_e2e_config = [
+  # TODO(fxbug.dev/84938): remove log.level=DEBUG when we no longer have flake
+  "--config",
+  "log.level=DEBUG",
+  "--config",
+  "sdk.root=.",
+  "--config",
+  "ffx.subtool-search-paths=host-tools",
+]
+
 host_test("ffx-e2e-without-target") {
   binary_path = "$root_out_dir/ffx"
-  args = [
-    # TODO(slgrady): remove when we no longer have flake fxb/84938
-    "--config",
-    "log.level=DEBUG",
-    "self-test",
-    "--include-target",
-    "false",
-  ]
+  args = _ffx_e2e_config + [
+           "self-test",
+           "--include-target",
+           "false",
+         ]
 
   deps = [ ":ffx_bin" ]
+  data_deps = [ "//src/developer/ffx:suite_test_data" ]
 
-  # ffx self-test seems to be buggy, so let's at least prevent it
-  # from affecting other tests by isolating it to its own shard.
+  # TODO(fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
+  # prevent it from affecting other tests by isolating it to its own shard.
   isolated = true
 }
 
 host_test("ffx-e2e-with-target") {
   binary_path = "$root_out_dir/ffx"
-  args = [
-    "--config",
-
-    # TODO(slgrady): remove log.level=DEBUG when we no longer have flake fxb/84938
-    "sdk.root=.,sdk.type=in-tree,log.level=DEBUG",
-    "self-test",
-  ]
+  args = _ffx_e2e_config + [ "self-test" ]
 
   deps = [
-    ":ffx-e2e-test-data",
     ":ffx_bin",
 
     # Required by the test_debug_limbo in `ffx self-test`.
     # We cannot add it to the dependency of `ffx self-test` plugin because that will make
     # the crasher into all production builds.
     "//src/developer/forensics/crasher($target_toolchain)",
+  ]
+  data_deps = [
+    ":ffx-e2e-test-data",
+    "//src/developer/ffx:suite_test_data",
   ]
 
   # TODO(fxbug.dev/60683): split additional dimensions such as multi-device
@@ -106,13 +111,14 @@ host_test("ffx-e2e-with-target") {
     nuc_env,
   ]
 
-  # ffx self-test seems to be buggy, so let's at least prevent it
-  # from affecting other tests by isolating it to its own shard.
+  # TODO(fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
+  # prevent it from affecting other tests by isolating it to its own shard.
   isolated = true
 }
 
 host_test_data("ffx-e2e-test-data") {
   sources = [
+    "$root_out_dir/ffx",
     "$root_out_dir/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json",
     "$root_out_dir/zxdb",
   ]

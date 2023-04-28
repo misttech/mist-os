@@ -47,8 +47,7 @@ ffx_tool("ffx_selftest_tool") {
   edition = "2021"
   output_name = "ffx-self-test"
   deps = [
-    ":ffx_selftest",
-    "//src/developer/ffx/lib/fho:lib",
+    ":ffx_selftest_suite",
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
