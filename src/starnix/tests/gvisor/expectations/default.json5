@@ -1075,6 +1075,15 @@
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 
+                // utimes_test
+                "UtimesTest.*",
+                "FutimesatTest.*",
+                "UtimensatTest.OnAbsPath",
+                "UtimensatTest.OnRelPath",
+                "UtimensatTest.InvalidNsec",
+                "Utimensat.*",
+                "UtimeTest.*",
+
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
                 "WaitTest.Wait4Rusage",
@@ -1149,20 +1158,25 @@
                 "Inotify.ReadWithTooSmallBufferFails",
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
+
                 // Passes in debian image, remove.
                 "ExecveTest.SymlinkLoop",
+
                 // Passes in debian image, remove.
                 "ExecveTest.Directory",
                 "InterpreterScriptTest.Execute",
+
                 // Passes in debian image, remove.
                 "InterpreterScriptTest.InterpreterScriptNoExecute",
                 "InterpreterScriptTest.BinaryNoExecute",
                 "InterpreterScriptTest.RelativePath",
                 "InterpreterScriptTest.Symlink",
+
                 // Passes in debian image, remove.
                 "InterpreterScriptTest.SymlinkLoop",
                 "InterpreterScriptTest.UncleanPath",
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
+
                 // Passes in debian image, remove.
                 "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "PingSocket.ICMPPortExhaustion",
