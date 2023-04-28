@@ -1283,6 +1283,9 @@
 
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
+
+                // socket_ipv4_udp_unbound_external_networking_test
+                "IPv4UDPUnboundSockets/IPv4UDPUnboundExternalNetworkingSocketTest*",
             ],
         },
     ],
