@@ -6,17 +6,12 @@
     {
       "licenseFilePath": "LICENSE.txt",
       "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://pub.dev/packages/foo/LICENSE.txt"
+      "licenseFileURL": "https://pub.dev/packages/foo/license"
     },
     {
       "licenseFilePath": "COPYING",
       "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://pub.dev/packages/foo/COPYING"
-    },
-    {
-      "licenseFilePath": "docs/some_other_license_file",
-      "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://pub.dev/packages/foo/docs/some_other_license_file"
+      "licenseFileURL": "https://pub.dev/packages/foo/license"
     }
   ]
 }

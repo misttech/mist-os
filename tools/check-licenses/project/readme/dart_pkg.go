@@ -6,6 +6,7 @@ package readme
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
@@ -23,12 +24,12 @@ func NewDartPkgReadme(path string) (*Readme, error) {
 
 	// Find all license files for this project.
 	// They should all live in the root directory of this project.
-	directoryContents, err := listFilesRecursive(path)
+	directoryContents, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 	for _, item := range directoryContents {
-		lower := strings.ToLower(item)
+		lower := strings.ToLower(item.Name())
 		// In practice, all license files for dart packages either have "COPYING"
 		// or "license" in their name.
 		if !(strings.Contains(lower, "licen") ||
@@ -38,13 +39,13 @@ func NewDartPkgReadme(path string) (*Readme, error) {
 
 		// There are some instances of dart source files and template files
 		// that fit the above criteria. Skip those files.
-		ext := filepath.Ext(item)
+		ext := filepath.Ext(item.Name())
 		if ext == ".dart" || ext == ".tmpl" || strings.Contains(lower, "template") {
 			continue
 		}
 
-		licenseUrl := fmt.Sprintf("%s/%s", url, item)
-		b.addLicense(item, licenseUrl, singleLicenseFile)
+		licenseUrl := fmt.Sprintf("%s/license", url)
+		b.addLicense(item.Name(), licenseUrl, singleLicenseFile)
 	}
-	return NewReadme(strings.NewReader(b.build()))
+	return NewReadme(strings.NewReader(b.build()), path)
 }

@@ -6,9 +6,9 @@ package readme
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,7 +40,10 @@ var (
 		"Security Critical":   true,
 
 		// Unused or non-standard
+		"Files":                      true,
+		"Upstream":                   true,
 		"License Android Compatible": true,
+		"Versions":                   true,
 		"Source":                     true,
 		"Short Name":                 true,
 		"Git Commit":                 true,
@@ -74,6 +77,10 @@ type Readme struct {
 	ReadmePath      string `json:"readmePath"`
 	RegularFileType file.FileType
 
+	// For generating the license URL of files that aren't
+	// explicitly listed in the README.fuchsia file.
+	GetLicenseURLForPath func(string) (string, error)
+
 	// For Compliance worksheet
 	ShouldBeDisplayed  bool
 	SourceCodeIncluded bool
@@ -94,6 +101,14 @@ type ReadmeLicense struct {
 
 // Create a Readme object from a README.* file on the filesystem.
 func NewReadmeFromFile(readmePath string) (*Readme, error) {
+	return NewReadmeFromFileCustomLocation(readmePath, readmePath)
+}
+
+// Create a Readme object from a README.* file on the filesystem.
+// Second parameter is the project root. This is helpful when creating projects
+// from README.fuchsia files that are not located in the root directory
+// of the project.
+func NewReadmeFromFileCustomLocation(readmePath, projectRoot string) (*Readme, error) {
 	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
 		return nil, err
 	}
@@ -103,7 +118,7 @@ func NewReadmeFromFile(readmePath string) (*Readme, error) {
 	}
 	defer f.Close()
 
-	return NewReadme(f)
+	return NewReadme(f, projectRoot)
 }
 
 // Create a Readme object from a path on the filesystem.
@@ -115,7 +130,7 @@ func NewReadmeCustom(projectRoot string) (*Readme, error) {
 	switch {
 	case strings.Contains(projectRoot, "dart-pkg"):
 		return NewDartPkgReadme(projectRoot)
-	case strings.Contains(projectRoot, "golibs"):
+	case strings.Contains(projectRoot, "golibs") || strings.Contains(projectRoot, "syzkaller"):
 		return NewGolibReadme(projectRoot)
 	case strings.Contains(projectRoot, "rust_crates"):
 		return NewRustCrateReadme(projectRoot)
@@ -125,10 +140,11 @@ func NewReadmeCustom(projectRoot string) (*Readme, error) {
 }
 
 // NewReadme creates a new Readme object from an io.Reader.
-func NewReadme(r io.Reader) (*Readme, error) {
+func NewReadme(r io.Reader, path string) (*Readme, error) {
 	readme := &Readme{
 		Licenses:       make([]*ReadmeLicense, 0),
 		MalformedLines: make([]string, 0),
+		ReadmePath:     path,
 	}
 
 	s := bufio.NewScanner(r)
@@ -159,15 +175,11 @@ func NewReadme(r io.Reader) (*Readme, error) {
 		switch directive {
 		case "Name":
 			readme.Name = value
-		case "Source":
-			fallthrough
-		case "URL":
+		case "Source", "URL":
 			readme.URL = value
-		case "Version":
+		case "Versions", "Version":
 			readme.Version = value
-		case "LICENSE":
-			fallthrough
-		case "License":
+		case "LICENSE", "License":
 			readme.ProcessReadmeLicense(&ReadmeLicense{License: value})
 		case "License File Format":
 			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileFormat: value})
@@ -175,18 +187,14 @@ func NewReadme(r io.Reader) (*Readme, error) {
 			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFilePath: value})
 		case "License File URL":
 			readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileURL: value})
-		case "Upstream git":
-			fallthrough
-		case "Upstream Git":
+		case "Upstream git", "Upstream Git":
 			readme.UpstreamGit = value
 		case "Security Critical":
 			readme.SecurityCritical = strings.ToLower(value) == "yes"
 		case "Description":
 			getNextLine = false
 			directive, value, readme.Description = parseReadmeMultiLineDirective(s, value)
-		case "Modifications":
-			fallthrough
-		case "Local Modifications":
+		case "Modifications", "Local Modifications":
 			getNextLine = false
 			directive, value, readme.LocalModifications = parseReadmeMultiLineDirective(s, value)
 
@@ -198,6 +206,22 @@ func NewReadme(r io.Reader) (*Readme, error) {
 		// Empty space is OK
 		case "":
 			// Do nothing.
+		}
+	}
+
+	readme.GetLicenseURLForPath = getLicenseURLFunction(path)
+
+	// Loop through all license files that are listed in this Readme.
+	for _, l := range readme.Licenses {
+		// If this license file does not already have a URL, generate one now.
+		if l.LicenseFileURL == "" {
+			dir := filepath.Dir(path)
+			licenseFilePath := filepath.Join(dir, l.LicenseFilePath)
+			licenseURL, err := readme.GetLicenseURLForPath(licenseFilePath)
+			if err != nil {
+				return nil, err
+			}
+			l.LicenseFileURL = licenseURL
 		}
 	}
 
@@ -238,7 +262,7 @@ func parseReadmeLine(line string) (string, string, error) {
 	if colon < 0 {
 		return "", line, fmt.Errorf("Failed to find ':' in line '%s'", line)
 	}
-	directive := strings.TrimSpace(line[:colon])
+	directive := line[:colon]
 	value := strings.TrimSpace(line[colon+1:])
 
 	if _, ok := knownDirectives[directive]; !ok {
@@ -268,29 +292,51 @@ func parseReadmeMultiLineDirective(s *bufio.Scanner, value string) (string, stri
 	return directive, value, b.String()
 }
 
-// Quickly list all files in a given directory, recursively.
-// This is used to ensure all license files in a custom readme project
-// are collected and processed correctly.
-func listFilesRecursive(root string) ([]string, error) {
-	paths := make([]string, 0)
-	err := filepath.WalkDir(root, func(currentPath string, info fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			rel, err := filepath.Rel(root, currentPath)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, rel)
-		}
-		return nil
-	})
+// README.fuchsia files should exist for all projects in the filesystem, and
+// they should specify the location and URLs of each license file in the project.
+//
+// Many times this isn't the case: either the URL is missing, or the license file
+// is entirely missing from the README.fuchsia file.
+//
+// This callback function supports setting the URL for a given license file
+// during directory traversal.
+func getLicenseURLFunction(projectRoot string) func(string) (string, error) {
+	ctx := context.Background()
 
-	if err != nil {
-		return nil, err
+	return func(licenseFilePath string) (string, error) {
+		licenseFileDir := filepath.Dir(licenseFilePath)
+		projectRootParent := filepath.Dir(projectRoot)
+
+		// Get the path to the license file, relative to the root of the project.
+		// Include the project name itself in the filepath.
+		relPath, err := filepath.Rel(projectRootParent, licenseFilePath)
+		if err != nil {
+			return "", fmt.Errorf("Failed to get relative path for license URL: %s %s %w\n",
+				projectRootParent, licenseFilePath, err)
+		}
+
+		gitURL, err := git.GetURL(ctx, licenseFileDir)
+		if err != nil {
+			return "", fmt.Errorf("Failed to get git URL for project path %s: %w",
+				projectRoot, err)
+		}
+
+		gitHash, err := git.GetCommitHash(ctx, licenseFileDir)
+		if err != nil {
+			return "", fmt.Errorf("Failed to get git hash for path %s: %w", licenseFilePath, err)
+		}
+
+		url := fmt.Sprintf("%s/+/%s/%s", gitURL, gitHash, licenseFilePath)
+
+		// Projects that are hosted in third_party fuchsia repositories do not
+		// have the project name in the URL path after the + sign.
+		//
+		// TODO: Design a better solution to construct these URLs.
+		if gitURL != "https://fuchsia.googlesource.com/fuchsia" {
+			url = fmt.Sprintf("%s/+/%s/%s", gitURL, gitHash, relPath)
+		}
+		return url, nil
 	}
-	return paths, nil
 }
 
 // Sort the internal fields of the Readme struct, so a readme object can deterministically

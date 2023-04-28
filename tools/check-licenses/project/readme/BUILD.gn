@@ -13,6 +13,7 @@ go_library("readme") {
     "dart_pkg_test.go",
     "golib.go",
     "golib_test.go",
+    "init.go",
     "readme.go",
     "readme_test.go",
     "rust_crate.go",
@@ -23,6 +24,7 @@ go_library("readme") {
     "//third_party/golibs:github.com/google/go-cmp",
     "//third_party/golibs:golang.org/x/sync",
     "//tools/check-licenses/file",
+    "//tools/check-licenses/util",
     "//tools/lib/logger",
   ]
 }

@@ -9,9 +9,6 @@ if (is_host) {
     sources = [
       "README.fuchsia",
       "README_malformed.fuchsia",
-      "listFilesRecursive/a/b/c/file",
-      "listFilesRecursive/a/file",
-      "listFilesRecursive/aa/bb/file",
       "want.json",
     ]
     outputs = [ "$root_gen_dir/{{source}}" ]

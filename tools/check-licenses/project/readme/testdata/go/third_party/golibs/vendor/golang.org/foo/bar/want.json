@@ -12,11 +12,6 @@
       "licenseFilePath": "COPYING",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
-    },
-    {
-      "licenseFilePath": "docs/some_other_license.txt",
-      "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
     }
   ]
 }

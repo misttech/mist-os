@@ -5,11 +5,21 @@
 package readme
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+)
+
+const (
+	rustCrateURLPrefix = "https://fuchsia.googlesource.com/fuchsia"
+
+	rustCrateEmptyRootDir     = "third_party/rust_crates/empty"
+	rustCrateEmptyLicenseFile = "../../../../LICENSE"
+	rustCrateEmptyLicenseURL  = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/LICENSE"
 )
 
 type (
@@ -30,25 +40,28 @@ type (
 // using data pulled from the Cargo.toml file of the given Rust crate.
 func NewRustCrateReadme(path string) (*Readme, error) {
 	var b builder
-	var cargo CargoTomlFile
+	var err error
 
-	_, err := toml.DecodeFile(filepath.Join(path, "Cargo.toml"), &cargo)
+	hash, err := git.GetCommitHash(context.Background(), path)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to decode Cargo.toml file for project %s: %w", path, err)
+		return nil, err
 	}
+	name := filepath.Base(path)
+	parentName := filepath.Base(filepath.Dir(path))
+	url := fmt.Sprintf("%s/+/%s/third_party/rust_crates/%s/%s", rustCrateURLPrefix, hash, parentName, name)
 
-	b.setName(cargo.Package.Name)
-	b.setURL(cargo.Package.Repository)
-	b.setVersion(cargo.Package.Version)
+	b.setPath(path)
+	b.setName(name)
+	b.setURL(url)
 
 	// Find all license files for this project.
 	// They should all live in the root directory of this project.
-	directoryContents, err := listFilesRecursive(path)
+	directoryContents, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 	for _, item := range directoryContents {
-		lower := strings.ToLower(item)
+		lower := strings.ToLower(item.Name())
 		// In practice, all license files for rust projects are either named
 		// COPYING or LICENSE
 		if !(strings.Contains(lower, "licen") ||
@@ -58,14 +71,33 @@ func NewRustCrateReadme(path string) (*Readme, error) {
 
 		// There are some instances of rust source files and template files
 		// that fit the above criteria. Skip those files.
-		ext := filepath.Ext(item)
+		ext := filepath.Ext(item.Name())
 		if ext == ".rs" || ext == ".tmpl" || strings.Contains(lower, "template") {
 			continue
 		}
 
-		licenseUrl := fmt.Sprintf("%s/%s", cargo.Package.Repository, item)
-		b.addLicense(item, licenseUrl, singleLicenseFile)
+		licenseUrl := fmt.Sprintf("%s/%s", url, item.Name())
+		b.addLicense(item.Name(), licenseUrl, singleLicenseFile)
 	}
 
-	return NewReadme(strings.NewReader(b.build()))
+	parentPath := filepath.Dir(path)
+	if strings.HasSuffix(parentPath, rustCrateEmptyRootDir) {
+		b.addLicense(rustCrateEmptyLicenseFile, rustCrateEmptyLicenseURL, singleLicenseFile)
+	}
+	return NewReadme(strings.NewReader(b.build()), path)
+}
+
+func loadRustCrateTomlFields(b builder, path string) error {
+	var cargo CargoTomlFile
+
+	_, err := toml.DecodeFile(filepath.Join(path, "Cargo.toml"), &cargo)
+	if err != nil {
+		return fmt.Errorf("Failed to decode Cargo.toml file for project %s: %w", path, err)
+	}
+
+	b.setName(cargo.Package.Name)
+	b.setURL(cargo.Package.Repository)
+	b.setVersion(cargo.Package.Version)
+
+	return nil
 }

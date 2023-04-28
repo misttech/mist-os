@@ -10,6 +10,8 @@ import (
 )
 
 func TestRustCrateReadmeGeneration(t *testing.T) {
+	git = gitForTest{}
+
 	wantPath := filepath.Join(*testDataDir, "rust", "want.json")
 
 	got, err := NewRustCrateReadme(filepath.Join(*testDataDir, "rust"))

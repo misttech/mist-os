@@ -16,6 +16,12 @@ type Git struct {
 	gitPath string
 }
 
+// For testing
+type GitInterface interface {
+	GetURL(context.Context, string) (string, error)
+	GetCommitHash(context.Context, string) (string, error)
+}
+
 // NewGit returns a Git object that is used to interface with the external
 // git tool. It can be used to retrieve the URL for a git repository, for
 // example. The path to the external binary is assumed to be in the user
@@ -53,6 +59,12 @@ func (git *Git) GetURL(ctx context.Context, dir string) (string, error) {
 
 	result := output.String()
 	result = strings.TrimSpace(result)
+
+	// Turquoise repos return "sso" urls, so convert them to
+	// http links that a user can view in a browser.
+	result = strings.ReplaceAll(result,
+		"sso://turquoise-internal",
+		"https://turquoise-internal.googlesource.com")
 
 	return result, nil
 }

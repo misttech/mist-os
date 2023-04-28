@@ -6,8 +6,17 @@ package readme
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	// This project doesn't have a LICENSE file, and so must rely on the
+	// license file in the parent directory.
+	golibCloudInternalRoot        = "third_party/golibs/vendor/cloud.google.com/go/internal"
+	golibCloudInternalLicenseFile = "../LICENSE"
+	golibCloudInternalLicenseURL  = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/golibs/vendor/cloud.google.com/go/LICENSE"
 )
 
 type golibReadmeBuilder struct {
@@ -34,12 +43,12 @@ func NewGolibReadme(path string) (*Readme, error) {
 
 	// Find all license files for this project.
 	// They should all live in the root directory of this project.
-	directoryContents, err := listFilesRecursive(path)
+	directoryContents, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 	for _, item := range directoryContents {
-		lower := strings.ToLower(item)
+		lower := strings.ToLower(item.Name())
 		// In practice, all license files for golibs either have "COPYING"
 		// or "license" in their name.
 		if !(strings.Contains(lower, "licen") ||
@@ -49,46 +58,44 @@ func NewGolibReadme(path string) (*Readme, error) {
 
 		// There are some instances of go source files that fit the above
 		// criteria. Skip those files.
-		ext := filepath.Ext(item)
+		ext := filepath.Ext(item.Name())
 		if ext == ".go" || ext == ".tmpl" || strings.Contains(lower, "template") {
 			continue
 		}
 
-		licenseUrl, err := getDartLicenseURL(&b, remainder, item)
+		licenseUrl, err := getGolibLicenseURL(&b, remainder, item.Name())
 		if err != nil {
 			return nil, err
 		}
 
-		b.addLicense(item, licenseUrl, singleLicenseFile)
+		b.addLicense(item.Name(), licenseUrl, singleLicenseFile)
 	}
 
-	return NewReadme(strings.NewReader(b.build()))
+	if path == golibCloudInternalRoot {
+		b.addLicense(golibCloudInternalLicenseFile, golibCloudInternalLicenseURL, singleLicenseFile)
+	}
+
+	return NewReadme(strings.NewReader(b.build()), path)
 }
 
-func getDartLicenseURL(b *builder, remainder, path string) (string, error) {
+func getGolibLicenseURL(b *builder, remainder, path string) (string, error) {
 	switch {
 	// pkg.go.dev/*
-	case b.parent == "google.golang.org":
-		fallthrough
-	case b.grandparent == "golang.org":
-		fallthrough
-	case b.grandparent == "gonum.org":
-		fallthrough
-	case b.grandparent == "gopkg.in":
-		fallthrough
-	case b.grandparent == "go.uber.org":
-		fallthrough
-	case b.grandparent == "gvisor.dev":
-		fallthrough
-	case b.dir == "go.opencensus.io":
-		fallthrough
-	case b.parent == "cloud.google.com":
+	case b.parent == "google.golang.org",
+		b.grandparent == "golang.org",
+		b.grandparent == "gonum.org",
+		b.grandparent == "gopkg.in",
+		b.parent == "go.uber.org",
+		b.parent == "gvisor.dev",
+		b.dir == "go.opencensus.io",
+		b.parent == "cloud.google.com",
+		b.grandparent == "cloud.google.com",
+		b.grandparent == "honnef.co":
 		return fmt.Sprintf("https://pkg.go.dev/%s?tab=licenses", remainder), nil
 
 	// github.com/*
-	case remainder == "github.com/googleapis/gax-go/v2":
-		fallthrough
-	case b.grandparent == "github.com":
+	case remainder == "github.com/googleapis/gax-go/v2",
+		b.grandparent == "github.com":
 		return fmt.Sprintf("%s/blob/master/%s", b.url, path), nil
 
 	// Unknown

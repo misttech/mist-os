@@ -12,11 +12,6 @@
       "licenseFilePath": "COPYING",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://github.com/foo/bar/blob/master/COPYING"
-    },
-    {
-      "licenseFilePath": "docs/some_other_license.txt",
-      "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://github.com/foo/bar/blob/master/docs/some_other_license.txt"
     }
   ]
 }
