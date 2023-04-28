@@ -785,7 +785,7 @@ mod tests {
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
         const ADDR_VALID_UNTIL: zx::Time = zx::Time::from_nanos(12345);
-        const BASE_PROPERTIES: finterfaces::Properties =
+        let base_properties =
             finterfaces::Properties { id: Some(IFACE1_ID.get()), ..finterfaces::Properties::EMPTY };
 
         for (event, expect) in [
@@ -801,7 +801,7 @@ mod tests {
                         valid_until: ADDR_VALID_UNTIL.into_nanos(),
                     }
                     .into()]),
-                    ..BASE_PROPERTIES
+                    ..base_properties.clone()
                 }),
             ),
             (
@@ -811,7 +811,7 @@ mod tests {
                 },
                 finterfaces::Event::Changed(finterfaces::Properties {
                     has_default_ipv4_route: Some(true),
-                    ..BASE_PROPERTIES
+                    ..base_properties.clone()
                 }),
             ),
             (
@@ -821,7 +821,7 @@ mod tests {
                 },
                 finterfaces::Event::Changed(finterfaces::Properties {
                     has_default_ipv6_route: Some(true),
-                    ..BASE_PROPERTIES
+                    ..base_properties.clone()
                 }),
             ),
             (
@@ -831,14 +831,14 @@ mod tests {
                 },
                 finterfaces::Event::Changed(finterfaces::Properties {
                     has_default_ipv6_route: Some(false),
-                    ..BASE_PROPERTIES
+                    ..base_properties.clone()
                 }),
             ),
             (
                 InterfaceUpdate::OnlineChanged(true),
                 finterfaces::Event::Changed(finterfaces::Properties {
                     online: Some(true),
-                    ..BASE_PROPERTIES
+                    ..base_properties.clone()
                 }),
             ),
         ] {

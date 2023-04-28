@@ -14,16 +14,18 @@ const CHANGED_VOLUME_UNMUTED: bool = false;
 
 const MAX_VOLUME_EARCON_ID: u32 = 0;
 
-const CHANGED_MEDIA_STREAM_SETTINGS_MAX: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(MAX_VOLUME_LEVEL),
-        muted: Some(CHANGED_VOLUME_UNMUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_media_stream_settings_max() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(MAX_VOLUME_LEVEL),
+            muted: Some(CHANGED_VOLUME_UNMUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
 // Test to ensure that when the volume is increased while already at max volume, the earcon for
 // max volume plays.
@@ -42,7 +44,7 @@ async fn test_max_volume_sound_on_press() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
     // Set volume to max.
-    test_instance.set_volume(vec![CHANGED_MEDIA_STREAM_SETTINGS_MAX]).await;
+    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
@@ -57,7 +59,7 @@ async fn test_max_volume_sound_on_press() {
     let _ = listener_proxy.on_event(buttons_event.clone()).await;
 
     // Sets volume max again.
-    test_instance.set_volume(vec![CHANGED_MEDIA_STREAM_SETTINGS_MAX]).await;
+    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
@@ -66,7 +68,7 @@ async fn test_max_volume_sound_on_press() {
     .await;
 
     // Set volume to max again, to simulate holding button.
-    test_instance.set_volume(vec![CHANGED_MEDIA_STREAM_SETTINGS_MAX]).await;
+    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,

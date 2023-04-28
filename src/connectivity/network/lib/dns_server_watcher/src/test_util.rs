@@ -14,88 +14,102 @@ pub(crate) mod constants {
     pub(crate) const UNSPECIFIED_SOURCE_SOCKADDR: fnet::SocketAddress =
         fidl_socket_addr!("192.0.2.1:53");
 
-    pub(crate) const UNSPECIFIED_SOURCE_SERVER: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(UNSPECIFIED_SOURCE_SOCKADDR),
-        source: None,
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn unspecified_source_server() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(UNSPECIFIED_SOURCE_SOCKADDR),
+            source: None,
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const STATIC_SOURCE_SOCKADDR: fnet::SocketAddress =
         fidl_socket_addr!("192.0.2.2:53");
 
-    pub(crate) const STATIC_SERVER: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(STATIC_SOURCE_SOCKADDR),
-        source: Some(fname::DnsServerSource::StaticSource(fname::StaticDnsServerSource::EMPTY)),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn static_server() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(STATIC_SOURCE_SOCKADDR),
+            source: Some(fname::DnsServerSource::StaticSource(fname::StaticDnsServerSource::EMPTY)),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const NDP_SOURCE_SOCKADDR: fnet::SocketAddress =
         fidl_socket_addr!("[2001:db8::1111]:53");
 
     pub(crate) const NDP_SERVER_INTERFACE_ID: u64 = 2;
 
-    pub(crate) const NDP_SERVER: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(NDP_SOURCE_SOCKADDR),
-        source: Some(fname::DnsServerSource::Ndp(fname::NdpDnsServerSource {
-            source_interface: Some(NDP_SERVER_INTERFACE_ID),
-            ..fname::NdpDnsServerSource::EMPTY
-        })),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn ndp_server() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(NDP_SOURCE_SOCKADDR),
+            source: Some(fname::DnsServerSource::Ndp(fname::NdpDnsServerSource {
+                source_interface: Some(NDP_SERVER_INTERFACE_ID),
+                ..fname::NdpDnsServerSource::EMPTY
+            })),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const DHCPV4_SOURCE_SOCKADDR1: fnet::SocketAddress =
         fidl_socket_addr!("192.0.2.3:53");
 
     pub(crate) const DHCPV4_SERVER1_INTERFACE_ID: u64 = 3;
 
-    pub(crate) const DHCPV4_SERVER1: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(DHCPV4_SOURCE_SOCKADDR1),
-        source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
-            source_interface: Some(DHCPV4_SERVER1_INTERFACE_ID),
-            ..fname::DhcpDnsServerSource::EMPTY
-        })),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn dhcpv4_server1() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(DHCPV4_SOURCE_SOCKADDR1),
+            source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
+                source_interface: Some(DHCPV4_SERVER1_INTERFACE_ID),
+                ..fname::DhcpDnsServerSource::EMPTY
+            })),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const DHCPV4_SOURCE_SOCKADDR2: fnet::SocketAddress =
         fidl_socket_addr!("192.0.2.4:53");
 
     pub(crate) const DHCPV4_SERVER2_INTERFACE_ID: u64 = 4;
 
-    pub(crate) const DHCPV4_SERVER2: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(DHCPV4_SOURCE_SOCKADDR2),
-        source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
-            source_interface: Some(DHCPV4_SERVER2_INTERFACE_ID),
-            ..fname::DhcpDnsServerSource::EMPTY
-        })),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn dhcpv4_server2() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(DHCPV4_SOURCE_SOCKADDR2),
+            source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
+                source_interface: Some(DHCPV4_SERVER2_INTERFACE_ID),
+                ..fname::DhcpDnsServerSource::EMPTY
+            })),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const DHCPV6_SOURCE_SOCKADDR1: fnet::SocketAddress =
         fidl_socket_addr!("[2001:db8::2222]:53");
 
     pub(crate) const DHCPV6_SERVER1_INTERFACE_ID: u64 = 3;
 
-    pub(crate) const DHCPV6_SERVER1: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(DHCPV6_SOURCE_SOCKADDR1),
-        source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
-            source_interface: Some(DHCPV6_SERVER1_INTERFACE_ID),
-            ..fname::Dhcpv6DnsServerSource::EMPTY
-        })),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn dhcpv6_server1() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(DHCPV6_SOURCE_SOCKADDR1),
+            source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
+                source_interface: Some(DHCPV6_SERVER1_INTERFACE_ID),
+                ..fname::Dhcpv6DnsServerSource::EMPTY
+            })),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 
     pub(crate) const DHCPV6_SOURCE_SOCKADDR2: fnet::SocketAddress =
         fidl_socket_addr!("[2001:db8::3333]:53");
 
     pub(crate) const DHCPV6_SERVER2_INTERFACE_ID: u64 = 4;
 
-    pub(crate) const DHCPV6_SERVER2: fname::DnsServer_ = fname::DnsServer_ {
-        address: Some(DHCPV6_SOURCE_SOCKADDR2),
-        source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
-            source_interface: Some(DHCPV6_SERVER2_INTERFACE_ID),
-            ..fname::Dhcpv6DnsServerSource::EMPTY
-        })),
-        ..fname::DnsServer_::EMPTY
-    };
+    pub(crate) fn dhcpv6_server2() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(DHCPV6_SOURCE_SOCKADDR2),
+            source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
+                source_interface: Some(DHCPV6_SERVER2_INTERFACE_ID),
+                ..fname::Dhcpv6DnsServerSource::EMPTY
+            })),
+            ..fname::DnsServer_::EMPTY
+        }
+    }
 }

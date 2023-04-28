@@ -313,7 +313,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::account_event_emitter::MINIMUM_AUTH_STATE;
+    use crate::account_event_emitter::minimum_auth_state;
     use crate::account_handler_connection::AccountHandlerConnectionImpl;
     use crate::stored_account_list::{StoredAccount, StoredAccountList};
     use fidl::endpoints::{create_request_stream, RequestStream};
@@ -494,11 +494,11 @@ mod tests {
                                 vec![
                                     AccountAuthState {
                                         account_id: 1,
-                                        auth_state: MINIMUM_AUTH_STATE
+                                        auth_state: minimum_auth_state()
                                     },
                                     AccountAuthState {
                                         account_id: 2,
-                                        auth_state: MINIMUM_AUTH_STATE
+                                        auth_state: minimum_auth_state()
                                     },
                                 ]
                             );

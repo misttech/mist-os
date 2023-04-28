@@ -32,15 +32,18 @@ pub(super) struct ClientState {
 }
 
 pub(super) const DEFAULT_SUBNET: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
-pub(super) const NEW_CLIENT_PARAMS: fnet_dhcp::NewClientParams = fnet_dhcp::NewClientParams {
-    configuration_to_request: Some(fnet_dhcp::ConfigurationToRequest {
-        routers: Some(true),
-        dns_servers: Some(true),
-        ..fnet_dhcp::ConfigurationToRequest::EMPTY
-    }),
-    request_ip_address: Some(true),
-    ..fnet_dhcp::NewClientParams::EMPTY
-};
+
+pub(super) fn new_client_params() -> fnet_dhcp::NewClientParams {
+    fnet_dhcp::NewClientParams {
+        configuration_to_request: Some(fnet_dhcp::ConfigurationToRequest {
+            routers: Some(true),
+            dns_servers: Some(true),
+            ..fnet_dhcp::ConfigurationToRequest::EMPTY
+        }),
+        request_ip_address: Some(true),
+        ..fnet_dhcp::NewClientParams::EMPTY
+    }
+}
 
 pub(super) type ConfigurationStreamMap = StreamMap<u64, InterfaceIdTaggedConfigurationStream>;
 pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<u64, ConfigurationStream>;
@@ -199,7 +202,7 @@ pub(super) fn start_client(
         .expect("create DHCPv4 client fidl endpoints");
 
     client_provider
-        .new_client(interface_id, NEW_CLIENT_PARAMS, server)
+        .new_client(interface_id, new_client_params(), server)
         .expect("create new DHCPv4 client");
 
     if let Some(stream) = configuration_streams.insert(

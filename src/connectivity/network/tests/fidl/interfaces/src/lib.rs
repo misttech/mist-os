@@ -1608,17 +1608,16 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
         )
         .expect("Control.AddAddress FIDL error");
 
-    const DEPRECATED_PROPERTIES: fidl_fuchsia_net_interfaces_admin::AddressProperties =
-        fidl_fuchsia_net_interfaces_admin::AddressProperties {
-            preferred_lifetime_info: Some(
-                fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
-                    fidl_fuchsia_net_interfaces::Empty,
-                ),
+    let deprecated_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties {
+        preferred_lifetime_info: Some(
+            fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
+                fidl_fuchsia_net_interfaces::Empty,
             ),
-            ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
-        };
+        ),
+        ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+    };
     address_state_provider
-        .update_address_properties(DEPRECATED_PROPERTIES)
+        .update_address_properties(deprecated_properties)
         .await
         .expect("FIDL error deprecating address");
 

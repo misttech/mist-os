@@ -335,8 +335,9 @@ trait UdpSendMsgPreflightTestIpExt {
     const REACHABLE_ADDR2: fnet::SocketAddress;
     const UNREACHABLE_ADDR: fnet::SocketAddress;
     const OTHER_SUBNET: fnet::Subnet;
-    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration;
     const FIDL_IP_VERSION: fnet::IpVersion;
+
+    fn forwarding_config() -> fnet_interfaces_admin::Configuration;
 }
 
 impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
@@ -359,15 +360,17 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
             port: Self::PORT,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
-    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration =
+    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V4;
+
+    fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 forwarding: Some(true),
                 ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
             }),
             ..fnet_interfaces_admin::Configuration::EMPTY
-        };
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V4;
+        }
+    }
 }
 
 impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
@@ -393,15 +396,17 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
             zone_index: 0,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
-    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration =
+    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V6;
+
+    fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 forwarding: Some(true),
                 ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
             }),
             ..fnet_interfaces_admin::Configuration::EMPTY
-        };
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V6;
+        }
+    }
 }
 
 async fn udp_send_msg_preflight_fidl_setup<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
@@ -545,7 +550,7 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
         UdpCacheInvalidationReason::SetConfigurationCalled => {
             let _prev_config = iface
                 .control()
-                .set_configuration(I::FORWARDING_CONFIG)
+                .set_configuration(I::forwarding_config())
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration");

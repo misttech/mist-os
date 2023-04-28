@@ -28,16 +28,18 @@ const ENV_NAME: &str = "settings_service_audio_test_environment";
 const CHANGED_VOLUME_LEVEL: f32 = 0.7;
 const CHANGED_VOLUME_MUTED: bool = true;
 
-const CHANGED_MEDIA_STREAM_SETTINGS: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(CHANGED_VOLUME_LEVEL),
-        muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_media_stream_settings() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(CHANGED_VOLUME_LEVEL),
+            muted: Some(CHANGED_VOLUME_MUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
 /// Creates an environment that will fail on a get request.
 async fn create_audio_test_env_with_failures(
@@ -288,7 +290,7 @@ async fn test_invalid_stream_fails() {
 
     // Make a set call with the media stream, which isn't present and should fail.
     let mut audio_settings = AudioSettings::EMPTY;
-    audio_settings.streams = Some(vec![CHANGED_MEDIA_STREAM_SETTINGS]);
+    audio_settings.streams = Some(vec![changed_media_stream_settings()]);
     let _ =
         audio_proxy.set(audio_settings).await.expect("set completed").expect_err("set should fail");
 }

@@ -54,15 +54,14 @@ async fn address_deprecation<N: Netstack>(name: &str) {
     // preferred lifetime.
     const PREFERRED_PROPERTIES: fidl_fuchsia_net_interfaces_admin::AddressProperties =
         fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY;
-    const DEPRECATED_PROPERTIES: fidl_fuchsia_net_interfaces_admin::AddressProperties =
-        fidl_fuchsia_net_interfaces_admin::AddressProperties {
-            preferred_lifetime_info: Some(
-                fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
-                    fidl_fuchsia_net_interfaces::Empty,
-                ),
+    let deprecated_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties {
+        preferred_lifetime_info: Some(
+            fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
+                fidl_fuchsia_net_interfaces::Empty,
             ),
-            ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
-        };
+        ),
+        ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+    };
     let addr1_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &interface,
         fidl_fuchsia_net::Subnet {
@@ -90,7 +89,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
             prefix_len: (ADDR2.octets().len() * 8).try_into().unwrap(),
         },
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
-            initial_properties: Some(DEPRECATED_PROPERTIES.clone()),
+            initial_properties: Some(deprecated_properties.clone()),
             ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
         },
     )
@@ -116,7 +115,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
     assert_eq!(get_source_addr().await, ADDR1);
 
     addr1_state_provider
-        .update_address_properties(DEPRECATED_PROPERTIES)
+        .update_address_properties(deprecated_properties.clone())
         .await
         .expect("FIDL error deprecating address");
     addr2_state_provider

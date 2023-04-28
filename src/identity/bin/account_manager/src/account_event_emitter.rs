@@ -21,8 +21,10 @@ use {
 
 // TODO(jsankey): Add a mechanism to publicize auth state changes rather than this fixed minimum
 // possible value.
-pub const MINIMUM_AUTH_STATE: AuthState =
-    AuthState { summary: Some(AuthStateSummary::StorageLocked), ..AuthState::EMPTY };
+
+pub fn minimum_auth_state() -> AuthState {
+    AuthState { summary: Some(AuthStateSummary::StorageLocked), ..AuthState::EMPTY }
+}
 
 /// Events emitted on account listeners
 pub enum AccountEvent {
@@ -84,7 +86,7 @@ impl Client {
         match event {
             AccountEvent::AccountAdded(id) => {
                 let mut account_state =
-                    AccountAuthState { account_id: (*id).into(), auth_state: MINIMUM_AUTH_STATE };
+                    AccountAuthState { account_id: (*id).into(), auth_state: minimum_auth_state() };
                 self.listener.on_account_added(&mut account_state)
             }
             AccountEvent::AccountRemoved(id) => self.listener.on_account_removed((*id).into()),
@@ -150,7 +152,7 @@ impl AccountEventEmitter {
                 .iter()
                 .map(|id| AccountAuthState {
                     account_id: (*id).into(),
-                    auth_state: MINIMUM_AUTH_STATE,
+                    auth_state: minimum_auth_state(),
                 })
                 .collect::<Vec<_>>();
             FutureObj::new(Box::pin(listener.on_initialize(&mut v.iter_mut())))
@@ -277,7 +279,7 @@ mod tests {
                     account_states,
                     vec![AccountAuthState {
                         account_id: (*TEST_ACCOUNT_ID).into(),
-                        auth_state: MINIMUM_AUTH_STATE
+                        auth_state: minimum_auth_state()
                     }]
                 );
                 responder.send().unwrap();

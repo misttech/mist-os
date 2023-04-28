@@ -18,27 +18,31 @@ const BLUETOOTH_DOMAIN: &str = "Bluetooth";
 const NON_BLUETOOTH_DOMAIN_1: &str = "Cast App";
 const NON_BLUETOOTH_DOMAIN_2: &str = "Cast App Helper";
 
-const CHANGED_MEDIA_STREAM_SETTINGS: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(AudioRenderUsage::Media),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(DEFAULT_VOLUME_LEVEL + 0.2),
-        muted: Some(DEFAULT_VOLUME_MUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_media_stream_settings() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(DEFAULT_VOLUME_LEVEL + 0.2),
+            muted: Some(DEFAULT_VOLUME_MUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
-const CHANGED_INTERRUPTION_STREAM_SETTINGS: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(fidl_fuchsia_media::AudioRenderUsage::Interruption),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(DEFAULT_VOLUME_LEVEL + 0.25),
-        muted: Some(DEFAULT_VOLUME_MUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_interruption_stream_settings() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Interruption),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(DEFAULT_VOLUME_LEVEL + 0.25),
+            muted: Some(DEFAULT_VOLUME_MUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
 // Tests to ensure that when the bluetooth connections change, the SoundPlayer receives requests
 // to play the sounds with the correct ids.
@@ -134,7 +138,7 @@ async fn test_earcons_play_at_media_volume_level() {
 
     // Set both the media and interruption streams to different volumes. The background stream
     // should match the media stream when played.
-    test_instance.set_volume(vec![CHANGED_MEDIA_STREAM_SETTINGS]).await;
+    test_instance.set_volume(vec![changed_media_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
@@ -142,7 +146,7 @@ async fn test_earcons_play_at_media_volume_level() {
     )
     .await;
 
-    test_instance.set_volume(vec![CHANGED_INTERRUPTION_STREAM_SETTINGS]).await;
+    test_instance.set_volume(vec![changed_interruption_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
@@ -163,7 +167,7 @@ async fn test_earcons_play_at_media_volume_level() {
     let expected_background_stream = AudioStreamSettings {
         stream: Some(AudioRenderUsage::Background),
         source: Some(AudioStreamSettingSource::System),
-        user_volume: CHANGED_MEDIA_STREAM_SETTINGS.user_volume,
+        user_volume: changed_media_stream_settings().user_volume,
         ..AudioStreamSettings::EMPTY
     };
     test_instance.verify_volume(AudioRenderUsage::Background, expected_background_stream).await;

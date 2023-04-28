@@ -111,16 +111,16 @@ mod tests {
             assert!(stream.next().now_or_never().is_none());
             {
                 let mut w = watcher.lock().await;
-                w.push_config(vec![NDP_SERVER]);
-                w.push_config(vec![STATIC_SERVER]);
+                w.push_config(vec![ndp_server()]);
+                w.push_config(vec![static_server()]);
             }
             let (source, res) = stream.next().await.expect("stream ended unexpectedly");
             assert_eq!(source, DnsServersUpdateSource::Netstack);
-            assert_eq!(vec![NDP_SERVER], res.expect("FIDL error occurred"));
+            assert_eq!(vec![ndp_server()], res.expect("FIDL error occurred"));
 
             let (source, res) = stream.next().await.expect("stream ended unexpectedly");
             assert_eq!(source, DnsServersUpdateSource::Netstack);
-            assert_eq!(vec![STATIC_SERVER], res.expect("FIDL error occurred"));
+            assert_eq!(vec![static_server()], res.expect("FIDL error occurred"));
 
             // Abort the serving future so join will end.
             abort_handle.abort();

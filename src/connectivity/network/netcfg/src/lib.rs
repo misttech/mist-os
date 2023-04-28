@@ -3072,7 +3072,8 @@ mod tests {
             .expect("error handling interface change event with interface online")
     }
     const DHCP_ADDRESS: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("192.0.2.254/24");
-    const DHCP_ADDRESS_PARAMETERS: fnet_interfaces_admin::AddressParameters =
+
+    fn dhcp_address_parameters() -> fnet_interfaces_admin::AddressParameters {
         fnet_interfaces_admin::AddressParameters {
             initial_properties: Some(fnet_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
@@ -3082,7 +3083,8 @@ mod tests {
             temporary: Some(true),
             add_subnet_route: Some(false),
             ..fnet_interfaces_admin::AddressParameters::EMPTY
-        };
+        }
+    }
 
     #[test_case(true, true; "added online and removed interface")]
     #[test_case(false, true; "added offline and removed interface")]
@@ -3165,7 +3167,7 @@ mod tests {
                     control_handle: _,
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID);
-                    assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
+                    assert_eq!(params, dhcpv4::new_client_params(),);
                     request.into_stream().expect("error converting client server end to stream")
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
@@ -3196,7 +3198,7 @@ mod tests {
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
                     address: Some(fnet_dhcp::Address {
                         address: Some(DHCP_ADDRESS),
-                        address_parameters: Some(DHCP_ADDRESS_PARAMETERS),
+                        address_parameters: Some(dhcp_address_parameters()),
                         address_state_provider: Some(asp_server),
                         ..fnet_dhcp::Address::EMPTY
                     }),
@@ -3248,7 +3250,7 @@ mod tests {
                         control_handle: _,
                     })  => {
                         assert_eq!(address, fnet::Subnet::from_ext(DHCP_ADDRESS));
-                        assert_eq!(parameters, DHCP_ADDRESS_PARAMETERS);
+                        assert_eq!(parameters, dhcp_address_parameters());
                     }
                 );
             };
@@ -3403,7 +3405,7 @@ mod tests {
                 control_handle: _,
             } => {
                 assert_eq!(interface_id, INTERFACE_ID);
-                assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
+                assert_eq!(params, dhcpv4::new_client_params(),);
                 request.into_stream().expect("error converting client server end to stream")
             }
             fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
@@ -3417,7 +3419,7 @@ mod tests {
             .send(fnet_dhcp::ClientWatchConfigurationResponse {
                 address: Some(fnet_dhcp::Address {
                     address: Some(DHCP_ADDRESS),
-                    address_parameters: Some(DHCP_ADDRESS_PARAMETERS),
+                    address_parameters: Some(dhcp_address_parameters()),
                     address_state_provider: Some(asp_server),
                     ..fnet_dhcp::Address::EMPTY
                 }),

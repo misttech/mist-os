@@ -438,25 +438,29 @@ mod tests {
             test_case::test_case,
         };
 
-        const POSITION_WITH_UNKNOWN_ACCURACY: Position = Position {
-            latitude: 1.0,
-            longitude: -1.0,
-            extras: PositionExtras {
-                accuracy_meters: None,
-                altitude_meters: None,
-                ..PositionExtras::EMPTY
-            },
-        };
+        fn position_with_unknown_accuracy() -> Position {
+            Position {
+                latitude: 1.0,
+                longitude: -1.0,
+                extras: PositionExtras {
+                    accuracy_meters: None,
+                    altitude_meters: None,
+                    ..PositionExtras::EMPTY
+                },
+            }
+        }
 
-        const POSITION_WITH_KNOWN_ACCURACY: Position = Position {
-            latitude: 1.0,
-            longitude: -1.0,
-            extras: PositionExtras {
-                accuracy_meters: Some(1.0),
-                altitude_meters: None,
-                ..PositionExtras::EMPTY
-            },
-        };
+        fn position_with_known_accuracy() -> Position {
+            Position {
+                latitude: 1.0,
+                longitude: -1.0,
+                extras: PositionExtras {
+                    accuracy_meters: Some(1.0),
+                    altitude_meters: None,
+                    ..PositionExtras::EMPTY
+                },
+            }
+        }
 
         #[fasync::run_until_stalled(test)]
         async fn propagates_success_to_client() {
@@ -466,7 +470,7 @@ mod tests {
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
-                &StubBssResolver { resolve: || Ok(POSITION_WITH_UNKNOWN_ACCURACY) },
+                &StubBssResolver { resolve: || Ok(position_with_unknown_accuracy()) },
                 IncomingRequest::EmergencyProviderRequest(stream),
                 cobalt_sender,
             );
@@ -504,7 +508,7 @@ mod tests {
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
-                &StubBssResolver { resolve: || Ok(POSITION_WITH_UNKNOWN_ACCURACY) },
+                &StubBssResolver { resolve: || Ok(position_with_unknown_accuracy()) },
                 IncomingRequest::EmergencyProviderRequest(stream),
                 cobalt_sender,
             );
@@ -558,7 +562,7 @@ mod tests {
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
-                &StubBssResolver { resolve: || Ok(POSITION_WITH_KNOWN_ACCURACY) },
+                &StubBssResolver { resolve: || Ok(position_with_known_accuracy()) },
                 IncomingRequest::EmergencyProviderRequest(stream),
                 cobalt_sender,
             );
@@ -587,7 +591,7 @@ mod tests {
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
-                &StubBssResolver { resolve: || Ok(POSITION_WITH_UNKNOWN_ACCURACY) },
+                &StubBssResolver { resolve: || Ok(position_with_unknown_accuracy()) },
                 IncomingRequest::EmergencyProviderRequest(stream),
                 cobalt_sender,
             );
@@ -614,7 +618,7 @@ mod tests {
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
-                &StubBssResolver { resolve: || Ok(POSITION_WITH_UNKNOWN_ACCURACY) },
+                &StubBssResolver { resolve: || Ok(position_with_unknown_accuracy()) },
                 IncomingRequest::EmergencyProviderRequest(stream),
                 cobalt_sender,
             );
@@ -696,7 +700,7 @@ mod tests {
                 let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
                 let resolver = StubBssResolver {
                     resolve: || match &result {
-                        Ok(()) => Ok(POSITION_WITH_KNOWN_ACCURACY),
+                        Ok(()) => Ok(position_with_known_accuracy()),
                         Err(()) => Err(ResolverError::NoBsses),
                     },
                 };

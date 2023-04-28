@@ -14,17 +14,17 @@ mod common;
 async fn test_accessibility_set_all() {
     const CHANGED_COLOR_BLINDNESS_TYPE: ColorBlindnessType = ColorBlindnessType::Tritanomaly;
     const TEST_COLOR: ColorRgba = ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 };
-    const CHANGED_FONT_STYLE: CaptionFontStyle = CaptionFontStyle {
+    let changed_font_style = CaptionFontStyle {
         family: Some(CaptionFontFamily::Casual),
         color: Some(TEST_COLOR),
         relative_size: Some(1.0),
         char_edge_style: Some(EdgeStyle::Raised),
         ..CaptionFontStyle::EMPTY
     };
-    const CHANGED_CAPTION_SETTINGS: CaptionsSettings = CaptionsSettings {
+    let changed_caption_settings = CaptionsSettings {
         for_media: Some(true),
         for_tts: Some(true),
-        font_style: Some(CHANGED_FONT_STYLE),
+        font_style: Some(changed_font_style),
         window_color: Some(TEST_COLOR),
         background_color: Some(TEST_COLOR),
         ..CaptionsSettings::EMPTY
@@ -38,7 +38,7 @@ async fn test_accessibility_set_all() {
     expected_settings.color_inversion = Some(true);
     expected_settings.enable_magnification = Some(true);
     expected_settings.color_correction = Some(CHANGED_COLOR_BLINDNESS_TYPE.into());
-    expected_settings.captions_settings = Some(CHANGED_CAPTION_SETTINGS);
+    expected_settings.captions_settings = Some(changed_caption_settings);
 
     let instance = AccessibilityTest::create_realm().await.expect("setting up test realm");
 
@@ -65,24 +65,24 @@ async fn test_accessibility_set_all() {
 
 #[fuchsia::test]
 async fn test_accessibility_set_captions() {
-    const CHANGED_FONT_STYLE: CaptionFontStyle = CaptionFontStyle {
+    let changed_font_style = CaptionFontStyle {
         family: Some(CaptionFontFamily::Casual),
         color: None,
         relative_size: Some(1.0),
         char_edge_style: None,
         ..CaptionFontStyle::EMPTY
     };
-    const EXPECTED_CAPTIONS_SETTINGS: CaptionsSettings = CaptionsSettings {
+    let expected_captions_settings = CaptionsSettings {
         for_media: Some(true),
         for_tts: None,
-        font_style: Some(CHANGED_FONT_STYLE),
+        font_style: Some(changed_font_style),
         window_color: Some(ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 }),
         background_color: None,
         ..CaptionsSettings::EMPTY
     };
 
     let mut expected_settings = AccessibilitySettings::EMPTY;
-    expected_settings.captions_settings = Some(EXPECTED_CAPTIONS_SETTINGS);
+    expected_settings.captions_settings = Some(expected_captions_settings.clone());
 
     let instance = AccessibilityTest::create_realm().await.expect("setting up test realm");
 
@@ -95,7 +95,7 @@ async fn test_accessibility_set_captions() {
             for_media: Some(false),
             for_tts: None,
             font_style: None,
-            window_color: EXPECTED_CAPTIONS_SETTINGS.window_color,
+            window_color: expected_captions_settings.clone().window_color,
             background_color: None,
             ..CaptionsSettings::EMPTY
         });
@@ -104,9 +104,9 @@ async fn test_accessibility_set_captions() {
         // Set FontStyle and overwrite for_media.
         let mut second_set = AccessibilitySettings::EMPTY;
         second_set.captions_settings = Some(CaptionsSettings {
-            for_media: EXPECTED_CAPTIONS_SETTINGS.for_media,
+            for_media: expected_captions_settings.clone().for_media,
             for_tts: None,
-            font_style: EXPECTED_CAPTIONS_SETTINGS.font_style,
+            font_style: expected_captions_settings.clone().font_style,
             window_color: None,
             background_color: None,
             ..CaptionsSettings::EMPTY

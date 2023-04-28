@@ -24,27 +24,31 @@ const CHANGED_VOLUME_LEVEL_2: f32 = CHANGED_VOLUME_LEVEL + 0.25;
 /// A mute state of true, which is different from the default of false.
 const CHANGED_VOLUME_MUTED: bool = !DEFAULT_VOLUME_MUTED;
 
-const CHANGED_MEDIA_STREAM_SETTINGS: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(AudioRenderUsage::Media),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(CHANGED_VOLUME_LEVEL),
-        muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_media_stream_settings() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(CHANGED_VOLUME_LEVEL),
+            muted: Some(CHANGED_VOLUME_MUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
-const CHANGED_MEDIA_STREAM_SETTINGS_2: AudioStreamSettings = AudioStreamSettings {
-    stream: Some(AudioRenderUsage::Media),
-    source: Some(AudioStreamSettingSource::User),
-    user_volume: Some(Volume {
-        level: Some(CHANGED_VOLUME_LEVEL_2),
-        muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
-    }),
-    ..AudioStreamSettings::EMPTY
-};
+fn changed_media_stream_settings_2() -> AudioStreamSettings {
+    AudioStreamSettings {
+        stream: Some(AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(CHANGED_VOLUME_LEVEL_2),
+            muted: Some(CHANGED_VOLUME_MUTED),
+            ..Volume::EMPTY
+        }),
+        ..AudioStreamSettings::EMPTY
+    }
+}
 
 async fn set_volume(proxy: &AudioProxy, streams: Vec<AudioStreamSettings>) {
     let mut audio_settings = AudioSettings::EMPTY;
@@ -79,9 +83,9 @@ async fn test_audio() {
     verify_audio_stream(&settings, DEFAULT_MEDIA_STREAM_SETTINGS);
 
     // Verify that a Set call changes the audio settings.
-    set_volume(audio_test.proxy(), vec![CHANGED_MEDIA_STREAM_SETTINGS]).await;
+    set_volume(audio_test.proxy(), vec![changed_media_stream_settings()]).await;
     let settings = audio_test.proxy().watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
 
     // Verify that audio core received the changed audio settings.
     audio_test
@@ -94,7 +98,7 @@ async fn test_audio() {
 
     // Verify that a separate client receives the changed settings on a Watch call.
     let settings = watch_client.watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
 
     audio_test.clean_up().await;
 }
@@ -111,9 +115,9 @@ async fn test_consecutive_volume_changes() {
     let watch_client = audio_test.connect_to_audio_marker();
 
     // Make a set call and verify the value returned from watch changes.
-    set_volume(audio_test.proxy(), vec![CHANGED_MEDIA_STREAM_SETTINGS]).await;
+    set_volume(audio_test.proxy(), vec![changed_media_stream_settings()]).await;
     let settings = audio_test.proxy().watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
 
     audio_test
         .verify_audio_requests(&[
@@ -124,9 +128,9 @@ async fn test_consecutive_volume_changes() {
         .expect("changed audio requests received");
 
     // Make a second set call and verify the value returned from watch changes again.
-    set_volume(audio_test.proxy(), vec![CHANGED_MEDIA_STREAM_SETTINGS_2]).await;
+    set_volume(audio_test.proxy(), vec![changed_media_stream_settings_2()]).await;
     let settings = audio_test.proxy().watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS_2);
+    verify_audio_stream(&settings, changed_media_stream_settings_2());
 
     // There won't be a muted request since the mute state doesn't change.
     audio_test
@@ -139,7 +143,7 @@ async fn test_consecutive_volume_changes() {
 
     // Verify that a separate client receives the changed settings on a Watch call.
     let settings = watch_client.watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS_2);
+    verify_audio_stream(&settings, changed_media_stream_settings_2());
 
     audio_test.clean_up().await;
 }
@@ -162,10 +166,10 @@ async fn test_deduped_volume_changes() {
         set_volume(&set_client, vec![DEFAULT_MEDIA_STREAM_SETTINGS]).await;
 
         // Make a third, different request. This should show up in the watch.
-        set_volume(&set_client, vec![CHANGED_MEDIA_STREAM_SETTINGS_2]).await;
+        set_volume(&set_client, vec![changed_media_stream_settings_2()]).await;
 
         let settings = fut.await.expect("watch completed");
-        verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS_2);
+        verify_audio_stream(&settings, changed_media_stream_settings_2());
     }
 
     audio_test.clean_up().await;
@@ -180,9 +184,9 @@ async fn test_volume_not_overwritten() {
             .expect("setting up test realm");
 
     // Change the media stream and verify a watch call returns the updated value.
-    set_volume(audio_test.proxy(), vec![CHANGED_MEDIA_STREAM_SETTINGS]).await;
+    set_volume(audio_test.proxy(), vec![changed_media_stream_settings()]).await;
     let settings = audio_test.proxy().watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
 
     audio_test
         .verify_audio_requests(&[
@@ -193,19 +197,19 @@ async fn test_volume_not_overwritten() {
         .expect("changed audio requests received");
 
     // Change the background stream and verify a watch call returns the updated value.
-    const CHANGED_BACKGROUND_STREAM_SETTINGS: AudioStreamSettings = AudioStreamSettings {
+    let changed_background_stream_settings = AudioStreamSettings {
         stream: Some(AudioRenderUsage::Background),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume { level: Some(0.3), muted: Some(true), ..Volume::EMPTY }),
         ..AudioStreamSettings::EMPTY
     };
 
-    set_volume(audio_test.proxy(), vec![CHANGED_BACKGROUND_STREAM_SETTINGS]).await;
+    set_volume(audio_test.proxy(), vec![changed_background_stream_settings.clone()]).await;
     let settings = audio_test.proxy().watch().await.expect("watch completed");
 
     // Changing the background volume should not affect media volume.
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
-    verify_audio_stream(&settings, CHANGED_BACKGROUND_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
+    verify_audio_stream(&settings, changed_background_stream_settings.clone());
 
     audio_test.clean_up().await;
 }
@@ -235,7 +239,7 @@ async fn test_volume_rounding() {
     .await;
 
     let settings = audio_test.proxy().watch().await.expect("watch completed");
-    verify_audio_stream(&settings, CHANGED_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, changed_media_stream_settings());
 
     audio_test
         .verify_audio_requests(&[
@@ -300,7 +304,7 @@ async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
 
     // The best way to test that audio core *didn't* receive an event is to
     // trigger another request and verify that it shows up next.
-    set_volume(audio_test.proxy(), vec![CHANGED_MEDIA_STREAM_SETTINGS]).await;
+    set_volume(audio_test.proxy(), vec![changed_media_stream_settings()]).await;
 
     // Verify that audio core received the changed audio settings.
     audio_test

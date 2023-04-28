@@ -801,87 +801,115 @@ mod tests {
 
     /// Allows types to provided an arbitrary but valid value for tests.
     trait ArbitraryTestValue {
-        const ARBITRARY_TEST_VALUE: Self;
+        fn arbitrary_test_value() -> Self;
     }
 
     impl ArbitraryTestValue for fnet_routes::SpecifiedRouteProperties {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::SpecifiedRouteProperties {
-            metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(0)),
-            ..fnet_routes::SpecifiedRouteProperties::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::SpecifiedRouteProperties {
+                metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(0)),
+                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::EffectiveRouteProperties {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::EffectiveRouteProperties {
-            metric: Some(0),
-            ..fnet_routes::EffectiveRouteProperties::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::EffectiveRouteProperties {
+                metric: Some(0),
+                ..fnet_routes::EffectiveRouteProperties::EMPTY
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RoutePropertiesV4 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::RoutePropertiesV4 {
-            specified_properties: Some(fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE),
-            ..fnet_routes::RoutePropertiesV4::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RoutePropertiesV4 {
+                specified_properties: Some(
+                    fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
+                ),
+                ..fnet_routes::RoutePropertiesV4::EMPTY
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RoutePropertiesV6 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::RoutePropertiesV6 {
-            specified_properties: Some(fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE),
-            ..fnet_routes::RoutePropertiesV6::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RoutePropertiesV6 {
+                specified_properties: Some(
+                    fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
+                ),
+                ..fnet_routes::RoutePropertiesV6::EMPTY
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteTargetV4 {
-        const ARBITRARY_TEST_VALUE: Self =
-            fnet_routes::RouteTargetV4 { outbound_interface: 1, next_hop: None };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteTargetV4 { outbound_interface: 1, next_hop: None }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteTargetV6 {
-        const ARBITRARY_TEST_VALUE: Self =
-            fnet_routes::RouteTargetV6 { outbound_interface: 1, next_hop: None };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteTargetV6 { outbound_interface: 1, next_hop: None }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteActionV4 {
-        const ARBITRARY_TEST_VALUE: Self =
-            fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4::ARBITRARY_TEST_VALUE);
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4::arbitrary_test_value())
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteActionV6 {
-        const ARBITRARY_TEST_VALUE: Self =
-            fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6::ARBITRARY_TEST_VALUE);
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6::arbitrary_test_value())
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteV4 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::RouteV4 {
-            destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
-            action: fnet_routes::RouteActionV4::ARBITRARY_TEST_VALUE,
-            properties: fnet_routes::RoutePropertiesV4::ARBITRARY_TEST_VALUE,
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteV4 {
+                destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
+                action: fnet_routes::RouteActionV4::arbitrary_test_value(),
+                properties: fnet_routes::RoutePropertiesV4::arbitrary_test_value(),
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::RouteV6 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::RouteV6 {
-            destination: fidl_ip_v6_with_prefix!("fe80::0/64"),
-            action: fnet_routes::RouteActionV6::ARBITRARY_TEST_VALUE,
-            properties: fnet_routes::RoutePropertiesV6::ARBITRARY_TEST_VALUE,
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::RouteV6 {
+                destination: fidl_ip_v6_with_prefix!("fe80::0/64"),
+                action: fnet_routes::RouteActionV6::arbitrary_test_value(),
+                properties: fnet_routes::RoutePropertiesV6::arbitrary_test_value(),
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::InstalledRouteV4 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::InstalledRouteV4 {
-            route: Some(fnet_routes::RouteV4::ARBITRARY_TEST_VALUE),
-            effective_properties: Some(fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE),
-            ..fnet_routes::InstalledRouteV4::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::InstalledRouteV4 {
+                route: Some(fnet_routes::RouteV4::arbitrary_test_value()),
+                effective_properties: Some(
+                    fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
+                ),
+                ..fnet_routes::InstalledRouteV4::EMPTY
+            }
+        }
     }
 
     impl ArbitraryTestValue for fnet_routes::InstalledRouteV6 {
-        const ARBITRARY_TEST_VALUE: Self = fnet_routes::InstalledRouteV6 {
-            route: Some(fnet_routes::RouteV6::ARBITRARY_TEST_VALUE),
-            effective_properties: Some(fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE),
-            ..fnet_routes::InstalledRouteV6::EMPTY
-        };
+        fn arbitrary_test_value() -> Self {
+            fnet_routes::InstalledRouteV6 {
+                route: Some(fnet_routes::RouteV6::arbitrary_test_value()),
+                effective_properties: Some(
+                    fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
+                ),
+                ..fnet_routes::InstalledRouteV6::EMPTY
+            }
+        }
     }
 
     #[test]
@@ -896,19 +924,18 @@ mod tests {
 
     #[test]
     fn specified_route_properties_try_from() {
-        const FIDL_TYPE: fnet_routes::SpecifiedRouteProperties =
-            fnet_routes::SpecifiedRouteProperties {
-                metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(1)),
-                ..fnet_routes::SpecifiedRouteProperties::EMPTY
-            };
+        let fidl_type = fnet_routes::SpecifiedRouteProperties {
+            metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(1)),
+            ..fnet_routes::SpecifiedRouteProperties::EMPTY
+        };
         let local_type =
             SpecifiedRouteProperties { metric: fnet_routes::SpecifiedMetric::ExplicitMetric(1) };
-        assert_eq!(FIDL_TYPE.clone().try_into(), Ok(local_type));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
         assert_eq!(
             <SpecifiedRouteProperties as std::convert::Into<
                 fnet_routes::SpecifiedRouteProperties,
             >>::into(local_type),
-            FIDL_TYPE
+            fidl_type.clone()
         );
     }
 
@@ -924,18 +951,17 @@ mod tests {
 
     #[test]
     fn effective_route_properties_try_from() {
-        const FIDL_TYPE: fnet_routes::EffectiveRouteProperties =
-            fnet_routes::EffectiveRouteProperties {
-                metric: Some(1),
-                ..fnet_routes::EffectiveRouteProperties::EMPTY
-            };
+        let fidl_type = fnet_routes::EffectiveRouteProperties {
+            metric: Some(1),
+            ..fnet_routes::EffectiveRouteProperties::EMPTY
+        };
         let local_type = EffectiveRouteProperties { metric: 1 };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(EffectiveRouteProperties { metric: 1 }));
+        assert_eq!(fidl_type.clone().try_into(), Ok(EffectiveRouteProperties { metric: 1 }));
         assert_eq!(
             <EffectiveRouteProperties as std::convert::Into<
                 fnet_routes::EffectiveRouteProperties,
             >>::into(local_type),
-            FIDL_TYPE
+            fidl_type.clone()
         );
     }
 
@@ -961,41 +987,45 @@ mod tests {
 
     #[test]
     fn route_properties_try_from_v4() {
-        const FIDL_TYPE: fnet_routes::RoutePropertiesV4 = fnet_routes::RoutePropertiesV4 {
-            specified_properties: Some(fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE),
+        let fidl_type = fnet_routes::RoutePropertiesV4 {
+            specified_properties: Some(
+                fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
+            ),
             ..fnet_routes::RoutePropertiesV4::EMPTY
         };
         let local_type = RouteProperties {
-            specified_properties: fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE
+            specified_properties: fnet_routes::SpecifiedRouteProperties::arbitrary_test_value()
                 .try_into()
                 .unwrap(),
         };
-        assert_eq!(FIDL_TYPE.clone().try_into(), Ok(local_type));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
         assert_eq!(
             <RouteProperties as std::convert::Into<fnet_routes::RoutePropertiesV4>>::into(
                 local_type
             ),
-            FIDL_TYPE
+            fidl_type.clone()
         );
     }
 
     #[test]
     fn route_properties_try_from_v6() {
-        const FIDL_TYPE: fnet_routes::RoutePropertiesV6 = fnet_routes::RoutePropertiesV6 {
-            specified_properties: Some(fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE),
+        let fidl_type = fnet_routes::RoutePropertiesV6 {
+            specified_properties: Some(
+                fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
+            ),
             ..fnet_routes::RoutePropertiesV6::EMPTY
         };
         let local_type = RouteProperties {
-            specified_properties: fnet_routes::SpecifiedRouteProperties::ARBITRARY_TEST_VALUE
+            specified_properties: fnet_routes::SpecifiedRouteProperties::arbitrary_test_value()
                 .try_into()
                 .unwrap(),
         };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
         assert_eq!(
             <RouteProperties as std::convert::Into<fnet_routes::RoutePropertiesV6>>::into(
                 local_type
             ),
-            FIDL_TYPE
+            fidl_type.clone()
         );
     }
 
@@ -1068,24 +1098,24 @@ mod tests {
 
     #[test]
     fn route_action_try_from_forward_v4() {
-        const FIDL_TYPE: fnet_routes::RouteActionV4 =
-            fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4::ARBITRARY_TEST_VALUE);
+        let fidl_type =
+            fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4::arbitrary_test_value());
         let local_type = RouteAction::Forward(
-            fnet_routes::RouteTargetV4::ARBITRARY_TEST_VALUE.try_into().unwrap(),
+            fnet_routes::RouteTargetV4::arbitrary_test_value().try_into().unwrap(),
         );
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
     fn route_action_try_from_forward_v6() {
-        const FIDL_TYPE: fnet_routes::RouteActionV6 =
-            fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6::ARBITRARY_TEST_VALUE);
+        let fidl_type =
+            fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6::arbitrary_test_value());
         let local_type = RouteAction::Forward(
-            fnet_routes::RouteTargetV6::ARBITRARY_TEST_VALUE.try_into().unwrap(),
+            fnet_routes::RouteTargetV6::arbitrary_test_value().try_into().unwrap(),
         );
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
@@ -1120,8 +1150,8 @@ mod tests {
             Route::try_from(fnet_routes::RouteV4 {
                 // Invalid, because subnets should not have the "host bits" set.
                 destination: fidl_ip_v4_with_prefix!("192.168.0.1/24"),
-                action: fnet_routes::RouteActionV4::ARBITRARY_TEST_VALUE,
-                properties: fnet_routes::RoutePropertiesV4::ARBITRARY_TEST_VALUE,
+                action: fnet_routes::RouteActionV4::arbitrary_test_value(),
+                properties: fnet_routes::RoutePropertiesV4::arbitrary_test_value(),
             }),
             Err(FidlConversionError::DestinationSubnet(_))
         );
@@ -1133,8 +1163,8 @@ mod tests {
             Route::try_from(fnet_routes::RouteV6 {
                 // Invalid, because subnets should not have the "host bits" set.
                 destination: fidl_ip_v6_with_prefix!("fe80::1/64"),
-                action: fnet_routes::RouteActionV6::ARBITRARY_TEST_VALUE,
-                properties: fnet_routes::RoutePropertiesV6::ARBITRARY_TEST_VALUE,
+                action: fnet_routes::RouteActionV6::arbitrary_test_value(),
+                properties: fnet_routes::RoutePropertiesV6::arbitrary_test_value(),
             }),
             Err(FidlConversionError::DestinationSubnet(_))
         );
@@ -1142,34 +1172,34 @@ mod tests {
 
     #[test]
     fn route_try_from_v4() {
-        const FIDL_TYPE: fnet_routes::RouteV4 = fnet_routes::RouteV4 {
+        let fidl_type = fnet_routes::RouteV4 {
             destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
-            action: fnet_routes::RouteActionV4::ARBITRARY_TEST_VALUE,
-            properties: fnet_routes::RoutePropertiesV4::ARBITRARY_TEST_VALUE,
+            action: fnet_routes::RouteActionV4::arbitrary_test_value(),
+            properties: fnet_routes::RoutePropertiesV4::arbitrary_test_value(),
         };
         let local_type = Route {
             destination: net_subnet_v4!("192.168.0.0/24"),
-            action: fnet_routes::RouteActionV4::ARBITRARY_TEST_VALUE.try_into().unwrap(),
-            properties: fnet_routes::RoutePropertiesV4::ARBITRARY_TEST_VALUE.try_into().unwrap(),
+            action: fnet_routes::RouteActionV4::arbitrary_test_value().try_into().unwrap(),
+            properties: fnet_routes::RoutePropertiesV4::arbitrary_test_value().try_into().unwrap(),
         };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
     fn route_try_from_v6() {
-        const FIDL_TYPE: fnet_routes::RouteV6 = fnet_routes::RouteV6 {
+        let fidl_type = fnet_routes::RouteV6 {
             destination: fidl_ip_v6_with_prefix!("fe80::0/64"),
-            action: fnet_routes::RouteActionV6::ARBITRARY_TEST_VALUE,
-            properties: fnet_routes::RoutePropertiesV6::ARBITRARY_TEST_VALUE,
+            action: fnet_routes::RouteActionV6::arbitrary_test_value(),
+            properties: fnet_routes::RoutePropertiesV6::arbitrary_test_value(),
         };
         let local_type = Route {
             destination: net_subnet_v6!("fe80::0/64"),
-            action: fnet_routes::RouteActionV6::ARBITRARY_TEST_VALUE.try_into().unwrap(),
-            properties: fnet_routes::RoutePropertiesV6::ARBITRARY_TEST_VALUE.try_into().unwrap(),
+            action: fnet_routes::RouteActionV6::arbitrary_test_value().try_into().unwrap(),
+            properties: fnet_routes::RoutePropertiesV6::arbitrary_test_value().try_into().unwrap(),
         };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
@@ -1178,7 +1208,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV4 {
                 route: None,
                 effective_properties: Some(
-                    fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE,
+                    fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
                 ..fnet_routes::InstalledRouteV4::EMPTY
             }),
@@ -1194,7 +1224,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV6 {
                 route: None,
                 effective_properties: Some(
-                    fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE,
+                    fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
                 ..fnet_routes::InstalledRouteV6::EMPTY
             }),
@@ -1208,7 +1238,7 @@ mod tests {
     fn installed_route_try_from_unset_effective_properties_v4() {
         assert_eq!(
             InstalledRoute::try_from(fnet_routes::InstalledRouteV4 {
-                route: Some(fnet_routes::RouteV4::ARBITRARY_TEST_VALUE),
+                route: Some(fnet_routes::RouteV4::arbitrary_test_value()),
                 effective_properties: None,
                 ..fnet_routes::InstalledRouteV4::EMPTY
             }),
@@ -1222,7 +1252,7 @@ mod tests {
     fn installed_route_try_from_unset_effective_properties_v6() {
         assert_eq!(
             InstalledRoute::try_from(fnet_routes::InstalledRouteV6 {
-                route: Some(fnet_routes::RouteV6::ARBITRARY_TEST_VALUE),
+                route: Some(fnet_routes::RouteV6::arbitrary_test_value()),
                 effective_properties: None,
                 ..fnet_routes::InstalledRouteV6::EMPTY
             }),
@@ -1234,43 +1264,46 @@ mod tests {
 
     #[test]
     fn installed_route_try_from_v4() {
-        const FIDL_TYPE: fnet_routes::InstalledRouteV4 = fnet_routes::InstalledRouteV4 {
-            route: Some(fnet_routes::RouteV4::ARBITRARY_TEST_VALUE),
-            effective_properties: Some(fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE),
+        let fidl_type = fnet_routes::InstalledRouteV4 {
+            route: Some(fnet_routes::RouteV4::arbitrary_test_value()),
+            effective_properties: Some(
+                fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
+            ),
             ..fnet_routes::InstalledRouteV4::EMPTY
         };
         let local_type = InstalledRoute {
-            route: fnet_routes::RouteV4::ARBITRARY_TEST_VALUE.try_into().unwrap(),
-            effective_properties: fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE
+            route: fnet_routes::RouteV4::arbitrary_test_value().try_into().unwrap(),
+            effective_properties: fnet_routes::EffectiveRouteProperties::arbitrary_test_value()
                 .try_into()
                 .unwrap(),
         };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
     fn installed_route_try_from_v6() {
-        const FIDL_TYPE: fnet_routes::InstalledRouteV6 = fnet_routes::InstalledRouteV6 {
-            route: Some(fnet_routes::RouteV6::ARBITRARY_TEST_VALUE),
-            effective_properties: Some(fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE),
+        let fidl_type = fnet_routes::InstalledRouteV6 {
+            route: Some(fnet_routes::RouteV6::arbitrary_test_value()),
+            effective_properties: Some(
+                fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
+            ),
             ..fnet_routes::InstalledRouteV6::EMPTY
         };
         let local_type = InstalledRoute {
-            route: fnet_routes::RouteV6::ARBITRARY_TEST_VALUE.try_into().unwrap(),
-            effective_properties: fnet_routes::EffectiveRouteProperties::ARBITRARY_TEST_VALUE
+            route: fnet_routes::RouteV6::arbitrary_test_value().try_into().unwrap(),
+            effective_properties: fnet_routes::EffectiveRouteProperties::arbitrary_test_value()
                 .try_into()
                 .unwrap(),
         };
-        assert_eq!(FIDL_TYPE.try_into(), Ok(local_type));
-        assert_eq!(local_type.try_into(), Ok(FIDL_TYPE));
+        assert_eq!(fidl_type.clone().try_into(), Ok(local_type));
+        assert_eq!(local_type.try_into(), Ok(fidl_type.clone()));
     }
 
     #[test]
     fn event_try_from_v4() {
-        const FIDL_ROUTE: fnet_routes::InstalledRouteV4 =
-            fnet_routes::InstalledRouteV4::ARBITRARY_TEST_VALUE;
-        let local_route = FIDL_ROUTE.try_into().unwrap();
+        let fidl_route = fnet_routes::InstalledRouteV4::arbitrary_test_value();
+        let local_route = fidl_route.clone().try_into().unwrap();
         assert_eq!(
             fnet_routes::EventV4::unknown_variant_for_testing().try_into(),
             Ok(Event::Unknown)
@@ -1282,39 +1315,38 @@ mod tests {
             ))
         );
         assert_eq!(
-            fnet_routes::EventV4::Existing(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV4::Existing(fidl_route.clone()).try_into(),
             Ok(Event::Existing(local_route))
         );
         assert_eq!(
             Event::Existing(local_route).try_into(),
-            Ok(fnet_routes::EventV4::Existing(FIDL_ROUTE))
+            Ok(fnet_routes::EventV4::Existing(fidl_route.clone()))
         );
 
         assert_eq!(fnet_routes::EventV4::Idle(fnet_routes::Empty).try_into(), Ok(Event::Idle));
         assert_eq!(Event::Idle.try_into(), Ok(fnet_routes::EventV4::Idle(fnet_routes::Empty)));
         assert_eq!(
-            fnet_routes::EventV4::Added(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV4::Added(fidl_route.clone()).try_into(),
             Ok(Event::Added(local_route))
         );
         assert_eq!(
             Event::Added(local_route).try_into(),
-            Ok(fnet_routes::EventV4::Added(FIDL_ROUTE))
+            Ok(fnet_routes::EventV4::Added(fidl_route.clone()))
         );
         assert_eq!(
-            fnet_routes::EventV4::Removed(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV4::Removed(fidl_route.clone()).try_into(),
             Ok(Event::Removed(local_route))
         );
         assert_eq!(
             Event::Removed(local_route).try_into(),
-            Ok(fnet_routes::EventV4::Removed(FIDL_ROUTE))
+            Ok(fnet_routes::EventV4::Removed(fidl_route.clone()))
         );
     }
 
     #[test]
     fn event_try_from_v6() {
-        const FIDL_ROUTE: fnet_routes::InstalledRouteV6 =
-            fnet_routes::InstalledRouteV6::ARBITRARY_TEST_VALUE;
-        let local_route = FIDL_ROUTE.try_into().unwrap();
+        let fidl_route = fnet_routes::InstalledRouteV6::arbitrary_test_value();
+        let local_route = fidl_route.clone().try_into().unwrap();
         assert_eq!(
             fnet_routes::EventV6::unknown_variant_for_testing().try_into(),
             Ok(Event::Unknown)
@@ -1326,31 +1358,31 @@ mod tests {
             ))
         );
         assert_eq!(
-            fnet_routes::EventV6::Existing(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV6::Existing(fidl_route.clone()).try_into(),
             Ok(Event::Existing(local_route))
         );
         assert_eq!(
             Event::Existing(local_route).try_into(),
-            Ok(fnet_routes::EventV6::Existing(FIDL_ROUTE))
+            Ok(fnet_routes::EventV6::Existing(fidl_route.clone()))
         );
 
         assert_eq!(fnet_routes::EventV6::Idle(fnet_routes::Empty).try_into(), Ok(Event::Idle));
         assert_eq!(Event::Idle.try_into(), Ok(fnet_routes::EventV6::Idle(fnet_routes::Empty)));
         assert_eq!(
-            fnet_routes::EventV6::Added(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV6::Added(fidl_route.clone()).try_into(),
             Ok(Event::Added(local_route))
         );
         assert_eq!(
             Event::Added(local_route).try_into(),
-            Ok(fnet_routes::EventV6::Added(FIDL_ROUTE))
+            Ok(fnet_routes::EventV6::Added(fidl_route.clone()))
         );
         assert_eq!(
-            fnet_routes::EventV6::Removed(FIDL_ROUTE).try_into(),
+            fnet_routes::EventV6::Removed(fidl_route.clone()).try_into(),
             Ok(Event::Removed(local_route))
         );
         assert_eq!(
             Event::Removed(local_route).try_into(),
-            Ok(fnet_routes::EventV6::Removed(FIDL_ROUTE))
+            Ok(fnet_routes::EventV6::Removed(fidl_route.clone()))
         );
     }
 
@@ -1512,18 +1544,18 @@ mod tests {
                 EventHolder(fnet_routes::EventV4::Added(fnet_routes::InstalledRouteV4 {
                     route: Some(fnet_routes::RouteV4 {
                         destination: fidl_ip_v4_with_prefix!("192.168.0.1/24"),
-                        ..fnet_routes::RouteV4::ARBITRARY_TEST_VALUE
+                        ..fnet_routes::RouteV4::arbitrary_test_value()
                     }),
-                    ..fnet_routes::InstalledRouteV4::ARBITRARY_TEST_VALUE
+                    ..fnet_routes::InstalledRouteV4::arbitrary_test_value()
                 }))
             },
             |()| {
                 EventHolder(fnet_routes::EventV6::Added(fnet_routes::InstalledRouteV6 {
                     route: Some(fnet_routes::RouteV6 {
                         destination: fidl_ip_v6_with_prefix!("fe80::1/64"),
-                        ..fnet_routes::RouteV6::ARBITRARY_TEST_VALUE
+                        ..fnet_routes::RouteV6::arbitrary_test_value()
                     }),
-                    ..fnet_routes::InstalledRouteV6::ARBITRARY_TEST_VALUE
+                    ..fnet_routes::InstalledRouteV6::arbitrary_test_value()
                 }))
             },
         );
@@ -1608,10 +1640,14 @@ mod tests {
         let RouteHolder(route) = I::map_ip(
             (),
             |()| {
-                RouteHolder(fnet_routes::InstalledRouteV4::ARBITRARY_TEST_VALUE.try_into().unwrap())
+                RouteHolder(
+                    fnet_routes::InstalledRouteV4::arbitrary_test_value().try_into().unwrap(),
+                )
             },
             |()| {
-                RouteHolder(fnet_routes::InstalledRouteV6::ARBITRARY_TEST_VALUE.try_into().unwrap())
+                RouteHolder(
+                    fnet_routes::InstalledRouteV6::arbitrary_test_value().try_into().unwrap(),
+                )
             },
         );
         route

@@ -313,14 +313,16 @@ impl Peer {
         metrics.log_occurrences(bt_metrics::A2DP_REMOTE_PEER_CAPABILITIES_METRIC_ID, cap_metrics);
     }
 
-    const TRANSPORT_CHANNEL_PARAMS: L2capParameters = L2capParameters {
-        psm: Some(PSM_AVDTP),
-        parameters: Some(ChannelParameters {
-            max_rx_sdu_size: Some(65535),
-            ..ChannelParameters::EMPTY
-        }),
-        ..L2capParameters::EMPTY
-    };
+    fn transport_channel_params() -> L2capParameters {
+        L2capParameters {
+            psm: Some(PSM_AVDTP),
+            parameters: Some(ChannelParameters {
+                max_rx_sdu_size: Some(65535),
+                ..ChannelParameters::EMPTY
+            }),
+            ..L2capParameters::EMPTY
+        }
+    }
 
     /// Open and start a media transport stream, connecting a compatible local stream to the remote
     /// stream `remote_id`, configuring it with the `capabilities` provided.
@@ -367,7 +369,7 @@ impl Peer {
             let channel = profile
                 .connect(
                     &mut peer_id.into(),
-                    &mut ConnectParameters::L2cap(Self::TRANSPORT_CHANNEL_PARAMS),
+                    &mut ConnectParameters::L2cap(Self::transport_channel_params()),
                 )
                 .await
                 .context("FIDL error: {}")?
@@ -1622,7 +1624,7 @@ mod tests {
         match request {
             Poll::Ready(Some(Ok(ProfileRequest::Connect { peer_id, connection, responder }))) => {
                 assert_eq!(PeerId(1), peer_id.into());
-                assert_eq!(connection, ConnectParameters::L2cap(Peer::TRANSPORT_CHANNEL_PARAMS));
+                assert_eq!(connection, ConnectParameters::L2cap(Peer::transport_channel_params()));
                 let channel = transport.try_into().unwrap();
                 responder.send(&mut Ok(channel)).expect("responder sends");
             }
