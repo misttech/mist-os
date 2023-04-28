@@ -8,7 +8,8 @@ import abc
 from typing import Any, Dict, Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances import bluetooth, component
+from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances import component
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import properties

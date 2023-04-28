@@ -5,13 +5,14 @@
 """Unit tests for honeydew.__init__.py."""
 
 import os
-import unittest
 from typing import Any, Dict, Set, Type
+import unittest
 from unittest import mock
 
 import honeydew
 from honeydew import custom_types
-from honeydew.device_classes import generic_fuchsia_device, x64
+from honeydew.device_classes import generic_fuchsia_device
+from honeydew.device_classes import x64
 from honeydew.interfaces.device_classes import fuchsia_device
 from parameterized import parameterized
 

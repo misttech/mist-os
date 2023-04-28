@@ -5,7 +5,8 @@
 """Mobly test for device_classes/x64.py."""
 
 from honeydew.device_classes import x64
-from mobly import asserts, test_runner
+from mobly import asserts
+from mobly import test_runner
 from test_fuchsia_device_base import test_fuchsia_device_base
 
 

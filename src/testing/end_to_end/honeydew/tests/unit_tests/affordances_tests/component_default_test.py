@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.component_default.py."""
 
-import unittest
 from typing import Any, Dict
+import unittest
 from unittest import mock
 
 from honeydew.affordances import component_default

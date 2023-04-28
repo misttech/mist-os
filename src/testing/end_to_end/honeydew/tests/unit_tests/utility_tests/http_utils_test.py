@@ -4,10 +4,10 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.utils.http_utils.py."""
 
-import json
-import unittest
 from http.client import RemoteDisconnected
+import json
 from typing import Any, Dict
+import unittest
 from unittest import mock
 
 from honeydew import errors

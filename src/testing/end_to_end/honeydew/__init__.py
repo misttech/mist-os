@@ -15,7 +15,8 @@ from typing import Any, List, Optional, Set, Type
 from honeydew import device_classes
 from honeydew.device_classes import generic_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.utils import ffx_cli, properties
+from honeydew.utils import ffx_cli
+from honeydew.utils import properties
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

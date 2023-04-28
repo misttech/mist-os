@@ -4,11 +4,12 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.device_classes.fuchsia_device_base.py."""
 
-import unittest
 from typing import Any, Dict
+import unittest
 from unittest import mock
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.device_classes import fuchsia_device_base
 from parameterized import parameterized
 

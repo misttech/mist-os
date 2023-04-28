@@ -6,12 +6,13 @@
 
 import json
 import logging
+from shutil import rmtree
 import subprocess
 import tempfile
-from shutil import rmtree
 from typing import Any, Dict, List, Optional
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 
 _FFX_CMDS: Dict[str, List[str]] = {
     "TARGET_SHOW": ["target", "show", "--json"],

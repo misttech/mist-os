@@ -5,24 +5,28 @@
 """Default implementation of FuchsiaDevice abstract base class."""
 
 import base64
+from datetime import datetime
+from http.client import RemoteDisconnected
 import logging
 import os
 import time
-from datetime import datetime
-from http.client import RemoteDisconnected
 from typing import Any, Dict, Optional
 
-from honeydew import custom_types, errors
-from honeydew.affordances import bluetooth_default, component_default
+from honeydew import custom_types
+from honeydew import errors
+from honeydew.affordances import bluetooth_default
+from honeydew.affordances import component_default
 from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
 from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
-from honeydew.interfaces.device_classes import (
-    bluetooth_capable_device, component_capable_device, fuchsia_device)
+from honeydew.interfaces.device_classes import bluetooth_capable_device
+from honeydew.interfaces.device_classes import component_capable_device
+from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
-from honeydew.utils import ffx_cli, properties
+from honeydew.utils import ffx_cli
+from honeydew.utils import properties
 
 _SL4F_METHODS: Dict[str, str] = {
     "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",

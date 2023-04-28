@@ -5,11 +5,12 @@
 """Unit tests for honeydew.utils.ffx_cli.py."""
 
 import subprocess
-import unittest
 from typing import Any, Dict, List
+import unittest
 from unittest import mock
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.utils import ffx_cli
 from parameterized import parameterized
 

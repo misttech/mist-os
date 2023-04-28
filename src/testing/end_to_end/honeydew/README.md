@@ -124,6 +124,11 @@ At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to
 follow the below instructions every time HoneyDew code is changed:
 
+#### formatting
+* Ensure code is formatted using [yapf]
+* `fx format-code` underneath uses [yapf] for formatting the python code
+* So just run `fx format-code`
+
 #### linting
 * Ensure code is [pylint] compliant
 * `pylint` module is not yet available under [Fuchsia third-party]. So for the
@@ -268,6 +273,8 @@ with the CL reviewers
 [mypy]: https://mypy.readthedocs.io/en/stable/
 
 [pytype]: https://google.github.io/pytype/
+
+[yapf]: https://github.com/google/yapf
 
 [vscode IDE]: https://code.visualstudio.com/docs/python/python-tutorial
 

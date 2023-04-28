@@ -3,37 +3,42 @@
     "python.linting.pylintEnabled": true,
     "python.linting.pylintPath": "pylint",
     "python.linting.pylintArgs": [
-        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
+        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/pylintrc"
     ],
     "pylint.args": [
-        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
+        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/pylintrc"
     ],
     "python.linting.mypyEnabled": true,
     "python.linting.mypyPath": "mypy",
     "python.linting.mypyArgs": [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/mypy.ini"
     ],
-    "mypy.args": [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
+    "mypy-type-checker.args": [
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/mypy.ini"
     ],
     "python.formatting.provider": "yapf",
-    "python.formatting.yapfPath": "yapf",
+    "isort.args": [
+        "--profile",
+        "google",
+        "--line-length",
+        "80"
+    ],
+    "isort.check": true,
     "editor.rulers": [
         80
     ],
-    "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
     "editor.detectIndentation": false,
     "editor.tabSize": 4,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "editor.formatOnType": true,
     "files.insertFinalNewline": true,
     "files.trimTrailingWhitespace": true,
     "update.mode": "none",
-    "[python]": {
-        "editor.codeActionsOnSave": {
-            "source.organizeImports": true
-        },
-        "editor.formatOnType": true
-    },
     "python.autoComplete.extraPaths": [
         "${env:FUCHSIA_DIR}/src/testing/end_to_end",
         "${env:FUCHSIA_DIR}/fuchsia/third_party/mobly/",

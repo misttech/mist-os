@@ -11,9 +11,11 @@ import tempfile
 from fuchsia_base_test import fuchsia_base_test
 from honeydew import custom_types
 from honeydew.device_classes import fuchsia_device_base
-from honeydew.interfaces.device_classes import (
-    bluetooth_capable_device, component_capable_device, fuchsia_device)
-from mobly import asserts, test_runner
+from honeydew.interfaces.device_classes import bluetooth_capable_device
+from honeydew.interfaces.device_classes import component_capable_device
+from honeydew.interfaces.device_classes import fuchsia_device
+from mobly import asserts
+from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

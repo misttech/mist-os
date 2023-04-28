@@ -9,7 +9,8 @@ import subprocess
 import time
 from typing import Any, Dict, List, Optional
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.utils import ffx_cli
 
 _DEFAULTS: Dict[str, Any] = {

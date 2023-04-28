@@ -5,11 +5,12 @@
 """Unit tests for honeydew.transports.ssh.py."""
 
 import subprocess
-import unittest
 from typing import Any, Dict
+import unittest
 from unittest import mock
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.transports import ssh
 
 _INPUT_ARGS: Dict[str, Any] = {

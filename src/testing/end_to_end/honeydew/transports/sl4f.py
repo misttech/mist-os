@@ -10,9 +10,12 @@ import sys
 import time
 from typing import Any, Dict, Iterable, Optional, Type
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
+from honeydew import errors
 from honeydew.transports import ssh as ssh_transport
-from honeydew.utils import ffx_cli, http_utils, properties
+from honeydew.utils import ffx_cli
+from honeydew.utils import http_utils
+from honeydew.utils import properties
 
 _TIMEOUTS: Dict[str, float] = {
     "RESPONSE": 30,

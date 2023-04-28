@@ -13,7 +13,8 @@ from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
 from honeydew.utils import ffx_cli
-from mobly import base_test, test_runner
+from mobly import base_test
+from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
