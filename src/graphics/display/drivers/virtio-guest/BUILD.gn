@@ -69,7 +69,10 @@ test("virtio-gpu-test") {
       configs -= fdio_config
     }
   }
-  sources = [ "gpu_test.cc" ]
+  sources = [
+    "gpu_test.cc",
+    "virtio-abi-test.cc",
+  ]
   deps = [
     ":gpu_lib",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",

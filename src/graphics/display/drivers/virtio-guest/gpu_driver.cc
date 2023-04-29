@@ -6,7 +6,7 @@
 #include <lib/virtio/driver_utils.h>
 #include <zircon/types.h>
 
-#include "gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/gpu.h"
 #include "src/graphics/display/drivers/virtio-guest/virtio_gpu_bind.h"
 
 static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {

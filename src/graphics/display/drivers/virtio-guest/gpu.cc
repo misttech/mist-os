@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/gpu.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -19,15 +19,16 @@
 #include <zircon/time.h>
 
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/bus/lib/virtio/trace.h"
+#include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "virtio_gpu.h"
 
 #define LOCAL_TRACE 0
 
@@ -38,9 +39,9 @@ namespace {
 constexpr uint32_t kRefreshRateHz = 30;
 constexpr uint64_t kDisplayId = 1;
 
-zx_status_t to_zx_status(uint32_t type) {
+zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
   LTRACEF("response type %#x\n", type);
-  if (type != VIRTIO_GPU_RESP_OK_NODATA) {
+  if (type != virtio_abi::ControlType::kEmptyResponse) {
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;
@@ -79,8 +80,8 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
           {
               .params =
                   {
-                      .width = pmode_.r.width,
-                      .height = pmode_.r.height,
+                      .width = pmode_.geometry.width,
+                      .height = pmode_.geometry.height,
                       .refresh_rate_e2 = kRefreshRateHz * 100,
                   },
           },
@@ -276,12 +277,13 @@ config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
-        .width = pmode_.r.width,
-        .height = pmode_.r.height,
+        .width = pmode_.geometry.width,
+        .height = pmode_.geometry.height,
     };
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
-              layer->image.width == pmode_.r.width && layer->image.height == pmode_.r.height &&
+              layer->image.width == pmode_.geometry.width &&
+              layer->image.height == pmode_.geometry.height &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
@@ -438,34 +440,52 @@ void GpuDevice::send_command_response(const RequestType* cmd, ResponseType** res
 zx_status_t GpuDevice::get_display_info() {
   LTRACEF("dev %p\n", this);
 
-  // Construct the get display info message
-  virtio_gpu_ctrl_hdr req;
-  memset(&req, 0, sizeof(req));
-  req.type = VIRTIO_GPU_CMD_GET_DISPLAY_INFO;
+  const virtio_abi::GetDisplayInfoCommand command = {
+      .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
+  };
 
-  // Send the message and get a response
-  virtio_gpu_resp_display_info* info;
-  send_command_response(&req, &info);
-  if (info->hdr.type != VIRTIO_GPU_RESP_OK_DISPLAY_INFO) {
+  virtio_abi::DisplayInfoResponse* response;
+  send_command_response(&command, &response);
+  if (response->header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  // We got a response
   LTRACEF("response:\n");
-  for (int i = 0; i < VIRTIO_GPU_MAX_SCANOUTS; i++) {
-    if (info->pmodes[i].enabled) {
-      LTRACEF("%u: x %u y %u w %u h %u flags 0x%x\n", i, info->pmodes[i].r.x, info->pmodes[i].r.y,
-              info->pmodes[i].r.width, info->pmodes[i].r.height, info->pmodes[i].flags);
-      if (pmode_id_ < 0) {
-        // Save the first valid pmode we see
-        memcpy(&pmode_, &info->pmodes[i], sizeof(pmode_));
-        pmode_id_ = i;
-      }
+  for (int i = 0; i < virtio_abi::kMaxScanouts; i++) {
+    const virtio_abi::ScanoutInfo& scanout = response->scanouts[i];
+    if (!scanout.enabled) {
+      continue;
     }
-  }
 
+    LTRACEF("%u: x %u y %u w %u h %u flags 0x%x\n", i, scanout.geometry.placement_x,
+            scanout.geometry.placement_y, scanout.geometry.width, scanout.geometry.height,
+            scanout.flags);
+    if (pmode_id_ >= 0) {
+      continue;
+    }
+
+    // Save the first valid pmode we see
+    pmode_ = response->scanouts[i];
+    pmode_id_ = i;
+  }
   return ZX_OK;
 }
+
+namespace {
+
+// Returns nullopt for an unsupported format.
+std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
+    fuchsia_images2::wire::PixelFormat pixel_format) {
+  // TODO(fxbug.dev/122802): Support more formats.
+  switch (pixel_format) {
+    case fuchsia_images2::PixelFormat::kBgra32:
+      return virtio_abi::ResourceFormat::kBgra32;
+    default:
+      return std::nullopt;
+  }
+}
+
+}  // namespace
 
 zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
                                             fuchsia_images2::wire::PixelFormat pixel_format) {
@@ -473,31 +493,23 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
 
   ZX_ASSERT(resource_id);
 
-  // Construct the request
-  virtio_gpu_resource_create_2d req;
-  memset(&req, 0, sizeof(req));
-
-  req.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
-  req.resource_id = next_resource_id_++;
-  *resource_id = req.resource_id;
-
-  // TODO(fxbug.dev/122802): Support more formats.
-  switch (pixel_format) {
-    case fuchsia_images2::PixelFormat::kBgra32:
-      req.format = VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM;
-      break;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
+  std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);
+  if (!resource_format.has_value()) {
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  req.width = width;
-  req.height = height;
+  const virtio_abi::Create2DResourceCommand command = {
+      .header = {.type = virtio_abi::ControlType::kCreate2DResourceCommand},
+      .resource_id = next_resource_id_++,
+      .format = virtio_abi::ResourceFormat::kBgra32,
+      .width = width,
+      .height = height,
+  };
+  *resource_id = command.resource_id;
 
-  // Send the command and get a response
-  struct virtio_gpu_ctrl_hdr* res;
-  send_command_response(&req, &res);
-
-  return to_zx_status(res->type);
+  virtio_abi::EmptyResponse* response;
+  send_command_response(&command, &response);
+  return ResponseTypeToZxStatus(response->header.type);
 }
 
 zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
@@ -506,24 +518,18 @@ zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size
 
   ZX_ASSERT(ptr);
 
-  // Construct the request
-  struct {
-    struct virtio_gpu_resource_attach_backing req;
-    struct virtio_gpu_mem_entry mem;
-  } req;
-  memset(&req, 0, sizeof(req));
+  const virtio_abi::AttachResourceBackingCommand<1> command = {
+      .header = {.type = virtio_abi::ControlType::kAttachResourceBackingCommand},
+      .resource_id = resource_id,
+      .entries =
+          {
+              {.address = ptr, .length = static_cast<uint32_t>(buf_len)},
+          },
+  };
 
-  req.req.hdr.type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
-  req.req.resource_id = resource_id;
-  req.req.nr_entries = 1;
-
-  req.mem.addr = ptr;
-  req.mem.length = static_cast<uint32_t>(buf_len);
-
-  // Send the command and get a response
-  struct virtio_gpu_ctrl_hdr* res;
-  send_command_response(&req, &res);
-  return to_zx_status(res->type);
+  virtio_abi::EmptyResponse* response;
+  send_command_response(&command, &response);
+  return ResponseTypeToZxStatus(response->header.type);
 }
 
 zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
@@ -531,60 +537,57 @@ zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, ui
   LTRACEF("dev %p, scanout_id %u, resource_id %u, width %u, height %u\n", this, scanout_id,
           resource_id, width, height);
 
-  // Construct the request
-  virtio_gpu_set_scanout req;
-  memset(&req, 0, sizeof(req));
+  const virtio_abi::SetScanoutCommand command = {
+      .header = {.type = virtio_abi::ControlType::kSetScanoutCommand},
+      .geometry =
+          {
+              .placement_x = 0,
+              .placement_y = 0,
+              .width = width,
+              .height = height,
+          },
+      .scanout_id = scanout_id,
+      .resource_id = resource_id,
+  };
 
-  req.hdr.type = VIRTIO_GPU_CMD_SET_SCANOUT;
-  req.r.x = req.r.y = 0;
-  req.r.width = width;
-  req.r.height = height;
-  req.scanout_id = scanout_id;
-  req.resource_id = resource_id;
-
-  // Send the command and get a response
-  virtio_gpu_ctrl_hdr* res;
-  send_command_response(&req, &res);
-  return to_zx_status(res->type);
+  virtio_abi::EmptyResponse* response;
+  send_command_response(&command, &response);
+  return ResponseTypeToZxStatus(response->header.type);
 }
 
 zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
   LTRACEF("dev %p, resource_id %u, width %u, height %u\n", this, resource_id, width, height);
 
-  // Construct the request
-  virtio_gpu_resource_flush req;
-  memset(&req, 0, sizeof(req));
+  virtio_abi::FlushResourceCommand command = {
+      .header = {.type = virtio_abi::ControlType::kFlushResourceCommand},
+      .geometry = {.placement_x = 0, .placement_y = 0, .width = width, .height = height},
+      .resource_id = resource_id,
+  };
 
-  req.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
-  req.r.x = req.r.y = 0;
-  req.r.width = width;
-  req.r.height = height;
-  req.resource_id = resource_id;
-
-  // Send the command and get a response
-  virtio_gpu_ctrl_hdr* res;
-  send_command_response(&req, &res);
-  return to_zx_status(res->type);
+  virtio_abi::EmptyResponse* response;
+  send_command_response(&command, &response);
+  return ResponseTypeToZxStatus(response->header.type);
 }
 
 zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height) {
   LTRACEF("dev %p, resource_id %u, width %u, height %u\n", this, resource_id, width, height);
 
-  // Construct the request
-  virtio_gpu_transfer_to_host_2d req;
-  memset(&req, 0, sizeof(req));
+  virtio_abi::Transfer2DResourceToHostCommand command = {
+      .header = {.type = virtio_abi::ControlType::kTransfer2DResourceToHostCommand},
+      .geometry =
+          {
+              .placement_x = 0,
+              .placement_y = 0,
+              .width = width,
+              .height = height,
+          },
+      .destination_offset = 0,
+      .resource_id = resource_id,
+  };
 
-  req.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
-  req.r.x = req.r.y = 0;
-  req.r.width = width;
-  req.r.height = height;
-  req.offset = 0;
-  req.resource_id = resource_id;
-
-  // Send the command and get a response
-  virtio_gpu_ctrl_hdr* res;
-  send_command_response(&req, &res);
-  return to_zx_status(res->type);
+  virtio_abi::EmptyResponse* response;
+  send_command_response(&command, &response);
+  return ResponseTypeToZxStatus(response->header.type);
 }
 
 void GpuDevice::virtio_gpu_flusher() {
@@ -605,14 +608,15 @@ void GpuDevice::virtio_gpu_flusher() {
     LTRACEF("flushing\n");
 
     if (displayed_fb_) {
-      zx_status_t status =
-          transfer_to_host_2d(displayed_fb_->resource_id, pmode_.r.width, pmode_.r.height);
+      zx_status_t status = transfer_to_host_2d(displayed_fb_->resource_id, pmode_.geometry.width,
+                                               pmode_.geometry.height);
       if (status != ZX_OK) {
         LTRACEF("failed to flush resource\n");
         continue;
       }
 
-      status = flush_resource(displayed_fb_->resource_id, pmode_.r.width, pmode_.r.height);
+      status =
+          flush_resource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
         LTRACEF("failed to flush resource\n");
         continue;
@@ -621,7 +625,8 @@ void GpuDevice::virtio_gpu_flusher() {
 
     if (fb_change) {
       uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
-      zx_status_t status = set_scanout(pmode_id_, res_id, pmode_.r.width, pmode_.r.height);
+      zx_status_t status =
+          set_scanout(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "%s: failed to set scanout: %d", tag(), status);
         continue;
@@ -654,8 +659,8 @@ zx_status_t GpuDevice::virtio_gpu_start() {
     return ZX_ERR_NOT_FOUND;
   }
 
-  printf("virtio-gpu: found display x %u y %u w %u h %u flags 0x%x\n", pmode_.r.x, pmode_.r.y,
-         pmode_.r.width, pmode_.r.height, pmode_.flags);
+  printf("virtio-gpu: found display x %u y %u w %u h %u flags 0x%x\n", pmode_.geometry.placement_x,
+         pmode_.geometry.placement_y, pmode_.geometry.width, pmode_.geometry.height, pmode_.flags);
 
   // Run a worker thread to shove in flush events
   auto virtio_gpu_flusher_entry = [](void* arg) {
@@ -726,12 +731,11 @@ zx_status_t GpuDevice::Init() {
 
   DeviceReset();
 
-  struct virtio_gpu_config config;
+  virtio_abi::GpuDeviceConfig config;
   CopyDeviceConfig(&config, sizeof(config));
-  LTRACEF("events_read 0x%x\n", config.events_read);
-  LTRACEF("events_clear 0x%x\n", config.events_clear);
-  LTRACEF("num_scanouts 0x%x\n", config.num_scanouts);
-  LTRACEF("reserved 0x%x\n", config.reserved);
+  LTRACEF("Pending events: 0x%08x\n", config.pending_events);
+  LTRACEF("Scanout limit: %d\n", config.scanout_limit);
+  LTRACEF("Capability set limit: %d\n", config.capability_set_limit);
 
   // Ack and set the driver status bit
   DriverStatusAck();

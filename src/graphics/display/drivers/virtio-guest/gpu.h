@@ -20,7 +20,7 @@
 
 #include <ddktl/device.h>
 
-#include "virtio_gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
 
 namespace virtio {
 
@@ -42,7 +42,7 @@ class GpuDevice : public Device,
   void IrqRingUpdate() override;
   void IrqConfigChange() override;
 
-  const virtio_gpu_resp_display_info::virtio_gpu_display_one* pmode() const { return &pmode_; }
+  const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
 
   const char* tag() const override { return "virtio-gpu"; }
 
@@ -144,7 +144,7 @@ class GpuDevice : public Device,
   io_buffer_t gpu_req_ = {};
 
   // A saved copy of the display
-  virtio_gpu_resp_display_info::virtio_gpu_display_one pmode_ = {};
+  virtio_abi::ScanoutInfo pmode_ = {};
   int pmode_id_ = -1;
 
   uint32_t next_resource_id_ = 1;
