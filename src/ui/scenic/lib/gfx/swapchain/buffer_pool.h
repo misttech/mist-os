@@ -9,7 +9,6 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/zx/event.h>
 #include <lib/zx/handle.h>
-#include <zircon/pixelformat.h>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/lib/escher/flib/fence_listener.h"

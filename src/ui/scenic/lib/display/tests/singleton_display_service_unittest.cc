@@ -5,7 +5,6 @@
 #include "src/ui/scenic/lib/display/singleton_display_service.h"
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
-#include <zircon/pixelformat.h>
 
 #include <gtest/gtest.h>
 

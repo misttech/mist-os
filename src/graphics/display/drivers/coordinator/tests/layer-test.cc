@@ -6,7 +6,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/defer.h>
-#include <zircon/pixelformat.h>
 
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_single_list.h>

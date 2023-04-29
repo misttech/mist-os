@@ -11,7 +11,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 
 #include <cstdint>

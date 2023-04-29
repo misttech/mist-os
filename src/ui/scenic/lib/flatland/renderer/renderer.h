@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
 #include <lib/zx/event.h>
-#include <zircon/pixelformat.h>
 
 #include <optional>
 

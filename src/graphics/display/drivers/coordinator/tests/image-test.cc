@@ -10,7 +10,6 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
 #include <lib/fit/defer.h>
-#include <zircon/pixelformat.h>
 
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>

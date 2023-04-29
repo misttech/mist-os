@@ -5,7 +5,6 @@
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/pixelformat.h>
 
 #include "fidl/fuchsia.images2/cpp/wire_types.h"
 

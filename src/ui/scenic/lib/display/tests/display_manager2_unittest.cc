@@ -9,7 +9,6 @@
 #include <fuchsia/ui/display/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/pixelformat.h>
 
 #include <gtest/gtest.h>
 

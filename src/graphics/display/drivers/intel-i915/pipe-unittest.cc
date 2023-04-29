@@ -7,7 +7,6 @@
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sysmem-version/sysmem-version.h>
-#include <zircon/pixelformat.h>
 
 #include <memory>
 #include <vector>

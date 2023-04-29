@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/message.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/event.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include <initializer_list>

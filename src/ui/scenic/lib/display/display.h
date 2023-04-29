@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/event.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include <array>

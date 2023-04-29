@@ -14,7 +14,6 @@
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/virtio/backends/fake.h>
 #include <zircon/compiler.h>
-#include <zircon/pixelformat.h>
 
 #include <list>
 

@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <zircon/pixelformat.h>
 
 #include <cstdint>
 

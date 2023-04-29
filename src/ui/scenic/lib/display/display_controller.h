@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
-#include <zircon/pixelformat.h>
 
 #include <cstdint>
 #include <memory>

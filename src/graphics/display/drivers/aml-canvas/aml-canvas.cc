@@ -10,7 +10,6 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/stdcompat/bit.h>
 #include <zircon/assert.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>

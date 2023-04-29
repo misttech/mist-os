@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/wire/array.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include <cstdint>

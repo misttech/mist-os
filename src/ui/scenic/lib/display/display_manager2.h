@@ -10,7 +10,6 @@
 #include <fuchsia/ui/display/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_ptr_set.h>
 #include <lib/zx/channel.h>
-#include <zircon/pixelformat.h>
 
 #include <vector>
 

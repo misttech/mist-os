@@ -22,7 +22,6 @@
 #include "src/ui/lib/escher/vk/image_layout_updater.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/util.h"
-#include "zircon/pixelformat.h"
 
 #define VK_CHECK_RESULT(XXX) FX_CHECK(XXX.result == vk::Result::eSuccess)
 

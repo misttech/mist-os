@@ -22,7 +22,6 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 

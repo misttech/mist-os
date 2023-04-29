@@ -7,7 +7,6 @@
 #include <fuchsia/images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
-#include <zircon/pixelformat.h>
 
 #include <gtest/gtest.h>
 

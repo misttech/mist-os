@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/fidl/txn_header.h>
-#include <zircon/pixelformat.h>
 
 #include <cmath>
 

@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <vk_dispatch_table_helper.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 
 #include <deque>
