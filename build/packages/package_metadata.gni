@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/dist/generated_resource.gni")
+import("//build/group_with_inputs.gni")
 
 # Generate a list of package metadata exported from all packages in the
 # transitive closure of declared dependencies.
@@ -143,6 +144,7 @@ template("generate_meta_package") {
 template("generate_meta_subpackages") {
   rebased_subpackages = []
   subpackage_targets = []
+  subpackage_inputs = []
   foreach(subpackage, invoker.subpackages) {
     if (defined(subpackage.name)) {
       name = subpackage.name
@@ -155,32 +157,56 @@ template("generate_meta_subpackages") {
       meta_package_target_name = get_label_info(meta_package_target, "name")
       package_output =
           meta_package_target_gen_dir + "/" + meta_package_target_name + ".txt"
-      meta_package_file = rebase_path(package_output, root_build_dir)
     }
-    merkle_file = rebase_path(
-            get_label_info(subpackage.package, "target_out_dir") + "/" +
-                get_label_info(subpackage.package, "name") + "/meta.far.merkle",
-            root_build_dir)
+    merkle_file =
+        get_label_info(subpackage.package, "target_out_dir") + "/" +
+        get_label_info(subpackage.package, "name") + "/meta.far.merkle"
+
     package_manifest_file =
-        rebase_path(get_label_info(subpackage.package, "target_out_dir") + "/" +
-                        get_label_info(subpackage.package, "name") +
-                        "/package_manifest.json",
-                    root_build_dir)
+        get_label_info(subpackage.package, "target_out_dir") + "/" +
+        get_label_info(subpackage.package, "name") + "/package_manifest.json"
+
+    subpackage_inputs += [
+      merkle_file,
+      package_manifest_file,
+    ]
 
     rebased_subpackages += [
       {
         if (defined(subpackage.name)) {
           name = name
         } else {
-          meta_package_file =
-              meta_package_file  # to get the subpackage package name
+          # to get the subpackage package name
+          meta_package_file = rebase_path(package_output, root_build_dir)
         }
-        merkle_file = merkle_file  # to get the subpackage package hash
+
+        # to get the subpackage package hash
+        merkle_file = rebase_path(merkle_file, root_build_dir)
+
+        # the package_manifest.json of the subpackage
         package_manifest_file =
-            package_manifest_file  # the package_manifest.json of the subpackage
+            rebase_path(package_manifest_file, root_build_dir)
       },
     ]
     subpackage_targets += [ subpackage.package ]
+  }
+
+  # This group validates that the subpackage labels passed into this template
+  # are actually package-creating targets, by ensuring that the computed package
+  # manifest and merkle files above are all outputs of the labels in question.
+  group_with_inputs(target_name + ".subpackage_deps") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    if (!defined(visibility)) {
+      visibility = []
+    }
+    visibility += [ ":*" ]
+
+    deps = subpackage_targets
+    inputs = subpackage_inputs
   }
 
   generated_resource(target_name) {
@@ -193,6 +219,6 @@ template("generate_meta_subpackages") {
     outputs = [ "target_subpackages.json" ]
     output_conversion = "json"
 
-    deps = subpackage_targets
+    deps = [ ":${target_name}.subpackage_deps" ]
   }
 }
