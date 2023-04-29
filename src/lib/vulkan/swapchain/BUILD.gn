@@ -98,7 +98,6 @@ source_set("display") {
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/lib/fdio",
-    "//src/graphics/display/lib/pixel-format",
     "//src/lib/fsl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",

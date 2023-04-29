@@ -15,7 +15,6 @@ static_library("testing") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
-    "//src/graphics/display/lib/pixel-format",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",

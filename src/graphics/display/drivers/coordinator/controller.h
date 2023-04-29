@@ -35,7 +35,6 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/async-watchdog/watchdog.h"
 
 namespace display {

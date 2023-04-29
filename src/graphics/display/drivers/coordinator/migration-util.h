@@ -15,8 +15,6 @@
 
 #include <fbl/vector.h>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
-
 namespace display {
 
 // Pixel format that the display coordinator can use internally.

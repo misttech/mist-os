@@ -16,8 +16,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
-
 namespace display {
 
 // static

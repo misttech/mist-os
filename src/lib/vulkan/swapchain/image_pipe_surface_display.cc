@@ -24,7 +24,6 @@
 #include <fbl/unique_fd.h>
 #include <vulkan/vk_layer.h>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/vulkan/swapchain/vulkan_utils.h"
 #include "vulkan/vulkan_fuchsia.h"

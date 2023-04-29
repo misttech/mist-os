@@ -11,7 +11,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "lib/fit/function.h"
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace scenic_impl {
 namespace display {

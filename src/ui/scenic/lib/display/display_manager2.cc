@@ -12,7 +12,6 @@
 #include <iterator>
 #include <string>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/display/display_controller.h"
 

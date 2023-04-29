@@ -12,7 +12,6 @@
 
 #include "src/devices/lib/audio/audio.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace display {
 

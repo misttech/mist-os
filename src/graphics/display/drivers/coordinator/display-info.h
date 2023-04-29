@@ -25,7 +25,6 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/edid/edid.h"
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace display {
 
