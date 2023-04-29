@@ -48,6 +48,7 @@ fn get_environ() -> Vec<String> {
 async fn run_console(
     controller: &fstarcontainer::ControllerProxy,
     argv: Vec<String>,
+    env: Vec<String>,
 ) -> Result<u8> {
     let (local_console, remote_console) = fidl::Socket::create_stream();
     let binary_path = argv[0].clone();
@@ -58,7 +59,7 @@ async fn run_console(
             console: Some(remote_console),
             binary_path: Some(binary_path),
             argv: Some(argv),
-            environ: Some(get_environ()),
+            environ: Some(env),
             window_size: Some(fstarcontainer::ConsoleWindowSize { rows, cols, x_pixels, y_pixels }),
             ..Default::default()
         })
@@ -90,7 +91,7 @@ async fn run_console(
 #[argh(
     subcommand,
     name = "console",
-    example = "ffx starnix console [command [argument ...]]",
+    example = "ffx starnix console [-e ENV=VAL -e ...] [command [argument ...]]",
     description = "Attach a console to a starnix container"
 )]
 pub struct StarnixConsoleCommand {
@@ -99,7 +100,11 @@ pub struct StarnixConsoleCommand {
     #[argh(option, short = 'm')]
     pub moniker: Option<String>,
 
-    /// the command and and arguments to run in the console
+    /// environment variables to pass to the program.
+    #[argh(option, short = 'e')]
+    env: Vec<String>,
+
+    /// the command and arguments to run in the console
     #[argh(positional, greedy)]
     argv: Vec<String>,
 }
@@ -116,7 +121,11 @@ pub async fn starnix_console(
     let controller = connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?;
     let argv =
         if command.argv.is_empty() { vec!["/bin/sh".to_string()] } else { command.argv.clone() };
-    let exit_code = run_console(&controller, argv).await?;
+
+    let mut env = command.env.clone();
+    env.append(&mut get_environ());
+
+    let exit_code = run_console(&controller, argv, env).await?;
     println!("(exit code: {})", exit_code);
     Ok(())
 }
