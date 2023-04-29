@@ -7,8 +7,6 @@ using fuchsia.hardware.audiotypes;
 using fuchsia.hardware.i2cimpl;
 using zx;
 
-alias ZxPixelFormat = uint32;
-
 type ImageType = strict enum : uint32 {
     /// The image is linear and VMO backed.
     SIMPLE = 0;
@@ -24,9 +22,6 @@ type Image = struct {
     /// The width and height of the image in pixels.
     width uint32;
     height uint32;
-
-    /// The pixel format of the image.
-    pixel_format ZxPixelFormat;
 
     /// The type conveys information about what is providing the pixel data. If this is not
     /// IMAGE_TYPE_SIMPLE, it is up to the driver and buffer producer to agree on the meaning

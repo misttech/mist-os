@@ -34,9 +34,6 @@ class LayerTest : public TestBase {
     image_t dc_image = {
         .width = kDisplayWidth,
         .height = kDisplayHeight,
-        // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
-        // the `pixel_format` field is deleted.
-        .pixel_format = ZX_PIXEL_FORMAT_NONE,
         .type = fhd::wire::kTypeSimple,
         .handle = 0,
     };

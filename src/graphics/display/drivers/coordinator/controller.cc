@@ -83,9 +83,6 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   // a basic layer configuration is acceptable.
   layer_t test_layer = {};
   layer_t* test_layers[] = {&test_layer};
-  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
-  // the `pixel_format` field is deleted.
-  test_layer.cfg.primary.image.pixel_format = ZX_PIXEL_FORMAT_NONE;
   test_layer.type = LAYER_TYPE_PRIMARY;
   display_config_t test_config;
   const display_config_t* test_configs[] = {&test_config};

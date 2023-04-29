@@ -98,9 +98,6 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   image_t dc_image = {};
   dc_image.height = request->image_config.height;
   dc_image.width = request->image_config.width;
-  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
-  // the `pixel_format` field is deleted.
-  dc_image.pixel_format = ZX_PIXEL_FORMAT_NONE;
   dc_image.type = request->image_config.type;
 
   zx_status_t status = controller_->dc()->ImportImage(
@@ -208,9 +205,6 @@ void Client::SetBufferCollectionConstraints(
   image_t dc_image;
   dc_image.height = request->config.height;
   dc_image.width = request->config.width;
-  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
-  // the `pixel_format` field is deleted.
-  dc_image.pixel_format = ZX_PIXEL_FORMAT_NONE;
   dc_image.type = request->config.type;
 
   zx_status_t status = ZX_ERR_INTERNAL;
