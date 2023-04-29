@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/metadata.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/partition.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -172,17 +173,23 @@ TEST(RamNandTest, ExportPartitionMap) {
   expected->partition_count = 2;
 
   memset(expected->guid, 33, ZBI_PARTITION_GUID_LEN);
-  memset(expected->partitions[0].type_guid, 44, ZBI_PARTITION_GUID_LEN);
-  memset(expected->partitions[0].uniq_guid, 45, ZBI_PARTITION_GUID_LEN);
-  expected->partitions[0].first_block = 46;
-  expected->partitions[0].last_block = 47;
-  memset(expected->partitions[0].name, 48, ZBI_PARTITION_NAME_LEN);
 
-  memset(expected->partitions[1].type_guid, 55, ZBI_PARTITION_GUID_LEN);
-  memset(expected->partitions[1].uniq_guid, 56, ZBI_PARTITION_GUID_LEN);
-  expected->partitions[1].first_block = 57;
-  expected->partitions[1].last_block = 58;
-  memset(expected->partitions[1].name, 59, ZBI_PARTITION_NAME_LEN);
+  {
+    static_assert(alignof(zbi_partition_map_t) >= alignof(zbi_partition_t));
+    cpp20::span<zbi_partition_t> partitions(reinterpret_cast<zbi_partition_t*>(expected + 1),
+                                            expected->partition_count);
+    memset(partitions[0].type_guid, 44, ZBI_PARTITION_GUID_LEN);
+    memset(partitions[0].uniq_guid, 45, ZBI_PARTITION_GUID_LEN);
+    partitions[0].first_block = 46;
+    partitions[0].last_block = 47;
+    memset(partitions[0].name, 48, ZBI_PARTITION_NAME_LEN);
+
+    memset(partitions[1].type_guid, 55, ZBI_PARTITION_GUID_LEN);
+    memset(partitions[1].uniq_guid, 56, ZBI_PARTITION_GUID_LEN);
+    partitions[1].first_block = 57;
+    partitions[1].last_block = 58;
+    memset(partitions[1].name, 59, ZBI_PARTITION_NAME_LEN);
+  }
 
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();

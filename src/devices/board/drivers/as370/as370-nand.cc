@@ -85,7 +85,7 @@ zx_status_t As370::NandInit() {
   nand_partition_map->partition_count = std::size(kPartitions);
   nand_partition_map->reserved = 0;
   memset(nand_partition_map->guid, 0, sizeof(nand_partition_map->guid));
-  memcpy(nand_partition_map->partitions, kPartitions, sizeof(kPartitions));
+  memcpy(nand_partition_map.get() + 1, kPartitions, sizeof(kPartitions));
 
   std::vector<fpbus::Metadata> nand_metadata{
       {{

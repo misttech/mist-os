@@ -85,8 +85,11 @@ fbl::Array<char> ExtractPartitionMap(const fuchsia_hardware_nand::wire::RamNandI
   map->partition_count = dest_partitions;
   memcpy(map->guid, info.partition_map.device_guid.data(), sizeof(map->guid));
 
-  zbi_partition_t* dest = map->partitions;
-  for (uint32_t i = 0; i < num_partitions; i++) {
+  static_assert(alignof(zbi_partition_map_t) >= alignof(zbi_partition_t));
+  cpp20::span<zbi_partition_t> partitions(reinterpret_cast<zbi_partition_t*>(map + 1),
+                                          map->partition_count);
+  auto dest = partitions.begin();
+  for (uint32_t i = 0; i < num_partitions; ++i) {
     const auto& src = info.partition_map.partitions[i];
     if (!src.hidden) {
       memcpy(dest->type_guid, src.type_guid.data(), sizeof(dest->type_guid));
@@ -94,9 +97,10 @@ fbl::Array<char> ExtractPartitionMap(const fuchsia_hardware_nand::wire::RamNandI
       dest->first_block = src.first_block;
       dest->last_block = src.last_block;
       memcpy(dest->name, src.name.data(), sizeof(dest->name));
-      dest++;
+      ++dest;
     }
   }
+  ZX_DEBUG_ASSERT(dest == partitions.end());
   return buffer;
 }
 

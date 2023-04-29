@@ -12,6 +12,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/partition.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
@@ -134,8 +135,11 @@ zx_status_t BootPartition::Bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  zbi_partition_map_t* zbi_partition_map = reinterpret_cast<zbi_partition_map_t*>(buffer);
-  if (zbi_partition_map->partition_count == 0) {
+  zbi_partition_map_t* map = reinterpret_cast<zbi_partition_map_t*>(buffer);
+  static_assert(alignof(zbi_partition_map_t) >= alignof(zbi_partition_t));
+  cpp20::span<const zbi_partition_t> partitions(reinterpret_cast<const zbi_partition_t*>(map + 1),
+                                                map->partition_count);
+  if (partitions.empty()) {
     zxlogf(ERROR, "Partition count is zero.");
     return ZX_ERR_INTERNAL;
   }
@@ -144,11 +148,10 @@ zx_status_t BootPartition::Bind(void* ctx, zx_device_t* parent) {
   size_t block_op_size;
   block_impl_client.Query(&block_info, &block_op_size);
 
-  for (uint64_t i = 0; i < zbi_partition_map->partition_count; i++) {
+  for (size_t i = 0; i < partitions.size(); ++i) {
     fbl::AllocChecker ac;
-    auto bootpart = fbl::make_unique_checked<BootPartition>(&ac, parent, i, block_impl_client,
-                                                            zbi_partition_map->partitions[i],
-                                                            block_info, block_op_size);
+    auto bootpart = fbl::make_unique_checked<BootPartition>(
+        &ac, parent, i, block_impl_client, partitions[i], block_info, block_op_size);
     if (!ac.check()) {
       zxlogf(ERROR, "Failed to allocate memory for boot partition driver.");
       return ZX_ERR_NO_MEMORY;

@@ -11,6 +11,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/operation/nand.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zbi-format/partition.h>
 #include <stdio.h>
@@ -129,15 +130,16 @@ zx_status_t NandPartDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   // Create a device for each partition.
-  for (unsigned i = 0; i < pmap->partition_count; i++) {
-    const auto* part = &pmap->partitions[i];
-
-    nand_info.num_blocks = static_cast<uint32_t>(part->last_block - part->first_block + 1);
-    memcpy(&nand_info.partition_guid, &part->type_guid, sizeof(nand_info.partition_guid));
+  static_assert(alignof(zbi_partition_map_t) >= alignof(zbi_partition_t));
+  cpp20::span<const zbi_partition_t> partitions(reinterpret_cast<const zbi_partition_t*>(pmap + 1),
+                                                pmap->partition_count);
+  for (const zbi_partition_t& part : partitions) {
+    nand_info.num_blocks = static_cast<uint32_t>(part.last_block - part.first_block + 1);
+    memcpy(&nand_info.partition_guid, &part.type_guid, sizeof(nand_info.partition_guid));
     // We only use FTL for the FVM partition.
-    if (memcmp(part->type_guid, fvm_guid, sizeof(fvm_guid)) == 0) {
+    if (memcmp(part.type_guid, fvm_guid, sizeof(fvm_guid)) == 0) {
       nand_info.nand_class = NAND_CLASS_FTL;
-    } else if (memcmp(part->type_guid, test_guid, sizeof(test_guid)) == 0) {
+    } else if (memcmp(part.type_guid, test_guid, sizeof(test_guid)) == 0) {
       nand_info.nand_class = NAND_CLASS_TEST;
     } else {
       nand_info.nand_class = NAND_CLASS_BBS;
@@ -146,23 +148,23 @@ zx_status_t NandPartDevice::Create(void* ctx, zx_device_t* parent) {
     fbl::AllocChecker ac;
     std::unique_ptr<NandPartDevice> device(
         new (&ac) NandPartDevice(parent, nand_proto, bad_block, parent_op_size, nand_info,
-                                 static_cast<uint32_t>(part->first_block)));
+                                 static_cast<uint32_t>(part.first_block)));
     if (!ac.check()) {
       continue;
     }
     // Find optional partition_config information.
     uint32_t copy_count = 1;
     for (uint32_t i = 0; i < nand_config->extra_partition_config_count; i++) {
-      if (memcmp(nand_config->extra_partition_config[i].type_guid, part->type_guid,
-                 sizeof(part->type_guid)) == 0 &&
+      if (memcmp(nand_config->extra_partition_config[i].type_guid, part.type_guid,
+                 sizeof(part.type_guid)) == 0 &&
           nand_config->extra_partition_config[i].copy_count > 0) {
         copy_count = nand_config->extra_partition_config[i].copy_count;
         break;
       }
     }
-    status = device->Bind(part->name, copy_count);
+    status = device->Bind(part.name, copy_count);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to bind %s with error %d", part->name, status);
+      zxlogf(ERROR, "Failed to bind %s with error %d", part.name, status);
 
       continue;
     }

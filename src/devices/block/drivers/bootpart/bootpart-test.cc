@@ -4,6 +4,8 @@
 
 #include "bootpart.h"
 
+#include <lib/stdcompat/span.h>
+
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -76,30 +78,32 @@ class BootPartitionTest : public zxtest::Test {
                          &fake_block_device_);
 
     // Set up 2 partitions of equal size.
-    zbi_partition_t partitions[2];  // For calculating sizeof() inclusive of alignment.
     std::vector<uint8_t> partition_map_buffer;
     // Add __STDCPP_DEFAULT_NEW_ALIGNMENT__ as loose upper-bound on alignment padding.
-    partition_map_buffer.resize(
-        sizeof(zbi_partition_map_t) + __STDCPP_DEFAULT_NEW_ALIGNMENT__ + sizeof(partitions), 0);
+    partition_map_buffer.resize(sizeof(zbi_partition_map_t) + __STDCPP_DEFAULT_NEW_ALIGNMENT__ +
+                                    2 * sizeof(zbi_partition_t),
+                                0);
     zbi_partition_map_t* partition_map =
         reinterpret_cast<zbi_partition_map_t*>(partition_map_buffer.data());
     partition_map->partition_count = 2;
 
+    static_assert(alignof(zbi_partition_map_t) >= alignof(zbi_partition_t));
+    cpp20::span<zbi_partition_t> partitions(reinterpret_cast<zbi_partition_t*>(partition_map + 1),
+                                            partition_map->partition_count);
+
     // Set up partition 0.
-    zbi_partition_t* partition = partition_map->partitions;
-    partition->first_block = 0;
-    partition->last_block = 11;
-    memset(partition->type_guid, 'T', sizeof(partition->type_guid));
-    memset(partition->uniq_guid, 'I', sizeof(partition->uniq_guid));
-    strncpy(partition->name, "This is partition0", sizeof(partition->name));
+    partitions[0].first_block = 0;
+    partitions[0].last_block = 11;
+    memset(partitions[0].type_guid, 'T', sizeof(partitions[0].type_guid));
+    memset(partitions[0].uniq_guid, 'I', sizeof(partitions[0].uniq_guid));
+    strncpy(partitions[0].name, "This is partition0", sizeof(partitions[0].name));
 
     // Set up partition 1.
-    partition++;
-    partition->first_block = 12;
-    partition->last_block = 23;
-    memset(partition->type_guid, 'U', sizeof(partition->type_guid));
-    memset(partition->uniq_guid, 'J', sizeof(partition->uniq_guid));
-    strncpy(partition->name, "This is partition1", sizeof(partition->name));
+    partitions[1].first_block = 12;
+    partitions[1].last_block = 23;
+    memset(partitions[1].type_guid, 'U', sizeof(partitions[1].type_guid));
+    memset(partitions[1].uniq_guid, 'J', sizeof(partitions[1].uniq_guid));
+    strncpy(partitions[1].name, "This is partition1", sizeof(partitions[1].name));
 
     ASSERT_OK(device_add_metadata(parent_.get(), DEVICE_METADATA_PARTITION_MAP,
                                   partition_map_buffer.data(), partition_map_buffer.size()));

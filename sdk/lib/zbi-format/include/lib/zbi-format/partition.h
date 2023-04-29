@@ -27,7 +27,8 @@ typedef struct {
   char name[ZBI_PARTITION_NAME_LEN];
 } zbi_partition_t;
 
-// ZBI_TYPE_DRV_PARTITION_MAP payload.
+// ZBI_TYPE_DRV_PARTITION_MAP payload. This header is immediately followed by
+// an array of the corresponding zbi_partition_t.
 typedef struct {
   // Total blocks used on the device.
   uint64_t block_count;
@@ -42,9 +43,6 @@ typedef struct {
 
   // Device GUID.
   uint8_t guid[ZBI_PARTITION_GUID_LEN];
-
-  // partition_count partition entries follow.
-  zbi_partition_t partitions[];
 } zbi_partition_map_t;
 
 #endif  // LIB_ZBI_FORMAT_PARTITION_H_
