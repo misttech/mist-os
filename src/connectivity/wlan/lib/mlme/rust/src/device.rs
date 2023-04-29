@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::common::mac::WlanGi,
-    crate::{buffer::OutBuf, key},
+    crate::{banjo_buffer_to_slice, banjo_list_to_slice, buffer::OutBuf, common::mac::WlanGi, key},
     banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
@@ -16,7 +15,7 @@ use {
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::MacAddr,
-    std::{ffi::c_void, marker::PhantomData},
+    std::ffi::c_void,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
 };
 
@@ -131,12 +130,12 @@ impl Device {
 
     pub fn start_passive_scan(
         &self,
-        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
+        passive_scan_args: PassiveScanArgs,
     ) -> Result<u64, zx::Status> {
-        self.raw_device.start_passive_scan(&passive_scan_args)
+        self.raw_device.start_passive_scan(passive_scan_args)
     }
 
-    pub fn start_active_scan(&self, active_scan_args: &ActiveScanArgs) -> Result<u64, zx::Status> {
+    pub fn start_active_scan(&self, active_scan_args: ActiveScanArgs) -> Result<u64, zx::Status> {
         self.raw_device.start_active_scan(active_scan_args)
     }
 
@@ -277,6 +276,26 @@ impl<'a> WlanSoftmacIfcProtocol<'a> {
     }
 }
 
+#[cfg_attr(test, derive(Clone, Debug, PartialEq))]
+pub struct PassiveScanArgs {
+    pub channels: Vec<u8>,
+    pub min_channel_time: zx::sys::zx_duration_t,
+    pub max_channel_time: zx::sys::zx_duration_t,
+    pub min_home_time: zx::sys::zx_duration_t,
+}
+
+impl From<banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest> for PassiveScanArgs {
+    fn from(banjo_args: banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest) -> PassiveScanArgs {
+        PassiveScanArgs {
+            channels: banjo_list_to_slice!(banjo_args, channels).to_vec(),
+            min_channel_time: banjo_args.min_channel_time,
+            max_channel_time: banjo_args.max_channel_time,
+            min_home_time: banjo_args.min_home_time,
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Clone, Debug, PartialEq))]
 pub struct ActiveScanArgs {
     pub min_channel_time: zx::sys::zx_duration_t,
     pub max_channel_time: zx::sys::zx_duration_t,
@@ -289,69 +308,103 @@ pub struct ActiveScanArgs {
     pub ies: Vec<u8>,
 }
 
-// Private wrapper struct to manage the lifetime of the pointers contained in the
-// banjo_fuchsia_wlan_softmac::WlanSoftmacStartActiveScanRequest converted
-// from an ActiveScanArgs.
-struct WlanSoftmacStartActiveScanRequest<'a, T> {
-    args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
-    phantom: PhantomData<&'a T>,
-}
-
-impl<'a> From<&'a ActiveScanArgs> for WlanSoftmacStartActiveScanRequest<'a, ActiveScanArgs> {
-    fn from(
-        active_scan_args: &ActiveScanArgs,
-    ) -> WlanSoftmacStartActiveScanRequest<'_, ActiveScanArgs> {
-        WlanSoftmacStartActiveScanRequest {
-            args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
-                min_channel_time: active_scan_args.min_channel_time,
-                max_channel_time: active_scan_args.max_channel_time,
-                min_home_time: active_scan_args.min_home_time,
-                min_probes_per_channel: active_scan_args.min_probes_per_channel,
-                max_probes_per_channel: active_scan_args.max_probes_per_channel,
-                channels_list: active_scan_args.channels.as_ptr(),
-                channels_count: active_scan_args.channels.len(),
-                ssids_list: active_scan_args.ssids_list.as_ptr(),
-                ssids_count: active_scan_args.ssids_list.len(),
-                mac_header_buffer: active_scan_args.mac_header.as_ptr(),
-                mac_header_size: active_scan_args.mac_header.len(),
-                ies_buffer: active_scan_args.ies.as_ptr(),
-                ies_size: active_scan_args.ies.len(),
-            },
-            phantom: PhantomData,
+impl From<banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest> for ActiveScanArgs {
+    fn from(banjo_args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest) -> ActiveScanArgs {
+        ActiveScanArgs {
+            min_channel_time: banjo_args.min_channel_time,
+            max_channel_time: banjo_args.max_channel_time,
+            min_home_time: banjo_args.min_home_time,
+            min_probes_per_channel: banjo_args.min_probes_per_channel,
+            max_probes_per_channel: banjo_args.max_probes_per_channel,
+            ssids_list: banjo_list_to_slice!(banjo_args, ssids).to_vec(),
+            channels: banjo_list_to_slice!(banjo_args, channels).to_vec(),
+            mac_header: banjo_buffer_to_slice!(banjo_args, mac_header).to_vec(),
+            ies: banjo_buffer_to_slice!(banjo_args, ies).to_vec(),
         }
     }
 }
 
-impl From<banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest> for ActiveScanArgs {
-    fn from(banjo_args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest) -> ActiveScanArgs {
-        unsafe {
-            ActiveScanArgs {
-                min_channel_time: banjo_args.min_channel_time,
-                max_channel_time: banjo_args.max_channel_time,
-                min_home_time: banjo_args.min_home_time,
-                min_probes_per_channel: banjo_args.min_probes_per_channel,
-                max_probes_per_channel: banjo_args.max_probes_per_channel,
-                ssids_list: std::slice::from_raw_parts(
-                    banjo_args.ssids_list,
-                    banjo_args.ssids_count,
-                )
-                .to_vec(),
-                mac_header: std::slice::from_raw_parts(
-                    banjo_args.mac_header_buffer,
-                    banjo_args.mac_header_size,
-                )
-                .to_vec(),
-                channels: std::slice::from_raw_parts(
-                    banjo_args.channels_list,
-                    banjo_args.channels_count,
-                )
-                .to_vec(),
-                ies: std::slice::from_raw_parts(banjo_args.ies_buffer, banjo_args.ies_size)
-                    .to_vec(),
+mod convert {
+    use super::*;
+
+    pub struct StartPassiveScanRequest {
+        banjo_args: banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
+        _args: PassiveScanArgs,
+    }
+
+    impl StartPassiveScanRequest {
+        #[cfg(test)]
+        pub fn as_banjo(&self) -> &banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
+            &self.banjo_args
+        }
+
+        pub fn to_banjo_ptr(
+            &self,
+        ) -> *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
+            &self.banjo_args as *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest
+        }
+    }
+
+    impl From<PassiveScanArgs> for StartPassiveScanRequest {
+        fn from(passive_scan_args: PassiveScanArgs) -> StartPassiveScanRequest {
+            StartPassiveScanRequest {
+                banjo_args: banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
+                    channels_list: passive_scan_args.channels.as_ptr(),
+                    channels_count: passive_scan_args.channels.len(),
+                    min_channel_time: passive_scan_args.min_channel_time,
+                    max_channel_time: passive_scan_args.max_channel_time,
+                    min_home_time: passive_scan_args.min_home_time,
+                },
+                _args: passive_scan_args,
+            }
+        }
+    }
+
+    pub struct StartActiveScanRequest {
+        banjo_args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
+        _args: ActiveScanArgs,
+    }
+
+    impl StartActiveScanRequest {
+        #[cfg(test)]
+        pub fn as_banjo(&self) -> &banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
+            &self.banjo_args
+        }
+
+        pub fn to_banjo_ptr(&self) -> *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
+            &self.banjo_args as *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest
+        }
+    }
+
+    impl From<ActiveScanArgs> for StartActiveScanRequest {
+        fn from(active_scan_args: ActiveScanArgs) -> StartActiveScanRequest {
+            StartActiveScanRequest {
+                banjo_args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
+                    min_channel_time: active_scan_args.min_channel_time,
+                    max_channel_time: active_scan_args.max_channel_time,
+                    min_home_time: active_scan_args.min_home_time,
+                    min_probes_per_channel: active_scan_args.min_probes_per_channel,
+                    max_probes_per_channel: active_scan_args.max_probes_per_channel,
+                    channels_list: active_scan_args.channels.as_ptr(),
+                    channels_count: active_scan_args.channels.len(),
+                    ssids_list: active_scan_args.ssids_list.as_ptr(),
+                    ssids_count: active_scan_args.ssids_list.len(),
+                    mac_header_buffer: active_scan_args.mac_header.as_ptr(),
+                    mac_header_size: active_scan_args.mac_header.len(),
+                    ies_buffer: active_scan_args.ies.as_ptr(),
+                    ies_size: active_scan_args.ies.len(),
+                },
+                _args: active_scan_args,
             }
         }
     }
 }
+
+// Private wrapper structs to manage the lifetime of the pointers contained in the
+// banjo_fuchsia_wlan_softmac::WlanSoftmacStartPassiveScanRequest and
+// banjo_fuchsia_wlan_softmac::WlanSoftmacStartActiveScanRequest types, respectively.
+use convert::StartActiveScanRequest;
+use convert::StartPassiveScanRequest;
 
 // Our device is used inside a separate worker thread, so we force Rust to allow this.
 unsafe impl Send for DeviceInterface {}
@@ -495,25 +548,21 @@ impl DeviceInterface {
         zx::ok(status)
     }
 
-    fn start_passive_scan(
-        &self,
-        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
-    ) -> Result<u64, zx::Status> {
+    fn start_passive_scan(&self, passive_scan_args: PassiveScanArgs) -> Result<u64, zx::Status> {
         let mut out_scan_id = 0;
         let status = (self.start_passive_scan)(
             self.device,
-            passive_scan_args as *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
+            StartPassiveScanRequest::from(passive_scan_args).to_banjo_ptr(),
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|_| out_scan_id)
     }
 
-    fn start_active_scan(&self, active_scan_args: &ActiveScanArgs) -> Result<u64, zx::Status> {
+    fn start_active_scan(&self, active_scan_args: ActiveScanArgs) -> Result<u64, zx::Status> {
         let mut out_scan_id = 0;
         let status = (self.start_active_scan)(
             self.device,
-            &WlanSoftmacStartActiveScanRequest::<'_>::from(active_scan_args).args
-                as *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
+            StartActiveScanRequest::from(active_scan_args).to_banjo_ptr(),
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|_| out_scan_id)
@@ -608,38 +657,6 @@ pub mod test_utils {
         std::convert::TryInto,
         wlan_sme,
     };
-
-    pub struct CapturedWlanSoftmacStartPassiveScanRequest {
-        pub channels: Vec<u8>,
-        pub min_channel_time: zx::sys::zx_duration_t,
-        pub max_channel_time: zx::sys::zx_duration_t,
-        pub min_home_time: zx::sys::zx_duration_t,
-    }
-
-    impl CapturedWlanSoftmacStartPassiveScanRequest {
-        /// # Safety
-        ///
-        /// This function is used exclusively in tests to simulate a driver
-        /// receiving a request. It is only guaranteed to be safe if the given
-        /// pointer is safe to dereference and will outlive the returned
-        /// CapturedWlanSoftmacStartPassiveScanRequest. The caller is responsible for
-        /// enforcing this.
-        pub unsafe fn from_banjo(
-            banjo_args_ptr: *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
-        ) -> CapturedWlanSoftmacStartPassiveScanRequest {
-            let banjo_args = *banjo_args_ptr;
-            CapturedWlanSoftmacStartPassiveScanRequest {
-                channels: std::slice::from_raw_parts(
-                    banjo_args.channels_list,
-                    banjo_args.channels_count,
-                )
-                .to_vec(),
-                min_channel_time: banjo_args.min_channel_time,
-                max_channel_time: banjo_args.max_channel_time,
-                min_home_time: banjo_args.min_home_time,
-            }
-        }
-    }
 
     pub trait FromMlmeEvent {
         fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self>
@@ -746,7 +763,7 @@ pub mod test_utils {
         pub keys: Vec<banjo_wlan_softmac::WlanKeyConfiguration>,
         pub keys_vec: Vec<Vec<u8>>,
         pub next_scan_id: u64,
-        pub captured_passive_scan_args: Option<CapturedWlanSoftmacStartPassiveScanRequest>,
+        pub captured_passive_scan_args: Option<PassiveScanArgs>,
         pub captured_active_scan_args: Option<ActiveScanArgs>,
         pub info: WlanSoftmacQueryResponse,
         pub discovery_support: banjo_common::DiscoverySupport,
@@ -923,8 +940,7 @@ pub mod test_utils {
                 let self_ = &mut *(device as *mut Self);
                 *out_scan_id = self_.next_scan_id;
                 self_.next_scan_id += 1;
-                self_.captured_passive_scan_args =
-                    Some(CapturedWlanSoftmacStartPassiveScanRequest::from_banjo(passive_scan_args));
+                self_.captured_passive_scan_args = Some(PassiveScanArgs::from(*passive_scan_args));
             }
             zx::sys::ZX_OK
         }
@@ -1383,19 +1399,32 @@ mod tests {
     }
 
     #[test]
+    fn successful_conversion_of_passive_scan_args_to_banjo() {
+        let args = StartPassiveScanRequest::from(PassiveScanArgs {
+            channels: vec![1u8, 2, 3],
+            min_channel_time: zx::Duration::from_millis(3).into_nanos(),
+            max_channel_time: zx::Duration::from_millis(123).into_nanos(),
+            min_home_time: 5,
+        });
+        let banjo_args = args.as_banjo();
+        assert_eq!(banjo_list_to_slice!(banjo_args, channels), &[1u8, 2, 3]);
+        assert_eq!(banjo_args.min_channel_time, zx::Duration::from_millis(3).into_nanos());
+        assert_eq!(banjo_args.max_channel_time, zx::Duration::from_millis(123).into_nanos());
+        assert_eq!(banjo_args.min_home_time, 5);
+    }
+
+    #[test]
     fn start_passive_scan() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
-        let result =
-            dev.start_passive_scan(&banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
-                channels_list: &[1u8, 2, 3] as *const u8,
-                channels_count: 3,
-                min_channel_time: zx::Duration::from_millis(0).into_nanos(),
-                max_channel_time: zx::Duration::from_millis(200).into_nanos(),
-                min_home_time: 0,
-            });
+        let result = dev.start_passive_scan(PassiveScanArgs {
+            channels: vec![1u8, 2, 3],
+            min_channel_time: zx::Duration::from_millis(0).into_nanos(),
+            max_channel_time: zx::Duration::from_millis(200).into_nanos(),
+            min_home_time: 0,
+        });
         assert!(result.is_ok());
         assert_variant!(fake_device.captured_passive_scan_args, Some(passive_scan_args) => {
             assert_eq!(passive_scan_args.channels.len(), 3);
@@ -1407,12 +1436,72 @@ mod tests {
     }
 
     #[test]
+    fn successful_conversion_of_active_scan_args_to_banjo() {
+        let args = StartActiveScanRequest::from(ActiveScanArgs {
+            min_channel_time: zx::Duration::from_millis(2).into_nanos(),
+            max_channel_time: zx::Duration::from_millis(301).into_nanos(),
+            min_home_time: 6,
+            min_probes_per_channel: 1,
+            max_probes_per_channel: 3,
+            channels: vec![4u8, 36, 149],
+            ssids_list: vec![
+                cssid_from_ssid_unchecked(&Ssid::try_from("foo").unwrap().into()),
+                cssid_from_ssid_unchecked(&Ssid::try_from("bar").unwrap().into()),
+            ],
+            #[rustfmt::skip]
+            mac_header: vec![
+                0x40u8, 0x00, // Frame Control
+                0x00, 0x00, // Duration
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 1
+                0x66, 0x66, 0x66, 0x66, 0x66, 0x66, // Address 2
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 3
+                0x70, 0xdc, // Sequence Control
+            ],
+            #[rustfmt::skip]
+            ies: vec![
+                0x01u8, // Element ID for Supported Rates
+                0x08, // Length
+                0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Supported Rates
+            ],
+        });
+        let banjo_args = args.as_banjo();
+        assert_eq!(banjo_args.min_channel_time, zx::Duration::from_millis(2).into_nanos());
+        assert_eq!(banjo_args.max_channel_time, zx::Duration::from_millis(301).into_nanos());
+        assert_eq!(banjo_args.min_home_time, 6);
+        assert_eq!(banjo_args.min_probes_per_channel, 1);
+        assert_eq!(banjo_args.max_probes_per_channel, 3);
+        assert_eq!(banjo_list_to_slice!(banjo_args, channels), &[4, 36, 149]);
+        assert_eq!(
+            banjo_list_to_slice!(banjo_args, ssids),
+            &[
+                cssid_from_ssid_unchecked(&Ssid::try_from("foo").unwrap().into()),
+                cssid_from_ssid_unchecked(&Ssid::try_from("bar").unwrap().into()),
+            ]
+        );
+        #[rustfmt::skip]
+        assert_eq!(banjo_buffer_to_slice!(banjo_args, mac_header), &[
+            0x40u8, 0x00, // Frame Control
+            0x00, 0x00, // Duration
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 1
+            0x66, 0x66, 0x66, 0x66, 0x66, 0x66, // Address 2
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 3
+            0x70, 0xdc, // Sequence Control
+        ]);
+        #[rustfmt::skip]
+        assert_eq!(banjo_buffer_to_slice!(banjo_args, ies), &[
+            0x01u8, // Element ID for Supported Rates
+            0x08, // Length
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Supported Rates
+        ]);
+    }
+
+    #[test]
     fn start_active_scan() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
-        let result = dev.start_active_scan(&ActiveScanArgs {
+        let result = dev.start_active_scan(ActiveScanArgs {
             min_channel_time: zx::Duration::from_millis(0).into_nanos(),
             max_channel_time: zx::Duration::from_millis(200).into_nanos(),
             min_home_time: 0,

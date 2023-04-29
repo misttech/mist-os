@@ -6,7 +6,7 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::{ActiveScanArgs, Device},
+        device::{ActiveScanArgs, Device, PassiveScanArgs},
         error::Error,
     },
     anyhow::format_err,
@@ -200,16 +200,13 @@ impl<'a> BoundScanner<'a> {
     }
 
     fn start_passive_scan(&mut self, req: fidl_mlme::ScanRequest) -> Result<OngoingScan, Error> {
-        // Note: WlanSoftmacStartPassiveScanRequest contains raw pointers and the memory pointed
-        // to must remain in scope for the duration of the call to Device::start_passive_scan().
         Ok(OngoingScan::PassiveOffloadScan {
             mlme_txn_id: req.txn_id,
             in_progress_device_scan_id: self
                 .ctx
                 .device
-                .start_passive_scan(&banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
-                    channels_list: req.channel_list.as_ptr(),
-                    channels_count: req.channel_list.len(),
+                .start_passive_scan(PassiveScanArgs {
+                    channels: req.channel_list,
                     // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
                     // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
                     // four octets.
@@ -281,7 +278,7 @@ impl<'a> BoundScanner<'a> {
         // for the duration of the call to Device::start_active_scan().
         self.ctx
             .device
-            .start_active_scan(&active_scan_args)
+            .start_active_scan(active_scan_args)
             .map_err(|status| ScanError::StartOffloadScanFails(status))
     }
 

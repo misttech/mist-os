@@ -13,6 +13,36 @@ use {
     zerocopy::AsBytes,
 };
 
+#[macro_export]
+macro_rules! banjo_list_to_slice {
+    ($banjo_struct:expr, $field_prefix:ident $(,)?) => {{
+        use paste::paste;
+        paste! {
+            unsafe {
+                std::slice::from_raw_parts(
+                    $banjo_struct.[<$field_prefix _list>],
+                    $banjo_struct.[<$field_prefix _count>],
+                )
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! banjo_buffer_to_slice {
+    ($banjo_struct:expr, $field_prefix:ident $(,)?) => {{
+        use paste::paste;
+        paste! {
+            unsafe {
+                std::slice::from_raw_parts(
+                    $banjo_struct.[<$field_prefix _buffer>],
+                    $banjo_struct.[<$field_prefix _size>],
+                )
+            }
+        }
+    }};
+}
+
 pub fn ddk_channel_from_fidl(
     fc: fidl_common::WlanChannel,
 ) -> Result<banjo_common::WlanChannel, Error> {
@@ -124,8 +154,7 @@ pub fn device_info_from_wlan_softmac_query_response(
     let softmac_hardware_capability = info.hardware_capability;
     let mut bands = vec![];
     // SAFETY: softmac.fidl API guarantees these values represent a valid memory region.
-    let band_caps_list =
-        unsafe { std::slice::from_raw_parts(info.band_caps_list, info.band_caps_count) };
+    let band_caps_list = banjo_list_to_slice!(info, band_caps);
     for band_cap in band_caps_list {
         bands.push(convert_ddk_band_cap(band_cap)?);
     }
@@ -255,6 +284,44 @@ mod tests {
         wlan_common::{ie, mac},
         zerocopy::AsBytes,
     };
+
+    #[test]
+    fn conversion_from_banjo_list_to_slice_successful() {
+        let channels = vec![3, 4, 5];
+        let banjo = banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
+            channels_list: channels.as_ptr(),
+            channels_count: channels.len(),
+            min_channel_time: 0,
+            max_channel_time: 100,
+            min_home_time: 5,
+        };
+        assert_eq!(&channels, banjo_list_to_slice!(banjo, channels));
+    }
+
+    #[test]
+    fn conversion_from_banjo_buffer_to_slice_successful() {
+        let ssids_list = vec![];
+        let channels = vec![];
+        let mac_header = vec![0xAA, 0xAA];
+        let ies = vec![0xBB, 0xBB, 0xBB];
+        let banjo = banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
+            min_channel_time: 0,
+            max_channel_time: 100,
+            min_home_time: 5,
+            min_probes_per_channel: 1,
+            max_probes_per_channel: 6,
+            ssids_list: ssids_list.as_ptr(),
+            ssids_count: ssids_list.len(),
+            channels_list: channels.as_ptr(),
+            channels_count: channels.len(),
+            mac_header_buffer: mac_header.as_ptr(),
+            mac_header_size: mac_header.len(),
+            ies_buffer: ies.as_ptr(),
+            ies_size: ies.len(),
+        };
+        assert_eq!(&mac_header, banjo_buffer_to_slice!(banjo, mac_header));
+        assert_eq!(&ies, banjo_buffer_to_slice!(banjo, ies));
+    }
 
     #[test]
     fn assoc_cfg_construction_successful() {
