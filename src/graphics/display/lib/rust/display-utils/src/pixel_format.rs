@@ -153,6 +153,12 @@ impl From<PixelFormat> for images2::PixelFormat {
     }
 }
 
+impl From<&PixelFormat> for images2::PixelFormat {
+    fn from(src: &PixelFormat) -> Self {
+        Self::from(*src)
+    }
+}
+
 impl fmt::Display for PixelFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string: &str = match *self {

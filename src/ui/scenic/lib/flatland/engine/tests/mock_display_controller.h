@@ -25,7 +25,8 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
 
   MOCK_METHOD(void, ImportEvent, (zx::event, uint64_t));
 
-  MOCK_METHOD(void, SetLayerColorConfig, (uint64_t, uint32_t, std::vector<uint8_t>));
+  MOCK_METHOD(void, SetLayerColorConfig,
+              (uint64_t, fuchsia::images2::PixelFormat, std::vector<uint8_t>));
 
   MOCK_METHOD(void, SetLayerImage, (uint64_t, uint64_t, uint64_t, uint64_t));
 

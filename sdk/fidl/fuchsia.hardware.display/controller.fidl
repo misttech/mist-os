@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+using fuchsia.images2;
 using fuchsia.sysmem;
 using zx;
 
@@ -270,15 +271,17 @@ protocol Controller {
         y int32;
     });
 
-    // Configures the layer as a color layer with the given color. The
-    // color_bytes vector is little-endian and must have length appropriate
-    // for the pixel format.
+    // Configures the layer as a color layer with the given color in
+    // `pixel_format`.
+    //
+    // `color_bytes` vector is little-endian and of the exact size of one pixel
+    // in `pixel_format`.
     //
     // It is illegal to call this on an invalid layer or for the length of
     // color_bytes to mismatch the size of the supplied format.
     SetLayerColorConfig(struct {
         layer_id uint64;
-        pixel_format uint32;
+        pixel_format fuchsia.images2.PixelFormat;
         color_bytes vector<uint8>:MAX;
     });
 

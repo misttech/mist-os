@@ -437,16 +437,17 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
 
     layer->active = true;
 
-    constexpr uint32_t kColorLayerFormat = ZX_PIXEL_FORMAT_ARGB_8888;
+    constexpr fuchsia_images2::wire::PixelFormat kColorLayerFormat =
+        fuchsia_images2::wire::PixelFormat::kBgra32;
+    constexpr uint32_t kColorLayerBytesPerPixel = 4;
     uint32_t kColorLayerColor = get_fg_color();
 
-    uint32_t size = FIDL_ALIGN(ZX_PIXEL_FORMAT_BYTES(kColorLayerFormat));
-    uint8_t data[size];
+    uint8_t data[kColorLayerBytesPerPixel];
     *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
 
     auto result = dc->SetLayerColorConfig(
         layer->id, kColorLayerFormat,
-        ::fidl::VectorView<uint8_t>::FromExternal(data, ZX_PIXEL_FORMAT_BYTES(kColorLayerFormat)));
+        ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));
 
     if (!result.ok()) {
       printf("Setting layer config failed\n");
