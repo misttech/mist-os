@@ -172,7 +172,11 @@ impl Emu {
                 arg
             })
             .arg("-q")
-            .arg(&*QEMU_PATH);
+            .arg(&*QEMU_PATH)
+            // QEMU rewrites the system TMPDIR from /tmp to /var/tmp.
+            // Instead use the directory the emulator is running in.
+            // https://gitlab.com/qemu-project/qemu/-/issues/1626
+            .env("TMPDIR", emu_dir.path());
 
         Emu { dir: emu_dir, child: command.spawn().unwrap() }
     }
