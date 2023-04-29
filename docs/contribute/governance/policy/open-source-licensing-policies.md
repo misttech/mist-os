@@ -119,6 +119,9 @@ The following are the approved licenses for production target devices:
 *   MIT license, specifically the text at
     [/zircon/kernel/LICENSE](/zircon/kernel/LICENSE)
 
+*   MITNFA license, specifically the text at
+    [https://spdx.org/licenses/MITNFA.html](https://spdx.org/licenses/MITNFA.html)
+
 *   X11 license, specifically the text at
     [/third_party/github.com/intel/libva/va/x11/va_dri2.c](https://fuchsia.googlesource.com/third_party/github.com/intel/libva/+/6e86b4fb4dafa123b1e31821f61da88f10cfbe91/va/x11/va_dri2.c)
 
