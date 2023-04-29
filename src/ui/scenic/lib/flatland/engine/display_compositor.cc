@@ -311,8 +311,7 @@ bool DisplayCompositor::ImportBufferCollection(
   return ImportBufferCollectionToDisplayController(
       collection_id, std::move(display_token),
       // Indicate that no specific size, format, or type is required.
-      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-      fuchsia::hardware::display::ImageConfig{.pixel_format = ZX_PIXEL_FORMAT_NONE, .type = 0});
+      fuchsia::hardware::display::ImageConfig{.type = 0});
 }
 
 void DisplayCompositor::ReleaseBufferCollection(
@@ -346,8 +345,6 @@ fuchsia::hardware::display::ImageConfig DisplayCompositor::CreateImageConfig(
   return fuchsia::hardware::display::ImageConfig{
       .width = metadata.width,
       .height = metadata.height,
-      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-      .pixel_format = ZX_PIXEL_FORMAT_NONE,
       .type = BufferCollectionPixelFormatToImageType(pixel_format)};
 }
 
@@ -1002,9 +999,7 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
   {  // Set display constraints.
     std::scoped_lock lock(lock_);
     const auto result = ImportBufferCollectionToDisplayController(
-        collection_id, std::move(display_token),
-        // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-        fuchsia::hardware::display::ImageConfig{.pixel_format = ZX_PIXEL_FORMAT_NONE});
+        collection_id, std::move(display_token), fuchsia::hardware::display::ImageConfig{});
     FX_DCHECK(result);
   }
 

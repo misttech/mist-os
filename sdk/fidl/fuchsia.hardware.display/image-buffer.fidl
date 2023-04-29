@@ -9,9 +9,6 @@ type ImageConfig = struct {
     width uint32;
     height uint32;
 
-    // A zx_pixel_format_t constant that defines the pixel format of the data.
-    pixel_format uint32;
-
     // Type conveys information about what is providing the pixel data. If this
     // is not TYPE_SIMPLE, it is up to the driver and image producer to
     // agree on the meaning of the value through some mechanism outside the scope

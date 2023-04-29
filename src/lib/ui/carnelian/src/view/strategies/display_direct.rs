@@ -312,14 +312,7 @@ impl DisplayDirectViewStrategy {
             )),
         };
 
-        let direct_pixel_format = if use_spinel { context.pixel_format() } else { pixel_format };
-
-        let mut image_config = ImageConfig {
-            width: unsize.width,
-            height: unsize.height,
-            pixel_format: direct_pixel_format.into(),
-            type_: 0,
-        };
+        let mut image_config = ImageConfig { width: unsize.width, height: unsize.height, type_: 0 };
 
         let controller_token = buffer_allocator.duplicate_token().await?;
         display.controller.import_buffer_collection(collection_id, controller_token).await?;

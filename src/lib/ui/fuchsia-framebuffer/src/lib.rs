@@ -216,13 +216,7 @@ pub struct Frame {
 
 impl Frame {
     fn create_image_config(image_type: u32, config: &Config) -> ImageConfig {
-        ImageConfig {
-            width: config.width,
-            height: config.height,
-            // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-            pixel_format: 0,
-            type_: image_type,
-        }
+        ImageConfig { width: config.width, height: config.height, type_: image_type }
     }
 
     async fn import_buffer(

@@ -278,8 +278,6 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
       .width = extent.width,
       .height = extent.height,
   };
-  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-  image_config.pixel_format = ZX_PIXEL_FORMAT_NONE;
 #if defined(__x86_64__)
   // Must be consistent with intel-gpu-core.h
   const uint32_t kImageTypeXTiled = 1;

@@ -114,13 +114,7 @@ impl Drop for Image {
 
 impl From<&ImageParameters> for fdisplay::ImageConfig {
     fn from(src: &ImageParameters) -> Self {
-        Self {
-            width: src.width,
-            height: src.height,
-            // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
-            pixel_format: 0,
-            type_: fdisplay::TYPE_SIMPLE,
-        }
+        Self { width: src.width, height: src.height, type_: fdisplay::TYPE_SIMPLE }
     }
 }
 
