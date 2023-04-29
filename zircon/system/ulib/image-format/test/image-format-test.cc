@@ -4,6 +4,7 @@
 
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <zircon/pixelformat.h>
 
 #include <fbl/array.h>
 #include <zxtest/zxtest.h>
@@ -157,14 +158,16 @@ TEST(ImageFormat, LinearRowBytes_V1_wire) {
 }
 
 TEST(ImageFormat, InvalidColorSpace_V1_wire) {
-  fidl::Arena allocator;
-  auto sysmem_format_result = ImageFormatConvertZxToSysmem_v1(allocator, ZX_PIXEL_FORMAT_RGB_565);
-  EXPECT_TRUE(sysmem_format_result.is_ok());
-  auto sysmem_format = sysmem_format_result.take_value();
+  fuchsia_sysmem::wire::PixelFormat kPixelFormat = {
+      .type = fuchsia_sysmem::PixelFormatType::kRgb565,
+      .has_format_modifier = true,
+      .format_modifier = {
+          .value = fuchsia_sysmem::wire::kFormatModifierLinear,
+      }};
 
   sysmem_v1::wire::ColorSpace color_space{sysmem_v1::wire::ColorSpaceType::kInvalid};
   // Shouldn't crash.
-  EXPECT_FALSE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, sysmem_format));
+  EXPECT_FALSE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, kPixelFormat));
 }
 
 TEST(ImageFormat, PassThroughColorSpace_V1_wire) {
@@ -193,219 +196,91 @@ TEST(ImageFormat, PassThroughColorSpace_V1_wire) {
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, linear_nv12));
 }
 
-TEST(ImageFormat, ZxPixelFormat_V2) {
-  static constexpr zx_pixel_format_t pixel_formats[] = {
-      ZX_PIXEL_FORMAT_RGB_565,
-      ZX_PIXEL_FORMAT_RGB_332,
-      ZX_PIXEL_FORMAT_RGB_2220,
-      ZX_PIXEL_FORMAT_ARGB_8888,
-      ZX_PIXEL_FORMAT_RGB_x888,
-      ZX_PIXEL_FORMAT_MONO_8,
-      ZX_PIXEL_FORMAT_GRAY_8,
-      ZX_PIXEL_FORMAT_I420,
-      ZX_PIXEL_FORMAT_NV12,
-      ZX_PIXEL_FORMAT_RGB_888,
-      ZX_PIXEL_FORMAT_ABGR_8888,
-      ZX_PIXEL_FORMAT_BGR_888x,
-      ZX_PIXEL_FORMAT_ARGB_2_10_10_10,
-      ZX_PIXEL_FORMAT_ABGR_2_10_10_10,
-  };
-  for (zx_pixel_format_t format : pixel_formats) {
-    fprintf(stderr, "Format %x\n", format);
-    auto sysmem_format_result = ImageFormatConvertZxToSysmem_v2(format);
-    EXPECT_TRUE(sysmem_format_result.is_ok());
-    PixelFormatAndModifier sysmem_format = sysmem_format_result.take_value();
-    zx_pixel_format_t back_format;
-    EXPECT_TRUE(ImageFormatConvertSysmemToZx(sysmem_format, &back_format));
-    if (format == ZX_PIXEL_FORMAT_RGB_x888) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ARGB_8888, back_format);
-    } else if (format == ZX_PIXEL_FORMAT_BGR_888x) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ABGR_8888, back_format);
-    } else {
-      EXPECT_EQ(back_format, format);
-    }
-    EXPECT_EQ(fuchsia_images2::kFormatModifierLinear,
-              static_cast<uint64_t>(sysmem_format.pixel_format_modifier));
-
-    fuchsia_images2::ColorSpace color_space;
-    if (format == ZX_PIXEL_FORMAT_NV12 || format == ZX_PIXEL_FORMAT_I420) {
-      color_space = fuchsia_images2::ColorSpace::kRec601Ntsc;
-    } else {
-      color_space = fuchsia_images2::ColorSpace::kSrgb;
-    }
-    EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, sysmem_format));
-
-    EXPECT_EQ(ZX_PIXEL_FORMAT_BYTES(format), ImageFormatStrideBytesPerWidthPixel(sysmem_format));
-    EXPECT_TRUE(ImageFormatIsSupported(sysmem_format));
-    EXPECT_LT(0u, ImageFormatBitsPerPixel(sysmem_format));
+TEST(ImageFormat, ZxPixelFormatV2) {
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_RGB_565);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb565);
   }
-
-  PixelFormatAndModifier other_format;
-  other_format.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
-  other_format.pixel_format_modifier = fuchsia_images2::kFormatModifierIntelI915XTiled;
-
-  zx_pixel_format_t back_format;
-  EXPECT_FALSE(ImageFormatConvertSysmemToZx(other_format, &back_format));
-  // Treat as linear.
-  //
-  // clone via generated code
-  auto other_format2 = other_format;
-  other_format2.pixel_format_modifier = fuchsia_images2::kFormatModifierNone;
-  EXPECT_TRUE(ImageFormatConvertSysmemToZx(other_format2, &back_format));
-}
-
-TEST(ImageFormat, ZxPixelFormat_V2_wire) {
-  fidl::Arena allocator;
-  static constexpr zx_pixel_format_t pixel_formats[] = {
-      ZX_PIXEL_FORMAT_RGB_565,
-      ZX_PIXEL_FORMAT_RGB_332,
-      ZX_PIXEL_FORMAT_RGB_2220,
-      ZX_PIXEL_FORMAT_ARGB_8888,
-      ZX_PIXEL_FORMAT_RGB_x888,
-      ZX_PIXEL_FORMAT_MONO_8,
-      ZX_PIXEL_FORMAT_GRAY_8,
-      ZX_PIXEL_FORMAT_I420,
-      ZX_PIXEL_FORMAT_NV12,
-      ZX_PIXEL_FORMAT_RGB_888,
-      ZX_PIXEL_FORMAT_ABGR_8888,
-      ZX_PIXEL_FORMAT_BGR_888x,
-      ZX_PIXEL_FORMAT_ARGB_2_10_10_10,
-      ZX_PIXEL_FORMAT_ABGR_2_10_10_10,
-  };
-  for (zx_pixel_format_t format : pixel_formats) {
-    fprintf(stderr, "Format %x\n", format);
-
-    fpromise::result<fuchsia_images2::wire::PixelFormat> sysmem_format_type_result =
-        ImageFormatConvertZxToSysmemPixelFormat_v2(format);
-    EXPECT_TRUE(sysmem_format_type_result.is_ok());
-    fuchsia_images2::wire::PixelFormat sysmem_format_type = sysmem_format_type_result.take_value();
-
-    auto sysmem_format_result = ImageFormatConvertZxToSysmem_v2(format);
-    EXPECT_TRUE(sysmem_format_result.is_ok());
-
-    PixelFormatAndModifier sysmem_format = sysmem_format_result.take_value();
-    EXPECT_EQ(sysmem_format.pixel_format, sysmem_format_type);
-
-    zx_pixel_format_t back_format;
-    EXPECT_TRUE(ImageFormatConvertSysmemToZx(sysmem_format, &back_format));
-    if (format == ZX_PIXEL_FORMAT_RGB_x888) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ARGB_8888, back_format);
-    } else if (format == ZX_PIXEL_FORMAT_BGR_888x) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ABGR_8888, back_format);
-    } else {
-      EXPECT_EQ(back_format, format);
-    }
-
-    zx_pixel_format_t back_format_from_type_only;
-    EXPECT_TRUE(ImageFormatConvertSysmemToZx(sysmem_format_type, &back_format_from_type_only));
-    EXPECT_EQ(back_format, back_format_from_type_only);
-
-    EXPECT_EQ(fuchsia_images2::wire::kFormatModifierLinear,
-              static_cast<uint64_t>(sysmem_format.pixel_format_modifier));
-
-    fuchsia_images2::wire::ColorSpace color_space;
-    if (format == ZX_PIXEL_FORMAT_NV12 || format == ZX_PIXEL_FORMAT_I420) {
-      color_space = fuchsia_images2::wire::ColorSpace::kRec601Ntsc;
-    } else {
-      color_space = fuchsia_images2::wire::ColorSpace::kSrgb;
-    }
-    EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, sysmem_format));
-
-    EXPECT_EQ(ZX_PIXEL_FORMAT_BYTES(format), ImageFormatStrideBytesPerWidthPixel(sysmem_format));
-    EXPECT_TRUE(ImageFormatIsSupported(sysmem_format));
-    EXPECT_LT(0u, ImageFormatBitsPerPixel(sysmem_format));
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_RGB_332);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb332);
   }
-
-  PixelFormatAndModifier other_format;
-  other_format.pixel_format = fuchsia_images2::wire::PixelFormat::kBgra32;
-  other_format.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierIntelI915XTiled;
-
-  zx_pixel_format_t back_format;
-  EXPECT_FALSE(ImageFormatConvertSysmemToZx(other_format, &back_format));
-  // Treat as linear.
-  auto other_format2 = other_format;
-  other_format2.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierLinear;
-  EXPECT_TRUE(ImageFormatConvertSysmemToZx(other_format2, &back_format));
-}
-
-TEST(ImageFormat, ZxPixelFormat_V1_wire) {
-  fidl::Arena allocator;
-  static constexpr zx_pixel_format_t pixel_formats[] = {
-      ZX_PIXEL_FORMAT_RGB_565,
-      ZX_PIXEL_FORMAT_RGB_332,
-      ZX_PIXEL_FORMAT_RGB_2220,
-      ZX_PIXEL_FORMAT_ARGB_8888,
-      ZX_PIXEL_FORMAT_RGB_x888,
-      ZX_PIXEL_FORMAT_MONO_8,
-      ZX_PIXEL_FORMAT_GRAY_8,
-      ZX_PIXEL_FORMAT_I420,
-      ZX_PIXEL_FORMAT_NV12,
-      ZX_PIXEL_FORMAT_RGB_888,
-      ZX_PIXEL_FORMAT_ABGR_8888,
-      ZX_PIXEL_FORMAT_BGR_888x,
-      ZX_PIXEL_FORMAT_ARGB_2_10_10_10,
-      ZX_PIXEL_FORMAT_ABGR_2_10_10_10,
-  };
-  for (zx_pixel_format_t format : pixel_formats) {
-    printf("Format %x\n", format);
-
-    fpromise::result<fuchsia_sysmem::wire::PixelFormatType> sysmem_format_type_result =
-        ImageFormatConvertZxToSysmemPixelFormatType_v1(format);
-    EXPECT_TRUE(sysmem_format_type_result.is_ok());
-    fuchsia_sysmem::wire::PixelFormatType sysmem_format_type =
-        sysmem_format_type_result.take_value();
-
-    auto sysmem_format_result = ImageFormatConvertZxToSysmem_v1(allocator, format);
-    EXPECT_TRUE(sysmem_format_result.is_ok());
-
-    auto sysmem_format = sysmem_format_result.take_value();
-    EXPECT_EQ(sysmem_format.type, sysmem_format_type);
-
-    zx_pixel_format_t back_format;
-    EXPECT_TRUE(ImageFormatConvertSysmemToZx(sysmem_format, &back_format));
-    if (format == ZX_PIXEL_FORMAT_RGB_x888) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ARGB_8888, back_format);
-    } else if (format == ZX_PIXEL_FORMAT_BGR_888x) {
-      EXPECT_EQ(ZX_PIXEL_FORMAT_ABGR_8888, back_format);
-    } else {
-      EXPECT_EQ(back_format, format);
-    }
-
-    zx_pixel_format_t back_format_from_type_only;
-    EXPECT_TRUE(ImageFormatConvertSysmemToZx(sysmem_format_type, &back_format_from_type_only));
-    EXPECT_EQ(back_format, back_format_from_type_only);
-
-    EXPECT_TRUE(sysmem_format.has_format_modifier);
-    EXPECT_EQ(fuchsia_sysmem::kFormatModifierLinear,
-              static_cast<uint64_t>(sysmem_format.format_modifier.value));
-
-    sysmem_v1::wire::ColorSpace color_space;
-    if (format == ZX_PIXEL_FORMAT_NV12 || format == ZX_PIXEL_FORMAT_I420) {
-      color_space.type = sysmem_v1::wire::ColorSpaceType::kRec601Ntsc;
-    } else {
-      color_space.type = sysmem_v1::wire::ColorSpaceType::kSrgb;
-    }
-    EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, sysmem_format));
-
-    EXPECT_EQ(ZX_PIXEL_FORMAT_BYTES(format), ImageFormatStrideBytesPerWidthPixel(sysmem_format));
-    EXPECT_TRUE(ImageFormatIsSupported(sysmem_format));
-    EXPECT_LT(0u, ImageFormatBitsPerPixel(sysmem_format));
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_RGB_2220);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb2220);
   }
-
-  sysmem_v1::wire::PixelFormat other_format = {
-      .type = sysmem_v1::wire::PixelFormatType::kBgra32,
-      .has_format_modifier = true,
-      .format_modifier =
-          {
-              .value = sysmem_v1::wire::kFormatModifierIntelI915XTiled,
-          },
-  };
-
-  zx_pixel_format_t back_format;
-  EXPECT_FALSE(ImageFormatConvertSysmemToZx(other_format, &back_format));
-  // Treat as linear.
-  other_format.has_format_modifier = false;
-  EXPECT_TRUE(ImageFormatConvertSysmemToZx(other_format, &back_format));
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_ARGB_8888);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgra32);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_RGB_x888);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgra32);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_MONO_8);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kL8);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_GRAY_8);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kL8);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_I420);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kI420);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_NV12);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kNv12);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_RGB_888);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgr24);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_ABGR_8888);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR8G8B8A8);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_BGR_888x);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR8G8B8A8);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_ARGB_2_10_10_10);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kA2R10G10B10);
+  }
+  {
+    fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
+        ImageFormatConvertZxToSysmemPixelFormat_v2(ZX_PIXEL_FORMAT_ABGR_2_10_10_10);
+    ASSERT_TRUE(convert_result.is_ok());
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kA2B10G10R10);
+  }
 }
 
 TEST(ImageFormat, PlaneByteOffset_V2) {
