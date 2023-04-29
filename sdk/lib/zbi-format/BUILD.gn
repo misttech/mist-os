@@ -23,10 +23,6 @@ sdk_source_set("zbi-format") {
     "include/lib/zbi-format/partition.h",
     "include/lib/zbi-format/reboot.h",
     "include/lib/zbi-format/zbi.h",
-
-    # TODO(b/271475507): Delete once everyone consumes <lib/zbi-format/zbi.h>
-    # directly.
-    "include/zircon/boot/image.h",
   ]
 
   # These are headers that are meant for internal development use and are not
