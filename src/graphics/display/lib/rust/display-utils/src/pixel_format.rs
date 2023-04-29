@@ -50,24 +50,6 @@ pub enum PixelFormat {
     Nv12,
 }
 
-/// Alias for zx_pixel_format_t
-#[allow(non_camel_case_types)]
-pub type zx_pixel_format_t = u32;
-
-/// See //zircon/system/public/zircon/pixelformat.h.
-const ZX_PIXEL_FORMAT_NONE: zx_pixel_format_t = 0;
-const ZX_PIXEL_FORMAT_RGB_565: zx_pixel_format_t = 0x00020001;
-const ZX_PIXEL_FORMAT_RGB_332: zx_pixel_format_t = 0x00010002;
-const ZX_PIXEL_FORMAT_RGB_2220: zx_pixel_format_t = 0x00010003;
-const ZX_PIXEL_FORMAT_ARGB_8888: zx_pixel_format_t = 0x00040004;
-const ZX_PIXEL_FORMAT_RGB_x888: zx_pixel_format_t = 0x00040005;
-const ZX_PIXEL_FORMAT_MONO_8: zx_pixel_format_t = 0x00010007;
-const ZX_PIXEL_FORMAT_GRAY_8: zx_pixel_format_t = 0x00010007;
-const ZX_PIXEL_FORMAT_NV12: zx_pixel_format_t = 0x00010008;
-const ZX_PIXEL_FORMAT_RGB_888: zx_pixel_format_t = 0x00030009;
-const ZX_PIXEL_FORMAT_ABGR_8888: zx_pixel_format_t = 0x0004000a;
-const ZX_PIXEL_FORMAT_BGR_888x: zx_pixel_format_t = 0x0004000b;
-
 impl Default for PixelFormat {
     fn default() -> PixelFormat {
         PixelFormat::Unknown
@@ -92,31 +74,6 @@ impl From<images2::PixelFormat> for PixelFormat {
 
 impl From<&images2::PixelFormat> for PixelFormat {
     fn from(src: &images2::PixelFormat) -> Self {
-        Self::from(*src)
-    }
-}
-
-impl From<PixelFormat> for zx_pixel_format_t {
-    fn from(src: PixelFormat) -> Self {
-        match src {
-            PixelFormat::Unknown => ZX_PIXEL_FORMAT_NONE,
-            PixelFormat::Mono8 => ZX_PIXEL_FORMAT_MONO_8,
-            PixelFormat::Gray8 => ZX_PIXEL_FORMAT_GRAY_8,
-            PixelFormat::Rgb332 => ZX_PIXEL_FORMAT_RGB_332,
-            PixelFormat::Rgb2220 => ZX_PIXEL_FORMAT_RGB_2220,
-            PixelFormat::Rgb565 => ZX_PIXEL_FORMAT_RGB_565,
-            PixelFormat::Rgb888 => ZX_PIXEL_FORMAT_RGB_888,
-            PixelFormat::Bgr888X => ZX_PIXEL_FORMAT_BGR_888x,
-            PixelFormat::RgbX888 => ZX_PIXEL_FORMAT_RGB_x888,
-            PixelFormat::Abgr8888 => ZX_PIXEL_FORMAT_ABGR_8888,
-            PixelFormat::Argb8888 => ZX_PIXEL_FORMAT_ARGB_8888,
-            PixelFormat::Nv12 => ZX_PIXEL_FORMAT_NV12,
-        }
-    }
-}
-
-impl From<&PixelFormat> for zx_pixel_format_t {
-    fn from(src: &PixelFormat) -> Self {
         Self::from(*src)
     }
 }
