@@ -52,8 +52,8 @@ struct VsyncArgs {
     #[argh(option, default = "Rgb888{r: 0x00, g: 0x00, b: 0xff}")]
     color: Rgb888,
 
-    /// pixel format. Default to ARGB8888.
-    #[argh(option, default = "PixelFormat::Argb8888")]
+    /// pixel format. Default to BGRA8888.
+    #[argh(option, default = "PixelFormat::Bgra32")]
     pixel_format: PixelFormat,
 }
 
@@ -70,8 +70,8 @@ struct ColorArgs {
     #[argh(option, default = "Rgb888{r: 0x00, g: 0x00, b: 0xff}")]
     color: Rgb888,
 
-    /// pixel format. Default to ARGB8888.
-    #[argh(option, default = "PixelFormat::Argb8888")]
+    /// pixel format. Default to BGRA8888.
+    #[argh(option, default = "PixelFormat::Bgra32")]
     pixel_format: PixelFormat,
 }
 

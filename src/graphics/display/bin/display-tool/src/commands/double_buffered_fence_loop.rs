@@ -59,7 +59,7 @@ pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
     let params = ImageParameters {
         width,
         height,
-        pixel_format: PixelFormat::Argb8888,
+        pixel_format: PixelFormat::Bgra32,
         color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
         name: Some("display-tool squares layer".to_string()),
     };

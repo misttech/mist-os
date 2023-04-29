@@ -23,8 +23,7 @@ mod image;
 /// protocol.
 mod controller;
 
-/// Rust bindings for the Fuchsia-canonical `zx_pixel_format_t` declared in
-/// //zircon/system/public/zircon/pixelformat.h.
+/// Rust bindings bridging fuchsia sysmem PixelFormatType and images2 PixelFormat types.
 mod pixel_format;
 
 pub use config::*;

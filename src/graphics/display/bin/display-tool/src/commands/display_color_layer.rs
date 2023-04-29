@@ -25,10 +25,10 @@ pub struct Args<'a> {
 
 pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result<Vec<u8>> {
     match pixel_format {
-        PixelFormat::Argb8888 | PixelFormat::RgbX888 => {
+        PixelFormat::Bgra32 => {
             Ok(vec![rgb.b, rgb.g, rgb.r, /*alpha=*/ 255])
         }
-        PixelFormat::Abgr8888 | PixelFormat::Bgr888X => {
+        PixelFormat::R8G8B8A8 => {
             Ok(vec![rgb.r, rgb.g, rgb.b, /*alpha=*/ 255])
         }
         _ => Err(anyhow::format_err!("unsupported pixel format {}", pixel_format)),

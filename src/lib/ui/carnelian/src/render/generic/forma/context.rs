@@ -199,7 +199,7 @@ impl FormaContext {
 
 impl Context<Forma> for FormaContext {
     fn pixel_format(&self) -> PixelFormat {
-        PixelFormat::RgbX888
+        PixelFormat::R8G8B8A8
     }
 
     fn path_builder(&self) -> Option<FormaPathBuilder> {
