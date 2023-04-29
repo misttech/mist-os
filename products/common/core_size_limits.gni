@@ -202,7 +202,7 @@ size_checker_input = {
     {
       component = "Development Support"
       src = [ "packages/cache/driver_playground" ]
-      limit = 943718  # 0.900 MiB
+      limit = 1271398  # 1.212 MiB
       creep_limit = 81920  # 80.0 KiB
     },
 
@@ -210,7 +210,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5124777734
+      limit = 5124450054
       creep_limit = 0
     },
   ]
