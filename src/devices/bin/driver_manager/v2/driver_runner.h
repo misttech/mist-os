@@ -55,7 +55,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher);
 
-  // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>
+  // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
 
   // CompositeManagerBridge interface
@@ -63,12 +63,29 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
                             AddToIndexCallback callback) override;
 
-  fpromise::promise<inspect::Inspector> Inspect() const;
-  size_t NumOrphanedNodes() const;
+  // NodeManager interface
+  // Create a driver component with `url` against a given `node`.
+  zx::result<> StartDriver(Node& node, std::string_view url,
+                           fuchsia_driver_index::DriverPackageType package_type) override;
+
+  // NodeManager interface
+  // Shutdown hooks called by the shutdown manager
+  void ShutdownAllDrivers(fit::callback<void()> callback) override {
+    removal_tracker_.set_all_callback(std::move(callback));
+    root_node_->Remove(RemovalSet::kAll, &removal_tracker_);
+    removal_tracker_.FinishEnumeration();
+  }
+
+  void ShutdownPkgDrivers(fit::callback<void()> callback) override {
+    removal_tracker_.set_pkg_callback(std::move(callback));
+    root_node_->Remove(RemovalSet::kPackage, &removal_tracker_);
+    removal_tracker_.FinishEnumeration();
+  }
+
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
   void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
-  std::shared_ptr<Node> root_node();
+
   // This function schedules a callback to attempt to bind all orphaned nodes against
   // the base drivers.
   void ScheduleBaseDriversBinding();
@@ -79,30 +96,19 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
       NodeBindingInfoResultCallback result_callback =
           [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>) {});
 
-  // Only exposed for testing.
-  CompositeNodeSpecManager& composite_node_spec_manager() { return composite_node_spec_manager_; }
-
-  // NodeManager
-  // Create a driver component with `url` against a given `node`.
-  zx::result<> StartDriver(Node& node, std::string_view url,
-                           fuchsia_driver_index::DriverPackageType package_type) override;
-
-  // Shutdown hooks called by the shutdown manager
-  void ShutdownAllDrivers(fit::callback<void()> callback) override {
-    removal_tracker_.set_all_callback(std::move(callback));
-    root_node_->Remove(RemovalSet::kAll, &removal_tracker_);
-    removal_tracker_.FinishEnumeration();
-  }
-  void ShutdownPkgDrivers(fit::callback<void()> callback) override {
-    removal_tracker_.set_pkg_callback(std::move(callback));
-    root_node_->Remove(RemovalSet::kPackage, &removal_tracker_);
-    removal_tracker_.FinishEnumeration();
-  }
-
   zx::result<uint32_t> RestartNodesColocatedWithDriverUrl(std::string_view url);
 
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
+  fpromise::promise<inspect::Inspector> Inspect() const;
+  size_t NumOrphanedNodes() const { return orphaned_nodes_.size(); }
+
+  std::shared_ptr<Node> root_node() const { return root_node_; }
+
+  // Only exposed for testing.
+  CompositeNodeSpecManager& composite_node_spec_manager() { return composite_node_spec_manager_; }
+
+  // Only exposed for testing.
   driver_manager::Runner& runner_for_tests() { return runner_; }
 
  private:
@@ -114,15 +120,13 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
     std::shared_ptr<BindResultTracker> tracker;
   };
 
-  // NodeManager
-  // Attempt to bind `node`.
-  // A nullptr for result_tracker is acceptable if the caller doesn't intend to
-  // track the results.
+  // NodeManager interface.
+  // Attempt to bind `node`. A nullptr for result_tracker is acceptable if the caller doesn't intend
+  // to track the results.
   void Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) override;
   void BindToUrl(Node& node, std::string_view driver_url_suffix,
                  std::shared_ptr<BindResultTracker> result_tracker) override;
   void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) override;
-
   zx::result<DriverHost*> CreateDriverHost() override;
 
   // Should only be called when |bind_orphan_ongoing_| is true.

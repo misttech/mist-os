@@ -294,8 +294,6 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   return fpromise::make_ok_promise(inspector);
 }
 
-size_t DriverRunner::NumOrphanedNodes() const { return orphaned_nodes_.size(); }
-
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {
   zx::result result = runner_.Publish(outgoing);
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
@@ -315,8 +313,6 @@ zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
                                        : fdi::DriverPackageType::kBase;
   return StartDriver(*root_node_, url, package);
 }
-
-std::shared_ptr<Node> DriverRunner::root_node() { return root_node_; }
 
 void DriverRunner::ScheduleBaseDriversBinding() {
   driver_index_->WaitForBaseDrivers().Then(
