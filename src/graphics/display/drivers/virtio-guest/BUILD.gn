@@ -22,14 +22,18 @@ group("tests") {
   ]
 }
 
-source_set("gpu_lib") {
+source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
-  sources = [ "gpu.cc" ]
+  sources = [
+    "gpu.cc",
+    "virtio-abi.cc",
+  ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//src/devices/bus/lib/virtio",
+    "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fsl",
     "//zircon/system/ulib/image-format",
@@ -45,7 +49,7 @@ fuchsia_driver("virtio_gpu-driver") {
   ]
   sources = [ "gpu_driver.cc" ]
   deps = [
-    ":gpu_lib",
+    ":common_srcs",
     ":virtio_gpu_bind",
     "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bus/lib/virtio",
@@ -74,7 +78,7 @@ test("virtio-gpu-test") {
     "virtio-abi-test.cc",
   ]
   deps = [
-    ":gpu_lib",
+    ":common_srcs",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
     "//sdk/lib/async-loop-testing/cpp",
     "//src/devices/bus/lib/virtio",

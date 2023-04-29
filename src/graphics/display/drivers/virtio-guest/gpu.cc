@@ -6,18 +6,18 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <string.h>
-#include <sys/param.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/time.h>
 
+#include <cinttypes>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -25,12 +25,9 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/bus/lib/virtio/trace.h"
 #include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
-
-#define LOCAL_TRACE 0
 
 namespace virtio {
 
@@ -40,8 +37,8 @@ constexpr uint32_t kRefreshRateHz = 30;
 constexpr uint64_t kDisplayId = 1;
 
 zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
-  LTRACEF("response type %#x\n", type);
   if (type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type), type);
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;
@@ -100,7 +97,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
-    zxlogf(ERROR, "%s: failed to CheckBuffersAllocated %d", tag(), check_result.status());
+    zxlogf(ERROR, "CheckBuffersAllocated IPC failed: %s", check_result.status_string());
     return zx::error(check_result.status());
   }
   const auto& check_response = check_result.value();
@@ -108,7 +105,8 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
     return zx::error(ZX_ERR_SHOULD_WAIT);
   }
   if (check_response.status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to CheckBuffersAllocated call %d", tag(), check_response.status);
+    zxlogf(ERROR, "CheckBuffersAllocated returned error: %s",
+           zx_status_get_string(check_response.status));
     return zx::error(check_response.status);
   }
 
@@ -117,19 +115,20 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
-    zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated %d", tag(), wait_result.status());
+    zxlogf(ERROR, "WaitForBuffersAllocated IPC failed: %s", wait_result.status_string());
     return zx::error(wait_result.status());
   }
   auto& wait_response = wait_result.value();
   if (wait_response.status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated call %d", tag(), wait_response.status);
+    zxlogf(ERROR, "WaitForBuffersAllocated returned error: %s",
+           zx_status_get_string(wait_response.status));
     return zx::error(wait_response.status);
   }
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
       wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints) {
-    zxlogf(ERROR, "%s: bad image format constraints", tag());
+    zxlogf(ERROR, "Bad image format constraints");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -148,7 +147,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   const auto& format_constraints = collection_info.settings.image_format_constraints;
   uint32_t minimum_row_bytes;
   if (!ImageFormatMinimumRowBytes(format_constraints, image->width, &minimum_row_bytes)) {
-    zxlogf(ERROR, "%s: Invalid image width %d for collection", tag(), image->width);
+    zxlogf(ERROR, "Invalid image width %" PRIu32 " for collection", image->width);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -235,20 +234,20 @@ zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32
   zx_status_t status = bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset, size, &paddr, 1,
                                 &import_data->pmt);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to pin vmo", tag());
+    zxlogf(ERROR, "Failed to pin VMO: %s", zx_status_get_string(status));
     return status;
   }
 
   status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height,
                                 pixel_format);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to allocate 2d resource", tag());
+    zxlogf(ERROR, "Failed to allocate 2D resource: %s", zx_status_get_string(status));
     return status;
   }
 
   status = attach_backing(import_data->resource_id, paddr, size);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to attach backing store", tag());
+    zxlogf(ERROR, "Failed to attach resource backing store: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -400,7 +399,9 @@ template <typename RequestType, typename ResponseType>
 void GpuDevice::send_command_response(const RequestType* cmd, ResponseType** res) {
   size_t cmd_len = sizeof(RequestType);
   size_t res_len = sizeof(ResponseType);
-  LTRACEF("dev %p, cmd %p, cmd_len %zu, res %p, res_len %zu\n", this, cmd, cmd_len, res, res_len);
+  zxlogf(TRACE,
+         "Sending command (buffer at %p, length %zu), expecting reply (pointer at %p, length %zu)",
+         cmd, cmd_len, res, res_len);
 
   // Keep this single message at a time
   sem_wait(&request_sem_);
@@ -438,8 +439,6 @@ void GpuDevice::send_command_response(const RequestType* cmd, ResponseType** res
 }
 
 zx_status_t GpuDevice::get_display_info() {
-  LTRACEF("dev %p\n", this);
-
   const virtio_abi::GetDisplayInfoCommand command = {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
@@ -447,19 +446,22 @@ zx_status_t GpuDevice::get_display_info() {
   virtio_abi::DisplayInfoResponse* response;
   send_command_response(&command, &response);
   if (response->header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
+    zxlogf(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
+           ControlTypeToString(response->header.type), response->header.type);
     return ZX_ERR_NOT_FOUND;
   }
 
-  LTRACEF("response:\n");
   for (int i = 0; i < virtio_abi::kMaxScanouts; i++) {
     const virtio_abi::ScanoutInfo& scanout = response->scanouts[i];
     if (!scanout.enabled) {
       continue;
     }
 
-    LTRACEF("%u: x %u y %u w %u h %u flags 0x%x\n", i, scanout.geometry.placement_x,
-            scanout.geometry.placement_y, scanout.geometry.width, scanout.geometry.height,
-            scanout.flags);
+    zxlogf(TRACE,
+           "Scanout %d: placement (%" PRIu32 ", %" PRIu32 "), resolution %" PRIu32 "x%" PRIu32
+           " flags 0x%08" PRIx32,
+           i, scanout.geometry.placement_x, scanout.geometry.placement_y, scanout.geometry.width,
+           scanout.geometry.height, scanout.flags);
     if (pmode_id_ >= 0) {
       continue;
     }
@@ -489,9 +491,9 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
 
 zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
                                             fuchsia_images2::wire::PixelFormat pixel_format) {
-  LTRACEF("dev %p\n", this);
-
   ZX_ASSERT(resource_id);
+
+  zxlogf(TRACE, "Allocate2DResource");
 
   std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);
   if (!resource_format.has_value()) {
@@ -513,10 +515,11 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
 }
 
 zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
-  LTRACEF("dev %p, resource_id %u, ptr %#" PRIxPTR ", buf_len %zu\n", this, resource_id, ptr,
-          buf_len);
-
   ZX_ASSERT(ptr);
+
+  zxlogf(TRACE,
+         "AttachResourceBacking - resource ID %" PRIu32 ", address 0x%" PRIx64 ", length %zu",
+         resource_id, ptr, buf_len);
 
   const virtio_abi::AttachResourceBackingCommand<1> command = {
       .header = {.type = virtio_abi::ControlType::kAttachResourceBackingCommand},
@@ -534,8 +537,9 @@ zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size
 
 zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
                                    uint32_t height) {
-  LTRACEF("dev %p, scanout_id %u, resource_id %u, width %u, height %u\n", this, scanout_id,
-          resource_id, width, height);
+  zxlogf(TRACE,
+         "SetScanout - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
+         scanout_id, resource_id, width, height);
 
   const virtio_abi::SetScanoutCommand command = {
       .header = {.type = virtio_abi::ControlType::kSetScanoutCommand},
@@ -556,7 +560,8 @@ zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, ui
 }
 
 zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
-  LTRACEF("dev %p, resource_id %u, width %u, height %u\n", this, resource_id, width, height);
+  zxlogf(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
+         width, height);
 
   virtio_abi::FlushResourceCommand command = {
       .header = {.type = virtio_abi::ControlType::kFlushResourceCommand},
@@ -570,7 +575,8 @@ zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint
 }
 
 zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height) {
-  LTRACEF("dev %p, resource_id %u, width %u, height %u\n", this, resource_id, width, height);
+  zxlogf(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
+         resource_id, width, height);
 
   virtio_abi::Transfer2DResourceToHostCommand command = {
       .header = {.type = virtio_abi::ControlType::kTransfer2DResourceToHostCommand},
@@ -591,7 +597,8 @@ zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
 }
 
 void GpuDevice::virtio_gpu_flusher() {
-  LTRACE_ENTRY;
+  zxlogf(TRACE, "Entering VirtioGpuFlusher()");
+
   zx_time_t next_deadline = zx_clock_get_monotonic();
   zx_time_t period = ZX_SEC(1) / kRefreshRateHz;
   for (;;) {
@@ -605,20 +612,20 @@ void GpuDevice::virtio_gpu_flusher() {
       displayed_config_stamp_ = latest_config_stamp_;
     }
 
-    LTRACEF("flushing\n");
+    zxlogf(TRACE, "flushing");
 
     if (displayed_fb_) {
       zx_status_t status = transfer_to_host_2d(displayed_fb_->resource_id, pmode_.geometry.width,
                                                pmode_.geometry.height);
       if (status != ZX_OK) {
-        LTRACEF("failed to flush resource\n");
+        zxlogf(ERROR, "Failed to transfer resource: %s", zx_status_get_string(status));
         continue;
       }
 
       status =
           flush_resource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
-        LTRACEF("failed to flush resource\n");
+        zxlogf(ERROR, "Failed to flush resource: %s", zx_status_get_string(status));
         continue;
       }
     }
@@ -628,7 +635,7 @@ void GpuDevice::virtio_gpu_flusher() {
       zx_status_t status =
           set_scanout(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "%s: failed to set scanout: %d", tag(), status);
+        zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
         continue;
       }
     }
@@ -645,22 +652,25 @@ void GpuDevice::virtio_gpu_flusher() {
 }
 
 zx_status_t GpuDevice::virtio_gpu_start() {
-  LTRACEF("dev %p\n", this);
+  zxlogf(TRACE, "VirtioGpuStart()");
 
   // Get the display info and see if we find a valid pmode
   zx_status_t status = get_display_info();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to get display info", tag());
+    zxlogf(ERROR, "Failed to get display info: %s", zx_status_get_string(status));
     return status;
   }
 
   if (pmode_id_ < 0) {
-    zxlogf(ERROR, "%s: failed to find a pmode, exiting", tag());
+    zxlogf(ERROR, "Failed to find a pmode");
     return ZX_ERR_NOT_FOUND;
   }
 
-  printf("virtio-gpu: found display x %u y %u w %u h %u flags 0x%x\n", pmode_.geometry.placement_x,
-         pmode_.geometry.placement_y, pmode_.geometry.width, pmode_.geometry.height, pmode_.flags);
+  zxlogf(INFO,
+         "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
+         ", flags 0x%08" PRIx32,
+         pmode_.geometry.placement_x, pmode_.geometry.placement_y, pmode_.geometry.width,
+         pmode_.geometry.height, pmode_.flags);
 
   // Run a worker thread to shove in flush events
   auto virtio_gpu_flusher_entry = [](void* arg) {
@@ -670,7 +680,7 @@ zx_status_t GpuDevice::virtio_gpu_start() {
   thrd_create_with_name(&flush_thread_, virtio_gpu_flusher_entry, this, "virtio-gpu-flusher");
   thrd_detach(flush_thread_);
 
-  LTRACEF("publishing device\n");
+  zxlogf(TRACE, "VirtioGpuStart() publishing device");
 
   status = DdkAdd("virtio-gpu-display");
   device_ = zxdev();
@@ -680,7 +690,7 @@ zx_status_t GpuDevice::virtio_gpu_start() {
     return status;
   }
 
-  LTRACE_EXIT;
+  zxlogf(TRACE, "VirtioGpuStart() completed");
   return ZX_OK;
 }
 
@@ -711,12 +721,12 @@ zx_status_t GpuDevice::InitSysmemAllocatorClient() {
 }
 
 zx_status_t GpuDevice::Init() {
-  LTRACE_ENTRY;
+  zxlogf(TRACE, "Init()");
 
   zx::result client =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
   if (client.is_error()) {
-    zxlogf(ERROR, "%s: Could not get Display SYSMEM protocol: %s", tag(), client.status_string());
+    zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", client.status_string());
     return client.status_value();
   }
 
@@ -724,8 +734,7 @@ zx_status_t GpuDevice::Init() {
 
   zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to create sysmem Allocator client: %s", tag(),
-           zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to create sysmem Allocator client: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -733,9 +742,9 @@ zx_status_t GpuDevice::Init() {
 
   virtio_abi::GpuDeviceConfig config;
   CopyDeviceConfig(&config, sizeof(config));
-  LTRACEF("Pending events: 0x%08x\n", config.pending_events);
-  LTRACEF("Scanout limit: %d\n", config.scanout_limit);
-  LTRACEF("Capability set limit: %d\n", config.capability_set_limit);
+  zxlogf(TRACE, "GpuDeviceConfig - pending events: 0x%08" PRIx32, config.pending_events);
+  zxlogf(TRACE, "GpuDeviceConfig - scanout limit: %d", config.scanout_limit);
+  zxlogf(TRACE, "GpuDeviceConfig - capability set limit: %d", config.capability_set_limit);
 
   // Ack and set the driver status bit
   DriverStatusAck();
@@ -745,7 +754,7 @@ zx_status_t GpuDevice::Init() {
   // Allocate the main vring
   status = vring_.Init(0, 16);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to allocate vring", tag());
+    zxlogf(ERROR, "Failed to allocate vring: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -753,12 +762,12 @@ zx_status_t GpuDevice::Init() {
   status = io_buffer_init(&gpu_req_, bti_.get(), zx_system_get_page_size(),
                           IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot alloc gpu_req buffers %d", tag(), status);
+    zxlogf(ERROR, "Failed to allocate command buffers: %s", zx_status_get_string(status));
     return status;
   }
 
-  LTRACEF("allocated gpu request at %p, physical address %#" PRIxPTR "\n",
-          io_buffer_virt(&gpu_req_), io_buffer_phys(&gpu_req_));
+  zxlogf(TRACE, "Allocated command buffer at virtual address %p, physical address 0x%016" PRIx64,
+         io_buffer_virt(&gpu_req_), io_buffer_phys(&gpu_req_));
 
   StartIrqThread();
   DriverStatusOk();
@@ -774,7 +783,7 @@ zx_status_t GpuDevice::Init() {
 }
 
 void GpuDevice::IrqRingUpdate() {
-  LTRACE_ENTRY;
+  zxlogf(TRACE, "IrqRingUpdate()");
 
   // Parse our descriptor chain, add back to the free queue
   auto free_chain = [this](vring_used_elem* used_elem) {
@@ -806,6 +815,6 @@ void GpuDevice::IrqRingUpdate() {
   vring_.IrqRingUpdate(free_chain);
 }
 
-void GpuDevice::IrqConfigChange() { LTRACE_ENTRY; }
+void GpuDevice::IrqConfigChange() { zxlogf(TRACE, "IrqConfigChange()"); }
 
 }  // namespace virtio

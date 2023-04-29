@@ -156,6 +156,9 @@ enum class ControlType : uint32_t {
   kInvalidParameterError = 0x1205,
 };
 
+// Descriptor for logging and debugging.
+const char* ControlTypeToString(ControlType type);
+
 // struct virtio_gpu_ctrl_hdr in virtio12 5.7.6.7 "Device Operation: Request
 // header"
 struct ControlHeader {

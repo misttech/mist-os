@@ -28,4 +28,4 @@ static const zx_driver_ops_t gpu_block_driver_ops = []() {
   return ops;
 }();
 
-ZIRCON_DRIVER(gpu_block, gpu_block_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(virtio_gpu, gpu_block_driver_ops, "zircon", "0.1");

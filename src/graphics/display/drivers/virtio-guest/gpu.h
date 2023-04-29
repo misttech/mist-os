@@ -32,6 +32,7 @@ class GpuDevice : public Device,
                   public DeviceType,
                   public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
  public:
+  // Constructor called by virtio::CreateAndBind().
   GpuDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend);
   ~GpuDevice() override;
 
