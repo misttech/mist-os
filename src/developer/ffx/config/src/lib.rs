@@ -9,8 +9,7 @@ use crate::api::{
 };
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{Context, Result};
-use std::sync::Mutex;
-use std::{convert::From, io::Write};
+use std::{convert::From, io::Write, sync::Mutex};
 
 pub mod api;
 pub mod environment;
@@ -22,18 +21,14 @@ mod cache;
 mod mapping;
 mod nested;
 mod paths;
-mod ssh_key;
 mod storage;
 
 pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
-pub use environment::{test_init, TestEnv};
-pub use environment::{Environment, EnvironmentContext};
+pub use environment::{test_init, Environment, EnvironmentContext, TestEnv};
 pub use sdk::{self, Sdk, SdkRoot};
 pub use storage::ConfigMap;
-
-pub use ssh_key::SshKeyFiles;
 
 lazy_static::lazy_static! {
     static ref ENV: Mutex<Option<EnvironmentContext>> = Mutex::default();

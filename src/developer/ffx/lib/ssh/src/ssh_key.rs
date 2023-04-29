@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::query;
-
 use anyhow::{anyhow, bail, Context, Result};
 use base64::display::Base64Display;
+use ffx_config::query;
 use ring::{
     rand::{self, SystemRandom},
     signature::{Ed25519KeyPair, KeyPair},
@@ -314,7 +313,7 @@ fn read_cstring(buf: &mut dyn Read) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigLevel;
+    use ffx_config::{test_init, ConfigLevel};
     use serde_json::json;
     use std::{
         fs::{self, File},
@@ -325,7 +324,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load() -> Result<()> {
         // Set up the test environment and set the ssh key paths
-        let _env = crate::test_init().await?;
+        let _env = test_init().await?;
         query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", "/expected/default", "someother"]))

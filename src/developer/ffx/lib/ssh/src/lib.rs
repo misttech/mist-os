@@ -3,3 +3,6 @@
 // found in the LICENSE file.
 
 pub mod ssh;
+mod ssh_key;
+
+pub use ssh_key::SshKeyFiles;

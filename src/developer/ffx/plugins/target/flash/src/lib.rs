@@ -4,10 +4,10 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
-use ffx_config::SshKeyFiles;
 use ffx_core::ffx_plugin;
 use ffx_fastboot::common::{cmd::OemFile, from_manifest};
 use ffx_flash_args::FlashCommand;
+use ffx_ssh::SshKeyFiles;
 use fidl_fuchsia_developer_ffx::FastbootProxy;
 use std::io::{stdout, Write};
 use termion::{color, style};

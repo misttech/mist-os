@@ -12,16 +12,26 @@ rustc_library("lib") {
   deps = [
     "//src/developer/ffx/config:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:ring",
   ]
 
   test_deps = [
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
     "src/lib.rs",
     "src/ssh.rs",
+    "src/ssh_key.rs",
+  ]
+
+  inputs = [
+    "testdata/test1_ed25519",
+    "testdata/test1_authorized_keys",
   ]
 }
 

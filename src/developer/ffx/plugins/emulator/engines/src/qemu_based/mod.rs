@@ -18,7 +18,6 @@ use emulator_instance::{
     NetworkingMode,
 };
 use errors::ffx_bail;
-use ffx_config::SshKeyFiles;
 use ffx_emulator_common::{
     config,
     config::EMU_START_TIMEOUT,
@@ -27,6 +26,7 @@ use ffx_emulator_common::{
     tuntap::{tap_ready, TAP_INTERFACE_NAME},
 };
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
+use ffx_ssh::SshKeyFiles;
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use serde_json::{json, Deserializer, Value};
