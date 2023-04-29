@@ -63,7 +63,7 @@ fn common_sco_params() -> bredr::ScoConnectionParameters {
         io_frame_size: Some(16),
         io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
         path: Some(bredr::DataPath::Offload),
-        ..bredr::ScoConnectionParameters::EMPTY
+        ..Default::default()
     }
 }
 

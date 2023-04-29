@@ -109,7 +109,7 @@ async fn install_netdevice(
             fnet_interfaces_admin::Options {
                 name: Some(name.to_string()),
                 metric: Some(DEFAULT_METRIC),
-                ..fnet_interfaces_admin::Options::EMPTY
+                ..Default::default()
             },
         )
         .map_err(|e| {
@@ -365,7 +365,7 @@ fn create_child_decl(child_name: &str, url: &str) -> fdecl::Child {
         // this field is currently required to be set to
         // `fdecl::StartupMode::Lazy` even though it is a no-op.
         startup: Some(fdecl::StartupMode::Lazy),
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     }
 }
 
@@ -382,7 +382,7 @@ async fn create_child(
     let realm_proxy = connector.connect_to_protocol::<fcomponent::RealmMarker>()?;
 
     realm_proxy
-        .create_child(&mut collection_ref, child, fcomponent::CreateChildArgs::EMPTY)
+        .create_child(&mut collection_ref, child, fcomponent::CreateChildArgs::default())
         .await
         .map_err(|e| {
             error!("create_child failed: {:?}", e);
@@ -1035,17 +1035,17 @@ impl Controller {
                             || (stateful && request_dns_servers.is_some()))
                         .then(|| fnet_dhcpv6::InformationConfig {
                             dns_servers: request_dns_servers,
-                            ..fnet_dhcpv6::InformationConfig::EMPTY
+                            ..Default::default()
                         }),
                         non_temporary_address_config: stateful.then(|| {
                             fnet_dhcpv6::AddressConfig {
                                 address_count: Some(1),
-                                ..fnet_dhcpv6::AddressConfig::EMPTY
+                                ..Default::default()
                             }
                         }),
-                        ..fnet_dhcpv6::ClientConfig::EMPTY
+                        ..Default::default()
                     }),
-                    ..fnet_dhcpv6::NewClientParams::EMPTY
+                    ..Default::default()
                 },
                 client_server_end,
             )

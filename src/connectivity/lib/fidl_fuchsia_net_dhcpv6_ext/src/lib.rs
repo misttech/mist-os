@@ -150,7 +150,7 @@ mod tests {
                                 .expect("must have address responder")
                                 .send(
                                     &mut subnet,
-                                    fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                                     server_end,
                                 )
                                 .expect("FIDL error");

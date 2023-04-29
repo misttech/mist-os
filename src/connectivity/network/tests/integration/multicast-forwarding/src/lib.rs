@@ -496,7 +496,7 @@ impl<'a> MulticastForwardingNetwork<'a> {
                     min_ttl: self.options.packet_ttl - 1,
                 },
             ])),
-            ..fnet_multicast_admin::Route::EMPTY
+            ..Default::default()
         }
     }
 
@@ -786,7 +786,7 @@ async fn add_address(interface: &netemul::TestInterface<'_>, addr: fnet::Subnet)
     let address_state_provider = interfaces::add_address_wait_assigned(
         &interface.control(),
         addr,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add_address_wait_assigned failed");
@@ -885,13 +885,13 @@ async fn set_multicast_forwarding(interface: &fnet_interfaces_ext::admin::Contro
     let config = fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
             multicast_forwarding: Some(enabled),
-            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            ..Default::default()
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             multicast_forwarding: Some(enabled),
-            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            ..Default::default()
         }),
-        ..fnet_interfaces_admin::Configuration::EMPTY
+        ..Default::default()
     };
 
     let _prev_config: fnet_interfaces_admin::Configuration = interface
@@ -1180,7 +1180,7 @@ async fn multicast_forwarding<I: net_types::ip::Ip, N: Netstack>(
             test_network.get_server(route_input_interface).router_interface.id(),
         ),
         action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(outgoing_interfaces)),
-        ..fnet_multicast_admin::Route::EMPTY
+        ..Default::default()
     };
 
     controller
@@ -1216,7 +1216,7 @@ async fn multicast_forwarding<I: net_types::ip::Ip, N: Netstack>(
                     expected_input_interface: Some(
                         test_network.get_server(route_input_interface).router_interface.id(),
                     ),
-                    ..fnet_multicast_admin::WrongInputInterface::EMPTY
+                    ..Default::default()
                 },
             ))
         }
@@ -1534,7 +1534,7 @@ async fn add_multicast_route<I: net_types::ip::Ip, N: Netstack>(
         expected_input_interface: input_interface
             .and_then(|interface| Some(get_interface_id(interface))),
         action: route_action,
-        ..fnet_multicast_admin::Route::EMPTY
+        ..Default::default()
     };
 
     assert_eq!(controller.add_route(addresses, route).await, expected_add_route_result);
@@ -1689,7 +1689,7 @@ async fn watch_routing_events_dropped_events<I: net_types::ip::Ip, N: Netstack>(
                 min_ttl: 1,
             },
         ])),
-        ..fnet_multicast_admin::Route::EMPTY
+        ..Default::default()
     };
 
     controller.add_route(addresses, route).await.expect("add_route error");

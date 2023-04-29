@@ -18,7 +18,7 @@ pub fn register(
     let mut profile = ProfileClient::advertise(
         proxy,
         &mut vec![service_definition],
-        bredr::ChannelParameters::EMPTY,
+        bredr::ChannelParameters::default(),
     )?;
     // Register a search for remote peers that support the Audio Gateway role
     profile.add_search(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway, &[])?;

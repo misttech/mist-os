@@ -168,7 +168,7 @@ fn get_interface_addresses(
                         name: Some(name.clone()),
                         addresses: Some(addresses),
                         interface_flags: Some(flags),
-                        ..psocket::InterfaceAddresses::EMPTY
+                        ..Default::default()
                     }
                 })
                 .collect::<Vec<_>>()

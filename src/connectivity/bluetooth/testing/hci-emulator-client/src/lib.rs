@@ -47,7 +47,7 @@ impl Emulator {
             extended_advertising: None,
             acl_buffer_settings: None,
             le_acl_buffer_settings: None,
-            ..EmulatorSettings::EMPTY
+            ..Default::default()
         }
     }
 
@@ -257,7 +257,7 @@ mod tests {
             extended_advertising: None,
             acl_buffer_settings: None,
             le_acl_buffer_settings: None,
-            ..EmulatorSettings::EMPTY
+            ..Default::default()
         }
     }
 
@@ -274,7 +274,7 @@ mod tests {
         let realm = realm.build().await.expect("failed to build realm");
         let args = fdt::RealmArgs {
             root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
-            ..fdt::RealmArgs::EMPTY
+            ..Default::default()
         };
         realm.driver_test_realm_start(args).await.expect("driver test realm start");
 

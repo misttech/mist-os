@@ -87,7 +87,7 @@ impl ProvisionCommand {
             net_type: self.net_type.clone(),
             channel: self.channel.clone(),
             panid: self.get_panid_u16()?,
-            ..Identity::EMPTY
+            ..Default::default()
         })
     }
 

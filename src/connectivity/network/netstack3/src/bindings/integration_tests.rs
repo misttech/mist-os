@@ -310,7 +310,7 @@ impl TestSetup {
             .sandbox()
             .setup_networks(vec![net::NetworkSetup {
                 name: "test_net".to_owned(),
-                config: net::NetworkConfig::EMPTY,
+                config: net::NetworkConfig::default(),
                 endpoints: ep_names.map(|name| new_endpoint_setup(name)).collect(),
             }])
             .await
@@ -418,7 +418,7 @@ impl TestSetupBuilder {
                     .create_interface(
                         &mut port_id,
                         server_end,
-                        fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                        fidl_fuchsia_net_interfaces_admin::Options::default(),
                     )
                     .context("create interface")?;
 
@@ -865,7 +865,7 @@ async fn test_ipv6_slaac_secret_stable() {
         .create_interface(
             &mut port_id,
             server_end,
-            fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
 

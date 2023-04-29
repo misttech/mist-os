@@ -349,7 +349,7 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::MediaPlayerItem {
                 feature_bits_ext: Some(fidl_avrcp::PlayerFeatureBitsExt::from_bits_truncate(
                     p.feature_bit_mask[1],
                 )),
-                ..fidl_avrcp::MediaPlayerItem::EMPTY
+                ..Default::default()
             }),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
         }
@@ -362,7 +362,7 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
     fn try_from(src: BrowseableItem) -> Result<Self, Self::Error> {
         match src {
             BrowseableItem::MediaElement(e) => {
-                let mut attrs = fidl_avrcp::MediaAttributes::EMPTY;
+                let mut attrs = fidl_avrcp::MediaAttributes::default();
                 for attr in e.attributes {
                     match attr.attribute_id {
                         MediaAttributeId::Title => attrs.title = Some(attr.value),
@@ -384,7 +384,7 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
                     media_type: Some(e.media_type.into()),
                     displayable_name: Some(e.name.clone()),
                     attributes: Some(attrs),
-                    ..fidl_avrcp::MediaElementItem::EMPTY
+                    ..Default::default()
                 }))
             }
             BrowseableItem::Folder(f) => Ok(Self::Folder(fidl_avrcp::FolderItem {
@@ -392,7 +392,7 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
                 folder_type: Some(f.folder_type.into()),
                 is_playable: Some(f.is_playable),
                 displayable_name: Some(f.name),
-                ..fidl_avrcp::FolderItem::EMPTY
+                ..Default::default()
             })),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
         }
@@ -1874,7 +1874,7 @@ mod tests {
             player_id: Some(player_id),
             playback_status: Some(fidl_avrcp::PlaybackStatus::Stopped),
             displayable_name: Some("hi".to_string()),
-            ..fidl_avrcp::MediaPlayerItem::EMPTY
+            ..Default::default()
         };
         let item: BrowseableItem = item_fidl.into();
         match item {
@@ -1929,7 +1929,7 @@ mod tests {
                 displayable_name: Some("Media Player".to_string()),
                 feature_bits: Some(TEST_PLAYER_FEATURE_BITS),
                 feature_bits_ext: Some(TEST_PLAYER_FEATURE_BITS_EXT),
-                ..fidl_avrcp::MediaPlayerItem::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -1957,9 +1957,9 @@ mod tests {
                 displayable_name: Some("test".to_string()),
                 attributes: Some(fidl_avrcp::MediaAttributes {
                     title: Some("test".to_string()),
-                    ..fidl_avrcp::MediaAttributes::EMPTY
+                    ..Default::default()
                 }),
-                ..fidl_avrcp::MediaElementItem::EMPTY
+                ..Default::default()
             })
         );
     }

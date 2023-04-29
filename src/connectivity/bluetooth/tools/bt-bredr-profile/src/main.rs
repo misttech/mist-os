@@ -64,17 +64,17 @@ fn security_requirements_from_str(s: &str) -> Result<Option<SecurityRequirements
         "auth" => Ok(Some(SecurityRequirements {
             authentication_required: Some(true),
             secure_connections_required: None,
-            ..SecurityRequirements::EMPTY
+            ..Default::default()
         })),
         "sc" => Ok(Some(SecurityRequirements {
             authentication_required: None,
             secure_connections_required: Some(true),
-            ..SecurityRequirements::EMPTY
+            ..Default::default()
         })),
         "auth-sc" => Ok(Some(SecurityRequirements {
             authentication_required: Some(true),
             secure_connections_required: Some(true),
-            ..SecurityRequirements::EMPTY
+            ..Default::default()
         })),
         s => Err(anyhow!("Invalid security requirements {}", s)),
     }
@@ -139,7 +139,7 @@ async fn advertise(
         channel_mode: Some(channel_mode),
         max_rx_sdu_size: Some(max_rx_sdu_size),
         security_requirements: None,
-        ..ChannelParameters::EMPTY
+        ..Default::default()
     };
 
     let audio_sink_uuid = Uuid::new16(0x110B); // Audio Sink
@@ -165,7 +165,7 @@ async fn advertise(
             channel_mode: Some(channel_mode),
             max_rx_sdu_size: Some(max_rx_sdu_size),
             security_requirements: None,
-            ..ChannelParameters::EMPTY
+            ..Default::default()
         },
     });
 
@@ -224,7 +224,7 @@ async fn connect_l2cap(
         channel_mode: Some(channel_mode),
         max_rx_sdu_size: Some(max_rx_sdu_size),
         security_requirements,
-        ..ChannelParameters::EMPTY
+        ..Default::default()
     };
 
     let channel = match profile_svc

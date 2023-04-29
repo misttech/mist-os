@@ -86,7 +86,7 @@ pub fn hands_free(features: HandsFreeFeatureSupport) -> bredr::ServiceDefinition
             id: ATTR_ID_HFP_SUPPORTED_FEATURES,
             element: bredr::DataElement::Uint16(supported_features),
         }]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 

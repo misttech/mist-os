@@ -3879,7 +3879,7 @@ pub mod tests {
             fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                 default: Some(default),
                 max: Some(max),
-                ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                ..Default::default()
             });
         let mut server = new_test_minimal_server();
         let () = server.dispatch_set_parameter(fidl_lease).expect("failed to set parameter");
@@ -3903,14 +3903,14 @@ pub mod tests {
             fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                 default: None,
                 max: None,
-                ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                ..Default::default()
             });
         let bad_prefix_length =
             fidl_fuchsia_net_dhcp::Parameter::AddressPool(fidl_fuchsia_net_dhcp::AddressPool {
                 prefix_length: Some(33),
                 range_start: Some(fidl_ip_v4!("192.168.0.2")),
                 range_stop: Some(fidl_ip_v4!("192.168.0.254")),
-                ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+                ..Default::default()
             });
         let mac = random_mac_generator().bytes();
         let duplicated_static_assignment =
@@ -3918,12 +3918,12 @@ pub mod tests {
                 fidl_fuchsia_net_dhcp::StaticAssignment {
                     host: Some(fidl_fuchsia_net::MacAddress { octets: mac.clone() }),
                     assigned_addr: Some(random_ipv4_generator().into_fidl()),
-                    ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                    ..Default::default()
                 },
                 fidl_fuchsia_net_dhcp::StaticAssignment {
                     host: Some(fidl_fuchsia_net::MacAddress { octets: mac.clone() }),
                     assigned_addr: Some(random_ipv4_generator().into_fidl()),
-                    ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                    ..Default::default()
                 },
             ]);
 
@@ -4100,7 +4100,7 @@ pub mod tests {
                     prefix_length: Some(24),
                     range_start: Some(fidl_ip_v4!("192.168.0.2")),
                     range_stop: Some(fidl_ip_v4!("192.168.0.254")),
-                    ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+                    ..Default::default()
                 }
             )),
             Err(Status::BAD_STATE)
@@ -4117,7 +4117,7 @@ pub mod tests {
                     prefix_length: Some(24),
                     range_start: Some(fidl_ip_v4!("192.168.0.2")),
                     range_stop: Some(fidl_ip_v4!("192.168.0.5")),
-                    ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+                    ..Default::default()
                 },
             ))
             .expect("failed to set parameter");

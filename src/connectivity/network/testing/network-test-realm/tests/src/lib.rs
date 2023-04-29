@@ -247,7 +247,7 @@ async fn add_address_to_hermetic_interface(
     let address_state_provider = netstack_testing_common::interfaces::add_address_wait_assigned(
         &control,
         subnet,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add_address_wait_assigned failed");
@@ -2314,7 +2314,7 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
             address: Some(DEFAULT_IPV6_LINK_LOCAL_SOURCE_ADDR),
             stateful: Some(stateful),
             request_dns_servers: Some(false),
-            ..fntr::ControllerStartDhcpv6ClientRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("FIDL error")

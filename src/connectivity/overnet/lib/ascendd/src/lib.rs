@@ -141,7 +141,7 @@ pub async fn run_stream<'a>(
                 fidl_fuchsia_overnet_protocol::AscenddLinkConfig {
                     path: path.clone(),
                     connection_label: label.clone(),
-                    ..fidl_fuchsia_overnet_protocol::AscenddLinkConfig::EMPTY
+                    ..Default::default()
                 },
             ))
         });

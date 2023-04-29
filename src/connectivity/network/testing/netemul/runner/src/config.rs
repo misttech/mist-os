@@ -493,7 +493,7 @@ impl Config {
                     gateway: gateway.map(Into::into),
                     enable_ipv4_forwarding: Some(enable_ipv4_forwarding),
                     enable_ipv6_forwarding: Some(enable_ipv6_forwarding),
-                    ..fnetemul::InterfaceOptions::EMPTY
+                    ..Default::default()
                 };
                 netstack
                     .configure_interface(options)

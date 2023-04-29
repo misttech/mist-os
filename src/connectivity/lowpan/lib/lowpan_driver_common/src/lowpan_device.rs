@@ -328,7 +328,7 @@ pub trait Driver: Send + Sync {
             thread_router_id: self.get_thread_router_id().await.ok(),
             thread_rloc: self.get_thread_rloc16().await.ok(),
             channel_index: self.get_current_channel().await.ok(),
-            ..Telemetry::EMPTY
+            ..Default::default()
         })
     }
 
@@ -1395,7 +1395,7 @@ mod tests {
 
         let client_future = async move {
             let (client_ep, server_ep) = create_endpoints::<EnergyScanResultStreamMarker>();
-            let params = EnergyScanParameters::EMPTY;
+            let params = EnergyScanParameters::default();
 
             assert_matches!(proxy.start_energy_scan(params, server_ep), Ok(()));
 
@@ -1433,7 +1433,7 @@ mod tests {
 
         let client_future = async move {
             let (client_ep, server_ep) = create_endpoints::<BeaconInfoStreamMarker>();
-            let params = NetworkScanParameters::EMPTY;
+            let params = NetworkScanParameters::default();
 
             assert_matches!(proxy.start_network_scan(params, server_ep), Ok(()));
 

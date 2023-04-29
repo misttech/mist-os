@@ -68,7 +68,7 @@ impl FromExt<ot::BorderRouterConfig> for OnMeshPrefix {
             stable: Some(x.is_stable()),
             slaac_preferred: Some(x.is_preferred()),
             slaac_valid: Some(x.is_slaac()),
-            ..OnMeshPrefix::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -82,7 +82,7 @@ impl FromExt<ot::ExternalRouteConfig> for ExternalRoute {
             }),
             route_preference: None,
             stable: Some(x.is_stable()),
-            ..ExternalRoute::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -124,12 +124,12 @@ impl FromExt<ot::ActiveScanResult> for BeaconInfo {
                 panid: Some(x.pan_id()),
                 xpanid: Some(x.extended_pan_id().into_array()),
                 xpanid_deprecated: Some(x.extended_pan_id().to_vec()),
-                ..Identity::EMPTY
+                ..Default::default()
             }),
             rssi: Some(x.rssi()),
             lqi: NonZeroU8::new(x.lqi()).map(NonZeroU8::get),
             address: Some(MacAddress { octets: x.ext_address().into_array() }),
-            ..BeaconInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -154,7 +154,7 @@ impl FromExt<&ot::OperationalDataset> for Identity {
                     prefix_len: ot::IP6_PREFIX_BITSIZE,
                 }
             }),
-            ..Identity::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -184,7 +184,7 @@ impl FromExt<&ot::BorderRoutingCounters>
             rs_rx: Some(x.rs_rx()),
             rs_tx_success: Some(x.rs_tx_success()),
             rs_tx_failure: Some(x.rs_tx_failure()),
-            ..fidl_fuchsia_lowpan_experimental::BorderRoutingCounters::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -199,7 +199,7 @@ impl FromExt<&ot::DnssdCounters> for fidl_fuchsia_lowpan_experimental::DnssdCoun
             not_implemented_response: Some(x.not_implemented_response()),
             other_response: Some(x.other_response()),
             resolved_by_srp: Some(x.resolved_by_srp()),
-            ..fidl_fuchsia_lowpan_experimental::DnssdCounters::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -212,7 +212,7 @@ impl FromExt<&ot::LeaderData> for fidl_fuchsia_lowpan_experimental::LeaderData {
             network_data_version: Some(x.data_version()),
             stable_network_data_version: Some(x.stable_data_version()),
             router_id: Some(x.leader_router_id()),
-            ..fidl_fuchsia_lowpan_experimental::LeaderData::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -228,7 +228,7 @@ impl FromExt<&ot::SrpServerResponseCounters>
             name_exists_response: Some(x.name_exists()),
             refused_response: Some(x.refused()),
             other_response: Some(x.other()),
-            ..fidl_fuchsia_lowpan_experimental::SrpServerResponseCounters::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -317,7 +317,7 @@ impl AllCountersUpdate<ot::MacCounters> for AllCounters {
             err_cca: Some(data.tx_err_cca()),
             err_abort: Some(data.tx_err_abort()),
             err_busy_channel: Some(data.tx_err_busy_channel()),
-            ..MacCounters::EMPTY
+            ..Default::default()
         });
         self.mac_rx = Some(MacCounters {
             total: Some(data.rx_total()),
@@ -337,7 +337,7 @@ impl AllCountersUpdate<ot::MacCounters> for AllCounters {
             err_sec: Some(data.rx_err_sec()),
             err_fcs: Some(data.rx_err_fcs()),
             err_other: Some(data.rx_err_other()),
-            ..MacCounters::EMPTY
+            ..Default::default()
         });
     }
 }
@@ -355,7 +355,7 @@ impl AllCountersUpdate<ot::RadioCoexMetrics> for AllCounters {
             ),
             delayed_grant: Some(data.num_tx_delayed_grant().into()),
             avg_delay_request_to_grant_usec: Some(data.avg_tx_request_to_grant_time()),
-            ..CoexCounters::EMPTY
+            ..Default::default()
         });
         self.coex_rx = Some(CoexCounters {
             requests: Some(data.num_tx_request().into()),
@@ -369,7 +369,7 @@ impl AllCountersUpdate<ot::RadioCoexMetrics> for AllCounters {
             delayed_grant: Some(data.num_rx_delayed_grant().into()),
             avg_delay_request_to_grant_usec: Some(data.avg_rx_request_to_grant_time()),
             grant_none: Some(data.num_rx_grant_none().into()),
-            ..CoexCounters::EMPTY
+            ..Default::default()
         });
         if self.coex_saturated != Some(true) {
             self.coex_saturated = Some(data.stopped());
@@ -382,12 +382,12 @@ impl AllCountersUpdate<ot::IpCounters> for AllCounters {
         self.ip_tx = Some(IpCounters {
             success: Some(data.tx_success()),
             failure: Some(data.tx_failure()),
-            ..IpCounters::EMPTY
+            ..Default::default()
         });
         self.ip_rx = Some(IpCounters {
             success: Some(data.rx_success()),
             failure: Some(data.rx_failure()),
-            ..IpCounters::EMPTY
+            ..Default::default()
         });
     }
 }

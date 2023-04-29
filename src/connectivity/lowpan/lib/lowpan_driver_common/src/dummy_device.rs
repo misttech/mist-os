@@ -54,7 +54,7 @@ impl Driver for DummyDevice {
             spectrum_center_frequency_hz: Some(2450000000),
             spectrum_bandwidth_hz: Some(2000000),
             masked_by_regulatory_domain: Some(false),
-            ..ChannelInfo::EMPTY
+            ..Default::default()
         };
         Ok(vec![channel_info])
     }
@@ -88,7 +88,7 @@ impl Driver for DummyDevice {
                     net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                     channel: Some(11),
                     panid: Some(0x1234),
-                    ..Identity::EMPTY
+                    ..Default::default()
                 }))))
                 .into_stream(),
             )
@@ -129,7 +129,7 @@ impl Driver for DummyDevice {
                     channel_index: Some(11),
                     max_rssi: Some(-20),
                     min_rssi: Some(-90),
-                    ..EnergyScanResult::EMPTY
+                    ..Default::default()
                 }])
                 .into_stream(),
             )
@@ -140,13 +140,13 @@ impl Driver for DummyDevice {
                         channel_index: Some(12),
                         max_rssi: Some(-30),
                         min_rssi: Some(-90),
-                        ..EnergyScanResult::EMPTY
+                        ..Default::default()
                     },
                     EnergyScanResult {
                         channel_index: Some(13),
                         max_rssi: Some(-25),
                         min_rssi: Some(-90),
-                        ..EnergyScanResult::EMPTY
+                        ..Default::default()
                     },
                 ])
                 .into_stream(),
@@ -157,13 +157,13 @@ impl Driver for DummyDevice {
                         channel_index: Some(14),
                         max_rssi: Some(-45),
                         min_rssi: Some(-90),
-                        ..EnergyScanResult::EMPTY
+                        ..Default::default()
                     },
                     EnergyScanResult {
                         channel_index: Some(15),
                         max_rssi: Some(-40),
                         min_rssi: Some(-50),
-                        ..EnergyScanResult::EMPTY
+                        ..Default::default()
                     },
                 ])
                 .into_stream(),
@@ -190,13 +190,13 @@ impl Driver for DummyDevice {
                         net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                         channel: Some(11),
                         panid: Some(0x1234),
-                        ..Identity::EMPTY
+                        ..Default::default()
                     }),
                     rssi: Some(-40),
                     address: Some(MacAddress {
                         octets: [0x02, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05],
                     }),
-                    ..BeaconInfo::EMPTY
+                    ..Default::default()
                 }])
                 .into_stream(),
             )
@@ -213,13 +213,13 @@ impl Driver for DummyDevice {
                             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                             channel: Some(11),
                             panid: Some(0x1234),
-                            ..Identity::EMPTY
+                            ..Default::default()
                         }),
                         rssi: Some(-60),
                         address: Some(MacAddress {
                             octets: [0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x13, 0x37],
                         }),
-                        ..BeaconInfo::EMPTY
+                        ..Default::default()
                     },
                     BeaconInfo {
                         identity: Some(Identity {
@@ -231,13 +231,13 @@ impl Driver for DummyDevice {
                             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                             channel: Some(12),
                             panid: Some(0x5678),
-                            ..Identity::EMPTY
+                            ..Default::default()
                         }),
                         rssi: Some(-26),
                         address: Some(MacAddress {
                             octets: [0x02, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef],
                         }),
-                        ..BeaconInfo::EMPTY
+                        ..Default::default()
                     },
                 ])
                 .into_stream(),
@@ -269,7 +269,7 @@ impl Driver for DummyDevice {
         let initial = Ok(DeviceState {
             connectivity_state: Some(ConnectivityState::Ready),
             role: None,
-            ..DeviceState::EMPTY
+            ..Default::default()
         });
 
         ready(initial).into_stream().chain(pending()).boxed()
@@ -281,7 +281,7 @@ impl Driver for DummyDevice {
         let initial = Ok(Identity {
             raw_name: Some(b"ABC1234".to_vec()),
             panid: Some(1234),
-            ..Identity::EMPTY
+            ..Default::default()
         });
 
         ready(initial).into_stream().chain(pending()).boxed()
@@ -332,9 +332,9 @@ impl Driver for DummyDevice {
                     octets: [0xFF, 0xAA, 0xBB, 0xCC, 0x11, 0x22, 0x33, 0xFF],
                 }),
                 rssi: Some(8),
-                ..MacAddressFilterItem::EMPTY
+                ..Default::default()
             }]),
-            ..MacAddressFilterSettings::EMPTY
+            ..Default::default()
         })
     }
 
@@ -352,7 +352,7 @@ impl Driver for DummyDevice {
             avg_rssi_in: Some(-12),
             lqi_in: Some(16),
             thread_mode: Some(5),
-            ..NeighborInfo::EMPTY
+            ..Default::default()
         }]);
     }
 
@@ -385,7 +385,7 @@ impl Driver for DummyDevice {
                 err_abort: Some(13),
                 err_busy_channel: Some(14),
                 err_other: None,
-                ..MacCounters::EMPTY
+                ..Default::default()
             }),
             mac_rx: Some(MacCounters {
                 total: Some(100),
@@ -414,7 +414,7 @@ impl Driver for DummyDevice {
                 err_abort: None,
                 err_busy_channel: None,
                 err_other: Some(116),
-                ..MacCounters::EMPTY
+                ..Default::default()
             }),
             coex_tx: Some(CoexCounters {
                 requests: Some(200),
@@ -425,7 +425,7 @@ impl Driver for DummyDevice {
                 grant_deactivated_during_request: Some(205),
                 delayed_grant: Some(206),
                 avg_delay_request_to_grant_usec: Some(207),
-                ..CoexCounters::EMPTY
+                ..Default::default()
             }),
             coex_rx: Some(CoexCounters {
                 requests: Some(300),
@@ -437,15 +437,15 @@ impl Driver for DummyDevice {
                 delayed_grant: Some(306),
                 avg_delay_request_to_grant_usec: Some(307),
                 grant_none: Some(308),
-                ..CoexCounters::EMPTY
+                ..Default::default()
             }),
             coex_saturated: Some(false),
-            ..AllCounters::EMPTY
+            ..Default::default()
         });
     }
 
     async fn reset_counters(&self) -> ZxResult<AllCounters> {
-        return Ok(AllCounters::EMPTY);
+        return Ok(AllCounters::default());
     }
 
     async fn register_on_mesh_prefix(&self, _net: OnMeshPrefix) -> ZxResult<()> {
@@ -477,7 +477,7 @@ impl Driver for DummyDevice {
     }
 
     async fn get_feature_config(&self) -> ZxResult<FeatureConfig> {
-        Ok(FeatureConfig::EMPTY)
+        Ok(FeatureConfig::default())
     }
 
     async fn update_feature_config(&self, _config: FeatureConfig) -> ZxResult<()> {

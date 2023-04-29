@@ -1691,7 +1691,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for AddressPool {
             prefix_length,
             range_start: range_start.map(|v| fidl_fuchsia_net::Ipv4Address { addr: v.octets() }),
             range_stop: range_stop.map(|v| fidl_fuchsia_net::Ipv4Address { addr: v.octets() }),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
         fidl_fuchsia_net_dhcp::Parameter::AddressPool(pool)
     }
@@ -1745,7 +1745,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for StaticallyAssignedAddrs {
             .map(|(host, assigned_addr)| fidl_fuchsia_net_dhcp::StaticAssignment {
                 host: Some(host),
                 assigned_addr: Some(assigned_addr),
-                ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                ..Default::default()
             })
             .collect();
         fidl_fuchsia_net_dhcp::Parameter::StaticallyAssignedAddrs(assignments)
@@ -1792,7 +1792,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for LeaseLength {
         fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
             default: self.default,
             max: self.max,
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         })
     }
 }

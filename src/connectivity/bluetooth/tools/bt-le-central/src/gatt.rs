@@ -128,7 +128,7 @@ async fn read_long_characteristic(
     let mut options = ReadOptions::LongRead(LongReadOptions {
         offset: Some(offset),
         max_bytes: Some(max_bytes),
-        ..LongReadOptions::EMPTY
+        ..Default::default()
     });
 
     let value: ReadValue = svc
@@ -158,7 +158,7 @@ async fn write_characteristic(
     value: Vec<u8>,
 ) -> Result<(), Error> {
     let options =
-        WriteOptions { write_mode: Some(mode), offset: Some(offset), ..WriteOptions::EMPTY };
+        WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() };
     svc.write_characteristic(&mut Handle { value: id }, &value, options)
         .await
         .context("Failed to write characteristic")?
@@ -195,7 +195,7 @@ async fn read_long_descriptor(
             &mut ReadOptions::LongRead(LongReadOptions {
                 offset: Some(offset),
                 max_bytes: Some(max_bytes),
-                ..LongReadOptions::EMPTY
+                ..Default::default()
             }),
         )
         .await
@@ -219,7 +219,7 @@ async fn write_descriptor(
     svc.write_descriptor(
         &mut Handle { value: id },
         &value,
-        WriteOptions { write_mode: Some(mode), offset: Some(offset), ..WriteOptions::EMPTY },
+        WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() },
     )
     .await
     .context("Failed to write descriptor")?
@@ -815,7 +815,7 @@ mod tests {
         let gatt_client = GattClient::new(client_proxy);
 
         let services =
-            vec![ServiceInfo { handle: Some(ServiceHandle { value: 1 }), ..ServiceInfo::EMPTY }];
+            vec![ServiceInfo { handle: Some(ServiceHandle { value: 1 }), ..Default::default() }];
         gatt_client.write().set_services(services);
 
         let args = vec!["0"]; // service index
@@ -853,7 +853,7 @@ mod tests {
             handle: Some(Handle { value: 2 }),
             value: Some(vec![0x00, 0x01, 0x02]),
             maybe_truncated: Some(false),
-            ..ReadValue::EMPTY
+            ..Default::default()
         };
 
         // The notification should immediately receive a flow control response.

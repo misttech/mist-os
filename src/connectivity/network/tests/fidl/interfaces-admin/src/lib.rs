@@ -52,15 +52,14 @@ async fn address_deprecation<N: Netstack>(name: &str) {
     let sock_addr = std_socket_addr!("[abcd::3]:12345");
     // Note that the absence of the preferred_lifetime_info field implies infinite
     // preferred lifetime.
-    const PREFERRED_PROPERTIES: fidl_fuchsia_net_interfaces_admin::AddressProperties =
-        fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY;
+    let preferred_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties::default();
     let deprecated_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties {
         preferred_lifetime_info: Some(
             fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
                 fidl_fuchsia_net_interfaces::Empty,
             ),
         ),
-        ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+        ..Default::default()
     };
     let addr1_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &interface,
@@ -73,8 +72,8 @@ async fn address_deprecation<N: Netstack>(name: &str) {
         // Note that an empty AddressParameters means that the address has
         // infinite preferred lifetime.
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
-            initial_properties: Some(PREFERRED_PROPERTIES.clone()),
-            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+            initial_properties: Some(preferred_properties.clone()),
+            ..Default::default()
         },
     )
     .await
@@ -90,7 +89,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
         },
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
             initial_properties: Some(deprecated_properties.clone()),
-            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+            ..Default::default()
         },
     )
     .await
@@ -119,7 +118,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
         .await
         .expect("FIDL error deprecating address");
     addr2_state_provider
-        .update_address_properties(PREFERRED_PROPERTIES)
+        .update_address_properties(preferred_properties.clone())
         .await
         .expect("FIDL error setting address to preferred");
 
@@ -140,7 +139,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     let addr_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &interface,
         ADDR,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("failed to add preferred address");
@@ -190,7 +189,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
             .update_address_properties(fidl_fuchsia_net_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
                 valid_lifetime_end: Some(VALID_UNTIL),
-                ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+                ..Default::default()
             })
             .await
             .expect("FIDL error updating address lifetimes");
@@ -224,8 +223,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
         .interface_control(loopback_id)
         .expect("failed to get loopback interface control client proxy");
 
-    const VALID_ADDRESS_PARAMETERS: fidl_fuchsia_net_interfaces_admin::AddressParameters =
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY;
+    let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
     // Removing non-existent address.
     {
@@ -267,9 +265,10 @@ async fn add_address_errors<N: Netstack>(name: &str) {
                 }
             }
         };
+        let valid_address_parameters = valid_address_parameters.clone();
         async move {
             assert_matches::assert_matches!(
-                interfaces::add_address_wait_assigned(&control, addr.clone(), VALID_ADDRESS_PARAMETERS).await,
+                interfaces::add_address_wait_assigned(&control, addr.clone(), valid_address_parameters).await,
                 Err(fidl_fuchsia_net_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
                     fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 )));
@@ -288,7 +287,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
             interfaces::add_address_wait_assigned(
                 &control,
                 invalid_address,
-                VALID_ADDRESS_PARAMETERS
+                valid_address_parameters
             )
             .await,
             Err(fidl_fuchsia_net_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
@@ -316,17 +315,19 @@ async fn add_address_removal<N: Netstack>(name: &str) {
         .expect("create Control proxy");
     let () = debug_control.get_admin(id, server).expect("get admin");
 
-    const VALID_ADDRESS_PARAMETERS: fidl_fuchsia_net_interfaces_admin::AddressParameters =
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY;
+    let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
     // Adding a valid address and observing the address removal.
     {
         let mut address = fidl_subnet!("3.3.3.3/32");
 
-        let address_state_provider =
-            interfaces::add_address_wait_assigned(&control, address, VALID_ADDRESS_PARAMETERS)
-                .await
-                .expect("add address failed unexpectedly");
+        let address_state_provider = interfaces::add_address_wait_assigned(
+            &control,
+            address,
+            valid_address_parameters.clone(),
+        )
+        .await
+        .expect("add address failed unexpectedly");
 
         let did_remove = control
             .remove_address(&mut address)
@@ -350,10 +351,13 @@ async fn add_address_removal<N: Netstack>(name: &str) {
     {
         let address = fidl_subnet!("4.4.4.4/32");
 
-        let address_state_provider =
-            interfaces::add_address_wait_assigned(&control, address, VALID_ADDRESS_PARAMETERS)
-                .await
-                .expect("add address failed unexpectedly");
+        let address_state_provider = interfaces::add_address_wait_assigned(
+            &control,
+            address,
+            valid_address_parameters.clone(),
+        )
+        .await
+        .expect("add address failed unexpectedly");
 
         let (_netemul_endpoint, _device_control_handle) =
             interface.remove().await.expect("failed to remove interface");
@@ -398,8 +402,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
             .expect("create Control proxy");
     let () = debug_control.get_admin(id, server).expect("get admin");
 
-    const VALID_ADDRESS_PARAMETERS: fidl_fuchsia_net_interfaces_admin::AddressParameters =
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY;
+    let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
     // Adding a valid address and observing the address removal.
     let mut address = fidl_subnet!("5.5.5.5/32");
@@ -409,7 +412,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
     >()
     .expect("create AddressStateProvider proxy");
     let () = control
-        .add_address(&mut address, VALID_ADDRESS_PARAMETERS, server)
+        .add_address(&mut address, valid_address_parameters, server)
         .expect("Control.AddAddress FIDL error");
 
     let state_stream = fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
@@ -449,13 +452,12 @@ async fn duplicate_watch_address_assignment_state<N: Netstack>(name: &str, detac
     assert!(interface.control().enable().await.expect("send enable").expect("enable"));
     let () = interface.set_link_up(true).await.expect("bring device up");
 
-    const VALID_ADDRESS_PARAMETERS: fidl_fuchsia_net_interfaces_admin::AddressParameters =
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY;
+    let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
     let address = fidl_subnet!("1.1.1.1/32");
     let address_state_provider = interfaces::add_address_wait_assigned(
         interface.control(),
         address,
-        VALID_ADDRESS_PARAMETERS,
+        valid_address_parameters,
     )
     .await
     .expect("add address failed unexpectedly");
@@ -570,7 +572,7 @@ async fn add_address_and_remove<N: Netstack>(
         subnet,
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
             add_subnet_route,
-            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+            ..Default::default()
         },
     )
     .await
@@ -681,7 +683,7 @@ async fn add_address_and_detach<N: Netstack>(
         subnet,
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
             add_subnet_route,
-            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+            ..Default::default()
         },
     )
     .await
@@ -755,7 +757,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_admin::Options {
                 name: Some(IF_NAME.to_string()),
                 metric: None,
-                ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                ..Default::default()
             },
         )
         .expect("create interface");
@@ -864,10 +866,10 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
                                 supported_flags: fidl_fuchsia_hardware_network::TxFlags::empty(),
                             }]),
                             mtu: Some(netemul::DEFAULT_MTU.into()),
-                            ..fidl_fuchsia_net_tun::BasePortConfig::EMPTY
+                            ..Default::default()
                         }),
                         mac: Some(fidl_mac!("02:03:04:05:06:07")),
-                        ..fidl_fuchsia_net_tun::DevicePortConfig::EMPTY
+                        ..Default::default()
                     },
                     port_server_end,
                 )
@@ -888,7 +890,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
                 .create_interface(
                     &mut port_id,
                     control_server_end,
-                    fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                    fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create interface");
 
@@ -1041,7 +1043,7 @@ async fn control_terminal_events<N: Netstack>(
             supported_flags: fidl_fuchsia_hardware_network::TxFlags::empty(),
         }]),
         mtu: Some(netemul::DEFAULT_MTU.into()),
-        ..fidl_fuchsia_net_tun::BasePortConfig::EMPTY
+        ..Default::default()
     };
 
     let create_port = |config: fidl_fuchsia_net_tun::BasePortConfig| {
@@ -1053,7 +1055,7 @@ async fn control_terminal_events<N: Netstack>(
                 fidl_fuchsia_net_tun::DevicePortConfig {
                     base: Some(config),
                     mac: Some(fidl_mac!("02:aa:bb:cc:dd:ee")),
-                    ..fidl_fuchsia_net_tun::DevicePortConfig::EMPTY
+                    ..Default::default()
                 },
                 port_server_end,
             )
@@ -1099,7 +1101,7 @@ async fn control_terminal_events<N: Netstack>(
                 let control =
                     fidl_fuchsia_net_interfaces_ext::admin::Control::new(create_interface(
                         port_id.clone(),
-                        fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                        fidl_fuchsia_net_interfaces_admin::Options::default(),
                     ));
                 // Verify that interface was created.
                 let _: u64 = control.get_id().await.expect("get id");
@@ -1108,7 +1110,7 @@ async fn control_terminal_events<N: Netstack>(
 
             // Create a new interface with the same port identifier.
             let control2 =
-                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::EMPTY);
+                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
             (control2, vec![KeepResource::Control(control1), KeepResource::Port(port)])
         }
         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::DuplicateName => {
@@ -1120,7 +1122,7 @@ async fn control_terminal_events<N: Netstack>(
                         port1_id,
                         fidl_fuchsia_net_interfaces_admin::Options {
                             name: Some(if_name.to_string()),
-                            ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                            ..Default::default()
                         },
                     ));
                 // Verify that interface was created.
@@ -1139,7 +1141,7 @@ async fn control_terminal_events<N: Netstack>(
                 port2_id,
                 fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(if_name.to_string()),
-                    ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                    ..Default::default()
                 },
             );
             (
@@ -1160,21 +1162,21 @@ async fn control_terminal_events<N: Netstack>(
             })
             .await;
             let control =
-                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::EMPTY);
+                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
             (control, vec![KeepResource::Port(port)])
         }
         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::PortClosed => {
             // Port closed is equivalent to port doesn't exist.
             let control = create_interface(
                 fidl_fuchsia_hardware_network::PortId { base: BASE_PORT_ID, salt: 0 },
-                fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::Options::default(),
             );
             (control, vec![])
         }
         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User => {
             let (port, port_id) = create_port(base_port_config).await;
             let control =
-                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::EMPTY);
+                create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
             let interface_id = control.get_id().await.expect("get id");
             // Setup a control handle via the debug API, and drop the original control handle.
             let debug_interfaces = realm
@@ -1236,7 +1238,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
         .create_interface(
             &mut port_id,
             control_server_end,
-            fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let _iface_id: u64 = control.get_id().await.expect("get id");
@@ -1345,7 +1347,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
                         fidl_fuchsia_net_interfaces_admin::Options {
                             name: Some(name.to_string()),
                             metric: None,
-                            ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                            ..Default::default()
                         },
                     )
                     .expect("create interface");
@@ -1368,7 +1370,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
                         let address_state_provider = interfaces::add_address_wait_assigned(
                             &control,
                             ipv4_addr,
-                            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                         )
                         .panic_on_timeout(format!("add {} ipv4 address", name))
                         .await
@@ -1544,7 +1546,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
         .create_interface(
             &mut port_id,
             control_server_end,
-            fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let iface_id = control.get_id().await.expect("get id");
@@ -1839,7 +1841,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         control
             .add_address(
                 address,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server_end,
             )
             .expect("failed to add_address");
@@ -1943,7 +1945,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
         .create_interface(
             &mut port_id,
             control_server_end,
-            fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let iface_id = control.get_id().await.expect("get id");
@@ -2066,14 +2068,14 @@ impl IpForwarding {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
                 forwarding: v4,
                 multicast_forwarding: v4_multicast,
-                ..finterfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
                 forwarding: v6,
                 multicast_forwarding: v6_multicast,
-                ..finterfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..finterfaces_admin::Configuration::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -2341,10 +2343,10 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
                             supported_flags: fidl_fuchsia_hardware_network::TxFlags::empty(),
                         }]),
                         mtu: Some(netemul::DEFAULT_MTU.into()),
-                        ..fidl_fuchsia_net_tun::BasePortConfig::EMPTY
+                        ..Default::default()
                     }),
                     mac: Some(fidl_mac!("02:03:04:05:06:07")),
-                    ..fidl_fuchsia_net_tun::DevicePortConfig::EMPTY
+                    ..Default::default()
                 },
                 port_server_end,
             )
@@ -2367,7 +2369,7 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
                 fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(format!("test{}", index)),
                     metric: None,
-                    ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                    ..Default::default()
                 },
             )
             .expect("create interface");
@@ -2479,7 +2481,7 @@ async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
                 server_end,
                 finterfaces_admin::Options {
                     name: Some("testif".to_string()),
-                    ..finterfaces_admin::Options::EMPTY
+                    ..Default::default()
                 },
             )
             .expect("create interface");

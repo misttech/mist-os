@@ -721,17 +721,17 @@ mod tests {
             fidl_policy::NetworkConfig {
                 id: Some(net_id_open.clone()),
                 credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
-                ..fidl_policy::NetworkConfig::EMPTY
+                ..Default::default()
             },
             fidl_policy::NetworkConfig {
                 id: Some(net_id_wpa2_w_password.clone()),
                 credential: Some(fidl_policy::Credential::Password(b"foobar-password".to_vec())),
-                ..fidl_policy::NetworkConfig::EMPTY
+                ..Default::default()
             },
             fidl_policy::NetworkConfig {
                 id: Some(net_id_wpa2_w_psk.clone()),
                 credential: Some(fidl_policy::Credential::Psk(vec![64; WPA_PSK_BYTE_LEN].to_vec())),
-                ..fidl_policy::NetworkConfig::EMPTY
+                ..Default::default()
             },
         ];
         let saved_networks =
@@ -1186,7 +1186,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id.clone()),
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let mut save_fut = controller.save_network(network_config);
 
@@ -1254,7 +1254,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id.clone()),
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let mut save_fut = controller.save_network(network_config);
 
@@ -1313,7 +1313,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(fidl_policy::NetworkIdentifier::from(network_id.clone())),
             credential: Some(fidl_policy::Credential::Password(b"other-password".to_vec())),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let mut save_fut = controller.save_network(network_config);
 
@@ -1370,7 +1370,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(bad_network_id.clone()),
             credential: Some(fidl_policy::Credential::Password(b"bar".to_vec())),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         // Attempt to save the config
         let mut save_fut = controller.save_network(network_config);
@@ -1420,7 +1420,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(test_values.net_id_open.clone()),
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let mut remove_fut = controller.remove_network(network_config.clone());
 

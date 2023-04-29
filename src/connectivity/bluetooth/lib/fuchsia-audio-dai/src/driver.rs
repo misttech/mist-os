@@ -192,7 +192,7 @@ mod tests {
                     is_input: Some(true),
                     manufacturer: Some(String::from("Fuchsia")),
                     product_name: Some(String::from("Spinny Audio")),
-                    ..DaiProperties::EMPTY
+                    ..Default::default()
                 })
                 .expect("send response okay"),
             x => panic!("Expected a ready GetProperties request, got {:?}", x),

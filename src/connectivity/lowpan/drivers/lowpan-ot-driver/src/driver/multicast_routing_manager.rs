@@ -136,7 +136,7 @@ impl MulticastRoutingManager {
                         action: Some(fnet_mcast::Action::OutgoingInterfaces(vec![
                             fnet_mcast::OutgoingInterfaces { id: net_if_id, min_ttl: MIN_TTL },
                         ])),
-                        ..fnet_mcast::Route::EMPTY
+                        ..Default::default()
                     };
 
                     match multicast_routing_client_end

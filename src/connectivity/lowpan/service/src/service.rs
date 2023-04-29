@@ -149,7 +149,7 @@ macro_rules! impl_serve_to_driver {
                                 if let Err(err) = match self.lookup(&name) {
                                     Ok(dev) => dev.get_protocols(Protocols {
                                         $protocol_member: Some(server_end),
-                                        ..Protocols::EMPTY
+                                        ..Default::default()
                                     }),
                                     Err(err) => server_end.close_with_epitaph(err.into()),
                                 } {

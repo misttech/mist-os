@@ -732,7 +732,7 @@ mod tests {
             Ok(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                 default: None,
                 max: None,
-                ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                ..Default::default()
             }))
         }
         fn dispatch_set_option(
@@ -837,7 +837,7 @@ mod tests {
                 Ok(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                     default: None,
                     max: None,
-                    ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                    ..Default::default()
                 }))
             );
         })
@@ -869,7 +869,7 @@ mod tests {
                         fidl_fuchsia_net_dhcp::LeaseLength {
                             default: None,
                             max: None,
-                            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                            ..Default::default()
                         },
                     ))
                     .await
@@ -1079,7 +1079,7 @@ mod tests {
                         fidl_fuchsia_net_dhcp::LeaseLength {
                             default: None,
                             max: None,
-                            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                            ..Default::default()
                         },
                     ))
                     .await

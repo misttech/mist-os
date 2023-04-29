@@ -244,7 +244,7 @@ impl From<LeBondData> for sys::LeBondData {
             local_ltk: src.local_ltk,
             irk: src.irk,
             csrk: src.csrk,
-            ..sys::LeBondData::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -255,7 +255,7 @@ impl From<BredrBondData> for sys::BredrBondData {
             role_preference: src.role_preference,
             services: Some(src.services.into_iter().map(|uuid| uuid.into()).collect()),
             link_key: src.link_key,
-            ..sys::BredrBondData::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -341,7 +341,7 @@ impl From<BondingData> for sys::BondingData {
             name: bd.name,
             le_bond,
             bredr_bond,
-            ..sys::BondingData::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -356,7 +356,7 @@ pub struct HostData {
 
 impl From<HostData> for sys::HostData {
     fn from(src: HostData) -> sys::HostData {
-        sys::HostData { irk: src.irk, ..sys::HostData::EMPTY }
+        sys::HostData { irk: src.irk, ..Default::default() }
     }
 }
 
@@ -376,7 +376,7 @@ impl From<Identity> for sys::Identity {
         sys::Identity {
             host: Some(src.host.into()),
             bonds: Some(src.bonds.into_iter().map(|i| i.into()).collect()),
-            ..sys::Identity::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -562,7 +562,7 @@ mod tests {
                 name: Some("name".into()),
                 le_bond: le_bond.clone(),
                 bredr_bond: bredr_bond.clone(),
-                ..sys::BondingData::EMPTY
+                ..Default::default()
             }
         }
 
@@ -574,8 +574,8 @@ mod tests {
                     type_: bt::AddressType::Random,
                     bytes: [1, 2, 3, 4, 5, 6],
                 }),
-                le_bond: Some(sys::LeBondData::EMPTY),
-                ..sys::BondingData::EMPTY
+                le_bond: Some(sys::LeBondData::default()),
+                ..Default::default()
             };
             let result = BondingData::try_from(src);
             assert_matches!(result, Err(Error::MissingRequired(_)));
@@ -585,9 +585,9 @@ mod tests {
         fn address_missing() {
             let src = sys::BondingData {
                 identifier: Some(bt::PeerId { value: 1 }),
-                le_bond: Some(sys::LeBondData::EMPTY),
-                bredr_bond: Some(sys::BredrBondData::EMPTY),
-                ..sys::BondingData::EMPTY
+                le_bond: Some(sys::LeBondData::default()),
+                bredr_bond: Some(sys::BredrBondData::default()),
+                ..Default::default()
             };
             let result = BondingData::try_from(src);
             assert_matches!(result, Err(Error::MissingRequired(_)));
@@ -603,9 +603,9 @@ mod tests {
                     type_: bt::AddressType::Public,
                     bytes: [1, 0, 0, 0, 0, 0],
                 }),
-                le_bond: Some(sys::LeBondData::EMPTY),
-                bredr_bond: Some(sys::BredrBondData::EMPTY),
-                ..sys::BondingData::EMPTY
+                le_bond: Some(sys::LeBondData::default()),
+                bredr_bond: Some(sys::BredrBondData::default()),
+                ..Default::default()
             };
             let result =
                 BondingData::try_from(src).expect("failed to convert from sys.BondingData");
@@ -631,10 +631,10 @@ mod tests {
                 le_bond: Some(sys::LeBondData {
                     local_ltk: Some(ltk1.clone()),
                     peer_ltk: Some(ltk2.clone()),
-                    ..sys::LeBondData::EMPTY
+                    ..Default::default()
                 }),
-                bredr_bond: Some(sys::BredrBondData::EMPTY),
-                ..sys::BondingData::EMPTY
+                bredr_bond: Some(sys::BredrBondData::default()),
+                ..Default::default()
             };
 
             let result =
@@ -646,8 +646,8 @@ mod tests {
 
         #[test]
         fn rejects_missing_transport_specific() {
-            let le_bond = Some(sys::LeBondData::EMPTY);
-            let bredr_bond = Some(sys::BredrBondData::EMPTY);
+            let le_bond = Some(sys::LeBondData::default());
+            let bredr_bond = Some(sys::BredrBondData::default());
 
             // Valid combinations of bonding data
             assert!(BondingData::try_from(test_sys_bond(&le_bond, &None)).is_ok());

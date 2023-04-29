@@ -480,7 +480,7 @@ impl Worker {
                                     Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                                         id: Some(id.get()),
                                         addresses: Some(Self::collect_addresses(addresses)),
-                                        ..finterfaces::Properties::EMPTY
+                                        ..Default::default()
                                     })))
                                 } else {
                                     Ok(None)
@@ -516,7 +516,7 @@ impl Worker {
                         Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                             id: Some(id.get()),
                             addresses: Some(Self::collect_addresses(addresses)),
-                            ..finterfaces::Properties::EMPTY
+                            ..Default::default()
                         })))
                     }
                     InterfaceUpdate::AddressRemoved(addr) => match addresses.remove(&addr) {
@@ -528,7 +528,7 @@ impl Worker {
                                 Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                                     id: Some(id.get()),
                                     addresses: (Some(Self::collect_addresses(addresses))),
-                                    ..finterfaces::Properties::EMPTY
+                                    ..Default::default()
                                 })))
                             } else {
                                 Ok(None)
@@ -540,10 +540,8 @@ impl Worker {
                         version,
                         has_default_route: new_value,
                     } => {
-                        let mut table = finterfaces::Properties {
-                            id: Some(id.get()),
-                            ..finterfaces::Properties::EMPTY
-                        };
+                        let mut table =
+                            finterfaces::Properties { id: Some(id.get()), ..Default::default() };
                         let (state, prop) = match version {
                             IpVersion::V4 => {
                                 (has_default_ipv4_route, &mut table.has_default_ipv4_route)
@@ -565,7 +563,7 @@ impl Worker {
                             finterfaces::Event::Changed(finterfaces::Properties {
                                 id: Some(id.get()),
                                 online: Some(new_online),
-                                ..finterfaces::Properties::EMPTY
+                                ..Default::default()
                             })
                         }))
                     }
@@ -786,7 +784,7 @@ mod tests {
         );
         const ADDR_VALID_UNTIL: zx::Time = zx::Time::from_nanos(12345);
         let base_properties =
-            finterfaces::Properties { id: Some(IFACE1_ID.get()), ..finterfaces::Properties::EMPTY };
+            finterfaces::Properties { id: Some(IFACE1_ID.get()), ..Default::default() };
 
         for (event, expect) in [
             (
@@ -1033,7 +1031,7 @@ mod tests {
                     valid_until: valid_until.into_nanos(),
                 }
                 .into()]),
-                ..finterfaces::Properties::EMPTY
+                ..Default::default()
             }));
 
         // Add address.
@@ -1170,7 +1168,7 @@ mod tests {
                     valid_until: valid_until.into_nanos()
                 }
                 .into()]),
-                ..finterfaces::Properties::EMPTY
+                ..Default::default()
             })))
         );
 
@@ -1203,7 +1201,7 @@ mod tests {
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                 id: Some(id.get()),
                 addresses: Some(Vec::new()),
-                ..finterfaces::Properties::EMPTY
+                ..Default::default()
             })))
         );
 
@@ -1268,7 +1266,7 @@ mod tests {
                         valid_until: valid_until.into_nanos(),
                     }
                     .into()]),
-                    ..finterfaces::Properties::EMPTY
+                    ..Default::default()
                 })),
             ),
             // Changing from `Unavailable` to `Tentative` is a no-op.
@@ -1306,7 +1304,7 @@ mod tests {
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                 id: Some(id.get()),
                 addresses: Some(Vec::new()),
-                ..finterfaces::Properties::EMPTY
+                ..Default::default()
             })))
         );
         // Check state is updated.
@@ -1332,7 +1330,7 @@ mod tests {
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
                 id: Some(id.get()),
                 online: Some(true),
-                ..finterfaces::Properties::EMPTY
+                ..Default::default()
             })))
         );
         // Check state is updated.
@@ -1354,14 +1352,12 @@ mod tests {
         let mut state = HashMap::from([(id, initial_state)]);
 
         let expect_set_props = match version {
-            IpVersion::V4 => finterfaces::Properties {
-                has_default_ipv4_route: Some(true),
-                ..finterfaces::Properties::EMPTY
-            },
-            IpVersion::V6 => finterfaces::Properties {
-                has_default_ipv6_route: Some(true),
-                ..finterfaces::Properties::EMPTY
-            },
+            IpVersion::V4 => {
+                finterfaces::Properties { has_default_ipv4_route: Some(true), ..Default::default() }
+            }
+            IpVersion::V6 => {
+                finterfaces::Properties { has_default_ipv6_route: Some(true), ..Default::default() }
+            }
         };
 
         // Update default route.

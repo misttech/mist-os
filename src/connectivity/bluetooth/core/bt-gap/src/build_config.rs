@@ -73,7 +73,7 @@ impl Into<sys::Settings> for Config {
             le_background_scan: Some(self.le.background_scan_enabled),
             bredr_connectable_mode: Some(self.bredr.connectable),
             le_security_mode: Some(self.le.security_mode),
-            ..sys::Settings::EMPTY
+            ..Default::default()
         }
     }
 }

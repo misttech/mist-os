@@ -201,7 +201,7 @@ where
                 id: Some(x.to_string()),
                 index: Some(u16::from(x)),
                 masked_by_regulatory_domain: Some(false),
-                ..ChannelInfo::EMPTY
+                ..Default::default()
             })
             .collect())
     }
@@ -410,7 +410,7 @@ where
             Ok(vec![EnergyScanResult {
                 channel_index: Some(x.channel().into()),
                 max_rssi: Some(x.max_rssi().into()),
-                ..EnergyScanResult::EMPTY
+                ..Default::default()
             }])
         });
 
@@ -616,13 +616,13 @@ where
                 last_rssi_in: Some(x.last_rssi() as i32),
                 avg_rssi_in: Some(x.average_rssi()),
                 lqi_in: Some(x.lqi_in()),
-                ..NeighborInfo::EMPTY
+                ..Default::default()
             })
             .collect::<Vec<_>>())
     }
 
     async fn get_counters(&self) -> ZxResult<AllCounters> {
-        let mut ret = AllCounters::EMPTY;
+        let mut ret = AllCounters::default();
         let driver_state = self.driver_state.lock();
 
         ret.update_from(driver_state.ot_instance.link_get_counters());
@@ -883,7 +883,7 @@ where
             key_lease_time_total: Some(0),
             remaining_lease_time_total: Some(0),
             remaining_key_lease_time_total: Some(0),
-            ..SrpServerRegistration::EMPTY
+            ..Default::default()
         };
         let mut services_registration = SrpServerRegistration {
             deleted_count: Some(0),
@@ -892,7 +892,7 @@ where
             key_lease_time_total: Some(0),
             remaining_lease_time_total: Some(0),
             remaining_key_lease_time_total: Some(0),
-            ..SrpServerRegistration::EMPTY
+            ..Default::default()
         };
         for srp_host in ot.srp_server_hosts() {
             if srp_host.is_deleted() {
@@ -954,12 +954,12 @@ where
                 response_counters: Some(ot.srp_server_get_response_counters().into_ext()),
                 hosts_registration: Some(hosts_registration),
                 services_registration: Some(services_registration),
-                ..SrpServerInfo::EMPTY
+                ..Default::default()
             }),
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),
             leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
             uptime: Some(ot.get_uptime().into_nanos()),
-            ..Telemetry::EMPTY
+            ..Default::default()
         })
     }
 
@@ -968,7 +968,7 @@ where
         let driver_state = self.driver_state.lock();
         let ot = &driver_state.ot_instance;
 
-        Ok(FeatureConfig { trel_enabled: Some(ot.trel_is_enabled()), ..FeatureConfig::EMPTY })
+        Ok(FeatureConfig { trel_enabled: Some(ot.trel_is_enabled()), ..Default::default() })
     }
 
     #[tracing::instrument(skip_all)]

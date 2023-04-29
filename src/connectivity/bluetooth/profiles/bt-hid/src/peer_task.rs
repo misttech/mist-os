@@ -284,12 +284,12 @@ impl PeerTaskInner {
             security_requirements: None,
             // HID v1.1 5.2.7 The L2CAP Flush timeout parameter should be set to 0xFFFF.
             flush_timeout: Some(0xFFFF),
-            ..bredr::ChannelParameters::EMPTY
+            ..Default::default()
         };
         let mut connect_parameters = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(psm),
             parameters: Some(channel_parameters),
-            ..bredr::L2capParameters::EMPTY
+            ..Default::default()
         });
 
         let connect_result_result =

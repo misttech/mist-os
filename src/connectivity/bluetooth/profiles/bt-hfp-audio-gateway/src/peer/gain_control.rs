@@ -301,7 +301,7 @@ mod tests {
 
         let _resp = wrong_proxy.connect(
             &mut fidl_fuchsia_bluetooth::PeerId { value: 1 },
-            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::EMPTY),
+            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
         );
 
         let result = ctrl.next().await;

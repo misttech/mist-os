@@ -33,7 +33,7 @@ pub async fn create_metrics_logger(
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia.
         project_id: Some(metrics::PROJECT_ID),
-        ..fidl_fuchsia_metrics::ProjectSpec::EMPTY
+        ..Default::default()
     };
 
     let status = factory_proxy

@@ -262,7 +262,7 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                         addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
                         prefix_len,
                     },
-                    fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 )
                 .await
                 .expect("add IPv4 address to bridge failed");

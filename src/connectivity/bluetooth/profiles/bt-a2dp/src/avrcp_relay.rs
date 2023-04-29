@@ -172,9 +172,9 @@ impl AvrcpRelay {
                         | sessions2::PlayerCapabilityFlags::CHANGE_TO_NEXT_ITEM
                         | sessions2::PlayerCapabilityFlags::CHANGE_TO_PREV_ITEM,
                 ),
-                ..sessions2::PlayerCapabilities::EMPTY
+                ..Default::default()
             }),
-            ..sessions2::PlayerInfoDelta::EMPTY
+            ..Default::default()
         });
 
         let mut hanging_watcher = None;
@@ -289,7 +289,7 @@ impl AvrcpRelay {
                     if notification.status.is_some() ||
                         notification.track_id.is_some() ||
                         notification.addressed_player.is_some() {
-                        let mut building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
+                        let mut building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                         if let Err(e) = update_attributes(&controller, &mut building, &mut last_player_status).await {
                             info!(%peer_id, ?e, "Couldn't update AVRCP attributes");
                         }
@@ -305,7 +305,7 @@ impl AvrcpRelay {
                     }
 
                     if player_status_updated {
-                        let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
+                        let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                         building.player_status = Some(last_player_status.clone().into());
                         debug!(%peer_id, ?building, "Updated player status");
                         self.update_player_status_inspect(&last_player_status);
@@ -318,7 +318,7 @@ impl AvrcpRelay {
                     if let Err(e) = update_status(&controller, &mut last_player_status).await {
                         info!(%peer_id, ?e, "Error updating AVRCP status (interval)");
                     }
-                    let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
+                    let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                     building.player_status = Some(last_player_status.clone().into());
                     self.update_player_status_inspect(&last_player_status);
                 }
@@ -513,7 +513,7 @@ mod tests {
                         total_number_of_tracks: Some("10".to_string()),
                         genre: Some("Alternative".to_string()),
                         playing_time: Some("237000".to_string()),
-                        ..avrcp::MediaAttributes::EMPTY
+                        ..Default::default()
                     }))
                     .expect("should have succeeded");
             }
@@ -533,7 +533,7 @@ mod tests {
                         song_length: Some(237000),
                         song_position: Some(1000),
                         playback_status: Some(avrcp::PlaybackStatus::Playing),
-                        ..avrcp::PlayStatus::EMPTY
+                        ..Default::default()
                     }))
                     .expect("should have succeeded");
             }
@@ -783,7 +783,7 @@ mod tests {
                 7000,
                 avrcp::Notification {
                     status: Some(avrcp::PlaybackStatus::Paused),
-                    ..avrcp::Notification::EMPTY
+                    ..Default::default()
                 },
             )
             .expect("should have sent");
@@ -802,7 +802,7 @@ mod tests {
                         total_number_of_tracks: Some("11".to_string()),
                         genre: Some("Alternative".to_string()),
                         playing_time: Some("189000".to_string()),
-                        ..avrcp::MediaAttributes::EMPTY
+                        ..Default::default()
                     }))
                     .expect("should have sent");
             }
@@ -817,7 +817,7 @@ mod tests {
                         song_length: Some(189000),
                         song_position: Some(1000),
                         playback_status: Some(avrcp::PlaybackStatus::Paused),
-                        ..avrcp::PlayStatus::EMPTY
+                        ..Default::default()
                     }))
                     .expect("should have sent");
             }
@@ -863,7 +863,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 7000,
-                avrcp::Notification { addressed_player: Some(2), ..avrcp::Notification::EMPTY },
+                avrcp::Notification { addressed_player: Some(2), ..Default::default() },
             )
             .expect("should have sent");
 
@@ -875,7 +875,7 @@ mod tests {
                 responder
                     .send(&mut Ok(avrcp::MediaAttributes {
                         title: Some("some track".to_string()),
-                        ..avrcp::MediaAttributes::EMPTY
+                        ..Default::default()
                     }))
                     .expect("should have sent");
             }
@@ -922,7 +922,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 9000,
-                avrcp::Notification { pos: Some(3051), ..avrcp::Notification::EMPTY },
+                avrcp::Notification { pos: Some(3051), ..Default::default() },
             )
             .expect("should have sent");
 
@@ -1044,7 +1044,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Low),
             level_percent: Some(33f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let update_fut = test_battery_manager.send_update(update);
         pin_mut!(update_fut);
@@ -1075,7 +1075,7 @@ mod tests {
         // Simulate a battery update via the TestBatteryManager.
         let update = fpower::BatteryInfo {
             status: Some(fpower::BatteryStatus::Unknown),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let update_fut = test_battery_manager.send_update(update);
         pin_mut!(update_fut);
@@ -1142,10 +1142,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 7000,
-                avrcp::Notification {
-                    available_players_changed: Some(true),
-                    ..avrcp::Notification::EMPTY
-                },
+                avrcp::Notification { available_players_changed: Some(true), ..Default::default() },
             )
             .expect("should have sent");
 
@@ -1162,7 +1159,7 @@ mod tests {
                     .send(&mut Ok(vec![avrcp::MediaPlayerItem {
                         player_id: Some(1),
                         playback_status: Some(avrcp::PlaybackStatus::Stopped),
-                        ..avrcp::MediaPlayerItem::EMPTY
+                        ..Default::default()
                     }]))
                     .expect("should have sent");
             }

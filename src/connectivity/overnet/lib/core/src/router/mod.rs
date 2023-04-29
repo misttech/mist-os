@@ -547,7 +547,7 @@ impl Router {
                 .connect(
                     service_name,
                     chan,
-                    ConnectionInfo { peer: Some(node_id.into()), ..ConnectionInfo::EMPTY },
+                    ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
                 )
                 .await
         } else {

@@ -136,7 +136,7 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
             NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end_a,
         )
@@ -148,7 +148,7 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
             NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end_b,
         )
@@ -198,7 +198,7 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netsta
                 NewClientParams {
                     configuration_to_request: None,
                     request_ip_address: Some(true),
-                    ..NewClientParams::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             )
@@ -241,7 +241,7 @@ async fn client_provider_double_watch<N: Netstack>(name: &str) {
             NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end,
         )
@@ -285,7 +285,7 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
             NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end,
         )
@@ -333,7 +333,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
             NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end,
         )

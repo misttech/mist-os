@@ -97,7 +97,7 @@ pub fn audio_gateway(features: AudioGatewayFeatureSupport) -> bredr::ServiceDefi
                 element: bredr::DataElement::Uint16(supported_features),
             },
         ]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 

@@ -327,7 +327,7 @@ mod tests {
         let network = NetworkInformation {
             service_available: Some(true),
             signal_strength: Some(SignalStrength::Low),
-            ..NetworkInformation::EMPTY
+            ..Default::default()
         };
         peer_task.connected_peer_handler.set(true);
         peer_task.network.update(&network);

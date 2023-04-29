@@ -156,7 +156,7 @@ async fn add_pure_ip_interface(
             server_end,
             fnet_interfaces_admin::Options {
                 name: Some(interface_name.to_string()),
-                ..fnet_interfaces_admin::Options::EMPTY
+                ..Default::default()
             },
         )
         .expect("create interface");

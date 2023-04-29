@@ -109,7 +109,7 @@ impl From<&PeripheralData> for Information {
         Information {
             identifier: Some(Identifier::PeerId(src.id.into())),
             battery_info: src.battery.as_ref().map(Into::into),
-            ..Information::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -136,7 +136,7 @@ impl From<&BatteryInfo> for fidl_fuchsia_power_battery::BatteryInfo {
         fidl_fuchsia_power_battery::BatteryInfo {
             level_percent: Some(src.level_percent),
             level_status: src.level_status,
-            ..fidl_fuchsia_power_battery::BatteryInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -176,13 +176,13 @@ mod tests {
 
     #[test]
     fn invalid_battery_info() {
-        let empty = fidl_fuchsia_power_battery::BatteryInfo::EMPTY;
+        let empty = fidl_fuchsia_power_battery::BatteryInfo::default();
         let local = BatteryInfo::try_from(empty);
         assert_matches!(local, Err(Error::BatteryInfo { .. }));
 
         let missing_percent = fidl_fuchsia_power_battery::BatteryInfo {
             level_status: Some(fidl_fuchsia_power_battery::LevelStatus::Low),
-            ..fidl_fuchsia_power_battery::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let local = BatteryInfo::try_from(missing_percent);
         assert_matches!(local, Err(Error::BatteryInfo { .. }));
@@ -195,7 +195,7 @@ mod tests {
             level_percent: Some(1.0f32),
             level_status: Some(fidl_fuchsia_power_battery::LevelStatus::Low),
             charge_source: Some(fidl_fuchsia_power_battery::ChargeSource::Usb),
-            ..fidl_fuchsia_power_battery::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let local = BatteryInfo::try_from(valid).expect("valid conversion");
         let expected = BatteryInfo {
@@ -251,9 +251,9 @@ mod tests {
             battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo {
                 level_percent: Some(10.0),
                 level_status: Some(fidl_fuchsia_power_battery::LevelStatus::Low),
-                ..fidl_fuchsia_power_battery::BatteryInfo::EMPTY
+                ..Default::default()
             }),
-            ..Information::EMPTY
+            ..Default::default()
         }];
         assert_eq!(info2, expected_info);
     }

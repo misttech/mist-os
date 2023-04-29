@@ -64,7 +64,7 @@ impl<'h> Collector<'h> {
                             hdl.signal(signals, Signals::empty())?;
                             Poll::Ready(Ok(ReadValue::SignalUpdate(SignalUpdate {
                                 assert_signals: Some(to_wire_signals(signals)),
-                                ..SignalUpdate::EMPTY
+                                ..Default::default()
                             })))
                         }
                     }

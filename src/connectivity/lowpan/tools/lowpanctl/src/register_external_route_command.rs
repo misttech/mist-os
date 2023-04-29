@@ -27,11 +27,8 @@ impl RegisterExternalRouteCommand {
         let prefix_len = 64;
         let subnet = Ipv6Subnet { addr: Ipv6Address { addr: self.addr.octets() }, prefix_len };
 
-        let on_mesh_prefix = ExternalRoute {
-            subnet: Some(subnet),
-            stable: Some(self.stable),
-            ..ExternalRoute::EMPTY
-        };
+        let on_mesh_prefix =
+            ExternalRoute { subnet: Some(subnet), stable: Some(self.stable), ..Default::default() };
 
         device_route
             .register_external_route(on_mesh_prefix)

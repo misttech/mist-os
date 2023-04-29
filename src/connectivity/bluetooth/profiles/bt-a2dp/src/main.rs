@@ -74,7 +74,7 @@ pub(crate) fn make_profile_service_definition(service_uuid: Uuid) -> bredr::Serv
             major_version: 1,
             minor_version: 2,
         }]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 
@@ -751,7 +751,7 @@ mod tests {
             bredr::ChannelParameters {
                 channel_mode: Some(bredr::ChannelMode::Basic),
                 max_rx_sdu_size: Some(crate::config::MAX_RX_SDU_SIZE),
-                ..bredr::ChannelParameters::EMPTY
+                ..Default::default()
             },
             Some(DEFAULT_INITIATOR_DELAY),
         );
@@ -823,7 +823,7 @@ mod tests {
             &peer_id,
             &attributes,
             peers.clone(),
-            bredr::ChannelParameters::EMPTY,
+            bredr::ChannelParameters::default(),
             Some(DEFAULT_INITIATOR_DELAY),
         );
 

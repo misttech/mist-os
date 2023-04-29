@@ -111,7 +111,7 @@ impl PeerTask {
             connection_behavior,
             profile_proxy,
             handler: None,
-            network: NetworkInformation::EMPTY,
+            network: NetworkInformation::default(),
             network_updates: empty().right_stream(),
             // Default to a battery level of 5 (max). This will be updated when we receive
             // a battery information update.
@@ -227,7 +227,7 @@ impl PeerTask {
         };
         let params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
             channel: Some(server_channel.into()),
-            ..bredr::RfcommParameters::EMPTY
+            ..Default::default()
         });
 
         if self.connection_behavior.autoconnect {
@@ -954,7 +954,7 @@ mod tests {
                 service_available,
                 roaming,
                 signal_strength,
-                ..NetworkInformation::EMPTY
+                ..Default::default()
             }
         }
     }
@@ -1045,7 +1045,7 @@ mod tests {
             match result {
                 Some(Ok(PeerHandlerRequest::WatchNetworkInformation { responder })) => {
                     responder
-                        .send(NetworkInformation::EMPTY)
+                        .send(NetworkInformation::default())
                         .expect("Successfully send network information");
                 }
                 x => panic!("Expected watch network information request: {:?}", x),
@@ -1121,7 +1121,7 @@ mod tests {
         let network_update_1 = NetworkInformation {
             signal_strength: Some(SignalStrength::Low),
             roaming: Some(false),
-            ..NetworkInformation::EMPTY
+            ..Default::default()
         };
         // Expect to send the Signal and Roam indicators to the peer.
         let expected_data1 = vec![AgIndicator::Signal(3).into(), AgIndicator::Roam(0).into()];
@@ -1129,7 +1129,7 @@ mod tests {
         let network_update_2 = NetworkInformation {
             service_available: Some(true),
             roaming: Some(true),
-            ..NetworkInformation::EMPTY
+            ..Default::default()
         };
         // Expect to send the Service and Roam indicators to the peer.
         let expected_data2 = vec![AgIndicator::Service(1).into(), AgIndicator::Roam(1).into()];
@@ -1139,7 +1139,7 @@ mod tests {
             service_available: Some(true),
             roaming: Some(true),
             signal_strength: Some(SignalStrength::Low),
-            ..NetworkInformation::EMPTY
+            ..Default::default()
         };
 
         // Set up the executor, peer, and background call manager task
@@ -1283,7 +1283,7 @@ mod tests {
         match stream.next().await {
             Some(Ok(PeerHandlerRequest::WatchNetworkInformation { responder })) => {
                 responder
-                    .send(NetworkInformation::EMPTY)
+                    .send(NetworkInformation::default())
                     .expect("Successfully send network information");
             }
             x => panic!("Expected watch network information request: {:?}", x),
@@ -1340,7 +1340,7 @@ mod tests {
             remote: Some("1234567".to_string()),
             state: Some(CallState::IncomingRinging),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
@@ -1384,7 +1384,7 @@ mod tests {
             remote: Some("1234567".to_string()),
             state: Some(CallState::IncomingRinging),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
@@ -1571,7 +1571,7 @@ mod tests {
             remote: Some(raw_number.to_string()),
             state: Some(CallState::IncomingWaiting),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
@@ -1623,7 +1623,7 @@ mod tests {
             remote: Some("1234567".to_string()),
             state: Some(CallState::IncomingWaiting),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
@@ -1990,7 +1990,7 @@ mod tests {
             remote: Some("1234567".to_string()),
             state: Some(CallState::IncomingWaiting),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
@@ -2118,7 +2118,7 @@ mod tests {
                 remote: Some("1234567".to_string()),
                 state: Some(CallState::OngoingHeld),
                 direction: Some(CallDirection::MobileTerminated),
-                ..NextCall::EMPTY
+                ..Default::default()
             };
             responder.send(next_call).expect("Successfully send call information");
 

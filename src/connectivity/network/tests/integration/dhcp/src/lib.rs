@@ -290,7 +290,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(na
     parameters.push(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
         default: Some(LONG_LEASE),
         max: Some(LONG_LEASE),
-        ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+        ..Default::default()
     }));
 
     test_dhcp::<N>(
@@ -480,7 +480,7 @@ fn test_dhcp<'a, N: NetstackAndDhcpClient>(
                                     let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
                                         &iface,
                                         subnet,
-                                        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                                        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                                     )
                                         .await
                                         .expect("add subnet address and route");
@@ -607,12 +607,12 @@ impl PersistenceMode {
                     prefix_length: Some(0),
                     range_start: Some(fidl_ip_v4!("0.0.0.0")),
                     range_stop: Some(fidl_ip_v4!("0.0.0.0")),
-                    ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+                    ..Default::default()
                 }),
                 fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                     default: Some(86400),
                     max: Some(86400),
-                    ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+                    ..Default::default()
                 }),
                 fidl_fuchsia_net_dhcp::Parameter::PermittedMacs(vec![]),
                 fidl_fuchsia_net_dhcp::Parameter::StaticallyAssignedAddrs(vec![]),
@@ -639,14 +639,14 @@ fn test_dhcpd_parameters(if_name: String) -> Vec<fidl_fuchsia_net_dhcp::Paramete
         fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
             default: Some(60),
             max: Some(60),
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         }),
         fidl_fuchsia_net_dhcp::Parameter::PermittedMacs(vec![fidl_mac!("aa:bb:cc:dd:ee:ff")]),
         fidl_fuchsia_net_dhcp::Parameter::StaticallyAssignedAddrs(vec![
             fidl_fuchsia_net_dhcp::StaticAssignment {
                 host: Some(fidl_mac!("aa:bb:cc:dd:ee:ff")),
                 assigned_addr: Some(fidl_ip_v4!("192.168.0.2")),
-                ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                ..Default::default()
             },
         ]),
         fidl_fuchsia_net_dhcp::Parameter::ArpProbe(true),

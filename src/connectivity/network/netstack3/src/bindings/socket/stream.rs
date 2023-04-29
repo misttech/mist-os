@@ -1211,7 +1211,7 @@ where
                     responder,
                     fposix_socket::StreamSocketDescribeResponse {
                         socket: Some(socket),
-                        ..fposix_socket::StreamSocketDescribeResponse::EMPTY
+                        ..Default::default()
                     }
                 );
             }

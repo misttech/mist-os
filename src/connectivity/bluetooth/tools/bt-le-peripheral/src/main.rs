@@ -260,7 +260,7 @@ async fn main() -> Result<(), Error> {
         Some(ConnectionOptions {
             bondable_mode: Some(true),
             service_filter: None,
-            ..ConnectionOptions::EMPTY
+            ..Default::default()
         })
     } else {
         None
@@ -275,13 +275,13 @@ async fn main() -> Result<(), Error> {
             service_data: optionalize(service_data),
             manufacturer_data: optionalize(manufacturer_data),
             uris: optionalize(uris),
-            ..AdvertisingData::EMPTY
+            ..Default::default()
         }),
         scan_response: None,
         mode_hint,
         connectable: None,
         connection_options: conn_opts,
-        ..AdvertisingParameters::EMPTY
+        ..Default::default()
     };
 
     let peripheral = connect_to_protocol::<PeripheralMarker>()
@@ -439,7 +439,7 @@ mod tests {
                     connectable: Some(true),
                     rssi: None,
                     advertising_data: None,
-                    ..Peer::EMPTY
+                    ..Default::default()
                 };
 
                 let proxy = advertised_peripheral.into_proxy()?;
@@ -471,9 +471,9 @@ mod tests {
             connection_options: Some(ConnectionOptions {
                 bondable_mode: Some(true),
                 service_filter: None,
-                ..ConnectionOptions::EMPTY
+                ..Default::default()
             }),
-            ..AdvertisingParameters::EMPTY
+            ..Default::default()
         };
         let listen_task = listen(&proxy, input_parameters, &[]);
         let emulate_task = async {
@@ -505,9 +505,9 @@ mod tests {
             connection_options: Some(ConnectionOptions {
                 bondable_mode: Some(true),
                 service_filter: None,
-                ..ConnectionOptions::EMPTY
+                ..Default::default()
             }),
-            ..AdvertisingParameters::EMPTY
+            ..Default::default()
         };
 
         drop(server);

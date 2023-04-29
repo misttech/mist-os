@@ -647,7 +647,7 @@ fn save_and_connect(
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(test_credentials.policy.clone()),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the network
@@ -944,7 +944,7 @@ fn test_save_and_fail_to_connect(
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(saved_credential),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the network
@@ -1056,7 +1056,7 @@ fn test_fail_to_save(
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(saved_credential),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the network
@@ -1098,7 +1098,7 @@ fn test_connect_to_new_network() {
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the second network.
@@ -1306,7 +1306,7 @@ fn test_autoconnect_to_saved_network() {
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the network.
@@ -1551,7 +1551,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     };
 
     // Save the network.

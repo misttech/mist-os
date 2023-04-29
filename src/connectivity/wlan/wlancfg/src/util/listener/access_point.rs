@@ -18,7 +18,7 @@ impl From<ConnectedClientInformation> for fidl_policy::ConnectedClientInformatio
     fn from(connected_client_info: ConnectedClientInformation) -> Self {
         fidl_policy::ConnectedClientInformation {
             count: Some(connected_client_info.count),
-            ..fidl_policy::ConnectedClientInformation::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -70,7 +70,7 @@ impl From<ApStatesUpdate> for Vec<fidl_policy::AccessPointState> {
                 band: ap.band.map(|band| fidl_policy::OperatingBand::from(band)),
                 frequency: ap.frequency,
                 clients: ap.clients.map(|c| c.into()),
-                ..fidl_policy::AccessPointState::EMPTY
+                ..Default::default()
             })
             .collect()
     }
@@ -189,9 +189,9 @@ mod tests {
                 frequency: Some(200),
                 clients: Some(fidl_policy::ConnectedClientInformation {
                     count: Some(1),
-                    ..fidl_policy::ConnectedClientInformation::EMPTY
+                    ..Default::default()
                 }),
-                ..fidl_policy::AccessPointState::EMPTY
+                ..Default::default()
             }]
         );
     }

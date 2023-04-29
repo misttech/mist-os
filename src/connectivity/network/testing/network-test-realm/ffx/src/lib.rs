@@ -161,7 +161,7 @@ async fn handle_command(
                             address: Some(address.into()),
                             stateful: Some(stateful),
                             request_dns_servers: Some(request_dns_servers),
-                            ..fntr::ControllerStartDhcpv6ClientRequest::EMPTY
+                            ..Default::default()
                         })
                         .await,
                     "start_dhcpv6_client",

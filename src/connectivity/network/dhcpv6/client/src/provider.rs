@@ -88,9 +88,9 @@ mod tests {
                             address: Some(fidl_socket_addr_v6!("[fe01::1:2]:546")),
                             config: Some(ClientConfig {
                                 information_config: None,
-                                ..ClientConfig::EMPTY
+                                ..Default::default()
                             }),
-                            ..NewClientParams::EMPTY
+                            ..Default::default()
                         },
                         server_end,
                     )

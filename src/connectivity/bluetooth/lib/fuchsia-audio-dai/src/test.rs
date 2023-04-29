@@ -124,7 +124,7 @@ async fn test_handle_dai_requests(
     let properties = DaiProperties {
         is_input: Some(as_input),
         manufacturer: Some("Fuchsia".to_string()),
-        ..DaiProperties::EMPTY
+        ..Default::default()
     };
 
     let mut _rb_task = None;
@@ -199,8 +199,8 @@ fn mock_dai_device(
     };
 
     let number_of_channels = 1usize;
-    let attributes = vec![ChannelAttributes::EMPTY; number_of_channels];
-    let channel_set = ChannelSet { attributes: Some(attributes), ..ChannelSet::EMPTY };
+    let attributes = vec![ChannelAttributes::default(); number_of_channels];
+    let channel_set = ChannelSet { attributes: Some(attributes), ..Default::default() };
     let supported_pcm_formats = SupportedFormats {
         pcm_supported_formats: Some(PcmSupportedFormats {
             channel_sets: Some(vec![channel_set]),
@@ -208,9 +208,9 @@ fn mock_dai_device(
             bytes_per_sample: Some(vec![2]),
             valid_bits_per_sample: Some(vec![16]),
             frame_rates: Some(vec![8000, 16000, 32000, 48000, 96000]),
-            ..PcmSupportedFormats::EMPTY
+            ..Default::default()
         }),
-        ..SupportedFormats::EMPTY
+        ..Default::default()
     };
 
     let handle = TestHandle::new();

@@ -934,7 +934,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     Ok(fname::LookupResult {
                         addresses: Some(addrs),
                         canonical_name: cname,
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     })
                 })()
                 .await;
@@ -1272,14 +1272,14 @@ mod tests {
                         fname::LookupIpOptions {
                             ipv4_lookup: Some(true),
                             ipv6_lookup: Some(true),
-                            ..fname::LookupIpOptions::EMPTY
+                            ..Default::default()
                         }
                     )
                     .await
                     .expect("lookup_ip"),
                 Ok(fname::LookupResult {
                     addresses: Some(vec![IPV4_LOOPBACK, IPV6_LOOPBACK]),
-                    ..fname::LookupResult::EMPTY
+                    ..Default::default()
                 }),
             );
 
@@ -1288,16 +1288,13 @@ mod tests {
                 proxy
                     .lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions {
-                            ipv4_lookup: Some(true),
-                            ..fname::LookupIpOptions::EMPTY
-                        }
+                        fname::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() }
                     )
                     .await
                     .expect("lookup_ip"),
                 Ok(fname::LookupResult {
                     addresses: Some(vec![IPV4_LOOPBACK]),
-                    ..fname::LookupResult::EMPTY
+                    ..Default::default()
                 }),
             );
 
@@ -1306,16 +1303,13 @@ mod tests {
                 proxy
                     .lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions {
-                            ipv6_lookup: Some(true),
-                            ..fname::LookupIpOptions::EMPTY
-                        }
+                        fname::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() }
                     )
                     .await
                     .expect("lookup_ip"),
                 Ok(fname::LookupResult {
                     addresses: Some(vec![IPV6_LOOPBACK]),
-                    ..fname::LookupResult::EMPTY
+                    ..Default::default()
                 }),
             );
         })
@@ -1537,7 +1531,7 @@ mod tests {
                                     fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
-                                        ..fname::LookupIpOptions::EMPTY
+                                        ..Default::default()
                                     }
                                 )
                                 .await
@@ -1562,14 +1556,14 @@ mod tests {
                             fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ipv6_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
                         .expect("lookup_ip"),
                     Ok(fname::LookupResult {
                         addresses: Some(vec![map_ip(IPV4_HOST)]),
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     }),
                 );
 
@@ -1580,14 +1574,14 @@ mod tests {
                             REMOTE_IPV4_HOST,
                             fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
                         .expect("lookup_ip"),
                     Ok(fname::LookupResult {
                         addresses: Some(vec![map_ip(IPV4_HOST)]),
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     }),
                 );
 
@@ -1598,7 +1592,7 @@ mod tests {
                             REMOTE_IPV4_HOST,
                             fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
@@ -1621,14 +1615,14 @@ mod tests {
                             fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ipv6_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
                         .expect("lookup_ip"),
                     Ok(fname::LookupResult {
                         addresses: Some(vec![map_ip(IPV6_HOST)]),
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     }),
                 );
 
@@ -1639,7 +1633,7 @@ mod tests {
                             REMOTE_IPV6_HOST,
                             fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
@@ -1654,14 +1648,14 @@ mod tests {
                             REMOTE_IPV6_HOST,
                             fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
                         .expect("lookup_ip"),
                     Ok(fname::LookupResult {
                         addresses: Some(vec![map_ip(IPV6_HOST)]),
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     }),
                 );
             })
@@ -1680,7 +1674,7 @@ mod tests {
                             hostname,
                             fname::LookupIpOptions {
                                 canonical_name_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await,
@@ -1710,7 +1704,7 @@ mod tests {
                                     fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
-                                        ..fname::LookupIpOptions::EMPTY
+                                        ..Default::default()
                                     }
                                 )
                                 .await
@@ -1728,7 +1722,7 @@ mod tests {
                                     fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
-                                        ..fname::LookupIpOptions::EMPTY
+                                        ..Default::default()
                                     }
                                 )
                                 .await
@@ -1967,14 +1961,14 @@ mod tests {
                             REMOTE_IPV4_HOST,
                             fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
                         .expect("lookup_ip"),
                     Ok(fname::LookupResult {
                         addresses: Some(vec![map_ip(IPV4_HOST)]),
-                        ..fname::LookupResult::EMPTY
+                        ..Default::default()
                     }),
                 );
             })
@@ -1988,7 +1982,7 @@ mod tests {
                             REMOTE_IPV4_HOST,
                             fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
-                                ..fname::LookupIpOptions::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
@@ -2373,7 +2367,7 @@ mod tests {
                         fname::LookupIpOptions {
                             ipv4_lookup: Some(true),
                             ipv6_lookup: Some(true),
-                            ..fname::LookupIpOptions::EMPTY
+                            ..Default::default()
                         },
                     );
             }
@@ -2718,7 +2712,7 @@ mod tests {
                             let inner = fnet_routes::Destination {
                                 address: Some(*dst),
                                 source_address: *src,
-                                ..fnet_routes::Destination::EMPTY
+                                ..Default::default()
                             };
                             // Send both Direct and Gateway resolved routes to show we
                             // don't care about that part.
@@ -2765,7 +2759,7 @@ mod tests {
                 Ok(fnet_routes::Resolved::Direct(fnet_routes::Destination {
                     address: Some(destination),
                     source_address: Some(destination),
-                    ..fnet_routes::Destination::EMPTY
+                    ..Default::default()
                 }))
             } else {
                 Err(zx::Status::ADDRESS_UNREACHABLE.into_raw())
@@ -2778,10 +2772,7 @@ mod tests {
                     // All arguments unset.
                     assert_eq!(
                         proxy
-                            .lookup_ip(
-                                REMOTE_IPV4_HOST,
-                                fname::LookupIpOptions { ..fname::LookupIpOptions::EMPTY }
-                            )
+                            .lookup_ip(REMOTE_IPV4_HOST, fname::LookupIpOptions::default())
                             .await
                             .expect("lookup_ip"),
                         Err(fname::LookupError::InvalidArgs)
@@ -2794,7 +2785,7 @@ mod tests {
                                 fname::LookupIpOptions {
                                     ipv4_lookup: Some(false),
                                     ipv6_lookup: Some(false),
-                                    ..fname::LookupIpOptions::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
@@ -2809,7 +2800,7 @@ mod tests {
                                 fname::LookupIpOptions {
                                     ipv4_lookup: Some(false),
                                     ipv6_lookup: Some(true),
-                                    ..fname::LookupIpOptions::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
@@ -2824,14 +2815,14 @@ mod tests {
                                 fname::LookupIpOptions {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
-                                    ..fname::LookupIpOptions::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
                             .expect("lookup_ip"),
                         Ok(fname::LookupResult {
                             addresses: Some(vec![map_ip(IPV4_HOST)]),
-                            ..fname::LookupResult::EMPTY
+                            ..Default::default()
                         })
                     );
                     // Successfully resolve IPv4 + IPv6 (no sorting).
@@ -2842,14 +2833,14 @@ mod tests {
                                 fname::LookupIpOptions {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
-                                    ..fname::LookupIpOptions::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
                             .expect("lookup_ip"),
                         Ok(fname::LookupResult {
                             addresses: Some(vec![map_ip(IPV4_HOST), map_ip(IPV6_HOST)]),
-                            ..fname::LookupResult::EMPTY
+                            ..Default::default()
                         })
                     );
                     // Successfully resolve IPv4 + IPv6 (with sorting).
@@ -2861,14 +2852,14 @@ mod tests {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
                                     sort_addresses: Some(true),
-                                    ..fname::LookupIpOptions::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
                             .expect("lookup_ip"),
                         Ok(fname::LookupResult {
                             addresses: Some(vec![map_ip(IPV6_HOST), map_ip(IPV4_HOST)]),
-                            ..fname::LookupResult::EMPTY
+                            ..Default::default()
                         })
                     );
                 },

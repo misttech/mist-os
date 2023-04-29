@@ -310,7 +310,7 @@ async fn run_ascendd_connection<'a>(
             fidl_fuchsia_overnet_protocol::AscenddLinkConfig {
                 path: Some(sockpath.clone()),
                 connection_label: label.clone(),
-                ..fidl_fuchsia_overnet_protocol::AscenddLinkConfig::EMPTY
+                ..Default::default()
             },
         ))
     });

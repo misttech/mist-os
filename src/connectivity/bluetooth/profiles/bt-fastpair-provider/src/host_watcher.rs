@@ -209,7 +209,7 @@ pub(crate) mod tests {
             discoverable: Some(discoverable),
             discovering: Some(true),
             addresses: Some(vec![Address::Public([1, 2, 3, 4, 5, 6]).into()]),
-            ..sys::HostInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -383,11 +383,8 @@ pub(crate) mod tests {
 
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         // HostInfo is missing a bunch of mandatory fields.
-        let invalid_host = sys::HostInfo {
-            id: Some(HostId(12).into()),
-            active: Some(true),
-            ..sys::HostInfo::EMPTY
-        };
+        let invalid_host =
+            sys::HostInfo { id: Some(HostId(12).into()), active: Some(true), ..Default::default() };
         let _ = watch_responder.send(&mut vec![invalid_host].into_iter()).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher termination");

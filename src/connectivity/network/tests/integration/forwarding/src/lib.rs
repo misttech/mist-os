@@ -46,9 +46,9 @@ const RESPONSE: &str = "hello from server";
         router_if_config: fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 forwarding: Some(true),
-                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         },
     };
     "ipv4"
@@ -66,9 +66,9 @@ const RESPONSE: &str = "hello from server";
         router_if_config: fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 forwarding: Some(true),
-                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         },
     };
     "ipv6"

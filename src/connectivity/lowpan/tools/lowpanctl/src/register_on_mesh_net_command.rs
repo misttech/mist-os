@@ -48,7 +48,7 @@ impl RegisterOnMeshNetCommand {
             stable: Some(self.stable),
             slaac_preferred: Some(self.slaac_preferred),
             slaac_valid: Some(self.slaac_valid),
-            ..OnMeshPrefix::EMPTY
+            ..Default::default()
         };
 
         device_route

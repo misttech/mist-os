@@ -105,7 +105,7 @@ async fn timeouts(name: &str) {
             latency: None,
             packet_loss: Some(fnetemul_network::LossConfig::RandomRate(100)),
             reorder: None,
-            ..fnetemul_network::NetworkConfig::EMPTY
+            ..Default::default()
         })
         .await
         .expect("call set config");

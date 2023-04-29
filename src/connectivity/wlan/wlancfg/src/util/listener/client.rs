@@ -23,7 +23,7 @@ impl From<ClientNetworkState> for fidl_policy::NetworkState {
             id: Some(client_network_state.id.into()),
             state: Some(client_network_state.state),
             status: client_network_state.status,
-            ..fidl_policy::NetworkState::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -40,7 +40,7 @@ impl From<ClientStateUpdate> for fidl_policy::ClientStateSummary {
         fidl_policy::ClientStateSummary {
             state: Some(update.state),
             networks: Some(update.networks.iter().map(|n| n.clone().into()).collect()),
-            ..fidl_policy::ClientStateSummary::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -282,9 +282,9 @@ mod tests {
                     }),
                     state: Some(fidl_policy::ConnectionState::Connected),
                     status: None,
-                    ..fidl_policy::NetworkState::EMPTY
+                    ..Default::default()
                 }]),
-                ..fidl_policy::ClientStateSummary::EMPTY
+                ..Default::default()
             }
         );
 
@@ -322,7 +322,7 @@ mod tests {
                         }),
                         state: Some(fidl_policy::ConnectionState::Connecting),
                         status: None,
-                        ..fidl_policy::NetworkState::EMPTY
+                        ..Default::default()
                     },
                     fidl_policy::NetworkState {
                         id: Some(fidl_policy::NetworkIdentifier {
@@ -331,10 +331,10 @@ mod tests {
                         }),
                         state: Some(fidl_policy::ConnectionState::Disconnected),
                         status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
-                        ..fidl_policy::NetworkState::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..fidl_policy::ClientStateSummary::EMPTY
+                ..Default::default()
             }
         );
     }

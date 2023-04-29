@@ -90,7 +90,7 @@ fn node_description(
             .and_then(|p| p.file_name().map(|s| s.to_owned()))
             .and_then(|p| p.to_str().map(str::to_string)),
         hostname: hostname(),
-        ..fidl_fuchsia_overnet_protocol::NodeDescription::EMPTY
+        ..Default::default()
     }
 }
 
@@ -131,7 +131,7 @@ async fn handle_diagnostic_requests(
                             futures::future::ready(get_router()?.connecting_link_count()),
                         )
                         .await,
-                        ..ProbeResult::EMPTY
+                        ..Default::default()
                     });
                     if let Err(e) = res {
                         tracing::warn!("Failed handling probe: {:?}", e);

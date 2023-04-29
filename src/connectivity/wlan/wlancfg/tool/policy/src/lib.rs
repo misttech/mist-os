@@ -383,7 +383,7 @@ pub async fn handle_remove_network(
                 type_: security_type.unwrap(),
             }),
             credential: credential.clone(),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     } else {
         // Reuse the saved networks, but don't check for errors until using the data because it
@@ -776,12 +776,12 @@ mod tests {
             id: Some(create_network_id(ssid)),
             state: Some(state),
             status: None,
-            ..wlan_policy::NetworkState::EMPTY
+            ..Default::default()
         };
         wlan_policy::ClientStateSummary {
             state: Some(wlan_policy::WlanClientState::ConnectionsEnabled),
             networks: Some(vec![network_state]),
-            ..wlan_policy::ClientStateSummary::EMPTY
+            ..Default::default()
         }
     }
 
@@ -796,7 +796,7 @@ mod tests {
             band: None,
             frequency: None,
             clients: None,
-            ..wlan_policy::AccessPointState::EMPTY
+            ..Default::default()
         }
     }
 
@@ -905,7 +905,7 @@ mod tests {
         wlan_policy::NetworkConfig {
             id: Some(create_network_id(ssid)),
             credential: Some(create_password(TEST_PASSWORD)),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     }
 
@@ -919,11 +919,7 @@ mod tests {
         security: wlan_policy::SecurityType,
     ) -> fidl_fuchsia_wlan_policy::NetworkConfig {
         let id = wlan_policy::NetworkIdentifier { ssid: ssid.as_bytes().to_vec(), type_: security };
-        wlan_policy::NetworkConfig {
-            id: Some(id),
-            credential: None,
-            ..wlan_policy::NetworkConfig::EMPTY
-        }
+        wlan_policy::NetworkConfig { id: Some(id), credential: None, ..Default::default() }
     }
 
     /// Create a scan result to be sent as a response to a scan request.
@@ -932,7 +928,7 @@ mod tests {
             id: Some(create_network_id(ssid)),
             entries: None,
             compatibility: None,
-            ..wlan_policy::ScanResult::EMPTY
+            ..Default::default()
         }
     }
 

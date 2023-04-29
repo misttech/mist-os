@@ -30,7 +30,7 @@ fn service_information(description: &String) -> Vec<bredr::Information> {
     let info = bredr::Information {
         language: Some("en".to_string()), // English
         description: Some(description.clone()),
-        ..bredr::Information::EMPTY
+        ..Default::default()
     };
     vec![info]
 }
@@ -171,7 +171,7 @@ impl From<&DIRecord> for bredr::ServiceDefinition {
             service_class_uuids: Some(vec![service_uuid.into()]),
             additional_attributes: Some(attributes),
             information,
-            ..bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -246,7 +246,7 @@ pub(crate) mod tests {
             major: Some(2),
             minor: Some(0),
             subminor: Some(6),
-            ..di::DeviceReleaseNumber::EMPTY
+            ..Default::default()
         }
     }
 
@@ -260,14 +260,16 @@ pub(crate) mod tests {
             // Primary is optional.
             primary,
             // Optional `service_description` is omitted.
-            ..DeviceIdentificationRecord::EMPTY
+            ..Default::default()
         }
     }
 
     #[test]
     fn di_fidl_record_with_missing_mandatory_fields_is_error() {
         assert_matches!(
-            DeviceIdentificationService::from_di_records(&vec![DeviceIdentificationRecord::EMPTY]),
+            DeviceIdentificationService::from_di_records(&vec![
+                DeviceIdentificationRecord::default()
+            ]),
             Err(_)
         );
 
@@ -379,14 +381,14 @@ pub(crate) mod tests {
         let expected_information = vec![bredr::Information {
             language: Some("en".to_string()), // English always specified
             description: Some(desc.clone()),
-            ..bredr::Information::EMPTY
+            ..Default::default()
         }];
         assert_eq!(bredr_record[0].information, Some(expected_information));
     }
 
     #[test]
     fn parse_fidl_version_with_missing_fields_is_error() {
-        let empty = di::DeviceReleaseNumber::EMPTY;
+        let empty = di::DeviceReleaseNumber::default();
         assert_matches!(Version::try_from(&empty), Err(_));
 
         let missing_major =

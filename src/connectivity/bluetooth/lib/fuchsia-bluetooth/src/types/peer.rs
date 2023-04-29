@@ -178,7 +178,7 @@ impl From<&Peer> for fsys::Peer {
             services: None,
             le_services: Some(src.le_services.iter().map(|uuid| uuid.into()).collect()),
             bredr_services: Some(src.bredr_services.iter().map(|uuid| uuid.into()).collect()),
-            ..fsys::Peer::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -192,14 +192,14 @@ mod tests {
 
     #[test]
     fn try_from_sys_id_not_present() {
-        let peer = fsys::Peer::EMPTY;
+        let peer = fsys::Peer::default();
         let peer = Peer::try_from(peer);
         assert!(peer.is_err());
     }
 
     #[test]
     fn try_from_sys_address_not_present() {
-        let peer = fsys::Peer { id: Some(fbt::PeerId { value: 1 }), ..fsys::Peer::EMPTY };
+        let peer = fsys::Peer { id: Some(fbt::PeerId { value: 1 }), ..Default::default() };
         let peer = Peer::try_from(peer);
         assert!(peer.is_err());
     }
@@ -212,7 +212,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }),
-            ..fsys::Peer::EMPTY
+            ..Default::default()
         };
         let peer = Peer::try_from(peer);
         assert!(peer.is_err());

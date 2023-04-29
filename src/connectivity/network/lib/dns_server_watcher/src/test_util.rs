@@ -18,7 +18,7 @@ pub(crate) mod constants {
         fname::DnsServer_ {
             address: Some(UNSPECIFIED_SOURCE_SOCKADDR),
             source: None,
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -28,8 +28,10 @@ pub(crate) mod constants {
     pub(crate) fn static_server() -> fname::DnsServer_ {
         fname::DnsServer_ {
             address: Some(STATIC_SOURCE_SOCKADDR),
-            source: Some(fname::DnsServerSource::StaticSource(fname::StaticDnsServerSource::EMPTY)),
-            ..fname::DnsServer_::EMPTY
+            source: Some(fname::DnsServerSource::StaticSource(
+                fname::StaticDnsServerSource::default(),
+            )),
+            ..Default::default()
         }
     }
 
@@ -43,9 +45,9 @@ pub(crate) mod constants {
             address: Some(NDP_SOURCE_SOCKADDR),
             source: Some(fname::DnsServerSource::Ndp(fname::NdpDnsServerSource {
                 source_interface: Some(NDP_SERVER_INTERFACE_ID),
-                ..fname::NdpDnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -59,9 +61,9 @@ pub(crate) mod constants {
             address: Some(DHCPV4_SOURCE_SOCKADDR1),
             source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
                 source_interface: Some(DHCPV4_SERVER1_INTERFACE_ID),
-                ..fname::DhcpDnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -75,9 +77,9 @@ pub(crate) mod constants {
             address: Some(DHCPV4_SOURCE_SOCKADDR2),
             source: Some(fname::DnsServerSource::Dhcp(fname::DhcpDnsServerSource {
                 source_interface: Some(DHCPV4_SERVER2_INTERFACE_ID),
-                ..fname::DhcpDnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -91,9 +93,9 @@ pub(crate) mod constants {
             address: Some(DHCPV6_SOURCE_SOCKADDR1),
             source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
                 source_interface: Some(DHCPV6_SERVER1_INTERFACE_ID),
-                ..fname::Dhcpv6DnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -107,9 +109,9 @@ pub(crate) mod constants {
             address: Some(DHCPV6_SOURCE_SOCKADDR2),
             source: Some(fname::DnsServerSource::Dhcpv6(fname::Dhcpv6DnsServerSource {
                 source_interface: Some(DHCPV6_SERVER2_INTERFACE_ID),
-                ..fname::Dhcpv6DnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fname::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 }

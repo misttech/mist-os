@@ -132,12 +132,12 @@ pub(super) fn start_client(
         config: Some(fnet_dhcpv6::ClientConfig {
             information_config: Some(fnet_dhcpv6::InformationConfig {
                 dns_servers: Some(true),
-                ..fnet_dhcpv6::InformationConfig::EMPTY
+                ..Default::default()
             }),
             prefix_delegation_config,
-            ..fnet_dhcpv6::ClientConfig::EMPTY
+            ..Default::default()
         }),
-        ..fnet_dhcpv6::NewClientParams::EMPTY
+        ..Default::default()
     };
     let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
         .context("error creating DHCPv6 client fidl endpoints")

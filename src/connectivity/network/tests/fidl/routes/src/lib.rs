@@ -60,7 +60,7 @@ async fn resolve_loopback_route<N: Netstack>(name: &str) {
                 mac: None,
                 interface_id: Some(1),
                 source_address: Some(source),
-                ..fidl_fuchsia_net_routes::Destination::EMPTY
+                ..Default::default()
             }),
         );
     };
@@ -94,7 +94,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
     let _host_address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &host_ep,
         HOST_IP_V6,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add subnet address and route");
@@ -117,7 +117,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
     let _gateway_address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &gateway_ep,
         GATEWAY_IP_V6,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add subnet address and route");
@@ -160,7 +160,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
                 mac: expected_mac,
                 interface_id: Some(interface_id),
                 source_address: Some(source_address),
-                ..fidl_fuchsia_net_routes::Destination::EMPTY
+                ..Default::default()
             }
         };
 
@@ -182,7 +182,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
                             mac: None,
                             interface_id: Some(interface_id),
                             source_address: Some(source_address),
-                            ..fidl_fuchsia_net_routes::Destination::EMPTY
+                            ..Default::default()
                         }
                     )
                 )
@@ -279,7 +279,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
             addr: fidl_fuchsia_net::IpAddress::Ipv4(EP_ADDR),
             prefix_len: PREFIX_LEN,
         },
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add address");
@@ -319,7 +319,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
             mac: Some(GATEWAY_MAC),
             interface_id: Some(ep.id()),
             source_address: Some(fidl_fuchsia_net::IpAddress::Ipv4(EP_ADDR)),
-            ..fidl_fuchsia_net_routes::Destination::EMPTY
+            ..Default::default()
         }))
     );
 }
@@ -408,7 +408,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
             mac: expected_mac,
             interface_id: Some(interface.id()),
             source_address: Some(local),
-            ..fidl_fuchsia_net_routes::Destination::EMPTY
+            ..Default::default()
         })
     );
 }

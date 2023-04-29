@@ -926,7 +926,7 @@ mod tests {
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_direction: Some(client_end),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
         let transport = Channel::try_from(ext).unwrap();
         assert_matches!(s.receive_channel(transport), Ok(false));
@@ -1004,7 +1004,7 @@ mod tests {
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_l2cap: Some(client_end),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
         let transport = Channel::try_from(ext).unwrap();
         assert_matches!(s.receive_channel(transport), Ok(false));

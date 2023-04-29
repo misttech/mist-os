@@ -49,7 +49,7 @@ impl EnergyScanCommand {
         Ok(EnergyScanParameters {
             channels: self.get_channels_vec_from_str()?,
             dwell_time_ms: self.dwell_time_ms.clone(),
-            ..EnergyScanParameters::EMPTY
+            ..Default::default()
         })
     }
 

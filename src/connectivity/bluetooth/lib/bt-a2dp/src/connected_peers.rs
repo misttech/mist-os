@@ -148,7 +148,7 @@ async fn connect_peer(
         &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(bredr::PSM_AVDTP),
             parameters: Some(channel_params),
-            ..bredr::L2capParameters::EMPTY
+            ..Default::default()
         }),
     );
     let channel = match connect_fut.await {
@@ -1102,7 +1102,7 @@ mod tests {
     fn try_connect_cancels_previous_attempt() {
         let (mut exec, id, peers, mut profile_stream) = setup_connected_peer_test();
 
-        let mut connect_fut = peers.try_connect(id, ChannelParameters::EMPTY);
+        let mut connect_fut = peers.try_connect(id, ChannelParameters::default());
 
         // Should get a request to connect, which we will stall and not respond to.
         let responder = match exec.run_singlethreaded(profile_stream.next()) {
@@ -1111,7 +1111,7 @@ mod tests {
         };
 
         // Trying to connect again should cancel the first try, and send another connect.
-        let mut connect_again_fut = peers.try_connect(id, ChannelParameters::EMPTY);
+        let mut connect_again_fut = peers.try_connect(id, ChannelParameters::default());
         let responder_two = match exec.run_singlethreaded(profile_stream.next()) {
             Some(Ok(bredr::ProfileRequest::Connect { responder, .. })) => responder,
             x => panic!("Expected Profile connect, got {x:?}"),

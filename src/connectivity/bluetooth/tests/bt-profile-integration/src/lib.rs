@@ -81,7 +81,7 @@ async fn create_bredr_peer(proxy: &HciEmulatorProxy, address: Address) -> Result
         connectable: Some(true),
         device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0 }),
         service_definition: Some(vec![a2dp_sink_service_definition()]),
-        ..BredrPeerParameters::EMPTY
+        ..Default::default()
     };
 
     let (peer, remote) = fidl::endpoints::create_proxy()?;

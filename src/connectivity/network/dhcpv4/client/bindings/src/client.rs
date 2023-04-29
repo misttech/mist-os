@@ -134,7 +134,7 @@ impl Client {
             return Err(Error::Exit(ClientExitReason::InvalidParams));
         }
         let ConfigurationToRequest { routers, dns_servers, .. } =
-            configuration_to_request.unwrap_or(ConfigurationToRequest::EMPTY);
+            configuration_to_request.unwrap_or(ConfigurationToRequest::default());
 
         let config = dhcp_client_core::client::ClientConfig {
             client_hardware_address: mac,
@@ -231,13 +231,13 @@ impl Client {
                         valid_lifetime_end: Some(
                             zx::Time::from(start_time + lease_time.into()).into_nanos(),
                         ),
-                        ..fnet_interfaces_admin::AddressProperties::EMPTY
+                        ..Default::default()
                     }),
                     add_subnet_route: Some(true),
-                    ..fnet_interfaces_admin::AddressParameters::EMPTY
+                    ..Default::default()
                 }),
                 address_state_provider: Some(asp_server_end),
-                ..fdhcp::Address::EMPTY
+                ..Default::default()
             }),
             dns_servers: dns_servers.map(|list| {
                 list.into_iter()
@@ -249,7 +249,7 @@ impl Client {
                     .map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext())
                     .collect()
             }),
-            ..ClientWatchConfigurationResponse::EMPTY
+            ..Default::default()
         })
     }
 

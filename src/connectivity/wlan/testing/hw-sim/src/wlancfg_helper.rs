@@ -21,7 +21,7 @@ fn create_network_config(
     credential: Credential,
 ) -> NetworkConfig {
     let network_id = NetworkIdentifier { ssid: ssid.to_vec(), type_: security_type };
-    NetworkConfig { id: Some(network_id), credential: Some(credential), ..NetworkConfig::EMPTY }
+    NetworkConfig { id: Some(network_id), credential: Some(credential), ..Default::default() }
 }
 
 fn credential_to_string(credential: &Credential) -> String {
@@ -87,7 +87,7 @@ impl From<NetworkConfigBuilder> for fidl_policy::NetworkConfig {
         fidl_policy::NetworkConfig {
             id: Some(fidl_policy::NetworkIdentifier { ssid: ssid.into(), type_ }),
             credential: Some(credential),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -314,7 +314,7 @@ pub async fn await_failed(
                     id: Some(network_identifier.clone()),
                     state: Some(fidl_policy::ConnectionState::Failed),
                     status: Some(disconnect_status),
-                    ..fidl_policy::NetworkState::EMPTY
+                    ..Default::default()
                 }])
             );
             true

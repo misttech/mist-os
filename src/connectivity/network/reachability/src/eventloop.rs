@@ -130,7 +130,7 @@ async fn dns_lookup(
             fnet_name::LookupIpOptions {
                 ipv4_lookup: Some(true),
                 ipv6_lookup: Some(true),
-                ..fnet_name::LookupIpOptions::EMPTY
+                ..Default::default()
             },
         )
         .map_err(|e: fidl::Error| anyhow!("lookup_ip call failed: {:?}", e))
@@ -245,7 +245,7 @@ impl EventLoop {
                 fidl::endpoints::create_proxy::<fnet_neighbor::EntryIteratorMarker>()
                     .context("failed to create EntryIterator proxy")?;
             let () = view
-                .open_entry_iterator(server_end, fnet_neighbor::EntryIteratorOptions::EMPTY)
+                .open_entry_iterator(server_end, fnet_neighbor::EntryIteratorOptions::default())
                 .context("failed to open EntryIterator")?;
             futures::stream::try_unfold(proxy, |proxy| {
                 proxy.get_next().map_ok(|e| {
@@ -683,7 +683,7 @@ mod tests {
             addr: Some(v4_subnet),
             valid_until: Some(123_000_000_000),
             preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
-            ..Address::EMPTY
+            ..Default::default()
         };
 
         let mut props = Properties {
@@ -696,7 +696,7 @@ mod tests {
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
             name: Some("IPv4 Reachability Test Interface".to_string()),
-            ..Properties::EMPTY
+            ..Default::default()
         };
 
         let event_res = Ok(Some(Event::Existing(props.clone())));
@@ -726,7 +726,7 @@ mod tests {
             addr: Some(v6_subnet),
             valid_until: Some(123_000_000_000),
             preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
-            ..Address::EMPTY
+            ..Default::default()
         };
 
         let mut props = Properties {
@@ -739,7 +739,7 @@ mod tests {
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
             name: Some("IPv6 Reachability Test Interface".to_string()),
-            ..Properties::EMPTY
+            ..Default::default()
         };
 
         let event_res = Ok(Some(Event::Existing(props.clone())));
@@ -772,7 +772,7 @@ mod tests {
             Poll::Ready(Ok(Some(fnet_name::LookupRequest::LookupIp { responder, hostname, .. }))) => {
                 if DNS_DOMAIN == hostname {
                     responder.send(&mut Ok(fnet_name::LookupResult
-                    { addresses: Some(vec![fidl_ip!("1.2.3.1")]), ..fnet_name::LookupResult::EMPTY }) )
+                    { addresses: Some(vec![fidl_ip!("1.2.3.1")]), ..Default::default() }) )
                 } else {
                     responder.send(&mut Err(fnet_name::LookupError::NotFound))
                 }
@@ -853,7 +853,7 @@ mod tests {
         let mut event_loop = create_eventloop();
         let lookup_res = fnet_name::LookupResult {
             addresses: Some(vec![fidl_ip!("192.0.2.1")]),
-            ..fnet_name::LookupResult::EMPTY
+            ..Default::default()
         };
 
         event_loop.update_dns_state(Ok(lookup_res)).await;
@@ -866,7 +866,7 @@ mod tests {
 
         let lookup_res = fnet_name::LookupResult {
             addresses: Some(vec![fidl_ip!("2001:db8::1")]),
-            ..fnet_name::LookupResult::EMPTY
+            ..Default::default()
         };
         event_loop.update_dns_state(Ok(lookup_res)).await;
         assert_eq!(event_loop.latest_dns_addresses, vec![fidl_ip!("2001:db8::1")]);
@@ -876,8 +876,7 @@ mod tests {
     async fn test_update_dns_state_error_and_empty() {
         let mut event_loop = create_eventloop();
 
-        let lookup_res =
-            fnet_name::LookupResult { addresses: Some(vec![]), ..fnet_name::LookupResult::EMPTY };
+        let lookup_res = fnet_name::LookupResult { addresses: Some(vec![]), ..Default::default() };
         event_loop.update_dns_state(Ok(lookup_res)).await;
         assert_eq!(event_loop.latest_dns_addresses, vec![]);
 

@@ -49,7 +49,7 @@ struct Config {}
 
 impl Config {
     fn negotiate(_request: ConfigRequest) -> (Self, ConfigResponse) {
-        (Config {}, ConfigResponse::EMPTY)
+        (Config {}, ConfigResponse::default())
     }
 
     fn from_response(_response: ConfigResponse) -> Self {
@@ -814,7 +814,7 @@ impl Peer {
                     service_name: service.to_string(),
                     stream_ref,
                     rights,
-                    options: ConnectToServiceOptions::EMPTY,
+                    options: ConnectToServiceOptions::default(),
                 }))
                 .await?;
             Ok(())
@@ -876,7 +876,7 @@ impl Peer {
                 .as_ref()
                 .map(|stats| stats.rtt.as_micros().try_into().unwrap_or(std::u64::MAX)),
             congestion_window_bytes: stats.as_ref().map(|stats| stats.cwnd as u64),
-            ..PeerConnectionDiagnosticInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -968,7 +968,7 @@ async fn client_handshake(
         conn_stream_writer
             .send(
                 FrameType::Data(coding_context),
-                &encode_fidl_with_context(coding_context, &mut ConfigRequest::EMPTY.clone())?,
+                &encode_fidl_with_context(coding_context, &mut ConfigRequest::default().clone())?,
                 false,
                 &conn_stats.config,
             )
@@ -1104,7 +1104,7 @@ async fn client_conn_stream(
                             coding_context,
                             &mut PeerMessage::UpdateNodeDescription(PeerDescription {
                                 services,
-                                ..PeerDescription::EMPTY
+                                ..Default::default()
                             }),
                         )?,
                         false,
@@ -1304,10 +1304,7 @@ async fn server_conn_stream(
                             .connect(
                                 &service_name,
                                 app_channel,
-                                ConnectionInfo {
-                                    peer: Some(node_id.into()),
-                                    ..ConnectionInfo::EMPTY
-                                },
+                                ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
                             )
                             .map_err(RunnerError::ServiceError)
                             .await?;

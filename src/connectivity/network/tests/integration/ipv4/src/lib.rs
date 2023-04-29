@@ -167,11 +167,11 @@ async fn sends_igmp_reports<N: Netstack>(
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
                     version: Some(igmp_version),
-                    ..fnet_interfaces_admin::IgmpConfiguration::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         };
         let control = iface.control();
         let new_config = gen_config(igmp_version);
@@ -215,7 +215,7 @@ async fn sends_igmp_reports<N: Netstack>(
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &iface,
         net::Subnet { addr: net::IpAddress::Ipv4(addr), prefix_len: 24 },
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add subnet address and route");

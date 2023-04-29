@@ -797,7 +797,7 @@ mod tests {
             remote: Some(number.into()),
             state: Some(CallState::OngoingActive),
             direction: Some(CallDirection::MobileTerminated),
-            ..NextCall::EMPTY
+            ..Default::default()
         }
     }
 
@@ -962,7 +962,7 @@ mod tests {
             remote: Some(num.to_string()),
             state: Some(state),
             direction: Some(direction),
-            ..NextCall::EMPTY
+            ..Default::default()
         };
         responder.send(next_call).expect("response to succeed");
         call

@@ -122,7 +122,7 @@ fn publish_border_agent_service(
         .publish_service_instance(
             BORDER_AGENT_SERVICE_TYPE,
             service_instance.as_str(),
-            ServiceInstancePublicationOptions::EMPTY,
+            ServiceInstancePublicationOptions::default(),
             client,
         )
         .map(|x| -> Result<(), anyhow::Error> {
@@ -145,11 +145,8 @@ fn publish_border_agent_service(
         .collect::<Vec<_>>();
 
     // Prepare our static response for all queries.
-    let publication = Ok(ServiceInstancePublication {
-        port: Some(port),
-        text: Some(txt),
-        ..ServiceInstancePublication::EMPTY
-    });
+    let publication =
+        Ok(ServiceInstancePublication { port: Some(port), text: Some(txt), ..Default::default() });
 
     let publish_responder_future = server.into_stream().unwrap().map_err(Into::into).try_for_each(
         move |ServiceInstancePublicationResponder_Request::OnPublication {

@@ -172,7 +172,7 @@ mod tests {
             io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
             io_pcm_sample_payload_msb_position: Some(1),
             path: Some(bredr::DataPath::Offload),
-            ..bredr::ScoConnectionParameters::EMPTY
+            ..Default::default()
         };
         let (sco_proxy, _sco_stream) =
             fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>()

@@ -118,7 +118,7 @@ impl From<SimplifiedNetworkConfig> for wlan_policy::NetworkConfig {
                 type_: simplified_config.security_type.into(),
             }),
             credential: Some(simplified_config.credential.into()),
-            ..Self::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -166,7 +166,7 @@ mod tests {
                 type_: wlan_policy::SecurityType::Wpa2,
             }),
             credential: Some(wlan_policy::Credential::Password("12345678".as_bytes().to_vec())),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }];
 
         (serialized, deserialized)
@@ -187,7 +187,7 @@ mod tests {
                 ssid: Ssid::try_from("MALFORMED - NO CREDENTIAL").unwrap().into(),
                 type_: wlan_policy::SecurityType::Wpa2,
             }),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }];
         deserialized.append(&mut malformed);
         // Only the correctly-formed network should be serialized

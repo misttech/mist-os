@@ -35,7 +35,7 @@ async fn test_rx() {
             frame_type: Some(netdev::FrameType::Ethernet),
             data: Some(vec![DATA_BYTE; DATA_LEN]),
             port: Some(DEFAULT_PORT_ID),
-            ..tun::Frame::EMPTY
+            ..Default::default()
         };
         let () = tun.write_frame(frame).await.unwrap().expect("failed to write frame");
         let buff = session.recv().await.expect("failed to recv buffer");
@@ -114,7 +114,7 @@ async fn test_echo_tun() {
                     frame_type: Some(netdev::FrameType::Ethernet),
                     data: Some(Vec::from(i.to_le_bytes())),
                     port: Some(DEFAULT_PORT_ID),
-                    ..tun::Frame::EMPTY
+                    ..Default::default()
                 };
                 let () = tun
                     .write_frame(frame)
@@ -291,7 +291,7 @@ fn default_base_port_config() -> tun::BasePortConfig {
             features: netdev::FRAME_FEATURES_RAW,
             supported_flags: netdev::TxFlags::empty(),
         }]),
-        ..tun::BasePortConfig::EMPTY
+        ..Default::default()
     }
 }
 
@@ -300,11 +300,8 @@ async fn create_tun_device_and_port() -> (tun::DeviceProxy, tun::PortProxy, Port
         connect_to_protocol::<tun::ControlMarker>().expect("failed to connect to tun.Control");
     let (device, server) = endpoints::create_proxy::<tun::DeviceMarker>()
         .expect("failed to create proxy for tun::Device");
-    ctrl.create_device(
-        tun::DeviceConfig { blocking: Some(true), ..tun::DeviceConfig::EMPTY },
-        server,
-    )
-    .expect("failed to create device");
+    ctrl.create_device(tun::DeviceConfig { blocking: Some(true), ..Default::default() }, server)
+        .expect("failed to create device");
     let (port, server) =
         endpoints::create_proxy::<tun::PortMarker>().expect("failed to create proxy for tun::Port");
     device
@@ -312,7 +309,7 @@ async fn create_tun_device_and_port() -> (tun::DeviceProxy, tun::PortProxy, Port
             tun::DevicePortConfig {
                 base: Some(default_base_port_config()),
                 online: Some(true),
-                ..tun::DevicePortConfig::EMPTY
+                ..Default::default()
             },
             server,
         )
@@ -332,7 +329,7 @@ fn create_tun_device_pair() -> tun::DevicePairProxy {
         connect_to_protocol::<tun::ControlMarker>().expect("failed to connect to tun.Control");
     let (pair, server) = endpoints::create_proxy::<tun::DevicePairMarker>()
         .expect("failed to create proxy for tun::DevicePair");
-    ctrl.create_pair(tun::DevicePairConfig::EMPTY, server).expect("create device pair");
+    ctrl.create_pair(tun::DevicePairConfig::default(), server).expect("create device pair");
     pair
 }
 
@@ -357,7 +354,7 @@ async fn create_netdev_client_pair(pair: &tun::DevicePairProxy) -> (Client, Port
     pair.get_right(right).expect("failed to connect right");
     pair.add_port(tun::DevicePairPortConfig {
         base: Some(default_base_port_config()),
-        ..tun::DevicePairPortConfig::EMPTY
+        ..Default::default()
     })
     .await
     .unwrap()

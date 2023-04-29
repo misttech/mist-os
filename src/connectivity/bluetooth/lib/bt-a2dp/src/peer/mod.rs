@@ -318,9 +318,9 @@ impl Peer {
             psm: Some(PSM_AVDTP),
             parameters: Some(ChannelParameters {
                 max_rx_sdu_size: Some(65535),
-                ..ChannelParameters::EMPTY
+                ..Default::default()
             }),
-            ..L2capParameters::EMPTY
+            ..Default::default()
         }
     }
 

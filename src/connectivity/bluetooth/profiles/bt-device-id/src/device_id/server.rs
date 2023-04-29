@@ -108,7 +108,7 @@ impl DeviceIdServer {
             fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
         let adv_fut = profile.advertise(
             &mut defs.into_iter(),
-            bredr::ChannelParameters::EMPTY,
+            bredr::ChannelParameters::default(),
             connect_client,
         );
         Ok(BrEdrAdvertisement { adv_fut, connect_server })

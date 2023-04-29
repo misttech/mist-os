@@ -153,7 +153,7 @@ async fn list_existing_entries(
 ) -> HashMap<(u64, fidl_fuchsia_net::IpAddress), fidl_fuchsia_net_neighbor::Entry> {
     use async_utils::fold::*;
     fold_while(
-        get_entry_iterator(realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY),
+        get_entry_iterator(realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default()),
         HashMap::new(),
         |mut map, item| {
             futures::future::ready(match item {
@@ -336,10 +336,12 @@ async fn neigh_list_entries(name: &str) {
 
     let (alice, bob) = create_neighbor_realms(&sandbox, &network, name).await;
 
-    let mut alice_iter =
-        get_entry_iterator(&alice.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+    let mut alice_iter = get_entry_iterator(
+        &alice.realm,
+        fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+    );
     let mut bob_iter =
-        get_entry_iterator(&bob.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+        get_entry_iterator(&bob.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default());
 
     // No Neighbors should exist initially.
     assert_entries(&mut alice_iter, [ItemMatch::Idle]).await;
@@ -675,8 +677,10 @@ async fn neigh_clear_entries(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
 
-    let mut iter =
-        get_entry_iterator(&alice.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+    let mut iter = get_entry_iterator(
+        &alice.realm,
+        fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+    );
     assert_entries(&mut iter, [ItemMatch::Idle]).await;
 
     // Exchange some datagrams to add some entries to the list and check that we
@@ -769,8 +773,10 @@ async fn neigh_add_remove_entry(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
 
-    let mut alice_iter =
-        get_entry_iterator(&alice.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+    let mut alice_iter = get_entry_iterator(
+        &alice.realm,
+        fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+    );
     assert_entries(&mut alice_iter, [ItemMatch::Idle]).await;
 
     // Check error conditions.
@@ -929,7 +935,7 @@ async fn neigh_unreachability_config_errors(name: &str) {
             .update_unreachability_config(
                 alice.ep.id() + 100,
                 fidl_fuchsia_net::IpVersion::V4,
-                fidl_fuchsia_net_neighbor::UnreachabilityConfig::EMPTY,
+                fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
             )
             .await
             .expect("update_unreachability_config FIDL error")
@@ -941,14 +947,14 @@ async fn neigh_unreachability_config_errors(name: &str) {
             .update_unreachability_config(
                 alice.loopback_id,
                 fidl_fuchsia_net::IpVersion::V4,
-                fidl_fuchsia_net_neighbor::UnreachabilityConfig::EMPTY,
+                fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
             )
             .await
             .expect("update_unreachability_config FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
         Err(fuchsia_zircon::Status::NOT_SUPPORTED)
     );
-    let mut invalid_config = fidl_fuchsia_net_neighbor::UnreachabilityConfig::EMPTY;
+    let mut invalid_config = fidl_fuchsia_net_neighbor::UnreachabilityConfig::default();
     invalid_config.base_reachable_time = Some(-1);
     assert_eq!(
         controller
@@ -1038,7 +1044,7 @@ async fn neigh_unreachability_config(name: &str) {
         );
 
         // Update config with some non-defaults
-        let mut updates = fidl_fuchsia_net_neighbor::UnreachabilityConfig::EMPTY;
+        let mut updates = fidl_fuchsia_net_neighbor::UnreachabilityConfig::default();
         let updated_base_reachable_time =
             Some(fidl_fuchsia_net_neighbor::DEFAULT_BASE_REACHABLE_TIME * 2);
         let updated_retransmit_timer =
@@ -1084,8 +1090,10 @@ async fn neigh_unreachable_entries(name: &str) {
     )
     .await;
 
-    let mut iter =
-        get_entry_iterator(&alice.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+    let mut iter = get_entry_iterator(
+        &alice.realm,
+        fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+    );
 
     // No Neighbors should exist initially.
     assert_entries(&mut iter, [ItemMatch::Idle]).await;
@@ -1143,7 +1151,7 @@ async fn cant_hang_twice(name: &str) {
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
             .expect("failed to create EntryIterator proxy");
     let () = view
-        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY)
+        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default())
         .expect("failed to open EntryIterator");
 
     assert_eq!(
@@ -1184,7 +1192,7 @@ async fn channel_is_closed_if_not_polled(name: &str) {
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
             .expect("failed to create EntryIterator proxy");
     let () = view
-        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY)
+        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default())
         .expect("failed to open EntryIterator");
 
     let controller = alice
@@ -1233,7 +1241,7 @@ async fn remove_device_clears_neighbors(name: &str) {
     .await;
 
     let mut iter =
-        get_entry_iterator(&realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+        get_entry_iterator(&realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default());
     assert_entries(&mut iter, [ItemMatch::Idle]).await;
 
     let controller = realm
@@ -1301,7 +1309,7 @@ async fn neighbor_with_many_addresses_disconnects(name: &str) {
     let iface_id = ep.id();
 
     let mut iter =
-        get_entry_iterator(&realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+        get_entry_iterator(&realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default());
     assert_entries(&mut iter, [ItemMatch::Idle]).await;
 
     let controller = realm

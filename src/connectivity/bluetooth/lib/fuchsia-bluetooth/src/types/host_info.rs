@@ -76,7 +76,7 @@ impl From<&HostInfo> for fsys::HostInfo {
             discoverable: Some(src.discoverable),
             discovering: Some(src.discovering),
             addresses: Some(src.addresses.iter().map(Into::into).collect()),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -157,13 +157,13 @@ mod tests {
 
     #[test]
     fn from_fidl_id_not_present() {
-        let info = HostInfo::try_from(fsys::HostInfo::EMPTY);
+        let info = HostInfo::try_from(fsys::HostInfo::default());
         assert!(info.is_err());
     }
 
     #[test]
     fn from_fidl_technology_not_present() {
-        let info = fsys::HostInfo { id: Some(fbt::HostId { value: 1 }), ..fsys::HostInfo::EMPTY };
+        let info = fsys::HostInfo { id: Some(fbt::HostId { value: 1 }), ..Default::default() };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());
     }
@@ -173,7 +173,7 @@ mod tests {
         let info = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());
@@ -185,7 +185,7 @@ mod tests {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
             addresses: Some(vec![]),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());
@@ -200,7 +200,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }]),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         };
         let expected = HostInfo {
             id: HostId(1),
@@ -229,7 +229,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }]),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         };
         let expected = HostInfo {
             id: HostId(1),
@@ -267,7 +267,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }]),
-            ..fsys::HostInfo::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(expected, info.into());

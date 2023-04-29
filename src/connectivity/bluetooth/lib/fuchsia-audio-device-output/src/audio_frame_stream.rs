@@ -193,7 +193,7 @@ mod tests {
                 valid_bits_per_sample:   16u8,
                 frame_rate:              44100,
             }),
-            ..Format::EMPTY
+            ..Default::default()
         };
 
         stream_config.create_ring_buffer(format, server).expect("ring buffer error");

@@ -115,13 +115,13 @@ pub async fn setup_masquerade_nat_network<'a>(
         let gen_forwarding_config = |forwarding| finterfaces_admin::Configuration {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
                 forwarding: Some(forwarding),
-                ..finterfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
                 forwarding: Some(forwarding),
-                ..finterfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..finterfaces_admin::Configuration::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(

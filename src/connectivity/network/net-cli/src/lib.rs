@@ -214,16 +214,16 @@ fn configuration_with_ip_forwarding_set(
         fnet::IpVersion::V4 => finterfaces_admin::Configuration {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
                 forwarding: Some(forwarding),
-                ..finterfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
-            ..finterfaces_admin::Configuration::EMPTY
+            ..Default::default()
         },
         fnet::IpVersion::V6 => finterfaces_admin::Configuration {
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
                 forwarding: Some(forwarding),
-                ..finterfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..finterfaces_admin::Configuration::EMPTY
+            ..Default::default()
         },
     }
 }
@@ -371,11 +371,11 @@ async fn do_if<C: NetCliDepsConnector>(
                         ipv4: Some(finterfaces_admin::Ipv4Configuration {
                             igmp: Some(finterfaces_admin::IgmpConfiguration {
                                 version,
-                                ..finterfaces_admin::IgmpConfiguration::EMPTY
+                                ..Default::default()
                             }),
-                            ..finterfaces_admin::Ipv4Configuration::EMPTY
+                            ..Default::default()
                         }),
-                        ..finterfaces_admin::Configuration::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .map_err(anyhow::Error::new)
@@ -423,11 +423,11 @@ async fn do_if<C: NetCliDepsConnector>(
                         ipv6: Some(finterfaces_admin::Ipv6Configuration {
                             mld: Some(finterfaces_admin::MldConfiguration {
                                 version,
-                                ..finterfaces_admin::MldConfiguration::EMPTY
+                                ..Default::default()
                             }),
-                            ..finterfaces_admin::Ipv6Configuration::EMPTY
+                            ..Default::default()
                         }),
-                        ..finterfaces_admin::Configuration::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .map_err(anyhow::Error::new)
@@ -550,7 +550,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let () = control
                     .add_address(
                         &mut subnet.into(),
-                        finterfaces_admin::AddressParameters::EMPTY,
+                        finterfaces_admin::AddressParameters::default(),
                         server_end,
                     )
                     .context("call add address")?;
@@ -997,7 +997,7 @@ async fn do_neigh<C: NetCliDepsConnector>(
                     max_unicast_probes,
                     max_anycast_delay_time,
                     max_reachability_confirmations,
-                    ..fneighbor::UnreachabilityConfig::EMPTY
+                    ..Default::default()
                 };
                 let interface = interface.find_nicid(connector).await?;
                 let controller =
@@ -1101,7 +1101,7 @@ async fn print_neigh_entries(
     let it = it_client.into_proxy().context("error creating proxy to entry iterator")?;
 
     let () = view
-        .open_entry_iterator(it_server, fneighbor::EntryIteratorOptions::EMPTY)
+        .open_entry_iterator(it_server, fneighbor::EntryIteratorOptions::default())
         .context("error opening a connection to the entry iterator")?;
 
     let out_ref = &mut out;
@@ -1359,7 +1359,7 @@ async fn do_dns<W: std::io::Write, C: NetCliDepsConnector>(
                 ipv4_lookup: Some(ipv4),
                 ipv6_lookup: Some(ipv6),
                 sort_addresses: Some(sort),
-                ..fname::LookupIpOptions::EMPTY
+                ..Default::default()
             },
         )
         .await?
@@ -1696,7 +1696,7 @@ mod tests {
         // net-cli does not check the returned configuration so we do not
         // return a populated one.
         let () = responder
-            .send(&mut Ok(finterfaces_admin::Configuration::EMPTY))
+            .send(&mut Ok(finterfaces_admin::Configuration::default()))
             .expect("responder.send should succeed");
     }
 
@@ -1765,11 +1765,11 @@ mod tests {
                 ipv4: Some(finterfaces_admin::Ipv4Configuration {
                     igmp: Some(finterfaces_admin::IgmpConfiguration {
                         version: Some(igmp_version),
-                        ..finterfaces_admin::IgmpConfiguration::EMPTY
+                        ..Default::default()
                     }),
-                    ..finterfaces_admin::Ipv4Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..finterfaces_admin::Configuration::EMPTY
+                ..Default::default()
             },
         );
         let mut output_buf = ffx_writer::Writer::new_test(None);
@@ -1834,11 +1834,11 @@ mod tests {
                 ipv6: Some(finterfaces_admin::Ipv6Configuration {
                     mld: Some(finterfaces_admin::MldConfiguration {
                         version: Some(mld_version),
-                        ..finterfaces_admin::MldConfiguration::EMPTY
+                        ..Default::default()
                     }),
-                    ..finterfaces_admin::Ipv6Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..finterfaces_admin::Configuration::EMPTY
+                ..Default::default()
             },
         );
         let mut output_buf = ffx_writer::Writer::new_test(None);
@@ -2338,14 +2338,14 @@ mac             -
                                         finterfaces::Address {
                                             addr: Some(addr),
                                             valid_until: Some(valid_until),
-                                            ..finterfaces::Address::EMPTY
+                                            ..Default::default()
                                         }
                                     })
                                     .collect(),
                             ),
                             has_default_ipv4_route: Some(has_default_ipv4_route),
                             has_default_ipv6_route: Some(has_default_ipv6_route),
-                            ..finterfaces::Properties::EMPTY
+                            ..Default::default()
                         })
                     },
                 );
@@ -2573,16 +2573,16 @@ mac             -
                     properties: froutes::RoutePropertiesV4 {
                         specified_properties: Some(froutes::SpecifiedRouteProperties {
                             metric: Some(froutes::SpecifiedMetric::ExplicitMetric(4)),
-                            ..froutes::SpecifiedRouteProperties::EMPTY
+                            ..Default::default()
                         }),
-                        ..froutes::RoutePropertiesV4::EMPTY
+                        ..Default::default()
                     },
                 }),
                 effective_properties: Some(froutes::EffectiveRouteProperties {
                     metric: Some(4),
-                    ..froutes::EffectiveRouteProperties::EMPTY
+                    ..Default::default()
                 }),
-                ..froutes::InstalledRouteV4::EMPTY
+                ..Default::default()
             }),
             froutes::EventV4::Existing(froutes::InstalledRouteV4 {
                 route: Some(froutes::RouteV4 {
@@ -2594,16 +2594,16 @@ mac             -
                     properties: froutes::RoutePropertiesV4 {
                         specified_properties: Some(froutes::SpecifiedRouteProperties {
                             metric: Some(froutes::SpecifiedMetric::ExplicitMetric(40)),
-                            ..froutes::SpecifiedRouteProperties::EMPTY
+                            ..Default::default()
                         }),
-                        ..froutes::RoutePropertiesV4::EMPTY
+                        ..Default::default()
                     },
                 }),
                 effective_properties: Some(froutes::EffectiveRouteProperties {
                     metric: Some(40),
-                    ..froutes::EffectiveRouteProperties::EMPTY
+                    ..Default::default()
                 }),
-                ..froutes::InstalledRouteV4::EMPTY
+                ..Default::default()
             }),
             froutes::EventV4::Idle(froutes::Empty),
         ];
@@ -2618,16 +2618,16 @@ mac             -
                     properties: froutes::RoutePropertiesV6 {
                         specified_properties: Some(froutes::SpecifiedRouteProperties {
                             metric: Some(froutes::SpecifiedMetric::ExplicitMetric(400)),
-                            ..froutes::SpecifiedRouteProperties::EMPTY
+                            ..Default::default()
                         }),
-                        ..froutes::RoutePropertiesV6::EMPTY
+                        ..Default::default()
                     },
                 }),
                 effective_properties: Some(froutes::EffectiveRouteProperties {
                     metric: Some(400),
-                    ..froutes::EffectiveRouteProperties::EMPTY
+                    ..Default::default()
                 }),
-                ..froutes::InstalledRouteV6::EMPTY
+                ..Default::default()
             }),
             froutes::EventV6::Idle(froutes::Empty),
         ];
@@ -2842,7 +2842,7 @@ mac             -
                 state: Some(fneighbor::EntryState::Reachable),
                 mac: Some(MAC_1),
                 updated_at: Some(updated_at),
-                ..fneighbor::Entry::EMPTY
+                ..Default::default()
             }
         }
 
@@ -2891,7 +2891,7 @@ mac             -
                 state: Some(fneighbor::EntryState::Reachable),
                 mac: Some(mac),
                 updated_at: Some(updated_at),
-                ..fneighbor::Entry::EMPTY
+                ..Default::default()
             }
         }
 
@@ -2980,7 +2980,7 @@ mac             -
             state: Some(fneighbor::EntryState::Reachable),
             mac: Some(MAC_1),
             updated_at: Some(timestamp_60s_ago()),
-            ..fneighbor::Entry::EMPTY
+            ..Default::default()
         });
 
         let mut output = if json {
@@ -3087,7 +3087,7 @@ mac             -
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_version, IP_VERSION);
             let () = responder
-                .send(&mut Ok(fneighbor::UnreachabilityConfig::EMPTY))
+                .send(&mut Ok(fneighbor::UnreachabilityConfig::default()))
                 .expect("responder.send should succeed");
             Ok(())
         };
@@ -3098,7 +3098,7 @@ mac             -
 
     #[fasync::run_singlethreaded(test)]
     async fn neigh_config_update() {
-        const CONFIG: fneighbor::UnreachabilityConfig = fneighbor::UnreachabilityConfig::EMPTY;
+        let config = fneighbor::UnreachabilityConfig::default();
 
         let (controller, mut requests) =
             fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>()
@@ -3106,7 +3106,7 @@ mac             -
         let neigh = update_neigh_config(
             INTERFACE_ID,
             IP_VERSION,
-            fneighbor::UnreachabilityConfig::EMPTY,
+            fneighbor::UnreachabilityConfig::default(),
             controller,
         );
         let neigh_succeeds = async {
@@ -3119,7 +3119,7 @@ mac             -
                 .expect("request should be of type UpdateUnreachabilityConfig");
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_version, IP_VERSION);
-            assert_eq!(got_config, CONFIG);
+            assert_eq!(got_config, config);
             let () = responder.send(&mut Ok(())).expect("responder.send should succeed");
             Ok(())
         };
@@ -3209,9 +3209,8 @@ mac             -
                         );
                         // We don't care what the value is here, we just need something to give as
                         // an argument to responder.send().
-                        let mut dummy_result = Ok(fdhcp::Parameter::Lease(fdhcp::LeaseLength {
-                            ..fdhcp::LeaseLength::EMPTY
-                        }));
+                        let mut dummy_result =
+                            Ok(fdhcp::Parameter::Lease(fdhcp::LeaseLength::default()));
                         let () = responder
                             .send(&mut dummy_result)
                             .expect("responder.send should succeed");
@@ -3335,7 +3334,7 @@ mac             -
                 ipv4_lookup: Some(ipv4),
                 ipv6_lookup: Some(ipv6),
                 sort_addresses: Some(sort),
-                ..fname::LookupIpOptions::EMPTY
+                ..Default::default()
             };
             assert_eq!(
                 hostname, want_hostname,
@@ -3346,7 +3345,7 @@ mac             -
             responder
                 .send(&mut Ok(fname::LookupResult {
                     addresses: Some(vec![fidl_ip!("203.0.113.1"), fidl_ip!("2001:db8::1")]),
-                    ..fname::LookupResult::EMPTY
+                    ..Default::default()
                 }))
                 .expect("send response");
         };

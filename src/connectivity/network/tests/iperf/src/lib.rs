@@ -36,22 +36,22 @@ fn iperf_component(
                 capability: Some(fnetemul::ExposedCapability::Protocol(
                     fidl_fuchsia_posix_socket::ProviderMarker::DEBUG_NAME.to_string(),
                 )),
-                ..fnetemul::ChildDep::EMPTY
+                ..Default::default()
             }),
             fnetemul::Capability::ChildDep(fnetemul::ChildDep {
                 name: Some(NAME_PROVIDER_MONIKER.to_string()),
                 capability: Some(fnetemul::ExposedCapability::Protocol(
                     fidl_fuchsia_device::NameProviderMarker::DEBUG_NAME.to_string(),
                 )),
-                ..fnetemul::ChildDep::EMPTY
+                ..Default::default()
             }),
             fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                 variant: Some(fnetemul::StorageVariant::Tmp),
                 path: Some("/tmp".to_string()),
-                ..fnetemul::StorageDep::EMPTY
+                ..Default::default()
             }),
         ])),
-        ..fnetemul::ChildDef::EMPTY
+        ..Default::default()
     }
 }
 
@@ -64,7 +64,7 @@ fn device_name_provider_component() -> fnetemul::ChildDef {
             fnetemul::Empty,
         )])),
         program_args: Some(vec!["--nodename".to_string(), "fuchsia-test-device".to_string()]),
-        ..fnetemul::ChildDef::EMPTY
+        ..Default::default()
     }
 }
 

@@ -465,7 +465,7 @@ mod tests {
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             flush_timeout: None,
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
 
         // Random RFCOMM protocol.
@@ -690,7 +690,7 @@ mod tests {
                         channel_mode: Some(bredr::ChannelMode::Basic),
                         max_tx_sdu_size: Some(1004),
                         flush_timeout: None,
-                        ..bredr::Channel::EMPTY
+                        ..Default::default()
                     };
 
                     responder.send(&mut Ok(chan)).expect("successfully send connection response");
@@ -786,7 +786,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Low),
             level_percent: Some(88f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let update_fut = test_battery_manager.send_update(update);
         pin_mut!(update_fut);
@@ -829,10 +829,8 @@ mod tests {
         // Make a new fidl request by creating a channel and sending the request over the channel.
         let (proxy, mut stream) = create_proxy_and_stream::<hfp_test::HfpTestMarker>().unwrap();
         let fidl_request = {
-            let behavior = hfp_test::ConnectionBehavior {
-                autoconnect: Some(false),
-                ..hfp_test::ConnectionBehavior::EMPTY
-            };
+            let behavior =
+                hfp_test::ConnectionBehavior { autoconnect: Some(false), ..Default::default() };
             proxy.set_connection_behavior(behavior).unwrap();
             stream.next().await.unwrap().unwrap()
         };

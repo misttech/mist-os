@@ -91,16 +91,16 @@ async fn do_scan(appname: &String, args: &[String], state: CentralStatePtr) -> R
 
     let mut filters = Vec::<Filter>::new();
     if uuid.is_some() {
-        filters.push(Filter { service_uuid: uuid, ..Filter::EMPTY });
+        filters.push(Filter { service_uuid: uuid, ..Default::default() });
     }
     if name.is_some() {
-        filters.push(Filter { name: name, ..Filter::EMPTY });
+        filters.push(Filter { name: name, ..Default::default() });
     }
     if filters.is_empty() {
         // At least 1 filter must be specified, so pass an empty filter to match everything.
-        filters.push(Filter::EMPTY);
+        filters.push(Filter::default());
     }
-    let scan_options = ScanOptions { filters: Some(filters), ..ScanOptions::EMPTY };
+    let scan_options = ScanOptions { filters: Some(filters), ..Default::default() };
 
     let (result_watcher_client, result_watcher_server) =
         endpoints::create_proxy::<ScanResultWatcherMarker>()

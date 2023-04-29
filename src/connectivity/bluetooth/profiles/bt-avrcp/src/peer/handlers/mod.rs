@@ -997,7 +997,7 @@ mod test {
                         responder.send(&mut Ok(MediaAttributes {
                             title: Some("Foo".to_string()),
                             artist_name: Some("Bar".to_string()),
-                            ..MediaAttributes::EMPTY
+                            ..Default::default()
                         }))
                     }
                     TargetHandlerRequest::GetPlayStatus { responder } => {
@@ -1020,16 +1020,16 @@ mod test {
                         responder,
                     } => responder.send(&mut Ok(fidl_avrcp::PlayerApplicationSettings {
                         shuffle_mode: Some(fidl_avrcp::ShuffleMode::Off),
-                        ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+                        ..Default::default()
                     })),
                     TargetHandlerRequest::SetPlayerApplicationSettings {
                         requested_settings: _,
                         responder,
-                    } => responder.send(&mut Ok(fidl_avrcp::PlayerApplicationSettings::EMPTY)),
+                    } => responder.send(&mut Ok(fidl_avrcp::PlayerApplicationSettings::default())),
                     TargetHandlerRequest::GetNotification { event_id: _, responder } => responder
                         .send(&mut Ok(Notification {
                             status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Playing),
-                            ..Notification::EMPTY
+                            ..Default::default()
                         })),
                     TargetHandlerRequest::WatchNotification {
                         event_id: _,
@@ -1038,7 +1038,7 @@ mod test {
                         responder,
                     } => responder.send(&mut Ok(Notification {
                         status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Stopped),
-                        ..Notification::EMPTY
+                        ..Default::default()
                     })),
                     TargetHandlerRequest::SetAddressedPlayer { responder, .. } => {
                         responder.send(&mut Ok(()))
@@ -1229,7 +1229,7 @@ mod test {
                  Curabitur vehicula mauris nec ex sollicitudin rhoncus. Integer ipsum libero, \
                  porta id velit et, egestas facilisis tellus.",
                             )),
-                            ..MediaAttributes::EMPTY
+                            ..Default::default()
                         }))
                     }
                     _ => {

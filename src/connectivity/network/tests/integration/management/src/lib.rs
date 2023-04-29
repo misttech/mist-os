@@ -392,7 +392,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                 fnet_dhcp::Parameter::Lease(fnet_dhcp::LeaseLength {
                     default: Some(DHCP_LEASE_TIME),
                     max: Some(DHCP_LEASE_TIME),
-                    ..fnet_dhcp::LeaseLength::EMPTY
+                    ..Default::default()
                 }),
             ),
             (
@@ -405,7 +405,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                     prefix_length: Some(NETWORK_PREFIX_LEN),
                     range_start: Some(DHCP_POOL_START_ADDR),
                     range_stop: Some(DHCP_POOL_END_ADDR),
-                    ..fnet_dhcp::AddressPool::EMPTY
+                    ..Default::default()
                 }),
             ),
         ];
@@ -629,20 +629,20 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
                             multicast_forwarding: Some(true),
                             igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
                                 version: Some(fnet_interfaces_admin::IgmpVersion::V3),
-                                ..fnet_interfaces_admin::IgmpConfiguration::EMPTY
+                                ..Default::default()
                             }),
-                            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                            ..Default::default()
                         }),
                         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                             forwarding: Some(false),
                             multicast_forwarding: Some(false),
                             mld: Some(fnet_interfaces_admin::MldConfiguration {
                                 version: Some(fnet_interfaces_admin::MldVersion::V2),
-                                ..fnet_interfaces_admin::MldConfiguration::EMPTY
+                                ..Default::default()
                             }),
-                            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                            ..Default::default()
                         }),
-                        ..fnet_interfaces_admin::Configuration::EMPTY
+                        ..Default::default()
                     })
                 );
             }
@@ -679,7 +679,7 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
         fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
             .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
     prefix_provider
-        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
     assert_eq!(
         prefix_control
@@ -722,7 +722,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
             fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                 .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
         prefix_provider
-            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
 
         // Calling acquire_prefix a second time results in ALREADY_ACQUIRING.
@@ -731,7 +731,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
                 fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                     .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
             prefix_provider
-                .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+                .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
                 .expect("acquire prefix");
             let fnet_dhcpv6::PrefixControlEvent::OnExit { reason } = prefix_control
                 .take_event_stream()
@@ -752,7 +752,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
             fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                 .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
         prefix_provider
-            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
         match prefix_control
             .take_event_stream()
@@ -781,7 +781,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
 #[test_case(
     fnet_dhcpv6::AcquirePrefixConfig {
         interface_id: Some(42),
-        ..fnet_dhcpv6::AcquirePrefixConfig::EMPTY
+        ..Default::default()
     },
     fnet_dhcpv6::PrefixControlExitReason::InvalidInterface;
     "interface not found"
@@ -789,7 +789,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
 #[test_case(
     fnet_dhcpv6::AcquirePrefixConfig {
         preferred_prefix_len: Some(129),
-        ..fnet_dhcpv6::AcquirePrefixConfig::EMPTY
+        ..Default::default()
     },
     fnet_dhcpv6::PrefixControlExitReason::InvalidPrefixLength;
     "invalid prefix length"
@@ -859,7 +859,7 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
         fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
             .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
     prefix_provider
-        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
 
     let (res1, res2) =
@@ -1073,7 +1073,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     .acquire_prefix(
                         fnet_dhcpv6::AcquirePrefixConfig {
                             interface_id: Some(if_id),
-                            ..fnet_dhcpv6::AcquirePrefixConfig::EMPTY
+                            ..Default::default()
                         },
                         server_end,
                     )

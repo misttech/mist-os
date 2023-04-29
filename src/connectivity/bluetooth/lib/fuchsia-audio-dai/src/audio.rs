@@ -107,15 +107,16 @@ async fn process_audio_requests(
     product: String,
 ) -> Result<(), Error> {
     let dai_props = dai.properties().await?;
-    let attributes = Some(vec![ChannelAttributes::EMPTY; pcm_format.number_of_channels as usize]);
-    let channel_set = ChannelSet { attributes: attributes, ..ChannelSet::EMPTY };
+    let attributes =
+        Some(vec![ChannelAttributes::default(); pcm_format.number_of_channels as usize]);
+    let channel_set = ChannelSet { attributes: attributes, ..Default::default() };
     let supported_formats = PcmSupportedFormats {
         channel_sets: Some(vec![channel_set]),
         sample_formats: Some(vec![pcm_format.sample_format]),
         bytes_per_sample: Some(vec![pcm_format.bytes_per_sample]),
         valid_bits_per_sample: Some(vec![pcm_format.valid_bits_per_sample]),
         frame_rates: Some(vec![pcm_format.frame_rate]),
-        ..PcmSupportedFormats::EMPTY
+        ..Default::default()
     };
     let mut gain_state_replied = false;
     let mut plug_state_replied = false;
@@ -126,7 +127,7 @@ async fn process_audio_requests(
         }
         match request.unwrap() {
             StreamConfigRequest::GetHealthState { responder } => {
-                responder.send(HealthState::EMPTY)?;
+                responder.send(HealthState::default())?;
             }
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
@@ -144,7 +145,7 @@ async fn process_audio_requests(
                     manufacturer: Some(manufacturer.clone()),
                     product: Some(product.clone()),
                     clock_domain: Some(CLOCK_DOMAIN_MONOTONIC),
-                    ..StreamProperties::EMPTY
+                    ..Default::default()
                 };
 
                 responder.send(prop)?;
@@ -152,7 +153,7 @@ async fn process_audio_requests(
             StreamConfigRequest::GetSupportedFormats { responder } => {
                 let formats_vector = vec![SupportedFormats {
                     pcm_supported_formats: Some(supported_formats.clone()),
-                    ..SupportedFormats::EMPTY
+                    ..Default::default()
                 }];
                 responder.send(&mut formats_vector.into_iter())?;
             }
@@ -169,7 +170,7 @@ async fn process_audio_requests(
                     muted: Some(false),
                     agc_enabled: Some(false),
                     gain_db: Some(0.0f32),
-                    ..GainState::EMPTY
+                    ..Default::default()
                 };
                 responder.send(gain_state)?;
                 gain_state_replied = true;
@@ -188,7 +189,7 @@ async fn process_audio_requests(
                 let plug_state = PlugState {
                     plugged: Some(true),
                     plug_state_time: Some(time.into_nanos() as i64),
-                    ..PlugState::EMPTY
+                    ..Default::default()
                 };
                 responder.send(plug_state)?;
                 plug_state_replied = true;
@@ -377,7 +378,7 @@ mod tests {
 
         let format = fidl_fuchsia_hardware_audio::Format {
             pcm_format: Some(SUPPORTED_PCM_FORMAT.clone()),
-            ..fidl_fuchsia_hardware_audio::Format::EMPTY
+            ..Default::default()
         };
         stream_proxy.create_ring_buffer(format, server_end).expect("setup ring buffer okay");
 
@@ -410,7 +411,7 @@ mod tests {
 
         // Set gain state is ignored.  Shouldn't wake us up.
         let _ = stream_proxy
-            .set_gain(GainState { muted: Some(true), ..GainState::EMPTY })
+            .set_gain(GainState { muted: Some(true), ..Default::default() })
             .expect("set gain");
         assert!(Pin::new(&mut gain_state_fut)
             .poll(&mut Context::from_waker(futures::task::noop_waker_ref()))

@@ -53,11 +53,7 @@ impl ReplaceMacFilterSettingsCommand {
             let excess: Vec<_> = iter.collect();
             assert!(excess.is_empty(), "excess items {:?}", excess);
 
-            filter_item_vec.push(MacAddressFilterItem {
-                mac_address,
-                rssi,
-                ..MacAddressFilterItem::EMPTY
-            });
+            filter_item_vec.push(MacAddressFilterItem { mac_address, rssi, ..Default::default() });
         }
         Ok(filter_item_vec)
     }
@@ -83,7 +79,7 @@ impl ReplaceMacFilterSettingsCommand {
                 .replace_mac_address_filter_settings(MacAddressFilterSettings {
                     mode: Some(mode),
                     items: None,
-                    ..MacAddressFilterSettings::EMPTY
+                    ..Default::default()
                 })
                 .await?;
         } else {
@@ -92,7 +88,7 @@ impl ReplaceMacFilterSettingsCommand {
                 .replace_mac_address_filter_settings(MacAddressFilterSettings {
                     mode: Some(mode),
                     items: Some(mac_addr_filter_item_vec),
-                    ..MacAddressFilterSettings::EMPTY
+                    ..Default::default()
                 })
                 .await?;
         }

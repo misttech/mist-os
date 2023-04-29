@@ -91,7 +91,7 @@ mod tests {
         let battery_info = BatteryInfo {
             level_percent: Some(10.0),
             level_status: Some(LevelStatus::Ok),
-            ..BatteryInfo::EMPTY
+            ..Default::default()
         };
         state.record_power_update(id, battery_info.clone().try_into().unwrap());
 
@@ -100,7 +100,7 @@ mod tests {
         let expected_peripherals = vec![Information {
             identifier: Some(Identifier::PeerId(id.into())),
             battery_info: Some(battery_info),
-            ..Information::EMPTY
+            ..Default::default()
         }];
         assert_eq!(peripherals, expected_peripherals);
     }
@@ -135,7 +135,7 @@ mod tests {
         let battery_info = BatteryInfo {
             level_percent: Some(10.0),
             level_status: Some(LevelStatus::Ok),
-            ..BatteryInfo::EMPTY
+            ..Default::default()
         };
         state.record_power_update(id, battery_info.clone().try_into().unwrap());
         let _ = exec.run_until_stalled(&mut watcher_task).expect_pending("main loop active");

@@ -87,7 +87,7 @@ impl LinkIntroductionFacts {
                     zone_index: v6.scope_id() as u64,
                 }),
             }),
-            ..LinkIntroduction::EMPTY
+            ..Default::default()
         }
     }
 
@@ -920,7 +920,7 @@ impl LinkRouting {
                 .round_trip_time()
                 .map(|d| d.as_micros().try_into().unwrap_or(std::u64::MAX)),
             config: (self.output.config)(),
-            ..LinkDiagnosticInfo::EMPTY
+            ..Default::default()
         }
     }
 

@@ -529,7 +529,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: None,
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
@@ -580,7 +580,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: None,
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
@@ -627,11 +627,8 @@ mod tests {
         // Issue StartAP request.
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
-        let network_config = fidl_policy::NetworkConfig {
-            id: None,
-            credential: None,
-            ..fidl_policy::NetworkConfig::EMPTY
-        };
+        let network_config =
+            fidl_policy::NetworkConfig { id: None, credential: None, ..Default::default() };
         let start_fut =
             controller.start_access_point(network_config, connectivity_mode, operating_band);
         pin_mut!(start_fut);
@@ -669,7 +666,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: Some(credential),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let stop_fut = controller.stop_access_point(network_config);
         pin_mut!(stop_fut);
@@ -718,7 +715,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: Some(credential),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let stop_fut = controller.stop_access_point(network_config);
         pin_mut!(stop_fut);
@@ -876,7 +873,7 @@ mod tests {
         let network_config = fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: None,
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;

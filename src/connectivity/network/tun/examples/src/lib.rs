@@ -61,13 +61,13 @@ fn new_device_and_port_config(
             // method.
             report_metadata: Some(false),
             min_tx_buffer_length: None,
-            ..fidl_fuchsia_net_tun::BaseDeviceConfig::EMPTY
+            ..Default::default()
         }),
         // Blocking will cause the read and write frame methods to block. See
         // the documentation on fuchsia.net.tun/DeviceConfig for more details.
         blocking: Some(true),
 
-        ..fidl_fuchsia_net_tun::DeviceConfig::EMPTY
+        ..Default::default()
     };
     let port_config = fidl_fuchsia_net_tun::DevicePortConfig {
         base: Some(fidl_fuchsia_net_tun::BasePortConfig {
@@ -79,14 +79,14 @@ fn new_device_and_port_config(
             // request different frame types.
             rx_types: Some(rx_types),
             tx_types: Some(tx_types),
-            ..fidl_fuchsia_net_tun::BasePortConfig::EMPTY
+            ..Default::default()
         }),
         // Create the port with the link online signal.
         online: Some(true),
         // Use the MAC requested by the caller. TAP-like devices require a MAC
         // address, while TUN-like devices don't.
         mac,
-        ..fidl_fuchsia_net_tun::DevicePortConfig::EMPTY
+        ..Default::default()
     };
     (device_config, port_config)
 }
@@ -148,7 +148,7 @@ async fn tap_like_over_network_tun() {
             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ethernet),
             data: Some(helpers::bob_pings_alice_for_tap_like(&CONFIG_FOR_TAP_LIKE)),
             meta: None,
-            ..fidl_fuchsia_net_tun::Frame::EMPTY
+            ..Default::default()
         })
         .await
         .expect("write_frame FIDL error")
@@ -193,7 +193,7 @@ async fn tap_like_over_network_tun() {
                             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ethernet),
                             data: Some(helpers::build_bob_arp_response(&CONFIG_FOR_TAP_LIKE)),
                             meta: None,
-                            ..fidl_fuchsia_net_tun::Frame::EMPTY
+                            ..Default::default()
                         })
                         .await
                         .expect("write_frame FIDL error")
@@ -272,7 +272,7 @@ async fn tun_like_over_network_tun() {
             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ipv4),
             data: Some(helpers::bob_pings_alice_for_tun_like(&CONFIG_FOR_TUN_LIKE)),
             meta: None,
-            ..fidl_fuchsia_net_tun::Frame::EMPTY
+            ..Default::default()
         })
         .await
         .expect("write_frame FIDL error")
@@ -591,7 +591,7 @@ mod helpers {
                 .create_interface(
                     &mut port_id,
                     server_end,
-                    fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                    fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create_interface failed");
             control
@@ -623,7 +623,7 @@ mod helpers {
         let () = control
             .add_address(
                 &mut subnet.clone(),
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server_end,
             )
             .expect("add_address failed");

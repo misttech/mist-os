@@ -63,7 +63,7 @@ pub fn spp_service_definition() -> bredr::ServiceDefinition {
             major_version: 1,
             minor_version: 2,
         }]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 
@@ -112,7 +112,7 @@ async fn setup_spp_client(
         .connect_to_protocol::<bredr::ProfileMarker>(topology)
         .expect("Profile should be available");
     let spp = spp_service_definition();
-    ProfileClient::advertise(profile, &vec![spp], bredr::ChannelParameters::EMPTY).unwrap()
+    ProfileClient::advertise(profile, &vec![spp], bredr::ChannelParameters::default()).unwrap()
 }
 
 async fn expect_peer_advertising(
@@ -243,7 +243,7 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
     // Client #2 can now connect via RFCOMM to Client #1.
     let mut params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
         channel: Some(rfcomm_channel_number.into()),
-        ..bredr::RfcommParameters::EMPTY
+        ..Default::default()
     });
     let connect_fut = other_rfcomm_proxy.connect(&mut this_rfcomm.peer_id().into(), &mut params);
     pin_mut!(connect_fut);
@@ -278,7 +278,7 @@ fn a2dp_service_definition() -> bredr::ServiceDefinition {
             protocol: bredr::ProtocolIdentifier::L2Cap,
             params: vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)],
         }]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 
@@ -294,7 +294,7 @@ async fn passthrough_advertisement_is_discovered() {
         .expect("Profile should be available");
     let a2dp = a2dp_service_definition();
     let _client =
-        ProfileClient::advertise(profile.clone(), &vec![a2dp], bredr::ChannelParameters::EMPTY)
+        ProfileClient::advertise(profile.clone(), &vec![a2dp], bredr::ChannelParameters::default())
             .unwrap();
 
     // Test driven peer searches for A2DP Sink.
@@ -344,7 +344,7 @@ async fn passthrough_search_discovers_advertisement() {
             &mut test_driven_peer.peer_id().into(),
             &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters {
                 psm: Some(bredr::PSM_AVDTP),
-                ..bredr::L2capParameters::EMPTY
+                ..Default::default()
             }),
         )
         .await;

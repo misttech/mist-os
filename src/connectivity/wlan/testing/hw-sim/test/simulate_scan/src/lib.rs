@@ -115,10 +115,10 @@ async fn simulate_scan() {
                 bssid: Some(BSS_FOO.0.clone()),
                 rssi: Some(-60),
                 frequency: Some(2412),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -129,10 +129,10 @@ async fn simulate_scan() {
                 bssid: Some(BSS_FOO_2.0.clone()),
                 rssi: Some(-60),
                 frequency: Some(2417),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -144,17 +144,17 @@ async fn simulate_scan() {
                     bssid: Some(BSS_BAR.0.clone()),
                     rssi: Some(-60),
                     frequency: Some(2422),
-                    ..fidl_policy::Bss::EMPTY
+                    ..Default::default()
                 },
                 fidl_policy::Bss {
                     bssid: Some(BSS_BAR_2.0.clone()),
                     rssi: Some(-40),
                     frequency: Some(2427),
-                    ..fidl_policy::Bss::EMPTY
+                    ..Default::default()
                 },
             ]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -165,10 +165,10 @@ async fn simulate_scan() {
                 bssid: Some(BSS_BAZ.0.clone()),
                 rssi: Some(-60),
                 frequency: Some(2432),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -179,10 +179,10 @@ async fn simulate_scan() {
                 bssid: Some(BSS_BAZ_2.0.clone()),
                 rssi: Some(-60),
                 frequency: Some(2437),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
     ]);
 

@@ -254,7 +254,7 @@ mod tests {
                 major_version: 1,
                 minor_version: 2,
             }]),
-            ..bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         }
     }
 
@@ -268,7 +268,7 @@ mod tests {
         let defs = vec![make_profile_service_definition(source_uuid)];
         let channel_params = bredr::ChannelParameters {
             channel_mode: Some(bredr::ChannelMode::Basic),
-            ..bredr::ChannelParameters::EMPTY
+            ..Default::default()
         };
 
         let mut profile = ProfileClient::advertise(proxy, &defs, channel_params.clone())
@@ -307,7 +307,7 @@ mod tests {
         let defs = vec![make_profile_service_definition(source_uuid)];
         let channel_params = bredr::ChannelParameters {
             channel_mode: Some(bredr::ChannelMode::Basic),
-            ..bredr::ChannelParameters::EMPTY
+            ..Default::default()
         };
 
         let mut profile = ProfileClient::advertise(proxy, &defs, channel_params.clone())

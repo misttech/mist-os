@@ -113,7 +113,7 @@ impl From<PolicyNetworkConfig> for wlan_policy::NetworkConfig {
         wlan_policy::NetworkConfig {
             id: Some(network_id),
             credential: Some(credential),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -374,7 +374,7 @@ mod tests {
                 type_: wlan_policy::SecurityType::None,
             }),
             credential: Some(wlan_policy::Credential::None(wlan_policy::Empty {})),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let result_cfg = wlan_policy::NetworkConfig::from(open_config);
         assert_eq!(expected_cfg, result_cfg);
@@ -426,7 +426,7 @@ mod tests {
                 type_: wlan_policy::SecurityType::Wpa2,
             }),
             credential: Some(wlan_policy::Credential::Psk([17; 32].to_vec())),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let result_cfg = wlan_policy::NetworkConfig::from(wpa_config);
         assert_eq!(expected_cfg, result_cfg);
@@ -452,7 +452,7 @@ mod tests {
             credential: Some(wlan_policy::Credential::Password(
                 "some_password_here".as_bytes().to_vec(),
             )),
-            ..wlan_policy::NetworkConfig::EMPTY
+            ..Default::default()
         };
         let result_cfg = wlan_policy::NetworkConfig::from(wpa_config);
         assert_eq!(expected_cfg, result_cfg);

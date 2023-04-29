@@ -60,11 +60,11 @@ impl AvrcpVolume {
             user_volume: Some(settings::Volume {
                 level: Some(self.0 as f32 / 127.0),
                 muted: Some(false),
-                ..settings::Volume::EMPTY
+                ..Default::default()
             }),
-            ..settings::AudioStreamSettings::EMPTY
+            ..Default::default()
         };
-        settings::AudioSettings { streams: Some(vec![settings]), ..settings::AudioSettings::EMPTY }
+        settings::AudioSettings { streams: Some(vec![settings]), ..Default::default() }
     }
 }
 
@@ -310,11 +310,11 @@ mod tests {
                     stream: Some(media::AudioRenderUsage::Media),
                     user_volume: Some(settings::Volume {
                         level: Some(level),
-                        ..settings::Volume::EMPTY
+                        ..Default::default()
                     }),
-                    ..settings::AudioStreamSettings::EMPTY
+                    ..Default::default()
                 }]),
-                ..settings::AudioSettings::EMPTY
+                ..Default::default()
             })
             .expect("watch responder to send");
     }

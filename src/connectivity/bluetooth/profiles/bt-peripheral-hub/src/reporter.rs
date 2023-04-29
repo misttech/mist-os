@@ -96,8 +96,8 @@ mod tests {
 
         let info = Information {
             identifier: Some(Identifier::PeerId(PeerId(123).into())),
-            battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo::EMPTY),
-            ..Information::EMPTY
+            battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo::default()),
+            ..Default::default()
         };
         let report_request_fut = reporter_proxy.report(info);
         pin_mut!(server_task, report_request_fut);
@@ -120,9 +120,9 @@ mod tests {
             identifier: Some(Identifier::PeerId(id.into())),
             battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo {
                 level_percent: Some(5.0f32),
-                ..fidl_fuchsia_power_battery::BatteryInfo::EMPTY
+                ..Default::default()
             }),
-            ..Information::EMPTY
+            ..Default::default()
         };
         let report_request_fut = reporter_proxy.report(info);
         pin_mut!(server_task, report_request_fut);

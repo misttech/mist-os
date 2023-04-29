@@ -45,7 +45,7 @@ async fn test_lifecycle(_: ()) {
         extended_advertising: None,
         acl_buffer_settings: None,
         le_acl_buffer_settings: None,
-        ..EmulatorSettings::EMPTY
+        ..Default::default()
     };
 
     let dev_dir = realm.dev().unwrap();

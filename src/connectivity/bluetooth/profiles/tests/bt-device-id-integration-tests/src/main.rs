@@ -61,12 +61,12 @@ fn record(primary: bool) -> DeviceIdentificationRecord {
             major: Some(2),
             minor: Some(0),
             subminor: Some(6),
-            ..DeviceReleaseNumber::EMPTY
+            ..Default::default()
         }),
         // Primary is optional.
         primary: Some(primary),
         // Missing optional `service_description`.
-        ..DeviceIdentificationRecord::EMPTY
+        ..Default::default()
     }
 }
 

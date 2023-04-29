@@ -42,7 +42,7 @@ fn spp_service_definition() -> bredr::ServiceDefinition {
             major_version: 1,
             minor_version: 2,
         }]),
-        ..bredr::ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 
@@ -252,8 +252,11 @@ impl RfcommManager {
 
         // Add an SPP advertisement & search.
         let spp_service = vec![spp_service_definition()];
-        let mut client =
-            ProfileClient::advertise(profile_proxy, &spp_service, bredr::ChannelParameters::EMPTY)?;
+        let mut client = ProfileClient::advertise(
+            profile_proxy,
+            &spp_service,
+            bredr::ChannelParameters::default(),
+        )?;
         let _ = client.add_search(bredr::ServiceClassProfileIdentifier::SerialPort, &[])?;
         let service_task = fasync::Task::spawn(async move {
             let result = Self::handle_profile_events(client, inner_clone).await;
@@ -337,7 +340,7 @@ impl RfcommManager {
                 &mut id.into(),
                 &mut bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
                     channel: Some(server_channel.into()),
-                    ..bredr::RfcommParameters::EMPTY
+                    ..Default::default()
                 }),
             )
             .await?

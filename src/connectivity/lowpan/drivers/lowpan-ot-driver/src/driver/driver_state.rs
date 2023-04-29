@@ -149,7 +149,7 @@ where
 
     pub fn get_current_identity(&self) -> Identity {
         if !self.ot_instance.is_commissioned() {
-            return Identity::EMPTY;
+            return Identity::default();
         }
 
         let mut operational_dataset = Default::default();
@@ -157,7 +157,7 @@ where
             Ok(()) => operational_dataset.into_ext(),
             Err(err) => {
                 warn!("Commissioned, but unable to get active dataset: {:?}", err);
-                Identity::EMPTY
+                Identity::default()
             }
         }
     }
@@ -166,7 +166,7 @@ where
         DeviceState {
             connectivity_state: Some(self.updated_connectivity_state()),
             role: Some(self.get_current_role()),
-            ..DeviceState::EMPTY
+            ..Default::default()
         }
     }
 

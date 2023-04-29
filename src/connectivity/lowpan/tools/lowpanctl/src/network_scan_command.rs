@@ -50,7 +50,7 @@ impl NetworkScanCommand {
         Ok(NetworkScanParameters {
             channels: self.get_channels_vec_from_str()?,
             tx_power_dbm: self.tx_power_dbm.clone(),
-            ..NetworkScanParameters::EMPTY
+            ..Default::default()
         })
     }
 

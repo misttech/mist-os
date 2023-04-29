@@ -110,7 +110,7 @@ where
         headers: None,
         body: Some(HttpBody::Buffer(MemBuffer { vmo: request_vmo, size: request_size })),
         deadline: None,
-        ..HttpRequest::EMPTY
+        ..Default::default()
     }))
 }
 
@@ -174,10 +174,10 @@ fn json_to_position(response: JsonValue) -> Result<Position, ResolverError> {
         Some(accuracy) => PositionExtras {
             accuracy_meters: Some(accuracy),
             altitude_meters: None,
-            ..PositionExtras::EMPTY
+            ..Default::default()
         },
         None => {
-            PositionExtras { accuracy_meters: None, altitude_meters: None, ..PositionExtras::EMPTY }
+            PositionExtras { accuracy_meters: None, altitude_meters: None, ..Default::default() }
         }
     };
 
@@ -342,7 +342,7 @@ mod tests {
                     status_line: None,
                     headers: None,
                     redirect: None,
-                    ..HttpResponse::EMPTY
+                    ..Default::default()
                 })
             });
             assert_eq!(
@@ -363,7 +363,7 @@ mod tests {
                     status_line: None,
                     headers: None,
                     redirect: None,
-                    ..HttpResponse::EMPTY
+                    ..Default::default()
                 })
             });
             assert_eq!(
@@ -727,7 +727,7 @@ mod test_doubles {
                 status_line: None,
                 headers: None,
                 redirect: None,
-                ..HttpResponse::EMPTY
+                ..Default::default()
             }))
         }
 
@@ -788,7 +788,7 @@ mod test_doubles {
                 status_line: None,
                 headers: None,
                 redirect: None,
-                ..HttpResponse::EMPTY
+                ..Default::default()
             }))
         }
 

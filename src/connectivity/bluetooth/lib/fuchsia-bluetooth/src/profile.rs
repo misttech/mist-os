@@ -433,7 +433,7 @@ impl TryFrom<&Information> for fidl_bredr::Information {
             name: src.name.clone(),
             description: src.description.clone(),
             provider: src.provider.clone(),
-            ..fidl_bredr::Information::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -562,7 +562,7 @@ impl TryFrom<&ServiceDefinition> for fidl_bredr::ServiceDefinition {
             profile_descriptors: Some(profile_descriptors),
             information: Some(information?),
             additional_attributes: Some(additional_attributes),
-            ..fidl_bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -591,7 +591,7 @@ impl From<&SecurityRequirements> for fidl_bredr::SecurityRequirements {
         fidl_bredr::SecurityRequirements {
             authentication_required: src.authentication_required,
             secure_connections_required: src.secure_connections_required,
-            ..fidl_bredr::SecurityRequirements::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -654,7 +654,7 @@ impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
                 .security_requirements
                 .as_ref()
                 .map(fidl_bredr::SecurityRequirements::from),
-            ..fidl_bredr::ChannelParameters::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -912,13 +912,11 @@ mod tests {
         assert!(fidl.is_err());
 
         // No language.
-        let local = Information::try_from(&fidl_bredr::Information::EMPTY);
+        let local = Information::try_from(&fidl_bredr::Information::default());
         assert!(local.is_err());
 
-        let empty_lang_fidl = fidl_bredr::Information {
-            language: Some(empty_language),
-            ..fidl_bredr::Information::EMPTY
-        };
+        let empty_lang_fidl =
+            fidl_bredr::Information { language: Some(empty_language), ..Default::default() };
         let local = Information::try_from(&empty_lang_fidl);
         assert!(local.is_err());
     }
@@ -1039,7 +1037,7 @@ mod tests {
                 name: Some(name.clone()),
                 description: Some(description.clone()),
                 provider: Some(provider.clone()),
-                ..fidl_bredr::Information::EMPTY
+                ..Default::default()
             }]),
             additional_attributes: Some(vec![fidl_bredr::Attribute {
                 id: attribute_id,
@@ -1047,7 +1045,7 @@ mod tests {
                     fidl_bredr::DataElement::Uint32(attribute_value),
                 ))]),
             }]),
-            ..fidl_bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         };
 
         // Converting from local ServiceDefinition to the FIDL ServiceDefinition should work.
@@ -1082,11 +1080,8 @@ mod tests {
 
         let local =
             ChannelParameters { channel_mode, max_rx_sdu_size, security_requirements: None };
-        let fidl = fidl_bredr::ChannelParameters {
-            channel_mode,
-            max_rx_sdu_size,
-            ..fidl_bredr::ChannelParameters::EMPTY
-        };
+        let fidl =
+            fidl_bredr::ChannelParameters { channel_mode, max_rx_sdu_size, ..Default::default() };
 
         let local_to_fidl =
             fidl_bredr::ChannelParameters::try_from(&local).expect("conversion should work");
@@ -1115,10 +1110,8 @@ mod tests {
             max_rx_sdu_size: too_small_sdu,
             security_requirements: None,
         };
-        let fidl = fidl_bredr::ChannelParameters {
-            max_rx_sdu_size: too_small_sdu,
-            ..fidl_bredr::ChannelParameters::EMPTY
-        };
+        let fidl =
+            fidl_bredr::ChannelParameters { max_rx_sdu_size: too_small_sdu, ..Default::default() };
 
         let local_to_fidl = fidl_bredr::ChannelParameters::try_from(&local);
         assert!(local_to_fidl.is_err());
@@ -1136,7 +1129,7 @@ mod tests {
         let fidl = fidl_bredr::SecurityRequirements {
             authentication_required,
             secure_connections_required,
-            ..fidl_bredr::SecurityRequirements::EMPTY
+            ..Default::default()
         };
 
         let local_to_fidl = fidl_bredr::SecurityRequirements::from(&local);
@@ -1289,7 +1282,7 @@ mod tests {
             io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
             io_pcm_sample_payload_msb_position: Some(1),
             path: Some(fidl_bredr::DataPath::Offload),
-            ..fidl_bredr::ScoConnectionParameters::EMPTY
+            ..Default::default()
         };
 
         let mut local: ValidScoConnectionParameters = params.try_into().expect("can convert");

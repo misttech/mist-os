@@ -15,10 +15,10 @@ fn example_di_record() -> di::DeviceIdentificationRecord {
             major: Some(1),
             minor: Some(0),
             subminor: Some(10),
-            ..di::DeviceReleaseNumber::EMPTY
+            ..Default::default()
         }),
         service_description: Some("Example DI record".to_string()),
-        ..di::DeviceIdentificationRecord::EMPTY
+        ..Default::default()
     }
 }
 

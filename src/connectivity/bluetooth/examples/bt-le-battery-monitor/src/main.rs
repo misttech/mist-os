@@ -109,7 +109,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     info!(%id, "Trying to connect");
     // Try to connect and establish a GATT connection.
     let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>()?;
-    central.connect(&mut id.into(), ConnectionOptions::EMPTY, le_server)?;
+    central.connect(&mut id.into(), ConnectionOptions::default(), le_server)?;
     let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>()?;
     le_client.request_gatt_client(gatt_server)?;
 
@@ -211,9 +211,9 @@ async fn main() -> Result<(), Error> {
         filters: Some(vec![Filter {
             service_uuid: Some(BATTERY_SERVICE_UUID.into()),
             connectable: Some(true),
-            ..Filter::EMPTY
+            ..Default::default()
         }]),
-        ..ScanOptions::EMPTY
+        ..Default::default()
     };
     // The lifetime of the scan will be determined by `watch_scan_results` so this Future can be
     // ignored.
@@ -291,7 +291,7 @@ mod tests {
             handle: Some(gatt::Handle { value: 10 }),
             value: Some(vec![u8::MAX]),
             maybe_truncated: Some(false),
-            ..gatt::ReadValue::EMPTY
+            ..Default::default()
         };
         let truncated_value = read_battery_level(value).expect("valid read result");
         assert_eq!(truncated_value, 100);
@@ -300,13 +300,13 @@ mod tests {
     #[fuchsia::test]
     fn read_battery_level_error() {
         // Missing all fields is an Error.
-        assert_matches!(read_battery_level(gatt::ReadValue::EMPTY), Err(_));
+        assert_matches!(read_battery_level(gatt::ReadValue::default()), Err(_));
 
         // Missing the read result value is an Error.
         let missing_value = gatt::ReadValue {
             handle: Some(gatt::Handle { value: 10 }),
             maybe_truncated: Some(false),
-            ..gatt::ReadValue::EMPTY
+            ..Default::default()
         };
         assert_matches!(read_battery_level(missing_value), Err(_));
 
@@ -315,7 +315,7 @@ mod tests {
             handle: Some(gatt::Handle { value: 10 }),
             value: Some(vec![0, 1, 2]),
             maybe_truncated: Some(false),
-            ..gatt::ReadValue::EMPTY
+            ..Default::default()
         };
         assert_matches!(read_battery_level(invalid_value), Err(_));
     }
@@ -325,7 +325,7 @@ mod tests {
             handle: Some(gatt::ServiceHandle { value: 5 }),
             kind: Some(gatt::ServiceKind::Primary),
             type_: Some(BATTERY_SERVICE_UUID.into()),
-            ..gatt::ServiceInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -336,7 +336,7 @@ mod tests {
             properties: Some(
                 gatt::CharacteristicPropertyBits::READ | gatt::CharacteristicPropertyBits::NOTIFY,
             ),
-            ..gatt::Characteristic::EMPTY
+            ..Default::default()
         }
     }
 
@@ -345,7 +345,7 @@ mod tests {
             handle: Some(gatt::Handle { value: 10 }),
             value: Some(vec![50]),
             maybe_truncated: Some(false),
-            ..gatt::ReadValue::EMPTY
+            ..Default::default()
         }
     }
 

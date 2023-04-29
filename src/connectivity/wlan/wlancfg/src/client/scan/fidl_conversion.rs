@@ -72,13 +72,13 @@ pub fn scan_result_to_policy_scan_result(
                                     rssi: Some(input.rssi),
                                     frequency: Some(frequency.into()), // u16.into() -> u32
                                     timestamp_nanos: Some(input.timestamp.into_nanos()),
-                                    ..fidl_policy::Bss::EMPTY
+                                    ..Default::default()
                                 }
                             })
                             .collect(),
                     ),
                     compatibility: Some(internal.compatibility),
-                    ..fidl_policy::ScanResult::EMPTY
+                    ..Default::default()
                 })
             } else {
                 debug!(
@@ -203,18 +203,18 @@ mod tests {
                         rssi: Some(0),
                         frequency: Some(CENTER_FREQ_CHAN_1),
                         timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
-                        ..fidl_policy::Bss::EMPTY
+                        ..Default::default()
                     },
                     fidl_policy::Bss {
                         bssid: Some([7, 8, 9, 10, 11, 12]),
                         rssi: Some(13),
                         frequency: Some(CENTER_FREQ_CHAN_11),
                         timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
-                        ..fidl_policy::Bss::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 compatibility: Some(fidl_policy::Compatibility::Supported),
-                ..fidl_policy::ScanResult::EMPTY
+                ..Default::default()
             },
             fidl_policy::ScanResult {
                 id: Some(fidl_policy::NetworkIdentifier {
@@ -226,10 +226,10 @@ mod tests {
                     rssi: Some(7),
                     frequency: Some(CENTER_FREQ_CHAN_8),
                     timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
-                    ..fidl_policy::Bss::EMPTY
+                    ..Default::default()
                 }]),
                 compatibility: Some(fidl_policy::Compatibility::Supported),
-                ..fidl_policy::ScanResult::EMPTY
+                ..Default::default()
             },
         ]
     }
@@ -247,13 +247,13 @@ mod tests {
                 type_: fidl_policy::SecurityType::None,
             }),
             entries: Some(vec![]),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         };
         let minimal_result_size: usize = minimal_scan_result.measure().num_bytes;
 
         // Create result with single entry
         let mut scan_result_with_one_bss = minimal_scan_result.clone();
-        scan_result_with_one_bss.entries = Some(vec![fidl_policy::Bss::EMPTY]);
+        scan_result_with_one_bss.entries = Some(vec![fidl_policy::Bss::default()]);
 
         // Size of each additional BSS entry to FIDL ScanResult
         let empty_bss_entry_size: usize =
@@ -277,7 +277,7 @@ mod tests {
                 ssid: (0..ssid_length).map(|_| rand::random::<u8>()).collect(),
                 type_: fidl_policy::SecurityType::None,
             });
-            scan_result.entries = Some(vec![fidl_policy::Bss::EMPTY; num_bss_for_ap]);
+            scan_result.entries = Some(vec![fidl_policy::Bss::default(); num_bss_for_ap]);
 
             // Validate result measures to expected size.
             assert_eq!(scan_result.measure().num_bytes, size);

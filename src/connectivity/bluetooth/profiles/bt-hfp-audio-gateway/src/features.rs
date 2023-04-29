@@ -164,7 +164,7 @@ impl TryFrom<CodecId> for fidl_fuchsia_hardware_audio::Format {
                 valid_bits_per_sample: 16u8,
                 frame_rate,
             }),
-            ..Self::EMPTY
+            ..Default::default()
         })
     }
 }

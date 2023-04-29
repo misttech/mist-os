@@ -13,7 +13,7 @@ use fidl_fuchsia_net_tun as fnet_tun;
 /// `fuchsia.net.tun/Device` and the underlying network device.
 pub fn create_tun_device(
 ) -> (fnet_tun::DeviceProxy, fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>) {
-    create_tun_device_with(fnet_tun::DeviceConfig::EMPTY)
+    create_tun_device_with(fnet_tun::DeviceConfig::default())
 }
 
 /// Create a Tun device with the provided config and return its handles.
@@ -78,10 +78,10 @@ pub async fn create_tun_port_with(
                     rx_types: Some(rx_types),
                     tx_types: Some(tx_types),
                     mtu: Some(netemul::DEFAULT_MTU.into()),
-                    ..fnet_tun::BasePortConfig::EMPTY
+                    ..Default::default()
                 }),
                 mac,
-                ..fnet_tun::DevicePortConfig::EMPTY
+                ..Default::default()
             },
             server_end,
         )

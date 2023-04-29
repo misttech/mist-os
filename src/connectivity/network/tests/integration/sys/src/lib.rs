@@ -47,7 +47,7 @@ where
         capabilities.push(fnetemul::Capability::ChildDep(fnetemul::ChildDep {
             name: Some(MOCK_SERVICES_NAME.to_string()),
             capability: Some(fnetemul::ExposedCapability::Protocol(service_name.clone())),
-            ..fnetemul::ChildDep::EMPTY
+            ..Default::default()
         }));
     }
 
@@ -65,7 +65,7 @@ where
                 fnetemul::ChildDef {
                     source: Some(fnetemul::ChildSource::Mock(mock_dir)),
                     name: Some(MOCK_SERVICES_NAME.to_string()),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 },
             ],
         )
@@ -259,7 +259,7 @@ async fn serves_update_verify<N: Netstack>(name: &str) {
         .expect("connect to protocol");
 
     let response = verifier
-        .verify(fidl_fuchsia_update_verify::VerifyOptions::EMPTY)
+        .verify(fidl_fuchsia_update_verify::VerifyOptions::default())
         .await
         .expect("call succeeded");
     assert_eq!(response, Ok(()));

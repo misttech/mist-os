@@ -107,7 +107,7 @@ fn resolve_inner<A: IpAddress>(destination: A, ns: Netstack) -> Option<fnet_rout
             mac,
             interface_id: Some(interface_id.get()),
             source_address: Some(source_address),
-            ..fnet_routes::Destination::EMPTY
+            ..Default::default()
         }
     };
 

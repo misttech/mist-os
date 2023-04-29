@@ -519,9 +519,9 @@ fn static_source_from_ip(f: std::net::IpAddr) -> fnet_name::DnsServer_ {
     fnet_name::DnsServer_ {
         address: Some(socket_addr),
         source: Some(fnet_name::DnsServerSource::StaticSource(
-            fnet_name::StaticDnsServerSource::EMPTY,
+            fnet_name::StaticDnsServerSource::default(),
         )),
-        ..fnet_name::DnsServer_::EMPTY
+        ..Default::default()
     }
 }
 
@@ -1767,14 +1767,14 @@ impl<'a> NetCfg<'a> {
                 ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                     forwarding: Some(ipv6_forwarding),
                     multicast_forwarding: Some(ipv6_forwarding),
-                    ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                    ..Default::default()
                 }),
                 ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                     forwarding: Some(ipv4_forwarding),
                     multicast_forwarding: Some(ipv4_forwarding),
-                    ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_interfaces_admin::Configuration::EMPTY
+                ..Default::default()
             })
             .await
             .map_err(map_control_error("setting configuration"))
@@ -1987,7 +1987,7 @@ impl<'a> NetCfg<'a> {
         let () = control
             .add_address(
                 &mut addr.clone(),
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server_end,
             )
             .map_err(map_control_error("error sending add address request"))?;
@@ -2095,7 +2095,7 @@ impl<'a> NetCfg<'a> {
         let v = fnet_dhcp::LeaseLength {
             default: Some(WLAN_AP_DHCP_LEASE_TIME_SECONDS),
             max: Some(WLAN_AP_DHCP_LEASE_TIME_SECONDS),
-            ..fnet_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         };
         debug!("setting DHCP LeaseLength parameter to {:?}", v);
         let () = dhcp_server
@@ -2124,7 +2124,7 @@ impl<'a> NetCfg<'a> {
             prefix_length: Some(WLAN_AP_PREFIX_LEN.get()),
             range_start: Some(dhcp_pool_start),
             range_stop: Some(dhcp_pool_end),
-            ..fnet_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
         debug!("setting DHCP AddressPool parameter to {:?}", v);
         dhcp_server
@@ -2851,13 +2851,13 @@ mod tests {
         std::iter::once(fnet_interfaces::Address {
             addr: Some(GLOBAL_ADDR),
             valid_until: Some(fuchsia_zircon::Time::INFINITE.into_nanos()),
-            ..fnet_interfaces::Address::EMPTY
+            ..Default::default()
         })
         .chain(a.map(|fnet::Ipv6SocketAddress { address, port: _, zone_index: _ }| {
             fnet_interfaces::Address {
                 addr: Some(fnet::Subnet { addr: fnet::IpAddress::Ipv6(address), prefix_len: 64 }),
                 valid_until: Some(fuchsia_zircon::Time::INFINITE.into_nanos()),
-                ..fnet_interfaces::Address::EMPTY
+                ..Default::default()
             }
         }))
         .collect()
@@ -2878,7 +2878,7 @@ mod tests {
             addresses,
             has_default_ipv4_route: None,
             has_default_ipv6_route: None,
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         });
         netcfg.handle_interface_watcher_event(event, dns_watchers, &mut virtualization::Stub).await
     }
@@ -2908,12 +2908,12 @@ mod tests {
                             config: Some(fnet_dhcpv6::ClientConfig {
                                 information_config: Some(fnet_dhcpv6::InformationConfig {
                                     dns_servers: Some(true),
-                                    ..fnet_dhcpv6::InformationConfig::EMPTY
+                                    ..Default::default()
                                 }),
                                 prefix_delegation_config,
-                                ..fnet_dhcpv6::ClientConfig::EMPTY
+                                ..Default::default()
                             }),
-                            ..fnet_dhcpv6::NewClientParams::EMPTY
+                            ..Default::default()
                         }
                     );
 
@@ -2977,7 +2977,7 @@ mod tests {
                     addresses: Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
@@ -3066,7 +3066,7 @@ mod tests {
                     id: Some(INTERFACE_ID),
                     online,
                     addresses,
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 dns_watchers,
                 &mut virtualization::Stub,
@@ -3081,11 +3081,11 @@ mod tests {
             initial_properties: Some(fnet_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
                 valid_lifetime_end: Some(zx::Time::INFINITE.into_nanos()),
-                ..fnet_interfaces_admin::AddressProperties::EMPTY
+                ..Default::default()
             }),
             temporary: Some(true),
             add_subnet_route: Some(false),
-            ..fnet_interfaces_admin::AddressParameters::EMPTY
+            ..Default::default()
         }
     }
 
@@ -3135,7 +3135,7 @@ mod tests {
                         addresses: Some(Vec::new()),
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
-                        ..fnet_interfaces::Properties::EMPTY
+                        ..Default::default()
                     }),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
@@ -3203,11 +3203,11 @@ mod tests {
                         address: Some(DHCP_ADDRESS),
                         address_parameters: Some(dhcp_address_parameters()),
                         address_state_provider: Some(asp_server),
-                        ..fnet_dhcp::Address::EMPTY
+                        ..Default::default()
                     }),
                     dns_servers: Some(dns_servers.clone()),
                     routers: Some(routers.clone()),
-                    ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
+                    ..Default::default()
                 })
                 .expect("send configuration update");
 
@@ -3387,7 +3387,7 @@ mod tests {
                     addresses: Some(Vec::new()),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
@@ -3424,9 +3424,9 @@ mod tests {
                     address: Some(DHCP_ADDRESS),
                     address_parameters: Some(dhcp_address_parameters()),
                     address_state_provider: Some(asp_server),
-                    ..fnet_dhcp::Address::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
+                ..Default::default()
             })
             .expect("send configuration update");
 
@@ -3449,7 +3449,7 @@ mod tests {
                         .map(|address| fnet_interfaces::Address {
                             addr: Some(address),
                             valid_until: Some(fuchsia_zircon::sys::ZX_TIME_INFINITE),
-                            ..fnet_interfaces::Address::EMPTY
+                            ..Default::default()
                         })
                         .collect(),
                 ),
@@ -3496,9 +3496,9 @@ mod tests {
                 vec![fnet_name::DnsServer_ {
                     address: Some(DNS_SERVER1),
                     source: Some(fnet_name::DnsServerSource::StaticSource(
-                        fnet_name::StaticDnsServerSource::EMPTY,
+                        fnet_name::StaticDnsServerSource::default(),
                     )),
-                    ..fnet_name::DnsServer_::EMPTY
+                    ..Default::default()
                 }],
             ),
             run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
@@ -3530,7 +3530,7 @@ mod tests {
                     addresses: Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
@@ -3556,10 +3556,10 @@ mod tests {
                     source: Some(fnet_name::DnsServerSource::Dhcpv6(
                         fnet_name::Dhcpv6DnsServerSource {
                             source_interface: Some(INTERFACE_ID),
-                            ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                            ..Default::default()
                         },
                     )),
-                    ..fnet_name::DnsServer_::EMPTY
+                    ..Default::default()
                 }],
             ),
             run_lookup_admin_once(&mut servers.lookup_admin, &vec![DNS_SERVER2, DNS_SERVER1]),
@@ -3833,7 +3833,7 @@ mod tests {
                         addresses: Some(ipv6addrs(Some(sockaddr))),
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
-                        ..fnet_interfaces::Properties::EMPTY
+                        ..Default::default()
                     }),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
@@ -3954,10 +3954,10 @@ mod tests {
                         Some(fnet_dhcpv6::ClientConfig {
                             information_config: Some(fnet_dhcpv6::InformationConfig {
                                 dns_servers: Some(true),
-                                ..fnet_dhcpv6::InformationConfig::EMPTY
+                                ..Default::default()
                             }),
                             prefix_delegation_config: want_pd_config.clone(),
-                            ..fnet_dhcpv6::ClientConfig::EMPTY
+                            ..Default::default()
                         })
                     );
                     interface_id
@@ -4036,7 +4036,7 @@ mod tests {
                 fnet_dhcpv6::AcquirePrefixConfig {
                     interface_id,
                     preferred_prefix_len,
-                    ..fnet_dhcpv6::AcquirePrefixConfig::EMPTY
+                    ..Default::default()
                 },
                 server_end,
                 &mut dns_watchers,
@@ -4175,7 +4175,7 @@ mod tests {
                 .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
         netcfg
             .handle_dhcpv6_acquire_prefix(
-                fnet_dhcpv6::AcquirePrefixConfig::EMPTY,
+                fnet_dhcpv6::AcquirePrefixConfig::default(),
                 server_end,
                 &mut dns_watchers,
             )
@@ -4221,7 +4221,7 @@ mod tests {
                         addresses: Some(ipv6addrs(Some(sockaddr))),
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
-                        ..fnet_interfaces::Properties::EMPTY
+                        ..Default::default()
                     }),
                     &mut dns_watchers,
                     &mut virtualization::Stub,

@@ -904,7 +904,7 @@ fn set_configuration(
                     )
                     .expect("checked supported configuration before calling")
                 }),
-                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }
         }),
         ipv6: ipv6.map(|fnet_interfaces_admin::Ipv6Configuration { forwarding, .. }| {
@@ -923,10 +923,10 @@ fn set_configuration(
                     )
                     .expect("checked supported configuration before calling")
                 }),
-                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }
         }),
-        ..fnet_interfaces_admin::Configuration::EMPTY
+        ..Default::default()
     })
 }
 
@@ -945,7 +945,7 @@ fn get_configuration(ctx: &Ctx, id: BindingId) -> fnet_interfaces_admin::Configu
                     .ip_config
                     .forwarding_enabled,
             ),
-            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            ..Default::default()
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(
@@ -953,9 +953,9 @@ fn get_configuration(ctx: &Ctx, id: BindingId) -> fnet_interfaces_admin::Configu
                     .ip_config
                     .forwarding_enabled,
             ),
-            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            ..Default::default()
         }),
-        ..fnet_interfaces_admin::Configuration::EMPTY
+        ..Default::default()
     }
 }
 
@@ -993,7 +993,7 @@ fn add_address(
     }
     const INFINITE_NANOS: i64 = zx::Time::INFINITE.into_nanos();
     let initial_properties =
-        params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::EMPTY);
+        params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
     let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);
     if valid_lifetime_end != INFINITE_NANOS {
         log::warn!(
@@ -1541,7 +1541,11 @@ mod tests {
                 .expect("create ASP proxy");
         let mut addr = fidl_subnet!("1.1.1.1/32");
         control_client_end
-            .add_address(&mut addr, fnet_interfaces_admin::AddressParameters::EMPTY, asp_server_end)
+            .add_address(
+                &mut addr,
+                fnet_interfaces_admin::AddressParameters::default(),
+                asp_server_end,
+            )
             .expect("failed to add address");
 
         // Observe the `AddressAdded` event.

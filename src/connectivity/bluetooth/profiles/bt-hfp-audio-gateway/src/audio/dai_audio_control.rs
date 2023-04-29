@@ -286,7 +286,7 @@ mod tests {
             });
             let (proxy, server_end) = fidl::endpoints::create_proxy()?;
             self.client.create_ring_buffer(
-                audio::Format { pcm_format, ..audio::Format::EMPTY },
+                audio::Format { pcm_format, ..Default::default() },
                 server_end,
             )?;
             Ok(proxy)

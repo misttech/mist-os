@@ -987,7 +987,7 @@ mod tests {
             uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
                 fnetemul::Empty {},
             )])),
-            ..fnetemul::ChildDef::EMPTY
+            ..Default::default()
         }
     }
 
@@ -998,7 +998,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -1016,7 +1016,7 @@ mod tests {
             fnetemul::RealmOptions {
                 name: Some("a".to_string()),
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let realm_b = TestRealm::new(
@@ -1024,7 +1024,7 @@ mod tests {
             fnetemul::RealmOptions {
                 name: Some("b".to_string()),
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter_a = realm_a.connect_to_protocol::<CounterMarker>();
@@ -1061,7 +1061,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -1084,7 +1084,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -1119,7 +1119,7 @@ mod tests {
                     &sandbox,
                     fnetemul::RealmOptions {
                         children: Some(vec![counter_component()]),
-                        ..fnetemul::RealmOptions::EMPTY
+                        ..Default::default()
                     },
                 )
             })
@@ -1163,7 +1163,7 @@ mod tests {
             fnetemul::RealmOptions {
                 name: Some("test-realm-name".to_string()),
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         assert_eq!(
@@ -1185,7 +1185,7 @@ mod tests {
                 fnetemul::RealmOptions {
                     name: None,
                     children: Some(vec![counter_component()]),
-                    ..fnetemul::RealmOptions::EMPTY
+                    ..Default::default()
                 },
             );
             assert_eq!(
@@ -1241,7 +1241,7 @@ mod tests {
                     &sandbox,
                     fnetemul::RealmOptions {
                         children: Some(vec![counter_component()]),
-                        ..fnetemul::RealmOptions::EMPTY
+                        ..Default::default()
                     },
                 )
             })
@@ -1284,7 +1284,7 @@ mod tests {
                     eager: Some(true),
                     ..counter_component()
                 }]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
 
@@ -1371,12 +1371,12 @@ mod tests {
             let net_mgr2 = get_network_manager(&sandbox2);
 
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
+                .create_network("network", fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             let () = zx::Status::ok(status).expect("network creation");
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
+                .create_network("network", fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             assert_eq!(zx::Status::from_raw(status), zx::Status::ALREADY_EXISTS);
@@ -1385,13 +1385,13 @@ mod tests {
             // new one.
             let net_mgr1 = get_network_manager(&sandbox1);
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
+                .create_network("network", fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             assert_eq!(zx::Status::from_raw(status), zx::Status::ALREADY_EXISTS);
 
             let (status, _network) = net_mgr2
-                .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
+                .create_network("network", fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             let () = zx::Status::ok(status).expect("network creation");
@@ -1421,14 +1421,14 @@ mod tests {
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                             fnetemul::Capability::NetemulNetworkContext(fnetemul::Empty {}),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     // TODO(https://fxbug.dev/65359): when we can allow ERROR logs for routing
                     // errors, add a child component that does not `use` NetworkContext, and verify
                     // that we cannot get at NetworkContext through it. It should result in a
                     // zx::Status::UNAVAILABLE error.
                 ]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -1474,7 +1474,7 @@ mod tests {
                 children: vec![fnetemul::ChildDef {
                     source: None,
                     name: Some(COUNTER_COMPONENT_NAME.to_string()),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1483,7 +1483,7 @@ mod tests {
                 children: vec![fnetemul::ChildDef {
                     source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
                     name: None,
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1498,10 +1498,10 @@ mod tests {
                             capability: Some(fnetemul::ExposedCapability::Protocol(
                                 CounterMarker::PROTOCOL_NAME.to_string(),
                             )),
-                            ..fnetemul::ChildDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1514,10 +1514,10 @@ mod tests {
                         fnetemul::Capability::ChildDep(fnetemul::ChildDep {
                             name: Some("component".to_string()),
                             capability: None,
-                            ..fnetemul::ChildDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1530,7 +1530,7 @@ mod tests {
                         fnetemul::Capability::LogSink(fnetemul::Empty {}),
                         fnetemul::Capability::LogSink(fnetemul::Empty {}),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1546,10 +1546,10 @@ mod tests {
                             capability: Some(fnetemul::ExposedCapability::Protocol(
                                 flogger::LogSinkMarker::PROTOCOL_NAME.to_string(),
                             )),
-                            ..fnetemul::ChildDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1567,10 +1567,10 @@ mod tests {
                                 capability: Some(fnetemul::ExposedCapability::Protocol(
                                     CounterMarker::PROTOCOL_NAME.to_string(),
                                 )),
-                                ..fnetemul::ChildDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                 ],
                 epitaph: zx::Status::INVALID_ARGS,
@@ -1584,10 +1584,10 @@ mod tests {
                         fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                             variant: None,
                             path: Some(DATA_PATH.to_string()),
-                            ..fnetemul::StorageDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1600,10 +1600,10 @@ mod tests {
                         fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                             variant: Some(fnetemul::StorageVariant::Data),
                             path: None,
-                            ..fnetemul::StorageDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1613,12 +1613,12 @@ mod tests {
                     fnetemul::ChildDef {
                         name: Some(COUNTER_COMPONENT_NAME.to_string()),
                         source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     fnetemul::ChildDef {
                         name: Some(COUNTER_COMPONENT_NAME.to_string()),
                         source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                 ],
                 epitaph: zx::Status::INVALID_ARGS,
@@ -1632,15 +1632,15 @@ mod tests {
                         fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                             variant: Some(fnetemul::StorageVariant::Data),
                             path: Some(DATA_PATH.to_string()),
-                            ..fnetemul::StorageDep::EMPTY
+                            ..Default::default()
                         }),
                         fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                             variant: Some(fnetemul::StorageVariant::Data),
                             path: Some(DATA_PATH.to_string()),
-                            ..fnetemul::StorageDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1652,10 +1652,10 @@ mod tests {
                     uses: Some(fnetemul::ChildUses::Capabilities(vec![
                         fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                             name: None,
-                            ..fnetemul::DevfsDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1668,10 +1668,10 @@ mod tests {
                         fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                             name: Some("does-not-matter".to_string()),
                             subdir: Some("..".to_string()),
-                            ..fnetemul::DevfsDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1687,10 +1687,10 @@ mod tests {
                                 capability: Some(fnetemul::ExposedCapability::Protocol(
                                     CounterMarker::PROTOCOL_NAME.to_string(),
                                 )),
-                                ..fnetemul::ChildDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     fnetemul::ChildDef {
                         name: Some("counter-b".to_string()),
@@ -1701,10 +1701,10 @@ mod tests {
                                 capability: Some(fnetemul::ExposedCapability::Protocol(
                                     CounterMarker::PROTOCOL_NAME.to_string(),
                                 )),
-                                ..fnetemul::ChildDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                 ],
                 epitaph: zx::Status::INVALID_ARGS,
@@ -1717,7 +1717,7 @@ mod tests {
                         COUNTER_WITHOUT_PROGRAM_URL.to_string(),
                     )),
                     program_args: Some(vec![]),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
@@ -1727,10 +1727,7 @@ mod tests {
         for TestCase { name, children, epitaph } in cases {
             let TestRealm { realm } = TestRealm::new(
                 &sandbox,
-                fnetemul::RealmOptions {
-                    children: Some(children),
-                    ..fnetemul::RealmOptions::EMPTY
-                },
+                fnetemul::RealmOptions { children: Some(children), ..Default::default() },
             );
             match realm.take_event_stream().next().await.unwrap_or_else(|| {
                 panic!("test case failed: \"{}\": epitaph should be sent on realm channel", name)
@@ -1767,10 +1764,10 @@ mod tests {
                                 capability: Some(fnetemul::ExposedCapability::Protocol(
                                     COUNTER_B_PROTOCOL_NAME.to_string(),
                                 )),
-                                ..fnetemul::ChildDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     fnetemul::ChildDef {
                         source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
@@ -1779,10 +1776,10 @@ mod tests {
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter_a = {
@@ -1888,7 +1885,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let mut watcher = get_devfs_watcher(&realm).await;
@@ -1977,14 +1974,14 @@ mod tests {
                 &sandbox,
                 fnetemul::RealmOptions {
                     children: Some(vec![counter_component()]),
-                    ..fnetemul::RealmOptions::EMPTY
+                    ..Default::default()
                 },
             ),
             TestRealm::new(
                 &sandbox,
                 fnetemul::RealmOptions {
                     children: Some(vec![counter_component()]),
-                    ..fnetemul::RealmOptions::EMPTY
+                    ..Default::default()
                 },
             ),
         );
@@ -2039,17 +2036,17 @@ mod tests {
                             fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                                 name: Some("test-specific-devfs".to_string()),
                                 subdir: None,
-                                ..fnetemul::DevfsDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     // TODO(https://fxbug.dev/65359): when we can allow ERROR logs for routing
                     // errors, add a child component that does not `use` `devfs`, and verify that we
                     // cannot get at the realm's `devfs` through it. It should result in a
                     // zx::Status::UNAVAILABLE error.
                 ]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -2117,15 +2114,15 @@ mod tests {
                             fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                                 variant: Some(fnetemul::StorageVariant::Data),
                                 path: Some(String::from(DATA_PATH)),
-                                ..fnetemul::StorageDep::EMPTY
+                                ..Default::default()
                             }),
                             fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                                 variant: Some(fnetemul::StorageVariant::Cache),
                                 path: Some(String::from(CACHE_PATH)),
-                                ..fnetemul::StorageDep::EMPTY
+                                ..Default::default()
                             }),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                     fnetemul::ChildDef {
                         source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
@@ -2134,10 +2131,10 @@ mod tests {
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                         ])),
-                        ..fnetemul::ChildDef::EMPTY
+                        ..Default::default()
                     },
                 ]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter_storage = connect_to_counter(&realm, COUNTER_A_PROTOCOL_NAME);
@@ -2166,7 +2163,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let TestRealm { realm } = realm;
@@ -2197,7 +2194,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -2240,10 +2237,7 @@ mod tests {
         // TODO(https://fxbug.dev/124847): Use #[fixture] for this once it integrates
         // well with #[test_case].
         with_sandbox("start_stop_child_component_errors", |sandbox| async move {
-            let TestRealm { realm } = TestRealm::new(
-                &sandbox,
-                fnetemul::RealmOptions { ..fnetemul::RealmOptions::EMPTY },
-            );
+            let TestRealm { realm } = TestRealm::new(&sandbox, fnetemul::RealmOptions::default());
             let err = match action {
                 StartStop::Start => realm.start_child_component(moniker),
                 StartStop::Stop => realm.stop_child_component(moniker),
@@ -2263,7 +2257,7 @@ mod tests {
             &sandbox,
             fnetemul::RealmOptions {
                 children: Some(vec![counter_component()]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         const CLASS_DIR: &str = "class";
@@ -2331,7 +2325,7 @@ mod tests {
     // use #[fuchsia::test] which initializes syslog.
     #[fasync::run_singlethreaded(test)]
     async fn add_remove_device_invalid_path(sandbox: fnetemul::SandboxProxy) {
-        let TestRealm { realm } = TestRealm::new(&sandbox, fnetemul::RealmOptions::EMPTY);
+        let TestRealm { realm } = TestRealm::new(&sandbox, fnetemul::RealmOptions::default());
         const INVALID_FILE_PATH: &str = "class/ethernet/..";
         let (device_proxy, _server) =
             fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>();
@@ -2370,12 +2364,12 @@ mod tests {
                         fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                             name: Some("dev-class-ethernet".to_string()),
                             subdir: Some(SUBDIR.to_string()),
-                            ..fnetemul::DevfsDep::EMPTY
+                            ..Default::default()
                         }),
                     ])),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -2415,7 +2409,7 @@ mod tests {
                     ]),
                     ..counter_component()
                 }]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
@@ -2443,7 +2437,7 @@ mod tests {
                     source: Some(fnetemul::ChildSource::Mock(mock_dir)),
                     ..counter_component()
                 }]),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();

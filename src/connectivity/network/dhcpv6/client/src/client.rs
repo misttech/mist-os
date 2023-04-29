@@ -508,10 +508,10 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                     source: Some(fnet_name::DnsServerSource::Dhcpv6(
                         fnet_name::Dhcpv6DnsServerSource {
                             source_interface: Some(self.interface_id),
-                            ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                            ..Default::default()
                         },
                     )),
-                    ..fnet_name::DnsServer_::EMPTY
+                    ..Default::default()
                 }
             }))
             // The channel will be closed on error, so return an error to stop the client.
@@ -830,14 +830,14 @@ mod tests {
         let non_temporary_address_configs = [
             None,
             // No addresses but provided an address config.
-            Some(AddressConfig { address_count: None, ..AddressConfig::EMPTY }),
+            Some(AddressConfig { address_count: None, ..Default::default() }),
             // No addresses but provided an address config.
-            Some(AddressConfig { address_count: Some(0), ..AddressConfig::EMPTY }),
+            Some(AddressConfig { address_count: Some(0), ..Default::default() }),
             // preferred addresses > address count.
             Some(AddressConfig {
                 address_count: Some(1),
                 preferred_addresses: Some(vec![fidl_ip_v6!("ff01::1"), fidl_ip_v6!("ff01::1")]),
-                ..AddressConfig::EMPTY
+                ..Default::default()
             }),
         ];
         let prefix_delegation_configs = [
@@ -862,7 +862,7 @@ mod tests {
                                 information_config: information_config.clone(),
                                 non_temporary_address_config: non_temporary_address_config.clone(),
                                 prefix_delegation_config: prefix_delegation_config.clone(),
-                                ..ClientConfig::EMPTY
+                                ..Default::default()
                             }
                         ),
                         Err(ClientError::UnsupportedConfigs),
@@ -886,10 +886,10 @@ mod tests {
                     interface_id: Some(1),
                     address: Some(fidl_socket_addr_v6!("[::1]:546")),
                     config: Some(ClientConfig {
-                        information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                        ..ClientConfig::EMPTY
+                        information_config: Some(InformationConfig::default()),
+                        ..Default::default()
                     }),
-                    ..NewClientParams::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             ),
@@ -943,10 +943,10 @@ mod tests {
                     interface_id: Some(1),
                     address: Some(fidl_socket_addr_v6!("[::1]:546")),
                     config: Some(ClientConfig {
-                        information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                        ..ClientConfig::EMPTY
+                        information_config: Some(InformationConfig::default()),
+                        ..Default::default()
                     }),
-                    ..NewClientParams::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             )
@@ -966,8 +966,10 @@ mod tests {
             .contains("got watch request while the previous one is pending"));
     }
 
-    const VALID_INFORMATION_CONFIGS: [Option<InformationConfig>; 1] =
-        [Some(InformationConfig { ..InformationConfig::EMPTY })];
+    fn valid_information_configs() -> [Option<InformationConfig>; 1] {
+        [Some(InformationConfig::default())]
+    }
+
     const VALID_DELEGATED_PREFIX_CONFIGS: [Option<PrefixDelegationConfig>; 4] = [
         Some(PrefixDelegationConfig::Empty(Empty {})),
         Some(PrefixDelegationConfig::PrefixLength(1)),
@@ -981,29 +983,29 @@ mod tests {
             Some(AddressConfig {
                 address_count: Some(1),
                 preferred_addresses: None,
-                ..AddressConfig::EMPTY
+                ..Default::default()
             }),
             Some(AddressConfig {
                 address_count: Some(1),
                 preferred_addresses: Some(Vec::new()),
-                ..AddressConfig::EMPTY
+                ..Default::default()
             }),
             Some(AddressConfig {
                 address_count: Some(1),
                 preferred_addresses: Some(vec![fidl_ip_v6!("a::1")]),
-                ..AddressConfig::EMPTY
+                ..Default::default()
             }),
             Some(AddressConfig {
                 address_count: Some(2),
                 preferred_addresses: Some(vec![fidl_ip_v6!("a::2")]),
-                ..AddressConfig::EMPTY
+                ..Default::default()
             }),
         ]
     }
 
     #[test]
     fn test_client_starts_with_valid_args() {
-        for information_config in VALID_INFORMATION_CONFIGS.iter() {
+        for information_config in valid_information_configs().iter() {
             for non_temporary_address_config in get_valid_non_temporary_address_configs().iter() {
                 for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS.iter() {
                     let mut exec = fasync::TestExecutor::new();
@@ -1023,9 +1025,9 @@ mod tests {
                                         non_temporary_address_config: non_temporary_address_config
                                             .clone(),
                                         prefix_delegation_config: prefix_delegation_config.clone(),
-                                        ..ClientConfig::EMPTY
+                                        ..Default::default()
                                     }),
-                                    ..NewClientParams::EMPTY
+                                    ..Default::default()
                                 },
                                 server_end
                             )
@@ -1045,7 +1047,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_client_starts_in_correct_mode() {
-        for information_config in [None].into_iter().chain(VALID_INFORMATION_CONFIGS) {
+        for information_config in [None].into_iter().chain(valid_information_configs()) {
             for non_temporary_address_config in
                 [None].into_iter().chain(get_valid_non_temporary_address_configs())
             {
@@ -1080,7 +1082,7 @@ mod tests {
                             information_config: information_config.clone(),
                             non_temporary_address_config: non_temporary_address_config.clone(),
                             prefix_delegation_config: prefix_delegation_config.clone(),
-                            ..ClientConfig::EMPTY
+                            ..Default::default()
                         },
                         1, /* interface ID */
                         client_socket,
@@ -1108,10 +1110,10 @@ mod tests {
                 interface_id: Some(1),
                 address: None,
                 config: Some(ClientConfig {
-                    information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                    ..ClientConfig::EMPTY
+                    information_config: Some(InformationConfig::default()),
+                    ..Default::default()
                 }),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             // Interface ID and zone index mismatch on link-local address.
             NewClientParams {
@@ -1122,10 +1124,10 @@ mod tests {
                     zone_index: 1,
                 }),
                 config: Some(ClientConfig {
-                    information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                    ..ClientConfig::EMPTY
+                    information_config: Some(InformationConfig::default()),
+                    ..Default::default()
                 }),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
             // Multicast address is invalid.
             NewClientParams {
@@ -1136,10 +1138,10 @@ mod tests {
                     zone_index: 1,
                 }),
                 config: Some(ClientConfig {
-                    information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                    ..ClientConfig::EMPTY
+                    information_config: Some(InformationConfig::default()),
+                    ..Default::default()
                 }),
-                ..NewClientParams::EMPTY
+                ..Default::default()
             },
         ] {
             let (client_proxy, server_end) =
@@ -1177,9 +1179,9 @@ mod tests {
             })),
             source: Some(fnet_name::DnsServerSource::Dhcpv6(fnet_name::Dhcpv6DnsServerSource {
                 source_interface: Some(source_interface),
-                ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                ..Default::default()
             })),
-            ..fnet_name::DnsServer_::EMPTY
+            ..Default::default()
         }
     }
 
@@ -1212,8 +1214,8 @@ mod tests {
             .run_singlethreaded(Client::<fasync::net::UdpSocket>::start(
                 transaction_id,
                 ClientConfig {
-                    information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                    ..ClientConfig::EMPTY
+                    information_config: Some(InformationConfig::default()),
+                    ..Default::default()
                 },
                 1, /* interface ID */
                 client_socket,
@@ -1439,8 +1441,8 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             transaction_id,
             ClientConfig {
-                information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                ..ClientConfig::EMPTY
+                information_config: Some(InformationConfig::default()),
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -1504,7 +1506,7 @@ mod tests {
             [1, 2, 3],
             ClientConfig {
                 prefix_delegation_config: Some(PrefixDelegationConfig::Empty(Empty {})),
-                ..ClientConfig::EMPTY
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -1754,8 +1756,8 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
             ClientConfig {
-                information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                ..ClientConfig::EMPTY
+                information_config: Some(InformationConfig::default()),
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -1839,8 +1841,8 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
             ClientConfig {
-                information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                ..ClientConfig::EMPTY
+                information_config: Some(InformationConfig::default()),
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -1956,10 +1958,10 @@ mod tests {
                     source: Some(fnet_name::DnsServerSource::Dhcpv6(
                         fnet_name::Dhcpv6DnsServerSource {
                             source_interface: Some(42),
-                            ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                            ..Default::default()
                         },
                     )),
-                    ..fnet_name::DnsServer_::EMPTY
+                    ..Default::default()
                 }))
                 .expect("failed to send response on test channel");
         };
@@ -1972,10 +1974,10 @@ mod tests {
                 source: Some(fnet_name::DnsServerSource::Dhcpv6(
                     fnet_name::Dhcpv6DnsServerSource {
                         source_interface: Some(42),
-                        ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                        ..Default::default()
                     },
                 )),
-                ..fnet_name::DnsServer_::EMPTY
+                ..Default::default()
             }]
         );
 
@@ -1997,9 +1999,9 @@ mod tests {
                 non_temporary_address_config: Some(AddressConfig {
                     address_count: Some(1),
                     preferred_addresses: None,
-                    ..AddressConfig::EMPTY
+                    ..Default::default()
                 }),
-                ..ClientConfig::EMPTY
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -2034,8 +2036,8 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
             ClientConfig {
-                information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                ..ClientConfig::EMPTY
+                information_config: Some(InformationConfig::default()),
+                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -2126,8 +2128,8 @@ mod tests {
         let mut client = Client::<StubSocket>::start(
             [1, 2, 3], /* transaction ID */
             ClientConfig {
-                information_config: Some(InformationConfig { ..InformationConfig::EMPTY }),
-                ..ClientConfig::EMPTY
+                information_config: Some(InformationConfig::default()),
+                ..Default::default()
             },
             1, /* interface ID */
             StubSocket {},

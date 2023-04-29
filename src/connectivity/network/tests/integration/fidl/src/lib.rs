@@ -150,10 +150,14 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
 
     futures::stream::iter([fidl_subnet!("1.1.1.1/24"), fidl_subnet!("a::1/64")].into_iter())
         .for_each_concurrent(None, |addr| {
-            add_address_wait_assigned(&control, addr, finterfaces_admin::AddressParameters::EMPTY)
-                .map(|res| {
-                    let _: finterfaces_admin::AddressStateProviderProxy = res.expect("add address");
-                })
+            add_address_wait_assigned(
+                &control,
+                addr,
+                finterfaces_admin::AddressParameters::default(),
+            )
+            .map(|res| {
+                let _: finterfaces_admin::AddressStateProviderProxy = res.expect("add address");
+            })
         })
         .await;
 }
@@ -408,16 +412,16 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
             fnet::IpVersion::V4 => finterfaces_admin::Configuration {
                 ipv4: Some(finterfaces_admin::Ipv4Configuration {
                     forwarding: Some(forwarding),
-                    ..finterfaces_admin::Ipv4Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..finterfaces_admin::Configuration::EMPTY
+                ..Default::default()
             },
             fnet::IpVersion::V6 => finterfaces_admin::Configuration {
                 ipv6: Some(finterfaces_admin::Ipv6Configuration {
                     forwarding: Some(forwarding),
-                    ..finterfaces_admin::Ipv6Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..finterfaces_admin::Configuration::EMPTY
+                ..Default::default()
             },
         };
 

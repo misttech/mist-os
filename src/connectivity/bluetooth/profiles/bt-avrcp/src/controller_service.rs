@@ -77,7 +77,7 @@ impl ControllerService {
             notification_filter: Notifications::empty(),
             notification_window_counter: 0,
             notification_queue: VecDeque::new(),
-            notification_state: Notification::EMPTY,
+            notification_state: Notification::default(),
             notification_state_timestamp: 0,
         }
     }
@@ -217,7 +217,7 @@ impl ControllerService {
     ) -> Result<(), Error> {
         self.notification_window_counter += 1;
         let control_handle: ControllerControlHandle = self.fidl_stream.control_handle();
-        let mut notification = Notification::EMPTY;
+        let mut notification = Notification::default();
         Self::update_notification_from_controller_event(&mut notification, &event);
         control_handle.send_on_notification(timestamp, notification).map_err(Error::from)
     }
@@ -231,7 +231,7 @@ impl ControllerService {
         if self.notification_state_timestamp > 0 {
             let control_handle: ControllerControlHandle = self.fidl_stream.control_handle();
 
-            let mut notification = Notification::EMPTY;
+            let mut notification = Notification::default();
 
             if self.notification_filter.contains(Notifications::PLAYBACK_STATUS) {
                 notification.status = self.notification_state.status;
@@ -475,7 +475,7 @@ mod tests {
     #[fuchsia::test]
     fn update_notification_from_controller_event() {
         // Available players changed.
-        let mut notification = Notification::EMPTY;
+        let mut notification = Notification::default();
         let some_event = PeerControllerEvent::AvailablePlayersChanged;
         ControllerService::update_notification_from_controller_event(
             &mut notification,
@@ -483,17 +483,17 @@ mod tests {
         );
         assert_eq!(
             notification,
-            Notification { available_players_changed: Some(true), ..Notification::EMPTY }
+            Notification { available_players_changed: Some(true), ..Default::default() }
         );
 
         // Addressed player changed.
-        let mut notification = Notification::EMPTY;
+        let mut notification = Notification::default();
         let some_event = PeerControllerEvent::AddressedPlayerChanged(4);
         ControllerService::update_notification_from_controller_event(
             &mut notification,
             &some_event,
         );
-        assert_eq!(notification, Notification { addressed_player: Some(4), ..Notification::EMPTY });
+        assert_eq!(notification, Notification { addressed_player: Some(4), ..Default::default() });
     }
 
     /// Tests that controller events are filtered based on the notification

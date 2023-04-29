@@ -251,7 +251,7 @@ mod tests {
                 neighbor: Some(neighbor),
                 state: Some(state),
                 updated_at: Some(updated_at.into_nanos()),
-                ..fnet_neighbor::Entry::EMPTY
+                ..Default::default()
             }
         }
 

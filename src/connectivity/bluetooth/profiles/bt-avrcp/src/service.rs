@@ -807,7 +807,7 @@ mod tests {
         pin_mut!(get_all_player_application_settings_fut);
         expected_commands += 1;
 
-        let mut settings = fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettings::EMPTY;
+        let mut settings = fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettings::default();
         settings.scan_mode = Some(fidl_fuchsia_bluetooth_avrcp::ScanMode::GroupScan);
         settings.shuffle_mode = Some(fidl_fuchsia_bluetooth_avrcp::ShuffleMode::Off);
         let set_player_application_settings_fut =

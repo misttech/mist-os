@@ -264,7 +264,7 @@ impl NetworkDeviceInstance {
                 fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(name),
                     metric: Some(metric),
-                    ..fidl_fuchsia_net_interfaces_admin::Options::EMPTY
+                    ..Default::default()
                 },
             )
             .context("calling DeviceControl create_interface")

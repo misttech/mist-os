@@ -361,7 +361,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn create_player_status() -> fidl_media::PlayerStatus {
-        let mut player_status = fidl_media::PlayerStatus::EMPTY;
+        let mut player_status = fidl_media::PlayerStatus::default();
 
         let timeline_fn = fidl_media_types::TimelineFunction {
             // Playback started at beginning of media.
@@ -429,7 +429,7 @@ pub(crate) mod tests {
         let mut media_state = MediaState::new(session_proxy);
 
         // 1. Only metadata
-        let mut info = fidl_media::SessionInfoDelta::EMPTY;
+        let mut info = fidl_media::SessionInfoDelta::default();
         let title = "Sapphire 💖".to_string();
         info.metadata = Some(create_metadata_title(title.clone()));
         info.player_status = None;
@@ -445,7 +445,7 @@ pub(crate) mod tests {
 
         // 2. Only PlayerStatus
         exec.set_fake_time(fasync::Time::from_nanos(654321000));
-        let mut info = fidl_media::SessionInfoDelta::EMPTY;
+        let mut info = fidl_media::SessionInfoDelta::default();
         info.metadata = None;
         info.player_status = Some(create_player_status());
         media_state.update_session_info(info);
@@ -469,7 +469,7 @@ pub(crate) mod tests {
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
-            ..fidl_media::SessionInfoDelta::EMPTY
+            ..Default::default()
         };
         media_state.update_session_info(info);
 
@@ -495,7 +495,7 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().media_info, expected_media_info);
 
         // 4. Neither, values from (3) should stay the same.
-        let info = fidl_media::SessionInfoDelta::EMPTY;
+        let info = fidl_media::SessionInfoDelta::default();
         media_state.update_session_info(info);
 
         assert_eq!(media_state.session_info().play_status, expected_play_status);
@@ -532,7 +532,7 @@ pub(crate) mod tests {
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
-            ..fidl_media::SessionInfoDelta::EMPTY
+            ..Default::default()
         };
         media_state.update_session_info(info);
 
@@ -579,7 +579,7 @@ pub(crate) mod tests {
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
-            ..fidl_media::SessionInfoDelta::EMPTY
+            ..Default::default()
         };
         media_state.update_session_info(info);
 
@@ -606,13 +606,13 @@ pub(crate) mod tests {
                 subject_delta: 0,
                 reference_delta: 1,
             }),
-            ..fidl_media::PlayerStatus::EMPTY
+            ..Default::default()
         };
 
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(player_status),
-            ..fidl_media::SessionInfoDelta::EMPTY
+            ..Default::default()
         };
         media_state.update_session_info(info);
 
@@ -656,7 +656,7 @@ pub(crate) mod tests {
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
-            ..fidl_media::SessionInfoDelta::EMPTY
+            ..Default::default()
         };
         media_state.update_session_info(info);
         media_state.update_battery_status(fidl_avrcp::BatteryStatus::Critical);
@@ -665,7 +665,7 @@ pub(crate) mod tests {
         let expected_pas = fidl_avrcp::PlayerApplicationSettings {
             repeat_status_mode: Some(fidl_avrcp::RepeatStatusMode::Off),
             shuffle_mode: Some(fidl_avrcp::ShuffleMode::AllTrackShuffle),
-            ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+            ..Default::default()
         };
         let requested_events = vec![
             fidl_avrcp::NotificationEvent::PlayerApplicationSettingChanged,
@@ -677,18 +677,15 @@ pub(crate) mod tests {
         let expected_values = vec![
             fidl_avrcp::Notification {
                 application_settings: Some(expected_pas),
-                ..fidl_avrcp::Notification::EMPTY
+                ..Default::default()
             },
-            fidl_avrcp::Notification {
-                status: Some(expected_play_status),
-                ..fidl_avrcp::Notification::EMPTY
-            },
-            fidl_avrcp::Notification { track_id: Some(0), ..fidl_avrcp::Notification::EMPTY },
+            fidl_avrcp::Notification { status: Some(expected_play_status), ..Default::default() },
+            fidl_avrcp::Notification { track_id: Some(0), ..Default::default() },
             // 55.555 milliseconds have passed
-            fidl_avrcp::Notification { pos: Some(55), ..fidl_avrcp::Notification::EMPTY },
+            fidl_avrcp::Notification { pos: Some(55), ..Default::default() },
             fidl_avrcp::Notification {
                 battery_status: Some(fidl_avrcp::BatteryStatus::Critical),
-                ..fidl_avrcp::Notification::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -710,8 +707,7 @@ pub(crate) mod tests {
             .expect("value in notification")
             .into();
         // Expect 7 more seconds have passed
-        let expected =
-            fidl_avrcp::Notification { pos: Some(7055), ..fidl_avrcp::Notification::EMPTY };
+        let expected = fidl_avrcp::Notification { pos: Some(7055), ..Default::default() };
         assert_eq!(updated_pos, expected);
     }
 

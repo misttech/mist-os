@@ -157,7 +157,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
         let address_state_provider = interfaces::add_address_wait_assigned(
             iface.control(),
             addr,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
         )
         .await
         .expect("add address");
@@ -550,7 +550,7 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
         let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
             &dev,
             DEVICE_ADDRESS_IN_SUBNET,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
         )
         .await
         .expect("add subnet address and route");
@@ -867,7 +867,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
                 .expect("create watcher");
         let () = interface_state
-            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::EMPTY, server)
+            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)
             .expect("initialize interface watcher");
 
         let ep = sandbox
@@ -902,7 +902,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
                 let address_state_provider = interfaces::add_address_wait_assigned(
                     &control_add_address,
                     ADDR,
-                    fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 )
                 .await
                 .expect("add address");
@@ -1254,7 +1254,7 @@ async fn watcher(name: &str) {
         addresses: Some(vec![]),
         has_default_ipv4_route: Some(false),
         has_default_ipv6_route: Some(false),
-        ..fidl_fuchsia_net_interfaces::Properties::EMPTY
+        ..Default::default()
     });
     assert_eq!(next(&mut blocking_stream).await, want);
     assert_eq!(next(&mut stream).await, want);
@@ -1358,7 +1358,7 @@ async fn watcher(name: &str) {
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &dev,
         subnet,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
     .expect("add subnet address and route");
@@ -1413,7 +1413,7 @@ async fn watcher(name: &str) {
         fidl_fuchsia_net_interfaces::Event::Changed(fidl_fuchsia_net_interfaces::Properties {
             id: Some(id),
             has_default_ipv4_route: Some(true),
-            ..fidl_fuchsia_net_interfaces::Properties::EMPTY
+            ..Default::default()
         });
     assert_eq!(next(&mut blocking_stream).await, want);
     assert_eq!(next(&mut stream).await, want);
@@ -1429,7 +1429,7 @@ async fn watcher(name: &str) {
         fidl_fuchsia_net_interfaces::Event::Changed(fidl_fuchsia_net_interfaces::Properties {
             id: Some(id),
             has_default_ipv4_route: Some(false),
-            ..fidl_fuchsia_net_interfaces::Properties::EMPTY
+            ..Default::default()
         });
     assert_eq!(next(&mut blocking_stream).await, want);
     assert_eq!(next(&mut stream).await, want);
@@ -1603,7 +1603,7 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
         .control()
         .add_address(
             &mut ADDR.clone(),
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             server,
         )
         .expect("Control.AddAddress FIDL error");
@@ -1614,7 +1614,7 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
                 fidl_fuchsia_net_interfaces::Empty,
             ),
         ),
-        ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+        ..Default::default()
     };
     address_state_provider
         .update_address_properties(deprecated_properties)

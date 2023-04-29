@@ -176,9 +176,7 @@ fn create_bridged_network(
             .expect("failed to create fuchsia.net.virtualization/Network proxy");
     virtualization_control
         .create_network(
-            &mut fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged {
-                ..fnet_virtualization::Bridged::EMPTY
-            }),
+            &mut fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged::default()),
             server_end,
         )
         .expect("create network");

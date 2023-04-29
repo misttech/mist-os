@@ -77,11 +77,11 @@ async fn gets_dns_servers(name: &str) {
                 config: Some(fnet_dhcpv6::ClientConfig {
                     information_config: Some(fnet_dhcpv6::InformationConfig {
                         dns_servers: Some(true),
-                        ..fnet_dhcpv6::InformationConfig::EMPTY
+                        ..Default::default()
                     }),
-                    ..fnet_dhcpv6::ClientConfig::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_dhcpv6::NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end,
         )
@@ -99,9 +99,9 @@ async fn gets_dns_servers(name: &str) {
         })),
         source: Some(fnet_name::DnsServerSource::Dhcpv6(fnet_name::Dhcpv6DnsServerSource {
             source_interface: Some(iface.id()),
-            ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+            ..Default::default()
         })),
-        ..fnet_name::DnsServer_::EMPTY
+        ..Default::default()
     };
     assert_eq!(&got, &[want]);
 }
@@ -259,7 +259,7 @@ fn start_dhcpv6_client(
                     zone_index: interface_id,
                 }),
                 config: Some(client_config),
-                ..fnet_dhcpv6::NewClientParams::EMPTY
+                ..Default::default()
             },
             server_end,
         )
@@ -340,7 +340,7 @@ async fn stateful_renew(name: &str) {
             prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                 fnet_dhcpv6::Empty,
             )),
-            ..fnet_dhcpv6::ClientConfig::EMPTY
+            ..Default::default()
         },
     );
 
@@ -384,7 +384,7 @@ async fn stateful_alternative_server_while_rebinding(name: &str) {
             prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                 fnet_dhcpv6::Empty,
             )),
-            ..fnet_dhcpv6::ClientConfig::EMPTY
+            ..Default::default()
         },
     );
 
@@ -433,7 +433,7 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
                 prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                     fnet_dhcpv6::Empty,
                 )),
-                ..fnet_dhcpv6::ClientConfig::EMPTY
+                ..Default::default()
             },
         );
 
@@ -466,7 +466,7 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
                 prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                     fnet_dhcpv6::Empty,
                 )),
-                ..fnet_dhcpv6::ClientConfig::EMPTY
+                ..Default::default()
             },
         );
 

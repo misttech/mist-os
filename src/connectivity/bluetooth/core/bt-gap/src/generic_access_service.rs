@@ -26,10 +26,10 @@ fn build_generic_access_service_info() -> gatt::ServiceInfo {
         type_: Some(GENERIC_ACCESS_DEVICE_NAME_UUID.into()),
         properties: Some(gatt::CharacteristicPropertyBits::READ),
         permissions: Some(gatt::AttributePermissions {
-            read: Some(gatt::SecurityRequirements::EMPTY),
-            ..gatt::AttributePermissions::EMPTY
+            read: Some(gatt::SecurityRequirements::default()),
+            ..Default::default()
         }),
-        ..gatt::Characteristic::EMPTY
+        ..Default::default()
     };
 
     let appearance_characteristic = gatt::Characteristic {
@@ -37,10 +37,10 @@ fn build_generic_access_service_info() -> gatt::ServiceInfo {
         type_: Some(GENERIC_ACCESS_APPEARANCE_UUID.into()),
         properties: Some(gatt::CharacteristicPropertyBits::READ),
         permissions: Some(gatt::AttributePermissions {
-            read: Some(gatt::SecurityRequirements::EMPTY),
-            ..gatt::AttributePermissions::EMPTY
+            read: Some(gatt::SecurityRequirements::default()),
+            ..Default::default()
         }),
-        ..gatt::Characteristic::EMPTY
+        ..Default::default()
     };
 
     gatt::ServiceInfo {
@@ -50,7 +50,7 @@ fn build_generic_access_service_info() -> gatt::ServiceInfo {
         kind: Some(gatt::ServiceKind::Primary),
         type_: Some(GENERIC_ACCESS_SERVICE_UUID.into()),
         characteristics: Some(vec![device_name_characteristic, appearance_characteristic]),
-        ..gatt::ServiceInfo::EMPTY
+        ..Default::default()
     }
 }
 
@@ -282,7 +282,7 @@ mod tests {
                 handle: Some(gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID }),
                 offset: Some(0),
                 value: Some(b"new-name".to_vec()),
-                ..gatt::LocalServiceWriteValueRequest::EMPTY
+                ..Default::default()
             })
             .await
             .unwrap();

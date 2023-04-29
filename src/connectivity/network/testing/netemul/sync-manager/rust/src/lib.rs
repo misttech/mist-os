@@ -44,7 +44,7 @@ impl Event {
 
 impl From<Event> for fnetemul_sync::Event {
     fn from(Event { code, message, arguments }: Event) -> Self {
-        Self { code: Some(code), message, arguments, ..Self::EMPTY }
+        Self { code: Some(code), message, arguments, ..Default::default() }
     }
 }
 

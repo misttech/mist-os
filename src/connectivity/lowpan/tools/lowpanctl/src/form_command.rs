@@ -83,7 +83,7 @@ impl FormCommand {
             net_type: self.net_type.clone(),
             channel: self.channel.clone(),
             panid: self.panid.clone(),
-            ..Identity::EMPTY
+            ..Default::default()
         })
     }
 

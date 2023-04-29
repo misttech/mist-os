@@ -252,7 +252,7 @@ pub fn generate_random_fidl_network_config_with_ssid(ssid: &str) -> fidl_policy:
             type_: fidl_policy::SecurityType::Wpa2,
         }),
         credential: Some(fidl_policy::Credential::Password(credential_bytes)),
-        ..fidl_policy::NetworkConfig::EMPTY
+        ..Default::default()
     }
 }
 

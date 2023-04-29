@@ -399,7 +399,7 @@ impl From<OnMeshNet> for crate::lowpan_fidl::OnMeshPrefix {
             stable: Some(x.stable),
             slaac_preferred: Some(x.flags.is_slaac_preferred()),
             slaac_valid: Some(x.flags.is_slaac_valid()),
-            ..crate::lowpan_fidl::OnMeshPrefix::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -498,7 +498,7 @@ impl From<ExternalRoute> for crate::lowpan_fidl::ExternalRoute {
             subnet: Some(x.subnet.into()),
             route_preference: Some(x.flags.route_preference()),
             stable: Some(x.stable),
-            ..crate::lowpan_fidl::ExternalRoute::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -660,7 +660,7 @@ impl AllCountersUpdate<AllMacCounters> for AllCounters {
             err_cca: data.tx_counters.get(12).cloned(),
             err_abort: data.tx_counters.get(13).cloned(),
             err_busy_channel: data.tx_counters.get(14).cloned(),
-            ..MacCounters::EMPTY
+            ..Default::default()
         });
         self.mac_rx = Some(MacCounters {
             total: data.rx_counters.first().cloned(),
@@ -680,14 +680,14 @@ impl AllCountersUpdate<AllMacCounters> for AllCounters {
             err_sec: data.rx_counters.get(14).cloned(),
             err_fcs: data.rx_counters.get(15).cloned(),
             err_other: data.rx_counters.get(16).cloned(),
-            ..MacCounters::EMPTY
+            ..Default::default()
         });
     }
 }
 
 impl std::convert::From<AllMacCounters> for AllCounters {
     fn from(val: AllMacCounters) -> Self {
-        let mut ret = AllCounters::EMPTY;
+        let mut ret = AllCounters::default();
         ret.update_from(val);
         ret
     }
@@ -759,7 +759,7 @@ impl AllCountersUpdate<RadioCoexMetrics> for AllCounters {
             grant_deactivated_during_request: data.tx.get(5).cloned().map(Into::into),
             delayed_grant: data.tx.get(6).cloned().map(Into::into),
             avg_delay_request_to_grant_usec: data.tx.get(7).cloned(),
-            ..CoexCounters::EMPTY
+            ..Default::default()
         });
         self.coex_rx = Some(CoexCounters {
             requests: data.rx.first().cloned().map(Into::into),
@@ -771,7 +771,7 @@ impl AllCountersUpdate<RadioCoexMetrics> for AllCounters {
             delayed_grant: data.rx.get(6).cloned().map(Into::into),
             avg_delay_request_to_grant_usec: data.rx.get(7).cloned(),
             grant_none: data.rx.get(8).cloned().map(Into::into),
-            ..CoexCounters::EMPTY
+            ..Default::default()
         });
         if self.coex_saturated != Some(true) {
             self.coex_saturated = Some(data.stopped);
@@ -781,7 +781,7 @@ impl AllCountersUpdate<RadioCoexMetrics> for AllCounters {
 
 impl std::convert::From<RadioCoexMetrics> for AllCounters {
     fn from(val: RadioCoexMetrics) -> Self {
-        let mut ret = AllCounters::EMPTY;
+        let mut ret = AllCounters::default();
         ret.update_from(val);
         ret
     }

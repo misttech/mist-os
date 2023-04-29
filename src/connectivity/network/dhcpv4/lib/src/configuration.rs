@@ -117,7 +117,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::LeaseLength> for LeaseLength {
         Ok(fidl_fuchsia_net_dhcp::LeaseLength {
             default: Some(default_seconds),
             max: Some(max_seconds),
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -201,7 +201,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::AddressPool> for ManagedAddresses {
             prefix_length: Some(mask.ones()),
             range_start: Some(pool_range_start.into_fidl()),
             range_stop: Some(pool_range_stop.into_fidl()),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -268,7 +268,7 @@ impl FidlCompatible<Vec<fidl_fuchsia_net_dhcp::StaticAssignment>> for StaticAssi
             .map(|(host, assigned_addr)| fidl_fuchsia_net_dhcp::StaticAssignment {
                 host: Some(host.into()),
                 assigned_addr: Some(assigned_addr.into_fidl()),
-                ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                ..Default::default()
             })
             .collect())
     }
@@ -479,23 +479,20 @@ mod tests {
         let both = fidl_fuchsia_net_dhcp::LeaseLength {
             default: Some(42),
             max: Some(42),
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         };
         let with_default = fidl_fuchsia_net_dhcp::LeaseLength {
             default: Some(42),
             max: None,
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         };
         let with_max = fidl_fuchsia_net_dhcp::LeaseLength {
             default: None,
             max: Some(42),
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
+            ..Default::default()
         };
-        let neither = fidl_fuchsia_net_dhcp::LeaseLength {
-            default: None,
-            max: None,
-            ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
-        };
+        let neither =
+            fidl_fuchsia_net_dhcp::LeaseLength { default: None, max: None, ..Default::default() };
 
         assert_eq!(
             LeaseLength::try_from_fidl(both).unwrap(),
@@ -518,7 +515,7 @@ mod tests {
             prefix_length: Some(prefix_length),
             range_start: Some(start_addr),
             range_stop: Some(stop_addr),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
 
         assert_matches::assert_matches!(
@@ -534,7 +531,7 @@ mod tests {
             prefix_length: Some(33),
             range_start: Some(fidl_ip_v4!("192.168.0.2")),
             range_stop: Some(fidl_ip_v4!("192.168.0.254")),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
 
         assert_err_with_substring!(
@@ -546,7 +543,7 @@ mod tests {
             prefix_length: None,
             range_start: Some(fidl_ip_v4!("192.168.0.2")),
             range_stop: Some(fidl_ip_v4!("192.168.0.254")),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
 
         assert_err_with_substring!(
@@ -558,7 +555,7 @@ mod tests {
             prefix_length: Some(24),
             range_start: Some(fidl_ip_v4!("192.168.0.20")),
             range_stop: Some(fidl_ip_v4!("192.168.0.10")),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
 
         assert_err_with_substring!(
@@ -570,7 +567,7 @@ mod tests {
             prefix_length: Some(24),
             range_start: Some(fidl_ip_v4!("192.168.0.0")),
             range_stop: Some(fidl_ip_v4!("192.168.1.0")),
-            ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+            ..Default::default()
         };
 
         assert_err_with_substring!(
@@ -588,24 +585,24 @@ mod tests {
         let fields_present = vec![fidl_fuchsia_net_dhcp::StaticAssignment {
             host: Some(fidl_fuchsia_net::MacAddress { octets: mac.clone() }),
             assigned_addr: Some(ip.into_fidl()),
-            ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+            ..Default::default()
         }];
         let multiple_entries = vec![
             fidl_fuchsia_net_dhcp::StaticAssignment {
                 host: Some(fidl_fuchsia_net::MacAddress { octets: mac.clone() }),
                 assigned_addr: Some(ip.into_fidl()),
-                ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                ..Default::default()
             },
             fidl_fuchsia_net_dhcp::StaticAssignment {
                 host: Some(fidl_fuchsia_net::MacAddress { octets: mac.clone() }),
                 assigned_addr: Some(random_ipv4_generator().into_fidl()),
-                ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+                ..Default::default()
             },
         ];
         let fields_missing = vec![fidl_fuchsia_net_dhcp::StaticAssignment {
             host: None,
             assigned_addr: None,
-            ..fidl_fuchsia_net_dhcp::StaticAssignment::EMPTY
+            ..Default::default()
         }];
 
         assert_eq!(

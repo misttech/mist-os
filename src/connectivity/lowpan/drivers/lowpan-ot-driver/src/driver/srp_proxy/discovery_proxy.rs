@@ -135,25 +135,16 @@ impl DiscoveryProxy {
         subscriptions.lock().remove(&name_srp_domain);
     }
 
-    const fn host_name_subscription_options() -> HostNameSubscriptionOptions {
-        HostNameSubscriptionOptions {
-            exclude_local_proxies: Some(true),
-            ..HostNameSubscriptionOptions::EMPTY
-        }
+    fn host_name_subscription_options() -> HostNameSubscriptionOptions {
+        HostNameSubscriptionOptions { exclude_local_proxies: Some(true), ..Default::default() }
     }
 
-    const fn host_name_resolution_options() -> HostNameResolutionOptions {
-        HostNameResolutionOptions {
-            exclude_local_proxies: Some(true),
-            ..HostNameResolutionOptions::EMPTY
-        }
+    fn host_name_resolution_options() -> HostNameResolutionOptions {
+        HostNameResolutionOptions { exclude_local_proxies: Some(true), ..Default::default() }
     }
 
-    const fn service_subscription_options() -> ServiceSubscriptionOptions {
-        ServiceSubscriptionOptions {
-            exclude_local_proxies: Some(true),
-            ..ServiceSubscriptionOptions::EMPTY
-        }
+    fn service_subscription_options() -> ServiceSubscriptionOptions {
+        ServiceSubscriptionOptions { exclude_local_proxies: Some(true), ..Default::default() }
     }
 
     fn dnssd_subscribed_to_host(

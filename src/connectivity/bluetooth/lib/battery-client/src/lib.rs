@@ -302,7 +302,7 @@ mod tests {
         assert!(!client.is_terminated());
 
         // An empty update from the `fuchsia.power` service should trigger a stream event.
-        let update = fpower::BatteryInfo::EMPTY;
+        let update = fpower::BatteryInfo::default();
         let info = send_update_and_poll_battery_client(
             &mut exec,
             &mut client,
@@ -315,7 +315,7 @@ mod tests {
         // A not-OK battery status is fine. Stream event should still be NotAvailable.
         let update = fpower::BatteryInfo {
             status: Some(fpower::BatteryStatus::NotPresent),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -330,7 +330,7 @@ mod tests {
         let update = fpower::BatteryInfo {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Unknown),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -350,7 +350,7 @@ mod tests {
         let update = fpower::BatteryInfo {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Warning),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -365,7 +365,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Ok),
             level_percent: Some(125.58f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -380,7 +380,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Critical),
             level_percent: Some(-10.332),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -404,7 +404,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Low),
             level_percent: Some(88f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -424,7 +424,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Critical),
             level_percent: Some(-10.332),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -439,7 +439,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Critical),
             level_percent: Some(5.58f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -455,7 +455,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Critical),
             level_percent: Some(0.0f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,
@@ -471,7 +471,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Ok),
             level_status: Some(fpower::LevelStatus::Critical),
             level_percent: Some(100.0f32),
-            ..fpower::BatteryInfo::EMPTY
+            ..Default::default()
         };
         let info = send_update_and_poll_battery_client(
             &mut exec,

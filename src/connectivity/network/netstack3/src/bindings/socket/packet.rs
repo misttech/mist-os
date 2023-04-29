@@ -244,10 +244,7 @@ impl<'a> RequestHandler<'a> {
                 zx::Rights::BASIC,
             )
             .unwrap_or_else(|s: zx::Status| panic!("failed to duplicate handle: {s}"));
-        fppacket::SocketDescribeResponse {
-            event: Some(peer),
-            ..fppacket::SocketDescribeResponse::EMPTY
-        }
+        fppacket::SocketDescribeResponse { event: Some(peer), ..Default::default() }
     }
 
     fn bind(
@@ -501,10 +498,10 @@ impl<'a> RequestHandler<'a> {
             }
             fppacket::SocketRequest::SendMsg { packet_info, data, control, flags, responder } => {
                 if ![
-                    fppacket::SendControlData::EMPTY,
+                    fppacket::SendControlData::default(),
                     fppacket::SendControlData {
-                        socket: Some(fpsocket::SocketSendControlData::EMPTY),
-                        ..fppacket::SendControlData::EMPTY
+                        socket: Some(fpsocket::SocketSendControlData::default()),
+                        ..Default::default()
                     },
                 ]
                 .contains(&control)
@@ -645,7 +642,7 @@ impl RecvMsgParams {
 
         // TODO(https://fxbug.dev/106735): Return control data and flags.
         let _ = (want_control, flags, dst_mac);
-        let control = fppacket::RecvControlData::EMPTY;
+        let control = fppacket::RecvControlData::default();
 
         (packet_info, body, control, truncated.try_into().unwrap_or(u32::MAX))
     }

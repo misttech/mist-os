@@ -130,7 +130,7 @@ impl A2dpConfiguration {
         bredr::ChannelParameters {
             channel_mode: Some(self.channel_mode),
             max_rx_sdu_size: Some(MAX_RX_SDU_SIZE),
-            ..bredr::ChannelParameters::EMPTY
+            ..Default::default()
         }
     }
 

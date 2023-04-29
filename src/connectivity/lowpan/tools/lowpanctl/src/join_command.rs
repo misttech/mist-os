@@ -110,7 +110,7 @@ impl JoinCommand {
             net_type: self.net_type.clone(),
             channel: self.channel.clone(),
             panid: self.panid.clone(),
-            ..Identity::EMPTY
+            ..Default::default()
         })
     }
 
@@ -127,7 +127,7 @@ impl JoinCommand {
             vendor_model: self.vendor_model.clone(),
             vendor_sw_version: self.vendor_sw_version.clone(),
             vendor_data_string: self.vendor_data_string.clone(),
-            ..JoinerCommissioningParams::EMPTY
+            ..Default::default()
         }
     }
 

@@ -177,10 +177,10 @@ impl GattService {
             type_: Uuid::from_str(MODEL_ID_CHARACTERISTIC_UUID).ok().map(Into::into),
             properties: Some(CharacteristicPropertyBits::READ),
             permissions: Some(AttributePermissions {
-                read: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                read: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         // 1. Key-based Pairing - This supports write & notify with no specific security
@@ -192,11 +192,11 @@ impl GattService {
                 CharacteristicPropertyBits::WRITE | CharacteristicPropertyBits::NOTIFY,
             ),
             permissions: Some(AttributePermissions {
-                write: Some(SecurityRequirements::EMPTY),
-                update: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                write: Some(SecurityRequirements::default()),
+                update: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         // 2. Passkey - This supports write & notify with no specific security requirements.
@@ -207,11 +207,11 @@ impl GattService {
                 CharacteristicPropertyBits::WRITE | CharacteristicPropertyBits::NOTIFY,
             ),
             permissions: Some(AttributePermissions {
-                write: Some(SecurityRequirements::EMPTY),
-                update: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                write: Some(SecurityRequirements::default()),
+                update: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         // 3. Account Key - This only supports write with no specific security requirements.
@@ -220,10 +220,10 @@ impl GattService {
             type_: Uuid::from_str(ACCOUNT_KEY_CHARACTERISTIC_UUID).ok().map(Into::into),
             properties: Some(CharacteristicPropertyBits::WRITE),
             permissions: Some(AttributePermissions {
-                write: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                write: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         // 4. Firmware Revision - This only supports read with no specific security requirements.
@@ -232,10 +232,10 @@ impl GattService {
             type_: Some(Uuid::new16(FIRMWARE_REVISION_CHARACTERISTIC_UUID).into()),
             properties: Some(CharacteristicPropertyBits::READ),
             permissions: Some(AttributePermissions {
-                read: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                read: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         // 5. Additional Data - This supports write & notify with no specific security requirements.
@@ -246,11 +246,11 @@ impl GattService {
                 CharacteristicPropertyBits::WRITE | CharacteristicPropertyBits::NOTIFY,
             ),
             permissions: Some(AttributePermissions {
-                write: Some(SecurityRequirements::EMPTY),
-                update: Some(SecurityRequirements::EMPTY),
-                ..AttributePermissions::EMPTY
+                write: Some(SecurityRequirements::default()),
+                update: Some(SecurityRequirements::default()),
+                ..Default::default()
             }),
-            ..Characteristic::EMPTY
+            ..Default::default()
         };
 
         vec![model_id, key_based_pairing, passkey, account_key, firmware_revision, additional_data]
@@ -263,7 +263,7 @@ impl GattService {
             kind: Some(ServiceKind::Primary),
             type_: Some(Uuid::new16(FAST_PAIR_SERVICE_UUID).into()),
             characteristics: Some(Self::characteristics()),
-            ..ServiceInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -304,7 +304,7 @@ impl GattService {
             peer_ids: Some(vec![id.into()]),
             handle: Some(handle),
             value: Some(value),
-            ..ValueChangedParameters::EMPTY
+            ..Default::default()
         };
         self.local_service_server.control_handle().send_on_notify_value(params).map_err(Into::into)
     }
@@ -635,7 +635,7 @@ pub(crate) mod tests {
             handle: Some(MODEL_ID_CHARACTERISTIC_HANDLE),
             offset: Some(0),
             value: Some(vec![0x00, 0x01, 0x02]),
-            ..WriteValueRequest::EMPTY
+            ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(params);
         pin_mut!(write_request_fut);
@@ -652,7 +652,7 @@ pub(crate) mod tests {
             handle: Some(Handle { value: 999 }),
             offset: Some(0),
             value: Some(vec![0x00, 0x01, 0x02]),
-            ..WriteValueRequest::EMPTY
+            ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(params);
         pin_mut!(write_request_fut);
@@ -675,7 +675,7 @@ pub(crate) mod tests {
             handle: Some(characteristic_handle),
             offset: Some(0),
             value: Some(vec![0x00, 0x01, 0x02]),
-            ..WriteValueRequest::EMPTY
+            ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(params);
         pin_mut!(write_request_fut);
@@ -744,7 +744,7 @@ pub(crate) mod tests {
             handle: Some(PASSKEY_CHARACTERISTIC_HANDLE),
             offset: Some(10), // Nonzero is not supported.
             value: Some(vec![0x00, 0x01, 0x02]),
-            ..WriteValueRequest::EMPTY
+            ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(params);
         pin_mut!(write_request_fut);

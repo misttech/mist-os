@@ -241,7 +241,7 @@ impl From<PlayerApplicationSettings> for fidl_avrcp::PlayerApplicationSettings {
             repeat_status_mode: src.repeat_status_mode.map(Into::into),
             shuffle_mode: src.shuffle_mode.map(Into::into),
             scan_mode: src.scan_mode.map(Into::into),
-            ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+            ..Default::default()
         }
     }
 }

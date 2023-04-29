@@ -962,7 +962,7 @@ mod tests {
                 handle: Some(handle),
                 offset: Some(0),
                 value: Some(encrypted_buf),
-                ..WriteValueRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("valid FIDL request");
@@ -1497,7 +1497,7 @@ mod tests {
                 handle: Some(KEY_BASED_PAIRING_CHARACTERISTIC_HANDLE),
                 offset: Some(0),
                 value: Some(encrypted_buf),
-                ..WriteValueRequest::EMPTY
+                ..Default::default()
             })
             .await
             .expect("valid FIDL request")

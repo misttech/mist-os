@@ -174,7 +174,7 @@ impl Channel {
             let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
             let parameters = bredr::ChannelParameters {
                 flush_timeout: duration.clone().map(zx::Duration::into_nanos),
-                ..bredr::ChannelParameters::EMPTY
+                ..Default::default()
             };
             let new_params = proxy.request_parameters(parameters).await?;
             let new_timeout = new_params.flush_timeout.map(zx::Duration::from_nanos);
@@ -239,7 +239,7 @@ impl TryFrom<Channel> for bredr::Channel {
             ext_direction,
             flush_timeout,
             ext_l2cap,
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn test_channel_from_fidl() {
         let _exec = fasync::TestExecutor::new();
-        let empty = bredr::Channel::EMPTY;
+        let empty = bredr::Channel::default();
         assert!(Channel::try_from(empty).is_err());
 
         let (remote, _local) = zx::Socket::create_datagram();
@@ -330,7 +330,7 @@ mod tests {
             socket: Some(remote),
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
 
         let chan = Channel::try_from(okay).expect("okay channel to be converted");
@@ -364,7 +364,7 @@ mod tests {
             socket: Some(remote),
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
         let channel = Channel::try_from(no_ext).unwrap();
 
@@ -381,7 +381,7 @@ mod tests {
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_direction: Some(client_end),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
 
         let channel = Channel::try_from(ext).unwrap();
@@ -441,7 +441,7 @@ mod tests {
             channel_mode: Some(bredr::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             flush_timeout: Some(50_000_000), // 50 milliseconds
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
         let channel = Channel::try_from(no_ext).unwrap();
 
@@ -469,7 +469,7 @@ mod tests {
             max_tx_sdu_size: Some(1004),
             flush_timeout: None,
             ext_l2cap: Some(client_end),
-            ..bredr::Channel::EMPTY
+            ..Default::default()
         };
 
         let channel = Channel::try_from(ext).unwrap();
@@ -502,7 +502,7 @@ mod tests {
                     // Send a different response
                     let params = bredr::ChannelParameters {
                         flush_timeout: Some(50_000_000), // 50ms
-                        ..bredr::ChannelParameters::EMPTY
+                        ..Default::default()
                     };
                     responder.send(params).expect("response to send cleanly");
                 }

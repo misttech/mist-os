@@ -51,10 +51,7 @@ impl TunNetworkInterface {
         let (tun_dev, req) = create_proxy::<ftun::DeviceMarker>()?;
 
         tun_control
-            .create_device(
-                ftun::DeviceConfig { blocking: Some(true), ..ftun::DeviceConfig::EMPTY },
-                req,
-            )
+            .create_device(ftun::DeviceConfig { blocking: Some(true), ..Default::default() }, req)
             .context("failed to create tun pair")?;
 
         let (tun_port, port_req) = create_proxy::<ftun::PortMarker>()?;
@@ -82,9 +79,9 @@ impl TunNetworkInterface {
                                 supported_flags: fhwnet::TxFlags::empty(),
                             },
                         ]),
-                        ..ftun::BasePortConfig::EMPTY
+                        ..Default::default()
                     }),
-                    ..ftun::DevicePortConfig::EMPTY
+                    ..Default::default()
                 },
                 port_req,
             )
@@ -118,7 +115,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &mut port_id,
                     control_sync_server.into(),
-                    fnetifadmin::Options { name: name.clone(), ..fnetifadmin::Options::EMPTY },
+                    fnetifadmin::Options { name: name.clone(), ..Default::default() },
                 )
                 .context("create_interface failed")?;
 
@@ -127,7 +124,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &mut port_id,
                     server_end,
-                    fnetifadmin::Options { name, ..fnetifadmin::Options::EMPTY },
+                    fnetifadmin::Options { name, ..Default::default() },
                 )
                 .context("create_interface failed")?;
 
@@ -193,7 +190,7 @@ impl NetworkInterface for TunNetworkInterface {
                 frame_type: Some(fhwnet::FrameType::Ipv6),
                 data: Some(packet.to_vec()),
                 meta: None,
-                ..fidl_fuchsia_net_tun::Frame::EMPTY
+                ..Default::default()
             })
             .await?
             .map_err(fuchsia_zircon::Status::from_raw)?)
@@ -251,7 +248,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         self.control_sync.lock().add_address(
             &mut device_addr,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             server_end,
         )?;
 
@@ -369,15 +366,18 @@ impl NetworkInterface for TunNetworkInterface {
             watcher: Option<WatcherProxy>,
             next_events: Vec<NetworkInterfaceEvent>,
         }
-        let init_state =
-            EventState { prev_prop: Properties::EMPTY, watcher: None, next_events: Vec::default() };
+        let init_state = EventState {
+            prev_prop: Properties::default(),
+            watcher: None,
+            next_events: Vec::default(),
+        };
 
         let if_event_stream = futures::stream::try_unfold(init_state, move |mut state| {
             async move {
                 if state.watcher.is_none() {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
                     let (watcher, req) = create_proxy::<WatcherMarker>()?;
-                    fnif_state.get_watcher(WatcherOptions::EMPTY, req)?;
+                    fnif_state.get_watcher(WatcherOptions::default(), req)?;
                     state.watcher = Some(watcher);
                 }
 
@@ -461,9 +461,9 @@ impl NetworkInterface for TunNetworkInterface {
                     ipv6: Some(fnetifadmin::Ipv6Configuration {
                         forwarding: Some(enabled),
                         multicast_forwarding: Some(enabled),
-                        ..fnetifadmin::Ipv6Configuration::EMPTY
+                        ..Default::default()
                     }),
-                    ..fnetifadmin::Configuration::EMPTY
+                    ..Default::default()
                 },
                 zx::Time::INFINITE,
             )

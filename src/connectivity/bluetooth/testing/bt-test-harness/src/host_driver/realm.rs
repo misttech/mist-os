@@ -30,7 +30,7 @@ impl HostDriverRealm {
         // Start DriverTestRealm
         let args = fdt::RealmArgs {
             root_driver: Some(EMULATOR_ROOT_DRIVER_URL.to_string()),
-            ..fdt::RealmArgs::EMPTY
+            ..Default::default()
         };
         instance.driver_test_realm_start(args).await?;
         Ok(Self { realm: instance })

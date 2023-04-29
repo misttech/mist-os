@@ -118,10 +118,7 @@ impl TrelInstance {
 
         if let Err(err) = subscriber.subscribe_to_service(
             ot::TREL_DNSSD_SERVICE_NAME_WITH_DOT,
-            ServiceSubscriptionOptions {
-                exclude_local: Some(true),
-                ..ServiceSubscriptionOptions::EMPTY
-            },
+            ServiceSubscriptionOptions { exclude_local: Some(true), ..Default::default() },
             client,
         ) {
             error!(
@@ -153,7 +150,7 @@ impl TrelInstance {
             .publish_service_instance(
                 ot::TREL_DNSSD_SERVICE_NAME_WITH_DOT,
                 self.instance_name.as_str(),
-                ServiceInstancePublicationOptions::EMPTY,
+                ServiceInstancePublicationOptions::default(),
                 client,
             )
             .map(|x| -> Result<(), anyhow::Error> {
@@ -177,7 +174,7 @@ impl TrelInstance {
                             .send(&mut Ok(ServiceInstancePublication {
                                 port: Some(port),
                                 text: Some(txt),
-                                ..ServiceInstancePublication::EMPTY
+                                ..Default::default()
                             }))
                             .map_err(Into::into)
                     }

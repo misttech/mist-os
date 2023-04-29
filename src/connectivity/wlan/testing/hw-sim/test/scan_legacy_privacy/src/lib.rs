@@ -88,10 +88,10 @@ async fn scan_legacy_privacy() {
                 bssid: Some(BSS_MIXED.0.clone()),
                 rssi: Some(-50),
                 frequency: Some(2412),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -102,10 +102,10 @@ async fn scan_legacy_privacy() {
                 bssid: Some(BSS_WEP.0.clone()),
                 rssi: Some(-40),
                 frequency: Some(2412),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
         fidl_policy::ScanResult {
             id: Some(fidl_policy::NetworkIdentifier {
@@ -116,10 +116,10 @@ async fn scan_legacy_privacy() {
                 bssid: Some(BSS_WPA1.0.clone()),
                 rssi: Some(-30),
                 frequency: Some(2412),
-                ..fidl_policy::Bss::EMPTY
+                ..Default::default()
             }]),
             compatibility: Some(fidl_policy::Compatibility::Supported),
-            ..fidl_policy::ScanResult::EMPTY
+            ..Default::default()
         },
     ]);
 

@@ -99,7 +99,7 @@ fn build_common_service_definition() -> ServiceDefinition {
             major_version: 1,
             minor_version: 6,
         }]),
-        ..ServiceDefinition::EMPTY
+        ..Default::default()
     }
 }
 
@@ -293,7 +293,7 @@ pub fn connect_and_advertise() -> Result<(ProfileProxy, ProfileClient), Error> {
     let service_defs = vec![make_controller_service_definition(), make_target_service_definition()];
     let channel_parameters = ChannelParameters {
         channel_mode: Some(ChannelMode::EnhancedRetransmission),
-        ..ChannelParameters::EMPTY
+        ..Default::default()
     };
     let mut profile_client =
         ProfileClient::advertise(profile_svc.clone(), &service_defs, channel_parameters)?;

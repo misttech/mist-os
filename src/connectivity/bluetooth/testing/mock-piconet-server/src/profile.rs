@@ -89,7 +89,7 @@ pub(crate) mod tests {
                 Uuid::new16(bredr::ServiceClassProfileIdentifier::Headset as u16).into(),
                 Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree as u16).into(),
             ]),
-            ..bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         };
 
         let ids = vec![
@@ -126,7 +126,7 @@ pub(crate) mod tests {
             protocol_descriptor_list: Some(protocol_descriptor_list.clone()),
             profile_descriptors: Some(prof_descs.clone()),
             additional_attributes: Some(vec![]),
-            ..bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         };
 
         let a2dp_ids = vec![bredr::ServiceClassProfileIdentifier::AudioSink].into_iter().collect();
@@ -252,7 +252,7 @@ pub(crate) mod tests {
             .into()]),
             protocol_descriptor_list: Some(protocol_descriptor_list.clone()),
             profile_descriptors: Some(prof_descs.clone()),
-            ..bredr::ServiceDefinition::EMPTY
+            ..Default::default()
         };
         let spp_ids = vec![bredr::ServiceClassProfileIdentifier::SerialPort].into_iter().collect();
         let primary_protocol = protocol_descriptor_list.iter().map(Into::into).collect();

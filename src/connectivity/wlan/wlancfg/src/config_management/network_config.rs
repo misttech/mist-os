@@ -365,7 +365,7 @@ impl From<&NetworkConfig> for fidl_policy::NetworkConfig {
         fidl_policy::NetworkConfig {
             id: Some(network_id),
             credential: Some(credential),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -599,7 +599,7 @@ impl From<NetworkConfig> for fidl_policy::NetworkConfig {
         fidl_policy::NetworkConfig {
             id: Some(fidl_policy::NetworkIdentifier::from(network_id)),
             credential: Some(fidl_policy::Credential::from(config.credential)),
-            ..fidl_policy::NetworkConfig::EMPTY
+            ..Default::default()
         }
     }
 }

@@ -192,7 +192,7 @@ async fn configure_interface(
             fnet_interfaces_admin::Options {
                 name: Some(name.clone()),
                 metric: Some(DEFAULT_METRIC),
-                ..fnet_interfaces_admin::Options::EMPTY
+                ..Default::default()
             },
         )?;
 
@@ -272,7 +272,7 @@ async fn configure_interface(
                 control
                     .add_address(
                         &mut interface_address,
-                        fnet_interfaces_admin::AddressParameters::EMPTY,
+                        fnet_interfaces_admin::AddressParameters::default(),
                         server_end,
                     )
                     .map_err(NetstackError::InterfaceControl)?;
@@ -337,13 +337,13 @@ async fn configure_interface(
             .set_configuration(fnet_interfaces_admin::Configuration {
                 ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                     forwarding: ipv4.then(|| true),
-                    ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                    ..Default::default()
                 }),
                 ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                     forwarding: ipv6.then(|| true),
-                    ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_interfaces_admin::Configuration::EMPTY
+                ..Default::default()
             })
             .await
             .map_err(NetstackError::InterfaceControl)?
@@ -368,11 +368,9 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn missing_name() {
-        let result = configure_interface(fnetemul::InterfaceOptions {
-            name: None,
-            ..fnetemul::InterfaceOptions::EMPTY
-        })
-        .await;
+        let result =
+            configure_interface(fnetemul::InterfaceOptions { name: None, ..Default::default() })
+                .await;
 
         assert_matches!(result, Err(InterfaceConfigError::NameNotProvided));
     }
@@ -382,7 +380,7 @@ mod tests {
         let result = configure_interface(fnetemul::InterfaceOptions {
             name: Some("ep".to_string()),
             device: None,
-            ..fnetemul::InterfaceOptions::EMPTY
+            ..Default::default()
         })
         .await;
 
@@ -398,7 +396,7 @@ mod tests {
         let result = configure_interface(fnetemul::InterfaceOptions {
             name: Some("ep".to_string()),
             device: Some(client_end),
-            ..fnetemul::InterfaceOptions::EMPTY
+            ..Default::default()
         })
         .await;
 

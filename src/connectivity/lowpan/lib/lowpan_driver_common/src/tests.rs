@@ -41,7 +41,7 @@ async fn test_legacy_joining_mutual_exclusion() {
         driver_proxy
             .get_protocols(Protocols {
                 thread_legacy_joining: Some(server1_ep),
-                ..Protocols::EMPTY
+                ..Default::default()
             })
             .unwrap();
 
@@ -54,7 +54,7 @@ async fn test_legacy_joining_mutual_exclusion() {
         driver_proxy
             .get_protocols(Protocols {
                 thread_legacy_joining: Some(server2_ep),
-                ..Protocols::EMPTY
+                ..Default::default()
             })
             .unwrap();
 
@@ -77,7 +77,7 @@ async fn test_legacy_joining_mutual_exclusion() {
         driver_proxy
             .get_protocols(Protocols {
                 thread_legacy_joining: Some(server3_ep),
-                ..Protocols::EMPTY
+                ..Default::default()
             })
             .unwrap();
 

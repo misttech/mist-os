@@ -108,7 +108,7 @@ impl ConfiguredSinkTask {
 
                 let registration = sessions2::PlayerRegistration {
                     domain: Some(builder.domain),
-                    ..sessions2::PlayerRegistration::EMPTY
+                    ..Default::default()
                 };
 
                 match builder.publisher.publish(player_client, registration).await {
@@ -663,7 +663,7 @@ mod tests {
                 max_lead_time: Some(500),
                 error: None,
                 presentation_timeline: None,
-                ..AudioConsumerStatus::EMPTY
+                ..Default::default()
             },
         );
 
@@ -730,7 +730,7 @@ mod tests {
                 max_lead_time: Some(500),
                 error: None,
                 presentation_timeline: None,
-                ..AudioConsumerStatus::EMPTY
+                ..Default::default()
             },
         );
 

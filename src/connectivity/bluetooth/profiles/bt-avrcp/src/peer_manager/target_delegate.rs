@@ -158,7 +158,7 @@ impl TargetDelegate {
                 .map_err(|_| TargetAvcError::RejectedNoAvailablePlayers)
                 .await?;
 
-            return Ok(Notification { volume: Some(volume), ..Notification::EMPTY });
+            return Ok(Notification { volume: Some(volume), ..Default::default() });
         }
         let target_handler =
             self.target_handler().ok_or(TargetAvcError::RejectedNoAvailablePlayers)?;
@@ -189,7 +189,7 @@ impl TargetDelegate {
                 .map_err(|_| TargetAvcError::RejectedAddressedPlayerChanged)
                 .await?;
 
-            return Ok(Notification { volume: Some(volume), ..Notification::EMPTY });
+            return Ok(Notification { volume: Some(volume), ..Default::default() });
         }
         let target_handler =
             self.target_handler().ok_or(TargetAvcError::RejectedAddressedPlayerChanged)?;
@@ -325,14 +325,14 @@ mod tests {
         pin_utils::pin_mut!(select_next_some_fut);
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetMediaAttributes { responder })) => {
-                assert!(responder.send(&mut Ok(MediaAttributes::EMPTY)).is_ok());
+                assert!(responder.send(&mut Ok(MediaAttributes::default())).is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
         };
 
         match exec.run_until_stalled(&mut get_media_attr_fut) {
             Poll::Ready(attributes) => {
-                assert_eq!(attributes, Ok(MediaAttributes::EMPTY));
+                assert_eq!(attributes, Ok(MediaAttributes::default()));
             }
             _ => assert!(false, "unexpected state"),
         }
@@ -397,7 +397,7 @@ mod tests {
                 assert!(responder
                     .send(&mut Ok(PlayerApplicationSettings {
                         shuffle_mode: Some(ShuffleMode::Off),
-                        ..PlayerApplicationSettings::EMPTY
+                        ..Default::default()
                     }))
                     .is_ok());
             }
@@ -410,7 +410,7 @@ mod tests {
                     attributes,
                     Ok(PlayerApplicationSettings {
                         shuffle_mode: Some(ShuffleMode::Off),
-                        ..PlayerApplicationSettings::EMPTY
+                        ..Default::default()
                     })
                 );
             }
@@ -429,10 +429,8 @@ mod tests {
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         // Current media doesn't support Equalizer.
-        let attributes = PlayerApplicationSettings {
-            equalizer: Some(Equalizer::Off),
-            ..PlayerApplicationSettings::EMPTY
-        };
+        let attributes =
+            PlayerApplicationSettings { equalizer: Some(Equalizer::Off), ..Default::default() };
         let set_pas_fut = target_delegate.send_set_player_application_settings_command(attributes);
         pin_utils::pin_mut!(set_pas_fut);
         assert!(exec.run_until_stalled(&mut set_pas_fut).is_pending());
@@ -444,7 +442,7 @@ mod tests {
                 responder,
                 ..
             })) => {
-                assert!(responder.send(&mut Ok(PlayerApplicationSettings::EMPTY)).is_ok());
+                assert!(responder.send(&mut Ok(PlayerApplicationSettings::default())).is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
         };
@@ -453,7 +451,7 @@ mod tests {
         // unsupported application setting.
         match exec.run_until_stalled(&mut set_pas_fut) {
             Poll::Ready(attr) => {
-                assert_eq!(attr, Ok(PlayerApplicationSettings::EMPTY));
+                assert_eq!(attr, Ok(PlayerApplicationSettings::default()));
             }
             _ => assert!(false, "unexpected state"),
         }
@@ -480,7 +478,7 @@ mod tests {
                 assert!(responder
                     .send(&mut Ok(vec![MediaPlayerItem {
                         player_id: Some(1),
-                        ..MediaPlayerItem::EMPTY
+                        ..Default::default()
                     }]))
                     .is_ok());
             }

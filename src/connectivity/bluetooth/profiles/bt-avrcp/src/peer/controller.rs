@@ -134,7 +134,7 @@ impl Controller {
             total_number_of_tracks: response.total_number_of_tracks,
             genre: response.genre,
             playing_time: response.playing_time,
-            ..fidl_avrcp::MediaAttributes::EMPTY
+            ..Default::default()
         })
     }
 
@@ -152,7 +152,7 @@ impl Controller {
         let buf = self.peer.send_vendor_dependent_command(&cmd).await?;
         let response = GetPlayStatusResponse::decode(&buf[..])?;
         trace!("get_play_status received response {:?}", response);
-        let mut play_status = fidl_avrcp::PlayStatus::EMPTY;
+        let mut play_status = fidl_avrcp::PlayStatus::default();
         play_status.song_length = if response.song_length != SONG_LENGTH_NOT_SUPPORTED {
             Some(response.song_length)
         } else {

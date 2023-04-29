@@ -60,9 +60,9 @@ impl MessageStream {
                 ProtocolDescriptor { protocol: ProtocolIdentifier::L2Cap, params: vec![] },
                 ProtocolDescriptor { protocol: ProtocolIdentifier::Rfcomm, params: vec![] },
             ]),
-            ..ServiceDefinition::EMPTY
+            ..Default::default()
         };
-        ProfileClient::advertise(profile.clone(), &[service], ChannelParameters::EMPTY)
+        ProfileClient::advertise(profile.clone(), &[service], ChannelParameters::default())
             .map_err(Into::into)
     }
 

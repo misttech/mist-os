@@ -176,9 +176,9 @@ async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
     let config_with_ipv6_forwarding_set = |forwarding| fnet_interfaces_admin::Configuration {
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(forwarding),
-            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            ..Default::default()
         }),
-        ..fnet_interfaces_admin::Configuration::EMPTY
+        ..Default::default()
     };
 
     let configuration = iface
@@ -466,7 +466,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
                         }),
                         prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
                     },
-                    fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                     server,
                 )
                 .expect("Control.AddAddress FIDL error");
@@ -999,11 +999,11 @@ async fn sends_mld_reports<N: Netstack>(
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 mld: Some(fnet_interfaces_admin::MldConfiguration {
                     version: Some(mld_version),
-                    ..fnet_interfaces_admin::MldConfiguration::EMPTY
+                    ..Default::default()
                 }),
-                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         };
         let control = iface.control();
         let new_config = gen_config(mld_version);
@@ -1061,7 +1061,7 @@ async fn sends_mld_reports<N: Netstack>(
             interfaces::add_address_wait_assigned(
                 &iface.control(),
                 subnet,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             )
             .await
             .expect("add_address_wait_assigned failed")
@@ -1069,7 +1069,7 @@ async fn sends_mld_reports<N: Netstack>(
             interfaces::add_subnet_address_and_route_wait_assigned(
                 &iface,
                 subnet,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             )
             .await
             .expect("add subnet address and route")

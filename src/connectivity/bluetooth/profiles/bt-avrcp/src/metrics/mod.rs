@@ -452,7 +452,7 @@ mod tests {
                 major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                 displayable_name: Some("player 1".to_string()),
                 feature_bits: Some(NOT_BROWSABLE),
-                ..fidl_avrcp::MediaPlayerItem::EMPTY
+                ..Default::default()
             }],
         );
         assert_data_tree!(inspect, root: {
@@ -482,14 +482,14 @@ mod tests {
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("player 1".to_string()),
                     feature_bits: Some(NOT_BROWSABLE),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
                 fidl_avrcp::MediaPlayerItem {
                     player_id: Some(2),
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("player 2".to_string()),
                     feature_bits: Some(NOT_BROWSABLE),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -517,14 +517,14 @@ mod tests {
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("player 1".to_string()),
                     feature_bits: Some(BROWSABLE_WHEN_ADDRESSED),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
                 fidl_avrcp::MediaPlayerItem {
                     player_id: Some(2),
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("player 2".to_string()),
                     feature_bits: Some(BROWSABLE),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -559,14 +559,14 @@ mod tests {
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("player 1".to_string()),
                     feature_bits: Some(BROWSABLE_WHEN_ADDRESSED),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
                 fidl_avrcp::MediaPlayerItem {
                     player_id: Some(1004),
                     major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
                     displayable_name: Some("other player".to_string()),
                     feature_bits: Some(NOT_BROWSABLE),
-                    ..fidl_avrcp::MediaPlayerItem::EMPTY
+                    ..Default::default()
                 },
             ],
         );

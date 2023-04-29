@@ -95,7 +95,7 @@ impl TestSandbox {
             fnetemul::RealmOptions {
                 name: Some(name.clone().into_owned()),
                 children: Some(children.into_iter().map(Into::into).collect()),
-                ..fnetemul::RealmOptions::EMPTY
+                ..Default::default()
             },
         )?;
         Ok(TestRealm { realm, name, _sandbox: self })
@@ -149,7 +149,7 @@ impl TestSandbox {
                     latency: None,
                     packet_loss: None,
                     reorder: None,
-                    ..fnetemul_network::NetworkConfig::EMPTY
+                    ..Default::default()
                 },
             )
             .await
@@ -879,11 +879,7 @@ impl<'a> TestEndpoint<'a> {
             .create_interface(
                 &mut port_id,
                 server_end,
-                fnet_interfaces_admin::Options {
-                    name,
-                    metric,
-                    ..fnet_interfaces_admin::Options::EMPTY
-                },
+                fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
             .context("create interface")?;
         let id = control.get_id().await.context("get id")?;
@@ -1246,7 +1242,7 @@ impl<'a> TestInterface<'a> {
             .control
             .add_address(
                 &mut subnet.clone(),
-                fnet_interfaces_admin::AddressParameters::EMPTY,
+                fnet_interfaces_admin::AddressParameters::default(),
                 server,
             )
             .context("FIDL error")?;
@@ -1272,7 +1268,7 @@ impl<'a> TestInterface<'a> {
             .control
             .add_address(
                 &mut subnet.clone(),
-                fnet_interfaces_admin::AddressParameters::EMPTY,
+                fnet_interfaces_admin::AddressParameters::default(),
                 server,
             )
             .context("FIDL error")?;
@@ -1389,9 +1385,9 @@ impl<'a> TestInterface<'a> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 forwarding: Some(enabled),
-                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         })
         .await
     }
@@ -1401,9 +1397,9 @@ impl<'a> TestInterface<'a> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 forwarding: Some(enabled),
-                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         })
         .await
     }

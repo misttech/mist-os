@@ -248,7 +248,7 @@ where
     fnetemul::ChildDep {
         name: Some(component_name.into()),
         capability: Some(fnetemul::ExposedCapability::Protocol(P::PROTOCOL_NAME.to_string())),
-        ..fnetemul::ChildDep::EMPTY
+        ..Default::default()
     }
 }
 
@@ -286,7 +286,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         })
                         .collect(),
                 )),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::Manager { agent, use_dhcp_server, config } => {
                 let enable_dhcpv6 = match config {
@@ -366,12 +366,12 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                         subdir: Some(
                                             constants::netcfg::CLASS_NETWORK_PATH.to_string(),
                                         ),
-                                        ..fnetemul::DevfsDep::EMPTY
+                                        ..Default::default()
                                     }),
                                     fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                                         variant: Some(fnetemul::StorageVariant::Data),
                                         path: Some("/data".to_string()),
-                                        ..fnetemul::StorageDep::EMPTY
+                                        ..Default::default()
                                     }),
                                 ]
                                 .into_iter(),
@@ -379,7 +379,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                             .collect(),
                     )),
                     eager: Some(true),
-                    ..fnetemul::ChildDef::EMPTY
+                    ..Default::default()
                 }
             }
             KnownServiceProvider::SecureStash => fnetemul::ChildDef {
@@ -393,10 +393,10 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                         variant: Some(fnetemul::StorageVariant::Data),
                         path: Some("/data".to_string()),
-                        ..fnetemul::StorageDep::EMPTY
+                        ..Default::default()
                     }),
                 ])),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::DhcpServer { persistent } => fnetemul::ChildDef {
                 name: Some(constants::dhcp_server::COMPONENT_NAME.to_string()),
@@ -436,7 +436,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 } else {
                     None
                 },
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::DhcpClient => fnetemul::ChildDef {
                 name: Some(constants::dhcp_client::COMPONENT_NAME.to_string()),
@@ -456,7 +456,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     )),
                 ])),
                 program_args: None,
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::Dhcpv6Client => fnetemul::ChildDef {
                 name: Some(constants::dhcpv6_client::COMPONENT_NAME.to_string()),
@@ -470,7 +470,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::netstack::COMPONENT_NAME,
                     )),
                 ])),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::DnsResolver => fnetemul::ChildDef {
                 name: Some(constants::dns_resolver::COMPONENT_NAME.to_string()),
@@ -495,7 +495,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::fake_clock::COMPONENT_NAME
                     )),
                 ])),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::Reachability { eager } => fnetemul::ChildDef {
                 name: Some(constants::reachability::COMPONENT_NAME.to_string()),
@@ -536,7 +536,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     )),
                 ])),
                 eager: Some(*eager),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::NetworkTestRealm => fnetemul::ChildDef {
                 name: Some(constants::network_test_realm::COMPONENT_NAME.to_string()),
@@ -559,7 +559,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::netstack::COMPONENT_NAME,
                     )),
                 ])),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
             KnownServiceProvider::FakeClock => fnetemul::ChildDef {
                 name: Some(constants::fake_clock::COMPONENT_NAME.to_string()),
@@ -573,7 +573,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
                     fnetemul::Empty {},
                 )])),
-                ..fnetemul::ChildDef::EMPTY
+                ..Default::default()
             },
         }
     }

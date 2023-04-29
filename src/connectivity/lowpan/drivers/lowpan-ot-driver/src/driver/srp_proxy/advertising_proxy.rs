@@ -69,7 +69,7 @@ impl AdvertisingProxyServiceInfo {
             text: Some(self.txt),
             srv_priority: Some(self.priority),
             srv_weight: Some(self.weight),
-            ..ServiceInstancePublication::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -282,7 +282,7 @@ impl AdvertisingProxyInner {
                         &mut addrs.iter_mut(),
                         ProxyHostPublicationOptions {
                             perform_probe: Some(false),
-                            ..ProxyHostPublicationOptions::EMPTY
+                            ..Default::default()
                         },
                         server,
                     )
@@ -448,7 +448,7 @@ impl AdvertisingProxyInner {
                 .publish_service_instance(
                     local_service_name,
                     local_instance_name,
-                    ServiceInstancePublicationOptions::EMPTY,
+                    ServiceInstancePublicationOptions::default(),
                     client,
                 )
                 .map(|x| match x {

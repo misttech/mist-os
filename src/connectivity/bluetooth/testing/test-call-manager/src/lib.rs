@@ -88,7 +88,7 @@ impl Default for ManagerState {
     fn default() -> Self {
         Self {
             peer_watcher: None,
-            network: NetworkInformation::EMPTY,
+            network: NetworkInformation::default(),
             operator: String::new(),
             subscriber_numbers: vec![],
             nrec_support: true,
@@ -419,7 +419,7 @@ impl TestCallManager {
                 remote: Some(remote),
                 state: Some(fidl_state),
                 direction: Some(direction),
-                ..NextCall::EMPTY
+                ..Default::default()
             };
             if let Ok(()) = responder.send(next_call) {
                 let task = fasync::Task::local(self.clone().manage_call(peer_id, call_id, stream));
@@ -574,7 +574,7 @@ impl TestCallManager {
                     remote: Some(remote),
                     state: Some(state),
                     direction: Some(direction),
-                    ..NextCall::EMPTY
+                    ..Default::default()
                 };
                 let res = peer.call_responder.take().expect("just put here").send(next_call);
                 if let Ok(()) = res {
@@ -931,7 +931,7 @@ impl TestCallManager {
         let mut inner = self.inner.lock().await;
 
         // Update network state
-        let last_net = std::mem::replace(&mut inner.manager.network, NetworkInformation::EMPTY);
+        let last_net = std::mem::replace(&mut inner.manager.network, NetworkInformation::default());
         inner.manager.network = NetworkInformation {
             service_available: network.service_available.or(last_net.service_available),
             signal_strength: network.signal_strength.or(last_net.signal_strength),
@@ -1039,7 +1039,7 @@ impl TestCallManager {
         })?;
         let () = proxy.set_connection_behavior(ConnectionBehavior {
             autoconnect: Some(autoconnect),
-            ..ConnectionBehavior::EMPTY
+            ..Default::default()
         })?;
         Ok(())
     }

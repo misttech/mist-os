@@ -170,10 +170,10 @@ mod tests {
                 application_settings: Some(fidl_avrcp::PlayerApplicationSettings {
                     repeat_status_mode: Some(fidl_avrcp::RepeatStatusMode::GroupRepeat),
                     scan_mode: Some(fidl_avrcp::ScanMode::Off),
-                    ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+                    ..Default::default()
                 }),
                 battery_status: Some(fidl_avrcp::BatteryStatus::Normal),
-                ..fidl_avrcp::Notification::EMPTY
+                ..Default::default()
             }
             .into();
             let data = NotificationData::new(
@@ -191,10 +191,10 @@ mod tests {
                 application_settings: Some(fidl_avrcp::PlayerApplicationSettings {
                     repeat_status_mode: Some(fidl_avrcp::RepeatStatusMode::GroupRepeat),
                     scan_mode: Some(fidl_avrcp::ScanMode::Off),
-                    ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+                    ..Default::default()
                 }),
                 battery_status: Some(fidl_avrcp::BatteryStatus::Critical),
-                ..fidl_avrcp::Notification::EMPTY
+                ..Default::default()
             }
             .into();
 

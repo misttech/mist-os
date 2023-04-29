@@ -37,7 +37,7 @@ impl From<ReachabilityState> for freachability::Snapshot {
             internet_available: Some(state.internet_available),
             gateway_reachable: Some(state.gateway_reachable),
             dns_active: Some(state.dns_active),
-            ..Self::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -306,9 +306,7 @@ mod tests {
 
         assert_matches!(client.get_reachability_state(&mut executor), Ok(_));
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions {
-                ..freachability::MonitorOptions::EMPTY
-            }),
+            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(executor.run_singlethreaded(client.watcher_proxy.on_closed()), Ok(_));
@@ -326,15 +324,11 @@ mod tests {
         let client = test_env.connect_client();
 
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions {
-                ..freachability::MonitorOptions::EMPTY
-            }),
+            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions {
-                ..freachability::MonitorOptions::EMPTY
-            }),
+            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(executor.run_singlethreaded(client.watcher_proxy.on_closed()), Ok(_));

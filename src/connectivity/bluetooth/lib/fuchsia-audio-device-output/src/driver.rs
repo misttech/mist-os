@@ -197,15 +197,15 @@ impl SoftPcm {
                 .expect("Error creating stream config endpoint");
 
         let number_of_channels = pcm_format.channel_map.len();
-        let attributes = vec![ChannelAttributes::EMPTY; number_of_channels];
-        let channel_set = ChannelSet { attributes: Some(attributes), ..ChannelSet::EMPTY };
+        let attributes = vec![ChannelAttributes::default(); number_of_channels];
+        let channel_set = ChannelSet { attributes: Some(attributes), ..Default::default() };
         let supported_formats = PcmSupportedFormats {
             channel_sets: Some(vec![channel_set]),
             sample_formats: Some(vec![SampleFormat::PcmSigned]),
             bytes_per_sample: Some(vec![(pcm_format.bits_per_sample / 8) as u8]),
             valid_bits_per_sample: Some(vec![pcm_format.bits_per_sample as u8]),
             frame_rates: Some(vec![pcm_format.frames_per_second]),
-            ..PcmSupportedFormats::EMPTY
+            ..Default::default()
         };
 
         let packet_frames =
@@ -304,7 +304,7 @@ impl SoftPcm {
     ) -> std::result::Result<(), anyhow::Error> {
         match request {
             StreamConfigRequest::GetHealthState { responder } => {
-                responder.send(HealthState::EMPTY)?;
+                responder.send(HealthState::default())?;
             }
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
@@ -323,7 +323,7 @@ impl SoftPcm {
                     clock_domain:             Some(self.clock_domain),
                     manufacturer:             Some(self.manufacturer.to_string()),
                     product:                  Some(self.product.to_string()),
-                    ..StreamProperties::EMPTY
+                    ..Default::default()
                 };
                 responder.send(prop)?;
             }
@@ -331,7 +331,7 @@ impl SoftPcm {
                 let pcm_formats = self.supported_formats.clone();
                 let formats_vector = vec![SupportedFormats {
                     pcm_supported_formats: Some(pcm_formats),
-                    ..SupportedFormats::EMPTY
+                    ..Default::default()
                 }];
                 responder.send(&mut formats_vector.into_iter())?;
             }
@@ -353,7 +353,7 @@ impl SoftPcm {
                     muted: Some(false),
                     agc_enabled: Some(false),
                     gain_db: Some(0.0f32),
-                    ..GainState::EMPTY
+                    ..Default::default()
                 };
                 responder.send(gain_state)?;
                 self.gain_state_replied = true
@@ -368,7 +368,7 @@ impl SoftPcm {
                 let plug_state = PlugState {
                     plugged: Some(true),
                     plug_state_time: Some(time.into_nanos() as i64),
-                    ..PlugState::EMPTY
+                    ..Default::default()
                 };
                 responder.send(plug_state)?;
                 self.plug_state_replied = true;
@@ -401,7 +401,7 @@ impl SoftPcm {
                     // TODO(fxbug.dev/123475): Adds driver_transfer_bytes for output streams.
                     driver_transfer_bytes: (!self.is_output)
                         .then_some((self.packet_frames * self.frame_bytes) as u32),
-                    ..RingBufferProperties::EMPTY
+                    ..Default::default()
                 };
                 responder.send(prop)?;
             }
@@ -484,7 +484,7 @@ impl SoftPcm {
                 // plus whatever delay has been communicated from the client.
                 let delay_info = DelayInfo {
                     internal_delay: Some(self.current_delay().into_nanos()),
-                    ..DelayInfo::EMPTY
+                    ..Default::default()
                 };
                 responder.send(delay_info)?;
                 self.delay_info_replied = true;
@@ -618,7 +618,7 @@ pub(crate) mod tests {
                 valid_bits_per_sample:   16u8,
                 frame_rate:              44100,
             }),
-            ..Format::EMPTY
+            ..Default::default()
         };
 
         let result = stream_config.create_ring_buffer(format, server);
@@ -711,7 +711,7 @@ pub(crate) mod tests {
                 valid_bits_per_sample:   16u8,
                 frame_rate:              44100,
             }),
-            ..Format::EMPTY
+            ..Default::default()
         };
 
         let result = stream_config.create_ring_buffer(format, server);

@@ -23,7 +23,7 @@ pub fn create_metrics_logger() -> Result<metrics::MetricEventLoggerProxy, Error>
     let project_spec = metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia
         project_id: Some(PROJECT_ID),
-        ..metrics::ProjectSpec::EMPTY
+        ..Default::default()
     };
 
     fasync::Task::spawn(async move {

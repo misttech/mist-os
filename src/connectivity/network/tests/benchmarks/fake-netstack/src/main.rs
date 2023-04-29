@@ -502,7 +502,7 @@ async fn handle_datagram_request(
             responder
                 .send(fposix_socket::SynchronousDatagramSocketDescribeResponse {
                     event: Some(event),
-                    ..fposix_socket::SynchronousDatagramSocketDescribeResponse::EMPTY
+                    ..Default::default()
                 })
                 .context("send Describe response")?;
         }
@@ -658,7 +658,7 @@ async fn handle_datagram_request(
                 .send(&mut Ok((
                     from,
                     data,
-                    fposix_socket::DatagramSocketRecvControlData::EMPTY,
+                    fposix_socket::DatagramSocketRecvControlData::default(),
                     truncated.try_into().unwrap(),
                 )))
                 .context("send RecvMsg response")?;
@@ -690,7 +690,7 @@ async fn handle_stream_request(
             responder
                 .send(fposix_socket::StreamSocketDescribeResponse {
                     socket: Some(socket),
-                    ..fposix_socket::StreamSocketDescribeResponse::EMPTY
+                    ..Default::default()
                 })
                 .context("send Describe response")?;
         }

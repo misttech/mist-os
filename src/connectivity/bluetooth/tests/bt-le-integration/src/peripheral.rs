@@ -48,7 +48,7 @@ fn empty_advertising_data() -> AdvertisingData {
         service_data: None,
         manufacturer_data: None,
         uris: None,
-        ..AdvertisingData::EMPTY
+        ..Default::default()
     }
 }
 
@@ -73,7 +73,7 @@ fn default_parameters() -> AdvertisingParameters {
         mode_hint: None,
         connectable: None,
         connection_options: None,
-        ..AdvertisingParameters::EMPTY
+        ..Default::default()
     }
 }
 
@@ -429,7 +429,7 @@ async fn add_fake_peer(proxy: &HciEmulatorProxy, address: &Address) -> Result<Pe
         connectable: Some(true),
         advertisement: None,
         scan_response: None,
-        ..LowEnergyPeerParameters::EMPTY
+        ..Default::default()
     };
     let _ = proxy
         .add_low_energy_peer(params, remote)

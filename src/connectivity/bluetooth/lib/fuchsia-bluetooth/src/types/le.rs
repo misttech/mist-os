@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn advertising_data_from_fidl_empty() {
-        let empty_data = fble::AdvertisingData::EMPTY;
+        let empty_data = fble::AdvertisingData::default();
         let expected = AdvertisingData {
             name: None,
             tx_power_level: None,
@@ -267,7 +267,7 @@ mod tests {
                 data: vec![3, 4, 5],
             }]),
             uris: Some(vec!["some/uri".to_string()]),
-            ..fble::AdvertisingData::EMPTY
+            ..Default::default()
         };
         let expected = AdvertisingData {
             name: Some("hello".to_string()),
@@ -368,7 +368,7 @@ mod tests {
     fn peer_from_fidl_no_id() {
         let peer = fble::Peer {
             id: None, // Omitted
-            ..fble::Peer::EMPTY
+            ..Default::default()
         };
         let peer = Peer::try_from(peer);
         assert!(peer.is_err());
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn peer_from_fidl_mandatory_fields_only() {
-        let peer = fble::Peer { id: Some(fbt::PeerId { value: 1 }), ..fble::Peer::EMPTY };
+        let peer = fble::Peer { id: Some(fbt::PeerId { value: 1 }), ..Default::default() };
         let expected = Peer {
             id: PeerId(1),
             name: None,
@@ -398,9 +398,9 @@ mod tests {
                 name: Some("hello".to_string()),
                 tx_power_level: Some(-10),
                 appearance: Some(fbt::Appearance::Watch),
-                ..fble::AdvertisingData::EMPTY
+                ..Default::default()
             }),
-            ..fble::Peer::EMPTY
+            ..Default::default()
         };
         let expected = Peer {
             id: PeerId(1),

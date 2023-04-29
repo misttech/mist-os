@@ -304,7 +304,7 @@ async fn execute_and_validate_preflights(
             let result =
                 proxy.send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest {
                     to: to_addr,
-                    ..fposix_socket::DatagramSocketSendMsgPreflightRequest::EMPTY
+                    ..Default::default()
                 });
             async move { (expected_result, result.await) }
         })
@@ -366,9 +366,9 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
         fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 forwarding: Some(true),
-                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -402,9 +402,9 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
         fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 forwarding: Some(true),
-                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+                ..Default::default()
             }),
-            ..fnet_interfaces_admin::Configuration::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -835,7 +835,7 @@ async fn connect_socket_and_validate_preflight(
     socket.connect(&mut addr).await.expect("call connect").expect("connect socket");
 
     let response = socket
-        .send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest::EMPTY)
+        .send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest::default())
         .await
         .expect("call send_msg_preflight")
         .expect("preflight check should succeed");
@@ -990,7 +990,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     let result = socket
         .send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest {
             to: None,
-            ..fposix_socket::DatagramSocketSendMsgPreflightRequest::EMPTY
+            ..Default::default()
         })
         .await
         .expect("call send_msg_preflight");
@@ -1028,7 +1028,7 @@ async fn udp_send_msg_preflight_dad_failure(name: &str) {
                 }),
                 prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
             },
-            fnet_interfaces_admin::AddressParameters::EMPTY,
+            fnet_interfaces_admin::AddressParameters::default(),
             server,
         )
         .expect("call add address");
@@ -1774,7 +1774,7 @@ async fn install_ip_device(
         let (control, server_end) =
             fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
         let () = device_control
-            .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::EMPTY)
+            .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::default())
             .expect("create interface");
         control
     };
@@ -1795,7 +1795,7 @@ async fn install_ip_device(
             let () = control
                 .add_address(
                     &mut subnet.clone(),
-                    fnet_interfaces_admin::AddressParameters::EMPTY,
+                    fnet_interfaces_admin::AddressParameters::default(),
                     server_end,
                 )
                 .expect("add address");
@@ -1849,7 +1849,7 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
                 supported_flags: fhardware_network::TxFlags::empty(),
             },
         ]),
-        ..fnet_tun::BasePortConfig::EMPTY
+        ..Default::default()
     }
 }
 
@@ -1868,8 +1868,9 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
 
     let (tun_pair, req) = fidl::endpoints::create_proxy::<fnet_tun::DevicePairMarker>()
         .expect("failed to create endpoints");
-    let () =
-        tun.create_pair(fnet_tun::DevicePairConfig::EMPTY, req).expect("failed to create tun pair");
+    let () = tun
+        .create_pair(fnet_tun::DevicePairConfig::default(), req)
+        .expect("failed to create tun pair");
 
     let () = tun_pair
         .add_port(fnet_tun::DevicePairPortConfig {
@@ -1877,7 +1878,7 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
             // No MAC, this is a pure IP device.
             mac_left: None,
             mac_right: None,
-            ..fnet_tun::DevicePairPortConfig::EMPTY
+            ..Default::default()
         })
         .await
         .expect("add_port failed")
@@ -1929,11 +1930,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .expect("failed to create endpoints");
     let () = tun
         .create_device(
-            fnet_tun::DeviceConfig {
-                base: None,
-                blocking: Some(true),
-                ..fnet_tun::DeviceConfig::EMPTY
-            },
+            fnet_tun::DeviceConfig { base: None, blocking: Some(true), ..Default::default() },
             req,
         )
         .expect("failed to create tun pair");
@@ -1948,7 +1945,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                     online: Some(true),
                     // No MAC, this is a pure IP device.
                     mac: None,
-                    ..fnet_tun::DevicePortConfig::EMPTY
+                    ..Default::default()
                 },
                 server_end,
             )
@@ -2101,7 +2098,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             frame_type: Some(fhardware_network::FrameType::Ipv4),
             data: Some(packet.clone()),
             meta: None,
-            ..fnet_tun::Frame::EMPTY
+            ..Default::default()
         })
         .await
         .expect("write_frame failed")
@@ -2142,7 +2139,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 frame_type: Some(fhardware_network::FrameType::Ipv6),
                 data: Some(packet),
                 meta: None,
-                ..fnet_tun::Frame::EMPTY
+                ..Default::default()
             },
             &mut read_frame,
         )
@@ -2173,7 +2170,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             frame_type: Some(fhardware_network::FrameType::Ipv6),
             data: Some(packet.clone()),
             meta: None,
-            ..fnet_tun::Frame::EMPTY
+            ..Default::default()
         })
         .await
         .expect("write_frame failed")
@@ -2214,7 +2211,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 frame_type: Some(fhardware_network::FrameType::Ipv4),
                 data: Some(packet),
                 meta: None,
-                ..fnet_tun::Frame::EMPTY
+                ..Default::default()
             },
             &mut read_frame,
         )

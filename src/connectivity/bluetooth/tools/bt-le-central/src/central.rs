@@ -110,7 +110,7 @@ pub async fn connect(
     let conn_opts = ConnectionOptions {
         bondable_mode: Some(true),
         service_filter: service_uuid.map(Into::into),
-        ..ConnectionOptions::EMPTY
+        ..Default::default()
     };
 
     state

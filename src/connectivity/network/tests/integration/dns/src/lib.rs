@@ -79,7 +79,7 @@ async fn no_ip_literal<N: Netstack>(name: &str) {
                         net_name::LookupIpOptions {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
-                            ..net_name::LookupIpOptions::EMPTY
+                            ..Default::default()
                         },
                     )
                     .await
@@ -97,7 +97,7 @@ async fn no_ip_literal<N: Netstack>(name: &str) {
                         net_name::LookupIpOptions {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
-                            ..net_name::LookupIpOptions::EMPTY
+                            ..Default::default()
                         },
                     )
                     .await
@@ -225,7 +225,7 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
                 prefix_length: Some(25),
                 range_start: Some(range_start),
                 range_stop: Some(range_stop),
-                ..fidl_fuchsia_net_dhcp::AddressPool::EMPTY
+                ..Default::default()
             }),
             fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(vec!["eth2".to_string()]),
         ]
@@ -572,7 +572,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
                     ipv4_lookup: Some(true),
                     ipv6_lookup: Some(true),
                     sort_addresses: Some(true),
-                    ..net_name::LookupIpOptions::EMPTY
+                    ..Default::default()
                 },
             )
             .await
@@ -580,7 +580,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
             .expect("lookup_ip error");
         let want = net_name::LookupResult {
             addresses: Some(vec![EXAMPLE_IPV6_ADDR]),
-            ..net_name::LookupResult::EMPTY
+            ..Default::default()
         };
         assert_eq!(ips, want);
     }
@@ -779,7 +779,7 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
                             sort_addresses: Some(true),
-                            ..net_name::LookupIpOptions::EMPTY
+                            ..Default::default()
                         },
                     )
                     .await
@@ -799,10 +799,8 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
                 // asserting on the contents of the response.
                 .sorted()
                 .collect::<Vec<_>>();
-            let want = net_name::LookupResult {
-                addresses: Some(want_addresses),
-                ..net_name::LookupResult::EMPTY
-            };
+            let want =
+                net_name::LookupResult { addresses: Some(want_addresses), ..Default::default() };
             assert_eq!(ips, want, "test case: {:?}", test_case);
         }
         .fuse();
@@ -922,10 +920,7 @@ async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions {
-                    ipv4_lookup: Some(true),
-                    ..net_name::LookupIpOptions::EMPTY
-                },
+                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");
@@ -983,10 +978,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
         let ips = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions {
-                    ipv4_lookup: Some(true),
-                    ..net_name::LookupIpOptions::EMPTY
-                },
+                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP")
@@ -995,7 +987,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
             ips,
             net_name::LookupResult {
                 addresses: Some(vec![EXAMPLE_IPV4_ADDR]),
-                ..net_name::LookupResult::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -1229,10 +1221,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions {
-                    ipv4_lookup: Some(true),
-                    ..net_name::LookupIpOptions::EMPTY
-                },
+                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");
@@ -1240,7 +1229,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
             lookup_result,
             Ok(net_name::LookupResult {
                 addresses: Some(vec![EXAMPLE_IPV4_ADDR]),
-                ..net_name::LookupResult::EMPTY
+                ..Default::default()
             })
         );
 
@@ -1250,10 +1239,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions {
-                    ipv6_lookup: Some(true),
-                    ..net_name::LookupIpOptions::EMPTY
-                },
+                net_name::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");
@@ -1261,7 +1247,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
             lookup_result,
             Ok(net_name::LookupResult {
                 addresses: Some(vec![EXAMPLE_IPV6_ADDR]),
-                ..net_name::LookupResult::EMPTY
+                ..Default::default()
             })
         );
     };

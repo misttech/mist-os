@@ -117,7 +117,7 @@ mod tests {
         let _ = proxy
             .connect(
                 &mut fidl_fuchsia_bluetooth::PeerId { value: 1 },
-                &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::EMPTY),
+                &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
             )
             .check()
             .expect("request to be sent");

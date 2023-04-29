@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
             channel: Some(13),
             panid: Some(0x1234),
-            ..Identity::EMPTY
+            ..Default::default()
         };
 
     static ref TEST_CREDENTIAL: Credential =
@@ -152,7 +152,7 @@ async fn test_initial_device_state() {
             .await
             .expect("Error in identity stream")
             .expect("Identity stream ended unexpectedly");
-        assert_eq!(new_identity, Identity::EMPTY);
+        assert_eq!(new_identity, Identity::default());
 
         assert!(identity_stream.next().now_or_never().is_none());
     })
@@ -163,8 +163,9 @@ async fn test_initial_device_state() {
 #[ignore] // TODO: Re-enable once scan support is added to test RCP
 async fn test_network_scan() {
     test_harness(|driver| async move {
-        let network_scan_stream = driver
-            .start_network_scan(&lowpan_driver_common::lowpan_fidl::NetworkScanParameters::EMPTY);
+        let network_scan_stream = driver.start_network_scan(
+            &lowpan_driver_common::lowpan_fidl::NetworkScanParameters::default(),
+        );
         assert_eq!(network_scan_stream.try_collect::<Vec<_>>().await.unwrap().len(), 3);
     })
     .await;
@@ -180,7 +181,7 @@ async fn test_joiner() {
         let join_stream =
             driver.join_network(JoinParams::JoinerParameter(JoinerCommissioningParams {
                 pskd: Some("ABCDEFG".to_string()),
-                ..JoinerCommissioningParams::EMPTY
+                ..Default::default()
             }));
         join_stream.try_collect::<Vec<_>>().await.unwrap();
     })
@@ -192,7 +193,7 @@ async fn test_joiner() {
 async fn test_energy_scan() {
     test_harness(|driver| async move {
         let energy_scan_stream = driver
-            .start_energy_scan(&lowpan_driver_common::lowpan_fidl::EnergyScanParameters::EMPTY);
+            .start_energy_scan(&lowpan_driver_common::lowpan_fidl::EnergyScanParameters::default());
         assert_eq!(energy_scan_stream.try_collect::<Vec<_>>().await.unwrap().len(), 3);
     })
     .await;
@@ -443,7 +444,7 @@ async fn test_add_on_mesh_prefix() {
             subnet: Some(on_mesh_prefix_subnet),
             slaac_preferred: Some(true),
             slaac_valid: Some(true),
-            ..lowpan_driver_common::lowpan_fidl::OnMeshPrefix::EMPTY
+            ..Default::default()
         };
         assert_eq!(driver.register_on_mesh_prefix(x.clone()).await, Ok(()));
 
@@ -487,7 +488,7 @@ async fn test_add_external_route() {
             subnet: Some(external_route_subnet),
             route_preference: Some(lowpan_driver_common::lowpan_fidl::RoutePreference::Medium),
             stable: Some(true),
-            ..lowpan_driver_common::lowpan_fidl::ExternalRoute::EMPTY
+            ..Default::default()
         };
         assert_eq!(driver.register_external_route(x.clone()).await, Ok(()));
 
@@ -662,7 +663,7 @@ async fn test_grind_lowpan_ot_driver() {
                 subnet: Some(on_mesh_prefix_subnet),
                 slaac_preferred: Some(true),
                 slaac_valid: Some(true),
-                ..lowpan_driver_common::lowpan_fidl::OnMeshPrefix::EMPTY
+                ..Default::default()
             };
             assert_eq!(driver.register_on_mesh_prefix(x.clone()).await, Ok(()));
             debug!("app_task: Registered!");

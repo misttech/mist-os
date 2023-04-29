@@ -150,7 +150,7 @@ impl Inner {
                 descriptor_length: Some(descriptor_length),
                 descriptor_count: Some(config.num_tx_buffers.get() + config.num_rx_buffers.get()),
                 options: Some(config.options),
-                ..netdev::SessionInfo::EMPTY
+                ..Default::default()
             }
         };
 

@@ -321,7 +321,7 @@ impl From<ValidPlayerApplicationSettings> for fidl_avrcp::PlayerApplicationSetti
             repeat_status_mode: src.repeat_status_mode.map(Into::into),
             shuffle_mode: src.shuffle_mode.map(Into::into),
             scan_mode: src.scan_mode.map(Into::into),
-            ..fidl_avrcp::PlayerApplicationSettings::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -529,7 +529,7 @@ impl From<fidl_avrcp::Notification> for Notification {
 
 impl From<Notification> for fidl_avrcp::Notification {
     fn from(src: Notification) -> fidl_avrcp::Notification {
-        let mut res = fidl_avrcp::Notification::EMPTY;
+        let mut res = fidl_avrcp::Notification::default();
 
         res.status = src.status.map(Into::into);
         res.track_id = src.media_info.as_ref().map(MediaInfo::get_track_id);
@@ -794,7 +794,7 @@ mod tests {
             song_length: expected_song_length,
             song_position: Some(expected_song_position),
             playback_status: Some(expected_player_state),
-            ..fidl_avrcp::PlayStatus::EMPTY
+            ..Default::default()
         };
         assert_eq!(play_status_fidl, expected_avrcp_play_status);
 
@@ -951,33 +951,33 @@ mod tests {
             track_id: Some(1000),
             pos: Some(99),
             battery_status: Some(fidl_avrcp::BatteryStatus::Critical),
-            ..fidl_avrcp::Notification::EMPTY
+            ..Default::default()
         }
         .into();
 
         // Supported event_id.
         let event_id = fidl_avrcp::NotificationEvent::TrackPosChanged;
         let expected: Notification =
-            fidl_avrcp::Notification { pos: Some(99), ..fidl_avrcp::Notification::EMPTY }.into();
+            fidl_avrcp::Notification { pos: Some(99), ..Default::default() }.into();
         assert_eq!(expected, notif.only_event(&event_id));
 
         // Supported event_id, volume is None.
         let event_id = fidl_avrcp::NotificationEvent::VolumeChanged;
-        let expected: Notification = fidl_avrcp::Notification::EMPTY.into();
+        let expected: Notification = fidl_avrcp::Notification::default().into();
         assert_eq!(expected, notif.only_event(&event_id));
 
         // Supported event_id.
         let event_id = fidl_avrcp::NotificationEvent::BattStatusChanged;
         let expected: Notification = fidl_avrcp::Notification {
             battery_status: Some(fidl_avrcp::BatteryStatus::Critical),
-            ..fidl_avrcp::Notification::EMPTY
+            ..Default::default()
         }
         .into();
         assert_eq!(expected, notif.only_event(&event_id));
 
         // Unsupported event_id.
         let event_id = fidl_avrcp::NotificationEvent::SystemStatusChanged;
-        let expected: Notification = fidl_avrcp::Notification::EMPTY.into();
+        let expected: Notification = fidl_avrcp::Notification::default().into();
         assert_eq!(expected, notif.only_event(&event_id));
     }
 

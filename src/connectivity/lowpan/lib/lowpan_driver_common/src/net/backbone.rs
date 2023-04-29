@@ -58,7 +58,7 @@ impl BackboneNetworkInterface {
                 async move {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
                     let (watcher_client, req) = create_proxy::<WatcherMarker>()?;
-                    fnif_state.get_watcher(WatcherOptions::EMPTY, req)?;
+                    fnif_state.get_watcher(WatcherOptions::default(), req)?;
                     let watcher = Some(watcher_client);
                     let mut wlan_nicid_set = HashSet::new();
                     loop {
@@ -133,7 +133,7 @@ impl BackboneNetworkInterface {
         }
 
         let init_state = EventState {
-            prev_prop: Properties::EMPTY,
+            prev_prop: Properties::default(),
             watcher: None,
             pending_events: Vec::default(),
         };
@@ -143,7 +143,7 @@ impl BackboneNetworkInterface {
                 if state.watcher.is_none() {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
                     let (watcher, req) = create_proxy::<WatcherMarker>()?;
-                    fnif_state.get_watcher(WatcherOptions::EMPTY, req)?;
+                    fnif_state.get_watcher(WatcherOptions::default(), req)?;
                     state.watcher = Some(watcher);
                 }
 
@@ -216,7 +216,7 @@ impl BackboneInterface for BackboneNetworkInterface {
     async fn is_backbone_if_running(&self) -> bool {
         let fnif_state = connect_to_protocol::<StateMarker>().expect("connect to StateMarker");
         let (watcher, req) = create_proxy::<WatcherMarker>().expect("creating WatcherMarker proxy");
-        fnif_state.get_watcher(WatcherOptions::EMPTY, req).expect("getting watcher");
+        fnif_state.get_watcher(WatcherOptions::default(), req).expect("getting watcher");
 
         loop {
             match watcher.watch().await.expect("watcher.watch") {

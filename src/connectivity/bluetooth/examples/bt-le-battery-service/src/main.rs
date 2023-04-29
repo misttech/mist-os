@@ -60,7 +60,7 @@ impl BatteryState {
                 peer_ids: Some(inner.peers.iter().cloned().map(Into::into).collect()),
                 handle: Some(BATTERY_CHARACTERISTIC_HANDLE),
                 value: Some(vec![level]),
-                ..gatt::ValueChangedParameters::EMPTY
+                ..Default::default()
             };
             inner.service.send_on_notify_value(params)?;
         }
@@ -140,15 +140,14 @@ async fn battery_manager_watcher(
 async fn main() -> Result<(), Error> {
     let config = Config::take_from_startup_handle();
     let security = match config.security.as_str() {
-        "none" => gatt::SecurityRequirements::EMPTY,
-        "enc" => gatt::SecurityRequirements {
-            encryption_required: Some(true),
-            ..gatt::SecurityRequirements::EMPTY
-        },
+        "none" => gatt::SecurityRequirements::default(),
+        "enc" => {
+            gatt::SecurityRequirements { encryption_required: Some(true), ..Default::default() }
+        }
         "auth" => gatt::SecurityRequirements {
             encryption_required: Some(true),
             authentication_required: Some(true),
-            ..gatt::SecurityRequirements::EMPTY
+            ..Default::default()
         },
         other => return Err(format_err!("invalid security value: {}", other)),
     };
@@ -174,16 +173,16 @@ async fn main() -> Result<(), Error> {
         permissions: Some(gatt::AttributePermissions {
             read: Some(security.clone()),
             update: Some(security),
-            ..gatt::AttributePermissions::EMPTY
+            ..Default::default()
         }),
-        ..gatt::Characteristic::EMPTY
+        ..Default::default()
     };
     let service_info = gatt::ServiceInfo {
         handle: Some(BATTERY_SERVICE_HANDLE),
         kind: Some(gatt::ServiceKind::Primary),
         type_: Uuid::from_str(BATTERY_SERVICE_UUID).ok().map(Into::into),
         characteristics: Some(vec![characteristic]),
-        ..gatt::ServiceInfo::EMPTY
+        ..Default::default()
     };
 
     // Publish the local gatt service delegate with the gatt service.

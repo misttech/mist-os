@@ -77,12 +77,7 @@ impl From<&PairingOptions> for sys::PairingOptions {
         };
         let le_security_level = Some(opts.le_security_level.into());
         let transport = Some(opts.transport.into());
-        sys::PairingOptions {
-            le_security_level,
-            bondable_mode,
-            transport,
-            ..sys::PairingOptions::EMPTY
-        }
+        sys::PairingOptions { le_security_level, bondable_mode, transport, ..Default::default() }
     }
 }
 

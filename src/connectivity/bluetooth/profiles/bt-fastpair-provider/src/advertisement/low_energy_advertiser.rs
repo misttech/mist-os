@@ -278,14 +278,14 @@ impl LowEnergyAdvertiser {
                     data: service_data_bytes,
                 }]),
                 include_tx_power_level: Some(true),
-                ..AdvertisingData::EMPTY
+                ..Default::default()
             }),
             connection_options: Some(ConnectionOptions {
                 bondable_mode: Some(true),
-                ..ConnectionOptions::EMPTY
+                ..Default::default()
             }),
             mode_hint: Some(mode),
-            ..AdvertisingParameters::EMPTY
+            ..Default::default()
         };
 
         let (connect_client, connect_server) =
@@ -478,8 +478,11 @@ mod tests {
         expect_stream_pending(&mut exec, &mut advertiser);
 
         // Upstream server notifies of two incoming LE connections.
-        let example_peer1 =
-            le::Peer { id: Some(PeerId(123).into()), connectable: Some(true), ..le::Peer::EMPTY };
+        let example_peer1 = le::Peer {
+            id: Some(PeerId(123).into()),
+            connectable: Some(true),
+            ..Default::default()
+        };
         let (connect_client1, connect_server1) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
         let connected_fut1 = adv_peripheral_client.on_connected(example_peer1, connect_client1);
@@ -488,8 +491,11 @@ mod tests {
             .run_until_stalled(&mut connected_fut1)
             .expect_pending("waiting for LEAdvertiser response");
 
-        let example_peer2 =
-            le::Peer { id: Some(PeerId(987).into()), connectable: Some(true), ..le::Peer::EMPTY };
+        let example_peer2 = le::Peer {
+            id: Some(PeerId(987).into()),
+            connectable: Some(true),
+            ..Default::default()
+        };
         let (connect_client2, connect_server2) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
         let connected_fut2 = adv_peripheral_client.on_connected(example_peer2, connect_client2);
@@ -531,7 +537,7 @@ mod tests {
         // Upstream server notifies with an invalidly formatted peer (missing all mandatory data).
         let (connect_client, _connect_server) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
-        let connected_fut = adv_peripheral_client.on_connected(le::Peer::EMPTY, connect_client);
+        let connected_fut = adv_peripheral_client.on_connected(le::Peer::default(), connect_client);
         pin_mut!(connected_fut);
         let _ = exec
             .run_until_stalled(&mut connected_fut)

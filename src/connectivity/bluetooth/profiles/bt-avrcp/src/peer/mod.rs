@@ -156,12 +156,10 @@ impl AVCTPConnectionType {
     pub fn parameters(&self) -> bredr::ChannelParameters {
         // TODO(fxbug.dev/101260): set minimum MTU to 335.
         match self {
-            AVCTPConnectionType::Control => {
-                bredr::ChannelParameters { ..bredr::ChannelParameters::EMPTY }
-            }
+            AVCTPConnectionType::Control => bredr::ChannelParameters::default(),
             AVCTPConnectionType::Browse => bredr::ChannelParameters {
                 channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
-                ..bredr::ChannelParameters::EMPTY
+                ..Default::default()
             },
         }
     }
@@ -176,7 +174,7 @@ impl AVCTPConnectionType {
         bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(self.psm(controller_desc, target_desc).into()),
             parameters: Some(self.parameters()),
-            ..bredr::L2capParameters::EMPTY
+            ..Default::default()
         })
     }
 }
