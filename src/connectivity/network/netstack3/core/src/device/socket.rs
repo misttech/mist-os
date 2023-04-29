@@ -1048,10 +1048,8 @@ impl<C: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> f
 
 #[cfg(test)]
 mod tests {
-    use crate::{data_structures::id_map::IdMap, device::Id, sync::Mutex};
     use alloc::{
         collections::{HashMap, HashSet},
-        sync::Arc,
         vec,
         vec::Vec,
     };
@@ -1065,7 +1063,12 @@ mod tests {
 
     use crate::{
         context::testutil::FakeSyncCtx,
-        device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+        data_structures::id_map::IdMap,
+        device::{
+            testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+            Id,
+        },
+        sync::Mutex,
     };
 
     use super::*;
@@ -1137,18 +1140,7 @@ mod tests {
 
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
-    struct ExternalSocketState<D>(Arc<Mutex<Vec<ReceivedFrame<D>>>>);
-
-    impl<D> ExternalSocketState<D> {
-        fn clone(ExternalSocketState(rc): &Self) -> Self {
-            ExternalSocketState(Arc::clone(rc))
-        }
-
-        fn take(&self) -> Vec<ReceivedFrame<D>> {
-            let Self(rc) = self;
-            core::mem::take(&mut *rc.lock())
-        }
-    }
+    struct ExternalSocketState<D>(Mutex<Vec<ReceivedFrame<D>>>);
 
     type FakeAllSockets<D> =
         IdMap<(ExternalSocketState<D>, Target<<D as crate::device::StrongId>::Weak>)>;
@@ -1639,21 +1631,17 @@ mod tests {
     fn receive_frame_deliver_to_multiple() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
         let mut non_sync_ctx = FakeNonSyncCtx::default();
-        let mut sockets = IdMap::new();
 
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            let id = SocketHandler::create(&mut sync_ctx, ExternalSocketState::clone(&state));
-            sockets.push((id, state))
+            SocketHandler::create(&mut sync_ctx, state)
         };
 
         let mut make_bound = |device, protocol| {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            let id =
-                make_bound(&mut sync_ctx, device, protocol, ExternalSocketState::clone(&state));
-            sockets.push((id, state))
+            make_bound(&mut sync_ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
@@ -1680,31 +1668,33 @@ mod tests {
             TestData::BUFFER,
         );
 
-        let mut received: HashSet<_> = sockets
+        let FakeSockets { all_sockets, any_device_sockets: _, device_sockets: _ } =
+            sync_ctx.into_state();
+
+        let mut sockets_with_received_frames = all_sockets
             .into_iter()
-            .filter_map(|(id, (_, frames))| {
-                let frames = frames.take();
-                if !frames.is_empty() {
-                    assert_eq!(
-                        frames,
-                        &[ReceivedFrame {
-                            device: MultipleDevicesId::A,
-                            frame: Frame::Ethernet {
-                                frame_dst: FrameDestination::Individual { local: true },
-                                src_mac: TestData::SRC_MAC,
-                                dst_mac: TestData::DST_MAC,
-                                protocol: Some(TestData::PROTO.into()),
-                                body: Vec::from(TestData::BODY),
-                            },
-                            raw: TestData::BUFFER.into(),
-                        }]
-                    );
-                    Some(id)
-                } else {
-                    None
-                }
+            .filter_map(|(index, (ExternalSocketState(frames), _)): (_, (_, Target<_>))| {
+                let frames = frames.into_inner();
+                (!frames.is_empty()).then_some((FakeStrongId(index), frames))
             })
-            .collect();
+            .collect::<HashMap<_, _>>();
+        let mut assert_received = |id| {
+            let frames = sockets_with_received_frames.remove(&id).unwrap();
+            assert_eq!(
+                frames,
+                &[ReceivedFrame {
+                    device: MultipleDevicesId::A,
+                    frame: Frame::Ethernet {
+                        frame_dst: FrameDestination::Individual { local: true },
+                        src_mac: TestData::SRC_MAC,
+                        dst_mac: TestData::DST_MAC,
+                        protocol: Some(TestData::PROTO.into()),
+                        body: Vec::from(TestData::BODY),
+                    },
+                    raw: TestData::BUFFER.into(),
+                }]
+            )
+        };
 
         let _ = (
             never_bound,
@@ -1718,23 +1708,22 @@ mod tests {
             bound_any_wrong_protocol,
         );
 
-        assert!(received.remove(&bound_a_all_protocols));
-        assert!(received.remove(&bound_a_right_protocol));
-        assert!(received.remove(&bound_any_all_protocols));
-        assert!(received.remove(&bound_any_right_protocol));
-        assert!(received.is_empty());
+        assert_received(bound_a_all_protocols);
+        assert_received(bound_a_right_protocol);
+        assert_received(bound_any_all_protocols);
+        assert_received(bound_any_right_protocol);
+        assert!(sockets_with_received_frames.is_empty());
     }
 
     #[test]
     fn deliver_multiple_frames() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
         let mut non_sync_ctx = FakeNonSyncCtx::default();
-        let received = ExternalSocketState::default();
-        let _socket = make_bound(
+        let socket = make_bound(
             &mut sync_ctx,
             TargetDevice::AnyDevice,
             Some(Protocol::All),
-            ExternalSocketState::clone(&received),
+            ExternalSocketState::default(),
         );
 
         const RECEIVE_COUNT: usize = 10;
@@ -1751,8 +1740,12 @@ mod tests {
             );
         }
 
+        let FakeSockets { mut all_sockets, any_device_sockets: _, device_sockets: _ } =
+            sync_ctx.into_state();
+        let FakeStrongId(index) = socket;
+        let (ExternalSocketState(received), _): (_, Target<_>) = all_sockets.remove(index).unwrap();
         assert_eq!(
-            received.take(),
+            received.into_inner(),
             vec![
                 ReceivedFrame {
                     device: MultipleDevicesId::A,
@@ -1768,6 +1761,7 @@ mod tests {
                 RECEIVE_COUNT
             ]
         );
+        assert!(all_sockets.is_empty());
     }
 
     #[test_case(None, None, Err(SendFrameError::NoDevice); "no bound or override device")]

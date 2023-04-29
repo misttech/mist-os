@@ -1261,6 +1261,11 @@ pub(crate) mod testutil {
         pub(crate) fn take_frames(&mut self) -> Vec<(Meta, Vec<u8>)> {
             self.frames.take_frames()
         }
+
+        /// Consumes the `FakeSyncCtx` and returns the inner state.
+        pub(crate) fn into_state(self) -> S {
+            self.state
+        }
     }
 
     impl<S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>> for FakeSyncCtx<S, Meta, DeviceId> {
