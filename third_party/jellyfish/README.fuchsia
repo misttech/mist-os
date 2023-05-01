@@ -1,0 +1,16 @@
+Name: jellyfish
+URL: https://github.com/jamesturk/jellyfish
+License: MIT
+License File: jellyfish/LICENSE
+Description:
+
+jellyfish is a Python library supporting a number of fuzzy string matching
+metrics. It can be used to support suggestions for mistyped commands or
+related options in our tooling.
+
+Local Modifications:
+Added README.fuchsia.
+Added BUILD.gn.
+Added METADATA.textproto
+Added OWNERS
+Checked out tag v0.10.1.

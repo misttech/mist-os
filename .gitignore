@@ -101,6 +101,8 @@ tables_generator_tests_*.txt
 !/third_party/golibs
 !/third_party/rust_crates
 /third_party/rust_crates/mirrors
+!/third_party/jellyfish/
+/third_party/jellyfish/jellyfish
 !/third_party/modinv/
 !/third_party/modp_b64
 !/third_party/OWNERS
