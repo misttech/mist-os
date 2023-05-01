@@ -365,12 +365,9 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       }
     }
 
-    const std::array<std::string, 6> kProtocols = {
-        "fuchsia.device.fs.Exporter",
-        "fuchsia.device.manager.Administrator",
-        "fuchsia.driver.development.DriverDevelopment",
-        "fuchsia.driver.registrar.DriverRegistrar",
-        "fuchsia.hardware.pci.DeviceWatcher",
+    const std::array<std::string, 5> kProtocols = {
+        "fuchsia.device.manager.Administrator",     "fuchsia.driver.development.DriverDevelopment",
+        "fuchsia.driver.registrar.DriverRegistrar", "fuchsia.hardware.pci.DeviceWatcher",
         "fuchsia.hardware.usb.DeviceWatcher",
     };
     for (const auto& protocol : kProtocols) {

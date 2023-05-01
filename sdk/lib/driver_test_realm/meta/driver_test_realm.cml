@@ -15,7 +15,6 @@
         // From #realm_builder to test.
         {
             protocol: [
-                "fuchsia.device.fs.Exporter",
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
@@ -87,7 +86,6 @@
         },
         {
             protocol: [
-                "fuchsia.device.fs.Exporter",
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.registrar.DriverRegistrar",

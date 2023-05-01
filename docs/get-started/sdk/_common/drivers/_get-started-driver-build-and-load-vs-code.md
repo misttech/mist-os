@@ -140,8 +140,7 @@ In VS Code, do the following:
               Instance ID:  None
                      Type:  CML Component
           Component State:  Resolved
-    Incoming Capabilities:  /svc/fuchsia.device.fs.Exporter
-                            /svc/fuchsia.driver.compat.Service
+    Incoming Capabilities:  /svc/fuchsia.driver.compat.Service
                             /svc/fuchsia.logger.LogSink
      Exposed Capabilities:  examples.qemuedu.Service
               Merkle root:  ca337aa579388a7335c8fa53e47ba111b6a58c0b9af7519731e9942dec31f7ef

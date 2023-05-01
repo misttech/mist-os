@@ -12,7 +12,6 @@
         colocate: 'true',
     },
     use: [
-        { protocol: 'fuchsia.device.fs.Exporter' },
         { service: 'fuchsia.driver.compat.Service' },
         { service: 'fuchsia.examples.gizmo.Service' },
     ],

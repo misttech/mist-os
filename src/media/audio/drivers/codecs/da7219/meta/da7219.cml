@@ -12,7 +12,6 @@
         { service: 'fuchsia.hardware.audio.CodecService' },
     ],
     use: [
-        { protocol: 'fuchsia.device.fs.Exporter' },
         { service: 'fuchsia.hardware.acpi.Service' },
         { service: 'fuchsia.hardware.i2c.Service' },
         { service: 'fuchsia.driver.compat.Service' },

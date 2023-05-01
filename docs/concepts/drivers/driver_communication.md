@@ -62,11 +62,8 @@ a Fuchsia component can connect to an input device by opening and writing to
 a file that looks like `/dev/class/input-report/000`. In this case,
 the client may receive a channel that speaks the `fuchsia.input.report` FIDL.
 
-Drivers can use the [`fuchsia.device.fs`][fuchsia-device-fs] protocol to export
-themselves into `devfs`. The path under the `/dev` directory for a driver is the
-direct reflection of the path in the node topology. Therefore, if a driver wants
-to show up in the right place in `devfs`, it needs to make sure that its
-topological path and protocol correspond correctly.
+Drivers can use the [`DevfsAddArgs`][devfs-add-args] table to export
+themselves into `devfs` when they add a new node.
 
 ## FIDL communication
 
@@ -94,5 +91,5 @@ the Zircon kernel.
 [driver-manager]: driver_framework.md#driver_manager
 [driver-runtime]: driver_framework.md#driver_runtime
 [node-topology]: drivers_and_nodes.md#node_topology
-[fuchsia-device-fs]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.device.fs/exporter.fidl;l=12
+[devfs-add-args]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framwork/topology.fidl
 [components]: /docs/concepts/components/v2/README.md

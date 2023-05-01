@@ -50,7 +50,6 @@ $ ffx component show intel-i2c-dfv2
                   Type: CML dynamic component
        Component State: Resolved
  Incoming Capabilities: fuchsia.boot.Items
-                        fuchsia.device.fs.Exporter
                         fuchsia.driver.compat.Service
                         fuchsia.logger.LogSink
                         pkg
