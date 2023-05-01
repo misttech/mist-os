@@ -169,15 +169,20 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
 
     // For A1, the CPU power is VDD_CORE, which share with other module.
     // The fixed voltage is 0.8v, we can't adjust it dynamically.
-    ddk::PowerProtocolClient power_client;
+    fidl::ClientEnd<fuchsia_hardware_power::Device> power_client;
     if (info.pid != PDEV_PID_AMLOGIC_A1) {
       fragment_name.Resize(0);
       fragment_name.AppendPrintf("power-%02d", perf_domain.id);
-      if ((st = ddk::PowerProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
-                                                           &power_client)) != ZX_OK) {
-        zxlogf(ERROR, "%s: Failed to create power client, st = %d", __func__, st);
-        return st;
+      zx::result client_end_result =
+          DdkConnectFragmentFidlProtocol<fuchsia_hardware_power::Service::Device>(
+              parent, fragment_name.c_str());
+      if (client_end_result.is_error()) {
+        zxlogf(ERROR, "%s: Failed to create power client, st = %s", __func__,
+               client_end_result.status_string());
+        return client_end_result.error_value();
       }
+
+      power_client = std::move(client_end_result.value());
     }
 
     // Vector of operating points that belong to this power domain.
@@ -265,32 +270,49 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
     return ZX_OK;
   }
 
-  zx_status_t st;
   if (target_state.volt_uv > initial_state.volt_uv) {
     // If we're increasing the voltage we need to do it before setting the
     // frequency.
-    uint32_t actual_voltage;
-    st = pwr_.RequestVoltage(target_state.volt_uv, &actual_voltage);
-    if (st != ZX_OK || actual_voltage != target_state.volt_uv) {
-      zxlogf(ERROR, "%s: Failed to set cpu voltage, requested = %u, got = %u, st = %d", __func__,
-             target_state.volt_uv, actual_voltage, st);
-      return st;
+    ZX_ASSERT(pwr_.is_valid());
+    fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
+             result.status_string());
+      return result.error().status();
+    }
+
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s: RequestVoltage call returned error: %s", __func__,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+
+    uint32_t actual_voltage = result->value()->actual_voltage;
+    if (actual_voltage != target_state.volt_uv) {
+      zxlogf(ERROR, "%s: Actual voltage does not match, requested = %u, got = %u", __func__,
+             target_state.volt_uv, actual_voltage);
+      return ZX_OK;
     }
   }
 
   // Set the frequency next.
-  st = cpuscaler_.SetRate(target_state.freq_hz);
+  zx_status_t st = cpuscaler_.SetRate(target_state.freq_hz);
   if (st != ZX_OK) {
     zxlogf(ERROR, "%s: Could not set CPU frequency, st = %d\n", __func__, st);
 
     // Put the voltage back if frequency scaling fails.
-    uint32_t actual_voltage;
     if (pwr_.is_valid()) {
-      zx_status_t vt_st = pwr_.RequestVoltage(initial_state.volt_uv, &actual_voltage);
-      if (vt_st != ZX_OK) {
-        zxlogf(ERROR, "%s: Failed to reset CPU voltage, st = %d, Voltage and frequency mismatch!",
-               __func__, vt_st);
-        return vt_st;
+      fidl::WireResult result = pwr_->RequestVoltage(initial_state.volt_uv);
+      if (!result.ok()) {
+        zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
+               result.status_string());
+        return result.error().status();
+      }
+
+      if (result->is_error()) {
+        zxlogf(ERROR, "%s: Failed to reset CPU voltage, st = %s, Voltage and frequency mismatch!",
+               __func__, zx_status_get_string(result->error_value()));
+        return result->error_value();
       }
     }
     return st;
@@ -299,14 +321,27 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
   // If we're decreasing the voltage, then we do it after the frequency has been
   // reduced to avoid undervolt conditions.
   if (target_state.volt_uv < initial_state.volt_uv) {
-    uint32_t actual_voltage;
-    st = pwr_.RequestVoltage(target_state.volt_uv, &actual_voltage);
-    if (st != ZX_OK || actual_voltage != target_state.volt_uv) {
+    ZX_ASSERT(pwr_.is_valid());
+    fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
+             result.status_string());
+      return result.error().status();
+    }
+
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s: RequestVoltage call returned error: %s", __func__,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+
+    uint32_t actual_voltage = result->value()->actual_voltage;
+    if (actual_voltage != target_state.volt_uv) {
       zxlogf(ERROR,
-             "%s: Failed to set cpu voltage, requested = %u, got = %u, st = %d. "
+             "%s: Failed to set cpu voltage, requested = %u, got = %u. "
              "Voltage and frequency mismatch!",
-             __func__, target_state.volt_uv, actual_voltage, st);
-      return st;
+             __func__, target_state.volt_uv, actual_voltage);
+      return ZX_OK;
     }
   }
 
@@ -338,9 +373,34 @@ zx_status_t AmlCpu::Init() {
   }
 
   if (pwr_.is_valid()) {
-    uint32_t min_voltage, max_voltage;
-    pwr_.GetSupportedVoltageRange(&min_voltage, &max_voltage);
-    pwr_.RegisterPowerDomain(min_voltage, max_voltage);
+    fidl::WireResult voltage_range_result = pwr_->GetSupportedVoltageRange();
+    if (!voltage_range_result.ok()) {
+      zxlogf(ERROR, "Failed to send GetSupportedVoltageRange request: %s",
+             voltage_range_result.status_string());
+      return voltage_range_result.status();
+    }
+
+    if (voltage_range_result->is_error()) {
+      zxlogf(ERROR, "GetSupportedVoltageRange returned error: %s",
+             zx_status_get_string(voltage_range_result->error_value()));
+      return voltage_range_result->error_value();
+    }
+
+    uint32_t max_voltage = voltage_range_result->value()->max;
+    uint32_t min_voltage = voltage_range_result->value()->min;
+
+    fidl::WireResult register_result = pwr_->RegisterPowerDomain(min_voltage, max_voltage);
+    if (!register_result.ok()) {
+      zxlogf(ERROR, "Failed to send RegisterPowerDomain request: %s",
+             register_result.status_string());
+      return voltage_range_result.status();
+    }
+
+    if (register_result->is_error()) {
+      zxlogf(ERROR, "RegisterPowerDomain returned error: %s",
+             zx_status_get_string(register_result->error_value()));
+      return register_result->error_value();
+    }
   }
 
   uint32_t actual;

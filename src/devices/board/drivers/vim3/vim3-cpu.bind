@@ -9,10 +9,10 @@ using fuchsia.amlogic.platform.a311d;
 using fuchsia.amlogic.platform.meson;
 using fuchsia.clock;
 using fuchsia.platform;
-using fuchsia.power;
+using fuchsia.hardware.power;
 
 primary node "power-01" {
-  fuchsia.BIND_PROTOCOL == fuchsia.power.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.power.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_POWER_DOMAIN == fuchsia.amlogic.platform.a311d.POWER_DOMAIN.ARM_CORE_BIG;
 }
 
@@ -40,7 +40,7 @@ node "clock-cpu-scaler-01" {
 }
 
 node "power-02" {
-  fuchsia.BIND_PROTOCOL == fuchsia.power.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.power.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_POWER_DOMAIN == fuchsia.amlogic.platform.a311d.POWER_DOMAIN.ARM_CORE_LITTLE;
 }
 

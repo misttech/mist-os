@@ -7,10 +7,11 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
-#include <fuchsia/hardware/power/cpp/banjo.h>
 #include <lib/inspect/cpp/inspector.h>
 
+#include <optional>
 #include <vector>
 
 #include <ddktl/device.h>
@@ -31,13 +32,14 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpu);
   explicit AmlCpu(zx_device_t* parent, const ddk::ClockProtocolClient& plldiv16,
                   const ddk::ClockProtocolClient& cpudiv16,
-                  const ddk::ClockProtocolClient& cpuscaler, const ddk::PowerProtocolClient& pwr,
+                  const ddk::ClockProtocolClient& cpuscaler,
+                  fidl::ClientEnd<fuchsia_hardware_power::Device> pwr,
                   const std::vector<operating_point_t>& operating_points, const uint32_t core_count)
       : DeviceType(parent),
         plldiv16_(plldiv16),
         cpudiv16_(cpudiv16),
         cpuscaler_(cpuscaler),
-        pwr_(pwr),
+        pwr_(std::move(pwr)),
         current_pstate_(operating_points.size() -
                         1)  // Assume the core is running at the slowest clock to begin.
         ,
@@ -76,7 +78,8 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   const ddk::ClockProtocolClient plldiv16_;
   const ddk::ClockProtocolClient cpudiv16_;
   const ddk::ClockProtocolClient cpuscaler_;
-  const ddk::PowerProtocolClient pwr_;
+  // This is from an optional fragment.
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> pwr_;
 
   size_t current_pstate_;
   const std::vector<operating_point_t> operating_points_;

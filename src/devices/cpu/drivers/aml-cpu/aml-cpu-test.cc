@@ -5,7 +5,6 @@
 #include "aml-cpu.h"
 
 #include <fuchsia/hardware/clock/cpp/banjo-mock.h>
-#include <fuchsia/hardware/power/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -85,39 +84,235 @@ class FakeMmio {
   ddk_fake::FakeMmioRegRegion mmio_;
 };
 
-class FakePowerDevice : public ddk::PowerProtocol<FakePowerDevice, ddk::base_protocol> {
+class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> {
  public:
-  FakePowerDevice() : proto_({&power_protocol_ops_, this}), voltage_(0) {}
+  explicit TestPowerDevice(bool use_mocks) : use_mocks_(use_mocks) {}
 
-  zx_status_t PowerRegisterPowerDomain(uint32_t min_needed_voltage,
-                                       uint32_t max_supported_voltage) {
-    return ZX_OK;
-  }
-  zx_status_t PowerUnregisterPowerDomain() { return ZX_OK; }
-  zx_status_t PowerGetPowerDomainStatus(power_domain_status_t* out_status) { return ZX_OK; }
-  zx_status_t PowerGetSupportedVoltageRange(uint32_t* min_voltage, uint32_t* max_voltage) {
-    return ZX_OK;
+  fuchsia_hardware_power::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_power::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, async_get_default_dispatcher(),
+                                               fidl::kIgnoreBindingClosure),
+    });
   }
 
-  zx_status_t PowerRequestVoltage(uint32_t voltage, uint32_t* actual_voltage) {
-    voltage_ = voltage;
-    *actual_voltage = voltage;
-    return ZX_OK;
+  void ConnectRequest(fidl::ServerEnd<fuchsia_hardware_power::Device> request) {
+    binding_group_.AddBinding(async_get_default_dispatcher(), std::move(request), this,
+                              fidl::kIgnoreBindingClosure);
   }
 
-  zx_status_t PowerGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) {
-    *current_voltage = voltage_;
-    return ZX_OK;
+  fidl::ClientEnd<fuchsia_hardware_power::Device> Connect() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
+    EXPECT_OK(endpoints);
+    ConnectRequest(std::move(endpoints->server));
+    return std::move(endpoints->client);
   }
 
-  zx_status_t PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value) { return ZX_OK; }
-  zx_status_t PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value) { return ZX_OK; }
+  void RegisterPowerDomain(RegisterPowerDomainRequestView request,
+                           RegisterPowerDomainCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_register_power_domain_.Call(request->min_needed_voltage,
+                                                     request->max_supported_voltage);
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess();
+        return;
+      }
 
-  const power_protocol_t* proto() const { return &proto_; }
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess();
+  }
+
+  void UnregisterPowerDomain(UnregisterPowerDomainCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_unregister_power_domain_.Call();
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess();
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess();
+  }
+  void GetPowerDomainStatus(GetPowerDomainStatusCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_get_power_domain_status_.Call();
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess(std::get<1>(result));
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess(fuchsia_hardware_power::wire::PowerDomainStatus::kEnabled);
+  }
+  void GetSupportedVoltageRange(GetSupportedVoltageRangeCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_get_supported_voltage_range_.Call();
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess(std::get<1>(result), std::get<2>(result));
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess(0, 1);
+  }
+
+  void RequestVoltage(RequestVoltageRequestView request,
+                      RequestVoltageCompleter::Sync& completer) override {
+    voltage_ = request->voltage;
+    if (use_mocks_) {
+      auto result = mock_request_voltage_.Call(request->voltage);
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess(std::get<1>(result));
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess(voltage_);
+  }
+
+  void GetCurrentVoltage(GetCurrentVoltageRequestView request,
+                         GetCurrentVoltageCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_get_current_voltage_.Call(request->index);
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess(std::get<1>(result));
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess(voltage_);
+  }
+
+  void WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
+                        WritePmicCtrlRegCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_write_pmic_ctrl_reg_.Call(request->reg_addr, request->value);
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess();
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess();
+  }
+  void ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
+                       ReadPmicCtrlRegCompleter::Sync& completer) override {
+    if (use_mocks_) {
+      auto result = mock_read_pmic_ctrl_reg_.Call(request->reg_addr);
+      zx_status_t status = std::get<0>(result);
+      if (status == ZX_OK) {
+        completer.ReplySuccess(std::get<1>(result));
+        return;
+      }
+
+      completer.ReplyError(status);
+      return;
+    }
+
+    completer.ReplySuccess(1);
+  }
+
+  void ExpectRegisterPowerDomain(zx_status_t out_s, uint32_t min_needed_voltage,
+                                 uint32_t max_supported_voltage) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_register_power_domain_.ExpectCall({out_s}, min_needed_voltage, max_supported_voltage);
+  }
+
+  void ExpectUnregisterPowerDomain(zx_status_t out_s) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_unregister_power_domain_.ExpectCall({out_s});
+  }
+
+  void ExpectGetSupportedVoltageRange(zx_status_t out_s, uint32_t out_min, uint32_t out_max) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_get_supported_voltage_range_.ExpectCall({out_s, out_min, out_max});
+  }
+
+  void ExpectRequestVoltage(zx_status_t out_s, uint32_t voltage, uint32_t out_actual_voltage) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_request_voltage_.ExpectCall({out_s, out_actual_voltage}, voltage);
+  }
+
+  void ExpectGetCurrentVoltage(zx_status_t out_s, uint32_t index, uint32_t out_current_voltage) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_get_current_voltage_.ExpectCall({out_s, out_current_voltage}, index);
+  }
+
+  void ExpectGetPowerDomainStatus(zx_status_t out_s,
+                                  fuchsia_hardware_power::PowerDomainStatus out_status) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_get_power_domain_status_.ExpectCall({out_s, out_status});
+  }
+
+  void ExpectWritePmicCtrlReg(zx_status_t out_s, uint32_t reg_addr, uint32_t value) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_write_pmic_ctrl_reg_.ExpectCall({out_s}, reg_addr, value);
+  }
+
+  void ExpectReadPmicCtrlReg(zx_status_t out_s, uint32_t reg_addr, uint32_t out_value) {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use Expect functions.");
+    mock_read_pmic_ctrl_reg_.ExpectCall({out_s, out_value}, reg_addr);
+  }
+
+  void VerifyAndClear() {
+    ZX_ASSERT_MSG(use_mocks_, "use_mocks needs to be true to use VerifyAndClear.");
+    mock_register_power_domain_.VerifyAndClear();
+    mock_unregister_power_domain_.VerifyAndClear();
+    mock_get_supported_voltage_range_.VerifyAndClear();
+    mock_request_voltage_.VerifyAndClear();
+    mock_get_current_voltage_.VerifyAndClear();
+    mock_get_power_domain_status_.VerifyAndClear();
+    mock_write_pmic_ctrl_reg_.VerifyAndClear();
+    mock_read_pmic_ctrl_reg_.VerifyAndClear();
+  }
+
+  uint32_t voltage() const { return voltage_; }
 
  private:
-  power_protocol_t proto_;
-  uint32_t voltage_;
+  bool use_mocks_;
+  uint32_t voltage_ = 0;
+  fidl::ServerBindingGroup<fuchsia_hardware_power::Device> binding_group_;
+
+  mock_function::MockFunction<std::tuple<zx_status_t>, uint32_t, uint32_t>
+      mock_register_power_domain_;
+  mock_function::MockFunction<std::tuple<zx_status_t>> mock_unregister_power_domain_;
+  mock_function::MockFunction<std::tuple<zx_status_t, uint32_t, uint32_t>>
+      mock_get_supported_voltage_range_;
+  mock_function::MockFunction<std::tuple<zx_status_t, uint32_t>, uint32_t> mock_request_voltage_;
+  mock_function::MockFunction<std::tuple<zx_status_t, uint32_t>, uint32_t>
+      mock_get_current_voltage_;
+  mock_function::MockFunction<std::tuple<zx_status_t, fuchsia_hardware_power::PowerDomainStatus>>
+      mock_get_power_domain_status_;
+  mock_function::MockFunction<std::tuple<zx_status_t>, uint32_t, uint32_t>
+      mock_write_pmic_ctrl_reg_;
+  mock_function::MockFunction<std::tuple<zx_status_t, uint32_t>, uint32_t> mock_read_pmic_ctrl_reg_;
 };
 
 class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_protocol> {
@@ -146,6 +341,7 @@ class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_pro
 
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
+  TestPowerDevice power_server{false};
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -157,21 +353,27 @@ class AmlCpuBindingTest : public zxtest::Test {
     mmios[0] = mmio_.mmio();
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
-    incoming_.SyncCall([mmios = std::move(mmios), server = std::move(outgoing_endpoints->server)](
-                           IncomingNamespace* infra) mutable {
-      infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
-          .mmios = std::move(mmios),
-          .device_info =
-              pdev_device_info_t{
-                  .pid = PDEV_PID_ASTRO,
-              },
-      });
+    zx::result power_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(power_endpoints);
+    incoming_.SyncCall(
+        [mmios = std::move(mmios), server = std::move(outgoing_endpoints->server),
+         power_server = std::move(power_endpoints->server)](IncomingNamespace* infra) mutable {
+          infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+              .mmios = std::move(mmios),
+              .device_info =
+                  pdev_device_info_t{
+                      .pid = PDEV_PID_ASTRO,
+                  },
+          });
 
-      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
+          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+              infra->pdev_server.GetInstanceHandler()));
+          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_power::Service>(
+              infra->power_server.GetInstanceHandler()));
 
-      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
-    });
+          ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+          ASSERT_OK(infra->outgoing.Serve(std::move(power_server)));
+        });
     ASSERT_NO_FATAL_FAILURE();
 
     root_ = MockDevice::FakeRootParent();
@@ -179,8 +381,9 @@ class AmlCpuBindingTest : public zxtest::Test {
 
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(outgoing_endpoints->client), "pdev");
+    root_->AddFidlService(fuchsia_hardware_power::Service::Name, std::move(power_endpoints->client),
+                          "power-01");
 
-    root_->AddProtocol(ZX_PROTOCOL_POWER, pwr_.proto()->ops, pwr_.proto()->ctx, "power-01");
     root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk0_.proto()->ops, clk0_.proto()->ctx,
                        "clock-pll-div16-01");
     root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk1_.proto()->ops, clk1_.proto()->ctx,
@@ -200,7 +403,6 @@ class AmlCpuBindingTest : public zxtest::Test {
 
   FakeMmio mmio_;
 
-  FakePowerDevice pwr_;
   FakeClockDevice clk0_;
   FakeClockDevice clk1_;
   FakeClockDevice clk2_;
@@ -237,15 +439,77 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
   EXPECT_OK(dev->DdkSetPerformanceState(0, &out_state));
   EXPECT_EQ(out_state, 0);
 
-  uint32_t voltage = 0;
-  EXPECT_OK(pwr_.PowerGetCurrentVoltage(0, &voltage));
-  EXPECT_EQ(voltage, 300'000);
+  incoming_.SyncCall([](IncomingNamespace* infra) {
+    uint32_t voltage = infra->power_server.voltage();
+    EXPECT_EQ(voltage, 300'000);
+  });
 }
+
+class TestPowerDeviceWrapper {
+ public:
+  TestPowerDeviceWrapper() { loop_.StartThread("power-loop"); }
+
+  fidl::ClientEnd<fuchsia_hardware_power::Device> Connect() {
+    return power_device_.SyncCall(&TestPowerDevice::Connect);
+  }
+
+  void ExpectRegisterPowerDomain(zx_status_t out_s, uint32_t min_needed_voltage,
+                                 uint32_t max_supported_voltage) {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::ExpectRegisterPowerDomain, out_s,
+                                              min_needed_voltage, max_supported_voltage));
+  }
+
+  void ExpectUnregisterPowerDomain(zx_status_t out_s) {
+    EXPECT_NO_FAILURES(
+        power_device_.SyncCall(&TestPowerDevice::ExpectUnregisterPowerDomain, out_s));
+  }
+
+  void ExpectGetSupportedVoltageRange(zx_status_t out_s, uint32_t out_min, uint32_t out_max) {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::ExpectGetSupportedVoltageRange,
+                                              out_s, out_min, out_max));
+  }
+
+  void ExpectRequestVoltage(zx_status_t out_s, uint32_t voltage, uint32_t out_actual_voltage) {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::ExpectRequestVoltage, out_s,
+                                              voltage, out_actual_voltage));
+  }
+
+  void ExpectGetCurrentVoltage(zx_status_t out_s, uint32_t index, uint32_t out_current_voltage) {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::ExpectGetCurrentVoltage, out_s,
+                                              index, out_current_voltage));
+  }
+
+  void ExpectGetPowerDomainStatus(zx_status_t out_s,
+                                  fuchsia_hardware_power::PowerDomainStatus out_status) {
+    EXPECT_NO_FAILURES(
+        power_device_.SyncCall(&TestPowerDevice::ExpectGetPowerDomainStatus, out_s, out_status));
+  }
+
+  void ExpectWritePmicCtrlReg(zx_status_t out_s, uint32_t reg_addr, uint32_t value) {
+    EXPECT_NO_FAILURES(
+        power_device_.SyncCall(&TestPowerDevice::ExpectWritePmicCtrlReg, out_s, reg_addr, value));
+  }
+
+  void ExpectReadPmicCtrlReg(zx_status_t out_s, uint32_t reg_addr, uint32_t out_value) {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::ExpectReadPmicCtrlReg, out_s,
+                                              reg_addr, out_value));
+  }
+
+  void VerifyAndClear() {
+    EXPECT_NO_FAILURES(power_device_.SyncCall(&TestPowerDevice::VerifyAndClear));
+  }
+
+ private:
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<TestPowerDevice> power_device_{loop_.dispatcher(),
+                                                                     std::in_place, true};
+};
 
 class AmlCpuTest : public AmlCpu {
  public:
   AmlCpuTest(const ddk::ClockProtocolClient&& plldiv16, const ddk::ClockProtocolClient&& cpudiv16,
-             const ddk::ClockProtocolClient&& cpuscaler, const ddk::PowerProtocolClient&& pwr,
+             const ddk::ClockProtocolClient&& cpuscaler,
+             fidl::ClientEnd<fuchsia_hardware_power::Device> pwr,
              const std::vector<operating_point_t> operating_points, const uint32_t core_count)
       : AmlCpu(nullptr, std::move(plldiv16), std::move(cpudiv16), std::move(cpuscaler),
                std::move(pwr), operating_points, core_count) {}
@@ -258,8 +522,8 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
   AmlCpuTestFixture()
       : dut_(ddk::ClockProtocolClient(pll_clock_.GetProto()),
              ddk::ClockProtocolClient(cpu_clock_.GetProto()),
-             ddk::ClockProtocolClient(scaler_clock_.GetProto()),
-             ddk::PowerProtocolClient(power_.GetProto()), kTestOperatingPoints, kTestCoreCount),
+             ddk::ClockProtocolClient(scaler_clock_.GetProto()), power_.Connect(),
+             kTestOperatingPoints, kTestCoreCount),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         operating_points_(kTestOperatingPoints) {}
 
@@ -302,7 +566,7 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
   ddk::MockClock pll_clock_;
   ddk::MockClock cpu_clock_;
   ddk::MockClock scaler_clock_;
-  ddk::MockPower power_;
+  TestPowerDeviceWrapper power_;
 
   AmlCpuTest dut_;
   CpuCtrlClient cpu_client_;

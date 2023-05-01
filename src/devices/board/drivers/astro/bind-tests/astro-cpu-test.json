@@ -7,7 +7,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_POWER_DOMAIN": "fuchsia.amlogic.platform.s905d2.POWER_DOMAIN.ARM_CORE",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.power.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.power.BIND_FIDL_PROTOCOL.SERVICE"
                 }
             }
         ]
