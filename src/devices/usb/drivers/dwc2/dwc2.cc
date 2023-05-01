@@ -145,8 +145,8 @@ void Dwc2::HandleInEpInterrupt() {
 
       if (diepint.timeout()) {
         // TODO(105382) remove logging once timeout recovery has stabilized.
-        zxlogf(ERROR, "(diepint.timeout) DIEPINT=0x%08x DIEPMSK=0x%08x", diepint.reg_value(),
-               diepmsk.reg_value());
+        zxlogf(ERROR, "(diepint.timeout) (ep%u) DIEPINT=0x%08x DIEPMSK=0x%08x", ep_num,
+               diepint.reg_value(), diepmsk.reg_value());
       }
 
       diepint.set_reg_value(diepint.reg_value() & diepmsk.reg_value());
@@ -183,9 +183,9 @@ void Dwc2::HandleInEpInterrupt() {
             auto dctl = DCTL::Get().ReadFrom(mmio);
             auto depctl0 = DEPCTL0::Get(0).ReadFrom(mmio);
             zxlogf(ERROR,
-                   "Got diepint.timeout for DATA_IN phase, attempting to recover. "
+                   "Got diepint.timeout for DATA_IN phase on ep%u, attempting to recover. "
                    "DCTL=0x%08x DEPCTL0=0x%08x",
-                   dctl.reg_value(), depctl0.reg_value());
+                   ep_num, dctl.reg_value(), depctl0.reg_value());
 
             // The timeout is due to one of two cases:
             //   1. The core never received an ACK to sent IN-data. In this case, the host
@@ -211,7 +211,8 @@ void Dwc2::HandleInEpInterrupt() {
           case Ep0State::STALL:
             // The other cases should either theoretically never happen, or handled by the core
             // internally in dedicate-FIFO mode, but we'll log anyway.
-            zxlogf(ERROR, "Unhandled IN EP0 diepint.timeout at txn phase %d", ep0_state_);
+            zxlogf(ERROR, "Unhandled IN EP0 diepint.timeout at txn phase %s",
+                   Ep0StateToStr(ep0_state_));
 
             DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
             break;
@@ -231,7 +232,8 @@ void Dwc2::HandleInEpInterrupt() {
         // Note the DWC_EP0_IN case is handled above.
         if (ep_num == DWC_EP0_OUT) {
           // This should theoretically never happen in dedicated-FIFO mode, but we'll log anyway.
-          zxlogf(ERROR, "Unhandled OUT EP0 diepint.timeout at txn phase %d", ep0_state_);
+          zxlogf(ERROR, "Unhandled OUT EP0 diepint.timeout at txn phase %s",
+                 Ep0StateToStr(ep0_state_));
         } else {
           zxlogf(ERROR, "Unhandled interrupt diepint.timeout for ep_num %u", ep_num);
         }
@@ -260,9 +262,6 @@ void Dwc2::HandleOutEpInterrupt() {
   if (timeout_recovering_) {
     // TODO(105382) remove logging once timeout recovery has stabilized.
     zxlogf(ERROR, "(diepint.timeout) OUT-ep interrupt with timeout_recovering_ = true");
-
-    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
-    timeout_recovering_ = false;
   }
 
   auto* mmio = get_mmio();
@@ -283,6 +282,15 @@ void Dwc2::HandleOutEpInterrupt() {
   while (ep_bits) {
     if (ep_bits & 1) {
       auto doepint = DOEPINT::Get(ep_num).ReadFrom(mmio);
+      auto doepmsk = DOEPMSK::Get().ReadFrom(mmio);
+
+      if (timeout_recovering_) {
+        // TODO(105382) remove logging once timeout recovery has stabilized.
+        // N.B. the use of "(diepint.timeout)" here is used for a searchable-term.
+        zxlogf(ERROR, "(diepint.timeout) OUT-ep (ep%u, state=%s) DOEPINT=0x%08x DOEPMSK=0x%08x",
+               ep_num, Ep0StateToStr(ep0_state_), doepint.reg_value(), doepmsk.reg_value());
+      }
+
       doepint.set_reg_value(doepint.reg_value() & DOEPMSK::Get().ReadFrom(mmio).reg_value());
 
       if (doepint.sr()) {
@@ -331,6 +339,14 @@ void Dwc2::HandleOutEpInterrupt() {
     }
     ep_num++;
     ep_bits >>= 1;
+  }
+
+  if (timeout_recovering_) {
+    // TODO(105382) remove logging once timeout recovery has stabilized.
+    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
+    zxlogf(ERROR, "(diepint.timeout) clearing timeout_recovering_ condition in state=%s",
+           Ep0StateToStr(ep0_state_));
+    timeout_recovering_ = false;
   }
 }
 

@@ -68,6 +68,19 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
     TIMEOUT_RECOVERY,
   };
 
+  // clang-format off
+  const char* Ep0StateToStr(Ep0State s) {
+    switch (s) {
+      case Ep0State::DISCONNECTED:     return "DISCONNECTED";
+      case Ep0State::IDLE:             return "IDLE";
+      case Ep0State::DATA:             return "DATA";
+      case Ep0State::STATUS:           return "STATUS";
+      case Ep0State::STALL:            return "STALL";
+      case Ep0State::TIMEOUT_RECOVERY: return "TIMEOUT_RECOVERY";
+    }
+  }
+  // clang-format on
+
   using Request = usb::BorrowedRequest<void>;
   using RequestQueue = usb::BorrowedRequestQueue<void>;
 
