@@ -6,14 +6,17 @@ use anyhow::{anyhow, Context, Result};
 use async_channel::{unbounded, Receiver, Sender};
 use async_trait::async_trait;
 use chrono::{Local, TimeZone};
-use diagnostics_data::Timestamp;
+use diagnostics_data::{LogsData, Timestamp};
 use errors::ffx_error;
 use ffx_daemon_target::logger::{
     streamer::GenericDiagnosticsStreamer, write_logs_to_file, SymbolizerConfig,
 };
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline};
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::{
+    endpoints::{create_proxy, ServerEnd},
+    AsyncSocket,
+};
 use fidl_fuchsia_developer_ffx::{
     DaemonDiagnosticsStreamParameters, DiagnosticsProxy, DiagnosticsStreamDiagnosticsResult,
     DiagnosticsStreamError, LogSession, OpenTargetError, SessionSpec, StreamMode,
@@ -22,12 +25,14 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{
     ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorGetNextResponder,
     ArchiveIteratorMarker, ArchiveIteratorProxy, ArchiveIteratorRequest,
-    ArchiveIteratorRequestStream, BridgeStreamParameters, ConnectError, DiagnosticsData,
-    IdentifyHostError, InlineData, RemoteDiagnosticsBridgeMarker, RemoteDiagnosticsBridgeProxy,
+    ArchiveIteratorRequestStream, ConnectError, DiagnosticsData, IdentifyHostError, InlineData,
 };
+use fidl_fuchsia_diagnostics::StreamParameters;
+use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use fuchsia_async::Timer;
-use futures::{lock::Mutex, AsyncReadExt, StreamExt};
+use futures::{lock::Mutex, AsyncReadExt, AsyncWriteExt, StreamExt};
 use selectors::{parse_selector, VerboseError};
+use serde::{Deserialize, Serialize};
 use std::{
     iter::Iterator,
     sync::Arc,
@@ -48,8 +53,8 @@ $ ffx doctor --restart-daemon";
 const NANOS_IN_SECOND: i64 = 1_000_000_000;
 const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 const RETRY_TIMEOUT_MILLIS: u64 = 1000;
-const RCS_SELECTOR: &str =
-    "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge";
+const READ_BUFFER_SIZE: usize = 1000 * 1000 * 5;
+const RCS_SELECTOR: &str = "bootstrap/archivist:expose:fuchsia.diagnostics.host.ArchiveAccessor";
 
 fn get_timestamp() -> Result<Timestamp> {
     Ok(Timestamp::from(
@@ -125,8 +130,7 @@ impl StreamDiagnostics for DiagnosticsProxy {
 struct ConnectionState {
     target_collection_proxy: TargetCollectionProxy,
     boot_timestamp: u64,
-    running_daemon_channel:
-        Option<Sender<(ServerEnd<ArchiveIteratorMarker>, ArchiveIteratorProxy)>>,
+    running_daemon_channel: Option<Sender<(ServerEnd<ArchiveIteratorMarker>, AsyncSocket)>>,
     current_task: Option<fuchsia_async::Task<Result<(), LogError>>>,
 }
 
@@ -164,6 +168,18 @@ enum LogError {
     },
     #[error("End of stream")]
     EndOfStream,
+    #[error("IO error {}", error)]
+    IOError {
+        #[from]
+        error: std::io::Error,
+    },
+    #[error("JSON error {}", error)]
+    JsonError {
+        #[from]
+        error: serde_json::Error,
+    },
+    #[error("Peer closed")]
+    PeerClosed,
 }
 
 impl From<OpenTargetError> for LogError {
@@ -196,6 +212,104 @@ struct LocalStreamParameters {
     boot_ts: i64,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+struct JsonDecoder {
+    socket: fuchsia_async::Socket,
+    buffer: Vec<u8>,
+    state: JsonDecoderState,
+}
+
+#[derive(PartialEq)]
+enum JsonDecoderState {
+    Init,
+    ReadingMessage(Vec<u8>),
+}
+
+impl JsonDecoderState {
+    fn take(&mut self) -> JsonDecoderState {
+        let mut ret = JsonDecoderState::Init;
+        std::mem::swap(self, &mut ret);
+        ret
+    }
+}
+
+impl JsonDecoder {
+    fn new(socket: fuchsia_async::Socket) -> Self {
+        let mut buffer = vec![];
+        buffer.resize(READ_BUFFER_SIZE, 0);
+        Self { socket, buffer, state: JsonDecoderState::Init }
+    }
+
+    async fn decode(&mut self) -> Result<Vec<LogsData>, LogError> {
+        let mut out_vec = vec![];
+        loop {
+            let mut next_state = JsonDecoderState::Init;
+            match self.state.take() {
+                JsonDecoderState::Init => {
+                    let bytes_read = self.socket.read(&mut self.buffer).await?;
+                    if bytes_read == 0 {
+                        return Err(LogError::PeerClosed);
+                    }
+                    // Try to decode message
+                    let des = serde_json::Deserializer::from_slice(&self.buffer[..bytes_read]);
+                    let mut stream = des.into_iter::<OneOrMany<LogsData>>();
+                    while let Some(Ok(value)) = stream.next() {
+                        handle_value(value, &mut out_vec);
+                    }
+                    // byte_offset is the last deserialized object, if any
+                    if stream.byte_offset() != bytes_read {
+                        next_state = JsonDecoderState::ReadingMessage(
+                            self.buffer[stream.byte_offset()..bytes_read].to_vec(),
+                        );
+                    }
+                }
+                JsonDecoderState::ReadingMessage(mut msg) => {
+                    let res = self.socket.read(&mut self.buffer).await?;
+                    if res == 0 {
+                        return Err(LogError::PeerClosed);
+                    }
+                    // append to msg
+                    msg.append(&mut self.buffer[..res].to_vec());
+                    let des = serde_json::Deserializer::from_slice(&msg);
+                    let mut stream = des.into_iter::<OneOrMany<LogsData>>();
+                    while let Some(Ok(value)) = stream.next() {
+                        handle_value(value, &mut out_vec);
+                    }
+                    // byte_offset is the last deserialized object, if any
+                    if stream.byte_offset() != msg.len() {
+                        next_state =
+                            JsonDecoderState::ReadingMessage(msg[stream.byte_offset()..].to_vec());
+                    }
+                }
+            }
+            self.state = next_state;
+            if self.state == JsonDecoderState::Init {
+                return Ok(out_vec);
+            }
+        }
+    }
+}
+
+fn handle_value(
+    value: OneOrMany<diagnostics_data::Data<diagnostics_data::Logs>>,
+    out_vec: &mut Vec<diagnostics_data::Data<diagnostics_data::Logs>>,
+) {
+    match value {
+        OneOrMany::One(one) => {
+            out_vec.push(one);
+        }
+        OneOrMany::Many(mut many) => {
+            out_vec.append(&mut many);
+        }
+    }
+}
+
 impl RemoteDiagnosticsBridgeProxyWrapper {
     pub fn new(target_collection_proxy: TargetCollectionProxy, node_name: String) -> Self {
         Self {
@@ -212,11 +326,8 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
     async fn translate_logs(
         self: Arc<Self>,
         mut iterator: ServerEnd<ArchiveIteratorMarker>,
-        mut proxy: ArchiveIteratorProxy,
-        mut new_connection_receiver: Receiver<(
-            ServerEnd<ArchiveIteratorMarker>,
-            ArchiveIteratorProxy,
-        )>,
+        mut proxy: AsyncSocket,
+        mut new_connection_receiver: Receiver<(ServerEnd<ArchiveIteratorMarker>, AsyncSocket)>,
         parameters: LocalStreamParameters,
     ) -> Result<(), LogError> {
         let mut pending_request = None;
@@ -289,16 +400,25 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
     async fn daemon_to_target(
         self: &Arc<Self>,
         daemon_iterator: ServerEnd<ArchiveIteratorMarker>,
-        proxy: ArchiveIteratorProxy,
+        socket: AsyncSocket,
     ) -> Result<(), LogError> {
         let mut daemon_server = daemon_iterator.into_stream()?;
+        let mut decoder = JsonDecoder::new(socket);
         while let Some(Ok(ArchiveIteratorRequest::GetNext { responder })) =
             daemon_server.next().await
         {
-            let Ok(mut value) = proxy.get_next().await else {
-                break;
-            };
-            responder.send(&mut value)?;
+            let out_vec = decoder.decode().await?;
+            // Encode value into a new emulated socket
+            let (local, remote) = fuchsia_async::emulated_handle::Socket::create_stream();
+            let mut local = fuchsia_async::Socket::from_socket(local)?;
+            let results = vec![ArchiveIteratorEntry {
+                data: None,
+                diagnostics_data: Some(DiagnosticsData::Socket(remote)),
+                truncated_chars: None,
+                ..Default::default()
+            }];
+            responder.send(&mut Ok(results))?;
+            local.write_all(serde_json::to_string(&out_vec)?.as_bytes()).await?;
         }
         Ok(())
     }
@@ -342,7 +462,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         }
     }
 
-    async fn connect(&self) -> Result<RemoteDiagnosticsBridgeProxy, LogError> {
+    async fn connect(&self) -> Result<ArchiveAccessorProxy, LogError> {
         let mut state = self.connection_state.lock().await;
         let (client, server) = create_proxy()?;
         state
@@ -359,8 +479,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             .await??
             .boot_timestamp_nanos
             .ok_or(LogError::NoBootTimestamp)?;
-        let (diagnostics_client, diagnostics_server) =
-            create_proxy::<RemoteDiagnosticsBridgeMarker>()?;
+        let (diagnostics_client, diagnostics_server) = create_proxy::<ArchiveAccessorMarker>()?;
         let channel = diagnostics_server.into_channel();
         rcs_client.connect(parse_selector::<VerboseError>(RCS_SELECTOR)?, channel).await??;
         Ok(diagnostics_client)
@@ -426,11 +545,10 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
             fidl_fuchsia_developer_remotecontrol::ArchiveIteratorMarker,
         >,
     ) -> Result<fidl_fuchsia_developer_ffx::DiagnosticsStreamDiagnosticsResult, anyhow::Error> {
-        let (proxy, server) = create_proxy().context("failed to create endpoints")?;
-        let proxy: ArchiveIteratorProxy = proxy;
+        let (socket, server) = fuchsia_async::emulated_handle::Socket::create_stream();
         let connection = self.connect().await?;
         let _ = connection.stream_diagnostics(
-            BridgeStreamParameters {
+            StreamParameters {
                 data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
                 stream_mode: parameters.stream_mode.map(|mode| match mode {
                     StreamMode::SnapshotAll => fidl_fuchsia_diagnostics::StreamMode::Snapshot,
@@ -442,6 +560,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
                     }
                     StreamMode::Subscribe => fidl_fuchsia_diagnostics::StreamMode::Subscribe,
                 }),
+                format: Some(fidl_fuchsia_diagnostics::Format::Json),
                 client_selector_configuration: Some(
                     fidl_fuchsia_diagnostics::ClientSelectorConfiguration::SelectAll(true),
                 ),
@@ -449,11 +568,13 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
             },
             server,
         );
+        let socket = fuchsia_async::Socket::from_socket(socket)?;
+
         let this = self.clone();
 
         let mut state = self.connection_state.lock().await;
         if let Some(daemon) = &state.running_daemon_channel {
-            daemon.send((iterator, proxy)).await?;
+            daemon.send((iterator, socket)).await?;
         } else {
             let boot_ts = state.boot_timestamp;
             // root task
@@ -461,7 +582,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
             state.current_task = Some(fuchsia_async::Task::local(async move {
                 this.translate_logs(
                     iterator,
-                    proxy,
+                    socket,
                     receiver,
                     LocalStreamParameters {
                         daemon_parameters: parameters,
@@ -699,7 +820,7 @@ async fn log_entry_from_socket(socket: fidl::Socket) -> Result<LogEntry> {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Timestamp};
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use ffx_config::test_init;
     use ffx_log_test_utils::{
         setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
@@ -709,9 +830,9 @@ mod test {
         TargetRequest,
     };
     use fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorError, IdentifyHostResponse, RemoteControlRequest,
-        RemoteDiagnosticsBridgeRequest, ServiceMatch,
+        ArchiveIteratorError, IdentifyHostResponse, RemoteControlRequest, ServiceMatch,
     };
+    use fidl_fuchsia_diagnostics_host::ArchiveAccessorRequest;
     use futures::TryStreamExt;
     use std::{ops::ControlFlow, sync::Arc};
 
@@ -936,16 +1057,42 @@ mod test {
                 subdir: Default::default(),
             }))
             .unwrap();
-        let server_end = ServerEnd::<RemoteDiagnosticsBridgeMarker>::new(service_chan);
+        let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
         let mut diagnostics_stream = server_end.into_stream().unwrap();
-        if let Some(Ok(RemoteDiagnosticsBridgeRequest::StreamDiagnostics {
+        if let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+            stream,
             parameters,
-            iterator,
             responder,
         })) = diagnostics_stream.next().await
         {
+            let (client, server) = fidl::endpoints::create_endpoints::<ArchiveIteratorMarker>();
+            fuchsia_async::Task::local(async move {
+                let mut stream = fuchsia_async::Socket::from_socket(stream).unwrap();
+                let proxy = client.into_proxy().unwrap();
+                loop {
+                    let Ok(Ok(batch)) = proxy.get_next().await else {
+                        break;
+                    };
+                    for value in batch {
+                        let data = value.diagnostics_data.unwrap();
+                        match data {
+                            DiagnosticsData::Inline(data) => {
+                                stream.write_all(data.data.as_bytes()).await.unwrap();
+                            }
+                            DiagnosticsData::Socket(socket) => {
+                                let mut socket =
+                                    fuchsia_async::Socket::from_socket(socket).unwrap();
+                                let mut data = vec![];
+                                socket.read_to_end(&mut data).await.unwrap();
+                                stream.write_all(&data).await.unwrap();
+                            }
+                        }
+                    }
+                }
+            })
+            .detach();
             setup_fake_archive_iterator(
-                iterator,
+                server,
                 ArchiveIteratorParameters {
                     legacy_format: false,
                     responses: expected_responses.clone(),
@@ -953,7 +1100,7 @@ mod test {
                 },
             )
             .unwrap();
-            responder.send(&mut Ok(())).unwrap();
+            responder.send().unwrap();
             if parameters.stream_mode == Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot) {
                 return Some(Some(ControlFlow::Break(())));
             }
@@ -1014,6 +1161,82 @@ mod test {
         direct_streamer.clean_sessions_for_target().await.unwrap();
         assert_eq!(direct_streamer.read_most_recent_entry_timestamp().await.unwrap(), None);
         assert_eq!(direct_streamer.read_most_recent_target_timestamp().await.unwrap(), None);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_json_decoder() {
+        // This is intentionally a datagram socket so we can
+        // guarantee torn writes and test all the code paths
+        // in the decoder.
+        let (local, remote) = fuchsia_async::emulated_handle::Socket::create_datagram();
+        let mut decoder = JsonDecoder::new(fuchsia_async::Socket::from_socket(remote).unwrap());
+        let test_log = vec![LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            severity: Severity::Info,
+            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+        })
+        .set_message("Hello world!")
+        .add_tag("Some tag")
+        .build()];
+        let serialized_log = serde_json::to_string(&test_log).unwrap();
+        let serialized_bytes = serialized_log.as_bytes();
+        let part_a = &serialized_bytes[..15];
+        let part_b = &serialized_bytes[15..20];
+        let part_c = &serialized_bytes[20..];
+        local.write(part_a).unwrap();
+        local.write(part_b).unwrap();
+        local.write(part_c).unwrap();
+        let decoded_log = &decoder.decode().await.unwrap();
+        assert_eq!(decoded_log, &test_log);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_json_decoder_regular_message() {
+        // This is intentionally a datagram socket so we can
+        // send the entire message as one "packet".
+        let (local, remote) = fuchsia_async::emulated_handle::Socket::create_datagram();
+        let mut decoder = JsonDecoder::new(fuchsia_async::Socket::from_socket(remote).unwrap());
+        let test_log = vec![LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            severity: Severity::Info,
+            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+        })
+        .set_message("Hello world!")
+        .add_tag("Some tag")
+        .build()];
+        let serialized_log = serde_json::to_string(&test_log).unwrap();
+        let serialized_bytes = serialized_log.as_bytes();
+        local.write(serialized_bytes).unwrap();
+        let decoded_log = decoder.decode().await.unwrap();
+        assert_eq!(decoded_log, test_log);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_json_decoder_truncated_message() {
+        // This is intentionally a datagram socket so we can
+        // guarantee torn writes and test all the code paths
+        // in the decoder.
+        let (local, remote) = fuchsia_async::emulated_handle::Socket::create_datagram();
+        let mut decoder = JsonDecoder::new(fuchsia_async::Socket::from_socket(remote).unwrap());
+        let test_log = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            severity: Severity::Info,
+            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+        })
+        .set_message("Hello world!")
+        .add_tag("Some tag")
+        .build();
+        let serialized_log = serde_json::to_string(&test_log).unwrap();
+        let serialized_bytes = serialized_log.as_bytes();
+        let part_a = &serialized_bytes[..15];
+        let part_b = &serialized_bytes[15..20];
+        local.write(part_a).unwrap();
+        local.write(part_b).unwrap();
+        drop(local);
+        assert_matches!(decoder.decode().await, Err(LogError::PeerClosed));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
