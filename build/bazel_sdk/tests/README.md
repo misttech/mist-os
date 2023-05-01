@@ -1,6 +1,6 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
+# Fuchsia Bazel SDK Tests
+
+This directory contains tests meant to test the Fuchsia Bazel SDK
 
 Until fxb/117700 is resolved, the tests can only run manually, e.g.:
 
