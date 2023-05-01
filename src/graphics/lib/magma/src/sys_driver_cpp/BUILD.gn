@@ -5,6 +5,7 @@
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 source_set("sys_driver_cpp") {
+  assert_no_deps = [ "//src/devices/bin/driver_host:driver" ]
   public_deps = [
     ":connection",
     "$magma_build_root/include:magma",
@@ -52,10 +53,8 @@ source_set("connection") {
     "$magma_build_root/src/magma_util:status",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/stdcompat",
-    "//src/graphics/lib/magma/src/magma_util/platform:thread",
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
@@ -74,9 +73,11 @@ source_set("device_impl") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util/platform:thread",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:dependency_injection_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:performance_counter_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
     "//src/lib/ddk",
     "//src/lib/ddktl",
   ]

@@ -20,7 +20,6 @@
 #include "magma_util/status.h"
 #include "msd/msd_defs.h"
 #include "msd_cc.h"
-#include "platform_thread.h"
 
 namespace magma {
 
@@ -111,12 +110,13 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   async::Loop* async_loop() { return &async_loop_; }
 
-  static void RunLoop(std::shared_ptr<magma::ZirconConnection> connection, void* device_handle) {
+  static void RunLoop(std::shared_ptr<magma::ZirconConnection> connection,
+                      fit::function<void(const char*)> set_thread_priority) {
     pthread_setname_np(pthread_self(),
                        ("ConnectionThread " + std::to_string(connection->client_id_)).c_str());
 
     // Apply the thread role before entering the handler loop.
-    magma::PlatformThreadHelper::SetRole(device_handle, "fuchsia.graphics.magma.connection");
+    set_thread_priority("fuchsia.graphics.magma.connection");
 
     while (connection->HandleRequest()) {
       connection->request_count_ += 1;

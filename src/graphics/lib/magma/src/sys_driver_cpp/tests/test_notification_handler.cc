@@ -73,7 +73,7 @@ TEST(MagmaNotification, NotAfterShutdown) {
   auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
                                                    std::move(notification_endpoints->server));
 
-  dev->StartConnectionThread(std::move(zircon_connection), nullptr);
+  dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
   connection_ptr->SendTask();
 
@@ -98,7 +98,7 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
   auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
                                                    std::move(notification_endpoints->server));
 
-  dev->StartConnectionThread(std::move(zircon_connection), nullptr);
+  dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
   connection_ptr->SendTask();
 

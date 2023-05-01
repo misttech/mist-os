@@ -51,7 +51,7 @@ class MagmaSystemDevice {
   // Called on driver thread.  |device_handle| may be used by the connection thread for
   // initialization/configuration but should not be retained.
   void StartConnectionThread(std::shared_ptr<magma::ZirconConnection> platform_connection,
-                             void* device_handle);
+                             fit::function<void(const char*)> set_thread_priority);
 
   // Called on connection thread
   void ConnectionClosed(std::thread::id thread_id);

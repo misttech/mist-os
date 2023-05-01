@@ -120,6 +120,7 @@ source_set("parent_device_dfv1") {
     "//src/graphics/lib/magma/src/magma_util/platform:thread",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
   ]
   public_deps = [
     ":src",

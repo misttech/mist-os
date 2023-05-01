@@ -473,7 +473,7 @@ class TestPlatformConnection {
 
  private:
   static void IpcThreadFunc(std::shared_ptr<magma::ZirconConnection> connection) {
-    magma::ZirconConnection::RunLoop(connection, nullptr);
+    magma::ZirconConnection::RunLoop(std::move(connection), [](const char* role_profile) {});
   }
 
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;

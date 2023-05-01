@@ -11,6 +11,7 @@
 
 #include <ddktl/device.h>
 
+#include "platform_thread.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_dependency_injection_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
@@ -152,7 +153,10 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     }
 
     ZX_DEBUG_ASSERT(zx_device_);
-    magma_system_device_->StartConnectionThread(std::move(connection), zx_device_);
+    magma_system_device_->StartConnectionThread(
+        std::move(connection), [zx_device_ = zx_device_](const char* name) {
+          magma::PlatformThreadHelper::SetRole(zx_device_, name);
+        });
   }
 
   void DumpState(fws::DumpStateRequestView request,

@@ -33,10 +33,12 @@ std::shared_ptr<magma::ZirconConnection> MagmaSystemDevice::Open(
 }
 
 void MagmaSystemDevice::StartConnectionThread(
-    std::shared_ptr<magma::ZirconConnection> platform_connection, void* device_handle) {
+    std::shared_ptr<magma::ZirconConnection> platform_connection,
+    fit::function<void(const char*)> set_thread_priority) {
   std::unique_lock<std::mutex> lock(connection_list_mutex_);
 
-  std::thread thread(magma::ZirconConnection::RunLoop, platform_connection, device_handle);
+  std::thread thread(magma::ZirconConnection::RunLoop, platform_connection,
+                     std::move(set_thread_priority));
 
   connection_map_->insert(std::pair<std::thread::id, Connection>(
       thread.get_id(), Connection{std::move(thread), platform_connection}));
