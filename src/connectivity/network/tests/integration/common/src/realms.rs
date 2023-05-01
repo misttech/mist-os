@@ -43,6 +43,7 @@ pub enum NetstackVersion {
     Netstack2,
     Netstack3,
     ProdNetstack2,
+    ProdNetstack3,
     Netstack2WithFastUdp,
 }
 
@@ -51,8 +52,9 @@ impl NetstackVersion {
     pub fn get_url(&self) -> &'static str {
         match self {
             NetstackVersion::Netstack2 => "#meta/netstack-debug.cm",
-            NetstackVersion::Netstack3 => "#meta/netstack3.cm",
+            NetstackVersion::Netstack3 => "#meta/netstack3-debug.cm",
             NetstackVersion::ProdNetstack2 => "#meta/netstack.cm",
+            NetstackVersion::ProdNetstack3 => "#meta/netstack3.cm",
             NetstackVersion::Netstack2WithFastUdp => "#meta/netstack-with-fast-udp-debug.cm",
         }
     }
@@ -89,7 +91,7 @@ impl NetstackVersion {
                 fnet_neighbor::ViewMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),
-            NetstackVersion::Netstack3 => &common_services_and!(),
+            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(),
         }
     }
 }
@@ -272,7 +274,8 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                             // reason.
                             NetstackVersion::Netstack2
                             | NetstackVersion::Netstack3
-                            | NetstackVersion::Netstack2WithFastUdp => {
+                            | NetstackVersion::Netstack2WithFastUdp
+                            | NetstackVersion::ProdNetstack3 => {
                                 itertools::Either::Left(std::iter::empty())
                             }
                             NetstackVersion::ProdNetstack2 => itertools::Either::Right(
@@ -594,6 +597,15 @@ impl Netstack for Netstack2 {
     const VERSION: NetstackVersion = NetstackVersion::Netstack2;
 }
 
+/// Uninstantiable type that represents Netstack2's production implementation of
+/// a network stack.
+#[derive(Copy, Clone)]
+pub enum ProdNetstack2 {}
+
+impl Netstack for ProdNetstack2 {
+    const VERSION: NetstackVersion = NetstackVersion::ProdNetstack2;
+}
+
 /// Uninstantiable type that represents Netstack2's implementation of a
 /// network stack with the Fast UDP feature enabled.
 #[derive(Copy, Clone)]
@@ -610,6 +622,15 @@ pub enum Netstack3 {}
 
 impl Netstack for Netstack3 {
     const VERSION: NetstackVersion = NetstackVersion::Netstack3;
+}
+
+/// Uninstantiable type that represents Netstack3's production implementation of
+/// a network stack.
+#[derive(Copy, Clone)]
+pub enum ProdNetstack3 {}
+
+impl Netstack for ProdNetstack3 {
+    const VERSION: NetstackVersion = NetstackVersion::ProdNetstack3;
 }
 
 /// Abstraction for a Fuchsia component which offers network configuration services.

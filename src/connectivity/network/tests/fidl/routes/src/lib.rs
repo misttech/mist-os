@@ -150,7 +150,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
             // TODO(https://fxbug.dev/120878): Expect NS3 to supply the MAC once
             // `Resolve` initiates dynamic neighbor resolution.
             let expected_mac = match N::VERSION {
-                NetstackVersion::Netstack3 => None,
+                NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => None,
                 NetstackVersion::Netstack2
                 | NetstackVersion::Netstack2WithFastUdp
                 | NetstackVersion::ProdNetstack2 => Some(GATEWAY_MAC),
@@ -173,7 +173,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
             // TODO(https://fxbug.dev/120878): Expect NS3 to fail to resolve the
             // `unreachable_peer`, once `Resolve` initiates dynamic neighbor
             // resolution.
-            NetstackVersion::Netstack3 => {
+            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
                 assert_eq!(
                     resolve(routes, unreachable_peer).await,
                     fidl_fuchsia_net_routes::Resolved::Direct(
@@ -363,7 +363,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
         // TODO(https://fxbug.dev/124960): Support Adding Neighbors in NS3.
         // TODO(https://fxbug.dev/120878): Expect NS3 to resolve the MAC once it
         // supports initiating neighbor resolution.
-        NetstackVersion::Netstack3 => None,
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => None,
         NetstackVersion::Netstack2
         | NetstackVersion::Netstack2WithFastUdp
         | NetstackVersion::ProdNetstack2 => {
@@ -481,12 +481,14 @@ fn initial_loopback_routes_v4<N: Netstack>(
     // TODO(https://fxbug.dev/123108) Unify the loopback routes between
     // Netstack2 and Netstack3
     .chain(match N::VERSION {
-        NetstackVersion::Netstack3 => Either::Left(std::iter::once(new_installed_route(
-            net_subnet_v4!("224.0.0.0/4"),
-            loopback_id,
-            DEFAULT_INTERFACE_METRIC,
-            true,
-        ))),
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+            Either::Left(std::iter::once(new_installed_route(
+                net_subnet_v4!("224.0.0.0/4"),
+                loopback_id,
+                DEFAULT_INTERFACE_METRIC,
+                true,
+            )))
+        }
         NetstackVersion::Netstack2
         | NetstackVersion::ProdNetstack2
         | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),
@@ -502,12 +504,14 @@ fn initial_loopback_routes_v6<N: Netstack>(
         // TODO(https://fxbug.dev/123108) Unify the loopback routes between
         // Netstack2 and Netstack3
         .chain(match N::VERSION {
-            NetstackVersion::Netstack3 => Either::Left(std::iter::once(new_installed_route(
-                net_subnet_v6!("ff00::/8"),
-                loopback_id,
-                DEFAULT_INTERFACE_METRIC,
-                true,
-            ))),
+            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+                Either::Left(std::iter::once(new_installed_route(
+                    net_subnet_v6!("ff00::/8"),
+                    loopback_id,
+                    DEFAULT_INTERFACE_METRIC,
+                    true,
+                )))
+            }
             NetstackVersion::Netstack2
             | NetstackVersion::ProdNetstack2
             | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),

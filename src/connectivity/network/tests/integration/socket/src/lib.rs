@@ -2986,7 +2986,7 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
         NetstackVersion::Netstack2
         | NetstackVersion::ProdNetstack2
         | NetstackVersion::Netstack2WithFastUdp => (),
-        NetstackVersion::Netstack3 => {
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
             // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
             // supports fallible device access.
             return;
@@ -3043,7 +3043,9 @@ enum ProtocolWithZirconSocket {
 async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconSocket) {
     // TODO(https://fxbug.dev/99905): Remove this test when Fast UDP is
     // supported by Netstack3.
-    if N::VERSION == NetstackVersion::Netstack3 && protocol == ProtocolWithZirconSocket::FastUdp {
+    if matches!(N::VERSION, NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3)
+        && protocol == ProtocolWithZirconSocket::FastUdp
+    {
         return;
     }
 
@@ -3055,9 +3057,12 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
         NetstackVersion::Netstack3 => {
             sandbox.create_netstack_realm::<N, _>(format!("{}", name)).expect("create realm")
         }
-        NetstackVersion::ProdNetstack2 | NetstackVersion::Netstack2WithFastUdp => {
-            panic!("unexpected netstack variant")
-        }
+        v @ (NetstackVersion::Netstack2WithFastUdp
+        | NetstackVersion::ProdNetstack2
+        | NetstackVersion::ProdNetstack3) => panic!(
+            "netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}",
+            v
+        ),
     };
 
     let provider = netstack

@@ -2019,7 +2019,7 @@ struct IpForwarding {
 impl IpForwarding {
     // Returns the expected response when calling `get_forwarding` on
     // an interface that was previously configured using the given config.
-    const fn expected_next_get_forwarding_response<N: Netstack>(&self) -> IpForwarding {
+    fn expected_next_get_forwarding_response<N: Netstack>(&self) -> IpForwarding {
         const fn false_if_none(val: Option<bool>) -> Option<bool> {
             // Manual implementation of `Option::and` since it is not yet
             // stable as a const fn.
@@ -2042,8 +2042,10 @@ impl IpForwarding {
                 v6: false_if_none(self.v6),
                 v6_multicast: false_if_none(self.v6_multicast),
             },
-            NetstackVersion::Netstack2WithFastUdp | NetstackVersion::ProdNetstack2 => {
-                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3");
+            v @ (NetstackVersion::Netstack2WithFastUdp
+            | NetstackVersion::ProdNetstack2
+            | NetstackVersion::ProdNetstack3) => {
+                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
             }
         }
     }

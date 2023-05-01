@@ -35,7 +35,9 @@ where
                 // in this suite.
                 NetstackVersion::Netstack2 => NetstackVersion::ProdNetstack2,
                 v @ NetstackVersion::Netstack3 => v,
-                v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                v @ (NetstackVersion::Netstack2WithFastUdp
+                | NetstackVersion::ProdNetstack2
+                | NetstackVersion::ProdNetstack3) => {
                     panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
                 }
             }

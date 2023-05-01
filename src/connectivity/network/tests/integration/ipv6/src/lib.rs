@@ -145,7 +145,9 @@ async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
                 KnownServiceProvider::Netstack(match N::VERSION {
                     NetstackVersion::Netstack2 => NetstackVersion::ProdNetstack2,
                     NetstackVersion::Netstack3 => NetstackVersion::Netstack3,
-                    v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                    v @ (NetstackVersion::Netstack2WithFastUdp
+                    | NetstackVersion::ProdNetstack2
+                    | NetstackVersion::ProdNetstack3) => {
                         panic!("netstack_test should only ever be parameterized with Netstack2 or Netstack3: got {:?}", v)
                     }
                 }),
@@ -975,7 +977,9 @@ fn check_mld_report(
         None => match netstack_version {
             NetstackVersion::Netstack2 => check_mldv2_report(dst_ip, mld, expected_group),
             NetstackVersion::Netstack3 => check_mldv1_report(dst_ip, mld, expected_group),
-            v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+            v @ (NetstackVersion::Netstack2WithFastUdp
+            | NetstackVersion::ProdNetstack2
+            | NetstackVersion::ProdNetstack3) => {
                 panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
             }
         },

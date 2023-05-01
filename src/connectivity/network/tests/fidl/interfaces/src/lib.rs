@@ -290,8 +290,14 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
             },
         ))
         .collect(),
-        NetstackVersion::ProdNetstack2 => panic!("unexpected netstack version"),
-        NetstackVersion::Netstack2WithFastUdp => panic!("unexpected netstack version"),
+        v @ (NetstackVersion::Netstack2WithFastUdp
+        | NetstackVersion::ProdNetstack2
+        | NetstackVersion::ProdNetstack3) => {
+            panic!(
+                "netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}",
+                v
+            );
+        }
     };
     assert_eq!(interfaces, expected);
 }
