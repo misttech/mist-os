@@ -169,6 +169,13 @@ FuchsiaProductImageInfo = provider(
     },
 )
 
+FuchsiaUpdatePackageInfo = provider(
+    doc = "Info for created update package",
+    fields = {
+        "update_out": "update out directory",
+    },
+)
+
 FuchsiaProductAssemblyInfo = provider(
     doc = "Info populated by product assembly",
     fields = {
