@@ -124,13 +124,16 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
                                        SetProfileByRoleCompleter::Sync& completer) {
   // Log the requested role and PID:TID of the thread being assigned.
   zx_info_handle_basic_t handle_info{};
-  zx_status_t status = request->thread.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+  zx_status_t status = request->handle.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
                                                 sizeof(handle_info), nullptr, nullptr);
   if (status != ZX_OK) {
     FX_SLOG(WARNING, "Failed to get info for thread handle",
             KV("status", zx_status_get_string(status)));
     handle_info.koid = ZX_KOID_INVALID;
     handle_info.related_koid = ZX_KOID_INVALID;
+  }
+  if (handle_info.type != ZX_OBJ_TYPE_THREAD) {
+    return completer.Reply(ZX_ERR_WRONG_TYPE);
   }
 
   const std::string role_selector{request->role.get()};
@@ -188,7 +191,13 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     return completer.Reply(ZX_ERR_INTERNAL);
   }
 
-  status = request->thread.set_profile(profile, 0);
+  if (handle_info.type == ZX_OBJ_TYPE_THREAD) {
+    status = zx::unowned_thread(request->handle.get())->set_profile(profile, 0);
+  } else {
+    // Should never get here as the type was checked at the start of the method so generate a fatal
+    // error.
+    FX_SLOG(FATAL, "Unsupported object type", KV("type", handle_info.type));
+  }
   completer.Reply(status);
 }
 

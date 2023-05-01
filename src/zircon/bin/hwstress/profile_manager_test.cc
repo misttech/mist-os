@@ -69,7 +69,7 @@ struct FakeProfileProvider : public fuchsia::scheduler::ProfileProvider {
     ZX_PANIC("unexpected call");
   }
 
-  void SetProfileByRole(zx::thread thread, std::string role,
+  void SetProfileByRole(zx::handle handle, std::string role,
                         SetProfileByRoleCallback callback) override {
     ZX_PANIC("unexpected call");
   }

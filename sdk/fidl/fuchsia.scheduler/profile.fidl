@@ -49,11 +49,11 @@ protocol ProfileProvider {
         profile zx.Handle:<PROFILE, optional>;
     });
 
-    /// Sets the given thread's profile based on the requested role. The exact
+    /// Sets the given object's profile based on the requested role. The exact
     /// parameters of the profile are system dependent and may vary based on
     /// device-specific tuning and/or runtime system goals.
     SetProfileByRole(resource struct {
-        thread zx.Handle:THREAD;
+        handle zx.Handle;
         role string:2048;
     }) -> (struct {
         status zx.Status;

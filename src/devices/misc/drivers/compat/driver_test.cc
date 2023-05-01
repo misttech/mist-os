@@ -224,7 +224,7 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
 
   void SetProfileByRole(SetProfileByRoleRequestView request,
                         SetProfileByRoleCompleter::Sync& completer) override {
-    if (!request->thread.is_valid()) {
+    if (!request->handle.is_valid()) {
       completer.Reply(ZX_ERR_INVALID_ARGS);
       return;
     }

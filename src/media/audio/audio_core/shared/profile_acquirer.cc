@@ -46,7 +46,7 @@ zx::result<> AcquireSchedulerRole(zx::unowned_thread thread, const std::string& 
     FX_PLOGS(ERROR, dup_status) << "Failed to connect to duplicate thread handle";
     return zx::error(dup_status);
   }
-  auto result = (*client)->SetProfileByRole({{.thread = std::move(dup_thread), .role = role}});
+  auto result = (*client)->SetProfileByRole({{.handle = std::move(dup_thread), .role = role}});
   if (!result.is_ok()) {
     FX_LOGS(ERROR) << "Failed to call SetProfileByRole, error=" << result.error_value();
     return zx::error(result.error_value().status());
