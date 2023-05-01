@@ -16,27 +16,9 @@ pub struct {{ .Name }} {
     {{- end }}
     pub {{ .Name }}: Option<{{ .Type.Owned }}>,
     {{- end }}
-    #[deprecated = "Use `..{{ .Name }}::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl {{ .Name }} {
-    {{- /* TODO(fxbug.dev/102876): Remove the EMPTY const. */}}
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self {
-        {{- range .Members }}
-        {{ .Name }}: None,
-        {{- end }}
-        __non_exhaustive: (),
-    };
-}
-
-impl std::default::Default for {{ .Name }} {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 
 {{- if .IsResourceType }}

@@ -1764,24 +1764,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolFlexibleEventTableRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
 
@@ -1795,24 +1783,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolStrictEventTableRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolStrictEventTableRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolStrictEventTableRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
 
@@ -1826,24 +1802,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
 
@@ -1857,24 +1821,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
 
@@ -1888,24 +1840,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolStrictEventTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
 
@@ -1919,24 +1859,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
 
@@ -1950,24 +1878,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsClosedProtocolStrictEventTableRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsClosedProtocolStrictEventTableRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsClosedProtocolStrictEventTableRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
 
@@ -1981,24 +1897,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
 
@@ -2012,24 +1916,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsClosedProtocolStrictEventTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
 
@@ -2043,24 +1935,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
 
@@ -2074,24 +1954,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolFlexibleEventTableRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolFlexibleEventTableRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolFlexibleEventTableRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
 
@@ -2105,24 +1973,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolStrictEventTableRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolStrictEventTableRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolStrictEventTableRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
 
@@ -2136,24 +1992,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolStrictTwoWayTableResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolStrictTwoWayTableResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolStrictTwoWayTableResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
 
@@ -2167,24 +2011,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolFlexibleEventTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolFlexibleEventTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolFlexibleEventTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
 
@@ -2198,24 +2030,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
 
@@ -2229,24 +2049,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolFlexibleTwoWayTableResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
 
@@ -2260,24 +2068,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolStrictEventTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolStrictEventTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolStrictEventTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
 
@@ -2291,24 +2087,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..UnknownInteractionsProtocolStrictTwoWayTableErrResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
 

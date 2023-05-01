@@ -378,23 +378,11 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct OnlyRust {
-    #[deprecated = "Use `..OnlyRust::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl OnlyRust {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { __non_exhaustive: () };
-}
-
-impl std::default::Default for OnlyRust {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for OnlyRust {}
 

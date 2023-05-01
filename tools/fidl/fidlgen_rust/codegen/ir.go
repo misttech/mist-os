@@ -1578,6 +1578,7 @@ const (
 	derivesDebug derives = 1 << iota
 	derivesCopy
 	derivesClone
+	derivesDefault
 	derivesEq
 	derivesPartialEq
 	derivesOrd
@@ -1599,6 +1600,7 @@ var derivesNames = []string{
 	"Debug",
 	"Copy",
 	"Clone",
+	"Default",
 	"Eq",
 	"PartialEq",
 	"Ord",
@@ -1758,6 +1760,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 		for _, member := range st.Members {
 			derivesOut &= dc.derivesForType(member.Type)
 		}
+		derivesOut &^= derivesDefault
 		st.Derives = derivesOut
 	case fidlgen.TableDeclType:
 		table := dc.root.findTable(eci)
@@ -1769,6 +1772,8 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 			break
 		}
 		derivesOut = minimalDerives(*declInfo.Resourceness)
+		// We can always derive Default because table fields are optional.
+		derivesOut |= derivesDefault
 		table.Derives = derivesOut
 	case fidlgen.UnionDeclType:
 		union := dc.root.findUnion(eci)
@@ -1787,6 +1792,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 				derivesOut &= dc.derivesForType(member.Type)
 			}
 		}
+		derivesOut &^= derivesDefault
 		union.Derives = derivesOut
 	default:
 		panic(fmt.Sprintf("unexpected declaration type: %v", declInfo.Type))

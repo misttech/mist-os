@@ -522,26 +522,14 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FunctionApplication {
     pub func: Option<String>,
     pub args: Option<Vec<Option<Box<Expression>>>>,
     pub flags: Option<Flags>,
-    #[deprecated = "Use `..FunctionApplication::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl FunctionApplication {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { func: None, args: None, flags: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for FunctionApplication {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for FunctionApplication {}
 
@@ -563,24 +551,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TableMember {
     pub table_data: Option<Vec<TableData>>,
-    #[deprecated = "Use `..TableMember::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl TableMember {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { table_data: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for TableMember {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for TableMember {}
 

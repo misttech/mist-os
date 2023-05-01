@@ -152,24 +152,12 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TableLargeArray {
     pub a: Option<[u32; 100]>,
-    #[deprecated = "Use `..TableLargeArray::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl TableLargeArray {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for TableLargeArray {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for TableLargeArray {}
 
@@ -183,24 +171,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TableSmallArray {
     pub a: Option<[u32; 2]>,
-    #[deprecated = "Use `..TableSmallArray::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl TableSmallArray {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for TableSmallArray {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for TableSmallArray {}
 

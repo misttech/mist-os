@@ -292,24 +292,12 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct LocalTablePayload {
     pub a: Option<u16>,
-    #[deprecated = "Use `..LocalTablePayload::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl LocalTablePayload {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for LocalTablePayload {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for LocalTablePayload {}
 
@@ -323,24 +311,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolOneWayAnonRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolOneWayAnonRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolOneWayAnonRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
 
@@ -354,24 +330,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolTwoWayAnonResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolTwoWayAnonResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolTwoWayAnonResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
 
@@ -385,24 +349,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolTwoWayAnonWithErrorRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolTwoWayAnonWithErrorRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolTwoWayAnonWithErrorRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
@@ -416,24 +368,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolOnAnonWithErrorResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolOnAnonWithErrorResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolOnAnonWithErrorResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolOnAnonWithErrorResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
 

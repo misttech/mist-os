@@ -379,27 +379,15 @@ fidl_struct! {
 /// table comment #1
 ///
 /// table comment #3
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Table {
     /// table field comment #1
     ///
     /// table field comment #3
     pub field: Option<i32>,
-    #[deprecated = "Use `..Table::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl Table {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { field: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for Table {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for Table {}
 

@@ -347,24 +347,12 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ComposedProtocolOneWayAnonComposedRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..ComposedProtocolOneWayAnonComposedRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl ComposedProtocolOneWayAnonComposedRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for ComposedProtocolOneWayAnonComposedRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for ComposedProtocolOneWayAnonComposedRequest {}
 
@@ -378,24 +366,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ComposedProtocolTwoWayAnonComposedResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..ComposedProtocolTwoWayAnonComposedResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl ComposedProtocolTwoWayAnonComposedResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for ComposedProtocolTwoWayAnonComposedResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedResponse {}
 
@@ -409,24 +385,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ComposedProtocolTwoWayAnonComposedWithErrorRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..ComposedProtocolTwoWayAnonComposedWithErrorRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl ComposedProtocolTwoWayAnonComposedWithErrorRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for ComposedProtocolTwoWayAnonComposedWithErrorRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorRequest {}
 
@@ -440,24 +404,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ComposedProtocolOnAnonComposedWithErrorResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..ComposedProtocolOnAnonComposedWithErrorResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl ComposedProtocolOnAnonComposedWithErrorResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for ComposedProtocolOnAnonComposedWithErrorResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for ComposedProtocolOnAnonComposedWithErrorResponse {}
 
@@ -471,24 +423,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolOneWayAnonRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolOneWayAnonRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolOneWayAnonRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
 
@@ -502,24 +442,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolTwoWayAnonResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolTwoWayAnonResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolTwoWayAnonResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
 
@@ -533,24 +461,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolTwoWayAnonWithErrorRequest::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolTwoWayAnonWithErrorRequest {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolTwoWayAnonWithErrorRequest {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
@@ -564,24 +480,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MainProtocolOnAnonWithErrorResponse {
     pub a: Option<u16>,
-    #[deprecated = "Use `..MainProtocolOnAnonWithErrorResponse::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl MainProtocolOnAnonWithErrorResponse {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for MainProtocolOnAnonWithErrorResponse {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
@@ -595,24 +499,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TablePayload {
     pub a: Option<u16>,
-    #[deprecated = "Use `..TablePayload::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl TablePayload {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for TablePayload {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Persistable for TablePayload {}
 

@@ -293,23 +293,11 @@ fidl_struct! {
     align_v2: 8,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct EmptyResourceTable {
-    #[deprecated = "Use `..EmptyResourceTable::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl EmptyResourceTable {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { __non_exhaustive: () };
-}
-
-impl std::default::Default for EmptyResourceTable {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Standalone for EmptyResourceTable {}
 
@@ -320,24 +308,12 @@ fidl_table! {
     ],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct TableWithHandle {
     pub h: Option<fidl::Vmo>,
-    #[deprecated = "Use `..TableWithHandle::EMPTY` to construct and `..` to match."]
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
     pub __non_exhaustive: (),
-}
-
-impl TableWithHandle {
-    /// An empty table with every field set to `None`.
-    #[allow(deprecated)]
-    pub const EMPTY: Self = Self { h: None, __non_exhaustive: () };
-}
-
-impl std::default::Default for TableWithHandle {
-    fn default() -> Self {
-        Self::EMPTY
-    }
 }
 impl fidl::encoding::Standalone for TableWithHandle {}
 
