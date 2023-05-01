@@ -5,9 +5,25 @@
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the session manager.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformSessionManagerConfig {
     #[serde(default)]
     pub enabled: bool,
+
+    /// If `autolaunch` is true (the default) and the `session_url` is set in
+    /// the `ProductConfig`, the named session will be launched when the device
+    /// boots up.
+    #[serde(default = "autolaunch_default")]
+    pub autolaunch: bool,
+}
+
+impl Default for PlatformSessionManagerConfig {
+    fn default() -> Self {
+        Self { enabled: Default::default(), autolaunch: autolaunch_default() }
+    }
+}
+
+fn autolaunch_default() -> bool {
+    true
 }

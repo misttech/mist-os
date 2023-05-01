@@ -18,9 +18,13 @@ rustc_test("test") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//src/lib/diagnostics/hierarchy/rust",
+    "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
     "//src/session/bin/session_manager:lib",
+    "//third_party/rust_crates:anyhow",
   ]
 
   sources = [ "src/main.rs" ]
@@ -37,4 +41,20 @@ fuchsia_test_package("package") {
   package_name = "session-manager-integration-tests"
   test_components = [ ":component" ]
   subpackages = [ "//src/session/examples/hello-world-session" ]
+  deps = [
+    ":bogus_session_manager_test_config_values",
+    "//src/session/bin/session_manager:session_manager_comp",
+  ]
+}
+
+# TODO(fxbug.dev/126272): Configuration gets specified using RealmBuilder, but
+# we need to provide values in the package for reasons (see bug). Include some
+# bogus defaults.
+fuchsia_structured_config_values("bogus_session_manager_test_config_values") {
+  cm_label = "//src/session/bin/session_manager:manifest"
+  component_name = "session_manager"
+  values = {
+    session_url = ""
+    autolaunch = false
+  }
 }

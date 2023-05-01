@@ -9,7 +9,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     session_framework_metrics_registry::cobalt_registry as metrics,
-    tracing::error,
+    tracing::warn,
 };
 
 /// Creates a LoggerProxy connected to Cobalt.
@@ -33,7 +33,7 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
             )
             .await
         {
-            error!(%err, "Failed to create Cobalt logger");
+            warn!(%err, "Failed to create Cobalt logger");
         }
     })
     .detach();

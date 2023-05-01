@@ -34,7 +34,8 @@ impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for 
             builder
                 .package("session_manager")
                 .component("meta/session_manager.cm")?
-                .field("session_url", session_url.to_owned())?;
+                .field("session_url", session_url.to_owned())?
+                .field("autolaunch", session_manager_config.autolaunch)?;
         } else {
             ensure!(
                 session_url.is_empty(),
