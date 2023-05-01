@@ -6,6 +6,8 @@
 
 #include <cinttypes>
 #include <cstdint>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "src/lib/unwinder/cfi_module.h"
@@ -15,7 +17,7 @@ namespace unwinder {
 
 CfiUnwinder::CfiUnwinder(const std::vector<Module>& modules) {
   for (const auto& module : modules) {
-    module_map_.emplace(module.load_address, module);
+    module_map_.emplace(module.load_address, std::make_pair(module, nullptr));
   }
 }
 
@@ -60,22 +62,19 @@ Error CfiUnwinder::GetCfiModuleFor(uint64_t pc, CfiModule** out) {
   }
   module_it--;
   uint64_t module_address = module_it->first;
-  Module& module = module_it->second;
+  auto& [module, cfi] = module_it->second;
 
-  auto cfi_it = cfi_map_.find(module_address);
-  if (cfi_it == cfi_map_.end()) {
-    CfiModule cfi_module(module.memory, module_address, module.mode);
-    cfi_it = cfi_map_.emplace(module_address, cfi_module).first;
-    if (auto err = cfi_it->second.Load(); err.has_err()) {
+  if (!cfi) {
+    cfi = std::make_unique<CfiModule>(module.memory, module_address, module.mode);
+    if (auto err = cfi->Load(); err.has_err()) {
       return err;
     }
   }
-  CfiModule& cfi = cfi_it->second;
 
-  if (!cfi.IsValidPC(pc)) {
+  if (!cfi->IsValidPC(pc)) {
     return Error("%#" PRIx64 " is not covered by any module", pc);
   }
-  *out = &cfi;
+  *out = cfi.get();
   return Success();
 }
 
