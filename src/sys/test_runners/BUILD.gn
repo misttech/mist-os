@@ -140,23 +140,11 @@ expect_includes("tmp_storage") {
   includes = [ "tmp_storage.shard.cml" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("test_runners") {
   testonly = true
-  deps = [
-    "dart_wrapper",
-    "elf",
-    "fuzz",
-    "gotests",
-    "gtest",
-    "gunit",
-    "inspect",
-    "legacy_test",
-    "lib_loader_cache",
-    "rust",
-    "starnix",
-    "stress_test",
-    "//src/connectivity/network/testing/netemul/runner:package",
-  ]
+  deps = []
 }
 
 group("tests") {
@@ -178,9 +166,10 @@ group("tests") {
   ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("legacy_tests") {
   testonly = true
-  deps = [ "legacy_test:legacy_tests" ]
 }
 
 # Use this group to include fuchsia.process.Launcher in generated test manifests.

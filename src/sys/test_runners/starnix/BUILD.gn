@@ -78,6 +78,11 @@ fuchsia_component("starnix_unit_test_runner") {
 
 fuchsia_package("starnix-test-runners") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [
     ":starnix_test_runner",
     ":starnix_unit_test_runner",
@@ -97,9 +102,9 @@ fuchsia_unittest_package("starnix-test-runner-tests") {
   }
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("starnix") {
-  testonly = true
-  deps = [ ":starnix-test-runners" ]
 }
 
 group("tests") {

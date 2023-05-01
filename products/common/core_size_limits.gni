@@ -190,6 +190,39 @@ size_checker_input = {
       creep_limit = 81920  # 80.0 KiB
     },
     {
+      component = "Testing Support"
+      src = [
+        "packages/base/trace_manager",
+        "packages/cache/test_manager",
+        "packages/cache/dart-aot-wrapper-runner",
+        "packages/cache/dart-jit-wrapper-runner",
+        "packages/cache/elf-test-runner",
+        "packages/cache/elf-test-ambient-exec-runner",
+        "packages/cache/elf-test-create-raw-processes-runner",
+        "packages/cache/elf-test-create-raw-processes-ambient-exec-runner",
+        "packages/cache/fuzz-test-runner",
+        "packages/cache/go-test-runner",
+        "packages/cache/gtest-test-runner",
+        "packages/cache/gunit-test-runner",
+        "packages/cache/inspect-test-runner",
+        "packages/cache/legacy-test-runner",
+        "packages/cache/lib_loader_runner_cache",
+        "packages/cache/rust-test-next-vdso",
+        "packages/cache/rust-test-runner",
+        "packages/cache/starnix-test-runner",
+        "packages/cache/stress-test-runner",
+        "packages/cache/netemul-test-runner",
+        "packages/cache/testing",
+        "packages/cache/fuchsia-component-test",
+        "packages/cache/fuzz-manager",
+        "packages/cache/fuzz-registry",
+        "packages/cache/fuzzctl",
+        "packages/cache/run_test_suite",
+      ]
+      limit = 12582912  # 12.0 MiB
+      creep_limit = 122880  # 120.0 KiB
+    },
+    {
       component = "Time"
       src = [
         "packages/base/httpsdate-time-source",
@@ -210,7 +243,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5124450054
+      limit = 5111867142
       creep_limit = 0
     },
   ]

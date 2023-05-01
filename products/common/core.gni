@@ -25,7 +25,6 @@ core_realm_shards += [
   "//src/settings/service:setui_service_core_shard",
   "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
   "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-  "//src/intl/tzdata_provider:core-shard",
   "//src/testing/metrics-logger:metrics-logger-shard",
 
   # TODO(https://fxbug.dev/120773) remove when unused
@@ -53,7 +52,6 @@ legacy_base_package_labels += [
   "//src/diagnostics/log_listener:log_listener_shell",
   "//src/connectivity/bluetooth:core",
   "//src/intl/intl_services:pkg_small",
-  "//src/intl/tzdata_provider:pkg",
   "//src/settings/service:setui_service",
 
   # TODO(fxbug.dev/80375): only include in eng builds

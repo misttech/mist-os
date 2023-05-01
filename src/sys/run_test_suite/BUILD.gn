@@ -155,13 +155,9 @@ fuchsia_test_package("run-test-suite-unit-tests") {
   ]
 }
 
-# fxbug.dev/44251: Packages cannot include other packages, so making a group here for dependency.
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("run_test_suite") {
-  testonly = true
-  deps = [
-    ":run_test_suite_pkg",
-    "//src/sys/test_manager",
-  ]
 }
 
 group("tests") {

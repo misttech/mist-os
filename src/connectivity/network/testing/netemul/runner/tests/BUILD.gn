@@ -49,7 +49,7 @@ fuchsia_unittest_package("netemul-runner-tests") {
     "test-data",
     "//src/connectivity/network/testing/netemul/runner:component",
   ]
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
 rustc_test("netemul_runner_errors_test") {
@@ -72,7 +72,7 @@ fuchsia_unittest_package("netemul-runner-errors-tests") {
     "//src/connectivity/network/testing/netemul/runner:component",
   ]
 
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 
   # TODO(https://fxbug.dev/65359): allowlist ERROR logs from netemul_test_runner
   # when testing invalid test configurations that cause it to emit ERROR logs.

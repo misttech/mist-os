@@ -42,6 +42,11 @@ fuchsia_component("dart_aot_wrapper_runner") {
 
 fuchsia_package("dart-aot-wrapper-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":dart_aot_wrapper_runner" ]
 }
 
@@ -54,19 +59,16 @@ fuchsia_component("dart_jit_wrapper_runner") {
 
 fuchsia_package("dart-jit-wrapper-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":dart_jit_wrapper_runner" ]
 }
 
 fuchsia_unittest_package("dart-wrapper-runner-unittests") {
   deps = [ ":bin_test" ]
-}
-
-group("dart_wrapper") {
-  testonly = true
-  deps = [
-    ":dart-aot-wrapper-runner",
-    ":dart-jit-wrapper-runner",
-  ]
 }
 
 group("tests") {

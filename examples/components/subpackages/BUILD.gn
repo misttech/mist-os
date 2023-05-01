@@ -46,7 +46,7 @@ fuchsia_test_package("subpackage-examples") {
   subpackages = [
     "//examples/components/routing/rust/echo_client",
     ":echo_client_with_subpackaged_server",
-    "//src/lib/fuchsia-component-test/realm_builder_server:fuchsia-component-test",
+    "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
   ]
   renameable_subpackages = [
     {

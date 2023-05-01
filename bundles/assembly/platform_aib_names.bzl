@@ -54,6 +54,7 @@ ENG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES + [
     "common_minimal_eng",
     "system_update_checker",
     "kernel_args_eng",
+    "testing_support",
     "example_assembly_bundle",
     "ui_eng",
     "ui_package_eng",

@@ -11,7 +11,7 @@ fuchsia_component("test_realm") {
   manifest = "meta/test_realm.cml"
 }
 
-fuchsia_package("testing_pkg") {
+fuchsia_package("testing") {
   testonly = true
   package_name = "testing"
   deps = [
@@ -22,12 +22,4 @@ fuchsia_package("testing_pkg") {
 
 core_shard("test_realm_core_shard") {
   shard_file = "meta/test_realm.core_shard.cml"
-}
-
-group("testing") {
-  testonly = true
-  deps = [
-    ":testing_pkg",
-    "//src/sys/test_manager",
-  ]
 }

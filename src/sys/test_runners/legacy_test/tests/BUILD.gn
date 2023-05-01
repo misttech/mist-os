@@ -31,7 +31,7 @@ fuchsia_component("legacy_test_runner_integration_test") {
 
 fuchsia_test_package("legacy-test-runner-integration-test") {
   test_components = [ ":legacy_test_runner_integration_test" ]
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
 group("tests") {

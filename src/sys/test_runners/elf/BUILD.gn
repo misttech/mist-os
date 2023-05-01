@@ -57,6 +57,11 @@ fuchsia_component("elf-test-runner-component") {
 
 fuchsia_package("elf-test-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//src/sys/test_manager:*",
+  ]
   deps = [ ":elf-test-runner-component" ]
 }
 
@@ -70,6 +75,10 @@ fuchsia_component("elf-test-ambient-exec-runner-component") {
 
 fuchsia_package("elf-test-ambient-exec-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+  ]
   deps = [ ":elf-test-ambient-exec-runner-component" ]
 }
 
@@ -83,6 +92,11 @@ fuchsia_component("elf-test-create-raw-processes-runner-component") {
 
 fuchsia_package("elf-test-create-raw-processes-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":elf-test-create-raw-processes-runner-component" ]
 }
 
@@ -98,17 +112,17 @@ fuchsia_component(
 
 fuchsia_package("elf-test-create-raw-processes-ambient-exec-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":elf-test-create-raw-processes-ambient-exec-runner-component" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("elf") {
-  testonly = true
-  deps = [
-    ":elf-test-ambient-exec-runner",
-    ":elf-test-create-raw-processes-ambient-exec-runner",
-    ":elf-test-create-raw-processes-runner",
-    ":elf-test-runner",
-  ]
 }
 
 group("tests") {

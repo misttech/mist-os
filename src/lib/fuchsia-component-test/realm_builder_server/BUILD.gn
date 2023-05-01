@@ -80,6 +80,12 @@ fuchsia_unittest_package("realm_builder_server_unit_tests") {
   ]
 }
 
-fuchsia_package("fuchsia-component-test") {
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("fuchsia-component-test") {
+}
+
+fuchsia_package("pkg") {
+  package_name = "fuchsia-component-test"
   deps = [ ":realm_builder_server_component" ]
 }

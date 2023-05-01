@@ -53,6 +53,12 @@ fuchsia_component("rust_test_runner") {
 
 fuchsia_package("rust-test-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
+  ]
   deps = [ ":rust_test_runner" ]
 }
 
@@ -65,15 +71,17 @@ fuchsia_component("rust_test_next_vdso_runner") {
 
 fuchsia_package("rust-test-next-vdso-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":rust_test_next_vdso_runner" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("rust") {
-  testonly = true
-  deps = [
-    ":rust-test-next-vdso-runner",
-    ":rust-test-runner",
-  ]
 }
 
 fuchsia_unittest_component("test-component") {

@@ -14,12 +14,18 @@ fuchsia_component("gunit-runner-component") {
 
 fuchsia_package("gunit-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
+  ]
   deps = [ ":gunit-runner-component" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("gunit") {
-  testonly = true
-  deps = [ ":gunit-runner" ]
 }
 
 fuchsia_unittest_package("gunit-runner-tests") {

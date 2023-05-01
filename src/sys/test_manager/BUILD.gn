@@ -178,9 +178,21 @@ fuchsia_component("fxfs_backed_data_for_tests_cmp") {
   manifest = "meta/fxfs_backed_data_for_tests.cml"
 }
 
-fuchsia_package("test_manager_pkg") {
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("test_manager_pkg") {
+}
+
+fuchsia_package("pkg") {
   testonly = true
   package_name = "test_manager"
+  visibility = [
+    "//bundles/assembly/*",
+    "//src/connectivity/network/testing/netemul/runner/tests/*",
+    "//src/sys/run_test_suite/tests/*",
+    "//src/sys/test_manager/tests/*",
+    "//src/sys/test_runners/*",
+  ]
   deps = [
     ":fxfs_backed_data_for_tests_cmp",
     ":test_manager_cmp",
@@ -213,15 +225,9 @@ fuchsia_unittest_package("test-manager-unittests") {
   deps = [ ":lib_test" ]
 }
 
-# Defines test manager and its dependencies.
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("test_manager") {
-  testonly = true
-  deps = [
-    ":test_manager_pkg",
-    "//src/lib/fuchsia-component-test/realm_builder_server:fuchsia-component-test",
-    "//src/sys/full-resolver",
-    "//src/sys/test_runners",
-  ]
 }
 
 group("tests") {

@@ -43,9 +43,8 @@ fuchsia_test_package("integration-test-pkg") {
     "//src/sys/fuzzing/common/testing:fuzzer",
     "//src/sys/fuzzing/manager",
     "//src/sys/fuzzing/registry",
-    "//src/sys/test_runners/fuzz",
   ]
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
   test_specs = {
     # Run sequentially.
     parallel = 1

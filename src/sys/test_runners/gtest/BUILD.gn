@@ -99,12 +99,18 @@ fuchsia_component("gtest-runner-component") {
 
 fuchsia_package("gtest-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
+  ]
   deps = [ ":gtest-runner-component" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("gtest") {
-  testonly = true
-  deps = [ ":gtest-runner" ]
 }
 
 fuchsia_unittest_package("gtest-runner-tests") {

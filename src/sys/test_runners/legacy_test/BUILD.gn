@@ -44,15 +44,15 @@ fuchsia_component("legacy_test_runner_cmp") {
 
 fuchsia_package("legacy-test-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":legacy_test_runner_cmp" ]
 }
 
-group("legacy_test") {
-  testonly = true
-  deps = [ ":legacy-test-runner" ]
-}
-
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("legacy_tests") {
-  testonly = true
-  deps = [ "tests" ]
 }

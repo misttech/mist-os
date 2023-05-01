@@ -5,20 +5,9 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-group("fuzz") {
-  testonly = true
-  deps = [
-    ":fuzz-test-runner",
-    "//src/sys/fuzzing",
-  ]
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    ":fuzz",
-    "tests",
-  ]
+  deps = [ "tests" ]
 }
 
 rustc_binary("bin") {
@@ -54,5 +43,10 @@ fuchsia_component("fuzz-test-runner-component") {
 
 fuchsia_package("fuzz-test-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":fuzz-test-runner-component" ]
 }

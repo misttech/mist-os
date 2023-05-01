@@ -99,7 +99,6 @@ group("tests") {
   testonly = true
   deps = [
     ":fuchsia_component_test_unittests",
-    "realm_builder_server:fuchsia-component-test",
     "realm_builder_server:realm_builder_server_unit_tests",
     "tests",
   ]

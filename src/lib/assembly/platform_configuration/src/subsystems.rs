@@ -108,6 +108,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "common_minimal",
                     "common_minimal_eng",
                     "common_minimal_userdebug",
+                    "testing_support",
                 ]
             }
             (FeatureSupportLevel::Minimal, BuildType::UserDebug) => {

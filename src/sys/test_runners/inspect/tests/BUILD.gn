@@ -49,7 +49,7 @@ fuchsia_test_package("inspect-runner-integration-test") {
     "//src/sys/test_runners/inspect/test_data/malformed-tests:unknown-pipeline",
     "//src/sys/test_runners/inspect/test_data/sample-inspect-tests:sample-component",
   ]
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
 group("tests") {

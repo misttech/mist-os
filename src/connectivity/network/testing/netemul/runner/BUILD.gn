@@ -63,6 +63,11 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   package_name = "netemul-test-runner"
   deps = [ ":component" ]
 }

@@ -461,6 +461,9 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/kcounter:diagnostics-kcounter",
     "//src/diagnostics/sampler",
 
+    # Internationalization
+    "//src/intl/tzdata_provider",
+
     # Security
     "//src/security/bin/root_ssl_certificates",
 
@@ -548,6 +551,7 @@ assembly_input_bundle("common_minimal") {
                     "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
                     "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
                     "//src/connectivity/network/meta/persistence.core_shard.cml",
+                    "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
 
                     # TODO(fxbug.dev/112433): The trace manager core shard should only
                     # appear in eng builds, however, many components do not properly
@@ -591,7 +595,7 @@ assembly_input_bundle("common_minimal") {
 #
 assembly_input_bundle("common_minimal_eng") {
   testonly = true
-  base_packages = [ "//src/performance/trace_manager" ]
+  base_packages = []
   cache_packages = [ "//src/devices/bin/driver_playground:pkg" ]
   compiled_packages = [
     {
@@ -690,6 +694,76 @@ assembly_input_bundle("starnix_support") {
                   root_build_dir)
         },
       ]
+    },
+  ]
+}
+
+# This AIB enables testing support, and is meant to be used with either the
+# `common_minimal_eng` and `common_minimal_userdebug` AIBs.
+#
+# This includes testing support in the platform `base` package set, not just
+# via `universe`
+assembly_input_bundle("testing_support") {
+  testonly = true
+  base_packages = [ "//src/performance/trace_manager" ]
+  cache_packages = [
+    # test-manager and all of its runners:
+    "//src/sys/test_manager:pkg",
+    "//src/sys/test_runners/dart_wrapper:dart-aot-wrapper-runner",
+    "//src/sys/test_runners/dart_wrapper:dart-jit-wrapper-runner",
+    "//src/sys/test_runners/elf:elf-test-runner",
+    "//src/sys/test_runners/elf:elf-test-ambient-exec-runner",
+    "//src/sys/test_runners/elf:elf-test-create-raw-processes-runner",
+    "//src/sys/test_runners/elf:elf-test-create-raw-processes-ambient-exec-runner",
+    "//src/sys/test_runners/fuzz:fuzz-test-runner",
+    "//src/sys/test_runners/gotests:go-test-runner",
+    "//src/sys/test_runners/gtest:gtest-runner",
+    "//src/sys/test_runners/gunit:gunit-runner",
+    "//src/sys/test_runners/inspect:inspect-test-runner",
+    "//src/sys/test_runners/legacy_test:legacy-test-runner",
+    "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
+    "//src/sys/test_runners/rust:rust-test-next-vdso-runner",
+    "//src/sys/test_runners/rust:rust-test-runner",
+    "//src/sys/test_runners/starnix:starnix-test-runners",
+    "//src/sys/test_runners/stress_test:stress-test-runner",
+    "//src/connectivity/network/testing/netemul/runner:package",
+
+    # required dependencies of test-manager
+    "//src/sys/testing:testing",  # The test_realm component's package
+    "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
+    "//src/sys/fuzzing:fuzz-manager",
+    "//src/sys/fuzzing:fuzz-registry",
+    "//src/sys/fuzzing/fuzzctl",
+    "//src/sys/run_test_suite:run_test_suite_pkg",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    # "//src/sys/test_manager/meta/test_manager.core_shard.cml",
+                    "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
+                    "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
+
+                    # "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
+                    # "//src/sys/testing/meta/test_realm.core_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+  shell_commands = [
+    {
+      package = "run_test_suite"
+      components = [ "run-test-suite" ]
+    },
+    {
+      package = "fuzzctl"
+      components = [ "fuzz_ctl" ]
     },
   ]
 }

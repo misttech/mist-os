@@ -110,6 +110,9 @@ _eng_aib_names = [
   # Kernel args
   "kernel_args_eng",
 
+  # Testing Support
+  "testing_support",
+
   # UI
   "ui_eng",
   "ui_package_eng",

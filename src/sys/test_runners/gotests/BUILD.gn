@@ -53,12 +53,17 @@ fuchsia_component("go_test_runner") {
 
 fuchsia_package("go-test-runner") {
   testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+  ]
   deps = [ ":go_test_runner" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("gotests") {
-  testonly = true
-  deps = [ ":go-test-runner" ]
 }
 
 fuchsia_unittest_component("test-component") {

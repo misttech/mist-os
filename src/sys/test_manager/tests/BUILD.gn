@@ -99,7 +99,7 @@ fuchsia_unittest_package("test_manager_test") {
     "test_data",
   ]
 
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 
   restricted_features = [ "allow_non_hermetic_packages" ]
 
@@ -129,7 +129,7 @@ fuchsia_unittest_package("test_manager_specified_realm_test") {
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
   ]
 
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 
   restricted_features = [ "allow_non_hermetic_packages" ]
 }
@@ -142,7 +142,7 @@ fuchsia_unittest_package("test_manager_stress_test") {
     "test_data:debug_data_spam_test",
   ]
 
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
 fuchsia_unittest_package("test_manager_legacy_test") {
@@ -153,7 +153,7 @@ fuchsia_unittest_package("test_manager_legacy_test") {
     "test_data:test_data_v1",
   ]
 
-  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
+  subpackages = [ "//src/sys/test_manager:pkg" ]
 
   # There's expected error logs that happen during the test such as not resolving an instance when
   # testing that we fail to execute a test with an unknown URL.
@@ -168,10 +168,6 @@ group("legacy_tests") {
   testonly = true
   deps = [
     ":test_manager_legacy_test",
-
-    # although these tests don't use test_manager itself, this group includes test_manager's
-    # dependencies (such as test runners).
-    "//src/sys/test_manager",
     "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
   ]
 }
@@ -186,13 +182,6 @@ group("tests") {
     "diagnostics_tests:tests",
     "nonhermetic_packaged_tests:tests",
     "test_data:debug-data-test",
-
-    # although these tests don't use test_manager itself, this group includes test_manager's
-    # dependencies (such as test runners).
-    #
-    # TODO(http://fxbug.dev/112006) Remove when added to platform assembly input
-    # bundles.
-    "//src/sys/test_manager",
 
     # test_manager_test launches these tests.
     # TODO(fxbug.dev/104764): consider reorganizing these tests so that these dependencies
