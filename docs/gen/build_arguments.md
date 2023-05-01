@@ -2413,6 +2413,16 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:150
 
 From //third_party/pigweed/src/modules.gni:25
 
+### dir_pw_third_party_abseil_cpp
+
+If compiling tests with Abseil C++, this variable is set to the path to the
+Abseil C++ installation. When set, a pw_source_set for the Abseil C++ library
+is created at "$dir_pw_third_party/abseil-cpp".
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/third_party/abseil-cpp/abseil-cpp.gni:22
+
 ### dir_pw_third_party_boringssl
 
 If compiling backends with boringssl, this variable is set to the path to the
