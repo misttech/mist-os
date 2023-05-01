@@ -59,7 +59,7 @@ bool CobaltTestApp::DoLocalAggregationTests(const size_t backfill_days,
       TestLogString,
   };
 
-  // TODO(fxbug.dev/52750): We try each of these tests twice in case the failure
+  // TODO(b/278930366): We try each of these tests twice in case the failure
   // reason is that the calendar date has changed mid-test.
   for (size_t i = 0; i < 2; ++i) {
     if (std::all_of(fns.begin(), fns.end(), [&](auto fn) {
