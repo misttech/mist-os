@@ -39,6 +39,11 @@ class SysmemAllocator {
 
  private:
   fuchsia::sysmem::AllocatorPtr allocator_;
+
+  // This should always be the last thing in the object. Otherwise scheduled tasks within this scope
+  // which reference members of this object may be allowed to run after destruction of this object
+  // has started. Keeping this at the end ensures that the scope is destroyed first, cancelling any
+  // scheduled tasks before the rest of the members are destroyed.
   fpromise::scope scope_;
 };
 

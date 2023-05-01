@@ -178,7 +178,7 @@ class StreamImpl {
   fuchsia::math::Size current_resolution_;
   MuteState mute_state_;
   std::unique_ptr<fuchsia::math::RectF> current_crop_region_;
-  fpromise::scope scope_;
+
   std::string description_;
   struct {
     zx::time window_start = zx::time::infinite();
@@ -189,6 +189,13 @@ class StreamImpl {
     }
     std::unique_ptr<MetricsReporter::FailureTestRecord> record;
   } streaming_failure_tracker_;
+
+  // This should always be the last thing in the object. Otherwise scheduled tasks within this scope
+  // which reference members of this object may be allowed to run after destruction of this object
+  // has started. Keeping this at the end ensures that the scope is destroyed first, cancelling any
+  // scheduled tasks before the rest of the members are destroyed.
+  fpromise::scope scope_;
+
   friend class Client;
 };
 
