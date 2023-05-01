@@ -307,9 +307,9 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         .parent()
         .with_context(|| format!("while parsing parent path: {}", manifest_path.display()))?;
     cmd.current_dir(parent_dir);
-    cmd.manifest_path(&manifest_path);
+    cmd.manifest_path(manifest_path);
     if let Some(ref cargo_path) = opt.cargo {
-        cmd.cargo_path(&cargo_path);
+        cmd.cargo_path(cargo_path);
     }
     if opt.all_features {
         cmd.features(CargoOpt::AllFeatures);

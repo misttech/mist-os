@@ -565,7 +565,7 @@ mod tests {
             "test_target",
             "test_package",
             "2018",
-            &Utf8Path::from_path(project_root.as_path()).unwrap(),
+            Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Library,
             &[],
@@ -577,16 +577,11 @@ mod tests {
         let prefix = std::env::temp_dir();
 
         let mut output = vec![];
-        assert_eq!(
-            false,
-            write_rule(&mut output, &target, not_prefix, None, None, None, false, None).is_ok()
+        assert!(
+            write_rule(&mut output, &target, not_prefix, None, None, None, false, None).is_err()
         );
-
-        assert_eq!(
-            true,
-            write_rule(&mut output, &target, prefix.as_path(), None, None, None, false, None)
-                .is_ok()
-        );
+        assert!(write_rule(&mut output, &target, prefix.as_path(), None, None, None, false, None)
+            .is_ok());
     }
 
     #[test]
@@ -603,7 +598,7 @@ mod tests {
             "test_target",
             "test_package",
             "2018",
-            &Utf8Path::from_path(project_root.as_path()).unwrap(),
+            Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Library,
             &[],
@@ -661,7 +656,7 @@ mod tests {
             "test_target",
             "test_package",
             "2018",
-            &Utf8Path::from_path(project_root.as_path()).unwrap(),
+            Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,
             &[],
@@ -721,7 +716,7 @@ mod tests {
             "test_target",
             "test_package",
             "2018",
-            &Utf8Path::from_path(project_root.as_path()).unwrap(),
+            Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,
             &[],
@@ -739,7 +734,7 @@ mod tests {
             None,
             outname,
             false,
-            Some(&"renamed_rule"),
+            Some("renamed_rule"),
         )
         .unwrap();
         let output = String::from_utf8(output).unwrap();
