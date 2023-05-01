@@ -5,9 +5,12 @@
 #ifndef SRC_DEVICES_POWER_DRIVERS_POWER_POWER_H_
 #define SRC_DEVICES_POWER_DRIVERS_POWER_POWER_H_
 
+#include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
+#include <zircon/compiler.h>
 
 #include <memory>
 #include <vector>
@@ -58,6 +61,8 @@ class PowerDevice : public PowerDeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   zx_status_t ReadPmicCtrlReg(uint64_t fragment_device_id, uint32_t reg_addr, uint32_t* out_value);
   uint32_t GetDependentCount();
 
+  zx_status_t Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
  private:
   PowerDeviceFragmentChild* GetFragmentChildLocked(uint64_t fragment_device_id)
       __TA_REQUIRES(power_device_lock_);
@@ -68,13 +73,16 @@ class PowerDevice : public PowerDeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   const ddk::PowerImplProtocolClient power_impl_;
   const ddk::PowerProtocolClient parent_power_;
   fbl::Mutex power_device_lock_;
-  std::vector<std::unique_ptr<PowerDeviceFragmentChild>> children_;
+  std::vector<std::unique_ptr<PowerDeviceFragmentChild>> children_ __TA_GUARDED(power_device_lock_);
   // Min supported voltage of this domain
   uint32_t min_voltage_uV_;
   // Max supported voltage of this domain
   uint32_t max_voltage_uV_;
   // Does it support voltage modifications?
   bool fixed_;
+  async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
+  component::OutgoingDirectory outgoing_{dispatcher_};
+  fidl::ServerBindingGroup<fuchsia_hardware_power::Device> bindings_;
 };
 
 // For each composite device that is dependent on a PowerDevice(power domain),
@@ -83,7 +91,8 @@ class PowerDevice : public PowerDeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
 // arrive on this calss and are forwarded to the PowerDevice with the corresponding composite
 // device context(fragment_device_id).
 class PowerDeviceFragmentChild
-    : public ddk::PowerProtocol<PowerDeviceFragmentChild, ddk::base_protocol> {
+    : public ddk::PowerProtocol<PowerDeviceFragmentChild, ddk::base_protocol>,
+      public fidl::WireServer<fuchsia_hardware_power::Device> {
  public:
   explicit PowerDeviceFragmentChild(uint64_t fragment_device_id, PowerDevice* parent)
       : fragment_device_id_(fragment_device_id), power_device_(parent) {}
@@ -97,6 +106,21 @@ class PowerDeviceFragmentChild
   zx_status_t PowerGetCurrentVoltage(uint32_t index, uint32_t* current_voltage);
   zx_status_t PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value);
   zx_status_t PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value);
+
+  void RegisterPowerDomain(RegisterPowerDomainRequestView request,
+                           RegisterPowerDomainCompleter::Sync& completer) override;
+  void UnregisterPowerDomain(UnregisterPowerDomainCompleter::Sync& completer) override;
+  void GetPowerDomainStatus(GetPowerDomainStatusCompleter::Sync& completer) override;
+  void GetSupportedVoltageRange(GetSupportedVoltageRangeCompleter::Sync& completer) override;
+  void RequestVoltage(RequestVoltageRequestView request,
+                      RequestVoltageCompleter::Sync& completer) override;
+  void GetCurrentVoltage(GetCurrentVoltageRequestView request,
+                         GetCurrentVoltageCompleter::Sync& completer) override;
+  void WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
+                        WritePmicCtrlRegCompleter::Sync& completer) override;
+  void ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
+                       ReadPmicCtrlRegCompleter::Sync& completer) override;
+
   uint64_t fragment_device_id() const { return fragment_device_id_; }
   power_protocol_ops_t* ops() { return &power_protocol_ops_; }
   uint32_t min_needed_voltage_uV() const { return min_needed_voltage_uV_; }

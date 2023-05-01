@@ -36,5 +36,6 @@ DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 DDK_FIDL_PROTOCOL_DEF(REGISTERS,       18, "fuchsia.hardware.registers.Service")
 DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
 DDK_FIDL_PROTOCOL_DEF(AMLOGIC_CANVAS,  20, "fuchsia.hardware.amlogiccanvas.Service")
+DDK_FIDL_PROTOCOL_DEF(POWER,           21, "fuchsia.hardware.power.Service")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

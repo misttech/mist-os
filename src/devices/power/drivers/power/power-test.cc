@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
 
 #include <memory>
 
@@ -113,6 +114,7 @@ class GenericPowerTest : public zxtest::Test {
   }
 
  protected:
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   std::unique_ptr<PowerDevice> dut_;
   power_protocol_t proto_ctx_;

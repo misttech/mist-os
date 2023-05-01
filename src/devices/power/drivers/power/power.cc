@@ -66,6 +66,97 @@ zx_status_t PowerDeviceFragmentChild::PowerReadPmicCtrlReg(uint32_t reg_addr, ui
   return power_device_->ReadPmicCtrlReg(fragment_device_id_, reg_addr, out_value);
 }
 
+void PowerDeviceFragmentChild::RegisterPowerDomain(RegisterPowerDomainRequestView request,
+                                                   RegisterPowerDomainCompleter::Sync& completer) {
+  zx_status_t status = power_device_->RegisterPowerDomain(
+      fragment_device_id_, request->min_needed_voltage, request->max_supported_voltage);
+  if (status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::UnregisterPowerDomain(
+    UnregisterPowerDomainCompleter::Sync& completer) {
+  zx_status_t status = power_device_->UnregisterPowerDomain(fragment_device_id_);
+  if (status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::GetPowerDomainStatus(
+    GetPowerDomainStatusCompleter::Sync& completer) {
+  power_domain_status_t out_status;
+  zx_status_t status = power_device_->GetPowerDomainStatus(fragment_device_id_, &out_status);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(static_cast<fuchsia_hardware_power::PowerDomainStatus>(out_status));
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::GetSupportedVoltageRange(
+    GetSupportedVoltageRangeCompleter::Sync& completer) {
+  uint32_t out_min, out_max;
+  zx_status_t status =
+      power_device_->GetSupportedVoltageRange(fragment_device_id_, &out_min, &out_max);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(out_min, out_max);
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::RequestVoltage(RequestVoltageRequestView request,
+                                              RequestVoltageCompleter::Sync& completer) {
+  uint32_t out_actual_voltage;
+  zx_status_t status =
+      power_device_->RequestVoltage(fragment_device_id_, request->voltage, &out_actual_voltage);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(out_actual_voltage);
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::GetCurrentVoltage(GetCurrentVoltageRequestView request,
+                                                 GetCurrentVoltageCompleter::Sync& completer) {
+  uint32_t out_current_voltage;
+  zx_status_t status =
+      power_device_->GetCurrentVoltage(fragment_device_id_, request->index, &out_current_voltage);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(out_current_voltage);
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
+                                                WritePmicCtrlRegCompleter::Sync& completer) {
+  zx_status_t status =
+      power_device_->WritePmicCtrlReg(fragment_device_id_, request->reg_addr, request->value);
+  if (status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void PowerDeviceFragmentChild::ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
+                                               ReadPmicCtrlRegCompleter::Sync& completer) {
+  uint32_t out_value;
+  zx_status_t status =
+      power_device_->ReadPmicCtrlReg(fragment_device_id_, request->reg_addr, &out_value);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(out_value);
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
 PowerDeviceFragmentChild* PowerDevice::GetFragmentChildLocked(uint64_t fragment_device_id) {
   for (auto& child : children_) {
     if (child->fragment_device_id() == fragment_device_id) {
@@ -276,6 +367,54 @@ zx_status_t PowerDevice::DdkCloseProtocolSessionMultibindable(void* child_ctx) {
 
 void PowerDevice::DdkRelease() { delete this; }
 
+zx_status_t PowerDevice::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  fuchsia_hardware_power::Service::InstanceHandler::MemberHandler<fuchsia_hardware_power::Device>
+      device_handler = [this](fidl::ServerEnd<fuchsia_hardware_power::Device> server_end) {
+        fbl::AutoLock al(&power_device_lock_);
+        fbl::AllocChecker ac;
+        uint64_t id = 0;
+        GetUniqueId(&id);
+        std::unique_ptr<PowerDeviceFragmentChild> child(new (&ac)
+                                                            PowerDeviceFragmentChild(id, this));
+        if (!ac.check()) {
+          zxlogf(ERROR, "Failed to allocate PowerDeviceFragmentChild.");
+          return;
+        }
+        children_.push_back(std::move(child));
+        PowerDeviceFragmentChild* child_ptr = children_.back().get();
+        auto close_handler = [this, id](fidl::UnbindInfo info) {
+          fbl::AutoLock al(&power_device_lock_);
+          for (auto iter = children_.begin(); iter != children_.end(); iter++) {
+            if (iter->get()->fragment_device_id() == id) {
+              children_.erase(iter);
+              return;
+            }
+          }
+
+          zxlogf(ERROR, "Unable to find the child with the given fragment id.");
+        };
+        bindings_.AddBinding(dispatcher_, std::move(server_end), child_ptr,
+                             std::move(close_handler));
+      };
+  fuchsia_hardware_power::Service::InstanceHandler handler({
+      .device = std::move(device_handler),
+  });
+
+  auto result = outgoing_.AddService<fuchsia_hardware_power::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  result = outgoing_.Serve(std::move(server_end));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
   auto power_domain = ddk::GetMetadata<power_domain_t>(parent, DEVICE_METADATA_POWER_DOMAINS);
   if (!power_domain.is_ok()) {
@@ -314,8 +453,25 @@ zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
       {BIND_POWER_DOMAIN, 0, index},
   };
 
-  status = dev->DdkAdd(
-      ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE).set_props(props));
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  status = dev->Serve(std::move(endpoints.value().server));
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  std::array offers = {
+      fuchsia_hardware_power::Service::Name,
+  };
+
+  status = dev->DdkAdd(ddk::DeviceAddArgs(name)
+                           .set_fidl_service_offers(offers)
+                           .set_outgoing_dir(endpoints->client.TakeChannel())
+                           .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                           .set_props(props));
   if (status != ZX_OK) {
     return status;
   }
