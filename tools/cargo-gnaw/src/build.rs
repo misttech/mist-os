@@ -4,7 +4,7 @@
 
 use {
     crate::target::GnTarget,
-    anyhow::{anyhow, Error},
+    anyhow::{anyhow, Result},
     std::ffi::OsString,
     std::process::Command,
     std::{fs::File, io::Read, path::PathBuf},
@@ -18,7 +18,7 @@ pub struct BuildScriptOutput {
 
 impl BuildScriptOutput {
     #[allow(unused)]
-    pub fn parse_from_file(file: PathBuf) -> Result<Self, Error> {
+    pub fn parse_from_file(file: PathBuf) -> Result<Self> {
         let mut file = File::open(file)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
@@ -26,7 +26,7 @@ impl BuildScriptOutput {
         Self::parse(configs)
     }
 
-    pub fn parse(lines: Vec<&str>) -> Result<Self, Error> {
+    pub fn parse(lines: Vec<&str>) -> Result<Self> {
         let mut bs = BuildScriptOutput { cfgs: vec![], rerun: vec![] };
 
         let rustc_cfg = "cargo:rustc-cfg=";
@@ -58,7 +58,7 @@ fn get_rustc() -> OsString {
 }
 
 impl<'a> BuildScript<'a> {
-    pub fn compile(target: &'a GnTarget<'_>) -> Result<BuildScript<'a>, Error> {
+    pub fn compile(target: &'a GnTarget<'_>) -> Result<BuildScript<'a>> {
         let build_script = target.build_script.as_ref().unwrap();
         let rustc = get_rustc();
         // compile the build script
@@ -93,7 +93,7 @@ impl<'a> BuildScript<'a> {
         Ok(BuildScript { path: out_file, output_dir: out_dir, target })
     }
 
-    pub fn execute(self) -> Result<BuildScriptOutput, Error> {
+    pub fn execute(self) -> Result<BuildScriptOutput> {
         let mut features = vec![];
         for feature in self.target.features {
             features.push((format!("CARGO_FEATURE_{}", feature.to_uppercase()), ""))

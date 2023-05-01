@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::Result;
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     gnaw_lib::run(&args[..])
 }

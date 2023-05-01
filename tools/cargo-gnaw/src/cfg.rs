@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Result};
 
 /// Converts a cargo platform-specific dependency target into GN imperative control flow.
 ///
@@ -23,7 +23,7 @@ use anyhow::{anyhow, Error};
 /// into `#[cfg]` syntax.
 ///
 /// [platform-specific dependencies]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
-pub fn target_to_gn_conditional(target: &str) -> Result<String, Error> {
+pub fn target_to_gn_conditional(target: &str) -> Result<String> {
     if target.starts_with("cfg") {
         // This is #[cfg] syntax already.
         cfg_to_gn_conditional(target)
@@ -56,7 +56,7 @@ pub fn target_to_gn_conditional(target: &str) -> Result<String, Error> {
 // to support Fuchsia at the moment.
 //
 // wow. an interview question in real life.
-pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String, Error> {
+pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
     #[allow(clippy::if_same_then_else)]
     if cfg.starts_with("cfg") {
         Ok(cfg_to_gn_conditional(&cfg[4..cfg.len() - 1])?)

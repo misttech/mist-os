@@ -7,7 +7,7 @@ use {
         target::{CustomBuildTarget, GnTarget},
         types::*,
     },
-    anyhow::{anyhow, Context as _, Error},
+    anyhow::{anyhow, Context as _, Result},
     cargo_metadata::{DependencyKind, Metadata, Package, PackageId},
     std::collections::{HashMap, HashSet},
     std::convert::TryFrom,
@@ -56,7 +56,7 @@ impl<'a> GnBuildGraph<'a> {
 
     /// Add a cargo package to the target list. If the dependencies
     /// are not already in the target graph, add them as well
-    pub fn add_cargo_package(&mut self, cargo_pkg_id: PackageId) -> Result<(), Error> {
+    pub fn add_cargo_package(&mut self, cargo_pkg_id: PackageId) -> Result<()> {
         let package = &self.metadata[&cargo_pkg_id];
         for node in self
             .metadata

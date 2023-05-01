@@ -9,7 +9,7 @@ use {
         types::*,
         BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility, RuleRenaming,
     },
-    anyhow::{Context, Error},
+    anyhow::{Context, Result},
     cargo_metadata::Package,
     std::borrow::Cow,
     std::collections::BTreeMap,
@@ -29,7 +29,7 @@ pub fn add_version_suffix(prefix: &str, version: &impl ToString) -> String {
 }
 
 /// Write a header for the output GN file
-pub fn write_header<W: io::Write>(output: &mut W, _cargo_file: &Path) -> Result<(), Error> {
+pub fn write_header<W: io::Write>(output: &mut W, _cargo_file: &Path) -> Result<()> {
     writeln!(
         output,
         include_str!("../templates/gn_header.template"),
@@ -39,13 +39,13 @@ pub fn write_header<W: io::Write>(output: &mut W, _cargo_file: &Path) -> Result<
     .map_err(Into::into)
 }
 
-pub fn write_fuchsia_sdk_metadata_header<W: io::Write>(output: &mut W) -> Result<(), Error> {
+pub fn write_fuchsia_sdk_metadata_header<W: io::Write>(output: &mut W) -> Result<()> {
     writeln!(output, include_str!("../templates/gn_sdk_metadata_header.template"),)
         .map_err(Into::into)
 }
 
 /// Write an import stament for the output GN file
-pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<(), Error> {
+pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<()> {
     writeln!(output, include_str!("../templates/gn_import.template"), file_name = file_name)
         .map_err(Into::into)
 }
@@ -62,7 +62,7 @@ pub fn write_top_level_rule<W: io::Write>(
     group_visibility: Option<&GroupVisibility>,
     rule_renaming: Option<&RuleRenaming>,
     has_tests: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let target_name = if pkg.is_proc_macro() {
         format!("{}($host_toolchain)", pkg.gn_name())
     } else {
@@ -115,7 +115,7 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
     pkg: &Package,
     abs_dir: &Path,
     rel_dir: &Path,
-) -> Result<(), Error> {
+) -> Result<()> {
     // TODO: add features, and registry
     std::fs::create_dir_all(abs_dir)
         .with_context(|| format!("while making directories for {}", abs_dir.display()))?;
@@ -173,7 +173,7 @@ pub fn write_binary_top_level_rule<'a, W: io::Write>(
     platform: Option<String>,
     target: &GnTarget<'a>,
     options: &BinaryRenderOptions<'_>,
-) -> Result<(), Error> {
+) -> Result<()> {
     if let Some(ref platform) = platform {
         writeln!(
             output,
@@ -327,7 +327,7 @@ pub fn write_rule<W: io::Write>(
     output_name: Option<&str>,
     is_test: bool,
     renamed_rule: Option<&str>,
-) -> Result<(), Error> {
+) -> Result<()> {
     // Generate a section for dependencies that is paramaterized on toolchain
     let mut dependencies = String::from("deps = []\n");
     let mut aliased_deps = vec![];

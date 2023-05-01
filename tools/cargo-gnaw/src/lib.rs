@@ -4,7 +4,7 @@
 
 use {
     crate::{build::BuildScript, graph::GnBuildGraph, target::GnTarget, types::*},
-    anyhow::{Context, Error, Result},
+    anyhow::{Context, Result},
     argh::FromArgs,
     camino::Utf8PathBuf,
     cargo_metadata::{CargoOpt, DependencyKind, Package},
@@ -280,7 +280,7 @@ fn write_import_once<W: io::Write>(
     Ok(())
 }
 
-pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Result<(), Error> {
+pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Result<()> {
     let manifest_path = &opt.manifest_path;
     let path_from_root_to_generated = opt
         .output
@@ -754,7 +754,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     Ok(())
 }
 
-pub fn run(args: &[impl AsRef<str>]) -> Result<(), Error> {
+pub fn run(args: &[impl AsRef<str>]) -> Result<()> {
     // Check if running through cargo or stand-alone before arg parsing
     let mut strs: Vec<&str> = args.iter().map(|s| s.as_ref()).collect();
     if strs.get(1) == Some(&"gnaw") {
