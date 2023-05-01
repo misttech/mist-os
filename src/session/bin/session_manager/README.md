@@ -52,29 +52,6 @@ or via `fx args`.
 Re-build, re-pave, and restart your device and it will boot into
 `session_manager` and launch your session.
 
-### Temporarily disabling launch-on-boot
-
-TODO(fxbug.dev/126266): Update this documentation once we move this
-functionality to only rely on structured config.
-
-If your development device runs a product that specifies
-`product_config.session_url`, you may nonetheless want to stop the session from
-launching (e.g., to avoid log spam from the session, or make changes to the
-device's state _before_ the session launches).
-
-You can disable autolaunching without reflashing or OTAing your device by
-creating an empty file at `/data/session-manager/noautolaunch`.
-
-To prevent your device from autolaunching the session, run:
-
-    fx shell 'mkdir -p /data/session-manager && echo "" > /data/session-manager/noautolaunch'
-
-To re-enable autolaunching, run:
-
-    fx shell 'rm /data/session-manager/noautolaunch'
-
-The setting will take effect the next time `session-manager` restarts.
-
 ## Testing
 
 Unit tests for `session_manager` are included in the `session_manager_tests`
