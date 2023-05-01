@@ -798,25 +798,31 @@ class AIBCreator:
                 # subpackages, recursively.
                 self.subpackages.add(subpackage.merkle)
 
-                with open(subpackage.manifest_path, 'r') as file:
+                # Make the path relative to the package manifest if necessary.
+                subpackage_manifest_path = subpackage.manifest_path
+                if manifest.blob_sources_relative == 'file':
+                    subpackage_manifest_path = os.path.join(
+                        package_manifest_dir, subpackage_manifest_path)
+
+                with open(subpackage_manifest_path, 'r') as file:
                     try:
                         subpackage_manifest = json_load(PackageManifest, file)
                     except Exception as exc:
                         raise PackageManifestParsingException(
-                            f"loading PackageManifest from {subpackage.manifest_path}"
+                            f"loading PackageManifest from {subpackage_manifest_path}"
                         ) from exc
 
                     # Track in deps, since it was opened.
-                    deps.add(subpackage.manifest_path)
+                    deps.add(subpackage_manifest_path)
 
                 try:
                     self._copy_package(
                         subpackage_manifest,
-                        os.path.dirname(subpackage.manifest_path),
+                        os.path.dirname(subpackage_manifest_path),
                         subpackage_destination, blobs, deps)
                 except Exception as e:
                     raise AssemblyInputBundleCreationException(
-                        f"Copying subpackage '{subpackage.name}' with manifest: {subpackage.manifest_path}"
+                        f"Copying subpackage '{subpackage.name}' with manifest: {subpackage_manifest_path}"
                     ) from e
 
         package_manifest_destination = os.path.join(
