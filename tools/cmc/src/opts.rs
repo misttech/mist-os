@@ -77,7 +77,7 @@ pub enum Commands {
     },
 
     #[structopt(name = "merge")]
-    /// merge the listed cml or cmx files
+    /// merge the listed cml or cmx files. Does NOT validate the resulting manifest.
     Merge {
         #[structopt(name = "FILE", parse(from_os_str))]
         /// files to process
@@ -105,7 +105,7 @@ pub enum Commands {
     },
 
     #[structopt(name = "include")]
-    /// add contents from includes if any
+    /// recursively process contents from includes, and validate the result
     Include {
         #[structopt(name = "FILE", parse(from_os_str))]
         /// file to process
