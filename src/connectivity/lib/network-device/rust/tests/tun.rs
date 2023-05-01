@@ -40,10 +40,7 @@ async fn test_rx() {
         let () = tun.write_frame(frame).await.unwrap().expect("failed to write frame");
         let buff = session.recv().await.expect("failed to recv buffer");
         let mut bytes = [0u8; DATA_LEN];
-        assert_eq!(
-            buff.read_at(0, &mut bytes[..]).expect("failed to read from the buffer"),
-            DATA_LEN
-        );
+        buff.read_at(0, &mut bytes[..]).expect("failed to read from the buffer");
         for i in bytes.iter() {
             assert_eq!(*i, DATA_BYTE);
         }

@@ -371,7 +371,10 @@ impl<K: AllocKind> Buffer<K> {
     /// Writes up to `src.len()` bytes into the buffer beginning at `offset`,
     /// returning how many bytes were written successfully. Partial write is
     /// not considered as an error.
-    pub fn write_at(&mut self, offset: usize, src: &[u8]) -> Result<usize> {
+    pub fn write_at(&mut self, offset: usize, src: &[u8]) -> Result<()> {
+        if self.cap() < offset + src.len() {
+            return Err(Error::TooSmall { size: self.cap(), offset, length: src.len() });
+        }
         let mut part_start = 0;
         let mut total = 0;
         for part in self.parts.iter_mut() {
@@ -386,15 +389,19 @@ impl<K: AllocKind> Buffer<K> {
             }
             part_start += part.cap;
         }
-        Ok(total)
+        assert_eq!(total, src.len());
+        Ok(())
     }
 
     /// Reads bytes from the buffer.
     ///
     /// Reads up to `dst.len()` bytes from the buffer beginning at `offset`,
     /// returning how many bytes were read successfully. Partial read is
-    /// not considered as an error.
-    pub fn read_at(&self, offset: usize, dst: &mut [u8]) -> Result<usize> {
+    /// considered as an error.
+    pub fn read_at(&self, offset: usize, dst: &mut [u8]) -> Result<()> {
+        if self.len() < offset + dst.len() {
+            return Err(Error::TooSmall { size: self.len(), offset, length: dst.len() });
+        }
         let mut part_start = 0;
         let mut total = 0;
         for part in self.parts.iter() {
@@ -407,7 +414,8 @@ impl<K: AllocKind> Buffer<K> {
             }
             part_start += part.cap;
         }
-        Ok(total)
+        assert_eq!(total, dst.len());
+        Ok(())
     }
 
     /// Pads the [`Buffer`] to minimum tx buffer length requirements.
@@ -896,21 +904,19 @@ impl<K: AllocKind> TryFrom<AllocGuard<K>> for Buffer<K> {
 
 impl<K: AllocKind> Read for Buffer<K> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let read = self
-            .read_at(self.pos, buf)
+        self.read_at(self.pos, buf)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
-        self.pos += read;
-        Ok(read)
+        self.pos += buf.len();
+        Ok(buf.len())
     }
 }
 
 impl Write for Buffer<Tx> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let written = self
-            .write_at(self.pos, buf)
+        self.write_at(self.pos, buf)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
-        self.pos += written;
-        Ok(written)
+        self.pos += buf.len();
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -1101,20 +1107,14 @@ mod tests {
         // 0..offset being the SENTINEL_BYTE, offset being the WRITE_BYTE and the
         // rest being PAD_BYTE.
         fn check_write_and_pad(&mut self, offset: usize, pad_size: usize) {
-            assert_eq!(
-                self.write_at(offset, &[WRITE_BYTE][..]).expect("failed to write to self"),
-                1
-            );
+            self.write_at(offset, &[WRITE_BYTE][..]).expect("failed to write to self");
             self.pad().expect("failed to pad");
             assert_eq!(self.len(), pad_size);
             // An arbitrary value that is not SENTINAL/WRITE/PAD_BYTE so that
             // we can make sure the write really happened.
             const INIT_BYTE: u8 = 42;
             let mut read_buf = vec![INIT_BYTE; pad_size];
-            assert_eq!(
-                self.read_at(0, &mut read_buf[..]).expect("failed to read from self"),
-                pad_size
-            );
+            self.read_at(0, &mut read_buf[..]).expect("failed to read from self");
             for (idx, byte) in read_buf.iter().enumerate() {
                 if idx < offset {
                     assert_eq!(*byte, SENTINEL_BYTE);
@@ -1471,15 +1471,9 @@ mod tests {
         assert_eq!(buffer.parts.len(), 2);
         assert_eq!(buffer.cap(), alloc_bytes);
         let write_buf = (0..u8::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()).collect::<Vec<_>>();
-        assert_eq!(
-            buffer.write_at(0, &write_buf[..]).expect("failed to write into buffer"),
-            write_buf.len()
-        );
+        buffer.write_at(0, &write_buf[..]).expect("failed to write into buffer");
         let mut read_buf = [0xff; DEFAULT_BUFFER_LENGTH.get()];
-        assert_eq!(
-            buffer.read_at(0, &mut read_buf[..]).expect("failed to read from buffer"),
-            read_buf.len()
-        );
+        buffer.read_at(0, &mut read_buf[..]).expect("failed to read from buffer");
         for (idx, byte) in read_buf.iter().enumerate() {
             assert_eq!(*byte, write_buf[idx]);
         }
@@ -1575,10 +1569,7 @@ mod tests {
             }
         });
         assert_eq!(buffer.alloc.len(), netdev::MAX_DESCRIPTOR_CHAIN.into());
-        assert_eq!(
-            buffer.write_at(write_offset, &[WRITE_BYTE][..]).expect("failed to write to buffer"),
-            1
-        );
+        buffer.write_at(write_offset, &[WRITE_BYTE][..]).expect("failed to write to buffer");
         // The accumulator is Some if we haven't found the part where the byte
         // was written, None if we've already found it.
         assert_eq!(
@@ -1623,7 +1614,7 @@ mod tests {
             let mut buffer = pool
                 .alloc_tx_buffer_now_or_never(MAX_BUFFER_BYTES)
                 .expect("failed to allocate buffer");
-            assert_eq!(buffer.write_at(offset, &[1][..]).expect("failed to write to buffer"), 1);
+            buffer.write_at(offset, &[1][..]).expect("failed to write to buffer");
             buffer.commit();
             for (part, descriptor) in buffer.parts.iter().zip(buffer.alloc.descriptors()) {
                 let head_length = descriptor.head_length();
@@ -1652,19 +1643,30 @@ mod tests {
             let pool = pool.clone();
             move || pool.alloc_tx_buffer_now_or_never(MIN_TX_DATA)
         })) {
-            assert_matches!(buffer.write(&[WRITE_SENTINAL_BYTE; MIN_TX_DATA]), Ok(MIN_TX_DATA));
+            buffer.write_at(0, &[WRITE_SENTINAL_BYTE; MIN_TX_DATA]).expect("failed to write");
         }
         let mut allocated =
             pool.alloc_tx_buffer_now_or_never(16).expect("failed to allocate buffer");
         assert_eq!(allocated.cap(), ALLOC_SIZE);
-        assert_matches!(allocated.write(&[WRITE_BYTE; ALLOC_SIZE + 1]), Ok(ALLOC_SIZE));
+        const WRITE_BUF_SIZE: usize = ALLOC_SIZE + 1;
+        assert_matches!(
+            allocated.write_at(0, &[WRITE_BYTE; WRITE_BUF_SIZE]),
+            Err(Error::TooSmall { size: ALLOC_SIZE, offset: 0, length: WRITE_BUF_SIZE })
+        );
+        allocated.write_at(0, &[WRITE_BYTE; ALLOC_SIZE]).expect("failed to write to buffer");
         assert_matches!(allocated.pad(), Ok(()));
         assert_eq!(allocated.cap(), MIN_TX_DATA);
         assert_eq!(allocated.len(), MIN_TX_DATA);
-        let mut read_buf = [READ_SENTINAL_BYTE; MIN_TX_DATA];
-        assert_matches!(allocated.read_at(0, &mut read_buf), Ok(MIN_TX_DATA));
+        const READ_BUF_SIZE: usize = MIN_TX_DATA + 1;
+        let mut read_buf = [READ_SENTINAL_BYTE; READ_BUF_SIZE];
+        assert_matches!(
+            allocated.read_at(0, &mut read_buf[..]),
+            Err(Error::TooSmall { size: MIN_TX_DATA, offset: 0, length: READ_BUF_SIZE })
+        );
+        allocated.read_at(0, &mut read_buf[..MIN_TX_DATA]).expect("failed to read from buffer");
         assert_eq!(&read_buf[..ALLOC_SIZE], &[WRITE_BYTE; ALLOC_SIZE][..]);
-        assert_eq!(&read_buf[ALLOC_SIZE..], &[0x0; ALLOC_SIZE][..]);
+        assert_eq!(&read_buf[ALLOC_SIZE..MIN_TX_DATA], &[0x0; ALLOC_SIZE][..]);
+        assert_eq!(&read_buf[MIN_TX_DATA..], &[READ_SENTINAL_BYTE; 1][..]);
     }
 
     #[test]

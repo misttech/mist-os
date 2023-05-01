@@ -117,7 +117,7 @@ impl NetdeviceWorker {
 
             // TODO(https://fxbug.dev/100873): pass strongly owned buffers down
             // to the stack instead of copying it out.
-            let len = rx.read_at(0, &mut buff[..]).map_err(|e| {
+            rx.read_at(0, &mut buff[..rx.len()]).map_err(|e| {
                 log::error!("failed to read from buffer {:?}", e);
                 Error::Client(e)
             })?;
@@ -141,7 +141,7 @@ impl NetdeviceWorker {
                 sync_ctx,
                 non_sync_ctx,
                 &id,
-                packet::Buf::new(&mut buff[..], ..len),
+                packet::Buf::new(&mut buff[..rx.len()], ..),
             )
         }
     }
@@ -455,8 +455,7 @@ impl PortHandler {
             session.alloc_tx_buffer(frame.len()).now_or_never().ok_or(SendError::NoTxBuffers)??;
         tx.set_port(*port_id);
         tx.set_frame_type(fhardware_network::FrameType::Ethernet);
-        let written = tx.write_at(0, frame)?;
-        assert_eq!(written, frame.len());
+        tx.write_at(0, frame)?;
         session.send(tx)?;
         Ok(())
     }

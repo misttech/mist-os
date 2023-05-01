@@ -48,6 +48,8 @@ pub enum Error {
     Detach(crate::Port, zx::Status),
     #[error("invalid base port identifier {0}")]
     InvalidPortId(u8),
+    #[error("buffer is too small: {size} < {offset} + {length}")]
+    TooSmall { size: usize, offset: usize, length: usize },
 }
 
 /// Common result type for methods in this crate.

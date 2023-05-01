@@ -9,7 +9,6 @@ use {
     wlan_common::{appendable::Appendable, big_endian::BigEndianU16, mac},
 };
 
-const ETHERNET_MTU: usize = 1500;
 const NETDEV_DIRECTORY: &str = "/dev/class/network";
 
 /// Returns a Netdevice client with the specified MAC address, or None if none is found.
@@ -99,22 +98,14 @@ pub async fn send(session: &netdevice_client::Session, port: &netdevice_client::
     let mut buffer = session.alloc_tx_buffer(data.len()).await.expect("allocate tx buffer");
     buffer.set_frame_type(fidl_fuchsia_hardware_network::FrameType::Ethernet);
     buffer.set_port(*port);
-    let written = buffer.write_at(0, &data).expect("write message");
-    assert_eq!(
-        written,
-        data.len(),
-        "expected to write {} bytes, wrote {} bytes",
-        data.len(),
-        written
-    );
+    buffer.write_at(0, &data).expect("write message");
     session.send(buffer).expect("failed to send data");
 }
 
 pub async fn recv(session: &netdevice_client::Session) -> Vec<u8> {
     let recv_result = session.recv().await.expect("recv failed");
-    let mut buffer = vec![0; ETHERNET_MTU];
-    let bytes_read = recv_result.read_at(0, &mut buffer).expect("read from buffer");
-    buffer.resize(bytes_read, 0);
+    let mut buffer = vec![0; recv_result.len()];
+    recv_result.read_at(0, &mut buffer).expect("read from buffer");
     buffer
 }
 
