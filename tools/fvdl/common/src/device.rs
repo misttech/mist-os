@@ -20,6 +20,23 @@ pub struct DeviceSpec {
     pub window_width: usize,
 }
 
+impl DeviceSpec {
+    /// Returns None if the image size is invalid or unspecified.
+    pub fn image_size_bytes(&self) -> Option<u64> {
+        if self.image_size.is_empty() {
+            return None;
+        }
+        let (multiplier, consumed) = match self.image_size.chars().last().unwrap() {
+            'G' => (1024 * 1024 * 1024, 1),
+            'M' => (1024 * 1024, 1),
+            'K' => (1024, 1),
+            _ => (1, 0),
+        };
+        let value: u64 = self.image_size[..self.image_size.len() - consumed].parse().ok()?;
+        value.checked_mul(multiplier)
+    }
+}
+
 fn default_audio() -> bool {
     true
 }
@@ -46,8 +63,8 @@ fn default_pointing_device() -> String {
     "touch".to_string()
 }
 
-impl DeviceSpec {
-    pub fn default() -> DeviceSpec {
+impl std::default::Default for DeviceSpec {
+    fn default() -> Self {
         DeviceSpec {
             audio: default_audio(),
             image_size: default_image_size(),
@@ -57,7 +74,9 @@ impl DeviceSpec {
             window_width: default_window_width(),
         }
     }
+}
 
+impl DeviceSpec {
     fn get_values_from_flags(&mut self, cmd: &StartCommand) {
         self.audio = cmd.audio.or(Some(self.audio)).unwrap();
         self.image_size = cmd.image_size.as_ref().unwrap_or(&self.image_size).to_string();
@@ -115,5 +134,20 @@ mod tests {
         assert_eq!(device_spec.ram_mb, 16392);
         assert_eq!(device_spec.window_height, 480);
         assert_eq!(device_spec.window_width, 640);
+    }
+
+    #[test]
+    fn test_image_size_parsing() {
+        let create_spec =
+            |img_size: &str| DeviceSpec { image_size: img_size.to_string(), ..Default::default() };
+
+        assert_eq!(create_spec("2G").image_size_bytes(), Some(2 * 1024 * 1024 * 1024));
+        assert_eq!(create_spec("3M").image_size_bytes(), Some(3 * 1024 * 1024));
+        assert_eq!(create_spec("44K").image_size_bytes(), Some(44 * 1024));
+        assert_eq!(create_spec("1023").image_size_bytes(), Some(1023));
+        assert_eq!(create_spec("").image_size_bytes(), None);
+        assert_eq!(create_spec("nan").image_size_bytes(), None);
+        assert_eq!(create_spec("xG").image_size_bytes(), None);
+        assert_eq!(create_spec("2nan000G").image_size_bytes(), None);
     }
 }

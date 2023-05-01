@@ -167,8 +167,8 @@ pub struct StartCommand {
 
     /// bool, download and re-use image files in the cached location ~/.fuchsia/<image_name>/<sdk_version>/.
     /// If not set (default), image files will be stored in a temp location and removed with `kill` subcommand.
-    /// If image location is specified with --kernel-image, --zbi-image, --fvm-image etc., the cached image will
-    /// be overwritten for the specified image file.
+    /// If image location is specified with --kernel-image, --zbi-image, --disk-image etc., the
+    /// cached image will be overwritten for the specified image file.
     #[argh(switch, short = 'i')]
     pub cache_image: bool,
 
@@ -228,9 +228,9 @@ pub struct StartCommand {
     #[argh(option, short = 'a')]
     pub amber_files: Option<String>,
 
-    /// string, absolute path to fvm image file location.
+    /// string, absolute path to disk image (Fxfs or FVM) file location.
     #[argh(option, short = 'f')]
-    pub fvm_image: Option<String>,
+    pub disk_image: Option<String>,
 
     /// string, absolute path to kernel image file location.
     /// If specified --zbi-image and --image-architecture must also be specified.
@@ -245,8 +245,8 @@ pub struct StartCommand {
     pub zbi_image: Option<String>,
 
     /// string, specifies image architecture, accepted values are 'arm64' or 'x64'.
-    /// Required if image override flags (i.e --fvm-image, --kernel-image, --zbi-image, or --amber-files)
-    /// are specified.
+    /// Required if image override flags (i.e --disk-image, --kernel-image, --zbi-image, or
+    /// --amber-files) are specified.
     #[argh(option, short = 'A')]
     pub image_architecture: Option<String>,
 

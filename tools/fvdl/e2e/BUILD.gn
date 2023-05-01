@@ -66,8 +66,12 @@ if (is_linux) {
 
   host_test_data("copy_images") {
     sources = [ files.zbi ]
-    if (!bootfs_only && !fxfs_blob) {
-      sources += [ files.fvm ]
+    if (!bootfs_only) {
+      if (fxfs_blob) {
+        sources += [ files.fxfs ]
+      } else {
+        sources += [ files.fvm ]
+      }
     }
 
     # Copy the files to a common directory to mimic the image tarball which is

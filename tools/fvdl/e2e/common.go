@@ -33,7 +33,7 @@ var (
 	hostToolsDir      string
 	ffx               string
 	ffxInstance       *ffxutil.FFXInstance
-	fvm               string
+	disk_image        string
 	zbi               string
 	kernel            string
 	runtimeDir        string
@@ -95,9 +95,13 @@ func setUp(t *testing.T, intree bool) {
 		if _, err := os.Stat(zbi); os.IsNotExist(err) {
 			t.Fatal(err)
 		}
-		fvm = filepath.Join(fuchsiaBuildDir, "fvm.blk")
-		if _, err := os.Stat(fvm); os.IsNotExist(err) {
-			t.Fatal(err)
+		disk_image = filepath.Join(fuchsiaBuildDir, "fvm.blk")
+		if _, err := os.Stat(disk_image); os.IsNotExist(err) {
+			t.Logf("fvm.blk not found, using fxfs.blk")
+			disk_image = filepath.Join(fuchsiaBuildDir, "fxfs.blk")
+			if _, err := os.Stat(disk_image); os.IsNotExist(err) {
+				t.Fatalf("Neither fvm.blk nor fxfs.blk found in %s", fuchsiaBuildDir)
+			}
 		}
 		kernel = filepath.Join(fuchsiaBuildDir, "multiboot.bin")
 		if _, err := os.Stat(kernel); os.IsNotExist(err) {

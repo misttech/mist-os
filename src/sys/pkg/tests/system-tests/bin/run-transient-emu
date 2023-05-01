@@ -11,7 +11,7 @@
 ##
 ##     --image-size   total image size in bytes (default 4 GiB)
 ##     --abr-size     abr partition size in bytes (default 256 MiB)
-##     --fvm-size     fvm partition size in bytes (default 0, 0 means fill)
+##     --system-disk-size     fvm partition size in bytes (default 0, 0 means fill)
 ##
 ## This command delegates to //src/sys/pkg/tests/system-tests/run-zircon. Flags
 ## are documented in that script, and can be discovered by passing -h or

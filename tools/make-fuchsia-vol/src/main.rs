@@ -145,9 +145,9 @@ struct TopLevel {
     #[argh(option, default = "63 * 1024 * 1024")]
     efi_size: u64,
 
-    /// fvm partition size in bytes (unspecified means `fill`)
+    /// system (i.e. FVM or Fxfs) disk partition size in bytes (unspecified means `fill`)
     #[argh(option)]
-    fvm_size: Option<u64>,
+    system_disk_size: Option<u64>,
 
     /// create or resize the image to this size in bytes
     #[argh(option)]
@@ -293,7 +293,7 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
     let block_size: u64 = gpt_disk.logical_block_size().clone().into();
 
     let fvm_part = if !args.ramdisk_only && !args.use_fxfs {
-        let size = args.fvm_size.unwrap_or_else(|| {
+        let size = args.system_disk_size.unwrap_or_else(|| {
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
                 * block_size
         });
@@ -307,7 +307,7 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
     };
     let fxfs_part = if args.fxfs.is_some() {
         assert!(fvm_part.is_none(), "Can't have both FVM and Fxfs");
-        let size = args.fvm_size.unwrap_or_else(|| {
+        let size = args.system_disk_size.unwrap_or_else(|| {
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
                 * block_size
         });

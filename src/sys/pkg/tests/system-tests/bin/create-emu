@@ -7,12 +7,12 @@
 ### create a persistent fuchsia image in a directory
 ## create a persistent fuchsia image in a directory
 ##
-## usage: create-emu --image-dir <DIR> [--image-size SIZE] [--abr-size SIZE] [--fvm-size SIZE] [run-zircon arguments...]
+## usage: create-emu --image-dir <DIR> [--image-size SIZE] [--abr-size SIZE] [--system-disk-size SIZE] [run-zircon arguments...]
 ##
 ##     --image-dir    create and run the fuchsia image from this directory
 ##     --image-size   total image size in bytes (default 4 GiB)
 ##     --abr-size     abr partition size in bytes (default 256 MiB)
-##     --fvm-size     fvm partition size in bytes (default fills)
+##     --system-disk-size     fvm partition size in bytes (default fills)
 ##
 ## This command creates a Fuchsia image in the specified directory. As part of
 ## this process, it starts up the image in QEMU so that we can copy in our
@@ -59,7 +59,7 @@ while (($#)); do
       shift
       ABR_SIZE_BYTES=$1
       ;;
-    --fvm-size)
+    --system-disk-size)
       shift
       FVM_SIZE_BYTES=$1
       ;;
@@ -135,7 +135,7 @@ MAKE_FUCHSIA_VOL_ARGS=(
 )
 
 if [[ -n "${FVM_SIZE_BYTES}" ]]; then
-  MAKE_FUCHSIA_VOL_ARGS+=( --fvm-size "${FVM_SIZE_BYTES}" )
+  MAKE_FUCHSIA_VOL_ARGS+=( --system-disk-size "${FVM_SIZE_BYTES}" )
 fi
 
 if [[ -n "${ABR_SIZE_BYTES}" ]]; then

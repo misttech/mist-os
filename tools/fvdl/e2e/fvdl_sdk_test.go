@@ -78,7 +78,7 @@ func TestStartFVDLSDK_noDownload(t *testing.T) {
 		"--gcs-bucket", "fuchsia",
 		"--image-name", "qemu-x64",
 		"--image-size", "10G",
-		"--fvm-image", fvm,
+		"--disk-image", disk_image,
 		"--zbi-image", zbi,
 		"--kernel-image", kernel,
 		"--amber-files", amberFiles,

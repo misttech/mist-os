@@ -156,7 +156,7 @@ impl VDLFiles {
                 self.image_files.kernel.display(),
                 self.image_files.amber_files.as_ref().unwrap_or(&PathBuf::new()).display(),
                 self.image_files.build_args.as_ref().unwrap_or(&PathBuf::new()).display(),
-                self.image_files.fvm.as_ref().unwrap_or(&PathBuf::new()).display(),
+                self.image_files.disk_image.as_ref().unwrap_or(&PathBuf::new()).display(),
             ))
         } else {
             // Not specifying any image files will allow device_launcher to download from GCS.
@@ -331,7 +331,7 @@ impl VDLFiles {
         }
         // Check that build architecture is specified when overriding image files
         if (command.amber_files.is_some()
-            || command.fvm_image.is_some()
+            || command.disk_image.is_some()
             || command.kernel_image.is_some()
             || command.zbi_image.is_some())
             && command.image_architecture.is_none()
@@ -348,7 +348,7 @@ impl VDLFiles {
             || (command.kernel_image.is_none() && command.zbi_image.is_some())
         {
             ffx_bail!("--kernel-image and --zbi-image must both be specified in order to override fuchsia image used for emulator.\n\
-            You can optionally specify --amber-files and --fvm-image locations. \n
+            You can optionally specify --amber-files and --disk-image locations. \n
         ")
         }
         if command.device_spec.is_some() && command.device_proto.is_some() {
@@ -498,6 +498,9 @@ impl VDLFiles {
             .arg(format!("--image_architecture={}", vdl_args.image_architecture))
             .arg(format!("--isolated_ffx_config_path={}", vdl_args.isolated_ffx_config_path));
 
+        if let Some(size) = device_spec.image_size_bytes() {
+            cmd.arg(format!("--resize_disk_image={}", size));
+        }
         for i in 0..start_command.envs.len() {
             cmd.arg("--env").arg(&start_command.envs[i]);
         }
@@ -763,7 +766,7 @@ mod tests {
             image_name: Some("qemu-x64".to_string()),
             vdl_version: Some("git_revision:2".to_string()),
             envs: vec!["A=1".to_string(), "B=2".to_string(), "C=3".to_string()],
-            fvm_image: Some("fvm".to_string()),
+            disk_image: Some("fvm".to_string()),
             zbi_image: Some("zircona".to_string()),
             kernel_image: Some("kernel".to_string()),
             ..Default::default()

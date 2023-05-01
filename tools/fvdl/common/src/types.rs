@@ -6,7 +6,7 @@ use crate::args::StartCommand;
 use crate::graphic_utils::get_default_graphics;
 use crate::images::Images;
 use crate::tools::Tools;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
 use ffx_config::sdk::{Sdk, SdkVersion};
 use home::home_dir;
@@ -155,7 +155,7 @@ pub fn get_sdk_version_from_manifest() -> Result<String> {
 pub struct ImageFiles {
     pub amber_files: Option<PathBuf>,
     pub build_args: Option<PathBuf>,
-    pub fvm: Option<PathBuf>,
+    pub disk_image: Option<PathBuf>,
     pub kernel: PathBuf,
     pub zbi: PathBuf,
 }
@@ -164,7 +164,7 @@ impl fmt::Debug for ImageFiles {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "[fvdl] image package {:?}", self.amber_files)?;
         writeln!(f, "[fvdl] image build_args {:?}", self.build_args)?;
-        writeln!(f, "[fvdl] image fvm {:?}", self.fvm)?;
+        writeln!(f, "[fvdl] image disk_image {:?}", self.disk_image)?;
         writeln!(f, "[fvdl] image kernel {:?}", self.kernel)?;
         write!(f, "[fvdl] image zbi {:?}", self.zbi)
     }
@@ -189,8 +189,9 @@ impl ImageFiles {
                 }
             },
             build_args: f.get_image_path(vec!["buildargs"], "gn").ok(),
-            fvm: f
+            disk_image: f
                 .get_image_path(vec!["storage-full", "storage-sparse", "fvm.fastboot"], "blk")
+                .or(f.get_image_path(vec!["storage-full"], "fxfs-blk"))
                 .ok(),
             kernel: f.get_image_path(vec!["qemu-kernel"], "kernel")?,
             zbi: f.get_image_path(vec!["zircon-a"], "zbi")?,
@@ -204,13 +205,13 @@ impl ImageFiles {
         Ok(Self {
             amber_files: None,
             build_args: None,
-            fvm: None,
+            disk_image: None,
             kernel: PathBuf::new(),
             zbi: PathBuf::new(),
         })
     }
 
-    /// Checks that all essential files exist. Note: amber_files, build_args, and fvm are optional.
+    /// Checks that all essential files exist. Note: amber_files, build_args, and disk_image are optional.
     pub fn check(&self) -> Result<()> {
         if let Some(a) = &self.amber_files {
             if !a.exists() {
@@ -222,9 +223,9 @@ impl ImageFiles {
                 ffx_bail!("build_args file at {:?} does not exist", b);
             }
         }
-        if let Some(f) = &self.fvm {
+        if let Some(f) = &self.disk_image {
             if !f.exists() {
-                ffx_bail!("fvm file at {:?} does not exist", f);
+                ffx_bail!("disk_image file at {:?} does not exist", f);
             }
         }
 
@@ -242,13 +243,13 @@ impl ImageFiles {
             && self.zbi.exists()
             && self.build_args.as_ref().map_or(true, |b| b.exists())
             && self.amber_files.as_ref().map_or(true, |a| a.exists())
-            && self.fvm.as_ref().map_or(true, |f| f.exists());
+            && self.disk_image.as_ref().map_or(true, |f| f.exists());
     }
 
     pub fn update_paths_from_cache(&mut self, cache_root: &PathBuf) {
         self.amber_files = Some(cache_root.join("package_archive"));
         self.build_args = Some(cache_root.join("images").join("buildargs"));
-        self.fvm = Some(cache_root.join("images").join("femu-fvm"));
+        self.disk_image = Some(cache_root.join("images").join("femu-disk"));
         self.kernel = cache_root.join("images").join("femu-kernel");
         self.zbi = cache_root.join("images").join("zircon-a.zbi");
     }
@@ -257,8 +258,8 @@ impl ImageFiles {
         if let Some(image) = &start_command.amber_files {
             self.amber_files = Some(PathBuf::from(image))
         }
-        if let Some(image) = &start_command.fvm_image {
-            self.fvm = Some(PathBuf::from(image))
+        if let Some(image) = &start_command.disk_image {
+            self.disk_image = Some(PathBuf::from(image))
         }
         if let Some(image) = &start_command.kernel_image {
             self.kernel = PathBuf::from(image)
@@ -274,11 +275,19 @@ impl ImageFiles {
         unix::fs::symlink(&vdl_kernel_src, &vdl_kernel_dest)?;
         self.kernel = vdl_kernel_dest.to_path_buf();
 
-        if let Some(f) = &self.fvm {
-            let vdl_fvm_dest = dir.join("femu_fvm");
-            let vdl_fvm_src = f.as_path();
-            unix::fs::symlink(&vdl_fvm_src, &vdl_fvm_dest)?;
-            self.fvm = Some(vdl_fvm_dest.to_path_buf());
+        if let Some(f) = &self.disk_image {
+            let vdl_disk_dest = if f
+                .to_str()
+                .context(format!("Invalid disk image path {:?}", f))?
+                .contains("fvm")
+            {
+                dir.join("femu_fvm")
+            } else {
+                dir.join("femu_fxfs")
+            };
+            let vdl_disk_src = f.as_path();
+            unix::fs::symlink(&vdl_disk_src, &vdl_disk_dest)?;
+            self.disk_image = Some(vdl_disk_dest.to_path_buf());
         }
 
         if let Some(f) = &self.build_args {
@@ -519,7 +528,10 @@ mod tests {
         let mut image_files = ImageFiles::from_tree_env(&mut mock)?;
         assert_eq!(image_files.zbi.to_str().unwrap(), "/build/out/zircon-a");
         assert_eq!(image_files.kernel.to_str().unwrap(), "/build/out/qemu-kernel");
-        assert_eq!(image_files.fvm.as_ref().unwrap().to_str().unwrap(), "/build/out/storage-full");
+        assert_eq!(
+            image_files.disk_image.as_ref().unwrap().to_str().unwrap(),
+            "/build/out/storage-full"
+        );
         assert_eq!(
             image_files.build_args.as_ref().unwrap().to_str().unwrap(),
             "/build/out/buildargs"
@@ -529,7 +541,7 @@ mod tests {
         assert_eq!(image_files.amber_files, None);
 
         image_files.update_paths_from_args(&StartCommand {
-            fvm_image: Some("/path/to/new_fvm".to_string()),
+            disk_image: Some("/path/to/new_fxfs".to_string()),
             zbi_image: Some("/path/to/new_zbi".to_string()),
             kernel_image: Some("/path/to/new_kernel".to_string()),
             amber_files: Some("/path/to/amber_files".to_string()),
@@ -537,7 +549,7 @@ mod tests {
         });
         assert_eq!(image_files.zbi.to_str().unwrap(), "/path/to/new_zbi");
         assert_eq!(image_files.kernel.to_str().unwrap(), "/path/to/new_kernel");
-        assert_eq!(image_files.fvm.as_ref().unwrap().to_str().unwrap(), "/path/to/new_fvm");
+        assert_eq!(image_files.disk_image.as_ref().unwrap().to_str().unwrap(), "/path/to/new_fxfs");
         assert_eq!(
             image_files.amber_files.as_ref().unwrap().to_str().unwrap(),
             "/path/to/amber_files"
@@ -551,8 +563,8 @@ mod tests {
         image_files.stage_files(&tmp_dir.path().to_owned())?;
         assert_eq!(image_files.kernel.to_str(), tmp_dir.path().join("femu_kernel").to_str());
         assert_eq!(
-            image_files.fvm.as_ref().unwrap().to_str(),
-            tmp_dir.path().join("femu_fvm").to_str()
+            image_files.disk_image.as_ref().unwrap().to_str(),
+            tmp_dir.path().join("femu_fxfs").to_str()
         );
         Ok(())
     }
@@ -563,7 +575,7 @@ mod tests {
         let mut image_files = ImageFiles::from_sdk_env()?;
         image_files.update_paths_from_args(&StartCommand {
             amber_files: Some("/path/to/amber_files".to_string()),
-            fvm_image: Some("/path/to/new_fvm".to_string()),
+            disk_image: Some("/path/to/new_fvm".to_string()),
             kernel_image: Some("/path/to/new_kernel".to_string()),
             zbi_image: Some("/path/to/new_zbi".to_string()),
             ..Default::default()
@@ -573,7 +585,7 @@ mod tests {
             "/path/to/amber_files"
         );
         assert_eq!(image_files.build_args, None);
-        assert_eq!(image_files.fvm.as_ref().unwrap().to_str().unwrap(), "/path/to/new_fvm");
+        assert_eq!(image_files.disk_image.as_ref().unwrap().to_str().unwrap(), "/path/to/new_fvm");
         assert_eq!(image_files.kernel.to_str().unwrap(), "/path/to/new_kernel");
         assert_eq!(image_files.zbi.to_str().unwrap(), "/path/to/new_zbi");
 
@@ -581,7 +593,7 @@ mod tests {
         image_files.stage_files(&tmp_dir.path().to_owned())?;
         assert_eq!(image_files.kernel.to_str(), tmp_dir.path().join("femu_kernel").to_str());
         assert_eq!(
-            image_files.fvm.as_ref().unwrap().to_str(),
+            image_files.disk_image.as_ref().unwrap().to_str(),
             tmp_dir.path().join("femu_fvm").to_str()
         );
         assert_eq!(image_files.build_args, None);
