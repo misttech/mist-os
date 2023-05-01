@@ -6,6 +6,7 @@ group("tests") {
   testonly = true
 
   public_deps = [
+    "colorama:tests",
     "go:tests",
     "jellyfish:tests",
     "pigweed:tests",

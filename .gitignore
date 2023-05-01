@@ -92,6 +92,8 @@ tables_generator_tests_*.txt
 !/third_party/BUILD.gn
 !/third_party/boringssl/
 /third_party/boringssl/src
+!/third_party/colorama/
+/third_party/colorama/colorama
 !/third_party/flatbuffers/
 /third_party/flatbuffers/src
 !/third_party/libpng/
