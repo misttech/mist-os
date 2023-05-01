@@ -30,7 +30,7 @@ pub fn default_config() -> fshost_config::Config {
         nand: false,
         netboot: false,
         no_zxcrypt: false,
-        use_disk_based_minfs_migration: false,
+        use_disk_migration: false,
     }
 }
 

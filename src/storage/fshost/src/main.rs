@@ -25,6 +25,7 @@ use {
 
 mod boot_args;
 mod config;
+mod copier;
 mod crypt;
 mod device;
 mod environment;
@@ -74,6 +75,7 @@ async fn main() -> Result<(), Error> {
         None
     };
 
+    let inspector = fuchsia_inspect::component::inspector();
     // matcher_lock is used to block matching temporarily and inject
     // paths to be ignored.
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
@@ -82,10 +84,10 @@ async fn main() -> Result<(), Error> {
         boot_args,
         ramdisk_path.clone(),
         matcher_lock.clone(),
+        inspector.clone(),
     );
 
     let launcher = env.launcher();
-    let inspector = fuchsia_inspect::component::inspector();
     // Records inspect metrics
     register_stats(inspector.root(), env.data_root()?).await;
     let blob_root = env.blobfs_root()?;

@@ -25,6 +25,7 @@ use {
     futures::FutureExt,
 };
 
+mod migration;
 mod wipe_storage;
 mod write_data_file;
 
@@ -719,4 +720,79 @@ async fn reset_fvm_partitions() {
             DEFAULT_DATA_VOLUME_SIZE + 2 * slice_size
         );
     }
+}
+
+// Toggle migration mode
+
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn migration_toggle() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .data_volume_size(DATA_MAX_BYTES / 2)
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
+        .set_fs_switch("toggle");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("data", VFS_TYPE_FXFS).await;
+    fixture.check_test_data_file().await;
+
+    let vmo = fixture.into_vmo().await.unwrap();
+
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("data_max_bytes", DATA_MAX_BYTES / 2);
+    let mut fixture = builder.build().await;
+    fixture.set_ramdisk_vmo(vmo).await;
+
+    fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
+    fixture.check_test_data_file().await;
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn migration_to_fxfs() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .data_volume_size(DATA_MAX_BYTES / 2)
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
+        .set_fs_switch("fxfs");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("data", VFS_TYPE_FXFS).await;
+    fixture.check_test_data_file().await;
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn migration_to_minfs() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .data_volume_size(DATA_MAX_BYTES / 2)
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("fxfs"), zxcrypt: false, ..Default::default() })
+        .set_fs_switch("minfs");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
+    fixture.check_test_data_file().await;
+    fixture.tear_down().await;
 }

@@ -437,7 +437,31 @@ impl Matcher for DataMatcher {
         env: &mut dyn Environment,
     ) -> Result<(), Error> {
         let fs = match env.launch_data(device).await? {
-            ServeFilesystemStatus::Serving(fs) => fs,
+            ServeFilesystemStatus::Serving(mut filesystem) => {
+                // If this build supports migrating data partition, try now, failing back to
+                // just using `filesystem` in the case of any error. Non-migration builds
+                // should return Ok(None).
+                match env.try_migrate_data(device, &mut filesystem).await {
+                    Ok(Some(new_filesystem)) => {
+                        // Migration successful.
+                        filesystem.shutdown(None).await.unwrap_or_else(|error| {
+                            tracing::warn!(
+                                ?error,
+                                "Failed to shutdown original filesystem after migration"
+                            );
+                        });
+                        new_filesystem
+                    }
+                    Ok(None) => filesystem, // Migration not requested.
+                    Err(error) => {
+                        // Migration failed.
+                        tracing::warn!(?error, "Failed to migrate filesystem");
+                        // TODO: Log migration failure metrics.
+                        // Continue with the original (unmigrated) filesystem.
+                        filesystem
+                    }
+                }
+            }
             ServeFilesystemStatus::FormatRequired => env.format_data(device).await?,
         };
         env.bind_data(fs)

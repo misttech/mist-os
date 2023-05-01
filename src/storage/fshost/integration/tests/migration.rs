@@ -23,21 +23,39 @@
 //!   - zxcrypt+minfs
 //!   - zxcrypt+f2fs
 //!
-//! If the original state doesn't match the goal state, we format the device with the goal state,
-//! disregarding any contents of the original filesystem.
+//! If the original state doesn't match the goal state, we format the device with the goal state.
+//! If the use_disk_migration build flag is in use, contents will be migrated. Otherwise
+//! any existing content will be erased.
 //!
 //! A set of fshost integration tests are generated for each of the three filesystem types. For
 //! filesystems which use zxcrypt, there is a set for both with and without zxcrypt. This covers
 //! all the goal states, so we just need one test for each original state.
 
-use crate::{data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, volumes_spec};
+use crate::{data_fs_name, data_fs_type, new_builder, volumes_spec, DataSpec, DATA_MAX_BYTES};
+
+/// f2fs requires more space than other filesystems so we use different values for it..
+fn data_max_bytes() -> u64 {
+    if data_fs_name() == "f2fs" {
+        100 * 1024 * 1024
+    } else {
+        DATA_MAX_BYTES / 2
+    }
+}
+fn disk_size_bytes() -> u64 {
+    data_max_bytes() * 2 + 4 * 1024 * 1024
+}
 
 // Original state - unknown/blank
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn none_to_format() {
     let mut builder = new_builder();
-    builder.with_disk(data_fs_spec());
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", data_max_bytes())
+        .set_config_value("use_disk_migration", true);
+    builder.with_disk().size(disk_size_bytes()).data_volume_size(data_max_bytes());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -48,58 +66,43 @@ async fn none_to_format() {
 // Original state - fxfs
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn fxfs_to_format() {
     let mut builder = new_builder();
     builder
-        .with_disk()
-        .format_volumes(volumes_spec())
-        .format_data(DataSpec { format: Some("fxfs"), ..Default::default() });
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.tear_down().await;
-}
-
-// Original state - minfs with no zxcrypt
-
-#[fuchsia::test]
-async fn minfs_no_zxcrypt_to_format() {
-    let mut builder = new_builder();
+        .fshost()
+        .set_config_value("data_max_bytes", data_max_bytes())
+        .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
+        .size(disk_size_bytes())
+        .data_volume_size(data_max_bytes())
         .format_volumes(volumes_spec())
-        .format_data(DataSpec { format: Some("minfs"), ..Default::default() });
+        .format_data(DataSpec { format: Some("fxfs"), ..Default::default() })
+        .set_fs_switch(data_fs_name());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.tear_down().await;
-}
-
-// Original state - f2fs with no zxcrypt
-
-#[fuchsia::test]
-async fn f2fs_no_zxcrypt_to_format() {
-    let mut builder = new_builder();
-    builder
-        .with_disk()
-        .format_volumes(volumes_spec())
-        .format_data(DataSpec { format: Some("f2fs"), ..Default::default() });
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
     fixture.tear_down().await;
 }
 
 // Original state - zxcrypt with unknown/blank
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
-        format: None,
-        zxcrypt: true,
-        ..Default::default()
-    });
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", data_max_bytes())
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .size(disk_size_bytes())
+        .data_volume_size(data_max_bytes())
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: None, zxcrypt: true, ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -110,31 +113,47 @@ async fn zxcrypt_to_format() {
 // Original state - zxcrypt with minfs
 
 #[fuchsia::test]
-async fn minfs_zxcrypt_to_format() {
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn minfs_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
-        format: Some("minfs"),
-        zxcrypt: true,
-        ..Default::default()
-    });
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", data_max_bytes())
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .size(disk_size_bytes())
+        .data_volume_size(data_max_bytes())
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
+        .set_fs_switch(data_fs_name());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
     fixture.tear_down().await;
 }
 
 // Original state - zxcrypt with f2fs
 
 #[fuchsia::test]
-async fn f2fs_zxcrypt_to_format() {
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn f2fs_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
-        format: Some("f2fs"),
-        zxcrypt: true,
-        ..Default::default()
-    });
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", data_max_bytes())
+        .set_config_value("use_disk_migration", true);
+    builder
+        .with_disk()
+        .size(disk_size_bytes())
+        .data_volume_size(data_max_bytes())
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("f2fs"), zxcrypt: true, ..Default::default() })
+        .set_fs_switch(data_fs_name());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
     fixture.tear_down().await;
 }

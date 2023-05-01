@@ -186,6 +186,19 @@ impl TestFixture {
         assert_eq!(self.crash_reports.next().await, None);
     }
 
+    pub async fn into_vmo(mut self) -> Option<zx::Vmo> {
+        let vmo = self.ramdisk_vmo.take();
+        self.tear_down().await;
+        vmo
+    }
+
+    pub async fn set_ramdisk_vmo(&mut self, vmo: zx::Vmo) {
+        let vmo_clone =
+            vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
+        self.add_ramdisk(vmo).await;
+        self.ramdisk_vmo = Some(vmo_clone);
+    }
+
     pub fn dir(&self, dir: &str, flags: fio::OpenFlags) -> fio::DirectoryProxy {
         let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
         self.realm
@@ -201,7 +214,8 @@ impl TestFixture {
             self.dir(dir, fio::OpenFlags::empty()).query_filesystem().await.expect("query failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert!(info.is_some());
-        assert_eq!(info.unwrap().fs_type, fs_type);
+        let info_type = info.unwrap().fs_type;
+        assert_eq!(info_type, fs_type, "{:#08x} != {:#08x}", info_type, fs_type);
     }
 
     pub async fn check_test_blob(&self) {

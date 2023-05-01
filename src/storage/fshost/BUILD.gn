@@ -36,6 +36,7 @@ rustc_binary("fshost") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_rust",
@@ -80,6 +81,7 @@ rustc_binary("fshost") {
   sources = [
     "src/boot_args.rs",
     "src/config.rs",
+    "src/copier.rs",
     "src/crypt.rs",
     "src/crypt/fxfs.rs",
     "src/crypt/zxcrypt.rs",

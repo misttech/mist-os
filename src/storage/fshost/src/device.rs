@@ -70,6 +70,14 @@ pub trait Device: Send + Sync {
     /// Establish a new connection to the Volume interface of the device.
     fn volume_proxy(&self) -> Result<VolumeProxy, Error>;
 
+    /// If device is backed by FVM, returns the topological path to FVM, otherwise None.
+    fn fvm_path(&self) -> Option<String> {
+        // The 4 is from the 4 characters in "/fvm"
+        self.topological_path()
+            .find("/fvm")
+            .map(|index| (self.topological_path()[..index + 4]).to_string())
+    }
+
     /// Returns a new Device, which is a child of this device with the specified suffix. This
     /// function will return when the device is available. This function assumes the child device
     /// will show up in /dev/class/block.

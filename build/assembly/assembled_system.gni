@@ -580,7 +580,7 @@ template("assembled_system") {
       options = {
         # Use the defaults from the build args set in generated_fshost_config.gni
         data_filesystem_format = data_filesystem_format
-        use_disk_based_minfs_migration = use_disk_based_minfs_migration
+        use_disk_migration = use_disk_migration
 
         # Override with anything passed from `fshost_config`
         forward_variables_from(fshost_config, "*")

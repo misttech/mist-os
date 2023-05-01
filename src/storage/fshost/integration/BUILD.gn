@@ -82,6 +82,9 @@ template("fshost_integration_test") {
   fshost_component_and_config(_fshost_target) {
     testonly = true
     options = invoker.options
+    if (!defined(options.use_disk_migration)) {
+      options.use_disk_migration = true
+    }
   }
 
   _fshost_component_name = get_label_info(_fshost_target, "name")
@@ -187,6 +190,7 @@ fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
   options = {
     fxfs_blob = true
     data_filesystem_format = "fxfs"
+    use_disk_migration = false
   }
 }
 

@@ -8298,10 +8298,12 @@ direct.
 
 From //src/lib/ui/carnelian/BUILD.gn:30
 
-### use_disk_based_minfs_migration
+### use_disk_migration
 
-If true, will attempt to copy the data partition to a new partition and then delete the old one
-to migrate from minfs to fxfs.
+If true, will enable content-detection for partition format, supporting both
+minfs and fxfs filesystems. A special "fs_switch" file can be written to the root directory
+containing the string "minfs", "fxfs" or "toggle" to trigger a migration from the current
+format to the specified format. (The "toggle" option will migrate back and forth at each boot.)
 
 **Current value (from the default):** `false`
 

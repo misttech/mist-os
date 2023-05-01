@@ -48,6 +48,8 @@ pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 // for calculation.
 pub const DEFAULT_DATA_VOLUME_SIZE: u64 = 101 * 1024 * 1024;
 pub const DEFAULT_REMAINING_VOLUME_SIZE: u64 = 4 * 1024 * 1024;
+// For migration tests, we make sure that the default disk size is twice the data volume size to
+// allow a second full data partition.
 pub const DEFAULT_DISK_SIZE: u64 = DEFAULT_DATA_VOLUME_SIZE + DEFAULT_REMAINING_VOLUME_SIZE;
 
 // We use a static key-bag so that the crypt instance can be shared across test executions safely.
@@ -240,6 +242,8 @@ pub struct DiskBuilder {
     with_account_and_virtualization: bool,
     format_fvm: bool,
     legacy_data_label: bool,
+    // Only used if 'fs_switch' set.
+    fs_switch: Option<String>,
 }
 
 impl DiskBuilder {
@@ -255,6 +259,7 @@ impl DiskBuilder {
             with_account_and_virtualization: false,
             format_fvm: true,
             legacy_data_label: false,
+            fs_switch: None,
         }
     }
 
@@ -287,6 +292,11 @@ impl DiskBuilder {
             }
         }
         self.data_spec = data_spec;
+        self
+    }
+
+    pub fn set_fs_switch(&mut self, content: &str) -> &mut Self {
+        self.fs_switch = Some(content.to_string());
         self
     }
 
@@ -646,6 +656,19 @@ impl DiskBuilder {
         fuchsia_fs::directory::create_directory(&root, "problems", fio::OpenFlags::RIGHT_READABLE)
             .await
             .unwrap();
+
+        if let Some(content) = &self.fs_switch {
+            let fs_switch = fuchsia_fs::directory::open_file(
+                &root,
+                "fs_switch",
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::CREATE,
+            )
+            .await
+            .unwrap();
+            fuchsia_fs::file::write(&fs_switch, content).await.unwrap();
+        }
     }
 
     async fn write_magic<const N: usize>(

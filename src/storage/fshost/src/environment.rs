@@ -5,6 +5,7 @@
 use {
     crate::{
         boot_args::BootArgs,
+        copier::recursive_copy,
         crypt::{
             fxfs::{self, CryptService},
             zxcrypt::{UnsealOutcome, ZxcryptDevice},
@@ -15,11 +16,13 @@ use {
             },
             BlockDevice, Device,
         },
+        inspect::register_migration_status,
     },
-    anyhow::{anyhow, Context, Error},
+    anyhow::{anyhow, bail, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_fxfs::MountOptions,
+    fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
     fidl_fuchsia_io as fio,
     fs_management::{
@@ -73,6 +76,20 @@ pub trait Environment: Send + Sync {
 
     /// Wipe and recreate data partition before reformatting with a filesystem.
     async fn format_data(&mut self, device: &mut dyn Device) -> Result<Filesystem, Error>;
+
+    /// Attempt to migrate |filesystem|, if requested, to some other format.
+    /// |device| should refer to the FVM partition for |filesystem|.
+    ///
+    /// Returns either:
+    ///   None if the original filesystem should be used.
+    ///   Some(filesystem) a migrated to a different filesystem should be used.
+    async fn try_migrate_data(
+        &mut self,
+        _device: &mut dyn Device,
+        _filesystem: &mut Filesystem,
+    ) -> Result<Option<Filesystem>, Error> {
+        Ok(None)
+    }
 
     /// Binds |filesystem| to the `/data` path. Fails if already bound.
     fn bind_data(&mut self, filesystem: Filesystem) -> Result<(), Error>;
@@ -155,6 +172,7 @@ pub struct FshostEnvironment {
     /// This lock can be taken and device.path() added to the vector to have them
     /// ignored the next time they appear to the Watcher/Matcher code.
     matcher_lock: Arc<Mutex<HashSet<String>>>,
+    inspector: fuchsia_inspect::Inspector,
 }
 
 impl FshostEnvironment {
@@ -163,6 +181,7 @@ impl FshostEnvironment {
         boot_args: BootArgs,
         ramdisk_prefix: Option<String>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
+        inspector: fuchsia_inspect::Inspector,
     ) -> Self {
         Self {
             config: config.clone(),
@@ -171,6 +190,7 @@ impl FshostEnvironment {
             data: Filesystem::Queue(Vec::new()),
             launcher: Arc::new(FilesystemLauncher { config, boot_args, ramdisk_prefix }),
             matcher_lock,
+            inspector,
         }
     }
 
@@ -188,6 +208,207 @@ impl FshostEnvironment {
 
     pub fn launcher(&self) -> Arc<FilesystemLauncher> {
         self.launcher.clone()
+    }
+
+    /// Set the max partition size for data
+    async fn apply_data_partition_limits(&self, device: &mut dyn Device) {
+        if !self.launcher.is_ramdisk_device(device) {
+            if let Err(error) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
+                tracing::warn!(%error, "Failed to set max partition size for data");
+            }
+        }
+    }
+
+    /// Formats a device with the specified disk format. Normally we only format the configured
+    /// format but this level of abstraction lets us select the format for use in migration code
+    /// paths.
+    async fn format_data_with_disk_format(
+        &mut self,
+        format: DiskFormat,
+        device: &mut dyn Device,
+    ) -> Result<Filesystem, Error> {
+        // Potentially bind and format zxcrypt first.
+        let mut zxcrypt_device;
+        let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
+            || self.launcher.requires_zxcrypt(format, device)
+        {
+            tracing::info!(
+                path = device.path(),
+                "Formatting zxcrypt before formatting inner data partition.",
+            );
+            let ignore_paths = &mut *self.matcher_lock.lock().await;
+            self.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
+            zxcrypt_device =
+                Box::new(ZxcryptDevice::format(device).await.context("zxcrypt format failed")?);
+            ignore_paths.insert(zxcrypt_device.topological_path().to_string());
+            zxcrypt_device.as_mut()
+        } else {
+            device
+        };
+
+        // Set the max partition size for data
+        self.apply_data_partition_limits(device).await;
+
+        tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
+
+        let filesystem = match format {
+            DiskFormat::Fxfs => {
+                let config =
+                    Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.format_data(device, config).await?
+            }
+            DiskFormat::F2fs => {
+                let config =
+                    F2fs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.format_data(device, config).await?
+            }
+            DiskFormat::Minfs => {
+                let config =
+                    Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.format_data(device, config).await?
+            }
+            format => {
+                tracing::warn!("Unsupported format {:?}", format);
+                return Err(anyhow!("Cannot format filesystem"));
+            }
+        };
+
+        Ok(filesystem)
+    }
+
+    async fn try_migrate_data_internal(
+        &mut self,
+        device: &mut dyn Device,
+        filesystem: &mut Filesystem,
+    ) -> Result<Option<Filesystem>, Error> {
+        // Take note of the original device GUID. We will mark it inactive on success.
+        let device_guid = device.partition_instance().await.map(|guid| *guid).ok();
+
+        // The filesystem may be zxcrypt wrapped so we can't use device.content_type() here.
+        // We query the FS directly.
+        let device_format = match filesystem {
+            Filesystem::Serving(filesystem) => {
+                if let Some(vfs_type) =
+                    fidl_fuchsia_fs::VfsType::from_primitive(filesystem.query().await?.fs_type)
+                {
+                    match vfs_type {
+                        fidl_fuchsia_fs::VfsType::Minfs => DiskFormat::Minfs,
+                        fidl_fuchsia_fs::VfsType::F2Fs => DiskFormat::F2fs,
+                        fidl_fuchsia_fs::VfsType::Fxfs => DiskFormat::Fxfs,
+                        _ => {
+                            return Ok(None);
+                        }
+                    }
+                } else {
+                    return Ok(None);
+                }
+            }
+            Filesystem::ServingMultiVolume(_, _, _) => DiskFormat::Fxfs,
+            _ => {
+                return Ok(None);
+            }
+        };
+
+        let root = filesystem.root(None)?;
+
+        // Read desired format from fs_switch, use config as default.
+        let desired_format = match fuchsia_fs::directory::open_file(
+            &root,
+            "fs_switch",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        {
+            Ok(file) => {
+                let mut desired_format = fuchsia_fs::file::read_to_string(&file).await?;
+                desired_format = desired_format.trim_end().to_string();
+                // "toggle" is a special format request that flip-flops between fxfs and minfs.
+                if desired_format.as_str() == "toggle" {
+                    desired_format =
+                        if device_format == DiskFormat::Fxfs { "minfs" } else { "fxfs" }
+                            .to_string();
+                }
+                desired_format
+            }
+            Err(error) => {
+                tracing::info!(%error, default_format=self.config.data_filesystem_format.as_str(),
+                    "fs_switch open failed.");
+                self.config.data_filesystem_format.to_string()
+            }
+        };
+        let desired_format = match desired_format.as_str().into() {
+            DiskFormat::Fxfs => DiskFormat::Fxfs,
+            DiskFormat::F2fs => DiskFormat::F2fs,
+            _ => DiskFormat::Minfs,
+        };
+
+        if device_format != desired_format {
+            tracing::info!(
+                device_format = device_format.as_str(),
+                desired_format = desired_format.as_str(),
+                "Attempting migration"
+            );
+
+            let volume_manager = connect_to_protocol_at_path::<VolumeManagerMarker>(
+                &device.fvm_path().ok_or(anyhow!("Not an fvm device"))?,
+            )
+            .context("Failed to connect to fvm volume manager")?;
+            let new_instance_guid = *uuid::Uuid::new_v4().as_bytes();
+
+            // Note that if we are using fxfs or f2fs we should always be setting data_max_bytes
+            // because these filesystems cannot automatically grow/shrink themselves.
+            let slices = self.config.data_max_bytes / self.config.fvm_slice_size;
+            if slices == 0 {
+                bail!("data_max_bytes not set. Cannot migrate.");
+            }
+            tracing::info!(slices, "Allocating new partition");
+            let new_data_partition_controller = fvm_allocate_partition(
+                &volume_manager,
+                DATA_TYPE_GUID,
+                new_instance_guid,
+                DATA_PARTITION_LABEL,
+                fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
+                slices,
+            )
+            .await
+            .context("Allocate migration partition.")?;
+
+            let device_path = new_data_partition_controller
+                .get_topological_path()
+                .await?
+                .map_err(zx::Status::from_raw)?;
+
+            let mut new_device =
+                BlockDevice::from_proxy(new_data_partition_controller, device_path).await?;
+
+            let mut new_filesystem =
+                self.format_data_with_disk_format(desired_format, &mut new_device).await?;
+
+            recursive_copy(&filesystem.root(None)?, &new_filesystem.root(None)?)
+                .await
+                .context("copy data")?;
+
+            // Ensure the watcher won't process the device we just added.
+            {
+                let mut ignore_paths = self.matcher_lock.lock().await;
+                ignore_paths.insert(new_device.topological_path().to_string());
+            }
+
+            // Mark the old partition inactive (deletion at next boot).
+            if let Some(old_instance_guid) = device_guid {
+                zx::Status::ok(
+                    volume_manager
+                        .activate(
+                            &mut Guid { value: old_instance_guid },
+                            &mut Guid { value: new_instance_guid },
+                        )
+                        .await?,
+                )?;
+            }
+            Ok(Some(new_filesystem))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -213,6 +434,8 @@ impl Environment for FshostEnvironment {
     }
 
     async fn mount_blob_volume(&mut self) -> Result<(), Error> {
+        let _ = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs partition already mounted"))?;
+
         let multi_vol_fs =
             self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
         let () = multi_vol_fs
@@ -277,26 +500,40 @@ impl Environment for FshostEnvironment {
     ) -> Result<ServeFilesystemStatus, Error> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
-        // Default to minfs if we don't match expected filesystems.
-        let format: DiskFormat = match self.config.data_filesystem_format.as_str().into() {
-            DiskFormat::Fxfs => DiskFormat::Fxfs,
-            DiskFormat::F2fs => DiskFormat::F2fs,
-            _ => DiskFormat::Minfs,
+        let mut format: DiskFormat = if self.config.use_disk_migration {
+            let format = device.content_format().await?;
+            tracing::info!(format = format.as_str(), "launching detected format");
+            format
+        } else {
+            match self.config.data_filesystem_format.as_str().into() {
+                DiskFormat::Fxfs => DiskFormat::Fxfs,
+                DiskFormat::F2fs => DiskFormat::F2fs,
+                // Default to minfs if we don't match expected filesystems.
+                _ => DiskFormat::Minfs,
+            }
         };
 
         // Potentially bind and unseal zxcrypt before serving data.
         let mut zxcrypt_device = None;
-        let device = if self.launcher.requires_zxcrypt(format, device) {
+        let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
+            || self.launcher.requires_zxcrypt(format, device)
+        {
             tracing::info!(path = device.path(), "Attempting to unseal zxcrypt device",);
             let ignore_paths = &mut *self.matcher_lock.lock().await;
             self.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-            let new_device = match ZxcryptDevice::unseal(device).await? {
+            let mut new_device = match ZxcryptDevice::unseal(device).await? {
                 UnsealOutcome::Unsealed(device) => device,
                 UnsealOutcome::FormatRequired => {
                     tracing::warn!("failed to unseal zxcrypt, format required");
                     return Ok(ServeFilesystemStatus::FormatRequired);
                 }
             };
+            // If we are using content sniffing to identify the filesystem, we have to do it again
+            // after unsealing zxcrypt.
+            if self.config.use_disk_migration {
+                format = new_device.content_format().await?;
+                tracing::info!(format = format.as_str(), "detected zxcrypt wrapped format");
+            }
             ignore_paths.insert(new_device.topological_path().to_string());
             zxcrypt_device = Some(Box::new(new_device));
             zxcrypt_device.as_mut().unwrap().as_mut()
@@ -305,11 +542,7 @@ impl Environment for FshostEnvironment {
         };
 
         // Set the max partition size for data
-        if !self.launcher.is_ramdisk_device(device) {
-            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
-                tracing::warn!(?e, "Failed to set max partition size for data");
-            };
-        }
+        self.apply_data_partition_limits(device).await;
 
         let filesystem = match format {
             DiskFormat::Fxfs => {
@@ -327,7 +560,10 @@ impl Environment for FshostEnvironment {
                     Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
                 self.launcher.serve_data(device, config).await
             }
-            _ => unreachable!(),
+            format => {
+                tracing::warn!(format = format.as_str(), "Unsupported filesystem");
+                Ok(ServeFilesystemStatus::FormatRequired)
+            }
         }?;
 
         if let ServeFilesystemStatus::FormatRequired = filesystem {
@@ -341,6 +577,7 @@ impl Environment for FshostEnvironment {
     }
 
     async fn format_data(&mut self, device: &mut dyn Device) -> Result<Filesystem, Error> {
+        // Reset FVM partition first, ensuring we blow away any existing zxcrypt volume.
         let mut device = self
             .launcher
             .reset_fvm_partition(device, &mut *self.matcher_lock.lock().await)
@@ -354,53 +591,30 @@ impl Environment for FshostEnvironment {
             DiskFormat::F2fs => DiskFormat::F2fs,
             _ => DiskFormat::Minfs,
         };
+        self.format_data_with_disk_format(format, device).await
+    }
 
-        // Potentially bind and format zxcrypt first.
-        let mut zxcrypt_device;
-        let device = if self.launcher.requires_zxcrypt(format, device) {
-            tracing::info!(
-                "Formatting zxcrypt on {:?} before formatting inner data partition.",
-                device.topological_path()
-            );
-            self.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-            let ignore_paths = &mut *self.matcher_lock.lock().await;
-            zxcrypt_device =
-                Box::new(ZxcryptDevice::format(device).await.context("zxcrypt format failed")?);
-            ignore_paths.insert(zxcrypt_device.topological_path().to_string());
-            zxcrypt_device.as_mut()
-        } else {
-            device
-        };
-
-        // Set the max partition size for data
-        if !self.launcher.is_ramdisk_device(device) {
-            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
-                tracing::warn!(?e, "Failed to set max partition size for data");
-            };
+    async fn try_migrate_data(
+        &mut self,
+        device: &mut dyn Device,
+        filesystem: &mut Filesystem,
+    ) -> Result<Option<Filesystem>, Error> {
+        if !self.config.use_disk_migration {
+            return Ok(None);
         }
 
-        tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
-
-        let filesystem = match format {
-            DiskFormat::Fxfs => {
-                let config =
-                    Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.format_data(device, config).await?
+        let res = self.try_migrate_data_internal(device, filesystem).await;
+        if let Err(error) = &res {
+            tracing::warn!(%error, "migration failed");
+            if let Some(status) = error.downcast_ref::<zx::Status>().clone() {
+                register_migration_status(self.inspector.root(), *status).await;
+            } else {
+                register_migration_status(self.inspector.root(), zx::Status::INTERNAL).await;
             }
-            DiskFormat::F2fs => {
-                let config =
-                    F2fs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.format_data(device, config).await?
-            }
-            DiskFormat::Minfs => {
-                let config =
-                    Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.format_data(device, config).await?
-            }
-            _ => unreachable!(),
-        };
-
-        Ok(filesystem)
+        } else {
+            register_migration_status(self.inspector.root(), zx::Status::OK).await;
+        }
+        res
     }
 
     fn bind_data(&mut self, mut filesystem: Filesystem) -> Result<(), Error> {
@@ -598,11 +812,7 @@ impl FilesystemLauncher {
     ) -> Result<Box<dyn Device>, Error> {
         tracing::info!(path = device.path(), "Resetting fvm partitions");
 
-        let index = device
-            .topological_path()
-            .rfind("/fvm")
-            .ok_or(anyhow!("fvm is not in the device path"))?;
-        let fvm_topo_path = device.topological_path()[..index + 4].to_string();
+        let fvm_topo_path = device.fvm_path().ok_or(anyhow!("Not an FVM partition"))?;
         let fvm_directory_proxy = fuchsia_fs::directory::open_in_namespace(
             &fvm_topo_path,
             fio::OpenFlags::RIGHT_READABLE,
