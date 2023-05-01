@@ -26,7 +26,8 @@ constexpr BotInfo kBotEnvironments[] = {{"TEST_ONLY_ENV", "test-only"},
                                         {"HEROKU_TEST_RUN_ID", "heroku"},
                                         {"BUILD_ID", "hudson-jenkins"},
                                         {"TEAMCITY_VERSION", "teamcity"},
-                                        {"TRAVIS", "travis"}};
+                                        {"TRAVIS", "travis"},
+                                        {"BUILD_NUMBER", "android-ci"}};
 
 // Some bot environment does not set special environment variables but uses "builder" as the user
 // name.
