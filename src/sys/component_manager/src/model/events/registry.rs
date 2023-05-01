@@ -21,7 +21,7 @@ use {
     },
     ::routing::{
         capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
-        event::EventFilter, mapper::NoopRouteMapper, route_event_stream_capability,
+        event::EventFilter, mapper::NoopRouteMapper, route_event_stream,
     },
     async_trait::async_trait,
     cm_rust::{CapabilityName, ChildRef, EventScope, UseDecl, UseEventStreamDecl},
@@ -332,11 +332,11 @@ impl EventRegistry {
     ) -> Result<(CapabilityName, ExtendedMoniker, Vec<ComponentEventRoute>), ModelError> {
         let mut components = vec![];
         let mut route = vec![];
-        let route_source = route_event_stream_capability(
+        let route_source = route_event_stream(
             event_decl.clone(),
             component,
-            &mut components,
             &mut NoopRouteMapper,
+            &mut components,
         )
         .await?;
         // Handle scope in "use" clause

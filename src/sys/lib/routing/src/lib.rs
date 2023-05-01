@@ -187,7 +187,7 @@ where
             route_directory(use_directory_decl, target, mapper).await
         }
         RouteRequest::UseEventStream(use_event_stream_decl) => {
-            route_event_stream(use_event_stream_decl, target, mapper).await
+            route_event_stream(use_event_stream_decl, target, mapper, &mut vec![]).await
         }
         RouteRequest::UseProtocol(use_protocol_decl) => {
             route_protocol(use_protocol_decl, target, mapper).await
@@ -417,23 +417,6 @@ where
     )
     .await?;
     Ok(RouteSource::new(source))
-}
-
-/// Routes a capability to its source.
-///
-/// If the capability is not allowed to be routed to the `target`, per the
-/// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
-pub async fn route_event_stream_capability<C, M>(
-    request: UseEventStreamDecl,
-    target: &Arc<C>,
-    route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ExposeEventStreamDecl>>,
-    mapper: &mut M,
-) -> Result<RouteSource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    M: DebugRouteMapper + 'static,
-{
-    route_event_stream_with_route(request, target, mapper, route).await
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `use_decl`.
@@ -1007,33 +990,10 @@ where
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
-async fn route_event_stream<C, M>(
-    use_decl: UseEventStreamDecl,
-    target: &Arc<C>,
-    mapper: &mut M,
-) -> Result<RouteSource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    M: DebugRouteMapper + 'static,
-{
-    let allowed_sources = AllowedSourcesBuilder::new().builtin();
-
-    let mut availability_visitor = AvailabilityEventStreamVisitor::new(&use_decl);
-    let source = router::route_from_use(
-        use_decl,
-        target.clone(),
-        allowed_sources,
-        &mut availability_visitor,
-        mapper,
-        &mut vec![],
-    )
-    .await?;
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::new(source))
-}
-
-/// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
-async fn route_event_stream_with_route<C, M>(
+///
+/// If the capability is not allowed to be routed to the `target`, per the
+/// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
+pub async fn route_event_stream<C, M>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
     mapper: &mut M,
@@ -1043,8 +1003,7 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let allowed_sources =
-        AllowedSourcesBuilder::new().framework(InternalCapability::EventStream).builtin();
+    let allowed_sources = AllowedSourcesBuilder::new().builtin();
     let mut availability_visitor = AvailabilityEventStreamVisitor::new(&use_decl);
     let source = router::route_from_use(
         use_decl,

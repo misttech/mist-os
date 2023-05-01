@@ -37,7 +37,7 @@ use {
         error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
         mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
-        route_capability, route_event_stream_capability, RouteInfo, RouteRequest, RouteSource,
+        route_capability, route_event_stream, RouteInfo, RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{
@@ -1127,7 +1127,7 @@ impl ComponentModelForAnalyzer {
         >,
     ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
         let mut mapper = RouteMapper::new();
-        let result = route_event_stream_capability(request, target, map, &mut mapper)
+        let result = route_event_stream(request, target, &mut mapper, map)
             .now_or_never()
             .expect("future was not ready immediately");
         (result, mapper.get_route())
