@@ -22,7 +22,7 @@ impl BuildScriptOutput {
         let mut file = File::open(file)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        let configs: Vec<&str> = contents.split("\n").collect();
+        let configs: Vec<&str> = contents.split('\n').collect();
         Self::parse(configs)
     }
 
@@ -36,7 +36,7 @@ impl BuildScriptOutput {
             if line == "" {
                 continue;
             } else if line.starts_with(rustc_cfg) {
-                bs.cfgs.push(format!("\"--cfg={}\"", line.split_at(rustc_cfg.len()).1.to_string()));
+                bs.cfgs.push(format!("\"--cfg={}\"", line.split_at(rustc_cfg.len()).1));
             } else if line.starts_with(rustc_rerun) {
                 // Ignored because these are always vendored
             } else {
@@ -54,7 +54,7 @@ pub struct BuildScript<'a> {
 }
 
 fn get_rustc() -> OsString {
-    std::env::var_os("RUSTC").unwrap_or(std::ffi::OsString::from("rustc"))
+    std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc"))
 }
 
 impl<'a> BuildScript<'a> {
@@ -90,7 +90,7 @@ impl<'a> BuildScript<'a> {
         }
 
         let out_dir = tempdir()?;
-        Ok(BuildScript { path: out_file, output_dir: out_dir, target: &target })
+        Ok(BuildScript { path: out_file, output_dir: out_dir, target })
     }
 
     pub fn execute(self) -> Result<BuildScriptOutput, Error> {
@@ -114,7 +114,7 @@ impl<'a> BuildScript<'a> {
         }
 
         let stdout = String::from_utf8(output.stdout)?;
-        let configs: Vec<&str> = stdout.split("\n").collect();
+        let configs: Vec<&str> = stdout.split('\n').collect();
 
         BuildScriptOutput::parse(configs)
     }

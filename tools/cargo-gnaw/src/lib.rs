@@ -334,7 +334,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     let metadata_configs: BuildMetadata =
         toml::from_str(&contents).context("parsing manifest toml")?;
 
-    gn::write_header(&mut output, &manifest_path).context("writing header")?;
+    gn::write_header(&mut output, manifest_path).context("writing header")?;
 
     if opt.output_fuchsia_sdk_metadata.is_some() {
         gn::write_fuchsia_sdk_metadata_header(&mut output)
@@ -560,7 +560,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             }
         }
     }
-    if unused_configs.len() > 0 {
+    if !unused_configs.is_empty() {
         anyhow::bail!(
             "GNaw config exists for crates that were not found in the Cargo build graph:\n\n{}",
             unused_configs
@@ -594,7 +594,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 )),
                 path: target.package_root(&opt.project_root),
             });
-            gn::write_binary_top_level_rule(&mut output, None, target, &options)
+            gn::write_binary_top_level_rule(&mut output, None, target, options)
                 .context(format!("writing binary top level rule: {}", target.name()))?;
         }
     }
@@ -656,17 +656,15 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     );
                 }
             }
-        } else {
-            if let Some(Some(_)) = reviewed_features {
-                anyhow::bail!(
-                    "{name} {version} sets reviewed_features but {name} was not found in \
+        } else if let Some(Some(_)) = reviewed_features {
+            anyhow::bail!(
+                "{name} {version} sets reviewed_features but {name} was not found in \
                     require_feature_reviews.\n\n\
                     Make sure to add it there so that reviewed_features is not accidentally \
                     removed during future crate version bumps.",
-                    name = target.name(),
-                    version = target.version(),
-                );
-            }
+                name = target.name(),
+                version = target.version(),
+            );
         }
 
         if let Some(&Some(reviewed_features)) = reviewed_features {
@@ -709,7 +707,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             path: package_root.to_owned(),
         });
 
-        let _ = gn::write_rule(
+        gn::write_rule(
             &mut output,
             &target,
             &opt.project_root,
@@ -717,12 +715,12 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             target_cfg,
             binary_name,
             false,
-            renamed_rules.get(target).as_deref().copied(),
+            renamed_rules.get(target).copied(),
         )
         .context(format!("writing rule for: {} {}", target.name(), target.version()))?;
 
         if targets_with_tests.contains(target) {
-            let _ = gn::write_rule(
+            gn::write_rule(
                 &mut output,
                 &target,
                 &opt.project_root,
@@ -730,7 +728,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 target_cfg,
                 binary_name,
                 true,
-                renamed_rules.get(&target).as_deref().copied(),
+                renamed_rules.get(&target).copied(),
             )
             .context(format!(
                 "writing rule for: {} {}",

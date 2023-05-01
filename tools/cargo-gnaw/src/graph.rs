@@ -101,7 +101,7 @@ impl<'a> GnBuildGraph<'a> {
                         DependencyKind::Normal => {
                             self.add_cargo_package(id.clone())?;
                             let platform = target.as_ref().map(|x| format!("{}", x));
-                            let platform_deps = dependencies.entry(platform).or_insert(vec![]);
+                            let platform_deps = dependencies.entry(platform).or_default();
 
                             // Somehow we get duplicates of the same dependency
                             // from cargo on some targets. Filter those out
@@ -153,22 +153,18 @@ impl<'a> GnBuildGraph<'a> {
                             //
                             // This logic imitates that behaviour.
                             let mut deps = dependencies.clone();
-                            let maybe_library = package
-                                .targets
-                                .iter()
-                                .filter(|v| {
-                                    v.kind.iter().any(|kind| {
-                                        matches!(
-                                            GnRustType::try_from(kind.as_str()),
-                                            Ok(GnRustType::Library)
-                                        )
-                                    })
+                            let maybe_library = package.targets.iter().find(|v| {
+                                v.kind.iter().any(|kind| {
+                                    matches!(
+                                        GnRustType::try_from(kind.as_str()),
+                                        Ok(GnRustType::Library)
+                                    )
                                 })
-                                .next();
+                            });
                             if let Some(lib) = maybe_library {
                                 deps.entry(None).or_default().push((
                                     &self.metadata[&node.id],
-                                    lib.name.clone().replace("-", "_"),
+                                    lib.name.clone().replace('-', "_"),
                                 ));
                             }
                             let gn_target = GnTarget::new(

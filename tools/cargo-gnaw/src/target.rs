@@ -79,8 +79,8 @@ impl PartialOrd for GnTarget<'_> {
 impl Ord for GnTarget<'_> {
     fn cmp(&self, other: &GnTarget<'_>) -> Ordering {
         self.cargo_pkg_id
-            .cmp(&other.cargo_pkg_id)
-            .then(self.target_name.cmp(&other.target_name))
+            .cmp(other.cargo_pkg_id)
+            .then(self.target_name.cmp(other.target_name))
             .then(self.target_type.cmp(&other.target_type))
     }
 }

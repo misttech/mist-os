@@ -24,7 +24,7 @@ pub fn add_version_suffix(prefix: &str, version: &impl ToString) -> String {
     let mut accum = String::new();
     accum.push_str(&prefix);
     accum.push_str("-v");
-    accum.push_str(version.to_string().replace(".", "_").as_str());
+    accum.push_str(version.to_string().replace('.', "_").as_str());
     accum
 }
 
@@ -72,7 +72,7 @@ pub fn write_top_level_rule<W: io::Write>(
         writeln!(
             output,
             "if ({conditional}) {{\n",
-            conditional = target_to_gn_conditional(&platform)?
+            conditional = target_to_gn_conditional(platform)?
         )?;
     }
 
@@ -178,7 +178,7 @@ pub fn write_binary_top_level_rule<'a, W: io::Write>(
         writeln!(
             output,
             "if ({conditional}) {{\n",
-            conditional = cfg_to_gn_conditional(&platform)?
+            conditional = cfg_to_gn_conditional(platform)?
         )?;
     }
     writeln!(
@@ -191,7 +191,7 @@ pub fn write_binary_top_level_rule<'a, W: io::Write>(
 
     if options.tests_enabled {
         let name = options.binary_name.to_owned() + "-test";
-        let dep_name = target.gn_target_name().to_owned() + "-test";
+        let dep_name = target.gn_target_name() + "-test";
         writeln!(
             output,
             include_str!("../templates/top_level_binary_gn_rule.template"),
@@ -231,7 +231,7 @@ impl GnField {
     }
 
     pub fn add_platform_cfg<T: AsRef<str> + Display>(&mut self, platform: Option<String>, cfg: T) {
-        let field = self.add_fields.entry(platform).or_insert(vec![]);
+        let field = self.add_fields.entry(platform).or_default();
         field.push(format!("\"{}\"", cfg));
     }
 
@@ -240,7 +240,7 @@ impl GnField {
         platform: Option<String>,
         cfg: T,
     ) {
-        let field = self.remove_fields.entry(platform).or_insert(vec![]);
+        let field = self.remove_fields.entry(platform).or_default();
         field.push(format!("\"{}\"", cfg));
     }
 
@@ -273,7 +273,7 @@ impl GnField {
             output.push_str(
                 format!(
                     "if ({}) {{\n",
-                    cfg_to_gn_conditional(&platform.as_ref().unwrap()).expect("valid cfg")
+                    cfg_to_gn_conditional(platform.as_ref().unwrap()).expect("valid cfg")
                 )
                 .as_str(),
             );
@@ -293,7 +293,7 @@ impl GnField {
             output.push_str(
                 format!(
                     "if ({}) {{\n",
-                    cfg_to_gn_conditional(&platform.as_ref().unwrap()).expect("valid cfg")
+                    cfg_to_gn_conditional(platform.as_ref().unwrap()).expect("valid cfg")
                 )
                 .as_str(),
             );
@@ -465,7 +465,7 @@ pub fn write_rule<W: io::Write>(
     };
 
     // making the templates more readable.
-    let aliased_deps_str = if aliased_deps.len() == 0 {
+    let aliased_deps_str = if aliased_deps.is_empty() {
         String::from("")
     } else {
         format!("aliased_deps = {{{}}}", aliased_deps.join("\n"))
@@ -490,7 +490,7 @@ pub fn write_rule<W: io::Write>(
             || {
                 Cow::Owned(format!(
                     "{}-{}-test",
-                    target.name().replace("-", "_"),
+                    target.name().replace('-', "_"),
                     target.metadata_hash()
                 ))
             },
@@ -501,11 +501,11 @@ pub fn write_rule<W: io::Write>(
             || {
                 Cow::Owned(format!(
                     "{}-{}",
-                    target.name().replace("-", "_"),
+                    target.name().replace('-', "_"),
                     target.metadata_hash()
                 ))
             },
-            |n| Cow::Borrowed(n),
+            Cow::Borrowed,
         )
     };
     let mut target_name = target.gn_target_name();
@@ -526,7 +526,7 @@ pub fn write_rule<W: io::Write>(
             target.gn_target_type()
         },
         target_name = target_name,
-        crate_name = target.name().replace("-", "_"),
+        crate_name = target.name().replace('-', "_"),
         output_name = output_name,
         root_path = root_relative_path,
         aliased_deps = aliased_deps_str,
