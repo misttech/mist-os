@@ -42,6 +42,11 @@ public:
 
     const other_types_reference_protocol_t* GetProto() const { return &proto_; }
 
+    const void* other_types_reference_protocol_server_driver() const {
+        return other_types_reference_protocol_server_driver_;
+    }
+
+
     virtual MockOtherTypesReference& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
         mock_struct_.ExpectCall({out_s}, s);
         return *this;
@@ -141,6 +146,11 @@ public:
     virtual ~MockOtherTypes() {}
 
     const other_types_protocol_t* GetProto() const { return &proto_; }
+
+    const void* other_types_protocol_server_driver() const {
+        return other_types_protocol_server_driver_;
+    }
+
 
     virtual MockOtherTypes& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
         mock_struct_.ExpectCall({out_s}, s);
@@ -281,6 +291,11 @@ public:
 
     const other_types_async_protocol_t* GetProto() const { return &proto_; }
 
+    const void* other_types_async_protocol_server_driver() const {
+        return other_types_async_protocol_server_driver_;
+    }
+
+
     virtual MockOtherTypesAsync& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
         mock_struct_.ExpectCall({out_s}, s);
         return *this;
@@ -407,6 +422,11 @@ public:
 
     const other_types_async_reference_protocol_t* GetProto() const { return &proto_; }
 
+    const void* other_types_async_reference_protocol_server_driver() const {
+        return other_types_async_reference_protocol_server_driver_;
+    }
+
+
     virtual MockOtherTypesAsyncReference& ExpectStruct(this_is_astruct_t s, this_is_astruct_t out_s) {
         mock_struct_.ExpectCall({out_s}, s);
         return *this;
@@ -506,6 +526,11 @@ public:
     virtual ~MockInterface() {}
 
     const interface_protocol_t* GetProto() const { return &proto_; }
+
+    const void* interface_protocol_server_driver() const {
+        return interface_protocol_server_driver_;
+    }
+
 
     virtual MockInterface& ExpectValue(other_types_protocol_t intf, other_types_protocol_t out_intf) {
         mock_value_.ExpectCall({out_intf}, intf);

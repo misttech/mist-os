@@ -39,6 +39,11 @@ public:
 
     const synchronous_primitive_protocol_t* GetProto() const { return &proto_; }
 
+    const void* synchronous_primitive_protocol_server_driver() const {
+        return synchronous_primitive_protocol_server_driver_;
+    }
+
+
     virtual MockSynchronousPrimitive& ExpectBool(bool out_b, bool b, bool out_b_2) {
         mock_bool_.ExpectCall({out_b, out_b_2}, b);
         return *this;
@@ -227,6 +232,11 @@ public:
     virtual ~MockAsyncPrimitive() {}
 
     const async_primitive_protocol_t* GetProto() const { return &proto_; }
+
+    const void* async_primitive_protocol_server_driver() const {
+        return async_primitive_protocol_server_driver_;
+    }
+
 
     virtual MockAsyncPrimitive& ExpectBool(bool b, bool out_b, bool out_b_2) {
         mock_bool_.ExpectCall({out_b, out_b_2}, b);

@@ -39,6 +39,11 @@ public:
 
     const synchronous_base_protocol_t* GetProto() const { return &proto_; }
 
+    const void* synchronous_base_protocol_server_driver() const {
+        return synchronous_base_protocol_server_driver_;
+    }
+
+
     virtual MockSynchronousBase& ExpectStatus(zx_status_t out_status, zx_status_t status, zx_status_t out_status_2) {
         mock_status_.ExpectCall({out_status, out_status_2}, status);
         return *this;
@@ -144,6 +149,11 @@ public:
 
     const driver_transport_protocol_t* GetProto() const { return &proto_; }
 
+    const void* driver_transport_protocol_server_driver() const {
+        return driver_transport_protocol_server_driver_;
+    }
+
+
     virtual MockDriverTransport& ExpectStatus(zx_status_t out_status, zx_status_t status) {
         mock_status_.ExpectCall({out_status}, status);
         return *this;
@@ -191,6 +201,11 @@ public:
     virtual ~MockAsyncBase() {}
 
     const async_base_protocol_t* GetProto() const { return &proto_; }
+
+    const void* async_base_protocol_server_driver() const {
+        return async_base_protocol_server_driver_;
+    }
+
 
     virtual MockAsyncBase& ExpectStatus(zx_status_t status, zx_status_t out_status, zx_status_t out_status_2) {
         mock_status_.ExpectCall({out_status, out_status_2}, status);

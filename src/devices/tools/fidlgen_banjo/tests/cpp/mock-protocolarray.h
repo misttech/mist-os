@@ -39,6 +39,11 @@ public:
 
     const arrayof_arrays_protocol_t* GetProto() const { return &proto_; }
 
+    const void* arrayof_arrays_protocol_server_driver() const {
+        return arrayof_arrays_protocol_server_driver_;
+    }
+
+
     virtual MockArrayofArrays& ExpectBool(bool b, bool out_b) {
         mock_bool_.ExpectCall({out_b}, b);
         return *this;
@@ -230,6 +235,11 @@ public:
 
     const array_protocol_t* GetProto() const { return &proto_; }
 
+    const void* array_protocol_server_driver() const {
+        return array_protocol_server_driver_;
+    }
+
+
     virtual MockArray& ExpectBool(bool b, bool out_b) {
         mock_bool_.ExpectCall({out_b}, b);
         return *this;
@@ -420,6 +430,11 @@ public:
     virtual ~MockArray2() {}
 
     const array2_protocol_t* GetProto() const { return &proto_; }
+
+    const void* array2_protocol_server_driver() const {
+        return array2_protocol_server_driver_;
+    }
+
 
     virtual MockArray2& ExpectBool(bool b, bool out_b) {
         mock_bool_.ExpectCall({out_b}, b);

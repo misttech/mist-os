@@ -11,6 +11,7 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -48,10 +49,11 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin>
+template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
 class InterfaceProtocol : public Base {
 public:
     InterfaceProtocol() {
+        interface_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckInterfaceProtocolSubclass<D>();
         interface_protocol_ops_.func = Interfacefunc;
 
@@ -64,12 +66,23 @@ public:
         }
     }
 
+    const void* interface_protocol_server_driver() const {
+        return interface_protocol_server_driver_;
+    }
+
 protected:
     interface_protocol_ops_t interface_protocol_ops_ = {};
+    const void* interface_protocol_server_driver_;
 
 private:
+    static const void* GetServerDriver(void* ctx) {
+        return static_cast<D*>(ctx)->interface_protocol_server_driver();
+    }
+
     static void Interfacefunc(void* ctx, bool x) {
+        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Interfacefunc(x);
+        fdf_env_register_driver_exit();
     }
 };
 

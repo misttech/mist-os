@@ -92,13 +92,16 @@ void fdf_env_destroy_all_dispatchers(void);
 // such as via a Banjo call.
 //
 // |driver| is an opaque unique identifier for the driver.
-void fdf_env_register_driver_entry(const void* driver);
+// |enforce_no_reentrancy| specifies whether the driver runtime should enforce that there is no
+// reentrancy by entering the |driver|.
+void fdf_env_register_driver_entry(const void* driver, bool enforce_no_reentrancy);
 
 // Notifies the runtime that we have exited the current driver context.
 void fdf_env_register_driver_exit(void);
 
 // Returns the driver on top of the the thread's current call stack.
-// Returns NULL if no drivers are on the stack.
+// Returns NULL if no drivers are on the stack or if the current thread is not managed
+// by the driver runtime.
 const void* fdf_env_get_current_driver(void);
 
 // Returns whether the dispatcher has any queued tasks.

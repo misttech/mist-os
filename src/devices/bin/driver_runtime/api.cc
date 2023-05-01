@@ -176,7 +176,13 @@ __EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordina
 
 __EXPORT void fdf_env_reset() { return driver_runtime::DispatcherCoordinator::EnvReset(); }
 
-__EXPORT void fdf_env_register_driver_entry(const void* driver) {
+__EXPORT void fdf_env_register_driver_entry(const void* driver, bool enforce_no_reentrancy) {
+  if (enforce_no_reentrancy) {
+    ZX_ASSERT_MSG(
+        !driver_context::IsDriverInCallStack(driver),
+        "Driver entry not allowed as it is already in the call stack of the current thread.");
+  }
+
   driver_context::PushDriver(driver);
 }
 
