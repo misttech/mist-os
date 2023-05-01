@@ -1,0 +1,27 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.diagnostics.host;
+
+using fuchsia.diagnostics;
+using zx;
+
+@discoverable
+protocol ArchiveAccessor {
+    /// Creates an iterator over diagnostics data on the system.
+    ///   * The iterator may be finite by streaming in SNAPSHOT mode, serving only the
+    ///     current state of diagnostics data on the system.
+    ///   * The iterator may be infinite by streaming in either SNAPSHOT_THEN_SUBSCRIBE
+    ///     or SUBSCRIBE mode; the prior first provides iteration over the current state of
+    ///     the sytem, and then both provide ongoing iteration over newly arriving diagnostics
+    ///     data.
+    ///
+    /// `stream` is a socket that diagnostic records are exposed to the client over.
+    ///
+    /// `parameters` is a [fuchsia.diagnostics/StreamParameter] which
+    ///   specifies how to configure the stream.
+    StreamDiagnostics(resource struct {
+        parameters fuchsia.diagnostics.StreamParameters;
+        stream zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+    }) -> ();
+};

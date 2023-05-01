@@ -1127,7 +1127,7 @@ mod tests {
             Task::spawn(async {
                 BatchIterator::new(
                     reader_server,
-                    batch_iterator_requests,
+                    Box::new(batch_iterator_requests.peekable()),
                     StreamMode::Snapshot,
                     stats,
                     None,

@@ -53,6 +53,7 @@ type ArchiveIteratorError = strict enum : uint32 {
     TRUNCATION_FAILED = 3;
 };
 
+@discoverable
 protocol ArchiveIterator {
     GetNext() -> (resource struct {
         entry vector<ArchiveIteratorEntry>:MAX_ENTRIES;

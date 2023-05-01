@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.logger.Log",
@@ -51,6 +52,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.logger.Log",

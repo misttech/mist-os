@@ -19,6 +19,10 @@ use crate::{
     pipeline::Pipeline,
 };
 use archivist_config::Config;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
+use fidl_fuchsia_diagnostics_host as fhost;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fidl_fuchsia_sys_internal as fsys_internal;
@@ -107,6 +111,7 @@ impl Archivist {
             Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
         ));
+
         let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
         let log_settings_server = Arc::new(LogSettingsServer::new(Arc::clone(&logs_repo)));
 
@@ -403,11 +408,27 @@ impl Archivist {
 
         // Serve fuchsia.diagnostics.ArchiveAccessors backed by a pipeline.
         for pipeline in &self.pipelines {
+            let host_accessor_server = Arc::clone(&self.accessor_server);
             let accessor_server = Arc::clone(&self.accessor_server);
             let accessor_pipeline = Arc::clone(pipeline);
-            svc_dir.add_fidl_service_at(pipeline.protocol_name(), move |stream| {
-                accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
-            });
+            svc_dir.add_fidl_service_at(
+                pipeline.protocol_name(),
+                move |stream: ArchiveAccessorRequestStream| {
+                    accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
+                },
+            );
+            let accessor_pipeline = Arc::clone(pipeline);
+            // TODO(https://fxbug.dev/126321): Add Inspect support
+            if accessor_pipeline.protocol_name()
+                == fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
+            {
+                svc_dir.add_fidl_service_at(
+                    fhost::ArchiveAccessorMarker::PROTOCOL_NAME,
+                    move |stream: fhost::ArchiveAccessorRequestStream| {
+                        host_accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
+                    },
+                );
+            }
         }
 
         // Ingest unattributed fuchsia.logger.LogSink connections.
@@ -452,10 +473,16 @@ mod tests {
         events::router::{Dispatcher, EventProducer},
         logs::testing::*,
     };
+    use diagnostics_data::LogsData;
     use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_diagnostics::{
+        ClientSelectorConfiguration, DataType, Format, StreamParameters,
+    };
+    use fidl_fuchsia_diagnostics_host as fhost;
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_async as fasync;
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::channel::oneshot;
 
     async fn init_archivist() -> Archivist {
@@ -578,6 +605,46 @@ mod tests {
             expected,
             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
         );
+    }
+
+    #[fuchsia::test]
+    async fn remote_log_test() {
+        let directory = run_archivist().await;
+        let accessor =
+            connect_to_protocol_at_dir_svc::<fhost::ArchiveAccessorMarker>(&directory).unwrap();
+        loop {
+            let (local, remote) = fuchsia_zircon::Socket::create_stream();
+            let mut reader = fuchsia_async::Socket::from_socket(local).unwrap();
+            accessor
+                .stream_diagnostics(
+                    StreamParameters {
+                        data_type: Some(DataType::Logs),
+                        stream_mode: Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot),
+                        format: Some(Format::Json),
+                        client_selector_configuration: Some(
+                            ClientSelectorConfiguration::SelectAll(true),
+                        ),
+                        ..Default::default()
+                    },
+                    remote,
+                )
+                .await
+                .unwrap();
+            let log_helper = LogSinkHelper::new(&directory);
+            let log_writer = log_helper.connect();
+            LogSinkHelper::write_log_at(&log_writer, "Test message");
+            let mut data = vec![];
+            reader.read_to_end(&mut data).await.unwrap();
+            if data.is_empty() {
+                continue;
+            }
+            let logs = serde_json::from_slice::<Vec<LogsData>>(&data).unwrap();
+            for log in logs {
+                if log.msg() == Some("Test message") {
+                    return;
+                }
+            }
+        }
     }
 
     /// Makes sure that implementation can handle multiple sockets from same

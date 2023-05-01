@@ -26,7 +26,14 @@ impl Command for ListAccessorsCommand {
     type Result = ListAccessorsResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        let paths = provider.get_accessor_paths(&self.paths).await?;
+        // Filter out the .host accessors since they use a different protocol designed
+        // for ffx.
+        let paths = provider
+            .get_accessor_paths(&self.paths)
+            .await?
+            .into_iter()
+            .filter(|path| !path.contains(".host"))
+            .collect();
         Ok(ListAccessorsResult(paths))
     }
 }
