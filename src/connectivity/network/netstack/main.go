@@ -811,7 +811,7 @@ func Main() {
 	}
 
 	{
-		stub := debug.DiagnosticsWithCtxStub{Impl: &debugDiagnositcsImpl{}}
+		stub := debug.DiagnosticsWithCtxStub{Impl: &debugDiagnosticsImpl{}}
 		componentCtx.OutgoingService.AddService(
 			debug.DiagnosticsName,
 			func(ctx context.Context, c zx.Channel) error {

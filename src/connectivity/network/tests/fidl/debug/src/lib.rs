@@ -10,7 +10,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
 use netstack_testing_common::{
@@ -251,4 +251,16 @@ async fn log_debug_info_to_syslog<N: Netstack>(name: &str) {
     let diagnostics =
         realm.connect_to_protocol::<fnet_debug::DiagnosticsMarker>().expect("connect to protocol");
     diagnostics.log_debug_info_to_syslog().await.expect("calling log_debug_info_to_syslog");
+}
+
+#[netstack_test]
+async fn get_process_handle_for_inspection<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let diagnostics =
+        realm.connect_to_protocol::<fnet_debug::DiagnosticsMarker>().expect("connect to protocol");
+    let process =
+        diagnostics.get_process_handle_for_inspection().await.expect("call get_process_handle");
+    let zx::HandleBasicInfo { rights, .. } = process.basic_info().expect("get process basic info");
+    assert_eq!(rights.bits(), zx::sys::ZX_RIGHT_INSPECT);
 }

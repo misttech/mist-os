@@ -7,6 +7,9 @@
 package netstack
 
 import (
+	// #include "zircon/process.h"
+	"C"
+
 	"fmt"
 	"runtime"
 	"syscall/zx"
@@ -81,12 +84,12 @@ func (ci *debugInterfacesImpl) GetPort(_ fidl.Context, nicid uint64, request net
 	return nil
 }
 
-var _ debug.DiagnosticsWithCtx = (*debugDiagnositcsImpl)(nil)
+var _ debug.DiagnosticsWithCtx = (*debugDiagnosticsImpl)(nil)
 
-type debugDiagnositcsImpl struct {
+type debugDiagnosticsImpl struct {
 }
 
-func (d *debugDiagnositcsImpl) LogDebugInfoToSyslog(fidl.Context) error {
+func (d *debugDiagnosticsImpl) LogDebugInfoToSyslog(fidl.Context) error {
 	s := func() string {
 		buf := make([]byte, 4096)
 		for {
@@ -104,4 +107,9 @@ func (d *debugDiagnositcsImpl) LogDebugInfoToSyslog(fidl.Context) error {
 	fmt.Println("End of debug info")
 
 	return nil
+}
+
+func (d *debugDiagnosticsImpl) GetProcessHandleForInspection(fidl.Context) (zx.Handle, error) {
+	self := zx.Handle(C.zx_process_self())
+	return self.Duplicate(zx.RightInspect | zx.RightTransfer)
 }
