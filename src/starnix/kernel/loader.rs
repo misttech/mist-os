@@ -17,6 +17,8 @@ use crate::types::*;
 #[derive(Debug)]
 struct StackResult {
     stack_pointer: UserAddress,
+    auxv_start: UserAddress,
+    auxv_end: UserAddress,
     argv_start: UserAddress,
     argv_end: UserAddress,
     environ_start: UserAddress,
@@ -93,17 +95,29 @@ fn populate_initial_stack(
     }
     main_data.extend_from_slice(&ZERO);
     // auxv
+    let auxv_start_offset = main_data.len();
     for (tag, val) in auxv {
         main_data.extend_from_slice(&(tag as u64).to_ne_bytes());
         main_data.extend_from_slice(&val.to_ne_bytes());
     }
+    let auxv_end_offset = main_data.len();
 
     // Time to push.
     stack_pointer -= main_data.len();
     stack_pointer -= stack_pointer.ptr() % 16;
     write_stack(main_data.as_slice(), stack_pointer)?;
+    let auxv_start = stack_pointer + auxv_start_offset;
+    let auxv_end = stack_pointer + auxv_end_offset;
 
-    Ok(StackResult { stack_pointer, argv_start, argv_end, environ_start, environ_end })
+    Ok(StackResult {
+        stack_pointer,
+        auxv_start,
+        auxv_end,
+        argv_start,
+        argv_end,
+        environ_start,
+        environ_end,
+    })
 }
 
 struct LoadedElf {
@@ -452,6 +466,8 @@ pub fn load_executable(
     mm_state.stack_base = stack_base;
     mm_state.stack_size = stack_size;
     mm_state.stack_start = stack.stack_pointer;
+    mm_state.auxv_start = stack.auxv_start;
+    mm_state.auxv_end = stack.auxv_end;
     mm_state.argv_start = stack.argv_start;
     mm_state.argv_end = stack.argv_end;
     mm_state.environ_start = stack.environ_start;
