@@ -91,7 +91,7 @@ async fn run_console(
 #[argh(
     subcommand,
     name = "console",
-    example = "ffx starnix console [-e ENV=VAL -e ...] [command [argument ...]]",
+    example = "ffx starnix console [-e ENV=VAL -e ...] program [argument ...]",
     description = "Attach a console to a starnix container"
 )]
 pub struct StarnixConsoleCommand {
@@ -104,7 +104,7 @@ pub struct StarnixConsoleCommand {
     #[argh(option, short = 'e')]
     env: Vec<String>,
 
-    /// the command and arguments to run in the console
+    /// full path to the program to run in the console and its arguments.
     #[argh(positional, greedy)]
     argv: Vec<String>,
 }
@@ -117,10 +117,18 @@ pub async fn starnix_console(
     if !termion::is_tty(&std::io::stdout()) {
         bail!("ffx starnix console must be run in a tty.");
     }
-
+    if command.argv.is_empty() {
+        bail!(
+            "Please specify a program to run.\n\
+               Examples:\n\
+               ffx starnix console /bin/bash\n\
+               ffx starnix console /bin/ls -l /\n\
+               Use ffx starnix console --help for more information."
+        );
+    }
     let controller = connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?;
-    let argv =
-        if command.argv.is_empty() { vec!["/bin/sh".to_string()] } else { command.argv.clone() };
+
+    let argv = command.argv.clone();
 
     let mut env = command.env.clone();
     env.append(&mut get_environ());
