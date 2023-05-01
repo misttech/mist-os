@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{num::NonZeroU16, ops::ControlFlow, sync::Arc};
+use std::{num::NonZeroU16, ops::ControlFlow};
 
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fpsocket;
@@ -46,9 +46,7 @@ use crate::bindings::{
 #[derive(Debug)]
 pub(crate) struct SocketState {
     /// The received messages for the socket.
-    ///
-    /// This is shared with the worker that handles requests for the socket.
-    queue: Arc<Mutex<MessageQueue<Message>>>,
+    queue: Mutex<MessageQueue<Message>>,
     kind: fppacket::Kind,
 }
 
@@ -125,12 +123,8 @@ pub(crate) async fn serve(
 struct BindingData {
     /// The event to hand off for [`fppacket::SocketRequest::Describe`].
     peer_event: zx::EventPair,
-    /// Shared queue of messages received for the socket.
-    ///
-    /// This is the "read" end of the queue; the non-sync context holds a
-    /// reference to the same queue for delivering incoming messages.
-    message_queue: Arc<Mutex<MessageQueue<Message>>>,
-    state: State,
+    /// The identifier for the [`netstack3_core`] socket resource.
+    id: SocketId<BindingsNonSyncCtxImpl>,
 }
 
 struct IntoMessage<'a>(MessageData, &'a [u8]);
@@ -183,20 +177,13 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let message_queue = Arc::new(Mutex::new(MessageQueue::new(local_event)));
         let id = netstack3_core::device::socket::create(
             sync_ctx,
-            SocketState { queue: message_queue.clone(), kind },
+            SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind },
         );
 
-        BindingData { message_queue, peer_event, state: State { id, kind } }
+        BindingData { peer_event, id }
     }
-}
-
-#[derive(Debug)]
-struct State {
-    id: SocketId<BindingsNonSyncCtxImpl>,
-    kind: fppacket::Kind,
 }
 
 impl CloseResponder for fppacket::SocketCloseResponder {
@@ -223,8 +210,7 @@ impl worker::SocketWorkerHandler for BindingData {
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { peer_event: _, state, message_queue: _ } = self;
-        let State { id, kind: _ } = state;
+        let Self { peer_event: _, id } = self;
         netstack3_core::device::socket::remove(sync_ctx, id)
     }
 }
@@ -236,7 +222,7 @@ struct RequestHandler<'a> {
 
 impl<'a> RequestHandler<'a> {
     fn describe(self) -> fppacket::SocketDescribeResponse {
-        let Self { ctx: _, data: BindingData { peer_event, state: _, message_queue: _ } } = self;
+        let Self { ctx: _, data: BindingData { peer_event, id: _ } } = self;
         let peer = peer_event
             .duplicate_handle(
                 // The client only needs to be able to receive signals so don't
@@ -262,7 +248,7 @@ impl<'a> RequestHandler<'a> {
                 })
             })
             .transpose()?;
-        let Self { ctx, data: BindingData { peer_event: _, message_queue: _, state } } = self;
+        let Self { ctx, data: BindingData { peer_event: _, id } } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device = match interface {
@@ -277,7 +263,6 @@ impl<'a> RequestHandler<'a> {
             None => TargetDevice::AnyDevice,
         };
 
-        let State { id, kind: _ } = state;
         match protocol {
             Some(protocol) => netstack3_core::device::socket::set_device_and_protocol(
                 sync_ctx,
@@ -296,15 +281,14 @@ impl<'a> RequestHandler<'a> {
         (fppacket::Kind, Option<Box<fppacket::ProtocolAssociation>>, fppacket::BoundInterface),
         fposix::Errno,
     > {
-        let Self {
-            ctx,
-            data: BindingData { peer_event: _, message_queue: _, state: State { id, kind } },
-        } = self;
+        let Self { ctx, data: BindingData { peer_event: _, id } } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let SocketInfo { device, protocol } =
             netstack3_core::device::socket::get_info(sync_ctx, id);
+        let SocketState { queue: _, kind } = *id.socket_state();
+
         let interface = match device {
             TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
             TargetDevice::SpecificDevice(d) => fppacket::BoundInterface::Specified(
@@ -319,36 +303,30 @@ impl<'a> RequestHandler<'a> {
             })
         });
 
-        Ok((*kind, protocol, interface))
+        Ok((kind, protocol, interface))
     }
 
     fn receive(self) -> Result<Message, fposix::Errno> {
-        let Self {
-            ctx: _,
-            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
-        } = self;
+        let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let mut queue = message_queue.lock();
+        let SocketState { queue, kind: _ } = id.socket_state();
+        let mut queue = queue.lock();
         queue.pop().ok_or(fposix::EWOULDBLOCK)
     }
 
     fn set_receive_buffer(self, size: u64) {
-        let Self {
-            ctx: _,
-            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
-        } = self;
+        let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let mut queue = message_queue.lock();
+        let SocketState { queue, kind: _ } = id.socket_state();
+        let mut queue = queue.lock();
         queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
     }
 
     fn receive_buffer(self) -> u64 {
-        let Self {
-            ctx: _,
-            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
-        } = self;
+        let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let queue = message_queue.lock();
+        let SocketState { queue, kind: _ } = id.socket_state();
+        let queue = queue.lock();
         queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
 
@@ -357,12 +335,10 @@ impl<'a> RequestHandler<'a> {
         packet_info: Option<Box<fppacket::PacketInfo>>,
         data: Vec<u8>,
     ) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data: BindingData { peer_event: _, message_queue: _, state: State { ref mut id, kind } },
-        } = self;
+        let Self { ctx, data: BindingData { peer_event: _, id } } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let SocketState { kind, queue: _ } = *id.socket_state();
 
         let data = Buf::new(data, ..);
         match kind {

@@ -669,9 +669,22 @@ fn make_send_metadata<SC: DeviceIdContext<AnyDevice>>(
 }
 
 /// Public identifier for a socket.
+///
+/// Strongly owns the state of the socket. So long as the `SocketId` for a
+/// socket is not dropped, the socket is guaranteed to exist.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "C::SocketState: Debug"))]
 pub struct SocketId<C: crate::NonSyncContext>(StrongId<C::SocketState, WeakDeviceId<C>>);
+
+impl<C: crate::NonSyncContext> SocketId<C> {
+    /// Provides immutable access to [`DeviceSocketTypes::SocketState`] for the
+    /// socket.
+    pub fn socket_state(&self) -> &C::SocketState {
+        let Self(StrongId(strong)) = self;
+        let SocketState { external_state, all_sockets_index: _, target: _ } = &**strong;
+        external_state
+    }
+}
 
 /// Creates an packet socket with no protocol set configured for all devices.
 pub fn create<C: crate::NonSyncContext>(
