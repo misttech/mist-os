@@ -13,6 +13,7 @@ use crate::{
 
 use {
     async_trait::async_trait,
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::Status,
     std::{any::Any, sync::Arc},
@@ -126,7 +127,12 @@ pub trait MutableDirectory: Directory + Send + Sync {
     ) -> Result<(), Status>;
 
     /// Creates a symbolic link.
-    async fn create_symlink(&self, _name: String, _target: Vec<u8>) -> Result<(), Status> {
+    async fn create_symlink(
+        &self,
+        _name: String,
+        _target: Vec<u8>,
+        _connection: Option<ServerEnd<fio::SymlinkMarker>>,
+    ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
     }
 }

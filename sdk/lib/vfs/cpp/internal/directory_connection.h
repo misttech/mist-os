@@ -81,6 +81,7 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
   }
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   void CreateSymlink(std::string name, std::vector<uint8_t> target,
+                     fidl::InterfaceRequest<::fuchsia::io::Symlink> connection,
                      CreateSymlinkCallback callback) override {
     callback(fuchsia::io::Directory2_CreateSymlink_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }

@@ -103,7 +103,7 @@ typedef struct zxio_ops {
   zx_status_t (*ioctl)(zxio_t* io, int request, int16_t* out_code, va_list va);
   zx_status_t (*read_link)(zxio_t* io, const uint8_t** out_target, size_t* out_target_len);
   zx_status_t (*create_symlink)(zxio_t* io, const char* name, size_t name_len,
-                                const uint8_t* target, size_t target_len);
+                                const uint8_t* target, size_t target_len, zxio_storage_t* storage);
 } zxio_ops_t;
 
 // Initialize a |zxio_t| object with the given |ops| table.

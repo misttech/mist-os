@@ -499,7 +499,12 @@ impl MutableDirectory for FxDirectory {
         Ok(())
     }
 
-    async fn create_symlink(&self, name: String, target: Vec<u8>) -> Result<(), zx::Status> {
+    async fn create_symlink(
+        &self,
+        name: String,
+        target: Vec<u8>,
+        connection: Option<ServerEnd<fio::SymlinkMarker>>,
+    ) -> Result<(), zx::Status> {
         let store = self.store();
         let dir = &self.directory;
         let keys = [LockKey::object(store.store_object_id(), dir.object_id())];
@@ -509,9 +514,32 @@ impl MutableDirectory for FxDirectory {
         if dir.lookup(&name).await.map_err(map_to_status)?.is_some() {
             return Err(zx::Status::ALREADY_EXISTS);
         }
-        dir.create_symlink(&mut transaction, &target, &name).await.map_err(map_to_status)?;
-        transaction.commit().await.map_err(map_to_status)?;
-        Ok(())
+        let object_id =
+            dir.create_symlink(&mut transaction, &target, &name).await.map_err(map_to_status)?;
+        if connection.is_some() {
+            if let GetResult::Placeholder(p) = self.volume().cache().get_or_reserve(object_id).await
+            {
+                transaction
+                    .commit_with_callback(|_| {
+                        let node = Arc::new(FxSymlink::new(self.volume().clone(), object_id));
+                        p.commit(&(node.clone() as Arc<dyn FxNode>));
+                        symlink::Connection::spawn(
+                            self.volume().scope().clone(),
+                            node,
+                            fio::OpenFlags::RIGHT_READABLE,
+                            ServerEnd::new(connection.unwrap().into_channel()),
+                        );
+                    })
+                    .await
+            } else {
+                // The node already exists in the cache which could only happen if the filesystem is
+                // corrupt.
+                return Err(zx::Status::IO_DATA_INTEGRITY);
+            }
+        } else {
+            transaction.commit().await.map(|_| ())
+        }
+        .map_err(map_to_status)
     }
 }
 
@@ -566,7 +594,7 @@ impl DirectoryEntry for FxDirectory {
                         }
                     } else if node.is::<FxSymlink>() {
                         let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                        symlink::Connection::run(scope, node.clone(), flags, server_end, shutdown)
+                        symlink::Connection::run(scope, node.take(), flags, server_end, shutdown)
                             .await;
                     } else {
                         unreachable!();
@@ -1445,7 +1473,7 @@ mod tests {
         {
             let root = fixture.root();
 
-            root.create_symlink("symlink", b"target")
+            root.create_symlink("symlink", b"target", None)
                 .await
                 .expect("FIDL call failed")
                 .expect("create_symlink failed");
@@ -1477,6 +1505,19 @@ mod tests {
             } else {
                 panic!("Unexpected on_open {on_open:?}");
             }
+
+            let (proxy, server_end) =
+                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            root.create_symlink("symlink2", b"target2", Some(server_end))
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            let node_info = proxy.describe().await.expect("FIDL call failed");
+            assert_matches!(
+                node_info,
+                fio::SymlinkInfo { target: Some(target), .. } if target == b"target2"
+            );
         }
 
         fixture.close().await;

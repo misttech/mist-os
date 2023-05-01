@@ -26,9 +26,6 @@
                 "AccessTest.UsrReadExec",
                 "AccessTest.UsrReadWrite",
                 "AccessTest.UsrReadWriteExec",
-                "FaccessatTest.SymlinkFollowed",
-                "Faccessat2Test.SymlinkFollowedByDefault",
-                "Faccessat2Test.SymlinkNofollow",
 
                 // chdir_test
                 "ChdirTest.Success",
@@ -58,22 +55,6 @@
                 // creat_test
                 "CreatTest.CreatTruncatesExistingFile",
 
-                // exec_test
-                "ExecTest.ExecFn",
-                "ExecTest.ExecNameScript",
-                "ExecTest.InterpreterScriptArgNUL",
-                "ExecTest.InterpreterScriptArgSplit",
-                "ExecTest.InterpreterScriptArgWhitespace",
-                "ExecTest.InterpreterScriptArgvZero",
-                "ExecTest.InterpreterScriptArgvZeroAdded",
-                "ExecTest.InterpreterScriptArgvZeroRelative",
-                "ExecTest.InterpreterScriptTrailingWhitespace",
-                "ExecTest.SymlinkLimitExceeded",
-                "ExecTest.SymlinkLimitRefreshedForInterpreter",
-                "ExecveatTest.SymlinkNoFollowAndEmptyPath",
-                "ExecveatTest.SymlinkNoFollowWithAbsolutePath",
-                "ExecveatTest.SymlinkNoFollowWithRelativePath",
-
                 // exec_binary_test
                 "ElfTest.MissingHeader",
                 "ElfTest.OutOfBoundsPhdrs",
@@ -96,7 +77,6 @@
                 // fcntl_test
                 "FcntlLockTest.SetLockAcrossRename",
                 "FcntlLockTest.SetLockDir",
-                "FcntlLockTest.SetLockSymlink",
                 "FcntlTest.GetOpathFlag",
 
                 // fifo_test
@@ -134,7 +114,6 @@
                 "FlockTest.TestSingleHolderUpgrade",
                 "FlockTest.TestUnlockWithNoHolders",
                 "FlockTestNoFixture.FlockDir",
-                "FlockTestNoFixture.FlockSymlink",
 
                 // fsync_test
                 "FsyncTest.TempDirSucceeds",
@@ -205,7 +184,6 @@
                 // mknod_test
                 "MknodTest.MknodAtEmptyPath",
                 "MknodTest.MknodAtFIFO",
-                "MknodTest.MknodOnExistingPathFails",
                 "MknodTest.RegularFilePermissions",
                 "MknodTest.Socket",
 

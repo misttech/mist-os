@@ -144,6 +144,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4:test_img",
+    "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",

@@ -1191,18 +1191,35 @@ class Directory : public Remote<fio::Directory> {
   }
 
   zx_status_t CreateSymlink(const char* name, size_t name_len, const uint8_t* target,
-                            size_t target_len) {
+                            size_t target_len, zxio_storage_t* storage) {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    fidl::Endpoints<fio::Symlink> endpoints;
+    if (storage) {
+      if (auto result = fidl::CreateEndpoints<fio::Symlink>(); result.is_error()) {
+        return result.status_value();
+      } else {
+        endpoints = *std::move(result);
+      }
+    }
+
     fidl::Arena arena;
     const fidl::WireResult result =
         client()->CreateSymlink(fidl::StringView(arena, std::string_view(name, name_len)),
-                                fidl::VectorView<uint8_t>(arena, cpp20::span(target, target_len)));
+                                fidl::VectorView<uint8_t>(arena, cpp20::span(target, target_len)),
+                                std::move(endpoints.server));
     if (!result.ok()) {
       return result.status();
     }
     const auto& response = result.value();
     if (response.is_error()) {
       return response.error_value();
+    }
+    if (storage) {
+      if (zx_status_t status = zxio_symlink_init(storage, std::move(endpoints.client),
+                                                 std::vector(target, target + target_len));
+          status != ZX_OK) {
+        return status;
+      }
     }
     return ZX_OK;
 #else

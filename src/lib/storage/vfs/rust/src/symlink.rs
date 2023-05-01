@@ -39,7 +39,12 @@ fn validate_flags(flags: fio::OpenFlags) -> Result<(), zx::Status> {
         return Err(zx::Status::NOT_DIR);
     }
 
-    let optional = fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE;
+    // We allow write and executable access because the client might not know this is a symbolic
+    // link and they want to open the target of the link with write or executable rights.
+    let optional = fio::OpenFlags::NOT_DIRECTORY
+        | fio::OpenFlags::DESCRIBE
+        | fio::OpenFlags::RIGHT_WRITABLE
+        | fio::OpenFlags::RIGHT_EXECUTABLE;
 
     if flags & !optional != fio::OpenFlags::RIGHT_READABLE {
         return Err(zx::Status::INVALID_ARGS);

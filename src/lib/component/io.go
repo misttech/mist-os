@@ -348,7 +348,7 @@ func (dirState *directoryState) Enumerate(ctx fidl.Context, options io.Directory
 	return nil
 }
 
-func (*directoryState) CreateSymlink(fidl.Context, string, []uint8) (io.Directory2CreateSymlinkResult, error) {
+func (*directoryState) CreateSymlink(fidl.Context, string, []uint8, io.SymlinkWithCtxInterfaceRequest) (io.Directory2CreateSymlinkResult, error) {
 	return io.Directory2CreateSymlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 

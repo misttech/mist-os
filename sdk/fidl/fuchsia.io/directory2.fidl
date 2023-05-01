@@ -325,6 +325,8 @@ protocol Directory2 {
     /// `name` is the name to be given to the created symbolic link.
     /// `target` is the target of the symbolic link, which has no meaning on the server. The server
     /// will perform no validation of `target` except for a server chosen maximum length.
+    /// `connection` is an optional server end of a channel that will speak the Symlink protocol
+    /// on the successfully created node.
     ///
     /// * [`Rights.MODIFY_DIRECTORY`]
     ///
@@ -335,8 +337,9 @@ protocol Directory2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Directory.CreateSymlink")
     @transitional
-    CreateSymlink(struct {
+    CreateSymlink(resource struct {
         name Name;
         target SymlinkTarget;
+        connection server_end:<Symlink, optional>;
     }) -> () error zx.Status;
 };

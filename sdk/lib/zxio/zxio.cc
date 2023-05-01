@@ -893,10 +893,10 @@ zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target, size_t* out_t
 }
 
 zx_status_t zxio_create_symlink(zxio_t* io, const char* name, size_t name_len,
-                                const uint8_t* target, size_t target_len) {
+                                const uint8_t* target, size_t target_len, zxio_storage_t* storage) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(io);
-  return zio->ops->create_symlink(io, name, name_len, target, target_len);
+  return zio->ops->create_symlink(io, name, name_len, target, target_len, storage);
 }

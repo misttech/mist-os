@@ -268,6 +268,7 @@ zx_status_t zxio_default_read_link(zxio_t* io, const uint8_t** out_target, size_
 }
 
 zx_status_t zxio_default_create_symlink(zxio_t* io, const char* name, size_t name_len,
-                                        const uint8_t* target, size_t target_len) {
+                                        const uint8_t* target, size_t target_len,
+                                        zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }

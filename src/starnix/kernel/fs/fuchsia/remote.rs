@@ -245,9 +245,13 @@ impl FsNodeOps for RemoteNode {
         // TODO: It's unfortunate to have another round-trip. We should be able
         // to set the mode based on the information we get during open.
         let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
-
-        let ops = Box::new(RemoteNode { zxio, rights: self.rights });
         let mode = get_mode(&attrs)?;
+
+        let ops = if mode.is_lnk() {
+            Box::new(RemoteSymlink { zxio }) as Box<dyn FsNodeOps>
+        } else {
+            Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
+        };
         let child = node.fs().create_node_with_id(ops, attrs.id, mode, FsCred::root());
         update_into_from_attrs(&mut child.info_write(), &attrs);
         Ok(child)
@@ -262,6 +266,33 @@ impl FsNodeOps for RemoteNode {
         let mut info = node.info_write();
         update_into_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
+    }
+
+    fn create_symlink(
+        &self,
+        node: &FsNode,
+        name: &FsStr,
+        target: &FsStr,
+        _owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        let name = std::str::from_utf8(name).map_err(|_| {
+            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
+            errno!(EINVAL)
+        })?;
+        let zxio = Arc::new(
+            self.zxio
+                .create_symlink(name, target)
+                .map_err(|status| from_status_like_fdio!(status))?,
+        );
+        let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+        let symlink = node.fs().create_node_with_id(
+            Box::new(RemoteSymlink { zxio }),
+            attrs.id,
+            get_mode(&attrs)?,
+            FsCred::root(),
+        );
+        update_into_from_attrs(&mut symlink.info_write(), &attrs);
+        Ok(symlink)
     }
 }
 
@@ -646,6 +677,24 @@ impl FileOps for RemotePipeObject {
     }
 }
 
+struct RemoteSymlink {
+    zxio: Arc<syncio::Zxio>,
+}
+
+impl FsNodeOps for RemoteSymlink {
+    fs_node_impl_symlink!();
+
+    fn readlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
+        Ok(SymlinkTarget::Path(
+            self.zxio.read_link().map_err(|status| from_status_like_fdio!(status))?.to_vec(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -657,6 +706,7 @@ mod test {
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_fs::{directory, file};
+    use fxfs_testing::TestFixture;
 
     #[::fuchsia::test]
     fn test_tree() -> Result<(), anyhow::Error> {
@@ -781,5 +831,36 @@ mod test {
         let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
         assert!(fd.to_handle(&kernel).expect("to_handle").is_some());
+    }
+
+    #[::fuchsia::test(threads = 2)]
+    async fn test_symlink() {
+        let fixture = TestFixture::new().await;
+
+        {
+            let (kernel, current_task) = create_kernel_and_task();
+            let (server, client) = zx::Channel::create();
+            fixture
+                .root()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+                .expect("clone failed");
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(&kernel, client, rights).expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            let root = ns.root();
+            root.symlink(&current_task, b"symlink", b"target").expect("symlink failed");
+
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = root
+                .lookup_child(&current_task, &mut context, b"symlink")
+                .expect("lookup_child failed");
+
+            match child.readlink(&current_task).expect("readlink failed") {
+                SymlinkTarget::Path(path) => assert_eq!(path, b"target"),
+                SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
+            }
+        }
+
+        fixture.close().await;
     }
 }

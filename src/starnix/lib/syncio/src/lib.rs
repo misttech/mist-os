@@ -753,8 +753,9 @@ impl Zxio {
         unsafe { Ok(std::slice::from_raw_parts(target, target_len)) }
     }
 
-    pub fn create_symlink(&self, name: &str, target: &[u8]) -> Result<(), zx::Status> {
+    pub fn create_symlink(&self, name: &str, target: &[u8]) -> Result<Zxio, zx::Status> {
         let name = name.as_bytes();
+        let zxio = Zxio::default();
         let status = unsafe {
             zxio::zxio_create_symlink(
                 self.as_ptr(),
@@ -762,9 +763,11 @@ impl Zxio {
                 name.len(),
                 target.as_ptr(),
                 target.len(),
+                zxio.as_storage_ptr(),
             )
         };
-        Ok(zx::ok(status)?)
+        zx::ok(status)?;
+        Ok(zxio)
     }
 }
 

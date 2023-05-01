@@ -92,7 +92,8 @@ zx_status_t zxio_default_sendmsg(zxio_t* io, const struct msghdr* msg, int flags
 zx_status_t zxio_default_ioctl(zxio_t* io, int request, int16_t* out_code, va_list va);
 zx_status_t zxio_default_read_link(zxio_t* io, const uint8_t** out_target, size_t* out_target_len);
 zx_status_t zxio_default_create_symlink(zxio_t* io, const char* name, size_t name_len,
-                                        const uint8_t* target, size_t target_len);
+                                        const uint8_t* target, size_t target_len,
+                                        zxio_storage_t* storage);
 
 // An ops table filled with the default implementations.
 //

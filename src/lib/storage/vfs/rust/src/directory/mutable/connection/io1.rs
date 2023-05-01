@@ -155,7 +155,9 @@ impl MutableConnection {
             | fio::DirectoryRequest::Watch { .. }) => {
                 return this.as_mut().base.handle_request(request).await;
             }
-            fio::DirectoryRequest::CreateSymlink { responder, name, target, .. } => {
+            fio::DirectoryRequest::CreateSymlink {
+                responder, name, target, connection, ..
+            } => {
                 if !this.base.options.rights.contains(fio::Operations::MODIFY_DIRECTORY) {
                     responder.send(&mut Err(zx::Status::ACCESS_DENIED.into_raw()))?;
                 } else if !validate_name(&name) {
@@ -166,7 +168,7 @@ impl MutableConnection {
                             .as_mut()
                             .base
                             .directory
-                            .create_symlink(name, target)
+                            .create_symlink(name, target, connection)
                             .await
                             .map_err(|s| s.into_raw()),
                     )?;

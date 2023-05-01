@@ -118,6 +118,7 @@ rustc_library("fxfs-testing") {
   features = [ "tracing" ]
   visibility = [
     "//sdk/lib/zxio/tests/*",
+    "//src/starnix/kernel/*",
     "//src/storage/fxfs/*",
   ]
 }

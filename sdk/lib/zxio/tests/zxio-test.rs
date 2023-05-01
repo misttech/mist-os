@@ -31,7 +31,9 @@ async fn test_symlink() {
 
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
 
-        dir_zxio.create_symlink("symlink", b"target").expect("create_symlink failed");
+        let symlink_zxio =
+            dir_zxio.create_symlink("symlink", b"target").expect("create_symlink failed");
+        assert_eq!(symlink_zxio.read_link().expect("read_link failed"), b"target");
 
         // Test some error cases
         assert_eq!(

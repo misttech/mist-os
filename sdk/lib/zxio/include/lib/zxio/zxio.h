@@ -507,9 +507,11 @@ ZXIO_EXPORT zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target,
 
 // Creates a symbolic link.
 //
-// See fuchsia.io's CreateSymlink method.
+// See fuchsia.io's CreateSymlink method. `storage` is optional storage which, if specified, will be
+// initialized with a connection to the successfully created symlink.
 ZXIO_EXPORT zx_status_t zxio_create_symlink(zxio_t* io, const char* name, size_t name_len,
-                                            const uint8_t* target, size_t target_len);
+                                            const uint8_t* target, size_t target_len,
+                                            zxio_storage_t* storage);
 
 __END_CDECLS
 

@@ -896,6 +896,7 @@ extern "C" {
         name_len: usize,
         target: *const u8,
         target_len: usize,
+        storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
 #[repr(C)]
