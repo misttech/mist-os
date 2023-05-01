@@ -568,7 +568,6 @@
                 "ProcPidStatusTest.Threads",
                 "ProcPidStatTest.VmStats",
                 "ProcPidCmdline.SubprocessSeekCmdline",
-                "ProcPidEnviron.MatchesEnviron",
                 "ProcPidSymlink.SubprocessRunning",
                 "ProcPidSymlink.SubprocessZombied",
                 "ProcPidSymlink.SubprocessExited",

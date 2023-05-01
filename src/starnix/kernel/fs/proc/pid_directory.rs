@@ -47,6 +47,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"environ", EnvironFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o444));
     dir.subdir(b"attr", 0o555, |dir| {
         dir.entry_creds(task.as_fscred());
@@ -394,6 +395,58 @@ impl FileOps for CmdlineFile {
             let len = argv_end.ptr().checked_sub(argv_start.ptr()).unwrap_or(0);
             let mut buf = vec![0u8; len];
             let len = self.task.mm.read_memory_partial(argv_start, &mut buf)?;
+            sink.write(&buf[..len]);
+            Ok(None)
+        };
+        self.seq.lock().read_at(current_task, iter, offset, data)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOSYS)
+    }
+}
+
+/// `EnvironFile` implements the `FsNodeOps` for a `proc/<pid>/environ` file.
+pub struct EnvironFile {
+    /// The task from which the `EnvironFile` fetches the command line parameters.
+    task: Arc<Task>,
+    seq: Mutex<SeqFileState<()>>,
+}
+
+impl EnvironFile {
+    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        let task = Arc::clone(task);
+        SimpleFileNode::new(move || {
+            Ok(EnvironFile { task: Arc::clone(&task), seq: Default::default() })
+        })
+    }
+}
+
+impl FileOps for EnvironFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let iter = move |_, sink: &mut SeqFileBuf| {
+            let (environ_start, environ_end) = {
+                let mm_state = self.task.mm.state.read();
+                (mm_state.environ_start, mm_state.environ_end)
+            };
+            #[allow(clippy::manual_saturating_arithmetic)]
+            let len = environ_end.ptr().checked_sub(environ_start.ptr()).unwrap_or(0);
+            let mut buf = vec![0u8; len];
+            let len = self.task.mm.read_memory_partial(environ_start, &mut buf)?;
             sink.write(&buf[..len]);
             Ok(None)
         };

@@ -19,6 +19,8 @@ struct StackResult {
     stack_pointer: UserAddress,
     argv_start: UserAddress,
     argv_end: UserAddress,
+    environ_start: UserAddress,
+    environ_end: UserAddress,
 }
 
 fn populate_initial_stack(
@@ -44,11 +46,12 @@ fn populate_initial_stack(
     }
     let argv_start = stack_pointer;
 
+    let environ_end = stack_pointer;
     for env in environ.iter().rev() {
         stack_pointer -= env.as_bytes_with_nul().len();
         write_stack(env.as_bytes_with_nul(), stack_pointer)?;
     }
-    let env_start = stack_pointer;
+    let environ_start = stack_pointer;
 
     // Write the path used with execve.
     stack_pointer -= path.to_bytes_with_nul().len();
@@ -83,7 +86,7 @@ fn populate_initial_stack(
     }
     main_data.extend_from_slice(&ZERO);
     // environ
-    let mut next_env_addr = env_start;
+    let mut next_env_addr = environ_start;
     for env in environ {
         main_data.extend_from_slice(&next_env_addr.ptr().to_ne_bytes());
         next_env_addr += env.as_bytes_with_nul().len();
@@ -100,7 +103,7 @@ fn populate_initial_stack(
     stack_pointer -= stack_pointer.ptr() % 16;
     write_stack(main_data.as_slice(), stack_pointer)?;
 
-    Ok(StackResult { stack_pointer, argv_start, argv_end })
+    Ok(StackResult { stack_pointer, argv_start, argv_end, environ_start, environ_end })
 }
 
 struct LoadedElf {
@@ -451,6 +454,8 @@ pub fn load_executable(
     mm_state.stack_start = stack.stack_pointer;
     mm_state.argv_start = stack.argv_start;
     mm_state.argv_end = stack.argv_end;
+    mm_state.environ_start = stack.environ_start;
+    mm_state.environ_end = stack.environ_end;
 
     Ok(ThreadStartInfo { entry, stack: stack.stack_pointer, dt_debug_address })
 }
