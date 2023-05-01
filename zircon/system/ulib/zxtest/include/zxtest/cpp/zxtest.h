@@ -82,6 +82,11 @@
 
 #define LIB_ZXTEST_REGISTER_FN(TestCase, Test) TestCase##_##Test##_register_fn
 
+// Group our constructor functions to enforce a specific call order. In particular, we want to be
+// sure that parametrized tests are registered before being instanced.
+#define LIB_ZXTEST_CTOR_GROUP_REGISTER __attribute__((constructor(101)))
+#define LIB_ZXTEST_CTOR_GROUP_INSTANTIATE __attribute__((constructor(102)))
+
 // Note: We intentionally wrap the assignment in a constructor function, to workaround the issue
 // where in certain builds (both debug and production), the compiler would generated a global
 // initiatialization function for the runtime, which would push a huge amount of memory into the
@@ -89,7 +94,7 @@
 #define LIB_ZXTEST_REGISTER(TestCase, Test, Fixture)                                            \
   LIB_ZXTEST_TEST_CLASS_DECL(Fixture, LIB_ZXTEST_TEST_CLASS(TestCase, Test));                   \
   static zxtest::TestRef LIB_ZXTEST_TEST_REF(TestCase, Test) = {};                              \
-  static void LIB_ZXTEST_REGISTER_FN(TestCase, Test)(void) __attribute__((constructor));        \
+  static void LIB_ZXTEST_REGISTER_FN(TestCase, Test)(void) LIB_ZXTEST_CTOR_GROUP_REGISTER;      \
   void LIB_ZXTEST_REGISTER_FN(TestCase, Test)(void) {                                           \
     LIB_ZXTEST_TEST_REF(TestCase, Test) =                                                       \
         zxtest::Runner::GetInstance()                                                           \
@@ -98,15 +103,15 @@
   }                                                                                             \
   LIB_ZXTEST_BEGIN_TEST_BODY(LIB_ZXTEST_TEST_CLASS(TestCase, Test))
 
-#define LIB_ZXTEST_REGISTER_PARAMETERIZED(TestSuite, Test)                                \
-  LIB_ZXTEST_TEST_CLASS_DECL(TestSuite, LIB_ZXTEST_TEST_CLASS(TestSuite, Test));          \
-  static void LIB_ZXTEST_REGISTER_FN(TestSuite, Test)(void) __attribute__((constructor)); \
-  void LIB_ZXTEST_REGISTER_FN(TestSuite, Test)(void) {                                    \
-    zxtest::Runner::GetInstance()->AddParameterizedTest<TestSuite>(                       \
-        std::make_unique<zxtest::internal::AddTestDelegateImpl<                           \
-            TestSuite, TestSuite::ParamType, LIB_ZXTEST_TEST_CLASS(TestSuite, Test)>>(),  \
-        #TestSuite, #Test, {.filename = __FILE__, .line_number = __LINE__});              \
-  }                                                                                       \
+#define LIB_ZXTEST_REGISTER_PARAMETERIZED(TestSuite, Test)                                  \
+  LIB_ZXTEST_TEST_CLASS_DECL(TestSuite, LIB_ZXTEST_TEST_CLASS(TestSuite, Test));            \
+  static void LIB_ZXTEST_REGISTER_FN(TestSuite, Test)(void) LIB_ZXTEST_CTOR_GROUP_REGISTER; \
+  void LIB_ZXTEST_REGISTER_FN(TestSuite, Test)(void) {                                      \
+    zxtest::Runner::GetInstance()->AddParameterizedTest<TestSuite>(                         \
+        std::make_unique<zxtest::internal::AddTestDelegateImpl<                             \
+            TestSuite, TestSuite::ParamType, LIB_ZXTEST_TEST_CLASS(TestSuite, Test)>>(),    \
+        #TestSuite, #Test, {.filename = __FILE__, .line_number = __LINE__});                \
+  }                                                                                         \
   LIB_ZXTEST_BEGIN_TEST_BODY(LIB_ZXTEST_TEST_CLASS(TestSuite, Test))
 
 #define TEST(TestCase, Test) LIB_ZXTEST_REGISTER(TestCase, Test, LIB_ZXTEST_DEFAULT_FIXTURE)
@@ -141,17 +146,17 @@
 #define LIB_ZXTEST_INSTANTIATION_NAME_FN(...) \
   LIB_ZXTEST_NAME_GENERATOR_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
-#define INSTANTIATE_TEST_SUITE_P(Prefix, TestSuite, ...)                                        \
-  static void LIB_ZXTEST_REGISTER_FN(Prefix, TestSuite)(void) __attribute__((constructor));     \
-  void LIB_ZXTEST_REGISTER_FN(Prefix, TestSuite)(void) {                                        \
-    static zxtest::internal::ValueProvider<TestSuite::ParamType> provider(                      \
-        LIB_ZXTEST_EXPAND_(LIB_ZXTEST_GET_FIRST_(__VA_ARGS__)));                                \
-    zxtest::Runner::GetInstance()->AddInstantiation<TestSuite, TestSuite::ParamType>(           \
-        std::make_unique<                                                                       \
-            zxtest::internal::AddInstantiationDelegateImpl<TestSuite, TestSuite::ParamType>>(), \
-        #Prefix, {.filename = __FILE__, .line_number = __LINE__}, provider,                     \
-        LIB_ZXTEST_INSTANTIATION_NAME_FN(__VA_ARGS__));                                         \
-  }                                                                                             \
+#define INSTANTIATE_TEST_SUITE_P(Prefix, TestSuite, ...)                                         \
+  static void LIB_ZXTEST_REGISTER_FN(Prefix, TestSuite)(void) LIB_ZXTEST_CTOR_GROUP_INSTANTIATE; \
+  void LIB_ZXTEST_REGISTER_FN(Prefix, TestSuite)(void) {                                         \
+    static zxtest::internal::ValueProvider<TestSuite::ParamType> provider(                       \
+        LIB_ZXTEST_EXPAND_(LIB_ZXTEST_GET_FIRST_(__VA_ARGS__)));                                 \
+    zxtest::Runner::GetInstance()->AddInstantiation<TestSuite, TestSuite::ParamType>(            \
+        std::make_unique<                                                                        \
+            zxtest::internal::AddInstantiationDelegateImpl<TestSuite, TestSuite::ParamType>>(),  \
+        #Prefix, {.filename = __FILE__, .line_number = __LINE__}, provider,                      \
+        LIB_ZXTEST_INSTANTIATION_NAME_FN(__VA_ARGS__));                                          \
+  }                                                                                              \
   static int LIB_ZXTEST_TEST_REF(Prefix, TestSuite) __attribute__((unused)) = 0
 
 // Definition of operations used to evaluate assertion conditions.

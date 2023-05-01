@@ -126,4 +126,12 @@ TEST_P(ConstructorTestChild, BasicTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Prefix, ConstructorTestChild, ::zxtest::Values(2));
+
+class InstantiatedBeforeRegisteringTest : public zxtest::TestWithParam<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(InstantiatedBeforeRegisteringClass, InstantiatedBeforeRegisteringTest,
+                         ::zxtest::Values(true));
+
+TEST_P(InstantiatedBeforeRegisteringTest, SomeName) {}
+
 }  // namespace
