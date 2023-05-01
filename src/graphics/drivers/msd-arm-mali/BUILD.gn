@@ -70,6 +70,7 @@ driver_bind_rules("msd_arm_test_bind") {
 }
 
 entry_deps = [
+  "src:parent_device_dfv1",
   "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
   "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",
   "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_wire",

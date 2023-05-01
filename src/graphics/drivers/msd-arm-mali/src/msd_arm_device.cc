@@ -515,8 +515,8 @@ int MsdArmDevice::DeviceThreadLoop() {
 
   DLOG("DeviceThreadLoop starting thread 0x%lx", device_thread_id_->id());
 
-  const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.device");
+  const bool applied_role =
+      parent_device_->SetThreadRole("fuchsia.graphics.drivers.msd-arm-mali.device");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -621,8 +621,8 @@ int MsdArmDevice::GpuInterruptThreadLoop() {
   magma::PlatformThreadHelper::SetCurrentThreadName("Gpu InterruptThread");
   DLOG("GPU Interrupt thread started");
 
-  const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt");
+  const bool applied_role =
+      parent_device_->SetThreadRole("fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -864,8 +864,8 @@ int MsdArmDevice::MmuInterruptThreadLoop() {
   magma::PlatformThreadHelper::SetCurrentThreadName("MMU InterruptThread");
   DLOG("MMU Interrupt thread started");
 
-  const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt");
+  const bool applied_role =
+      parent_device_->SetThreadRole("fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -1674,7 +1674,7 @@ std::shared_ptr<DeviceRequest::Reply> MsdArmDevice::RunTaskOnDeviceThread(FitCal
 }
 
 void MsdArmDevice::SetCurrentThreadToDefaultPriority() {
-  magma::PlatformThreadHelper::SetRole(parent_device_->GetDeviceHandle(), "fuchsia.default");
+  parent_device_->SetThreadRole("fuchsia.default");
 }
 
 MsdArmDevice::InspectEvent::InspectEvent(inspect::Node* parent, std::string type) {

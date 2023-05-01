@@ -130,7 +130,7 @@ source_set("registers") {
 
   public_deps = [
     ":macros",
-    "platform:device",
+    "platform:mmio_header",
   ]
 }
 

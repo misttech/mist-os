@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "parent_device.h"
+#include "parent_device_dfv1.h"
 
 #include <lib/ddk/driver.h>
 
+#include "src/graphics/lib/magma/src/magma_util/platform/platform_thread.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"
 
@@ -13,17 +14,11 @@ msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device) {
   return reinterpret_cast<msd::DeviceHandle*>(device);
 }
 
-zx_device_t* ParentDevice::GetDeviceHandle() { return parent_; }
-
-bool ParentDevice::GetProtocol(uint32_t proto_id, void* proto_out) {
-  zx_status_t status = device_get_protocol(parent_, proto_id, proto_out);
-  if (status != ZX_OK) {
-    return DRETF(false, "device_get_protocol for %d failed: %d", proto_id, status);
-  }
-  return true;
+bool ParentDeviceDFv1::SetThreadRole(const char* role_name) {
+  return magma::PlatformThreadHelper::SetRole(parent_, role_name);
 }
 
-zx::bti ParentDevice::GetBusTransactionInitiator() const {
+zx::bti ParentDeviceDFv1::GetBusTransactionInitiator() const {
   zx::bti bti;
   zx_status_t status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK) {
@@ -34,7 +29,7 @@ zx::bti ParentDevice::GetBusTransactionInitiator() const {
   return bti;
 }
 
-std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(
+std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv1::CpuMapMmio(
     unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) {
   DLOG("CpuMapMmio index %d", index);
 
@@ -62,7 +57,7 @@ std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(
   return mmio;
 }
 
-std::unique_ptr<magma::PlatformInterrupt> ParentDevice::RegisterInterrupt(unsigned int index) {
+std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv1::RegisterInterrupt(unsigned int index) {
   zx::interrupt interrupt;
   zx_status_t status = pdev_.GetInterrupt(index, 0, &interrupt);
   if (status != ZX_OK)
@@ -71,8 +66,8 @@ std::unique_ptr<magma::PlatformInterrupt> ParentDevice::RegisterInterrupt(unsign
   return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(interrupt.release()));
 }
 
-zx_status_t ParentDevice::ConnectRuntimeProtocol(const char* service_name, const char* name,
-                                                 fdf::Channel server_end) {
+zx_status_t ParentDeviceDFv1::ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                                     fdf::Channel server_end) {
   return device_connect_runtime_protocol(parent_, service_name, name, server_end.release());
 }
 
@@ -89,5 +84,5 @@ std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_han
     return DRETP(nullptr, "Error requesting protocol: %d", status);
   }
 
-  return std::make_unique<ParentDevice>(zx_device, pdev);
+  return std::make_unique<ParentDeviceDFv1>(zx_device, pdev);
 }

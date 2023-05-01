@@ -5,7 +5,6 @@
 #ifndef ZIRCON_PLATFORM_INTERRUPT_H
 #define ZIRCON_PLATFORM_INTERRUPT_H
 
-#include <lib/ddk/device.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/interrupt.h>

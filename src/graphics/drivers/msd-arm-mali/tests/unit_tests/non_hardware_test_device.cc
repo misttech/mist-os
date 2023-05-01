@@ -22,6 +22,13 @@
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
+// static
+std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle*) {
+  // This shouldn't be called with no hardware device.
+  DASSERT(false);
+  return nullptr;
+}
+
 namespace {
 class MaliMockMmioBase : public magma::PlatformMmio {
  public:
@@ -69,13 +76,12 @@ class FakePlatformInterrupt : public magma::PlatformInterrupt {
 
 class FakeParentDevice : public ParentDevice {
  public:
-  FakeParentDevice() : ParentDevice({}, {}) {}
+  FakeParentDevice() : ParentDevice() {}
 
-  zx_device_t* GetDeviceHandle() override { return nullptr; }
+  bool SetThreadRole(const char* role_name) override { return true; }
+  zx::bti GetBusTransactionInitiator() const override { return zx::bti(); }
 
-  bool GetProtocol(uint32_t proto_id, void* proto_out) override { return false; }
-
-  virtual std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
+  std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
       unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) override {
     auto mmio = CreateMockMmio(1024 * 1024);
 

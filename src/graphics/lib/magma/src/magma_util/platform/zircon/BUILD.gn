@@ -125,15 +125,26 @@ source_set("interrupt") {
   ]
 }
 
+source_set("mmio") {
+  configs += [ "..:platform_include_config" ]
+  sources = [
+    "zircon_platform_mmio.cc",
+    "zircon_platform_mmio.h",
+  ]
+  deps = [
+    "$magma_build_root/src/magma_util:macros",
+    "$magma_build_root/src/magma_util:short_macros",
+    "..:mmio_header",
+  ]
+  public_deps = [ "//src/devices/lib/mmio" ]
+}
+
 source_set("device") {
   configs += [ "..:platform_include_config" ]
 
   sources = [
     "zircon_platform_device.cc",
     "zircon_platform_device.h",
-    "zircon_platform_interrupt.h",
-    "zircon_platform_mmio.cc",
-    "zircon_platform_mmio.h",
     "zircon_platform_pci_device.cc",
     "zircon_platform_pci_device.h",
   ]
@@ -148,6 +159,7 @@ source_set("device") {
   deps = [
     ":bus_mapper",
     ":handle",
+    ":mmio",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:short_macros",
     "..:device_header",

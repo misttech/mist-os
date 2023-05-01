@@ -11,6 +11,7 @@
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
 #include "parent_device.h"
+#include "parent_device_dfv1.h"
 #include "platform_logger.h"
 
 namespace {

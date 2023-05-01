@@ -22,6 +22,7 @@
 
 #include "magma_util/platform/zircon/zircon_platform_status.h"
 #include "magma_util/short_macros.h"
+#include "parent_device_dfv1.h"
 #include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
