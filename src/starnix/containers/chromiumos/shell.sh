@@ -9,4 +9,4 @@ ffx component run >/dev/null 2>/dev/null \
 
 set -e
 
-ffx starnix console -m /core/starnix_runner/playground:starmium
+ffx starnix console -m /core/starnix_runner/playground:starmium /bin/bash

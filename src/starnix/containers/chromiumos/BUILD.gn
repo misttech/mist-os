@@ -3,15 +3,16 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/storage/ext4/ext4_to_pkg.gni")
 
 group("chromiumos") {
   deps = [ ":starmium" ]
 }
 
 if (target_cpu == "x64") {
-  resource("system_image") {
-    sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
-    outputs = [ "data/system.img" ]
+  ext4_to_pkg("system_image") {
+    input = "//prebuilt/starnix/chromiumos-image-amd64/system.img"
+    prefix = "data/system"
   }
 }
 

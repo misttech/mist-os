@@ -495,8 +495,9 @@ impl<T: 'static + Reader> Parser<T> {
             INode::from_reader_with_offset(&self.reader, inode_addr).expect("Failed reader");
 
         let sb = self.super_block().expect("No super block for inode");
-        let xattr_magic_addr =
-            inode_addr + MINIMUM_INODE_SIZE + u64::from(inode.e4di_extra_isize(sb)?);
+        let xattr_magic_addr = inode_addr
+            + MINIMUM_INODE_SIZE
+            + u64::from(inode.e4di_extra_isize(sb).unwrap_or_default());
 
         let mut magic = LEU32::ZERO;
         self.reader.read(xattr_magic_addr, magic.as_bytes_mut()).expect("Failed to read xattr");
