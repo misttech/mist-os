@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
+use ref_cast::RefCast;
+use smallvec::SmallVec;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -13,6 +16,8 @@ use crate::auth::FsCred;
 use crate::lock::Mutex;
 use crate::task::Kernel;
 use crate::types::{as_any::AsAny, *};
+
+const LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
@@ -23,12 +28,6 @@ pub struct FileSystem {
     /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
     /// this filesystem.
     pub dev_id: DeviceType,
-
-    /// Whether DirEntries added to this filesystem should be considered permanent, instead of a
-    /// cache of the backing storage. An example is tmpfs: the DirEntry tree *is* the backing
-    /// storage, as opposed to ext4, which uses the DirEntry tree as a cache and removes unused
-    /// nodes from it.
-    pub permanent_entries: bool,
 
     /// A file-system global mutex to serialize rename operations.
     ///
@@ -51,39 +50,56 @@ pub struct FileSystem {
     /// the cache.
     nodes: Mutex<HashMap<ino_t, Weak<FsNode>>>,
 
-    /// DirEntryHandle cache for the filesystem. Currently only used by filesystems that set the
-    /// permanent_entries flag, to store every node and make sure it doesn't get freed without
-    /// being explicitly unlinked.
-    entries: Mutex<HashMap<usize, DirEntryHandle>>,
+    /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
+    /// filesystems with permanent entries, this will hold a strong reference to every node to make
+    /// sure it doesn't get freed without being explicitly unlinked. Otherwise, entries are
+    /// maintained in an LRU cache.
+    entries: Entries,
 
     /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
     /// as the selinux label on any newly created inodes in the filesystem.
     pub selinux_context: OnceCell<FsString>,
 }
 
+enum Entries {
+    Permanent(Mutex<HashSet<ArcKey<DirEntry>>>),
+    Lru(Mutex<LinkedHashMap<ArcKey<DirEntry>, ()>>),
+    Uncached,
+}
+
+pub enum CacheMode {
+    /// Entries are pemanent, instead of a cache of the backing storage. An example is tmpfs: the
+    /// DirEntry tree *is* the backing storage, as opposed to ext4, which uses the DirEntry tree as
+    /// a cache and removes unused nodes from it.
+    Permanent,
+    /// Entries are cached.
+    Cached,
+    /// Entries are uncached. This can be appropriate in cases where it is difficult for the
+    /// filesystem to keep the cache coherent: e.g. the /proc/<pid>/task directory.
+    Uncached,
+}
+
 impl FileSystem {
     /// Create a new filesystem.
-    pub fn new(kernel: &Kernel, ops: impl FileSystemOps) -> FileSystemHandle {
-        Self::new_internal(kernel, ops, false)
-    }
-
-    /// Create a new filesystem with the permanent_entries flag set.
-    pub fn new_with_permanent_entries(
+    pub fn new(
         kernel: &Kernel,
+        cache_mode: CacheMode,
         ops: impl FileSystemOps,
     ) -> FileSystemHandle {
-        Self::new_internal(kernel, ops, true)
-    }
-
-    /// Create a new filesystem and call set_root in one step.
-    pub fn new_with_root(
-        kernel: &Kernel,
-        ops: impl FileSystemOps,
-        root_node: FsNode,
-    ) -> FileSystemHandle {
-        let fs = Self::new_with_permanent_entries(kernel, ops);
-        fs.set_root_node(root_node);
-        fs
+        Arc::new(FileSystem {
+            root: OnceCell::new(),
+            next_inode: AtomicU64::new(1),
+            ops: Box::new(ops),
+            dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
+            rename_mutex: Mutex::new(()),
+            nodes: Mutex::new(HashMap::new()),
+            entries: match cache_mode {
+                CacheMode::Permanent => Entries::Permanent(Mutex::new(HashSet::new())),
+                CacheMode::Cached => Entries::Lru(Mutex::new(LinkedHashMap::new())),
+                CacheMode::Uncached => Entries::Uncached,
+            },
+            selinux_context: OnceCell::new(),
+        })
     }
 
     pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
@@ -102,22 +118,8 @@ impl FileSystem {
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
     }
 
-    fn new_internal(
-        kernel: &Kernel,
-        ops: impl FileSystemOps,
-        permanent_entries: bool,
-    ) -> FileSystemHandle {
-        Arc::new(FileSystem {
-            root: OnceCell::new(),
-            next_inode: AtomicU64::new(1),
-            ops: Box::new(ops),
-            dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
-            permanent_entries,
-            rename_mutex: Mutex::new(()),
-            nodes: Mutex::new(HashMap::new()),
-            entries: Mutex::new(HashMap::new()),
-            selinux_context: OnceCell::new(),
-        })
+    pub fn has_permanent_entries(&self) -> bool {
+        matches!(self.entries, Entries::Permanent(_))
     }
 
     /// The root directory entry of this file system.
@@ -251,14 +253,51 @@ impl FileSystem {
     }
 
     pub fn did_create_dir_entry(&self, entry: &DirEntryHandle) {
-        if self.permanent_entries {
-            self.entries.lock().insert(Arc::as_ptr(entry) as usize, entry.clone());
+        match &self.entries {
+            Entries::Permanent(p) => {
+                p.lock().insert(ArcKey(entry.clone()));
+            }
+            Entries::Lru(l) => {
+                l.lock().insert(ArcKey(entry.clone()), ());
+            }
+            Entries::Uncached => {}
         }
     }
 
     pub fn will_destroy_dir_entry(&self, entry: &DirEntryHandle) {
-        if self.permanent_entries {
-            self.entries.lock().remove(&(Arc::as_ptr(entry) as usize));
+        match &self.entries {
+            Entries::Permanent(p) => {
+                p.lock().remove(ArcKey::ref_cast(entry));
+            }
+            Entries::Lru(l) => {
+                l.lock().remove(ArcKey::ref_cast(entry));
+            }
+            Entries::Uncached => {}
+        };
+    }
+
+    /// Informs the cache that the entry was used.
+    pub fn did_access_dir_entry(&self, entry: &DirEntryHandle) {
+        if let Entries::Lru(l) = &self.entries {
+            l.lock().get_refresh(ArcKey::ref_cast(entry));
+        }
+    }
+
+    /// Purges old entries from the cache. This is done as a separate step to avoid potential
+    /// deadlocks that could occur if done at admission time (where locks might be held that are
+    /// required when dropping old entries). This should be called after any new entries are
+    /// admitted with no locks held that might be required for dropping entries.
+    pub fn purge_old_entries(&self) {
+        if let Entries::Lru(l) = &self.entries {
+            let mut purged = SmallVec::<[DirEntryHandle; 4]>::new();
+            {
+                let mut l = l.lock();
+                while l.len() > LRU_CAPACITY {
+                    purged.push(l.pop_front().unwrap().0 .0);
+                }
+            }
+            // Entries will get dropped here whilst we're not holding a lock.
+            std::mem::drop(purged);
         }
     }
 

@@ -373,7 +373,7 @@ pub fn sys_bpf(
 pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new_with_permanent_entries(kernel, BpfFs);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs);
         let node = FsNode::new_root(BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT));
         {
             let mut info = node.info_write();

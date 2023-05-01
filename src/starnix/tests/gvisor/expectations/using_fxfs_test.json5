@@ -55,6 +55,9 @@
                 // creat_test
                 "CreatTest.CreatTruncatesExistingFile",
 
+                // exec_test
+                "ExecTest.SymlinkLimitRefreshedForInterpreter",
+
                 // exec_binary_test
                 "ElfTest.MissingHeader",
                 "ElfTest.OutOfBoundsPhdrs",

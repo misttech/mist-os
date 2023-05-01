@@ -609,7 +609,7 @@ impl FileObject {
         node: FsNodeHandle,
         flags: OpenFlags,
     ) -> FileHandle {
-        assert!(!node.fs().permanent_entries);
+        assert!(!node.fs().has_permanent_entries());
         Self::new(ops, NamespaceNode::new_anonymous(DirEntry::new_unrooted(node)), flags)
     }
 

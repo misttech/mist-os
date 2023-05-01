@@ -6,8 +6,8 @@ use {
     crate::{
         fs::{
             buffers::{InputBuffer, OutputBuffer},
-            fileops_impl_nonseekable, fs_args, FdNumber, FileObject, FileOps, FileSystem,
-            FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
+            fileops_impl_nonseekable, fs_args, CacheMode, FdNumber, FileObject, FileOps,
+            FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
         },
         task::CurrentTask,
         types::{errno, error, statfs, Errno, OpenFlags},
@@ -53,7 +53,7 @@ pub fn new_fuse_fs(task: &CurrentTask, data: &FsStr) -> Result<FileSystemHandle,
     let state =
         task.files.get(fd)?.downcast_file::<DevFuse>().ok_or_else(|| errno!(EINVAL))?.state.clone();
 
-    let fs = FileSystem::new(task.kernel(), FuseFs::new(state));
+    let fs = FileSystem::new(task.kernel(), CacheMode::Uncached, FuseFs::new(state));
     fs.set_root_node(FsNode::new_root(FuseNode {}));
     Ok(fs)
 }

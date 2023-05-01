@@ -64,7 +64,10 @@ impl RemoteBundle {
         );
         let mut root_node = FsNode::new_root(DirectoryObject);
         root_node.inode_num = ext4_metadata::ROOT_INODE_NUM;
-        Ok(FileSystem::new_with_root(kernel, RemoteBundle { metadata, root, rights }, root_node))
+        let fs =
+            FileSystem::new(kernel, CacheMode::Cached, RemoteBundle { metadata, root, rights });
+        fs.set_root_node(root_node);
+        Ok(fs)
     }
 
     // Returns the bundle from the filesystem.  Panics if the filesystem isn't associated with a

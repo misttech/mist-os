@@ -11,9 +11,9 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
-    fs_node_impl_dir_readonly, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString,
-    MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
+    fs_node_impl_dir_readonly, CacheMode, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle,
+    FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr,
+    FsString, MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
 };
 use crate::lock::{Mutex, MutexGuard, RwLock};
 use crate::logging::*;
@@ -3884,7 +3884,7 @@ fn make_binder_nodes(current_task: &CurrentTask, dir: &DirEntryHandle) -> Result
 
 impl BinderFs {
     pub fn new_fs(current_task: &CurrentTask) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new_with_permanent_entries(current_task.kernel(), BinderFs);
+        let fs = FileSystem::new(current_task.kernel(), CacheMode::Permanent, BinderFs);
         fs.set_root(BinderFsDir);
         make_binder_nodes(current_task, fs.root())?;
         Ok(fs)

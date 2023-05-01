@@ -17,5 +17,5 @@ impl FileSystemOps for SocketFs {
 
 /// Returns a handle to the `SocketFs` instance in `kernel`, initializing it if needed.
 pub fn socket_fs(kernel: &Kernel) -> &FileSystemHandle {
-    kernel.socket_fs.get_or_init(|| FileSystem::new(kernel, SocketFs))
+    kernel.socket_fs.get_or_init(|| FileSystem::new(kernel, CacheMode::Uncached, SocketFs))
 }

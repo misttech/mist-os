@@ -20,7 +20,7 @@ impl FileSystemOps for SysFs {
 
 impl SysFs {
     fn new_fs(kernel: &Arc<Kernel>) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new_with_permanent_entries(kernel, SysFs);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.subdir(b"fs", 0o755, |dir| {
             dir.subdir(b"selinux", 0o755, |_| ());

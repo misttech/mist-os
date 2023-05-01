@@ -79,7 +79,7 @@ impl TmpFs {
     }
 
     pub fn new_fs_with_data(kernel: &Kernel, data: &FsStr) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new_with_permanent_entries(kernel, Arc::new(TmpFs(())));
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())));
         fs.set_root(TmpfsDirectory::new());
         let root_node = &fs.root().node;
         let mut mount_options = fs_args::generic_parse_mount_options(data);

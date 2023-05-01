@@ -501,14 +501,13 @@ impl DirEntry {
         old_parent.node.check_access(current_task, Access::WRITE)?;
         new_parent.node.check_access(current_task, Access::WRITE)?;
 
+        // The mount_eq check in sys_renameat ensures that the nodes we're touching are part of the
+        // same file system. It doesn't matter where we grab the FileSystem reference from.
+        let fs = old_parent.node.fs();
+
         // We need to hold these DirEntryHandles until after we drop all the
         // locks so that we do not deadlock when we drop them.
         let (renamed, maybe_replaced) = {
-            // The mount_eq check in sys_renameat ensures that the nodes we're
-            // touching are part of the same file system. It doesn't matter
-            // where we grab the FileSystem reference from.
-            let fs = old_parent.node.fs();
-
             // Before we take any locks, we need to take the rename mutex on
             // the file system. This lock ensures that no other rename
             // operations are happening in this file system while we're
@@ -631,6 +630,8 @@ impl DirEntry {
             (renamed, maybe_replaced)
         };
 
+        fs.purge_old_entries();
+
         if let Some(replaced) = maybe_replaced {
             replaced.node.fs().will_destroy_dir_entry(&replaced);
         }
@@ -680,12 +681,14 @@ impl DirEntry {
         // The user must be able to search the directory (requires the EXEC permission)
         self.node.check_access(current_task, Access::EXEC)?;
 
-        let mut children = self.lock_children();
-        if let Some(child) = children.children.get(name).and_then(Weak::upgrade) {
+        if let Some(child) = self.children.read().get(name).and_then(Weak::upgrade) {
+            child.node.fs().did_access_dir_entry(&child);
             return Ok((child, true));
         }
 
-        children.get_or_create_child(name, create_fn)
+        let (child, exists) = self.lock_children().get_or_create_child(name, create_fn)?;
+        child.node.fs().purge_old_entries();
+        Ok((child, exists))
     }
 
     // This function is only useful for tests and has some oddities.
@@ -752,33 +755,34 @@ impl<'a> DirEntryLockedChildren<'a> {
             let entry = DirEntry::new(node, Some(self.entry.clone()), name.to_vec());
             #[cfg(any(test, debug_assertions))]
             {
-                // Take the lock on child while holding the one on the parent to ensure any wrong ordering
-                // will trigger the tracing-mutex at the right call site.
+                // Take the lock on child while holding the one on the parent to ensure any wrong
+                // ordering will trigger the tracing-mutex at the right call site.
                 let _l1 = entry.state.read();
             }
             Ok(entry)
         };
 
-        match self.children.entry(name.to_vec()) {
+        let child = match self.children.entry(name.to_vec()) {
             Entry::Vacant(entry) => {
                 let child = create_child()?;
                 entry.insert(Arc::downgrade(&child));
-                child.node.fs().did_create_dir_entry(&child);
-                Ok((child, false))
+                child
             }
             Entry::Occupied(mut entry) => {
-                // It's possible that the upgrade will succeed this time around
-                // because we dropped the read lock before acquiring the write
-                // lock. Another thread might have populated this entry while
-                // we were not holding any locks.
+                // It's possible that the upgrade will succeed this time around because we dropped
+                // the read lock before acquiring the write lock. Another thread might have
+                // populated this entry while we were not holding any locks.
                 if let Some(child) = Weak::upgrade(entry.get()) {
+                    child.node.fs().did_access_dir_entry(&child);
                     return Ok((child, true));
                 }
                 let child = create_child()?;
                 entry.insert(Arc::downgrade(&child));
-                Ok((child, false))
+                child
             }
-        }
+        };
+        child.node.fs().did_create_dir_entry(&child);
+        Ok((child, false))
     }
 }
 
