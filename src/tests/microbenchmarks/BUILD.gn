@@ -240,20 +240,12 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     deps = [ ":no_op_executable_in_test_dir($host_toolchain)" ]
   }
 
-  # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
-  resource("data_tmp_target") {
-    sources = [ "//src/starnix/containers/placeholder" ]
-    outputs = [ "data/tmp/.placeholder" ]
-  }
-
   group("container_resources") {
-    if (target_cpu == "x64") {
-      deps = [
-        ":data_tmp_target",
-        "//src/starnix/containers:default_init",
-        "//src/starnix/tests/syscalls:container_resources",
-      ]
-    }
+    deps = [
+      "//src/starnix/containers:data_tmp_target",
+      "//src/starnix/containers:default_init",
+      "//src/starnix/containers/debian:system_image",
+    ]
   }
 
   fuchsia_test_package("starnix_microbenchmarks_unittestmode") {
