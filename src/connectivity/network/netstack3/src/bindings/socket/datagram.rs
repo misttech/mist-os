@@ -1667,11 +1667,15 @@ where
                     &mut self.get_bound_device().map(|d| d.unwrap_or("".to_string()))
                 );
             }
-            fposix_socket::SynchronousDatagramSocketRequest::SetBroadcast {
-                value: _,
-                responder,
-            } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::SynchronousDatagramSocketRequest::SetBroadcast { value, responder } => {
+                // We allow a no-op since the core does not yet support limiting
+                // broadcast packets. Until we implement this, we leave this as a
+                // no-op so that applications needing to send broadcast packets may
+                // make progress.
+                //
+                // TODO(https://fxbug.dev/126299): Actually implement SO_BROADCAST.
+                let mut response = if value { Ok(()) } else { Err(fposix::Errno::Eopnotsupp) };
+                responder_send!(responder, &mut response);
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetBroadcast { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));

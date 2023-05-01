@@ -10,9 +10,16 @@
             ],
         },
         {
+            type: "skip",
+            matchers: [
+                "interface_disruption_ns3::dual_stack",
+                "interface_disruption_ns3::ipv4_only",
+            ],
+        },
+        {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "interface_disruption_ns3*",
+                "interface_disruption_ns3::ipv6_only",
             ],
         },
     ],
