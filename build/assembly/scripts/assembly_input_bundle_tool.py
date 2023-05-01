@@ -16,6 +16,11 @@ from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, P
 from serialization.serialization import instance_from_dict, json_dumps, json_load
 logger = logging.getLogger()
 
+BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
+    "fshost",
+    "qux"  # test package
+]
+
 
 def create_bundle(args: argparse.Namespace) -> None:
     """Create an Assembly Input Bundle (AIB).
@@ -186,6 +191,10 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
 
             main_def = instance_from_dict(
                 CompiledPackageMainDefinition, package_def)
+            if main_def.bootfs_unpackaged and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST:
+                raise ValueError(
+                    f"Compiled package {main_def.name} not in bootfs allowlist!"
+                )
             aib_creator.compiled_packages.append(main_def)
 
 

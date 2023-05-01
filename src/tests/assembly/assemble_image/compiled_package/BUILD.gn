@@ -42,6 +42,8 @@ if (is_host) {
           "/outdir/foo/bar/bar.cm",
       get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
           "/outdir/foo/baz/baz.cm",
+      get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
+          "/outdir/qux/qux/qux.cm",
     ]
     deps = [ ":compiled_package" ]
   }

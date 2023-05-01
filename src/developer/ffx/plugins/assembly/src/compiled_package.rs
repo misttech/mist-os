@@ -56,6 +56,11 @@ impl CompiledPackageBuilder {
                 if self.main_definition.is_some() {
                     bail!("Duplicate main definition for package {name}");
                 }
+
+                if def.bootfs_unpackaged && !def.contents.is_empty() {
+                    bail!("Failure adding {}. Bootfs compiled packages should only define components, not contents", def.name);
+                }
+
                 self.main_definition = Some(def.clone());
                 self.main_bundle_dir = bundle_dir.as_ref().into();
             }
@@ -102,51 +107,87 @@ impl CompiledPackageBuilder {
         Ok(())
     }
 
-    /// Build the components for the package and the package itself.
-    ///
-    /// Returns a path to the package manifest
-    pub fn build(self, cmc_tool: &dyn Tool, outdir: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
-        self.validate()?;
+    fn build_component(
+        &self,
+        cmc_tool: &dyn Tool,
+        component_name: &String,
+        cml: &Utf8PathBuf,
+        outdir: impl AsRef<Utf8Path>,
+    ) -> Result<Utf8PathBuf> {
+        let mut component_builder = ComponentBuilder::new(component_name);
+        component_builder.add_shard(self.main_bundle_dir.join(cml)).with_context(|| {
+            format!("Adding cml for component: '{component_name}' to package: '{}'", &self.name)
+        })?;
+
+        if let Some(cml_shards) = self.component_shards.get(component_name) {
+            for cml_shard in cml_shards {
+                component_builder.add_shard(cml_shard.as_path()).with_context(|| {
+                    format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
+                })?;
+            }
+        }
+
+        component_builder.build(
+            &outdir,
+            cmc_tool,
+            self.main_bundle_dir.join("compiled_packages").join("include"),
+        )
+    }
+
+    /// Build the compiled package as files in bootfs
+    fn build_bootfs(
+        &self,
+        cmc_tool: &dyn Tool,
+        bootfs_files: &mut BTreeMap<String, Utf8PathBuf>,
+        main_definition: &MainPackageDefinition,
+        outdir: impl AsRef<Utf8Path>,
+    ) -> Result<()> {
         let outdir = outdir.as_ref().join(&self.name);
 
-        let main_definition = self.main_definition.as_ref().context("no main definition")?;
+        if !main_definition.contents.is_empty() {
+            bail!("Failure adding {}. Bootfs compiled packages should only define components, not contents", &main_definition.name);
+        }
+
+        for (component_name, cml) in &main_definition.components {
+            let component_manifest_path = &self
+                .build_component(cmc_tool, component_name, cml, &outdir)
+                .with_context(|| format!("building component {component_name}"))?;
+            let component_manifest_file_name =
+                component_manifest_path.file_name().context("component file name")?;
+            let component_path = format!("meta/{component_manifest_file_name}");
+            bootfs_files.insert(component_path, component_manifest_path.to_owned());
+        }
+
+        Ok(())
+    }
+
+    /// Build the compiled package as a package
+    fn build_package(
+        &self,
+        cmc_tool: &dyn Tool,
+        main_definition: &MainPackageDefinition,
+        outdir: impl AsRef<Utf8Path>,
+    ) -> Result<Utf8PathBuf> {
+        self.validate()?;
+        let outdir = outdir.as_ref().join(&self.name);
 
         let mut package_builder = PackageBuilder::new(&self.name);
         package_builder.repository("fuchsia.com");
 
         for (component_name, cml) in &main_definition.components {
-            let mut component_builder = ComponentBuilder::new(component_name);
-            component_builder.add_shard(self.main_bundle_dir.join(cml)).with_context(|| {
-                format!("Adding cml for component: '{component_name}' to package: '{}'", &self.name)
-            })?;
-
-            if let Some(cml_shards) = self.component_shards.get(component_name) {
-                for cml_shard in cml_shards {
-                    component_builder.add_shard(cml_shard.as_path()).with_context(|| {
-                        format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
-                    })?;
-                }
-            }
-
-            let component_manifest_path = component_builder
-                .build(
-                    &outdir,
-                    cmc_tool,
-                    self.main_bundle_dir.join("compiled_packages").join("include"),
-                )
+            let component_manifest_path = &self
+                .build_component(cmc_tool, component_name, cml, &outdir)
                 .with_context(|| format!("building component {component_name}"))?;
             let component_manifest_file_name =
                 component_manifest_path.file_name().context("component file name")?;
 
-            package_builder.add_file_to_far(
-                format!("meta/{component_manifest_file_name}"),
-                component_manifest_path,
-            )?;
+            let component_path = format!("meta/{component_manifest_file_name}");
+            package_builder.add_file_to_far(component_path, component_manifest_path)?;
         }
 
         for entry in &main_definition.contents {
             package_builder
-                .add_file_as_blob(&entry.destination, self.main_bundle_dir.join(&entry.source))?;
+                .add_file_as_blob(&entry.destination, &self.main_bundle_dir.join(&entry.source))?;
         }
 
         let package_manifest_path = outdir.join("package_manifest.json");
@@ -156,6 +197,27 @@ impl CompiledPackageBuilder {
         package_builder.build(&outdir, metafar_path).context("building package")?;
 
         Ok(package_manifest_path)
+    }
+
+    /// Build the components for the package and either build the package
+    /// or extract the contents to bootfs
+    ///
+    /// Returns a path to the package manifest, if we actually build a package
+    pub fn build(
+        self,
+        cmc_tool: &dyn Tool,
+        bootfs_files: &mut BTreeMap<String, Utf8PathBuf>,
+        outdir: impl AsRef<Utf8Path>,
+    ) -> Result<Option<Utf8PathBuf>> {
+        let main_definition = &self.main_definition.as_ref().context("no main definition")?;
+        if main_definition.bootfs_unpackaged {
+            match self.build_bootfs(cmc_tool, bootfs_files, main_definition, outdir) {
+                Ok(()) => Ok(Option::None),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(Option::Some(self.build_package(cmc_tool, main_definition, outdir)?))
+        }
     }
 }
 
@@ -190,6 +252,7 @@ mod tests {
                         destination: "file1".into(),
                     }],
                     includes: Vec::default(),
+                    bootfs_unpackaged: false,
                 }),
                 outdir,
             )
@@ -227,6 +290,7 @@ mod tests {
                         destination: "file1".into()
                     }],
                     includes: Vec::default(),
+                    bootfs_unpackaged: false,
                 })
             }
         );
@@ -238,6 +302,7 @@ mod tests {
         let tools = FakeToolProvider::default();
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
+        let mut bootfs_files = BTreeMap::new();
         make_test_package_and_components(outdir);
 
         compiled_package_builder
@@ -253,6 +318,7 @@ mod tests {
                         destination: "file1".into(),
                     }],
                     includes: Vec::default(),
+                    bootfs_unpackaged: false,
                 }),
                 outdir,
             )
@@ -269,7 +335,9 @@ mod tests {
             )
             .unwrap();
 
-        compiled_package_builder.build(tools.get_tool("cmc").unwrap().as_ref(), outdir).unwrap();
+        compiled_package_builder
+            .build(tools.get_tool("cmc").unwrap().as_ref(), &mut bootfs_files, outdir)
+            .unwrap();
 
         let compiled_package_file = File::open(outdir.join("foo/foo.far")).unwrap();
         let mut far_reader = Utf8Reader::new(&compiled_package_file).unwrap();
@@ -294,6 +362,25 @@ mod tests {
                 components: BTreeMap::new(),
                 contents: Vec::default(),
                 includes: Vec::default(),
+                bootfs_unpackaged: false,
+            }),
+            "assembly/input/bundle/path/compiled_packages/include",
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn add_package_def_with_bootfs_with_contents_returns_err() {
+        let mut compiled_package_builder = CompiledPackageBuilder::new("bar");
+
+        let result = compiled_package_builder.add_package_def(
+            &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
+                name: "bar".into(),
+                components: BTreeMap::new(),
+                contents: vec![FileEntry { source: "file1".into(), destination: "file1".into() }],
+                includes: Vec::default(),
+                bootfs_unpackaged: true,
             }),
             "assembly/input/bundle/path/compiled_packages/include",
         );

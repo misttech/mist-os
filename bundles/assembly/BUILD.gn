@@ -1067,6 +1067,19 @@ assembly_input_bundle("example_assembly_bundle") {
       ]
     },
 
+    {
+      name = "qux"
+      components = [
+        {
+          component_name = "qux"
+          shards = rebase_path(
+                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
+                  root_build_dir)
+        },
+      ]
+      bootfs_unpackaged = true
+    },
+
     # Add a shard to the `core` package which should have a main definition
     # in the legacy bundle
     {

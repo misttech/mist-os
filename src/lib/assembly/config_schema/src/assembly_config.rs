@@ -86,6 +86,10 @@ pub struct MainPackageDefinition {
     /// CML files included by the component cml.
     #[serde(default)]
     pub includes: Vec<Utf8PathBuf>,
+    /// Whether the contents of this package should go into bootfs.
+    /// Gated by allowlist -- please use this as a base package if possible.
+    #[serde(default)]
+    pub bootfs_unpackaged: bool,
 }
 
 /// Additional contents of the package to be defined in

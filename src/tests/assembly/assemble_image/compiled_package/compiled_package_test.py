@@ -41,6 +41,27 @@ class CompiledPackageTest(unittest.TestCase):
             os.path.exists(os.path.join(outdir, "foo/baz/baz.cm")),
             "The baz component should have been compiled")
 
+    def test_assembly_has_bootfs_compiled_packages(self):
+        outdir = os.path.join(assembly_outdir, "outdir")
+        manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
+
+        self.assertNotIn(
+            os.path.join(outdir, "qux",
+                         "package_manifest.json"), manifest["base"],
+            "The image assembly config should not have qux in the base package list since it should be in bootfs"
+        )
+
+        self.assertIn(
+            "meta/qux.cm",
+            [blob['destination'] for blob in manifest["bootfs_files"]],
+            "The image assembly config should have meta/qux.cm in the bootfs files"
+        )
+
+        # Make sure the components were compiled
+        self.assertTrue(
+            os.path.exists(os.path.join(outdir, "qux/qux/qux.cm")),
+            "The qux component should have been compiled")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -475,7 +475,19 @@ impl ImageAssemblyConfigBuilder {
 
         let cmc_tool = tools.get_tool("cmc")?;
 
-        // add structured config value files to bootfs
+        // Add dynamically compiled packages first so they are all present
+        // and can be repackaged and configured
+        for (_, package_builder) in packages_to_compile {
+            let package_manifest_path = package_builder
+                .build(cmc_tool.as_ref(), &mut bootfs_files.entries, outdir)
+                .context("building compiled package")?;
+
+            if let Some(p) = package_manifest_path {
+                base.add_package_from_path(p).context("adding compiled package")?;
+            };
+        }
+
+        // Add structured config value files to bootfs
         let mut bootfs_repackager = Repackager::for_bootfs(&mut bootfs_files.entries, outdir);
         for (component, values) in bootfs_structured_config {
             // check if we should try to configure the component before attempting so we can still
@@ -487,11 +499,11 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
-        // repackage any matching packages
+        // Repackage any matching packages
         for (package, config) in &package_configs {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
-                // get the manifest for this package name, returning the set from which it was removed
+                // Get the manifest for this package name, returning the set from which it was removed
                 if let Some((manifest, source_package_set)) = remove_package_from_sets(
                     package,
                     [&mut base, &mut cache, &mut system, &mut bootfs_packages],
@@ -567,13 +579,6 @@ impl ImageAssemblyConfigBuilder {
                 shell_commands_builder.build(outdir).context("building shell commands package")?;
             base.add_package_from_path(manifest)
                 .context("adding shell commands package to base")?;
-        }
-
-        for (_, package_builder) in packages_to_compile {
-            let package_manifest_path = package_builder
-                .build(cmc_tool.as_ref(), outdir)
-                .context("building compiled package")?;
-            base.add_package_from_path(package_manifest_path).context("adding compiled package")?;
         }
 
         // Construct a single "partial" config from the combined fields, and
@@ -1212,6 +1217,7 @@ mod tests {
                 ]),
                 contents: Vec::default(),
                 includes: Vec::default(),
+                bootfs_unpackaged: false,
             },
         ));
         let bundle2 = AssemblyInputBundle {
