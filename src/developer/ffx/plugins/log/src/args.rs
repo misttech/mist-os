@@ -9,7 +9,7 @@ use diagnostics_data::Severity;
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::SessionSpec;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
-use std::time::Duration;
+use std::{ops::Deref, time::Duration};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TimeFormat {
@@ -32,6 +32,29 @@ impl std::str::FromStr for TimeFormat {
                 s
             )),
         }
+    }
+}
+
+/// Date/time structure containing a "now"
+/// field, set if it should be interpreted as the
+/// current time (used to call Subscribe instead of SnapshotThenSubscribe).
+#[derive(PartialEq, Clone, Debug)]
+pub struct DetailedDateTime {
+    pub time: DateTime<Local>,
+    pub is_now: bool,
+}
+
+impl Deref for DetailedDateTime {
+    type Target = DateTime<Local>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.time
+    }
+}
+
+impl From<DateTime<Local>> for DetailedDateTime {
+    fn from(value: DateTime<Local>) -> Self {
+        DetailedDateTime { is_now: false, time: value }
     }
 }
 
@@ -110,7 +133,7 @@ pub struct LogCommand {
 
     /// show only logs after a certain time
     #[argh(option, from_str_fn(parse_time))]
-    pub since: Option<DateTime<Local>>,
+    pub since: Option<DetailedDateTime>,
 
     /// show only logs after a certain time (as a monotonic
     /// timestamp: seconds from the target's boot time).
@@ -119,7 +142,7 @@ pub struct LogCommand {
 
     /// show only logs until a certain time
     #[argh(option, from_str_fn(parse_time))]
-    pub until: Option<DateTime<Local>>,
+    pub until: Option<DetailedDateTime>,
 
     /// show only logs until a certain time (as a monotonic
     /// timestamp: seconds since the target's boot time).
@@ -236,8 +259,9 @@ pub struct DumpCommand {
     pub session: SessionSpec,
 }
 
-pub fn parse_time(value: &str) -> Result<DateTime<Local>, String> {
+pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
     let d = parse_date_string(value, Local::now(), Dialect::Us)
+        .map(|time| DetailedDateTime { time, is_now: value == "now" })
         .map_err(|e| format!("invalid date string: {}", e));
     d
 }
@@ -279,6 +303,18 @@ fn log_interest_selector(s: &str) -> Result<LogInterestSelector, String> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_parse_time() {
+        assert_eq!(parse_time("now").unwrap().is_now, true);
+        let date_string = "04/20/2020";
+        let res = parse_time(date_string).unwrap();
+        assert_eq!(res.is_now, false);
+        assert_eq!(
+            res.date(),
+            parse_date_string(date_string, Local::now(), Dialect::Us).unwrap().date()
+        );
+    }
 
     #[test]
     fn test_session_spec_non_zero() {

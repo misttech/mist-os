@@ -723,11 +723,16 @@ async fn log_cmd<W: std::io::Write>(
     let stream_mode = if matches!(sub_command, LogSubCommand::Dump(..)) {
         StreamMode::SnapshotAll
     } else {
-        if cmd.since.is_some() {
-            StreamMode::SnapshotAllThenSubscribe
-        } else {
-            StreamMode::SnapshotRecentThenSubscribe
-        }
+        cmd.since
+            .as_ref()
+            .map(|value| {
+                if value.is_now {
+                    StreamMode::Subscribe
+                } else {
+                    StreamMode::SnapshotAllThenSubscribe
+                }
+            })
+            .unwrap_or(StreamMode::SnapshotRecentThenSubscribe)
     };
 
     let nodename = if let Some(rcs) = rcs_opt {
@@ -799,7 +804,7 @@ mod test {
     use super::*;
     use diagnostics_data::{LogsDataBuilder, LogsField, LogsProperty, Timestamp};
     use errors::ResultExt as _;
-    use ffx_log_args::DumpCommand;
+    use ffx_log_args::{parse_time, DumpCommand};
     use ffx_log_test_utils::{
         setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
     };
@@ -1023,6 +1028,91 @@ mod test {
         let cmd = LogCommand::default();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
+            ..Default::default()
+        };
+        let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
+        let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
+        let log3 = make_log_entry(LogData::MalformedTargetLog("text2".to_string()));
+
+        let expected_responses = vec![
+            FakeArchiveIteratorResponse::new_with_values(vec![
+                serde_json::to_string(&log1).unwrap(),
+                serde_json::to_string(&log2).unwrap(),
+            ]),
+            FakeArchiveIteratorResponse::new_with_values(vec![
+                serde_json::to_string(&log3).unwrap()
+            ]),
+        ];
+
+        let mut writer = Vec::new();
+        log_cmd(
+            setup_fake_daemon_server(params, Arc::new(expected_responses)),
+            setup_fake_rcs(),
+            &setup_fake_log_settings_proxy(vec![]),
+            &mut formatter,
+            cmd,
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.is_empty());
+        formatter.assert_same_logs(vec![Ok(log1), Ok(log2), Ok(log3)])
+    }
+
+    #[fuchsia::test]
+    async fn test_watch_since_arbitrary_timestamp() {
+        let mut formatter = FakeLogFormatter::new();
+        let mut cmd = LogCommand::default();
+        let date_string = "04/20/2020";
+        let ts = parse_time(date_string).unwrap();
+        cmd.since = Some(ts.clone());
+        let params = DaemonDiagnosticsStreamParameters {
+            stream_mode: Some(StreamMode::SnapshotAllThenSubscribe),
+            min_timestamp_nanos: Some(TimeBound::Absolute(ts.timestamp_nanos() as u64)),
+            ..Default::default()
+        };
+        let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
+        let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
+        let log3 = make_log_entry(LogData::MalformedTargetLog("text2".to_string()));
+
+        let expected_responses = vec![
+            FakeArchiveIteratorResponse::new_with_values(vec![
+                serde_json::to_string(&log1).unwrap(),
+                serde_json::to_string(&log2).unwrap(),
+            ]),
+            FakeArchiveIteratorResponse::new_with_values(vec![
+                serde_json::to_string(&log3).unwrap()
+            ]),
+        ];
+
+        let mut writer = Vec::new();
+        log_cmd(
+            setup_fake_daemon_server(params, Arc::new(expected_responses)),
+            setup_fake_rcs(),
+            &setup_fake_log_settings_proxy(vec![]),
+            &mut formatter,
+            cmd,
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.is_empty());
+        formatter.assert_same_logs(vec![Ok(log1), Ok(log2), Ok(log3)])
+    }
+
+    #[fuchsia::test]
+    async fn test_watch_since_now() {
+        let mut formatter = FakeLogFormatter::new();
+        let mut cmd = LogCommand::default();
+        let now_ts = parse_time("now").unwrap();
+        cmd.since = Some(now_ts.clone());
+        let params = DaemonDiagnosticsStreamParameters {
+            stream_mode: Some(StreamMode::Subscribe),
+            min_timestamp_nanos: Some(TimeBound::Absolute(now_ts.timestamp_nanos() as u64)),
             ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
@@ -1795,7 +1885,7 @@ mod test {
     async fn test_from_time_passed_to_daemon() {
         let mut formatter = FakeLogFormatter::new();
         let cmd = LogCommand {
-            since: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0)),
+            since: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0).into()),
             since_monotonic: None,
             until: None,
             until_monotonic: None,
@@ -1863,7 +1953,7 @@ mod test {
     async fn test_multiple_from_time_args_fails() {
         let mut formatter = FakeLogFormatter::new();
         let cmd = LogCommand {
-            since: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0)),
+            since: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0).into()),
             since_monotonic: Some(default_ts()),
             until: None,
             until_monotonic: None,
@@ -1895,7 +1985,7 @@ mod test {
     async fn test_multiple_to_time_args_fails() {
         let mut formatter = FakeLogFormatter::new();
         let cmd = LogCommand {
-            until: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0)),
+            until: Some(Local.timestamp(FAKE_START_TIMESTAMP, 0).into()),
             until_monotonic: Some(default_ts()),
             since: None,
             since_monotonic: None,
