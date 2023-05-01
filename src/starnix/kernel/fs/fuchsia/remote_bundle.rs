@@ -171,18 +171,13 @@ impl FileOps for DirectoryObject {
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
+        emit_dotdot(file, sink)?;
+
         let bundle = RemoteBundle::from_fs(&file.fs);
-        let mut child_iter =
+        let child_iter =
             bundle.get_node(file.node().inode_num).directory().ok_or(errno!(EIO))?.children.iter();
 
-        // Skip to the iterator position.
-        for _ in 0..sink.offset() {
-            if child_iter.next().is_none() {
-                return Ok(());
-            }
-        }
-
-        for (name, inode_num) in child_iter {
+        for (name, inode_num) in child_iter.skip(sink.offset() as usize - 2) {
             let node = bundle.metadata.get(*inode_num).ok_or(errno!(EIO))?;
             sink.add(
                 *inode_num,
@@ -428,6 +423,8 @@ mod test {
         assert_eq!(
             sink.entries,
             [
+                (b".".to_vec(), (test_dir.entry.node.inode_num, DirectoryEntryType::DIR)),
+                (b"..".to_vec(), (root.entry.node.inode_num, DirectoryEntryType::DIR)),
                 (b"file".to_vec(), (test_file.node().inode_num, DirectoryEntryType::REG)),
                 (b"symlink".to_vec(), (test_symlink.entry.node.inode_num, DirectoryEntryType::LNK))
             ]
