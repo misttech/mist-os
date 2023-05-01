@@ -310,7 +310,7 @@ template("syscall_test_suite") {
     },
     {
       label = ns3_label
-      component = "//src/connectivity/network/netstack3:component"
+      component = "//src/connectivity/network/netstack3:component-debug"
       expectations = ":${netstack3_expectations_target}"
       manifest = "meta/netstack3/${suite_label}_syscall_tests.cml"
     },

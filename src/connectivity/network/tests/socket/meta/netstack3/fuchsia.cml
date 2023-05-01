@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/connectivity/network/netstack3/meta/client.shard.cml",
+        "//src/connectivity/network/netstack3/meta/client-debug.shard.cml",
         "//src/connectivity/network/tests/socket/meta/test_with_expectations.shard.cml",
     ],
     program: {

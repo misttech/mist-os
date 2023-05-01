@@ -57,7 +57,7 @@ fuchsia_component("configurable-netstack-netstack3") {
   manifest = "meta/configurable-netstack-netstack3.cml"
   deps = [
     ":bin",
-    "//src/connectivity/network/netstack3:component",
+    "//src/connectivity/network/netstack3:component-debug",
   ]
 }
 

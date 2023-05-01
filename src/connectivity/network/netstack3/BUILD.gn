@@ -127,7 +127,7 @@ fuchsia_component("component") {
 # Component with debugging instrumentation enabled. This should be used for
 # tests but not benchmarks.
 fuchsia_component("component-debug") {
-  component_name = "netstack3"
+  component_name = "netstack3-debug"
   manifest = "meta/netstack3_debug.cml"
   deps = [ ":bin-instrumented" ]
   testonly = true
