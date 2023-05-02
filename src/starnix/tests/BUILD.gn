@@ -17,14 +17,14 @@ group("tests") {
     "syscalls:tests",
   ]
 
-  if (target_cpu == "x64") {
-    deps += [ ":test_chromiumos_distro" ]
-
-    # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
-    # ASAN.
-    if (!is_asan) {
-      deps += [ ":test_starnix_magma" ]
+  # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
+  # ASAN.
+  if (target_cpu == "x64" && !is_asan) {
+    if (host_os == "linux" && host_cpu == "x64" && !is_asan) {
+      deps += [ ":starnix_user_tests" ]
     }
+
+    deps += [ ":starnix_magma_tests" ]
   }
 }
 
@@ -38,41 +38,24 @@ expect_includes("starnix_test_with_expectations") {
 }
 
 group("container_resources") {
-  deps = [ "//src/starnix/containers:default_init" ]
-
-  if (target_cpu == "x64") {
-    deps += [
-      "//src/starnix/containers:data_tmp_target",
-      "//src/starnix/containers/chromiumos:system_image",
-    ]
-  }
-}
-
-fuchsia_component("sh_test") {
-  testonly = true
-  check_references = false
-  manifest = "meta/sh_test.cml"
+  deps = [
+    "//src/starnix/containers:data_tmp_target",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/containers/debian:system_image",
+  ]
 }
 
 if (host_os == "linux" && host_cpu == "x64") {
   starnix_host_test_component("fdio-test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"
   }
-}
 
-fuchsia_test_package("test_chromiumos_distro") {
-  test_components = [ ":sh_test" ]
+  fuchsia_test_package("starnix_user_tests") {
+    test_components = [ ":fdio-test" ]
 
-  # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
-  # ASAN.
-  if (host_os == "linux" && host_cpu == "x64" && !is_asan) {
-    test_components += [ ":fdio-test" ]
-  }
-
-  if (target_cpu == "x64") {
+    deps = [ ":container_resources" ]
     subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
   }
-  deps = [ ":container_resources" ]
 }
 
 if (target_cpu == "x64") {
@@ -86,7 +69,7 @@ if (target_cpu == "x64") {
         "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
   }
 
-  fuchsia_test_package("test_starnix_magma") {
+  fuchsia_test_package("starnix_magma_tests") {
     test_components = [
       ":virtmagma_conformance_tests",
       # TODO(fxbug.dev/104611) - enable this when all tests passing
@@ -94,7 +77,6 @@ if (target_cpu == "x64") {
     ]
 
     deps = [ ":container_resources" ]
-
     subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
     test_specs = {

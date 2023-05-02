@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/starnix/containers/chromiumos/meta/chromiumos_container.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container.shard.cml",
         "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {
         binary: "data/tests/fdio-test",
         args: [ "--gtest_filter=BadFdTest.*:DirectoryTest.*:EventFdTest.*:Poll.*:Pipe2.*:MmapTest.*:UnistdTest.*-UnistdTest/OpenCreate.*" ],
-        environ: [ "TEST_TMPDIR=/data/tmp" ],
+        environ: [ "TEST_TMPDIR=/tmp" ],
     },
 }
