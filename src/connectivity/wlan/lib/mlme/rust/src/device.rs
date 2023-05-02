@@ -245,9 +245,10 @@ impl DeviceOps for Device {
         passive_scan_args: PassiveScanArgs,
     ) -> Result<u64, zx::Status> {
         let mut out_scan_id = 0;
+        let passive_scan_request = StartPassiveScanRequest::from(passive_scan_args);
         let status = (self.raw_device.start_passive_scan)(
             self.raw_device.device,
-            StartPassiveScanRequest::from(passive_scan_args).to_banjo_ptr(),
+            passive_scan_request.to_banjo_ptr(),
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|()| out_scan_id)
@@ -255,9 +256,10 @@ impl DeviceOps for Device {
 
     fn start_active_scan(&mut self, active_scan_args: ActiveScanArgs) -> Result<u64, zx::Status> {
         let mut out_scan_id = 0;
+        let active_scan_request = StartActiveScanRequest::from(active_scan_args);
         let status = (self.raw_device.start_active_scan)(
             self.raw_device.device,
-            StartActiveScanRequest::from(active_scan_args).to_banjo_ptr(),
+            active_scan_request.to_banjo_ptr(),
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|()| out_scan_id)
@@ -585,6 +587,10 @@ mod convert {
             &self.banjo_args
         }
 
+        /// Returns a raw pointer to the `banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest`
+        /// that `StartPassiveScanRequest` owns. The caller must ensure that the
+        /// `StartPassiveScanRequest` outlives the pointer this function returns, or else it
+        /// will end up pointing to garbage.
         pub fn to_banjo_ptr(
             &self,
         ) -> *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
@@ -618,6 +624,10 @@ mod convert {
             &self.banjo_args
         }
 
+        /// Returns a raw pointer to the `banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest`
+        /// that `StartActiveScanRequest` owns. The caller must ensure that the
+        /// `StartActiveScanRequest` outlives the pointer this function returns, or else it
+        /// will end up pointing to garbage.
         pub fn to_banjo_ptr(&self) -> *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
             &self.banjo_args as *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest
         }
