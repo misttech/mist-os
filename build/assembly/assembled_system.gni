@@ -127,7 +127,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [scope] Arguments to add to fshost's configuration. These
 #     arguments come before other arguments set by build args.
 #
-#   skip_fshost (default: false)
+#   use_assembly_fshost (default: false)
 #   [boolean] Whether to build the fshost component
 #
 #   cmdline (optional)
@@ -535,17 +535,13 @@ template("assembled_system") {
     devmgr_config = invoker.devmgr_config
   }
 
-  skip_fshost = defined(invoker.skip_fshost) && invoker.skip_fshost
+  use_assembly_fshost =
+      defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
 
-  if (skip_fshost) {
-    assert(!defined(fshost_config),
-           "fshost_config should not be set when skip_fshost is true")
-  } else {
-    fshost_config = {
-    }
-    if (defined(invoker.fshost_config)) {
-      fshost_config = invoker.fshost_config
-    }
+  fshost_config = {
+  }
+  if (defined(invoker.fshost_config)) {
+    fshost_config = invoker.fshost_config
   }
 
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
@@ -564,34 +560,32 @@ template("assembled_system") {
   }
 
   # Compile the fshost component and configuration needed for this assembly
-  if (!skip_fshost) {
-    fshost_component_and_config(labels.fshost) {
-      # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
-      # changes behavior to create a non-bootable fshost if testly is set to true.
-      testonly = false
+  fshost_component_and_config(labels.fshost) {
+    # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
+    # changes behavior to create a non-bootable fshost if testly is set to true.
+    testonly = false
 
-      # Correct the component name since the target_name is per-image.
-      component_name = "fshost"
+    # Correct the component name since the target_name is per-image.
+    component_name = "fshost"
 
-      # This is picked up by the `cmc_merge()` within `fshost_cml()`, through its
-      # use of foward_variables_from(invoker, ["output_name" ...]).
-      output_name = files.fshost_merged_cml
+    # This is picked up by the `cmc_merge()` within `fshost_cml()`, through its
+    # use of foward_variables_from(invoker, ["output_name" ...]).
+    output_name = files.fshost_merged_cml
 
-      options = {
-        # Use the defaults from the build args set in generated_fshost_config.gni
-        data_filesystem_format = data_filesystem_format
-        use_disk_migration = use_disk_migration
+    options = {
+      # Use the defaults from the build args set in generated_fshost_config.gni
+      data_filesystem_format = data_filesystem_format
+      use_disk_migration = use_disk_migration
 
-        # Override with anything passed from `fshost_config`
-        forward_variables_from(fshost_config, "*")
+      # Override with anything passed from `fshost_config`
+      forward_variables_from(fshost_config, "*")
 
-        # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
-        if (ramdisk_in_zbi) {
-          ramdisk_image = true
-        }
-
-        fxfs_blob = fxfs_blob
+      # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
+      if (ramdisk_in_zbi) {
+        ramdisk_image = true
       }
+
+      fxfs_blob = fxfs_blob
     }
   }
 
@@ -651,7 +645,7 @@ template("assembled_system") {
     bootfs_labels = invoker.bootfs_labels
 
     bootfs_labels += [ kernel_image ]
-    if (!skip_fshost) {
+    if (!use_assembly_fshost) {
       bootfs_labels += [ ":${labels.fshost}" ]
     }
 
