@@ -8,13 +8,17 @@ load(":providers.bzl", "FuchsiaSizeCheckerInfo", "FuchsiaUpdatePackageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 UPDATE_BUDGET_TEMPLATE = """{
-    "name": "Update Package",
-    "budget_bytes": %s,
-    "creep_budget_bytes": %s,
-    "merge": false,
-    "packages": [
-        "%s",
-    ],
+    "package_set_budgets": [
+        {
+            "name": "Update Package",
+            "budget_bytes": %s,
+            "creep_budget_bytes": %s,
+            "merge": false,
+            "packages": [
+                "%s",
+            ],
+        }
+    ]
 }
 """
 
