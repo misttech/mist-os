@@ -124,9 +124,11 @@ pub struct StartCommand {
     pub monitor: bool,
 
     /// name of this emulator instance. This is used to identify the instance in other commands and
-    /// tools. Default is "fuchsia-emulator".
-    #[argh(option, default = "\"fuchsia-emulator\".to_string()")]
-    pub name: String,
+    /// tools. Default is "fuchsia-emulator". This value can also be set via configuration using the
+    /// key `emu.name`.
+    #[argh(option)]
+    #[ffx_config_default(key = "emu.name", default = "fuchsia-emulator")]
+    pub name: Option<String>,
 
     /// specify the networking mode for the emulator. Allowed values are "none" which disables
     /// networking, "tap" which attaches to a Tun/Tap interface, "user" which sets up mapped ports

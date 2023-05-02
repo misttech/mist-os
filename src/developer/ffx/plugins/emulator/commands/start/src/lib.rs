@@ -16,6 +16,8 @@ use std::str::FromStr;
 mod editor;
 mod pbm;
 
+pub(crate) const DEFAULT_NAME: &str = "fuchsia-emulator";
+
 #[cfg(test)]
 use mockall::{automock, predicate::*};
 
@@ -136,14 +138,21 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
 
 async fn get_engine(cmd: &mut StartCommand) -> Result<Box<dyn EmulatorEngine>> {
     if cmd.reuse && cmd.config.is_none() {
-        let mut name = Some(cmd.name.clone());
+        // Set the name from the default, and make sure it is not empty.
+        let name_from_cmd = cmd.name().await?;
+        let mut name = if &name_from_cmd == "" {
+            Some(crate::DEFAULT_NAME.into())
+        } else {
+            Some(name_from_cmd)
+        };
+
         let engine_result = get_engine_by_name(&mut name)
             .await
             .or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?;
 
         if let Some(engine) = engine_result {
             // Set the cmd name to the engine name.
-            cmd.name = name.unwrap();
+            cmd.name = name;
             return Ok(engine);
         } else {
             let message = format!(
@@ -166,6 +175,7 @@ mod tests {
     use anyhow::bail;
     use async_trait::async_trait;
     use emulator_instance::RuntimeConfig;
+    use ffx_config::ConfigLevel;
     use ffx_emulator_config::EmulatorEngine;
     use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
     use std::process::Command;
@@ -338,7 +348,7 @@ mod tests {
         let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
 
         let mut cmd = StartCommand::default();
-        cmd.name = "".to_string();
+        cmd.name = Some("".to_string());
         cmd.reuse = true;
         cmd.config = None;
         new_engine_ctx.expect().times(0);
@@ -351,7 +361,35 @@ mod tests {
             .times(1);
 
         let _ = get_engine(&mut cmd).await?;
-        assert_eq!(cmd.name, "NewName".to_string());
+        assert_eq!(cmd.name().await?, "NewName".to_string());
+        Ok(())
+    }
+
+    // Check that if DoesExist, then cmd.name is updated too
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_updates_cmd_name_when_blank() -> Result<()> {
+        let env = ffx_config::test_init().await.unwrap();
+        env.context.query("emu.name").level(Some(ConfigLevel::User)).set("".into()).await?;
+
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        cmd.name = None;
+        cmd.reuse = true;
+        cmd.config = None;
+        new_engine_ctx.expect().times(0);
+        get_engine_by_name_ctx
+            .expect()
+            .returning(|name| {
+                assert_eq!(name, &Some(DEFAULT_NAME.to_string()));
+                Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            })
+            .times(1);
+
+        let _ = get_engine(&mut cmd).await?;
+        assert_eq!(cmd.name().await?, DEFAULT_NAME.to_string());
         Ok(())
     }
 

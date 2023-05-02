@@ -88,7 +88,7 @@ async fn apply_command_line_options(
         emu_config.host.log = PathBuf::from(env::current_dir()?).join(log);
     } else {
         // TODO(http://fxbug.dev/116262): Move logs to ffx log dir so `ffx doctor` collects them.
-        let instance = get_instance_dir(&cmd.name, false).await?;
+        let instance = get_instance_dir(&cmd.name().await?, false).await?;
         emu_config.host.log = instance.join("emulator.log");
     }
 
@@ -178,7 +178,7 @@ async fn apply_command_line_options(
     emu_config.runtime.startup_timeout = Duration::from_secs(cmd.startup_timeout().await?);
     emu_config.runtime.hidpi_scaling = cmd.hidpi_scaling;
     emu_config.runtime.addl_kernel_args = cmd.kernel_args.clone();
-    emu_config.runtime.name = cmd.name.clone();
+    emu_config.runtime.name = cmd.name().await?;
     emu_config.runtime.instance_directory =
         get_instance_dir(&emu_config.runtime.name, true).await?;
     emu_config.runtime.reuse = cmd.reuse;
@@ -208,7 +208,7 @@ async fn apply_command_line_options(
     }
 
     // Any generated values or values from ffx_config.
-    emu_config.runtime.mac_address = generate_mac_address(&cmd.name);
+    emu_config.runtime.mac_address = generate_mac_address(&cmd.name().await?);
     let upscript: String = ffx_config::get(EMU_UPSCRIPT_FILE)
         .await
         .context("Getting upscript path from ffx config")?;
@@ -311,7 +311,7 @@ mod tests {
             hidpi_scaling: true,
             log: Some(PathBuf::from("/path/to/log")),
             monitor: false,
-            name: "SomeName".to_string(),
+            name: Some("SomeName".to_string()),
             net: Some("tap".to_string()),
             verbose: true,
             ..Default::default()
