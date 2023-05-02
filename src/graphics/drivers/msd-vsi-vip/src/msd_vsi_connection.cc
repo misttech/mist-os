@@ -105,7 +105,7 @@ void MsdVsiConnection::QueueReleasedMappings(std::vector<std::shared_ptr<GpuMapp
     } else {
       // It's an error to release a buffer while it has inflight mappings, as that
       // can fault the gpu.
-      DMESSAGE("buffer %lu mapping use_count %zd", mapping->BufferId(), use_count);
+      MAGMA_LOG(WARNING, "buffer %lu mapping use_count %zd", mapping->BufferId(), use_count);
       if (!killed) {
         SendContextKilled();
         killed = true;
