@@ -4258,6 +4258,14 @@ From //third_party/openweave-core/config.gni:13
 
 From //src/recovery/system/system_recovery_args.gni:8
 
+### integration_tests_verbose_logging
+
+By default, log verbose font messages in tests.
+
+**Current value (from the default):** `true`
+
+From //src/fonts/tests/integration/BUILD.gn:21
+
 ### is_analysis
 
 If set, the build will produce compilation analysis dumps, used for code
@@ -7838,6 +7846,14 @@ Platform portability header for spinel.
 **Current value (from the default):** `"\"spinel_platform.h\""`
 
 From //third_party/openthread/src/lib/spinel/BUILD.gn:32
+
+### src_fonts_verbose_logging
+
+Used in the structured configuration below.
+
+**Current value (from the default):** `false`
+
+From //src/fonts/BUILD.gn:15
 
 ### stack_size_section
 
