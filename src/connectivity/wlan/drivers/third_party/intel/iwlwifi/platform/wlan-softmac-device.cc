@@ -226,9 +226,34 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
   // Remove it first.
   wlan_channel_t channel = {
       .primary = request->channel().primary,
-      .cbw = (channel_bandwidth_t)request->channel().cbw,
       .secondary80 = request->channel().secondary80,
   };
+
+  switch (request->channel().cbw) {
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW20;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW40;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40Below:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW40BELOW;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW80;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw160:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW160;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80P80:
+      channel.cbw = CHANNEL_BANDWIDTH_CBW80P80;
+      break;
+    default:
+      IWL_ERR(this, "Bandwidth (%u) is not supported",
+              static_cast<uint32_t>(request->channel().cbw));
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
+  }
 
   status = mac_set_channel(mvmvif_, &channel);
   if (status != ZX_OK) {
