@@ -266,7 +266,7 @@ impl AdvertisingProxyInner {
                 let local_name_copy = local_name.to_string();
 
                 // Prepare versions of the addresses for use in FIDL call.
-                let mut addrs = addresses
+                let addrs = addresses
                     .iter()
                     .map(|x| {
                         fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address {
@@ -279,7 +279,7 @@ impl AdvertisingProxyInner {
                     .mdns_proxy_host_publisher
                     .publish_proxy_host(
                         local_name,
-                        &mut addrs.iter_mut(),
+                        &addrs,
                         ProxyHostPublicationOptions {
                             perform_probe: Some(false),
                             ..Default::default()

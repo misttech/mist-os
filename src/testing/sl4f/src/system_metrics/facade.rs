@@ -30,8 +30,7 @@ impl SystemMetricsFacade {
         connect_to_protocol::<MetricsLoggerMarker>()?
             .start_logging(
                 CLIENT_ID,
-                &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })]
-                    .into_iter(),
+                &[Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })],
                 params.duration_ms,
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
@@ -47,8 +46,7 @@ impl SystemMetricsFacade {
         connect_to_protocol::<MetricsLoggerMarker>()?
             .start_logging_forever(
                 CLIENT_ID,
-                &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })]
-                    .into_iter(),
+                &[Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })],
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
             )

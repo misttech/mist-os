@@ -746,14 +746,13 @@ mod tests {
         // Create a logging request.
         let mut _query = runner.proxy.start_logging(
             "test",
-            &mut vec![
-                &mut Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
-                &mut Metric::Temperature(Temperature {
+            &[
+                Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
+                Metric::Temperature(Temperature {
                     sampling_interval_ms: 100,
                     statistics_args: None,
                 }),
-            ]
-            .into_iter(),
+            ],
             1000,
             false,
             false,
@@ -906,7 +905,7 @@ mod tests {
         // Start logging every 100ms for a total of 2000ms.
         let _query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             2000,
             false,
             false,
@@ -928,11 +927,10 @@ mod tests {
         // contains duplicated metric type.
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![
-                &mut Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
-                &mut Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
-            ]
-            .into_iter(),
+            &[
+                Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
+                Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
+            ],
             200,
             false,
             false,
@@ -954,7 +952,7 @@ mod tests {
         // Start logging every 100ms with no predetermined end time.
         let _query = runner.proxy.start_logging_forever(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             false,
             false,
         );
@@ -973,7 +971,7 @@ mod tests {
         // `stop_logging` is called.
         let mut query = runner.proxy.start_logging_forever(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             false,
             false,
         );
@@ -991,11 +989,10 @@ mod tests {
 
         let _query = runner.proxy.start_logging_forever(
             "test",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 100,
                 statistics_args: None,
-            })]
-            .into_iter(),
+            })],
             false,
             false,
         );
@@ -1073,14 +1070,13 @@ mod tests {
         // Create a request for logging CPU load and Temperature.
         let _query1 = runner.proxy.start_logging(
             "test1",
-            &mut vec![
-                &mut Metric::CpuLoad(CpuLoad { interval_ms: 300 }),
-                &mut Metric::Temperature(Temperature {
+            &[
+                Metric::CpuLoad(CpuLoad { interval_ms: 300 }),
+                Metric::Temperature(Temperature {
                     sampling_interval_ms: 200,
                     statistics_args: None,
                 }),
-            ]
-            .into_iter(),
+            ],
             500,
             false,
             false,
@@ -1089,11 +1085,10 @@ mod tests {
         // Create a request for logging Temperature.
         let _query2 = runner.proxy.start_logging(
             "test2",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 200,
                 statistics_args: None,
-            })]
-            .into_iter(),
+            })],
             300,
             false,
             false,
@@ -1304,7 +1299,7 @@ mod tests {
         for i in 0..MAX_CONCURRENT_CLIENTS {
             let mut query = runner.proxy.start_logging_forever(
                 &(i as u32).to_string(),
-                &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 300 })].into_iter(),
+                &[Metric::CpuLoad(CpuLoad { interval_ms: 300 })],
                 false,
                 false,
             );
@@ -1315,7 +1310,7 @@ mod tests {
         // Check new client logging request returns TOO_MANY_ACTIVE_CLIENTS error.
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             400,
             false,
             false,
@@ -1332,7 +1327,7 @@ mod tests {
         // Check we can add another client.
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             400,
             false,
             false,
@@ -1356,7 +1351,7 @@ mod tests {
         // Start the first logging task.
         let _query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             400,
             false,
             false,
@@ -1370,7 +1365,7 @@ mod tests {
         // running. The request to start should fail.
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             400,
             false,
             false,
@@ -1384,11 +1379,10 @@ mod tests {
         // running. The request to start should fail.
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 100,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 100 })),
-            })]
-            .into_iter(),
+            })],
             200,
             false,
             false,
@@ -1401,11 +1395,10 @@ mod tests {
         // Starting a new logging task of a different client should succeed.
         let mut query = runner.proxy.start_logging(
             "test2",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 500,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 500 })),
-            })]
-            .into_iter(),
+            })],
             1000,
             false,
             false,
@@ -1420,11 +1413,10 @@ mod tests {
         // Starting a new logging task of the first client should succeed now.
         let _query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 100,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 100 })),
-            })]
-            .into_iter(),
+            })],
             200,
             false,
             false,
@@ -1434,11 +1426,10 @@ mod tests {
         // Starting a new logging task of the second client should still fail.
         let mut query = runner.proxy.start_logging(
             "test2",
-            &mut vec![&mut Metric::Temperature(Temperature {
+            &[Metric::Temperature(Temperature {
                 sampling_interval_ms: 100,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 100 })),
-            })]
-            .into_iter(),
+            })],
             200,
             false,
             false,
@@ -1465,7 +1456,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 100 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 100 })],
             200,
             false,
             false,
@@ -1491,7 +1482,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 0 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 0 })],
             200,
             false,
             false,
@@ -1504,7 +1495,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 200 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 200 })],
             1_000,
             true,
             false,
@@ -1518,7 +1509,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 200 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 200 })],
             100,
             false,
             false,
@@ -1541,7 +1532,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms: 200 })].into_iter(),
+            &[Metric::CpuLoad(CpuLoad { interval_ms: 200 })],
             1_000,
             false,
             false,
@@ -1559,7 +1550,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms: 0 })].into_iter(),
+            &[Metric::GpuUsage(GpuUsage { interval_ms: 0 })],
             200,
             false,
             false,
@@ -1572,7 +1563,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms: 200 })].into_iter(),
+            &[Metric::GpuUsage(GpuUsage { interval_ms: 200 })],
             1_000,
             true,
             false,
@@ -1586,7 +1577,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms: 200 })].into_iter(),
+            &[Metric::GpuUsage(GpuUsage { interval_ms: 200 })],
             100,
             false,
             false,
@@ -1600,7 +1591,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms: 200 })].into_iter(),
+            &[Metric::GpuUsage(GpuUsage { interval_ms: 200 })],
             1_000,
             false,
             false,
@@ -1621,7 +1612,7 @@ mod tests {
         let mut runner = runner_builder.with_gpu_drivers(gpu_drivers).build();
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms: 200 })].into_iter(),
+            &[Metric::GpuUsage(GpuUsage { interval_ms: 200 })],
             1_000,
             false,
             false,
@@ -1638,11 +1629,10 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
+            &[Metric::Power(Power {
                 sampling_interval_ms: 500,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 500 })),
-            })]
-            .into_iter(),
+            })],
             300,
             false,
             false,
@@ -1657,11 +1647,10 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
+            &[Metric::Power(Power {
                 sampling_interval_ms: 600,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 500 })),
-            })]
-            .into_iter(),
+            })],
             800,
             false,
             false,
@@ -1676,11 +1665,10 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
+            &[Metric::Power(Power {
                 sampling_interval_ms: 200,
                 statistics_args: Some(Box::new(StatisticsArgs { statistics_interval_ms: 200 })),
-            })]
-            .into_iter(),
+            })],
             800,
             false,
             true,
@@ -1695,8 +1683,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power { sampling_interval_ms: 0, statistics_args: None })]
-                .into_iter(),
+            &[Metric::Power(Power { sampling_interval_ms: 0, statistics_args: None })],
             800,
             false,
             false,
@@ -1709,11 +1696,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
-                sampling_interval_ms: 200,
-                statistics_args: None,
-            })]
-            .into_iter(),
+            &[Metric::Power(Power { sampling_interval_ms: 200, statistics_args: None })],
             800,
             true,
             false,
@@ -1727,11 +1710,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
-                sampling_interval_ms: 200,
-                statistics_args: None,
-            })]
-            .into_iter(),
+            &[Metric::Power(Power { sampling_interval_ms: 200, statistics_args: None })],
             100,
             false,
             false,
@@ -1745,11 +1724,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
-                sampling_interval_ms: 200,
-                statistics_args: None,
-            })]
-            .into_iter(),
+            &[Metric::Power(Power { sampling_interval_ms: 200, statistics_args: None })],
             1_000,
             false,
             false,
@@ -1771,11 +1746,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::Power(Power {
-                sampling_interval_ms: 200,
-                statistics_args: None,
-            })]
-            .into_iter(),
+            &[Metric::Power(Power { sampling_interval_ms: 200, statistics_args: None })],
             1_000,
             false,
             false,
@@ -1792,7 +1763,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms: 0 })].into_iter(),
+            &[Metric::NetworkActivity(NetworkActivity { interval_ms: 0 })],
             200,
             false,
             false,
@@ -1805,8 +1776,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })]
-                .into_iter(),
+            &[Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })],
             1_000,
             true,
             false,
@@ -1820,8 +1790,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })]
-                .into_iter(),
+            &[Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })],
             100,
             false,
             false,
@@ -1835,8 +1804,7 @@ mod tests {
 
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })]
-                .into_iter(),
+            &[Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })],
             1_000,
             false,
             false,
@@ -1859,8 +1827,7 @@ mod tests {
         let mut runner = runner_builder.with_network_drivers(network_drivers).build();
         let mut query = runner.proxy.start_logging(
             "test",
-            &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })]
-                .into_iter(),
+            &[Metric::NetworkActivity(NetworkActivity { interval_ms: 200 })],
             1_000,
             false,
             false,

@@ -75,27 +75,27 @@ impl Service for Camera3Service {
                 #[allow(unreachable_patterns)]
                 match req {
                     DeviceWatcherRequest::WatchDevices { responder } => {
-                        let mut camera_device = WatchDevicesEvent::Added(1);
-                        let camera_devices = vec![&mut camera_device];
-                        let empty_devices = vec![];
+                        let camera_device = WatchDevicesEvent::Added(1);
+                        let camera_devices = &[camera_device][..];
+                        let empty_devices = &[][..];
 
-                        let mut devices = if delay_camera_device.load(Ordering::Relaxed) {
+                        let devices = if delay_camera_device.load(Ordering::Relaxed) {
                             if watch_count == 0 {
                                 watch_count += 1;
-                                empty_devices.into_iter()
+                                empty_devices
                             } else {
                                 let timer = fasync::Timer::new(
                                     Duration::from_millis(CAMERA_WATCHER_TIMEOUT / 2).after_now(),
                                 );
                                 timer.await;
-                                camera_devices.into_iter()
+                                camera_devices
                             }
                         } else if has_camera_device.load(Ordering::Relaxed) {
-                            camera_devices.into_iter()
+                            camera_devices
                         } else {
-                            empty_devices.into_iter()
+                            empty_devices
                         };
-                        responder.send(&mut devices).expect("Failed to send devices response");
+                        responder.send(devices).expect("Failed to send devices response");
                     }
                     DeviceWatcherRequest::ConnectToDevice {
                         id: _,

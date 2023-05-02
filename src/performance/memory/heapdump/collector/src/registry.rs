@@ -267,40 +267,34 @@ mod tests {
             &self,
             dest: fheapdump_client::SnapshotReceiverProxy,
         ) -> Result<(), anyhow::Error> {
-            let fut = dest.batch(
-                &mut [
-                    fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                        address: Some(FAKE_ALLOCATION_ADDRESS),
-                        size: Some(FAKE_ALLOCATION_SIZE),
-                        stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
-                        timestamp: Some(FAKE_ALLOCATION_TIMESTAMP),
-                        ..Default::default()
-                    }),
-                    fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                        stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
-                        program_addresses: Some(FAKE_ALLOCATION_STACK_TRACE.to_vec()),
-                        ..Default::default()
-                    }),
-                ]
-                .iter_mut(),
-            );
+            let fut = dest.batch(&[
+                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                    address: Some(FAKE_ALLOCATION_ADDRESS),
+                    size: Some(FAKE_ALLOCATION_SIZE),
+                    stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_TIMESTAMP),
+                    ..Default::default()
+                }),
+                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
+                    program_addresses: Some(FAKE_ALLOCATION_STACK_TRACE.to_vec()),
+                    ..Default::default()
+                }),
+            ]);
             fut.await?;
 
             if self.with_contents {
-                let fut = dest.batch(
-                    &mut [fheapdump_client::SnapshotElement::BlockContents(
-                        fheapdump_client::BlockContents {
-                            address: Some(FAKE_ALLOCATION_ADDRESS),
-                            contents: Some(FAKE_ALLOCATION_CONTENTS.to_vec()),
-                            ..Default::default()
-                        },
-                    )]
-                    .iter_mut(),
-                );
+                let fut = dest.batch(&[fheapdump_client::SnapshotElement::BlockContents(
+                    fheapdump_client::BlockContents {
+                        address: Some(FAKE_ALLOCATION_ADDRESS),
+                        contents: Some(FAKE_ALLOCATION_CONTENTS.to_vec()),
+                        ..Default::default()
+                    },
+                )]);
                 fut.await?;
             }
 
-            let fut = dest.batch(&mut [].iter_mut());
+            let fut = dest.batch(&[]);
             fut.await?;
 
             Ok(())

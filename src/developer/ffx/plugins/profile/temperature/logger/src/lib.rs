@@ -40,11 +40,7 @@ pub async fn start(
         temperature_logger
             .start_logging(
                 "ffx_temperature",
-                &mut vec![&mut Metric::Temperature(Temperature {
-                    sampling_interval_ms,
-                    statistics_args,
-                })]
-                .into_iter(),
+                &[Metric::Temperature(Temperature { sampling_interval_ms, statistics_args })],
                 duration_ms,
                 cmd.output_samples_to_syslog,
                 cmd.output_stats_to_syslog,
@@ -54,11 +50,7 @@ pub async fn start(
         temperature_logger
             .start_logging_forever(
                 "ffx_temperature",
-                &mut vec![&mut Metric::Temperature(Temperature {
-                    sampling_interval_ms,
-                    statistics_args,
-                })]
-                .into_iter(),
+                &[Metric::Temperature(Temperature { sampling_interval_ms, statistics_args })],
                 cmd.output_samples_to_syslog,
                 cmd.output_stats_to_syslog,
             )

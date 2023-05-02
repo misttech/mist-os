@@ -213,7 +213,7 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Receive the snapshot we just transmitted and verify that it is empty.
@@ -230,66 +230,63 @@ mod tests {
 
         // Send a batch containing two allocations - whose stack traces and contents can be listed
         // before or after the allocation(s) that reference them - and two executable regions.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_1_ADDRESS),
+                    size: Some(FAKE_REGION_1_SIZE),
+                    file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                    }),
                     ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_1_ADDRESS),
-                        size: Some(FAKE_REGION_1_SIZE),
-                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                },
+            ),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_2_ADDRESS),
+                    size: Some(FAKE_REGION_2_SIZE),
+                    file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_2_BUILD_ID.to_vec(),
+                    }),
                     ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_2_ADDRESS),
-                        size: Some(FAKE_REGION_2_SIZE),
-                        file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_2_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_2_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_2_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+                },
+            ),
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_2_ADDRESS),
+                size: Some(FAKE_ALLOCATION_2_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Receive the snapshot we just transmitted and verify its contents.
@@ -323,74 +320,68 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send a first batch.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_2_ADDRESS),
-                        size: Some(FAKE_REGION_2_SIZE),
-                        file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_2_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_2_ADDRESS),
+                    size: Some(FAKE_REGION_2_SIZE),
+                    file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_2_BUILD_ID.to_vec(),
+                    }),
                     ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+                },
+            ),
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send another batch.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_2_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_2_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_2_ADDRESS),
+                size: Some(FAKE_ALLOCATION_2_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_1_ADDRESS),
+                    size: Some(FAKE_REGION_1_SIZE),
+                    file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                    }),
                     ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_1_ADDRESS),
-                        size: Some(FAKE_REGION_1_SIZE),
-                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+                },
+            ),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Receive the snapshot we just transmitted and verify its contents.
@@ -448,21 +439,18 @@ mod tests {
         set_one_field_to_none(&mut allocation);
 
         // Send it to the SnapshotReceiver along with the stack trace it references.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(allocation),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(allocation),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Return the result.
@@ -494,12 +482,12 @@ mod tests {
         set_one_field_to_none(&mut stack_trace);
 
         // Send it to the SnapshotReceiver.
-        let fut = receiver_proxy
-            .batch(&mut [fheapdump_client::SnapshotElement::StackTrace(stack_trace)].iter_mut());
+        let fut =
+            receiver_proxy.batch(&[fheapdump_client::SnapshotElement::StackTrace(stack_trace)]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Return the result.
@@ -537,12 +525,12 @@ mod tests {
         set_one_field_to_none(&mut region);
 
         // Send it to the SnapshotReceiver.
-        let fut = receiver_proxy
-            .batch(&mut [fheapdump_client::SnapshotElement::ExecutableRegion(region)].iter_mut());
+        let fut =
+            receiver_proxy.batch(&[fheapdump_client::SnapshotElement::ExecutableRegion(region)]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Return the result.
@@ -574,28 +562,25 @@ mod tests {
         set_one_field_to_none(&mut block_contents);
 
         // Send it to the SnapshotReceiver along with the allocation it references.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::BlockContents(block_contents),
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::BlockContents(block_contents),
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Return the result.
@@ -609,34 +594,31 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send two allocations with the same address along with the stack trace they reference.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Verify expected error.
@@ -653,37 +635,34 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send two executable regions with the same address.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_1_ADDRESS),
-                        size: Some(FAKE_REGION_1_SIZE),
-                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-                fheapdump_client::SnapshotElement::ExecutableRegion(
-                    fheapdump_client::ExecutableRegion {
-                        address: Some(FAKE_REGION_1_ADDRESS),
-                        size: Some(FAKE_REGION_1_SIZE),
-                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
-                        build_id: Some(fheapdump_client::BuildId {
-                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
-                        }),
-                        ..Default::default()
-                    },
-                ),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_1_ADDRESS),
+                    size: Some(FAKE_REGION_1_SIZE),
+                    file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                    }),
+                    ..Default::default()
+                },
+            ),
+            fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_1_ADDRESS),
+                    size: Some(FAKE_REGION_1_SIZE),
+                    file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                    }),
+                    ..Default::default()
+                },
+            ),
+        ]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Verify expected error.
@@ -701,32 +680,29 @@ mod tests {
 
         // Send an allocation whose BlockContents has the wrong size.
         let contents_with_wrong_size = vec![0; FAKE_ALLOCATION_1_SIZE as usize + 1];
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(contents_with_wrong_size),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(contents_with_wrong_size),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
 
         // Verify expected error.
@@ -743,27 +719,24 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation that references an empty stack trace.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(vec![]),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(vec![]),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Verify that the stack trace has been reconstructed correctly.
@@ -779,38 +752,34 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation and the first chunk of its stack trace.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(vec![1111, 2222]),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(vec![1111, 2222]),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the second chunk.
-        let fut = receiver_proxy.batch(
-            &mut [fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+        let fut = receiver_proxy.batch(&[fheapdump_client::SnapshotElement::StackTrace(
+            fheapdump_client::StackTrace {
                 stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                 program_addresses: Some(vec![3333]),
                 ..Default::default()
-            })]
-            .iter_mut(),
-        );
+            },
+        )]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Verify that the stack trace has been reconstructed correctly.
@@ -826,32 +795,29 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send a zero-sized allocation and its empty contents.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(0),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(vec![]),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(0),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(vec![]),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Verify that the allocation has been reconstructed correctly.
@@ -871,45 +837,39 @@ mod tests {
             FAKE_ALLOCATION_1_CONTENTS.split_at(FAKE_ALLOCATION_1_CONTENTS.len() / 2);
 
         // Send an allocation and the first chunk of its contents.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(content_first_chunk.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(content_first_chunk.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Send the second chunk.
-        let fut = receiver_proxy.batch(
-            &mut [fheapdump_client::SnapshotElement::BlockContents(
-                fheapdump_client::BlockContents {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    contents: Some(contents_second_chunk.to_vec()),
-                    ..Default::default()
-                },
-            )]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[fheapdump_client::SnapshotElement::BlockContents(
+            fheapdump_client::BlockContents {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                contents: Some(contents_second_chunk.to_vec()),
+                ..Default::default()
+            },
+        )]);
         fut.await.unwrap();
 
         // Send the end of stream marker.
-        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let fut = receiver_proxy.batch(&[]);
         fut.await.unwrap();
 
         // Verify that the allocation's block contents have been reconstructed correctly.
@@ -925,23 +885,20 @@ mod tests {
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation and its stack trace.
-        let fut = receiver_proxy.batch(
-            &mut [
-                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
-                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
-                    size: Some(FAKE_ALLOCATION_1_SIZE),
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
-                    ..Default::default()
-                }),
-                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
-                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
-                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
-                    ..Default::default()
-                }),
-            ]
-            .iter_mut(),
-        );
+        let fut = receiver_proxy.batch(&[
+            fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                size: Some(FAKE_ALLOCATION_1_SIZE),
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                ..Default::default()
+            }),
+            fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                ..Default::default()
+            }),
+        ]);
         fut.await.unwrap();
 
         // Close the channel without sending an end of stream marker.

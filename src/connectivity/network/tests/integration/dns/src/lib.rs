@@ -743,7 +743,7 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
         // Mock name servers in priority order.
         let erroring_dns_server: std::net::SocketAddr = std_socket_addr!("127.0.0.1:1234");
         let fallback_dns_server: std::net::SocketAddr = std_socket_addr!("127.0.0.2:5678");
-        let mut dns_servers = [
+        let dns_servers = &[
             fnet_ext::SocketAddress(erroring_dns_server).into(),
             fnet_ext::SocketAddress(fallback_dns_server).into(),
         ];
@@ -751,7 +751,7 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
             .connect_to_protocol::<net_name::LookupAdminMarker>()
             .expect("failed to connect to LookupAdmin");
         let () = lookup_admin
-            .set_dns_servers(&mut dns_servers.iter_mut())
+            .set_dns_servers(dns_servers)
             .await
             .expect("FIDL error")
             .expect("failed to set DNS servers");
@@ -879,11 +879,11 @@ async fn setup_dns_server(
     realm: &netemul::TestRealm<'_>,
     addr: std::net::SocketAddr,
 ) -> (fuchsia_async::net::UdpSocket, fuchsia_async::net::TcpListener) {
-    let mut dns_servers = [fnet_ext::SocketAddress(addr).into()];
+    let dns_servers = &[fnet_ext::SocketAddress(addr).into()];
     let lookup_admin =
         realm.connect_to_protocol::<net_name::LookupAdminMarker>().expect("connect to protocol");
     let () = lookup_admin
-        .set_dns_servers(&mut dns_servers.iter_mut())
+        .set_dns_servers(dns_servers)
         .await
         .expect("call set DNS servers")
         .expect("set DNS servers");
@@ -1143,7 +1143,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
 
     // Configure name servers in priority order.
     {
-        let mut dns_servers = preferred_servers
+        let dns_servers = preferred_servers
             .iter()
             .chain(std::iter::once(&secondary_server))
             .map(|name_server| fnet_ext::SocketAddress(name_server.addr).into())
@@ -1152,7 +1152,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
             .connect_to_protocol::<net_name::LookupAdminMarker>()
             .expect("connect to protocol");
         lookup_admin
-            .set_dns_servers(&mut dns_servers.iter_mut())
+            .set_dns_servers(&dns_servers)
             .await
             .expect("call set DNS servers")
             .expect("set DNS servers");

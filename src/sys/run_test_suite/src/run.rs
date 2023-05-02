@@ -153,10 +153,9 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
         .map(move |running_suite| (running_suite, suite_id));
         suite_start_futs.push(suite_and_id_fut);
         if let Some(realm) = params.realm.as_ref() {
-            let mut offers = realm.offers();
             builder_proxy.add_suite_in_realm(
                 realm.get_realm_client()?,
-                &mut offers.iter_mut(),
+                &realm.offers(),
                 realm.collection(),
                 &params.test_url,
                 run_options,

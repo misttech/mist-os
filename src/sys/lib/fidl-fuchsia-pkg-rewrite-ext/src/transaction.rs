@@ -177,12 +177,9 @@ mod tests {
                                             events_task.lock().unwrap().push(Event::IteratorNext);
 
                                             if let Some(rule) = rules.next() {
-                                                let mut rule = rule.into();
-                                                responder
-                                                    .send(&mut vec![&mut rule].into_iter())
-                                                    .unwrap();
+                                                responder.send(&[rule.into()]).unwrap();
                                             } else {
-                                                responder.send(&mut vec![].into_iter()).unwrap();
+                                                responder.send(&[]).unwrap();
                                             }
                                         }
                                     }

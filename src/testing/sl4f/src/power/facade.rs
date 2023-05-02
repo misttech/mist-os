@@ -56,11 +56,10 @@ impl PowerFacade {
         proxy
             .start_logging(
                 CLIENT_ID,
-                &mut vec![&mut Metric::Power(Power {
+                &[Metric::Power(Power {
                     sampling_interval_ms: req.sampling_interval_ms,
                     statistics_args,
-                })]
-                .into_iter(),
+                })],
                 req.duration_ms,
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
@@ -90,11 +89,10 @@ impl PowerFacade {
         proxy
             .start_logging_forever(
                 CLIENT_ID,
-                &mut vec![&mut Metric::Power(Power {
+                &[Metric::Power(Power {
                     sampling_interval_ms: req.sampling_interval_ms,
                     statistics_args,
-                })]
-                .into_iter(),
+                })],
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
             )

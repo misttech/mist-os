@@ -37,7 +37,7 @@ pub async fn start(
         gpu_loggger
             .start_logging(
                 "ffx_gpu",
-                &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms })].into_iter(),
+                &[Metric::GpuUsage(GpuUsage { interval_ms })],
                 duration_ms,
                 cmd.output_to_syslog,
                 false,
@@ -47,7 +47,7 @@ pub async fn start(
         gpu_loggger
             .start_logging_forever(
                 "ffx_gpu",
-                &mut vec![&mut Metric::GpuUsage(GpuUsage { interval_ms })].into_iter(),
+                &[Metric::GpuUsage(GpuUsage { interval_ms })],
                 cmd.output_to_syslog,
                 false,
             )

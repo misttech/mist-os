@@ -111,11 +111,10 @@ impl TemperatureFacade {
         proxy
             .start_logging(
                 CLIENT_ID,
-                &mut vec![&mut Metric::Temperature(Temperature {
+                &[Metric::Temperature(Temperature {
                     sampling_interval_ms: req.interval_ms,
                     statistics_args: None,
-                })]
-                .into_iter(),
+                })],
                 req.duration_ms,
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
@@ -140,11 +139,10 @@ impl TemperatureFacade {
         proxy
             .start_logging_forever(
                 CLIENT_ID,
-                &mut vec![&mut Metric::Temperature(Temperature {
+                &[Metric::Temperature(Temperature {
                     sampling_interval_ms: req.interval_ms,
                     statistics_args: None,
-                })]
-                .into_iter(),
+                })],
                 /* output_samples_to_syslog */ false,
                 /* output_stats_to_syslog */ false,
             )

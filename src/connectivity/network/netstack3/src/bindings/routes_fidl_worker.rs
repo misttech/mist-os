@@ -244,7 +244,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
         Inputs { req, events },
         |Inputs { req, events }| match req {
             fnet_routes::WatcherV4Request::Watch { responder } => {
-                let mut events = events
+                let events = events
                     .into_iter()
                     .map(|event| {
                         event.try_into().unwrap_or_else(|e| match e {
@@ -253,15 +253,13 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                             }
                         })
                     })
-                    // `responder.send` requires us to pass `&mut EventV4`,
-                    // which forces us to store the owned values.
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&mut events.iter_mut()))
+                IpInvariant(responder.send(&events))
             }
         },
         |Inputs { req, events }| match req {
             fnet_routes::WatcherV6Request::Watch { responder } => {
-                let mut events = events
+                let events = events
                     .into_iter()
                     .map(|event| {
                         event.try_into().unwrap_or_else(|e| match e {
@@ -270,10 +268,8 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                             }
                         })
                     })
-                    // `responder.send` requires us to pass `&mut EventV6`,
-                    // which forces us to store the owned values.
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&mut events.iter_mut()))
+                IpInvariant(responder.send(&events))
             }
         },
     );

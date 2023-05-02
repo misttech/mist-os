@@ -79,13 +79,12 @@ mod tests {
         });
 
         // The first Watch request should immediately resolve, per hanging-get invariants.
-        let peripherals = watcher_proxy.watch(&mut [].into_iter()).await.expect("FIDL response");
+        let peripherals = watcher_proxy.watch(&[]).await.expect("FIDL response");
         // No peripherals to report.
         assert_eq!(peripherals, vec![]);
 
         // A subsequent Watch request should only resolve when the state changes.
-        let watch_fut =
-            watcher_proxy.watch(&mut [].into_iter()).check().expect("valid FIDL request");
+        let watch_fut = watcher_proxy.watch(&[]).check().expect("valid FIDL request");
         // Simulate a change in state.
         let id = PeerId(123);
         let battery_info = BatteryInfo {
@@ -110,16 +109,16 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (watcher_task, watcher_proxy, _state) = make_watcher_task();
 
-        let watch_request1 = watcher_proxy.watch(&mut [].into_iter());
+        let watch_request1 = watcher_proxy.watch(&[]);
         let (peripherals, mut watcher_task) = run_while(&mut exec, watcher_task, watch_request1);
         assert_eq!(peripherals.expect("FIDL response"), vec![]);
 
-        let mut watch_request2 = watcher_proxy.watch(&mut [].into_iter());
+        let mut watch_request2 = watcher_proxy.watch(&[]);
         let _ = exec.run_until_stalled(&mut watcher_task).expect_pending("main loop active");
         let _ = exec.run_until_stalled(&mut watch_request2).expect_pending("no FIDL response");
         // A subsequent Watch request while one is outstanding is an Error and a violation of the
         // API. The Watcher server associated with this FIDL client should terminate.
-        let _watch_request3 = watcher_proxy.watch(&mut [].into_iter());
+        let _watch_request3 = watcher_proxy.watch(&[]);
         let server_result =
             exec.run_until_stalled(&mut watcher_task).expect("main loop terminated");
         assert_matches!(server_result, Err(Error::HangingGet(_)));
@@ -141,12 +140,12 @@ mod tests {
         let _ = exec.run_until_stalled(&mut watcher_task).expect_pending("main loop active");
 
         // The first Watch request should immediately resolve, per hanging-get invariants.
-        let watch_request1 = watcher_proxy.watch(&mut [].into_iter());
+        let watch_request1 = watcher_proxy.watch(&[]);
         let (peripherals, mut watcher_task) = run_while(&mut exec, watcher_task, watch_request1);
         assert_matches!(peripherals.expect("FIDL response")[..], [Information { .. }]);
 
         // Client re-registers the hanging-get request.
-        let mut watch_request2 = watcher_proxy.watch(&mut [].into_iter());
+        let mut watch_request2 = watcher_proxy.watch(&[]);
         let _ = exec.run_until_stalled(&mut watcher_task).expect_pending("main loop active");
         let _ = exec.run_until_stalled(&mut watch_request2).expect_pending("no FIDL response");
 

@@ -69,11 +69,11 @@ impl Streamer {
 
     async fn flush_buffer(&mut self) -> Result<(), Error> {
         // Read and reset the buffer.
-        let mut buffer = std::mem::replace(&mut self.buffer, Vec::new());
+        let buffer = std::mem::replace(&mut self.buffer, Vec::new());
         self.buffer_size = EMPTY_BUFFER_SIZE;
 
         // Send it.
-        let fut = self.dest.batch(&mut buffer.iter_mut());
+        let fut = self.dest.batch(&buffer);
         Ok(fut.await?)
     }
 }

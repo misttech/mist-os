@@ -40,8 +40,7 @@ pub async fn start(
         power_logger
             .start_logging(
                 "ffx_power",
-                &mut vec![&mut Metric::Power(Power { sampling_interval_ms, statistics_args })]
-                    .into_iter(),
+                &[Metric::Power(Power { sampling_interval_ms, statistics_args })],
                 duration_ms,
                 cmd.output_samples_to_syslog,
                 cmd.output_stats_to_syslog,
@@ -51,8 +50,7 @@ pub async fn start(
         power_logger
             .start_logging_forever(
                 "ffx_power",
-                &mut vec![&mut Metric::Power(Power { sampling_interval_ms, statistics_args })]
-                    .into_iter(),
+                &[Metric::Power(Power { sampling_interval_ms, statistics_args })],
                 cmd.output_samples_to_syslog,
                 cmd.output_stats_to_syslog,
             )

@@ -269,11 +269,11 @@ impl MockEngineService {
         iterator: ServerEnd<RuleIteratorMarker>,
     ) -> Result<(), Error> {
         let mut stream = iterator.into_stream().expect("list iterator into_stream");
-        let mut rules =
+        let rules =
             self.rules.lock().clone().into_iter().map(|rule| rule.into()).collect::<Vec<_>>();
-        let mut iter = rules.iter_mut();
+        let mut iter = rules.chunks(5).fuse();
         while let Some(RuleIteratorRequest::Next { responder }) = stream.try_next().await? {
-            responder.send(&mut iter.by_ref().take(5)).expect("next send")
+            responder.send(iter.next().unwrap_or(&[])).expect("next send")
         }
         Ok(())
     }

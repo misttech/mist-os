@@ -35,12 +35,9 @@ impl Mocks for InputTest {
                         #[allow(unreachable_patterns)]
                         match req {
                             DeviceWatcherRequest::WatchDevices { responder } => {
-                                let mut camera_device = WatchDevicesEvent::Added(1);
-                                let camera_devices = vec![&mut camera_device];
-
-                                let mut devices = camera_devices.into_iter();
+                                let camera_device = WatchDevicesEvent::Added(1);
                                 responder
-                                    .send(&mut devices)
+                                    .send(&[camera_device])
                                     .expect("Failed to send devices response");
                             }
                             DeviceWatcherRequest::ConnectToDevice {

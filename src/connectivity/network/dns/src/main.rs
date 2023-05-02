@@ -975,7 +975,7 @@ async fn run_lookup_admin<T: ResolverLookup>(
                     let () = responder.send(&mut response)?;
                 }
                 LookupAdminRequest::GetDnsServers { responder } => {
-                    let () = responder.send(&mut state.servers().iter_mut())?;
+                    let () = responder.send(&state.servers())?;
                 }
             }
             Ok(())
@@ -1801,7 +1801,7 @@ mod tests {
         // Set servers.
         env.run_admin(|proxy| async move {
             let () = proxy
-                .set_dns_servers(&mut vec![DHCP_SERVER, NDP_SERVER, DHCPV6_SERVER].iter_mut())
+                .set_dns_servers(&[DHCP_SERVER, NDP_SERVER, DHCPV6_SERVER])
                 .await
                 .expect("Failed to call SetDnsServers")
                 .expect("SetDnsServers error");
@@ -1822,7 +1822,7 @@ mod tests {
         // Clear servers.
         env.run_admin(|proxy| async move {
             let () = proxy
-                .set_dns_servers(&mut vec![].into_iter())
+                .set_dns_servers(&[])
                 .await
                 .expect("Failed to call SetDnsServers")
                 .expect("SetDnsServers error");
@@ -1842,13 +1842,10 @@ mod tests {
 
             // Multicast not allowed.
             let status = proxy
-                .set_dns_servers(
-                    &mut vec![fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-                        address: fnet::Ipv4Address { addr: [224, 0, 0, 1] },
-                        port: DEFAULT_PORT,
-                    })]
-                    .iter_mut(),
-                )
+                .set_dns_servers(&[fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                    address: fnet::Ipv4Address { addr: [224, 0, 0, 1] },
+                    port: DEFAULT_PORT,
+                })])
                 .await
                 .expect("Failed to call SetDnsServers")
                 .expect_err("SetDnsServers should fail for multicast address");
@@ -1856,14 +1853,11 @@ mod tests {
 
             // Unspecified not allowed.
             let status = proxy
-                .set_dns_servers(
-                    &mut vec![fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
-                        address: fnet::Ipv6Address { addr: [0; 16] },
-                        port: DEFAULT_PORT,
-                        zone_index: 0,
-                    })]
-                    .iter_mut(),
-                )
+                .set_dns_servers(&[fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+                    address: fnet::Ipv6Address { addr: [0; 16] },
+                    port: DEFAULT_PORT,
+                    zone_index: 0,
+                })])
                 .await
                 .expect("Failed to call SetDnsServers")
                 .expect_err("SetDnsServers should fail for unspecified address");
@@ -1879,9 +1873,9 @@ mod tests {
     async fn test_get_servers() {
         let env = TestEnvironment::new();
         env.run_admin(|proxy| async move {
-            let expect = vec![NDP_SERVER, DHCP_SERVER, DHCPV6_SERVER, STATIC_SERVER];
+            let expect = &[NDP_SERVER, DHCP_SERVER, DHCPV6_SERVER, STATIC_SERVER];
             let () = proxy
-                .set_dns_servers(&mut expect.clone().iter_mut())
+                .set_dns_servers(expect)
                 .await
                 .expect("FIDL error")
                 .expect("set_servers failed");
@@ -1900,9 +1894,9 @@ mod tests {
             servers: {}
         });
         env.run_admin(|proxy| async move {
-            let mut servers = [NDP_SERVER, DHCP_SERVER, DHCPV6_SERVER, STATIC_SERVER];
+            let servers = &[NDP_SERVER, DHCP_SERVER, DHCPV6_SERVER, STATIC_SERVER];
             let () = proxy
-                .set_dns_servers(&mut servers.iter_mut())
+                .set_dns_servers(servers)
                 .await
                 .expect("FIDL error")
                 .expect("set_servers failed");

@@ -138,7 +138,7 @@ impl TestBuilder {
     pub async fn add_suite_in_realm(
         &self,
         realm: fidl::endpoints::ClientEnd<fidl_fuchsia_component::RealmMarker>,
-        offers: &mut dyn ExactSizeIterator<Item = &mut fidl_fuchsia_component_decl::Offer>,
+        offers: &[fidl_fuchsia_component_decl::Offer],
         test_collection: &str,
         test_url: &str,
         run_options: ftest_manager::RunOptions,

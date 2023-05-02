@@ -2057,10 +2057,9 @@ mod tests {
                                                 .push(RewriteEngineEvent::IteratorNext);
 
                                             if let Some(rule) = rules.next() {
-                                                let rule = rule.into();
-                                                responder.send(&mut vec![rule].iter_mut()).unwrap();
+                                                responder.send(&[rule.into()]).unwrap();
                                             } else {
-                                                responder.send(&mut vec![].into_iter()).unwrap();
+                                                responder.send(&[]).unwrap();
                                             }
                                         }
                                     }

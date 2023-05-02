@@ -2244,13 +2244,13 @@ mod tests {
 
         async fn add_route_or_panic(
             &self,
-            mut capabilities: Vec<ftest::Capability>,
+            capabilities: Vec<ftest::Capability>,
             mut from: fcdecl::Ref,
-            mut tos: Vec<fcdecl::Ref>,
+            tos: Vec<fcdecl::Ref>,
         ) {
             let () = self
                 .realm_proxy
-                .add_route(&mut capabilities.iter_mut(), &mut from, &mut tos.iter_mut())
+                .add_route(&capabilities, &mut from, &tos)
                 .await
                 .expect("failed to make Realm.AddRoute call")
                 .expect("failed to add route");
@@ -3648,20 +3648,15 @@ mod tests {
         let err = realm_and_builder_task
             .realm_proxy
             .add_route(
-                &mut vec![ftest::Capability::Protocol(ftest::Protocol {
+                &[ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
                     as_: Some("fuchsia.examples.Elephant".to_owned()),
                     type_: Some(fcdecl::DependencyType::Strong),
                     availability: Some(fcdecl::Availability::SameAsTarget),
                     ..Default::default()
-                })]
-                .iter_mut(),
+                })],
                 &mut fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                &mut vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".into(),
-                    collection: None,
-                })]
-                .iter_mut(),
+                &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await
             .expect("failed to call add_route")
@@ -4235,9 +4230,9 @@ mod tests {
         ftest::RealmBuilderError::CapabilitiesEmpty ; "capabilities_empty")]
     #[fuchsia::test]
     async fn add_route_error(
-        mut capabilities: Vec<ftest::Capability>,
+        capabilities: Vec<ftest::Capability>,
         mut from: fcdecl::Ref,
-        mut to: Vec<fcdecl::Ref>,
+        to: Vec<fcdecl::Ref>,
         expected_err: ftest::RealmBuilderError,
     ) {
         let realm_and_builder_task = RealmAndBuilderTask::new();
@@ -4247,7 +4242,7 @@ mod tests {
 
         let err = realm_and_builder_task
             .realm_proxy
-            .add_route(&mut capabilities.iter_mut(), &mut from, &mut to.iter_mut())
+            .add_route(&capabilities, &mut from, &to)
             .await
             .expect("failed to call AddRoute")
             .expect_err("AddRoute succeeded unexpectedly");
@@ -4458,9 +4453,9 @@ mod tests {
         assert_err(rabt.realm_proxy.replace_component_decl("b", empty_decl())).await;
         assert_err(rabt.realm_proxy.replace_realm_decl(empty_decl())).await;
         assert_err(rabt.realm_proxy.add_route(
-            &mut vec![].iter_mut(),
+            &[],
             &mut fcdecl::Ref::Self_(fcdecl::SelfRef {}),
-            &mut vec![].iter_mut(),
+            &[],
         ))
         .await;
 
@@ -4473,9 +4468,9 @@ mod tests {
         assert_err(child_realm_proxy.replace_component_decl("b", empty_decl())).await;
         assert_err(child_realm_proxy.replace_realm_decl(empty_decl())).await;
         assert_err(child_realm_proxy.add_route(
-            &mut vec![].iter_mut(),
+            &[],
             &mut fcdecl::Ref::Self_(fcdecl::SelfRef {}),
-            &mut vec![].iter_mut(),
+            &[],
         ))
         .await;
     }
@@ -4493,11 +4488,7 @@ mod tests {
             .realm_proxy
             .read_only_directory(
                 "data",
-                &mut vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".into(),
-                    collection: None,
-                })]
-                .iter_mut(),
+                &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
                 &mut ftest::DirectoryContents {
                     entries: vec![ftest::DirectoryEntry {
                         file_path: "hippos".to_string(),

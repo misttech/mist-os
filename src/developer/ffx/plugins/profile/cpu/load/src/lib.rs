@@ -84,7 +84,7 @@ pub async fn start(
         cpu_logger
             .start_logging(
                 "ffx_cpu",
-                &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms })].into_iter(),
+                &[Metric::CpuLoad(CpuLoad { interval_ms })],
                 duration_ms,
                 cmd.output_to_syslog,
                 false,
@@ -94,7 +94,7 @@ pub async fn start(
         cpu_logger
             .start_logging_forever(
                 "ffx_cpu",
-                &mut vec![&mut Metric::CpuLoad(CpuLoad { interval_ms })].into_iter(),
+                &[Metric::CpuLoad(CpuLoad { interval_ms })],
                 cmd.output_to_syslog,
                 false,
             )

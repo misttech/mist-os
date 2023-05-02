@@ -809,6 +809,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			val.ElementType.Kind == fidlgen.ArrayType ||
 			val.ElementType.Kind == fidlgen.VectorType ||
 			t.ElementType.Kind == fidlgen.StringType ||
+			(val.ElementType.Kind == fidlgen.IdentifierType && el.DeclType == fidlgen.UnionDeclType) ||
 			el.IsResourceType() ||
 			val.Nullable ||
 			(val.ElementType.Nullable && val.ElementType.Kind != fidlgen.StringType) {
@@ -951,6 +952,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 			t.ElementType.Kind == fidlgen.ArrayType ||
 			t.ElementType.Kind == fidlgen.VectorType ||
 			t.ElementType.Kind == fidlgen.StringType ||
+			(t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.UnionDeclType) ||
 			t.IsResourceType() ||
 			t.Nullable ||
 			(t.ElementType.Nullable && t.ElementType.Kind != fidlgen.StringType) {

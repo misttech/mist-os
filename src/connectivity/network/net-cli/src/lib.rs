@@ -2759,7 +2759,7 @@ mac             -
             fidl::endpoints::create_proxy_and_stream::<fneighbor::EntryIteratorMarker>().unwrap();
 
         let server = async {
-            for mut items in batches {
+            for items in batches {
                 let responder = requests
                     .try_next()
                     .await
@@ -2767,8 +2767,7 @@ mac             -
                     .expect("request stream should not have ended")
                     .into_get_next()
                     .expect("request should be of type GetNext");
-                let () =
-                    responder.send(&mut items.iter_mut()).expect("responder.send should succeed");
+                let () = responder.send(&items).expect("responder.send should succeed");
             }
         }
         .on_timeout(std::time::Duration::from_secs(60), || panic!("server responder timed out"));

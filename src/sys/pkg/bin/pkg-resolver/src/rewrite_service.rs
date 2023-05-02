@@ -154,22 +154,17 @@ impl RewriteService {
     }
 
     fn serve_rule_iterator(rules: Vec<Rule>, mut stream: RuleIteratorRequestStream) {
-        let mut rules = rules.into_iter().map(|rule| rule.into()).collect::<Vec<_>>();
+        let rules = rules.into_iter().map(|rule| rule.into()).collect::<Vec<_>>();
 
         fasync::Task::spawn(
             async move {
-                let mut iter = rules.iter_mut().peekable();
+                let mut iter = rules.chunks(LIST_CHUNK_SIZE);
                 while let Some(request) = stream.try_next().await? {
                     let RuleIteratorRequest::Next { responder } = request;
-
-                    match iter.peek() {
-                        Some(_) => {
-                            responder.send(&mut iter.by_ref().take(LIST_CHUNK_SIZE))?;
-                        }
-                        None => {
-                            responder.send(&mut vec![].into_iter())?;
-                            return Ok(());
-                        }
+                    let chunk = iter.next().unwrap_or(&[]);
+                    responder.send(chunk)?;
+                    if chunk.is_empty() {
+                        return Ok(());
                     }
                 }
                 Ok(())

@@ -27,18 +27,18 @@ fn handle_watch<I: FidlRouteIpExt>(
     }
     I::map_ip::<HandleInputs<I>, ()>(
         HandleInputs { request, event_batch },
-        |HandleInputs { request, mut event_batch }| match request
+        |HandleInputs { request, event_batch }| match request
             .expect("failed to receive `Watch` request")
         {
             fnet_routes::WatcherV4Request::Watch { responder } => {
-                responder.send(&mut event_batch.iter_mut()).expect("failed to respond to `Watch`")
+                responder.send(&event_batch).expect("failed to respond to `Watch`")
             }
         },
-        |HandleInputs { request, mut event_batch }| match request
+        |HandleInputs { request, event_batch }| match request
             .expect("failed to receive `Watch` request")
         {
             fnet_routes::WatcherV6Request::Watch { responder } => {
-                responder.send(&mut event_batch.iter_mut()).expect("failed to respond to `Watch`")
+                responder.send(&event_batch).expect("failed to respond to `Watch`")
             }
         },
     );

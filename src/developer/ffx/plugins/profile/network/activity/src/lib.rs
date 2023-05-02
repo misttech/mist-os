@@ -37,8 +37,7 @@ pub async fn start(
         network_logger
             .start_logging(
                 "ffx_network",
-                &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms })]
-                    .into_iter(),
+                &[Metric::NetworkActivity(NetworkActivity { interval_ms })],
                 duration_ms,
                 cmd.output_to_syslog,
                 false,
@@ -48,8 +47,7 @@ pub async fn start(
         network_logger
             .start_logging_forever(
                 "ffx_network",
-                &mut vec![&mut Metric::NetworkActivity(NetworkActivity { interval_ms })]
-                    .into_iter(),
+                &[Metric::NetworkActivity(NetworkActivity { interval_ms })],
                 cmd.output_to_syslog,
                 false,
             )

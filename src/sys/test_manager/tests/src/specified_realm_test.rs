@@ -62,7 +62,7 @@ async fn run_test_in_echo_test_realm(
         dependency_type: None,
         ..Default::default()
     }));
-    run_single_test(realm, &mut offers.iter_mut(), ECHO_TEST_COL, test_url, run_options).await
+    run_single_test(realm, &offers, ECHO_TEST_COL, test_url, run_options).await
 }
 
 async fn run_test_in_hermetic_test_realm(
@@ -70,13 +70,13 @@ async fn run_test_in_hermetic_test_realm(
     run_options: RunOptions,
 ) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
     let realm = connect_realm().unwrap();
-    let mut offers = default_event_offers();
-    run_single_test(realm, &mut offers.iter_mut(), HERMETIC_TEST_COL, test_url, run_options).await
+    let offers = default_event_offers();
+    run_single_test(realm, &offers, HERMETIC_TEST_COL, test_url, run_options).await
 }
 
 async fn run_single_test(
     realm: ClientEnd<fcomponent::RealmMarker>,
-    offers: &mut dyn ExactSizeIterator<Item = &mut fdecl::Offer>,
+    offers: &[fdecl::Offer],
     test_collection: &str,
     test_url: &str,
     run_options: RunOptions,
@@ -222,11 +222,10 @@ async fn debug_data_test() {
 
     let builder = TestBuilder::new(connect_run_builder!().unwrap());
     let realm = connect_realm().unwrap();
-    let mut offers = default_event_offers();
     let suite_instance = builder
         .add_suite_in_realm(
             realm,
-            &mut offers.iter_mut(),
+            &default_event_offers(),
             HERMETIC_TEST_COL,
             test_url,
             default_run_option(),
@@ -273,11 +272,10 @@ async fn debug_data_accumulate_test() {
         let builder = TestBuilder::new(connect_run_builder!().unwrap());
         builder.set_scheduling_options(true).expect("set scheduling options");
         let realm = connect_realm().unwrap();
-        let mut offers = default_event_offers();
         let suite_instance = builder
             .add_suite_in_realm(
                 realm,
-                &mut offers.iter_mut(),
+                &default_event_offers(),
                 HERMETIC_TEST_COL,
                 test_url,
                 default_run_option(),
@@ -308,11 +306,10 @@ async fn debug_data_isolated_test() {
     for _ in 0..2 {
         let builder = TestBuilder::new(connect_run_builder!().unwrap());
         let realm = connect_realm().unwrap();
-        let mut offers = default_event_offers();
         let suite_instance = builder
             .add_suite_in_realm(
                 realm,
-                &mut offers.iter_mut(),
+                &default_event_offers(),
                 HERMETIC_TEST_COL,
                 test_url,
                 default_run_option(),
