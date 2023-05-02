@@ -354,7 +354,7 @@ zx_status_t AmlGpu::Bind() {
     }
   }
 
-  pdev_ = ddk::PDev::FromFragment(parent_);
+  pdev_ = ddk::PDevFidl::FromFragment(parent_);
   if (!pdev_.is_valid()) {
     GPU_ERROR("could not get platform device protocol\n");
     return ZX_ERR_NOT_SUPPORTED;

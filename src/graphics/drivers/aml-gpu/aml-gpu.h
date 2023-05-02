@@ -105,7 +105,7 @@ class AmlGpu final : public DdkDeviceType,
 
   void UpdateClockProperties();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fidl::Arena<> arena_;
   fuchsia_hardware_gpu_mali::wire::MaliProperties properties_;
 
