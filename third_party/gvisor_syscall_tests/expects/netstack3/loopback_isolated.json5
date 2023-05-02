@@ -16,6 +16,7 @@
             type: "expect_failure",
             matchers: [
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/UDP",
 
                 // Netstack3 does not support dual-stack TCP sockets yet.
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4Any_ConnectV4MappedAny",
