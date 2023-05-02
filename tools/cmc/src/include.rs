@@ -4,11 +4,9 @@
 
 use {
     crate::error::Error,
-    crate::features::FeatureSet,
     crate::merge::merge_json,
     crate::util,
     crate::util::{json_or_json5_from_file, write_depfile},
-    crate::validate::{validate_cml, ProtocolRequirements},
     serde_json::Value,
     std::{
         collections::HashSet,
@@ -40,12 +38,6 @@ pub fn merge_includes(
             document.merge_from(&mut include_document, &include)?;
         }
         document.include = None;
-        validate_cml(
-            &document,
-            &file,
-            &FeatureSet::empty(),
-            &ProtocolRequirements { must_offer: &[], must_use: &[] },
-        )?;
         serde_json::to_string_pretty(&document)?
     } else {
         // Perform a simple JSON merge algorithm.
@@ -388,7 +380,7 @@ mod tests {
         let ctx = TestContext::new();
         let cml_path = ctx.new_file(
             "some.cml",
-            "{include: [\"shard.cml\"], program: {binary: \"bin/hello_world\", runner: \"foo\"}}",
+            "{include: [\"shard.cml\"], program: {binary: \"bin/hello_world\"}}",
         );
         let shard_path =
             ctx.new_include("shard.cml", "{use: [{ protocol: [\"fuchsia.foo.Bar\"]}]}");
@@ -396,8 +388,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             },
             "use": [{
                 "protocol": "fuchsia.foo.Bar"
@@ -463,7 +454,7 @@ mod tests {
             json!({
                 "include": ["shard.cml"],
                 "use": [
-                    {"protocol": "bar", "path": "/svc/foo"}
+                    {"protocol": "bar", "path": "/foo"}
                 ]
             }),
         );
@@ -480,7 +471,7 @@ mod tests {
         ctx.assert_output_eq(json!({
             "use": [
                 {
-                    "path": "/svc/foo",
+                    "path": "/foo",
                     "protocol": "bar",
                 },
                 {
@@ -499,8 +490,7 @@ mod tests {
             json!({
                 "include": ["shard.cml"],
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -525,8 +515,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             },
             "use": [{
                 "protocol": "bar"
@@ -544,8 +533,7 @@ mod tests {
             json!({
                 "include": ["//path/to/shard.cml"],
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -561,8 +549,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             },
             "use": [{
                 "protocol": "bar"
@@ -579,8 +566,7 @@ mod tests {
             json!({
                 "include": ["shard1.cml", "shard2.cml"],
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -604,8 +590,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             },
             "use": [{
                 "protocol": "bar"
@@ -624,8 +609,7 @@ mod tests {
             json!({
                 "include": ["shard1.cml"],
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -650,8 +634,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             },
             "use": [{
                 "protocol": "bar"
@@ -670,8 +653,7 @@ mod tests {
             json!({
                 "include": [],
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -679,8 +661,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             }
         }));
         ctx.assert_depfile_eq(&ctx.output, &[]);
@@ -693,8 +674,7 @@ mod tests {
             "some.cml",
             json!({
                 "program": {
-                    "binary": "bin/hello_world",
-                    "runner": "foo"
+                    "binary": "bin/hello_world"
                 }
             }),
         );
@@ -702,8 +682,7 @@ mod tests {
 
         ctx.assert_output_eq(json!({
             "program": {
-                "binary": "bin/hello_world",
-                "runner": "foo"
+                "binary": "bin/hello_world"
             }
         }));
         ctx.assert_depfile_eq(&ctx.output, &[]);
