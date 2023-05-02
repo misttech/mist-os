@@ -260,6 +260,8 @@ mod test {
         assert_eq!(rtc_impl.get().await.is_err(), true);
     }
 
+    const RTC_SETUP_TIME: zx::Duration = zx::Duration::from_millis(90);
+
     #[fuchsia::test]
     async fn rtc_impl_set_whole_second() {
         let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
@@ -278,8 +280,8 @@ mod test {
         assert!(rtc_impl.set(TEST_ZX_TIME).await.is_ok());
         let span = zx::Time::get_monotonic() - before;
         // Setting an integer second should not require any delay and therefore should complete
-        // very fast - well under a millisecond typically.
-        assert_lt!(span, 50.millis());
+        // very fast - well under a millisecond typically. We did observe ~54ms very rarely.
+        assert_lt!(span, RTC_SETUP_TIME);
     }
 
     #[fuchsia::test]
