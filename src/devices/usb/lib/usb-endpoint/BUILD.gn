@@ -1,0 +1,27 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+group("tests") {
+  testonly = true
+  deps = [ "tests" ]
+}
+
+config("includes") {
+  include_dirs = [ "include" ]
+}
+
+source_set("usb-endpoint") {
+  public = [ "include/usb-endpoint/usb-endpoint.h" ]
+  sources = [ "usb-endpoint.cc" ]
+  public_deps = [
+    "//src/devices/lib/driver",
+    "//src/devices/usb/lib/usb:usb",
+    "//src/devices/usb/lib/usb:usb-fidl",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  public_configs = [ ":includes" ]
+}
