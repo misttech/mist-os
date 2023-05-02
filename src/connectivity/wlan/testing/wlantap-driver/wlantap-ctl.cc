@@ -32,14 +32,8 @@ constexpr size_t kWlantapPhyConfigBufferSize =
 
 fidl::Arena<kWlantapPhyConfigBufferSize> phy_config_arena;
 
-class WlantapDriver {
- private:
-  std::mutex mutex_;
-  std::unique_ptr<async::Loop> loop_;
-};
-
 struct WlantapCtl : fidl::WireServer<fuchsia_wlan_tap::WlantapCtl> {
-  explicit WlantapCtl(WlantapDriver* driver) : driver_(driver) {}
+  WlantapCtl() = default;
 
   static void DdkRelease(void* ctx) { delete static_cast<WlantapCtl*>(ctx); }
 
@@ -62,19 +56,12 @@ struct WlantapCtl : fidl::WireServer<fuchsia_wlan_tap::WlantapCtl> {
   }
 
   zx_device_t* device_ = nullptr;
-  WlantapDriver* driver_;
 };
 
 }  // namespace
 
-zx_status_t wlantapctl_init(void** out_ctx) {
-  *out_ctx = new WlantapDriver();
-  return ZX_OK;
-}
-
 zx_status_t wlantapctl_bind(void* ctx, zx_device_t* parent) {
-  auto driver = static_cast<WlantapDriver*>(ctx);
-  auto wlantapctl = std::make_unique<WlantapCtl>(driver);
+  auto wlantapctl = std::make_unique<WlantapCtl>();
   static zx_protocol_device_t device_ops = {
       .version = DEVICE_OPS_VERSION,
       .release = &WlantapCtl::DdkRelease,
@@ -97,14 +84,10 @@ zx_status_t wlantapctl_bind(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void wlantapctl_release(void* ctx) { delete static_cast<WlantapDriver*>(ctx); }
-
 static constexpr zx_driver_ops_t wlantapctl_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.init = wlantapctl_init;
   ops.bind = wlantapctl_bind;
-  ops.release = wlantapctl_release;
   return ops;
 }();
 
