@@ -141,7 +141,7 @@ TEST(Surface, CreateFramebufferSurfaceDynamicSymbol) {
   loop.StartThread();
   // Perform a backtrace if the test takes too long to try to diagnose fxbug.dev/109002
   async::PostDelayedTask(
-      loop.dispatcher(), []() { backtrace_request(); }, zx::sec(20));
+      loop.dispatcher(), []() { backtrace_request_all_threads(); }, zx::sec(20));
 
   TestSurface(true).CreateSurface(true);
   // Cancels the backtrace request if it hasn't yet executed.

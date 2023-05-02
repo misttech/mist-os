@@ -73,7 +73,10 @@ and then add the following where you want the backtrace printed:
 ```
 void my_function() {
   ...
-  backtrace_request();
+  backtrace_request_all_threads();
+
+  // Or the following version for only the current thread.
+  backtrace_request_current_thread();
   ...
 }
 ```

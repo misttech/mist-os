@@ -3,18 +3,18 @@
 // found in the LICENSE file.
 
 #include <lib/backtrace-request/backtrace-request-utils.h>
-
-#include <zircon/syscalls.h>
-
 #include <lib/backtrace-request/backtrace-request.h>
+#include <zircon/syscalls.h>
 
 namespace {
 
 bool have_swbreak_magic(const zx_thread_state_general_regs_t* regs) {
 #if defined(__x86_64__)
-  return regs->rax == BACKTRACE_REQUEST_MAGIC;
+  return regs->rax == BACKTRACE_REQUEST_MAGIC_ALL_THREADS ||
+         regs->rax == BACKTRACE_REQUEST_MAGIC_CURRENT_THREAD;
 #elif defined(__aarch64__)
-  return regs->r[0] == BACKTRACE_REQUEST_MAGIC;
+  return regs->r[0] == BACKTRACE_REQUEST_MAGIC_ALL_THREADS ||
+         regs->r[0] == BACKTRACE_REQUEST_MAGIC_CURRENT_THREAD;
 #else
   return false;
 #endif
@@ -25,6 +25,16 @@ bool have_swbreak_magic(const zx_thread_state_general_regs_t* regs) {
 // TODO: consider disabling this feature for non-development builds.
 bool is_backtrace_request(zx_excp_type_t excp_type, const zx_thread_state_general_regs_t* regs) {
   return excp_type == ZX_EXCP_SW_BREAKPOINT && regs != nullptr && have_swbreak_magic(regs);
+}
+
+bool is_backtrace_request_current_thread(const zx_thread_state_general_regs_t* regs) {
+#if defined(__x86_64__)
+  return regs->rax == BACKTRACE_REQUEST_MAGIC_CURRENT_THREAD;
+#elif defined(__aarch64__)
+  return regs->r[0] == BACKTRACE_REQUEST_MAGIC_CURRENT_THREAD;
+#else
+  return false;
+#endif
 }
 
 zx_status_t cleanup_backtrace_request(zx_handle_t thread, zx_thread_state_general_regs_t* regs) {

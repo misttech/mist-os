@@ -13,6 +13,9 @@
 // an exception caused by backtrace_request().
 bool is_backtrace_request(zx_excp_type_t excp_type, const zx_thread_state_general_regs_t* regs);
 
+// The backtrace request is requesting for the calling thread, rather than all threads.
+bool is_backtrace_request_current_thread(const zx_thread_state_general_regs_t* regs);
+
 // Cleans up the backtrace request so that resuming |thread| will allow it to
 // continue execution normally.
 //

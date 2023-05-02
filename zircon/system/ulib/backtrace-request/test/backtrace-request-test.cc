@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/backtrace-request/backtrace-request-utils.h>
 #include <lib/backtrace-request/backtrace-request.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/event.h>
+#include <lib/zx/exception.h>
+#include <lib/zx/thread.h>
 
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
 
-#include <lib/backtrace-request/backtrace-request-utils.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/event.h>
-#include <lib/zx/exception.h>
-#include <lib/zx/thread.h>
 #include <zxtest/zxtest.h>
 
 namespace {
@@ -34,7 +34,7 @@ TEST(BacktraceRequest, RequestAndResume) {
 
     // Request the backtrace, then once it returns flip the signal to prove
     // we got control back at the right place.
-    backtrace_request();
+    backtrace_request_current_thread();
     ASSERT_OK(event.signal(0, kBacktraceReturnedSignal));
   });
 
@@ -53,6 +53,7 @@ TEST(BacktraceRequest, RequestAndResume) {
 
   // Make sure this is a backtrace and clean it up.
   ASSERT_TRUE(is_backtrace_request(info.type, &regs));
+  ASSERT_TRUE(is_backtrace_request_current_thread(&regs));
   ASSERT_OK(cleanup_backtrace_request(exception_thread.get(), &regs));
 
   // Resume the thread, it should pick up where it left off.
@@ -95,7 +96,7 @@ TEST(BacktraceRequest, RequestAndResumeManyThreads) {
 
     // Request the backtrace, then once it returns flip the signal to prove
     // we got control back at the right place.
-    backtrace_request();
+    backtrace_request_all_threads();
     ASSERT_OK(event.signal(0, kBacktraceReturnedSignal));
   });
 
@@ -114,6 +115,7 @@ TEST(BacktraceRequest, RequestAndResumeManyThreads) {
 
   // Make sure this is a backtrace and clean it up.
   ASSERT_TRUE(is_backtrace_request(info.type, &regs));
+  ASSERT_FALSE(is_backtrace_request_current_thread(&regs));
   ASSERT_OK(cleanup_backtrace_request(exception_thread.get(), &regs));
 
   // Resume the thread, it should pick up where it left off.
@@ -130,7 +132,6 @@ TEST(BacktraceRequest, RequestAndResumeManyThreads) {
     wait_threads[i].join();
   }
 }
-
 
 TEST(BacktraceRequest, IgnoreNormalException) {
   zx::event event;
@@ -154,8 +155,7 @@ TEST(BacktraceRequest, IgnoreNormalException) {
 #error "what machine?"
 #endif
     ADD_FAILURE("This should never be reached");
-  exit:
-    ;
+  exit:;
   });
 
   ASSERT_OK(event.wait_one(kChannelReadySignal, zx::time::infinite(), nullptr));

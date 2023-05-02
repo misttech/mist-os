@@ -3,9 +3,20 @@
 // found in the LICENSE file.
 
 #include <lib/backtrace-request/backtrace-request.h>
+
+#include <thread>
+
 #include <zxtest/zxtest.h>
 
 // We can't easily verify the backtrace contents, but this at least checks
 // that we properly resume after requesting a backtrace. If we either hang
 // or get killed the unittest runner will detect it and report a failure.
-TEST(BacktraceRequest, RequestResumes) { backtrace_request(); }
+TEST(BacktraceRequest, RequestResumesAllThreads) {
+  std::thread t([]() { backtrace_request_all_threads(); });
+  t.join();
+}
+
+TEST(BacktraceRequest, RequestResumesCurrentThread) {
+  std::thread t([]() { backtrace_request_current_thread(); });
+  t.join();
+}

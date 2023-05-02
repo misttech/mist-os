@@ -13,7 +13,7 @@ namespace network {
 namespace {
 void TriggerBacktrace() {
   LOG_WARN("Requesting a backtrace from diagnostics, service. This is not a crash.");
-  backtrace_request();
+  backtrace_request_all_threads();
 }
 }  // namespace
 

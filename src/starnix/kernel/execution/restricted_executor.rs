@@ -205,7 +205,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 current_task.ignore_exceptions.store(true, std::sync::atomic::Ordering::Release);
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);
-                backtrace_request::backtrace_request();
+                backtrace_request::backtrace_request_current_thread();
                 restore_cfi_directives!();
             }
             return Ok(exit_status);

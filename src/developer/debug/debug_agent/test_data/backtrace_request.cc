@@ -57,7 +57,7 @@ int main() {
 
   // Create the backtrace request.
   printf("Doing backtrace request.\n");
-  backtrace_request();
+  backtrace_request_all_threads();
 
   // Tell all the threads to finish and join them.
   wait_event.signal(0, ZX_USER_SIGNAL_0);

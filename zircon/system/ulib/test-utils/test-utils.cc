@@ -41,7 +41,7 @@ void tu_fatal(const char* what, zx_status_t status) {
   // Request a backtrace to assist debugging.
   printf("FATAL: backtrace follows:\n");
   printf("       (using sw breakpoint request to crashlogger)\n");
-  backtrace_request();
+  backtrace_request_all_threads();
 
   printf("FATAL: exiting process\n");
   exit(TU_FAIL_ERRCODE);

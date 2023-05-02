@@ -166,7 +166,7 @@ void Process::AddPCs(PCsInfo pcs) {
 void Process::OnMalloc(const volatile void* ptr, size_t size) {
   ++num_mallocs_;
   if (size > malloc_limit_ && AcquireCrashState()) {
-    backtrace_request();
+    backtrace_request_all_threads();
     _Exit(options_.malloc_exitcode());
   }
 }

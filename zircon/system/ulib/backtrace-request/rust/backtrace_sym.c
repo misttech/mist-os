@@ -5,6 +5,6 @@
 #include <lib/backtrace-request/backtrace-request.h>
 #include <zircon/compiler.h>
 
-// Offers a symbol that can be called from rust code to generate a backtrace
-// request.
-__ALWAYS_INLINE void backtrace_request_for_rust(void) { backtrace_request(); }
+// Offers symbols that can be called from rust code to generate backtrace requests.
+void backtrace_request_all_threads_for_rust(void) { backtrace_request_all_threads(); }
+void backtrace_request_current_thread_for_rust(void) { backtrace_request_current_thread(); }

@@ -198,7 +198,7 @@
         if (what & MINIP_CMD_BACKTRACE_REQUEST) {
           what &= ~MINIP_CMD_BACKTRACE_REQUEST;
 
-          backtrace_request();
+          backtrace_request_all_threads();
           cmd.status = ZX_OK;
           goto reply;
         }

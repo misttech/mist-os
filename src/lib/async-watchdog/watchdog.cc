@@ -67,7 +67,7 @@ void WatchdogImpl::HandleTimer() {
     auto duration_since_last_response = async::Now(watchdog_dispatcher_) - last_update_timestamp_;
     mutex_.unlock();
 
-    backtrace_request();
+    backtrace_request_all_threads();
 
     FX_LOGS(WARNING) << "The watched thread is not responsive for " << warning_interval_.to_msecs()
                      << " ms. "

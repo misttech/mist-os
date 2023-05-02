@@ -15,7 +15,7 @@ static int g_fs_error;  // File system error code (FsError enum).
 // Called when a file system error has occurred.
 int FsError(int err_code) {
   printf("FsError: %d. What follows is NOT a crash:\n", err_code);
-  backtrace_request();
+  backtrace_request_all_threads();
   return -1;
 }
 

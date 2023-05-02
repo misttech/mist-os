@@ -58,7 +58,7 @@ debugger, or as a general builtin debug mechanism, this can be useful.
 #include <lib/backtrace-request/backtrace-request.h>
 
 void my_function() {
-  backtrace_request();
+  backtrace_request_all_threads();
 }
 ```
 

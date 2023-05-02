@@ -607,7 +607,7 @@ void MsdArmDevice::WatchdogTask() {
 
   if (!status.ok()) {
     MAGMA_LOG(ERROR, "msd-arm-mali watchdog timeout");
-    backtrace_request();
+    backtrace_request_all_threads();
   } else {
     // Chosen to be longer than any other driver timeouts, so it'll only happen if something is
     // completely deadlocked.

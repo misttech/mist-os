@@ -4,6 +4,7 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/backtrace-request/backtrace-request-utils.h>
+#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/handle.h>
@@ -83,7 +84,11 @@ void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
 
   // If this is a backtrace request, we print all the the threads and then return.
   if (ResumeIfBacktraceRequest(thread, exception, info, &regs)) {
-    inspector_print_debug_info_for_all_threads(stdout, process.get());
+    if (is_backtrace_request_current_thread(&regs)) {
+      inspector_print_debug_info(stdout, process.get(), thread.get());
+    } else {
+      inspector_print_debug_info_for_all_threads(stdout, process.get());
+    }
     return;
   }
 
