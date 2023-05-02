@@ -8,7 +8,7 @@ fidl("fuchsia.device.fs") {
   sdk_category = "experimental"
 
   sources = [
-    "exporter.fidl",
+    "connector.fidl",
     "names.fidl",
   ]
 
