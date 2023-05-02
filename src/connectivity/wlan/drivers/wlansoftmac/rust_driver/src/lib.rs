@@ -199,7 +199,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
     };
 
     let softmac_info = device.wlan_softmac_query_response();
-    let device_info = match wlan_mlme::device_info_from_wlan_softmac_query_response(softmac_info) {
+    let device_info = match (&softmac_info).try_into() {
         Ok(info) => info,
         Err(e) => {
             startup_sender.send(Err(format_err!("Failed to get MLME device info: {}", e))).unwrap();
@@ -303,7 +303,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match softmac_info.mac_role {
+    let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match softmac_info.mac_role() {
         banjo_common::WlanMacRole::CLIENT => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
@@ -320,7 +320,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
         banjo_common::WlanMacRole::AP => {
             info!("Running wlansoftmac with AP role");
-            let config = ieee80211::Bssid(softmac_info.sta_addr);
+            let config = ieee80211::Bssid(softmac_info.sta_addr());
             Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::ap::Ap<D>>(
                 config,
                 device,

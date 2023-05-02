@@ -212,7 +212,7 @@ impl<D: DeviceOps> ClientMlme<D> {
     ) -> Self {
         logger::init();
 
-        let iface_mac = device.wlan_softmac_query_response().sta_addr;
+        let iface_mac = device.wlan_softmac_query_response().sta_addr();
         Self {
             sta: None,
             ctx: Context {
@@ -382,7 +382,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             Ok((req, client_capabilities)) => {
                 self.sta.replace(Client::new(
                     req,
-                    self.ctx.device.wlan_softmac_query_response().sta_addr,
+                    self.ctx.device.wlan_softmac_query_response().sta_addr(),
                     client_capabilities,
                 ));
                 if let Some(sta) = &mut self.sta {
@@ -409,20 +409,14 @@ impl<D: DeviceOps> ClientMlme<D> {
     }
 
     fn join_device(&mut self, bss: &BssDescription) -> Result<ClientCapabilities, Error> {
-        let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
-        let join_caps = derive_join_capabilities(
-            Channel::from(bss.channel),
-            bss.rates(),
-            &crate::ddk_converter::device_info_from_wlan_softmac_query_response(
-                wlan_softmac_query_response,
-            )?,
-        )
-        .map_err(|e| {
-            Error::Status(
-                format!("Failed to derive join capabilities: {:?}", e),
-                zx::Status::NOT_SUPPORTED,
-            )
-        })?;
+        let info = self.ctx.device.wlan_softmac_query_response().try_into()?;
+        let join_caps = derive_join_capabilities(Channel::from(bss.channel), bss.rates(), &info)
+            .map_err(|e| {
+                Error::Status(
+                    format!("Failed to derive join capabilities: {:?}", e),
+                    zx::Status::NOT_SUPPORTED,
+                )
+            })?;
 
         let channel = crate::ddk_converter::ddk_channel_from_fidl(bss.channel.into())
             .map_err(|e| Error::Internal(e))?;
@@ -449,10 +443,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
-        let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
-        let info = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
-            wlan_softmac_query_response,
-        )?;
+        let info = self.ctx.device.wlan_softmac_query_response().try_into()?;
         responder.respond(info);
         Ok(())
     }
@@ -1270,7 +1261,10 @@ mod tests {
             block_ack::{self, BlockAckState, Closed, ADDBA_REQ_FRAME_LEN, ADDBA_RESP_FRAME_LEN},
             buffer::FakeBufferProvider,
             client::{lost_bss::LostBssCounter, test_utils::drain_timeouts},
-            device::{FakeDevice, FakeDeviceState, LinkStatus},
+            device::{
+                test_utils::fake_fidl_band_caps, FakeDevice, FakeDeviceConfig, FakeDeviceState,
+                LinkStatus,
+            },
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -1336,7 +1330,14 @@ mod tests {
     impl MockObjects {
         fn new(executor: &fasync::TestExecutor) -> Self {
             let (timer, time_stream) = create_timer();
-            let (fake_device, fake_device_state) = FakeDevice::new(executor);
+            let (fake_device, fake_device_state) = FakeDevice::new_with_config(
+                executor,
+                FakeDeviceConfig {
+                    mac_role: banjo_common::WlanMacRole::CLIENT,
+                    sta_addr: IFACE_MAC,
+                    ..Default::default()
+                },
+            );
             Self { fake_device, fake_device_state, timer: Some(timer), time_stream }
         }
 
@@ -2607,20 +2608,25 @@ mod tests {
     #[test]
     fn mlme_respond_to_query_device_info() {
         let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
-        let mut me = m.make_mlme();
+        let mut mock_objects = MockObjects::new(&exec);
+        let mut mlme = mock_objects.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
+            mlme.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
             Ok(())
         );
         let info = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
-        let expected = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
-            m.fake_device_state.lock().unwrap().info,
-        )
-        .expect("Failed to convert DDK WlanSoftmacInfo");
-        assert_eq!(info, expected);
+        assert_eq!(
+            info,
+            fidl_mlme::DeviceInfo {
+                sta_addr: IFACE_MAC,
+                role: fidl_common::WlanMacRole::Client,
+                bands: fake_fidl_band_caps(),
+                softmac_hardware_capability: 0,
+                qos_capable: false,
+            }
+        );
     }
 
     #[test]
