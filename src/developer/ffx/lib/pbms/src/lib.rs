@@ -34,7 +34,9 @@ use errors::ffx_bail;
 use fms::Entries;
 use futures::TryStreamExt as _;
 use hyper::{Body, Method, Request};
+#[cfg(feature = "build_pb_v1")]
 use itertools::Itertools as _;
+#[cfg(feature = "build_pb_v1")]
 use sdk;
 use sdk_metadata::ProductBundle;
 use std::{
@@ -118,9 +120,9 @@ pub fn is_local_product_bundle(product_bundle: &str) -> bool {
 /// Load a product bundle by name, uri, or local path.
 /// This is capable of loading both v1 and v2 ProductBundles.
 pub async fn load_product_bundle(
-    sdk: &ffx_config::Sdk,
+    _sdk: &ffx_config::Sdk,
     product_bundle: &Option<String>,
-    mode: ListingMode,
+    _mode: ListingMode,
 ) -> Result<ProductBundle> {
     tracing::debug!("Loading a product bundle: {:?}", product_bundle);
 
@@ -129,19 +131,25 @@ pub async fn load_product_bundle(
         return ProductBundle::try_load_from(path);
     }
 
-    // Otherwise, use the `fms` crate to fetch and parse the product bundle by name or uri.
-    let should_print = true;
-    let product_url = select_product_bundle(sdk, product_bundle, mode, should_print)
-        .await
-        .context("Selecting product bundle")?;
-    let name = product_url.fragment().expect("Product name is required.");
+    #[cfg(feature = "build_pb_v1")]
+    {
+        // Otherwise, use the `fms` crate to fetch and parse the product bundle by name or uri.
+        let should_print = true;
+        let product_url = select_product_bundle(_sdk, product_bundle, _mode, should_print)
+            .await
+            .context("Selecting product bundle")?;
+        let name = product_url.fragment().expect("Product name is required.");
 
-    let fms_entries =
-        fms_entries_from(&product_url, &sdk.get_path_prefix()).await.context("get fms entries")?;
-    let product = fms::find_product_bundle(&fms_entries, &Some(name.to_string()))
-        .context("problem with product_bundle")?
-        .to_owned();
-    Ok(ProductBundle::V1(product))
+        let fms_entries = fms_entries_from(&product_url, &_sdk.get_path_prefix())
+            .await
+            .context("get fms entries")?;
+        let product = fms::find_product_bundle(&fms_entries, &Some(name.to_string()))
+            .context("problem with product_bundle")?
+            .to_owned();
+        Ok(ProductBundle::V1(product))
+    }
+    #[cfg(not(feature = "build_pb_v1"))]
+    bail!("A path to a product bundle v2 is required because `build_pb_v1` was false");
 }
 
 /// For each non-local URL in ffx CONFIG_METADATA, fetch updated info.
@@ -268,6 +276,7 @@ pub async fn fms_entries_from(product_url: &url::Url, sdk_root: &Path) -> Result
 ///
 /// This function should only be called with an iterator of `url::Url`s that has
 /// 2 or more entries, and has already been sorted & reversed.
+#[cfg(feature = "build_pb_v1")]
 fn default_pbm_of_many<I>(
     mut urls: I,
     sdk_version: &sdk::SdkVersion,
@@ -358,55 +367,60 @@ pub fn is_locally_built(product_url: &url::Url) -> bool {
 /// Tip: Call `update_metadata()` to get up to date choices (or not, if the
 ///      intent is to select from what's already there).
 pub async fn select_product_bundle(
-    sdk: &ffx_config::Sdk,
-    looking_for: &Option<String>,
-    mode: ListingMode,
-    should_print: bool,
+    _sdk: &ffx_config::Sdk,
+    _looking_for: &Option<String>,
+    _mode: ListingMode,
+    _should_print: bool,
 ) -> Result<url::Url> {
     tracing::debug!("select_product_bundle");
-    let sdk_version = sdk.get_version();
-    let sdk_root = sdk.get_path_prefix();
-    let mut urls = product_bundle_urls(sdk).await.context("getting product bundle URLs")?;
-    // Sort the URLs lexigraphically, then reverse them so the most recent
-    // version strings will be first.
-    urls.sort();
-    urls.reverse();
-    let mut iter = urls.into_iter();
-    if mode == ListingMode::ReadyBundlesOnly || mode == ListingMode::RemovableBundles {
-        // Unfortunately this can't be a filter() because is_pb_ready is async.
-        let mut ready = Vec::new();
-        for url in iter {
-            if is_pb_ready(&url, sdk_root).await? {
-                ready.push(url);
+    #[cfg(feature = "build_pb_v1")]
+    {
+        let sdk_version = _sdk.get_version();
+        let sdk_root = _sdk.get_path_prefix();
+        let mut urls = product_bundle_urls(_sdk).await.context("getting product bundle URLs")?;
+        // Sort the URLs lexigraphically, then reverse them so the most recent
+        // version strings will be first.
+        urls.sort();
+        urls.reverse();
+        let mut iter = urls.into_iter();
+        if _mode == ListingMode::ReadyBundlesOnly || _mode == ListingMode::RemovableBundles {
+            // Unfortunately this can't be a filter() because is_pb_ready is async.
+            let mut ready = Vec::new();
+            for url in iter {
+                if is_pb_ready(&url, sdk_root).await? {
+                    ready.push(url);
+                }
             }
+            iter = ready.into_iter();
         }
-        iter = ready.into_iter();
-    }
-    // The locally built bundle can't be removed or downloaded, so skip it for those cases.
-    let iter = iter.filter(|url| {
-        mode == ListingMode::AllBundles
-            || mode == ListingMode::ReadyBundlesOnly
-            || !is_locally_built(&url)
-    });
-    if let Some(looking_for) = &looking_for {
-        let matches = iter.filter(|url| {
-            return url.as_str() == looking_for
-                || url.fragment().expect("product_urls must have fragment") == looking_for;
+        // The locally built bundle can't be removed or downloaded, so skip it for those cases.
+        let iter = iter.filter(|url| {
+            _mode == ListingMode::AllBundles
+                || _mode == ListingMode::ReadyBundlesOnly
+                || !is_locally_built(&url)
         });
-        match matches.at_most_one() {
+        if let Some(looking_for) = &_looking_for {
+            let matches = iter.filter(|url| {
+                return url.as_str() == looking_for
+                    || url.fragment().expect("product_urls must have fragment") == looking_for;
+            });
+            match matches.at_most_one() {
             Ok(Some(m)) => Ok(m),
             Ok(None) => bail!(
                 "A product bundle with that name was not found, please check the spelling and try again."
             ),
-            Err(matches) => default_pbm_of_many(matches, sdk_version, Some(looking_for.to_string()), should_print),
+            Err(matches) => default_pbm_of_many(matches, sdk_version, Some(looking_for.to_string()), _should_print),
         }
-    } else {
-        match iter.at_most_one() {
-            Ok(Some(url)) => Ok(url),
-            Ok(None) => bail!("There are no product bundles available."),
-            Err(urls) => default_pbm_of_many(urls, sdk_version, None, should_print),
+        } else {
+            match iter.at_most_one() {
+                Ok(Some(url)) => Ok(url),
+                Ok(None) => bail!("There are no product bundles available."),
+                Err(urls) => default_pbm_of_many(urls, sdk_version, None, _should_print),
+            }
         }
     }
+    #[cfg(not(feature = "build_pb_v1"))]
+    bail!("select_product_bundle requires build_pb_v1=true");
 }
 
 /// Determine whether the data for `product_url` is downloaded and ready to be

@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 declare_args() {
+  # Whether to build product bundle version 1 related tools and artifacts.
+  build_pb_v1 = true
+
   # Is the `assemble_system()` instantiation used by the product the standard
   # one or the bringup one?
   use_bringup_assembly = false

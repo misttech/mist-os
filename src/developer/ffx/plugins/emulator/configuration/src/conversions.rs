@@ -12,14 +12,17 @@ use camino::Utf8PathBuf;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
-use pbms::{
-    fms_entries_from, get_images_dir, load_product_bundle, select_product_bundle, ListingMode,
-};
+#[cfg(feature = "build_pb_v1")]
+use pbms::{fms_entries_from, get_images_dir, select_product_bundle};
+use pbms::{load_product_bundle, ListingMode};
+#[cfg(feature = "build_pb_v1")]
+use sdk_metadata::ProductBundleV1;
 use sdk_metadata::{
-    ProductBundle, ProductBundleV1, ProductBundleV2, VirtualDevice, VirtualDeviceManifest,
-    VirtualDeviceV1,
+    ProductBundle, ProductBundleV2, VirtualDevice, VirtualDeviceManifest, VirtualDeviceV1,
 };
-use std::path::{Path, PathBuf};
+#[cfg(feature = "build_pb_v1")]
+use std::path::Path;
+use std::path::PathBuf;
 
 pub async fn convert_bundle_to_configs(
     product_bundle_name: Option<String>,
@@ -33,65 +36,71 @@ pub async fn convert_bundle_to_configs(
     let product_bundle =
         load_product_bundle(&sdk, &product_bundle_name, ListingMode::ReadyBundlesOnly).await?;
     match &product_bundle {
-        ProductBundle::V1(product_bundle) => {
-            let should_print = false;
-            let product_url = select_product_bundle(
-                &sdk,
-                &Some(product_bundle.name.clone()),
-                ListingMode::ReadyBundlesOnly,
-                should_print,
-            )
-            .await
-            .context("Selecting product bundle")?;
+        ProductBundle::V1(_product_bundle) => {
+            #[cfg(feature = "build_pb_v1")]
+            {
+                let should_print = false;
+                let product_url = select_product_bundle(
+                    &sdk,
+                    &Some(_product_bundle.name.clone()),
+                    ListingMode::ReadyBundlesOnly,
+                    should_print,
+                )
+                .await
+                .context("Selecting product bundle")?;
 
-            // Find the data root, which is used to find the images and template file.
-            let data_root =
-                get_images_dir(&product_url, sdk.get_path_prefix()).await.context("images dir")?;
-
-            let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
-                device
-            } else {
-                // Get the virtual device from the bundle.
-                let fms_entries = fms_entries_from(&product_url, sdk.get_path_prefix())
+                // Find the data root, which is used to find the images and template file.
+                let data_root = get_images_dir(&product_url, sdk.get_path_prefix())
                     .await
-                    .context("get fms entries")?;
-                let virtual_devices =
-                    fms::find_virtual_devices(&fms_entries, &product_bundle.device_refs)
-                        .context("problem with virtual device")?;
+                    .context("images dir")?;
 
-                // Determine the correct device name from the user, or default to the first one
-                // listed in the product bundle.
-                let device = match device_name.as_deref() {
-                    // If no device_name is given, choose the first virtual device listed in
-                    // the product bundle.
-                    None | Some("") => virtual_devices.get(0).ok_or_else(|| {
-                        anyhow!("There are no virtual devices in this product bundle.")
-                    })?,
+                let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
+                    device
+                } else {
+                    // Get the virtual device from the bundle.
+                    let fms_entries = fms_entries_from(&product_url, sdk.get_path_prefix())
+                        .await
+                        .context("get fms entries")?;
+                    let virtual_devices =
+                        fms::find_virtual_devices(&fms_entries, &_product_bundle.device_refs)
+                            .context("problem with virtual device")?;
 
-                    // Otherwise, find the virtual device by name in the product bundle.
-                    Some(device_name) => virtual_devices
-                        .iter()
-                        .find(|vd| vd.name() == device_name)
-                        .ok_or_else(|| {
-                            anyhow!(
-                                "The device '{}' is not found in the product bundle.",
-                                device_name
-                            )
+                    // Determine the correct device name from the user, or default to the first one
+                    // listed in the product bundle.
+                    let device = match device_name.as_deref() {
+                        // If no device_name is given, choose the first virtual device listed in
+                        // the product bundle.
+                        None | Some("") => virtual_devices.get(0).ok_or_else(|| {
+                            anyhow!("There are no virtual devices in this product bundle.")
                         })?,
+
+                        // Otherwise, find the virtual device by name in the product bundle.
+                        Some(device_name) => virtual_devices
+                            .iter()
+                            .find(|vd| vd.name() == device_name)
+                            .ok_or_else(|| {
+                                anyhow!(
+                                    "The device '{}' is not found in the product bundle.",
+                                    device_name
+                                )
+                            })?,
+                    };
+                    device.clone()
                 };
-                device.clone()
-            };
-            let virtual_device = match virtual_device {
-                VirtualDevice::V1(v) => v,
-            };
-            if verbose {
-                println!(
-                    "Found PBM: {:?}, device_refs: {:?}, virtual_device: {:#?}",
-                    &product_bundle.name, &product_bundle.device_refs, &virtual_device
-                );
+                let virtual_device = match virtual_device {
+                    VirtualDevice::V1(v) => v,
+                };
+                if verbose {
+                    println!(
+                        "Found PBM: {:?}, device_refs: {:?}, virtual_device: {:#?}",
+                        &_product_bundle.name, &_product_bundle.device_refs, &virtual_device
+                    );
+                }
+                convert_v1_bundle_to_configs(_product_bundle, &virtual_device, &data_root)
+                    .context("problem with internal conversion")
             }
-            convert_v1_bundle_to_configs(product_bundle, &virtual_device, &data_root)
-                .context("problem with internal conversion")
+            #[cfg(not(feature = "build_pb_v1"))]
+            bail!("select_product_bundle requires build_pb_v1=true");
         }
         ProductBundle::V2(product_bundle) => {
             let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
@@ -179,6 +188,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
 /// - `data_root` is a path to a directory. When working in-tree it's the path
 ///   to build output dir; when using the SDK it's the path to the downloaded
 ///   images directory.
+#[cfg(feature = "build_pb_v1")]
 fn convert_v1_bundle_to_configs(
     product_bundle: &ProductBundleV1,
     virtual_device: &VirtualDeviceV1,
@@ -314,15 +324,17 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
-        AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, EmuManifest,
-        InputDevice, Manifests, PointingDevice, ProductBundleV1, Screen, ScreenUnits,
-        VirtualDeviceV1,
+        AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
+        PointingDevice, Screen, ScreenUnits, VirtualDeviceV1,
     };
+    #[cfg(feature = "build_pb_v1")]
+    use sdk_metadata::{EmuManifest, Manifests, ProductBundleV1};
     use std::{collections::HashMap, fs::File, io::Write};
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
 
+    #[cfg(feature = "build_pb_v1")]
     #[test]
     fn test_convert_v1_bundle_to_configs() {
         let temp_dir = tempfile::TempDir::new().expect("creating sdk_root temp dir");

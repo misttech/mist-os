@@ -578,33 +578,35 @@ if (board_is_phys) {
   compatible_devices += [ device_name ]
 }
 
-product_metadata("product_metadata") {
-  testonly = true
-  devices = compatible_devices
-  output = "$root_build_dir/product_bundle.json"
-  deps = []
+if (build_pb_v1) {
+  product_metadata("product_metadata") {
+    testonly = true
+    devices = compatible_devices
+    output = "$root_build_dir/product_bundle.json"
+    deps = []
 
-  if (board_is_emu) {
-    deps += virtual_device_labels
-    emu_manifest = {
-      if (use_bringup_assembly) {
-        initial_ramdisk = "bringup.zbi"
-      } else {
-        initial_ramdisk = "fuchsia.zbi"
-      }
-      kernel = rebase_path(files.qemu_kernel, root_out_dir)
-      disk_images = []
-      if (defined(files.fvm)) {
-        disk_images = [ rebase_path(files.fvm, root_build_dir) ]
-      } else if (defined(files.fxfs)) {
-        disk_images = [ rebase_path(files.fxfs, root_build_dir) ]
+    if (board_is_emu) {
+      deps += virtual_device_labels
+      emu_manifest = {
+        if (use_bringup_assembly) {
+          initial_ramdisk = "bringup.zbi"
+        } else {
+          initial_ramdisk = "fuchsia.zbi"
+        }
+        kernel = rebase_path(files.qemu_kernel, root_out_dir)
+        disk_images = []
+        if (defined(files.fvm)) {
+          disk_images = [ rebase_path(files.fvm, root_build_dir) ]
+        } else if (defined(files.fxfs)) {
+          disk_images = [ rebase_path(files.fxfs, root_build_dir) ]
+        }
       }
     }
-  }
 
-  if (board_is_phys) {
-    flash_manifest = flash_manifest_content
-    deps += [ ":physical_device_manifest" ]
+    if (board_is_phys) {
+      flash_manifest = flash_manifest_content
+      deps += [ ":physical_device_manifest" ]
+    }
   }
 }
 

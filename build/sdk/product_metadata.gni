@@ -7,149 +7,151 @@ import("//build/json/validate_json.gni")
 import("//build/product.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
-# Generates a physical device manifest and product bundle metadata JSON files.
-#
-# The template uses the product and board definitions to populate some values.
-#
-# Parameters
-#
-#   devices(required)
-#     A list of device names or identifiers this product may be installed on.
-#
-#   emu_manifest(optional)
-#     Emulator manifest
-#     See //build/sdk/meta/emu_manifest.json
-#
-#   flash_manifest(optional)
-#     Flash manifest
-#     See //build/sdk/meta/flash_manifest-835e8f26.json
-#
-#   output(optional)
-#     Location to write the output product bundle file
-#
-#   deps (optional)
-#   public_deps (optional)
-#   testonly (optional)
-#   visibility (optional)
-#     Standard GN meaning.
-template("product_metadata") {
-  assert(defined(invoker.devices), "Devices names are required.")
+if (build_pb_v1) {
+  # Generates a physical device manifest and product bundle metadata JSON files.
+  #
+  # The template uses the product and board definitions to populate some values.
+  #
+  # Parameters
+  #
+  #   devices(required)
+  #     A list of device names or identifiers this product may be installed on.
+  #
+  #   emu_manifest(optional)
+  #     Emulator manifest
+  #     See //build/sdk/meta/emu_manifest.json
+  #
+  #   flash_manifest(optional)
+  #     Flash manifest
+  #     See //build/sdk/meta/flash_manifest-835e8f26.json
+  #
+  #   output(optional)
+  #     Location to write the output product bundle file
+  #
+  #   deps (optional)
+  #   public_deps (optional)
+  #   testonly (optional)
+  #   visibility (optional)
+  #     Standard GN meaning.
+  template("product_metadata") {
+    assert(defined(invoker.devices), "Devices names are required.")
 
-  # All the paths are relative to the generated metadata json.
-  amber_files = rebase_path("$root_build_dir/amber-files", root_build_dir)
-  image_base = rebase_path("$root_build_dir", root_build_dir)
+    # All the paths are relative to the generated metadata json.
+    amber_files = rebase_path("$root_build_dir/amber-files", root_build_dir)
+    image_base = rebase_path("$root_build_dir", root_build_dir)
 
-  # This is the most recent schema.
-  schema_file = "product_bundle-6320eef1.json"
-  schema_target = "//build/sdk/meta/${schema_file}"
+    # This is the most recent schema.
+    schema_file = "product_bundle-6320eef1.json"
+    schema_target = "//build/sdk/meta/${schema_file}"
 
-  # Schema ID must match the id field in the schema file.
-  schema_id = "http://fuchsia.com/schemas/sdk/${schema_file}"
+    # Schema ID must match the id field in the schema file.
+    schema_id = "http://fuchsia.com/schemas/sdk/${schema_file}"
 
-  product_name = "${build_info_product}.${build_info_board}"
+    product_name = "${build_info_product}.${build_info_board}"
 
-  file_contents = {
-    schema_id = schema_id
-    data = {
-      type = "product_bundle"
-      name = product_name
-      description = product_description
-      device_refs = invoker.devices
-      metadata = [
-        [
-          "build_info_board",
-          build_info_board,
-        ],
-        [
-          "build_info_product",
-          build_info_product,
-        ],
-        [
-          "build_info_version",
-          build_info_version,
-        ],
-        [
-          "is_debug",
-          is_debug,
-        ],
-      ]
-      packages = [
-        {
-          format = "files"
-          repo_uri = "file:/$amber_files"
-        },
-      ]
-      images = [
-        {
-          format = "files"
-          base_uri = "file:/$image_base"
-        },
-      ]
-      manifests = {
-        if (defined(invoker.emu_manifest)) {
-          emu = invoker.emu_manifest
-        }
-        if (defined(invoker.flash_manifest)) {
-          flash = invoker.flash_manifest
+    file_contents = {
+      schema_id = schema_id
+      data = {
+        type = "product_bundle"
+        name = product_name
+        description = product_description
+        device_refs = invoker.devices
+        metadata = [
+          [
+            "build_info_board",
+            build_info_board,
+          ],
+          [
+            "build_info_product",
+            build_info_product,
+          ],
+          [
+            "build_info_version",
+            build_info_version,
+          ],
+          [
+            "is_debug",
+            is_debug,
+          ],
+        ]
+        packages = [
+          {
+            format = "files"
+            repo_uri = "file:/$amber_files"
+          },
+        ]
+        images = [
+          {
+            format = "files"
+            base_uri = "file:/$image_base"
+          },
+        ]
+        manifests = {
+          if (defined(invoker.emu_manifest)) {
+            emu = invoker.emu_manifest
+          }
+          if (defined(invoker.flash_manifest)) {
+            flash = invoker.flash_manifest
+          }
         }
       }
     }
-  }
 
-  if (defined(invoker.output)) {
-    file = invoker.output
-  } else {
-    file = "$target_gen_dir/product_bundle.json"
-  }
-  generator_target = "${target_name}_json_generator"
-  generated_file(generator_target) {
-    visibility = [ ":*" ]
-    forward_variables_from(invoker, [ "testonly" ])
-    contents = file_contents
-    output_conversion = "json"
-    outputs = [ file ]
-    metadata = {
-      images = [
-        {
-          label = get_label_info(":$target_name", "label_with_toolchain")
-          name = "product_bundle"
-          path = rebase_path(file, root_build_dir)
-          type = "manifest"
-        },
-      ]
+    if (defined(invoker.output)) {
+      file = invoker.output
+    } else {
+      file = "$target_gen_dir/product_bundle.json"
     }
-  }
+    generator_target = "${target_name}_json_generator"
+    generated_file(generator_target) {
+      visibility = [ ":*" ]
+      forward_variables_from(invoker, [ "testonly" ])
+      contents = file_contents
+      output_conversion = "json"
+      outputs = [ file ]
+      metadata = {
+        images = [
+          {
+            label = get_label_info(":$target_name", "label_with_toolchain")
+            name = "product_bundle"
+            path = rebase_path(file, root_build_dir)
+            type = "manifest"
+          },
+        ]
+      }
+    }
 
-  # TODO(https://fxbug.dev/82728): Add path validation.
-  validator_target = "${target_name}_json_validator"
-  validate_json(validator_target) {
-    visibility = [ ":*" ]
-    forward_variables_from(invoker, [ "testonly" ])
-    data = file
-    deps = [ ":${generator_target}" ]
-    schema = schema_target
-    sources = [
-      # Included schemata.
-      "//build/sdk/meta/common.json",
-      "//build/sdk/meta/emu_manifest.json",
-      "//build/sdk/meta/flash_manifest-835e8f26.json",
-    ]
-    allow_comments = true
-  }
+    # TODO(https://fxbug.dev/82728): Add path validation.
+    validator_target = "${target_name}_json_validator"
+    validate_json(validator_target) {
+      visibility = [ ":*" ]
+      forward_variables_from(invoker, [ "testonly" ])
+      data = file
+      deps = [ ":${generator_target}" ]
+      schema = schema_target
+      sources = [
+        # Included schemata.
+        "//build/sdk/meta/common.json",
+        "//build/sdk/meta/emu_manifest.json",
+        "//build/sdk/meta/flash_manifest-835e8f26.json",
+      ]
+      allow_comments = true
+    }
 
-  group(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    deps = [
-      ":${generator_target}",
-      ":${validator_target}",
-    ]
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = [
+        ":${generator_target}",
+        ":${validator_target}",
+      ]
 
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
     }
   }
 }
