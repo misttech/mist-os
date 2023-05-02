@@ -1,0 +1,123 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.hardware.usb.endpoint;
+
+using zx;
+using fuchsia.hardware.usb.request;
+
+/// Bulk Endpoint Information
+type BulkEndpointInfo = table {};
+
+/// Control Endpoint Information
+type ControlEndpointInfo = table {};
+
+/// Isochronous Endpoint Information
+type IsochronousEndpointInfo = table {
+    /// Lead time described in number of transfers.
+    1: lead_time uint64;
+};
+
+/// Interrupt Endpoint Information
+type InterruptEndpointInfo = table {};
+
+/// Endpoint Information
+type EndpointInfo = flexible union {
+    /// Bulk endpoint information
+    1: bulk BulkEndpointInfo;
+    /// Control endpoint information
+    2: control ControlEndpointInfo;
+    /// Isochronous endpoint information
+    3: isochronous IsochronousEndpointInfo;
+    /// Interrupt endpoint information
+    4: interrupt InterruptEndpointInfo;
+};
+
+/// Arbitrary limit on the number of VMOs in one call to `RegisterVmos()` or `UnregisterVmos()`
+const VMO_VECTOR_MAX uint32 = 300;
+/// Arbitrary limit on the number of Requests in one call to `QueueRequest()`
+const REQUEST_MAX uint32 = 300;
+
+/// VMO information for registering VMOs
+type VmoInfo = resource table {
+    // ID corresponding to the registered VMO
+    1: vmo_id uint64;
+    // VMO to register
+    2: vmo zx.Handle:VMO;
+};
+
+/// Completion
+type Completion = resource table {
+    /// Request completed.
+    1: request fuchsia.hardware.usb.request.Request;
+    /// Completion status.
+    2: status zx.Status;
+    /// Bytes successfully transferred.
+    3: transfer_size uint64;
+};
+
+/// Endpoint Interface.
+/// Pre-registered VMOs associated with the Endpoint are tied to the lifetime of the Endpoint. When
+/// the Endpoint is closed, all outstanding registered VMOs are unregistered, references to their
+/// handles dropped and any necessary actions for DisableEndpoint will be called.
+@discoverable
+protocol Endpoint {
+    /// Gets endpoint information
+    GetInfo() -> (struct {
+        info EndpointInfo;
+    }) error zx.Status;
+
+    /// Registers and pins VMOs to the vmo_ids. Returns
+    ///  * status: failure status for each unsuccessfully registered VMO. Should 1:1 correspond to
+    ///            the failed_vmos below.
+    ///      + ZX_ERR_ALREADY_EXISTS: vmo_id is already in use
+    ///      + other errors corresponding to vmo::get_size() or PhysMap.
+    ///  * failed_vmos: VMOs that were not successfully registered.
+    RegisterVmos(resource struct {
+        vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+    }) -> (resource struct {
+        status vector<zx.Status>:VMO_VECTOR_MAX;
+        failed_vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+    });
+    /// Unregisters the VMOs corresponding to the vmo_ids. Returns
+    ///  * vmos: IDs and handles to the VMOs successfully unregistered.
+    UnregisterVmos(struct {
+        vmo_ids vector<uint64>:VMO_VECTOR_MAX;
+    }) -> (resource struct {
+        vmos vector<VmoInfo>:VMO_VECTOR_MAX;
+    });
+
+    /// Submit Requests to queue. Processed starting with the 0th Request. Submitting a vector of
+    /// Requests allows for pre-buffering.
+    ///
+    /// Clients are responsible for cache management and ensuring cache coherency.
+    ///
+    /// After read requests:
+    /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE on buffers that
+    ///   have been mapped by the client.
+    /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN_INVALIDATE on all other buffers.
+    ///
+    /// Note that writing to any portion of a buffer before OnCompletion is called for that buffer
+    /// can corrupt the received data.
+    ///
+    /// Before write requests:
+    /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
+    ///   client.
+    /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
+    QueueRequests(resource struct {
+        req vector<fuchsia.hardware.usb.request.Request>:REQUEST_MAX;
+    });
+    /// Called on a completion to notify the device driver of an completion event.
+    /// Note that if more than REQUEST_MAX successful requests with defer_completion == true have
+    /// been seen, driver may call OnCompletion multiple times when defer_completion == false is
+    /// seen (or failure happens) to return all seen requests to the client.
+    -> OnCompletion(resource struct {
+        completion vector<Completion>:REQUEST_MAX;
+    });
+
+    /// Cancels all requests. Returns
+    ///  * ZX_ERR_IO_NOT_PRESENT: If device is not running, disconnected, or inactive.
+    ///  * ZX_ERR_IO: If cancel failed due to an unsuccessful request.
+    CancelAll() -> () error zx.Status;
+};

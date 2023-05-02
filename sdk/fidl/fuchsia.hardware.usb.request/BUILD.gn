@@ -1,0 +1,14 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.hardware.usb.request") {
+  sources = [ "request.fidl" ]
+  public_deps = [
+    # TODO(fxbug.dev/96732): migrate usb descriptor to FIDL
+    "//sdk/banjo/fuchsia.hardware.usb.descriptor",
+    "//zircon/vdso/zx",
+  ]
+}
