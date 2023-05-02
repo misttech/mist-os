@@ -52,6 +52,185 @@ using namespace display;
 namespace flatland {
 namespace test {
 
+namespace {
+
+// Configures the geometric range and offset of the captured image against the
+// golden image.
+//
+// The compare ranges of the captured image and the golden image specified in
+// the struct must be valid.
+//
+// TODO(fxbug.dev/125394): This should be moved to a standalone library that
+// supports generic image comparison against captured images and golden images.
+struct CompareConfig {
+  // The index of the first row in the captured image that will be compared
+  // against the golden image.
+  //
+  // Must be non-negative.
+  int start_row = 0;
+
+  // The index of the first column in the captured image that will be compared
+  // against the golden image.
+  //
+  // Must be non-negative.
+  int start_column = 0;
+
+  // One (1) plus the index of the last row that will be compared against the
+  // golden image in the captured image. So the rows within range [start_row,
+  // end_row) in the compared image will be used for comparison.
+  //
+  // Must be equal to or greater than `start_row`.
+  int end_row = 0;
+
+  // One (1) plus the index of the last column that will be compared against the
+  // golden image in the captured image. So the columns within range
+  // [start_column, end_column) in the compared image will be used for
+  // comparison.
+  //
+  // Must be equal to or greater than `start_column`.
+  int end_column = 0;
+
+  // Pixels of captured image may have an vertical offset from the golden image.
+  // Pixels of row `r` of the golden image will be compared with row
+  // `r + capture_offset_row` of the captured image.
+  int capture_offset_row = 0;
+
+  // Pixels of captured image may have an horizontal offset from the golden
+  // image.
+  // Pixels of column `c` of the golden image will be compared with column
+  // `c + capture_offset_column` of the captured image.
+  int capture_offset_column = 0;
+
+  // The maximum allowed difference of values between a pixel on the golden
+  // image and the corresponding pixel on the captured image.
+  //
+  // Must be non-negative.
+  int color_difference_threshold = 0;
+};
+
+CompareConfig GetCompareConfigForBoard(std::string_view board_name, int display_width,
+                                       int display_height) {
+  if (board_name == "astro") {
+    const int num_columns_to_compare = display_width - 1;
+    return CompareConfig{
+        // Ignore the first row. It sometimes contains junk due to a hardware
+        // bug per Amlogic.
+        .start_row = 1,
+        .start_column = 0,
+
+        .end_row = display_height,
+        // The last column of the captured image only contains junk bytes due
+        // to hardware bug.
+        .end_column = display_width - 1,
+
+        .capture_offset_row = 0,
+        // The captured contents of the first column from golden image is missing.
+        // The column 0 in captured image corresponds to the column 1 in the
+        // golden image.
+        .capture_offset_column = -1,
+
+        // On Amlogic S905D2, the color conversion matrix and calculated results
+        // are rounded to 0.5, so it's possible to see a maximum color error of
+        // one (1) in the readback pixels.
+        .color_difference_threshold = 1,
+    };
+  }
+
+  if (board_name == "sherlock") {
+    return CompareConfig{
+        // Ignore the first row. It sometimes contains junk (hardware bug).
+        .start_row = 1,
+        .start_column = 0,
+
+        // TODO(fxbug.dev/125842): The last 5 rows of the captured image on
+        // sherlock may contain only zeroes; so we ignore these rows.
+        .end_row = display_height - 5,
+        .end_column = display_width,
+
+        .capture_offset_row = 0,
+        .capture_offset_column = 0,
+        // The actual rounding mechanism used by Sherlock (Amlogic T931)
+        // hardware is unknown. Experiments show that the maximum color error
+        // of one (1) can be seen in the readback pixels.
+        .color_difference_threshold = 1,
+    };
+  }
+
+  if (board_name == "nelson") {
+    return CompareConfig{
+        // Ignore the first row. It sometimes contains junk (hardware bug).
+        .start_row = 1,
+        .start_column = 0,
+
+        .end_row = display_height,
+        .end_column = display_width,
+
+        .capture_offset_row = 0,
+        .capture_offset_column = 0,
+        // The actual rounding mechanism used by Nelson (Amlogic S905D3)
+        // hardware is unknown. Experiments show that the maximum color error
+        // of one (1) can be seen in the readback pixels.
+        .color_difference_threshold = 1,
+    };
+  }
+
+  if (board_name == "vim3") {
+    // TODO(fxbug.dev/125842): For VIM3 with 1920-width displays, the last 2
+    // rows of the captured image on sherlock may contain only zeroes; so we
+    // ignore these rows.
+    const int end_row = (display_width == 1920) ? (display_height - 2) : display_height;
+    return CompareConfig{
+        .start_row = 0,
+        .start_column = 0,
+
+        .end_row = end_row,
+        .end_column = display_width,
+
+        .capture_offset_row = 0,
+        .capture_offset_column = 0,
+        // On VIM3 (Amlogic A311D), the onboard color conversion caused some
+        // color difference between captured image and original RGB image.
+        // Currently we see a maximum difference of 3 (0xff and 0xfc) so we set
+        // it as the maximum allowed color difference.
+        .color_difference_threshold = 3,
+    };
+  }
+
+  // fallback
+  return CompareConfig{
+      .start_row = 0,
+      .start_column = 0,
+
+      .end_row = display_height,
+      .end_column = display_width,
+
+      .capture_offset_row = 0,
+      .capture_offset_column = 0,
+
+      .color_difference_threshold = 0,
+  };
+}
+
+[[maybe_unused]] CompareConfig GetCompareConfigForCurrentTestEnvironment(int display_width,
+                                                                         int display_height) {
+  static constexpr std::string_view board_name =
+#if defined(PLATFORM_ASTRO)
+      "astro";
+#elif defined(PLATFORM_SHERLOCK)
+      "sherlock";
+#elif defined(PLATFORM_NELSON)
+      "nelson";
+#elif defined(PLATFORM_VIM3)
+      "vim3";
+#else
+      "default";
+#endif
+
+  return GetCompareConfigForBoard(board_name, display_width, display_height);
+}
+
+}  // namespace
+
 class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
  public:
   void SetUp() override {
@@ -407,7 +586,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     fuchsia_sysmem::wire::PixelFormat pixel_format = {
         .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
         .format_modifier = {
-            .value = 0,
+          .value = 0,
         }};
     const uint32_t input_image_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
     // TODO(fxbug.dev/125394): This should not be hardcoded, instead sysmem
@@ -417,54 +596,23 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     const int expected_stride = static_cast<int>(
         fbl::round_up(width * input_image_bytes_per_pixel, kInputImageRowByteAlignment));
 
-    // Ignore the first row. It sometimes contains junk (hardware bug).
-    const int start_row = 1;
-    const int end_row = height;
-
-    const int start_column = 0;
-    // Ignore the last column for Astro only. It contains junk bytes (hardware bug).
-    const int end_column = [&] {
-#ifdef PLATFORM_ASTRO
-      return width - 1;
-#else
-      return width;
-#endif  // PLATFORM_ASTRO
-    }();
-
-    const int expected_image_column_offset = [] {
-#ifdef PLATFORM_ASTRO
-      return 1;
-#else
-      return 0;
-#endif  // PLATFORM_ASTRO
-    }();
-
-    const int color_difference_threshold = [] {
-#ifdef PLATFORM_VIM3
-      // On VIM3 with HDMI output the onboard color conversion caused some color
-      // difference between captured image and original RGB image. Currently we
-      // see a maximum difference of 3 (0xff and 0xfc) so we set it as the
-      // maximum allowed color difference.
-      return 3;
-#else
-      // On non VIM3 Amlogic platforms, the color conversion matrix and
-      // calculated results are rounded to 0.5, so it's possible to see a
-      // maximum color error of 1 in the readback pixels.
-      return 1;
-#endif  // PLATFORM_VIM3
-    }();
+    CompareConfig compare_config = GetCompareConfigForCurrentTestEnvironment(width, height);
 
     int64_t num_pixels_different = 0;
-    for (int row = start_row; row < end_row; row++) {
-      for (int captured_column = start_column; captured_column < end_column; captured_column++) {
-        int expected_column = captured_column + expected_image_column_offset;
+    for (int captured_row = compare_config.start_row; captured_row < compare_config.end_row;
+         ++captured_row) {
+      for (int captured_column = compare_config.start_column;
+           captured_column < compare_config.end_column; ++captured_column) {
+        int expected_row = captured_row - compare_config.capture_offset_row;
+        int expected_column = captured_column - compare_config.capture_offset_column;
         bool pixel_same = true;
         for (int channel = 0; channel < 3; channel++) {
           // On the expected image, the fourth byte per pixel is alpha channel, so we ignore it.
-          int expected_byte_index = row * expected_stride + expected_column * 4 + channel;
-          int captured_byte_index = row * capture_stride + captured_column * 3 + channel;
+          int expected_byte_index = expected_row * expected_stride + expected_column * 4 + channel;
+          int captured_byte_index = captured_row * capture_stride + captured_column * 3 + channel;
           if (abs(static_cast<int>(expected_rgba_image[expected_byte_index]) -
-                  captured_image[captured_byte_index]) > color_difference_threshold) {
+                  captured_image[captured_byte_index]) >
+              compare_config.color_difference_threshold) {
             pixel_same = false;
             break;
           }

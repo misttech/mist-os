@@ -17,6 +17,10 @@ config("engine_pixeltest_config") {
   defines = []
   if (board_name == "astro") {
     defines += [ "PLATFORM_ASTRO" ]
+  } else if (board_name == "sherlock") {
+    defines += [ "PLATFORM_SHERLOCK" ]
+  } else if (board_name == "nelson") {
+    defines += [ "PLATFORM_NELSON" ]
   } else if (board_name == "vim3") {
     defines += [ "PLATFORM_VIM3" ]
   }
