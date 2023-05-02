@@ -10,19 +10,6 @@ group("containers") {
     "debian",
     "empty_container",
   ]
-  if (target_cpu == "x64" && !is_asan) {
-    deps += [ "chromiumos" ]
-  }
-}
-
-group("release") {
-  deps = [
-    "debian",
-    "empty_container",
-  ]
-  if (target_cpu == "x64" && !is_asan) {
-    deps += [ "chromiumos" ]
-  }
 }
 
 group("tests") {
