@@ -133,6 +133,10 @@ func (r *Repository) LookupUpdatePrimeSystemImageMerkle(ctx context.Context) (st
 	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime/0", "system_image_prime/0")
 }
 
+func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (string, error) {
+	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime2/0", "system_image/0")
+}
+
 func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle string) error {
 	systemImageMerkle, err := r.LookupUpdateSystemImageMerkle(ctx)
 	if err != nil {
@@ -150,8 +154,16 @@ func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context
 		return nil
 	}
 
-	return fmt.Errorf("expected device to be running a system image of %s or %s, got %s",
-		systemImageMerkle, systemPrimeImageMerkle, merkle)
+	systemPrimeImage2Merkle, err := r.LookupUpdatePrimeSystemImage2Merkle(ctx)
+	if err != nil {
+		return err
+	}
+	if merkle == systemPrimeImage2Merkle {
+		return nil
+	}
+
+	return fmt.Errorf("expected device to be running a system image of %s, %s or %s, got %s",
+		systemImageMerkle, systemPrimeImageMerkle, systemPrimeImage2Merkle, merkle)
 }
 
 func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updatePackageName string, contentPackageName string) (string, error) {
@@ -183,7 +195,10 @@ func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updat
 // * passing it to the `createFunc` closure. The closure then adds any necessary files.
 // * creating a package from the directory contents.
 // * publishing the package to the repository with the `packagePath` path.
-func (r *Repository) CreatePackage(ctx context.Context, packagePath string, createFunc func(path string) error) (string, error) {
+func (r *Repository) CreatePackage(
+	ctx context.Context,
+	packagePath string,
+	createFunc func(path string) error) (string, error) {
 	// Extract the package name from the path. The variant currently is optional, but if specified, must be "0".
 	packageName, packageVariant, found := strings.Cut(packagePath, "/")
 	if found && packageVariant != "0" {
@@ -222,8 +237,11 @@ func (r *Repository) CreatePackage(ctx context.Context, packagePath string, crea
 // EditPackage takes the content of the source package from srcPacgePath, copies the content to
 // destination package at dstPackagePath and edits the content at destination with the help of
 // editFunc closure.
-func (r *Repository) EditPackage(ctx context.Context, srcPackagePath string, dstPackagePath string, editFunc func(path string) error) (Package, error) {
-
+func (r *Repository) EditPackage(
+	ctx context.Context,
+	srcPackagePath string,
+	dstPackagePath string,
+	editFunc func(path string) error) (Package, error) {
 	// First get the source package located at srcPackagePath
 	pkg, err := r.OpenPackage(ctx, srcPackagePath)
 	if err != nil {
@@ -322,7 +340,6 @@ func (r *Repository) EditUpdatePackage(
 	dstUpdatePackage string,
 	repoName string,
 	editFunc func(path string) error) (Package, error) {
-
 	vbmetaPropertyFiles := map[string]string{}
 	return r.EditUpdatePackageWithVBMetaProperties(
 		ctx,
@@ -345,15 +362,51 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 	dstUpdatePackagePath string,
 	bootfsCompression string,
 	editFunc func(path string) error) (Package, error) {
+	repoName := "fuchsia.com"
 	return r.EditUpdatePackage(ctx,
 		avbTool, zbiTool,
 		srcUpdatePackagePath,
 		dstUpdatePackagePath,
-		"testrepository",
+		repoName,
 		func(tempDir string) error {
-			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx, systemImageMerkle, tempDir, bootfsCompression); err != nil {
+			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx,
+				systemImageMerkle,
+				tempDir,
+				bootfsCompression,
+			); err != nil {
 				return err
 			}
+
+			pathToZbi := filepath.Join(tempDir, "zbi")
+			vbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
+			if err := avbTool.MakeVBMetaImageWithZbi(ctx, vbmetaPath, vbmetaPath, pathToZbi); err != nil {
+				return err
+			}
+
+			packagesJsonPath := filepath.Join(tempDir, "packages.json")
+			err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
+				src, err := os.Open(packagesJsonPath)
+				if err != nil {
+					return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
+				}
+
+				if err := util.UpdateHashValuePackagesJSON(
+					bufio.NewReader(src),
+					bufio.NewWriter(f),
+					repoName,
+					"system_image/0",
+					systemImageMerkle,
+				); err != nil {
+					return fmt.Errorf("failed to update system_image_merkle in package.json: %w", err)
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
+			}
+
 			return editFunc(tempDir)
 		})
 }

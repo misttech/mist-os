@@ -5,11 +5,14 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -434,7 +437,13 @@ func initializeDevice(
 	return rpcClient, nil
 }
 
-func systemOTA(ctx context.Context, device *device.Client, rpcClient **sl4f.Client, repo *packages.Repository, checkABR bool) error {
+func systemOTA(
+	ctx context.Context,
+	device *device.Client,
+	rpcClient **sl4f.Client,
+	repo *packages.Repository,
+	checkABR bool,
+) error {
 	expectedSystemImageMerkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
@@ -451,19 +460,86 @@ func systemOTA(ctx context.Context, device *device.Client, rpcClient **sl4f.Clie
 	)
 }
 
-func systemPrimeOTA(ctx context.Context, device *device.Client, rpcClient **sl4f.Client, repo *packages.Repository, checkABR bool) error {
-	expectedSystemImageMerkle, err := repo.LookupUpdatePrimeSystemImageMerkle(ctx)
+func systemPrimeOTA(
+	ctx context.Context,
+	device *device.Client,
+	rpcClient **sl4f.Client,
+	repo *packages.Repository,
+	checkABR bool,
+) error {
+	return buildAndOtaToPackage(
+		ctx,
+		device,
+		rpcClient,
+		repo,
+		checkABR,
+	)
+}
+
+func buildAndOtaToPackage(
+	ctx context.Context,
+	device *device.Client,
+	rpcClient **sl4f.Client,
+	repo *packages.Repository,
+	checkABR bool,
+) error {
+	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return fmt.Errorf("failed to intialize AVBTool: %q", err)
 	}
+
+	zbiTool, err := c.installerConfig.ZBITool()
+	if err != nil {
+		return fmt.Errorf("failed to intialize ZBITool: %q", err)
+	}
+
+	systemImagePrime2 := "system_image_prime2/0"
+	systemImagePrime2Pkg, err := repo.EditPackage(ctx, "system_image/0", systemImagePrime2, func(tempDir string) error {
+		newResource := "Hello World!"
+		contents := bytes.NewReader([]byte(newResource))
+		data, err := io.ReadAll((contents))
+		if err != nil {
+			return fmt.Errorf("failed to read new content %q %w", systemImagePrime2, err)
+		}
+
+		tempPath := filepath.Join(tempDir, "dummy2.txt")
+		if err := os.MkdirAll(filepath.Dir(tempPath), os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create parent directories for %q: %w", tempPath, err)
+		}
+
+		if err := os.WriteFile(tempPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write new data for %q to %q: %w", systemImagePrime2, tempPath, err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create the %q pacakge: %w", systemImagePrime2, err)
+	}
+
+	systemImagePrimeMerkle := systemImagePrime2Pkg.Merkle()
+
+	_, err = repo.EditUpdatePackageWithNewSystemImageMerkle(
+		ctx,
+		avbTool,
+		zbiTool,
+		systemImagePrimeMerkle,
+		"update/0",
+		"update_prime2/0",
+		c.bootfsCompression,
+		func(path string) error {
+			return nil
+		},
+	)
 
 	return otaToPackage(
 		ctx,
 		device,
 		rpcClient,
 		repo,
-		expectedSystemImageMerkle,
-		"fuchsia-pkg://fuchsia.com/update_prime/0",
+		systemImagePrimeMerkle,
+		"fuchsia-pkg://fuchsia.com/update_prime2/0",
 		checkABR,
 	)
 }

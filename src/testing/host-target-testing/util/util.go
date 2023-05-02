@@ -185,6 +185,30 @@ func RehostPackagesJSON(rd io.Reader, w io.Writer, newHostname string) error {
 	return json.NewEncoder(w).Encode(p)
 }
 
+func UpdateHashValuePackagesJSON(rd io.Reader, w io.Writer, repoName string, pkgUrlPath string, value string) error {
+	p, err := DecodePackagesJSON(rd)
+	if err != nil {
+		return err
+	}
+
+	for i, pkgURL := range p.Content {
+		u, err := url.Parse(pkgURL)
+		if err != nil {
+			return err
+		}
+
+		if u.Host == repoName && u.Path == "/"+pkgUrlPath {
+			queryValues := u.Query()
+			queryValues.Set("hash", value)
+			u.RawQuery = queryValues.Encode()
+		}
+
+		p.Content[i] = u.String()
+	}
+
+	return json.NewEncoder(w).Encode(p)
+}
+
 func AtomicallyWriteFile(path string, mode os.FileMode, writeFileFunc func(*os.File) error) error {
 	dir := filepath.Dir(path)
 	basename := filepath.Base(path)

@@ -129,6 +129,8 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
 	if err != nil {
 		return err
 	}
+
+	logger.Infof(ctx, "updating the devmgr config with new system_image_merkle %q", systemImageMerkle)
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "zircon.system.pkgfs.cmd") {
