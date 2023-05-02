@@ -4,7 +4,7 @@
 
 use {
     fidl::endpoints::ClientEnd,
-    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent},
+    fidl_fuchsia_hardware_display::{self as display, ControllerEvent},
     fidl_fuchsia_io as fio,
     fuchsia_async::{DurationExt as _, TimeoutExt as _},
     fuchsia_component::client::connect_to_protocol_at_path,
@@ -28,17 +28,17 @@ use crate::{
 const DEV_DIR_PATH: &str = "/dev/class/display-controller";
 const TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
 
-/// Client abstraction for the `fuchsia.hardware.display.Coordinator` protocol. Instances can be
+/// Client abstraction for the `fuchsia.hardware.display.Controller` protocol. Instances can be
 /// safely cloned and passed across threads.
 #[derive(Clone)]
-pub struct Coordinator {
-    inner: Arc<RwLock<CoordinatorInner>>,
+pub struct Controller {
+    inner: Arc<RwLock<ControllerInner>>,
 }
 
-struct CoordinatorInner {
+struct ControllerInner {
     displays: Vec<DisplayInfo>,
-    proxy: display::CoordinatorProxy,
-    events: Option<display::CoordinatorEventStream>,
+    proxy: display::ControllerProxy,
+    events: Option<display::ControllerEventStream>,
 
     // All subscribed vsync listeners and their optional ID filters.
     vsync_listeners: Vec<(mpsc::UnboundedSender<VsyncEvent>, Option<DisplayId>)>,
@@ -60,9 +60,9 @@ pub struct VsyncEvent {
     pub config: display::ConfigStamp,
 }
 
-impl Coordinator {
-    /// Establishes a connection to the display-controller device and initialize a `Coordinator`
-    /// instance with the initial set of available displays. The returned `Coordinator` will
+impl Controller {
+    /// Establishes a connection to the display-controller device and initialize a `Controller`
+    /// instance with the initial set of available displays. The returned `Controller` will
     /// maintain FIDL connection to the underlying device as long as it is alive or the connection
     /// is closed by the peer.
     ///
@@ -78,7 +78,7 @@ impl Coordinator {
     // TODO(fxbug.dev/87469): This will currently result in an error if no displays are present on
     // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on
     // a timeout if the display driver sent en event with no displays.
-    pub async fn init() -> Result<Coordinator> {
+    pub async fn init() -> Result<Controller> {
         let path = watch_first_file(DEV_DIR_PATH)
             .on_timeout(TIMEOUT.after_now(), || Err(Error::DeviceNotFound))
             .await?;
@@ -86,19 +86,17 @@ impl Coordinator {
         let provider_proxy = connect_to_protocol_at_path::<display::ProviderMarker>(path)
             .map_err(Error::DeviceConnectionError)?;
 
-        let (coordinator_proxy, coordinator_server_end) =
-            fidl::endpoints::create_proxy::<display::CoordinatorMarker>()?;
+        let (controller_proxy, controller_server_end) =
+            fidl::endpoints::create_proxy::<display::ControllerMarker>()?;
 
         // TODO(fxbug.dev/125034): Consider supporting virtcon client
         // connections.
-        let () = zx::Status::ok(
-            provider_proxy.open_coordinator_for_primary(coordinator_server_end).await?,
-        )?;
+        let () = zx::Status::ok(provider_proxy.open_controller(controller_server_end).await?)?;
 
-        Self::init_with_proxy(coordinator_proxy).await
+        Self::init_with_proxy(controller_proxy).await
     }
 
-    /// Initialize a `Coordinator` instance from a pre-established channel.
+    /// Initialize a `Controller` instance from a pre-established channel.
     ///
     /// Returns an error if
     /// - An initial OnDisplaysChanged event is not received from the display driver within
@@ -106,7 +104,7 @@ impl Coordinator {
     // TODO(fxbug.dev/87469): This will currently result in an error if no displays are present on
     // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on
     // a timeout if the display driver sent en event with no displays.
-    pub async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {
+    pub async fn init_with_proxy(proxy: display::ControllerProxy) -> Result<Controller> {
         let mut events = proxy.take_event_stream();
         let displays = wait_for_initial_displays(&mut events)
             .on_timeout(TIMEOUT.after_now(), || Err(Error::NoDisplays))
@@ -114,8 +112,8 @@ impl Coordinator {
             .into_iter()
             .map(DisplayInfo)
             .collect::<Vec<_>>();
-        Ok(Coordinator {
-            inner: Arc::new(RwLock::new(CoordinatorInner {
+        Ok(Controller {
+            inner: Arc::new(RwLock::new(ControllerInner {
                 proxy,
                 events: Some(events),
                 displays,
@@ -134,7 +132,7 @@ impl Coordinator {
     ///
     /// Note: This can be helpful to prevent holding the inner RwLock when awaiting a chained FIDL
     /// call over a proxy.
-    pub fn proxy(&self) -> display::CoordinatorProxy {
+    pub fn proxy(&self) -> display::ControllerProxy {
         self.inner.read().proxy.clone()
     }
 
@@ -161,10 +159,10 @@ impl Coordinator {
         let mut events = inner.write().events.take().ok_or(Error::AlreadyRequested)?;
         while let Some(msg) = events.try_next().await? {
             match msg {
-                CoordinatorEvent::OnDisplaysChanged { added, removed } => {
+                ControllerEvent::OnDisplaysChanged { added, removed } => {
                     inner.read().handle_displays_changed(added, removed);
                 }
-                CoordinatorEvent::OnVsync {
+                ControllerEvent::OnVsync {
                     display_id,
                     timestamp,
                     applied_config_stamp,
@@ -302,15 +300,15 @@ impl Coordinator {
     }
 }
 
-// fmt::Debug implementation to allow a `Coordinator` instance to be used with a debug format
-// specifier. We use a custom implementation as not all `Coordinator` members derive fmt::Debug.
-impl fmt::Debug for Coordinator {
+// fmt::Debug implementation to allow a `Controller` instance to be used with a debug format
+// specifier. We use a custom implementation as not all `Controller` members derive fmt::Debug.
+impl fmt::Debug for Controller {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Coordinator").field("displays", &self.displays()).finish()
+        f.debug_struct("Controller").field("displays", &self.displays()).finish()
     }
 }
 
-impl CoordinatorInner {
+impl ControllerInner {
     fn next_free_collection_id(&mut self) -> Result<CollectionId> {
         self.id_counter = self.id_counter.checked_add(1).ok_or(Error::IdsExhausted)?;
         Ok(CollectionId(self.id_counter))
@@ -385,15 +383,15 @@ async fn watch_first_file(path: &str) -> Result<PathBuf> {
     Err(Error::DeviceNotFound)
 }
 
-// Waits for a single fuchsia.hardware.display.Coordinator.OnDisplaysChanged event and returns the
+// Waits for a single fuchsia.hardware.display.Controller.OnDisplaysChanged event and returns the
 // reported displays. By API contract, this event will fire at least once upon initial channel
 // connection if any displays are present. If no displays are present, then the returned Future
 // will not resolve until a display is plugged in.
 async fn wait_for_initial_displays(
-    events: &mut display::CoordinatorEventStream,
+    events: &mut display::ControllerEventStream,
 ) -> Result<Vec<display::Info>> {
     let mut stream = events.try_filter_map(|event| match event {
-        CoordinatorEvent::OnDisplaysChanged { added, removed: _ } => future::ok(Some(added)),
+        ControllerEvent::OnDisplaysChanged { added, removed: _ } => future::ok(Some(added)),
         _ => future::ok(None),
     });
     stream.try_next().await?.ok_or(Error::NoDisplays)
@@ -401,26 +399,26 @@ async fn wait_for_initial_displays(
 
 #[cfg(test)]
 mod tests {
-    use super::{Coordinator, DisplayId, VsyncEvent};
+    use super::{Controller, DisplayId, VsyncEvent};
     use {
         anyhow::{format_err, Context, Result},
         assert_matches::assert_matches,
-        display_mocks::{create_proxy_and_mock, MockCoordinator},
+        display_mocks::{create_proxy_and_mock, MockController},
         fidl_fuchsia_hardware_display as display,
         fuchsia_async::TestExecutor,
         futures::{pin_mut, select, task::Poll, FutureExt, StreamExt},
     };
 
-    async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {
-        Coordinator::init_with_proxy(proxy).await.context("failed to initialize Coordinator")
+    async fn init_with_proxy(proxy: display::ControllerProxy) -> Result<Controller> {
+        Controller::init_with_proxy(proxy).await.context("failed to initialize Controller")
     }
 
-    // Returns a Coordinator and a connected mock FIDL server. This function sets up the initial
-    // "OnDisplaysChanged" event with the given list of `displays`, which `Coordinator` requires
+    // Returns a Controller and a connected mock FIDL server. This function sets up the initial
+    // "OnDisplaysChanged" event with the given list of `displays`, which `Controller` requires
     // before it can resolve its initialization Future.
     async fn init_with_displays(
         displays: &[display::Info],
-    ) -> Result<(Coordinator, MockCoordinator)> {
+    ) -> Result<(Controller, MockController)> {
         let (proxy, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays(displays.to_vec())?;
 
@@ -429,7 +427,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_init_fails_with_no_device_dir() {
-        let result = Coordinator::init().await;
+        let result = Controller::init().await;
         assert_matches!(result, Err(_));
     }
 
@@ -438,8 +436,8 @@ mod tests {
         let (proxy, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays([].to_vec())?;
 
-        let coordinator = init_with_proxy(proxy).await?;
-        assert!(coordinator.displays().is_empty());
+        let controller = init_with_proxy(proxy).await?;
+        assert!(controller.displays().is_empty());
 
         Ok(())
     }
@@ -479,10 +477,10 @@ mod tests {
         let (proxy, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays(displays.clone())?;
 
-        let coordinator = init_with_proxy(proxy).await?;
-        assert_eq!(coordinator.displays().len(), 2);
-        assert_eq!(coordinator.displays()[0].0, displays[0]);
-        assert_eq!(coordinator.displays()[1].0, displays[1]);
+        let controller = init_with_proxy(proxy).await?;
+        assert_eq!(controller.displays().len(), 2);
+        assert_eq!(controller.displays()[0].0, displays[0]);
+        assert_eq!(controller.displays()[1].0, displays[1]);
 
         Ok(())
     }
@@ -492,15 +490,15 @@ mod tests {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
         let mut executor = TestExecutor::new();
-        let (coordinator, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
-        let mut vsync = coordinator.add_vsync_listener(None)?;
+        let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
+        let mut vsync = controller.add_vsync_listener(None)?;
 
         const ID: DisplayId = DisplayId(1);
         const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
         let event_handlers = async {
             select! {
                 event = vsync.next().fuse() => event.ok_or(format_err!("did not receive vsync event")),
-                result = coordinator.handle_events().fuse() => {
+                result = controller.handle_events().fuse() => {
                     result.context("FIDL event handler failed")?;
                     Err(format_err!("FIDL event handler completed before client vsync event"))
                 },
@@ -524,10 +522,10 @@ mod tests {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
         let mut executor = TestExecutor::new();
-        let (coordinator, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
-        let mut vsync = coordinator.add_vsync_listener(None)?;
+        let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
+        let mut vsync = controller.add_vsync_listener(None)?;
 
-        let fidl_server = coordinator.handle_events().fuse();
+        let fidl_server = controller.handle_events().fuse();
         pin_mut!(fidl_server);
 
         const ID1: DisplayId = DisplayId(1);
@@ -571,18 +569,18 @@ mod tests {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
         let mut executor = TestExecutor::new();
-        let (coordinator, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
+        let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
 
         const ID1: DisplayId = DisplayId(1);
         const ID2: DisplayId = DisplayId(2);
         const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
 
         // Listen to events from ID2.
-        let mut vsync = coordinator.add_vsync_listener(Some(ID2))?;
+        let mut vsync = controller.add_vsync_listener(Some(ID2))?;
         let event_handlers = async {
             select! {
                 event = vsync.next().fuse() => event.ok_or(format_err!("did not receive vsync event")),
-                result = coordinator.handle_events().fuse() => {
+                result = controller.handle_events().fuse() => {
                     result.context("FIDL event handler failed")?;
                     Err(format_err!("FIDL event handler completed before client vsync event"))
                 },

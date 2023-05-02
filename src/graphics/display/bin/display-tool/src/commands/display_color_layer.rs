@@ -7,7 +7,7 @@
 use {
     anyhow::{format_err, Result},
     display_utils::{
-        Coordinator, DisplayConfig, DisplayInfo, Layer, LayerConfig, PixelFormat, VsyncEvent,
+        Controller, DisplayConfig, DisplayInfo, Layer, LayerConfig, PixelFormat, VsyncEvent,
     },
     futures::StreamExt,
     std::io::Write,
@@ -35,20 +35,20 @@ pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result
     }
 }
 
-pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
+pub async fn run<'a>(controller: &Controller, args: Args<'a>) -> Result<()> {
     let Args { display, color, pixel_format } = args;
     let color_bytes = get_bytes_for_rgb_color(color, pixel_format)?;
 
     // Ensure that vsync events are enabled before we issue the first call to ApplyConfig.
-    let mut vsync = coordinator.add_vsync_listener(Some(display.id()))?;
+    let mut vsync = controller.add_vsync_listener(Some(display.id()))?;
 
-    let layer = coordinator.create_layer().await?;
+    let layer = controller.create_layer().await?;
     let configs = vec![DisplayConfig {
         id: display.id(),
         layers: vec![Layer { id: layer, config: LayerConfig::Color { pixel_format, color_bytes } }],
     }];
-    coordinator.apply_config(&configs).await?;
-    let recent_applied_config_stamp = coordinator.get_recent_applied_config_stamp().await?;
+    controller.apply_config(&configs).await?;
+    let recent_applied_config_stamp = controller.get_recent_applied_config_stamp().await?;
 
     // The color layer should be displayed on the screen and Vsync events
     // should start.

@@ -4,7 +4,7 @@
 
 use crate::{
     app::{
-        strategies::framebuffer::{CoordinatorProxyPtr, DisplayId},
+        strategies::framebuffer::{ControllerProxyPtr, DisplayId},
         Config, MessageInternal,
     },
     drawing::DisplayRotation,
@@ -23,7 +23,7 @@ use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use display_utils::PixelFormat;
 use euclid::size2;
-use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy, ImageConfig};
+use fidl_fuchsia_hardware_display::{ControllerEvent, ControllerProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
@@ -86,12 +86,12 @@ fn next_image_id() -> u64 {
     ImageIdGenerator::default().next().expect("image_id")
 }
 
-async fn create_and_import_event(coordinator: &CoordinatorProxy) -> Result<(Event, u64), Error> {
+async fn create_and_import_event(controller: &ControllerProxy) -> Result<(Event, u64), Error> {
     let event = Event::create();
 
     let their_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
     let event_id = event.get_koid()?.raw_koid();
-    coordinator.import_event(Event::from_handle(their_event.into_handle()), event_id)?;
+    controller.import_event(Event::from_handle(their_event.into_handle()), event_id)?;
     Ok((event, event_id))
 }
 
@@ -102,7 +102,7 @@ fn size_from_info(info: &fidl_fuchsia_hardware_display::Info, mode_idx: usize) -
 
 #[derive(Debug, Clone)]
 pub struct Display {
-    pub coordinator: CoordinatorProxyPtr,
+    pub controller: ControllerProxyPtr,
     pub display_id: DisplayId,
     pub info: fidl_fuchsia_hardware_display::Info,
     pub layer_id: u64,
@@ -111,21 +111,21 @@ pub struct Display {
 
 impl Display {
     pub async fn new(
-        coordinator: CoordinatorProxyPtr,
+        controller: ControllerProxyPtr,
         display_id: DisplayId,
         info: fidl_fuchsia_hardware_display::Info,
     ) -> Result<Self, Error> {
-        Ok(Self { coordinator, display_id, info, layer_id: 0, mode_idx: 0 })
+        Ok(Self { controller, display_id, info, layer_id: 0, mode_idx: 0 })
     }
 
     pub fn set_mode(&mut self, mode_idx: usize) -> Result<(), Error> {
-        self.coordinator.set_display_mode(self.info.id, &mut self.info.modes[mode_idx])?;
+        self.controller.set_display_mode(self.info.id, &mut self.info.modes[mode_idx])?;
         self.mode_idx = mode_idx;
         Ok(())
     }
 
     pub async fn create_layer(&mut self) -> Result<(), Error> {
-        let (status, layer_id) = self.coordinator.create_layer().await?;
+        let (status, layer_id) = self.controller.create_layer().await?;
         ensure!(
             status == zx::sys::ZX_OK,
             "Display::new(): failed to create layer {}",
@@ -173,7 +173,7 @@ pub(crate) struct DisplayDirectViewStrategy {
 impl DisplayDirectViewStrategy {
     pub async fn new(
         key: ViewKey,
-        coordinator: CoordinatorProxyPtr,
+        controller: ControllerProxyPtr,
         app_sender: UnboundedSender<MessageInternal>,
         info: fidl_fuchsia_hardware_display::Info,
         preferred_size: IntSize,
@@ -192,7 +192,7 @@ impl DisplayDirectViewStrategy {
             })
             .unwrap_or(0);
 
-        let mut display = Display::new(coordinator, info.id, info).await?;
+        let mut display = Display::new(controller, info.id, info).await?;
 
         if mode_idx != 0 {
             display.set_mode(mode_idx)?;
@@ -314,10 +314,10 @@ impl DisplayDirectViewStrategy {
 
         let mut image_config = ImageConfig { width: unsize.width, height: unsize.height, type_: 0 };
 
-        let coordinator_token = buffer_allocator.duplicate_token().await?;
-        display.coordinator.import_buffer_collection(collection_id, coordinator_token).await?;
+        let controller_token = buffer_allocator.duplicate_token().await?;
+        display.controller.import_buffer_collection(collection_id, controller_token).await?;
         display
-            .coordinator
+            .controller
             .set_buffer_collection_constraints(collection_id, &mut image_config)
             .await?;
 
@@ -353,24 +353,24 @@ impl DisplayDirectViewStrategy {
             let uindex = index as u32;
             let image_id = next_image_id();
             let status = display
-                .coordinator
+                .controller
                 .import_image(&mut image_config, collection_id, image_id, uindex)
                 .await
-                .context("coordinator import_image")?;
+                .context("controller import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);
 
             image_ids.insert(image_id as u64);
             image_indexes.insert(image_id as u64, uindex);
 
-            let (event, event_id) = create_and_import_event(&display.coordinator).await?;
+            let (event, event_id) = create_and_import_event(&display.controller).await?;
             wait_events.insert(image_id as ImageId, (event, event_id));
-            let (event, event_id) = create_and_import_event(&display.coordinator).await?;
+            let (event, event_id) = create_and_import_event(&display.controller).await?;
             signal_events.insert(image_id as ImageId, (event, event_id));
         }
 
         let frame_set = FrameSet::new(collection_id as u64, image_ids);
 
-        display.coordinator.set_layer_primary_config(display.layer_id, &mut image_config)?;
+        display.controller.set_layer_primary_config(display.layer_id, &mut image_config)?;
 
         Ok(DisplayResources { context, image_indexes, frame_set, wait_events, signal_events })
     }
@@ -527,7 +527,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             let collection_id = self.collection_id;
             let view_key = view_details.key;
             self.display
-                .coordinator
+                .controller
                 .set_display_layers(self.display.display_id, &[self.display.layer_id])
                 .expect("set_display_layers");
             let (_, wait_event_id) =
@@ -536,10 +536,10 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 *self.display_resources().signal_events.get(&prepared).expect("signal event");
             let image_id = prepared;
             self.display
-                .coordinator
+                .controller
                 .set_layer_image(self.display.layer_id, prepared, wait_event_id, signal_event_id)
                 .expect("Frame::present() set_layer_image");
-            self.display.coordinator.apply_config().expect("Frame::present() apply_config");
+            self.display.controller.apply_config().expect("Frame::present() apply_config");
             let local_event =
                 self.duplicate_signal_event(prepared).expect("duplicate_signal_event");
             fasync::Task::local(async move {
@@ -636,9 +636,9 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         }
     }
 
-    async fn handle_display_coordinator_event(&mut self, event: CoordinatorEvent) {
+    async fn handle_display_controller_event(&mut self, event: ControllerEvent) {
         match event {
-            CoordinatorEvent::OnVsync { timestamp, cookie, .. } => {
+            ControllerEvent::OnVsync { timestamp, cookie, .. } => {
                 duration!("gfx", "DisplayDirectViewStrategy::OnVsync");
                 let vsync_interval = Duration::from_nanos(
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
@@ -648,7 +648,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     vsync_interval,
                 );
                 if cookie != 0 {
-                    self.display.coordinator.acknowledge_vsync(cookie).expect("acknowledge_vsync");
+                    self.display.controller.acknowledge_vsync(cookie).expect("acknowledge_vsync");
                 }
                 self.app_sender
                     .unbounded_send(MessageInternal::Render(self.key))
@@ -664,7 +664,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
 
     fn close(&mut self) {
         self.display
-            .coordinator
+            .controller
             .release_buffer_collection(self.collection_id)
             .expect("release_buffer_collection");
     }

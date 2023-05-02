@@ -22,22 +22,21 @@ namespace ui_display {
 
 // Implements the FIDL fuchsia.hardware.display.Provider API.  Only provides access to the primary
 // controller, not the Virtcon controller.
-class HardwareDisplayCoordinatorProviderImpl : public fuchsia::hardware::display::Provider {
+class HardwareDisplayControllerProviderImpl : public fuchsia::hardware::display::Provider {
  public:
   // |app_context| is used to publish this service.
-  HardwareDisplayCoordinatorProviderImpl(sys::ComponentContext* app_context);
+  HardwareDisplayControllerProviderImpl(sys::ComponentContext* app_context);
 
   // |fuchsia::hardware::display::Provider|.
-  void OpenCoordinatorForVirtcon(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator,
-      OpenCoordinatorForVirtconCallback callback) override {
+  void OpenVirtconController(
+      ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller,
+      OpenVirtconControllerCallback callback) override {
     callback(ZX_ERR_NOT_SUPPORTED);
   }
 
   // |fuchsia::hardware::display::Provider|.
-  void OpenCoordinatorForPrimary(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator,
-      OpenCoordinatorForPrimaryCallback callback) override;
+  void OpenController(::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller,
+                      OpenControllerCallback callback) override;
 
   void BindDisplayProvider(fidl::InterfaceRequest<fuchsia::hardware::display::Provider> request);
 

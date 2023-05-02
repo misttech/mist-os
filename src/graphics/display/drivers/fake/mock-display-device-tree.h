@@ -30,7 +30,7 @@ class MockDisplayDeviceTree {
                         std::unique_ptr<SysmemDeviceWrapper> sysmem, bool start_vsync);
   ~MockDisplayDeviceTree();
 
-  Controller* coordinator_controller() { return coordinator_controller_; }
+  Controller* controller() { return controller_; }
   fake_display::FakeDisplay* display() { return display_; }
 
   const zx_device_t* sysmem_device() { return sysmem_->device(); }
@@ -52,7 +52,7 @@ class MockDisplayDeviceTree {
   // Not owned, FakeDisplay will delete itself on shutdown.
   fake_display::FakeDisplay* display_;
 
-  Controller* coordinator_controller_;
+  Controller* controller_;
 
   bool shutdown_ = false;
 

@@ -67,10 +67,10 @@ pub struct ViewAssistantContext {
     /// `image_id`.
     pub image_index: u32,
     /// Position of the mouse cursor when running directly on the
-    /// display coordinator.
+    /// display controller.
     pub mouse_cursor_position: Option<IntPoint>,
     /// information about the hosting display when running directly on the
-    /// display coordinator.
+    /// display controller.
     pub display_info: Option<DisplayInfo>,
 
     app_sender: UnboundedSender<MessageInternal>,
@@ -648,11 +648,11 @@ impl ViewController {
         self.strategy.handle_on_next_frame_begin(info);
     }
 
-    pub async fn handle_display_coordinator_event(
+    pub async fn handle_display_controller_event(
         &mut self,
-        event: fidl_fuchsia_hardware_display::CoordinatorEvent,
+        event: fidl_fuchsia_hardware_display::ControllerEvent,
     ) {
-        self.strategy.handle_display_coordinator_event(event).await;
+        self.strategy.handle_display_controller_event(event).await;
     }
 
     pub fn is_hosted_on_display(&self, display_id: u64) -> bool {

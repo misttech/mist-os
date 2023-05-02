@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use euclid::size2;
 use fidl::endpoints::{self};
 use fidl_fuchsia_hardware_display::{
-    CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ProviderMarker, VirtconMode,
+    ControllerEvent, ControllerMarker, ControllerProxy, ProviderMarker, VirtconMode,
 };
 use fidl_fuchsia_input_report as hid_input_report;
 use fidl_fuchsia_ui_scenic::ScenicProxy;
@@ -58,7 +58,7 @@ async fn watch_directory_async(
                     }
                     let device_path = dir.join(msg.filename);
                     app_sender
-                        .unbounded_send(MessageInternal::NewDisplayCoordinator(device_path))
+                        .unbounded_send(MessageInternal::NewDisplayController(device_path))
                         .expect("unbounded_send");
                 }
                 _ => (),
@@ -130,18 +130,18 @@ impl AutoRepeatTimer for AutoRepeatContext {
 
 const DISPLAY_CONTROLLER_PATH: &'static str = "/dev/class/display-controller";
 
-pub type CoordinatorProxyPtr = Rc<CoordinatorProxy>;
+pub type ControllerProxyPtr = Rc<ControllerProxy>;
 
 pub fn first_display_device_path() -> Option<PathBuf> {
     let mut entries = fs::read_dir(DISPLAY_CONTROLLER_PATH).ok()?;
     entries.next()?.ok().map(|entry| entry.path())
 }
 
-pub struct DisplayCoordinator {
-    pub coordinator: CoordinatorProxyPtr,
+pub struct DisplayController {
+    pub controller: ControllerProxyPtr,
 }
 
-impl DisplayCoordinator {
+impl DisplayController {
     pub(crate) async fn open(
         path: &str,
         virtcon_mode: &Option<VirtconMode>,
@@ -150,39 +150,39 @@ impl DisplayCoordinator {
         let provider =
             fuchsia_component::client::connect_to_protocol_at_path::<ProviderMarker>(path)
                 .context("while opening device file")?;
-        let (coordinator, server) = endpoints::create_proxy::<CoordinatorMarker>()?;
+        let (controller, server) = endpoints::create_proxy::<ControllerMarker>()?;
         let status = if virtcon_mode.is_some() {
-            provider.open_coordinator_for_virtcon(server).await
+            provider.open_virtcon_controller(server).await
         } else {
-            provider.open_coordinator_for_primary(server).await
+            provider.open_controller(server).await
         }?;
         ensure!(
             status == zx::sys::ZX_OK,
-            "Failed to open display coordinator {}",
+            "Failed to open display controller {}",
             Status::from_raw(status)
         );
 
         if let Some(virtcon_mode) = virtcon_mode {
-            coordinator.set_virtcon_mode(*virtcon_mode as u8)?;
+            controller.set_virtcon_mode(*virtcon_mode as u8)?;
         }
 
-        let mut event_stream = coordinator.take_event_stream();
+        let mut event_stream = controller.take_event_stream();
         let app_sender = app_sender.clone();
         let f = async move {
             loop {
                 if let Some(event) = event_stream.next().await {
                     if let Ok(event) = event {
                         app_sender
-                            .unbounded_send(MessageInternal::DisplayCoordinatorEvent(event))
+                            .unbounded_send(MessageInternal::DisplayControllerEvent(event))
                             .expect("unbounded_send");
                     }
                 }
             }
         };
         fasync::Task::local(f).detach();
-        coordinator.enable_vsync(true).context("enable_vsync failed")?;
+        controller.enable_vsync(true).context("enable_vsync failed")?;
 
-        Ok(Self { coordinator: Rc::new(coordinator) })
+        Ok(Self { controller: Rc::new(controller) })
     }
 
     pub(crate) async fn watch_displays(app_sender: UnboundedSender<MessageInternal>) {
@@ -201,7 +201,7 @@ pub struct DisplayInfo {
 }
 
 pub(crate) struct DisplayDirectAppStrategy<'a> {
-    pub display_coordinator: Option<DisplayCoordinator>,
+    pub display_controller: Option<DisplayController>,
     pub display_rotation: DisplayRotation,
     pub keymap: &'a Keymap<'a>,
     pub input_report_handlers: HashMap<DeviceId, InputReportHandler<'a>>,
@@ -214,13 +214,13 @@ pub(crate) struct DisplayDirectAppStrategy<'a> {
 
 impl<'a> DisplayDirectAppStrategy<'a> {
     pub fn new(
-        display_coordinator: Option<DisplayCoordinator>,
+        display_controller: Option<DisplayController>,
         keymap: &'a Keymap<'a>,
         app_sender: UnboundedSender<MessageInternal>,
         app_config: &Config,
     ) -> DisplayDirectAppStrategy<'a> {
         DisplayDirectAppStrategy {
-            display_coordinator: display_coordinator,
+            display_controller: display_controller,
             display_rotation: app_config.display_rotation,
             keymap,
             input_report_handlers: HashMap::new(),
@@ -237,7 +237,7 @@ impl<'a> DisplayDirectAppStrategy<'a> {
         added: Vec<fidl_fuchsia_hardware_display::Info>,
         removed: Vec<u64>,
     ) -> Result<(), Error> {
-        let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
+        let display_controller = self.display_controller.as_ref().expect("display_controller");
         for display_id in removed {
             self.views.remove(&display_id);
             self.app_sender
@@ -264,7 +264,7 @@ impl<'a> DisplayDirectAppStrategy<'a> {
                 .unbounded_send(MessageInternal::CreateView(ViewStrategyParams::DisplayDirect(
                     DisplayDirectParams {
                         view_key: None,
-                        coordinator: display_coordinator.coordinator.clone(),
+                        controller: display_controller.controller.clone(),
                         info,
                         preferred_size,
                     },
@@ -294,7 +294,7 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         views_on_display.push(key);
         Ok(DisplayDirectViewStrategy::new(
             key,
-            strategy_params.coordinator,
+            strategy_params.controller,
             app_sender.clone(),
             strategy_params.info,
             strategy_params.preferred_size,
@@ -309,11 +309,11 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         let primary_display = self.primary_display.as_ref().expect("primary_display");
         ViewStrategyParams::DisplayDirect(DisplayDirectParams {
             view_key: Some(view_key),
-            coordinator: self
-                .display_coordinator
+            controller: self
+                .display_controller
                 .as_ref()
-                .expect("display_coordinator")
-                .coordinator
+                .expect("display_controller")
+                .controller
                 .clone(),
             info: primary_display.info.clone(),
             preferred_size: primary_display.preferred_size,
@@ -371,43 +371,43 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         handler.handle_keyboard_autorepeat(device_id, &mut self.context)
     }
 
-    async fn handle_new_display_coordinator(&mut self, display_path: PathBuf) {
-        if self.display_coordinator.is_none() {
-            let display_coordinator = DisplayCoordinator::open(
+    async fn handle_new_display_controller(&mut self, display_path: PathBuf) {
+        if self.display_controller.is_none() {
+            let display_controller = DisplayController::open(
                 display_path.to_str().unwrap(),
                 &Config::get().virtcon_mode,
                 &self.app_sender,
             )
             .await
-            .expect("DisplayCoordinator::open");
-            self.display_coordinator = Some(display_coordinator);
+            .expect("DisplayController::open");
+            self.display_controller = Some(display_controller);
         }
     }
 
-    async fn handle_display_coordinator_event(&mut self, event: CoordinatorEvent) {
+    async fn handle_display_controller_event(&mut self, event: ControllerEvent) {
         match event {
-            CoordinatorEvent::OnDisplaysChanged { added, removed } => {
+            ControllerEvent::OnDisplaysChanged { added, removed } => {
                 self.handle_displays_changed(added, removed)
                     .await
                     .expect("handle_displays_changed");
             }
-            CoordinatorEvent::OnClientOwnershipChange { has_ownership } => {
+            ControllerEvent::OnClientOwnershipChange { has_ownership } => {
                 self.owned = has_ownership;
                 self.app_sender
                     .unbounded_send(MessageInternal::OwnershipChanged(has_ownership))
                     .expect("unbounded_send");
             }
-            CoordinatorEvent::OnVsync { .. } => {
+            ControllerEvent::OnVsync { .. } => {
                 panic!("App strategy should not see vsync events");
             }
         }
     }
 
     fn set_virtcon_mode(&mut self, virtcon_mode: VirtconMode) {
-        self.display_coordinator
+        self.display_controller
             .as_ref()
-            .expect("display_coordinator")
-            .coordinator
+            .expect("display_controller")
+            .controller
             .set_virtcon_mode(virtcon_mode as u8)
             .expect("set_virtcon_mode");
     }
@@ -420,13 +420,13 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         mut g: BoxedGammaValues,
         mut b: BoxedGammaValues,
     ) {
-        let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
-        display_coordinator
-            .coordinator
+        let display_controller = self.display_controller.as_ref().expect("display_controller");
+        display_controller
+            .controller
             .import_gamma_table(gamma_table_id, &mut r, &mut g, &mut b)
             .expect("import_gamma_table");
-        display_coordinator
-            .coordinator
+        display_controller
+            .controller
             .set_display_gamma_table(display_id, gamma_table_id)
             .expect("set_display_gamma_table");
     }

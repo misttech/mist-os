@@ -415,14 +415,14 @@ bool GfxCommandApplier::ApplySetDisplayMinimumRgbCmd(
     Session* session, CommandContext* command_context,
     fuchsia::ui::gfx::SetDisplayMinimumRgbCmdHACK command) {
   auto display_manager = command_context->display_manager;
-  const auto& display_coordinator = *(display_manager->default_display_coordinator());
+  const auto& display_controller = *(display_manager->default_display_controller());
 
   // Attempt to apply minimum rgb.
-  fuchsia::hardware::display::Coordinator_SetMinimumRgb_Result cmd_result;
-  zx_status_t status = display_coordinator->SetMinimumRgb(command.min_value, &cmd_result);
+  fuchsia::hardware::display::Controller_SetMinimumRgb_Result cmd_result;
+  zx_status_t status = display_controller->SetMinimumRgb(command.min_value, &cmd_result);
   if (status != ZX_OK || cmd_result.is_err()) {
     FX_LOGS(WARNING)
-        << "GfxCommandApplier:ApplySetDisplayMinimumRgbCmd failed, coordinator returned status: "
+        << "GfxCommandApplier:ApplySetDisplayMinimumRgbCmd failed, controller returned status: "
         << status << " with error: " << cmd_result.err();
     // Treat ZX_ERR_INTERNAL as success. This error code is only returned when
     // the device is waiting for Scenic to apply its very first frame.
@@ -435,7 +435,7 @@ bool GfxCommandApplier::ApplySetDisplayMinimumRgbCmd(
   // Now check the config.
   fuchsia::hardware::display::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  display_coordinator->CheckConfig(/*discard=*/false, &result, &ops);
+  display_controller->CheckConfig(/*discard=*/false, &result, &ops);
   if (result != fuchsia::hardware::display::ConfigResult::OK) {
     const char* msg = "GfxCommandApplier::ApplySetDisplayMinimumRgbCmd config result: ";
     session->error_reporter()->ERROR() << msg << static_cast<uint32_t>(result);

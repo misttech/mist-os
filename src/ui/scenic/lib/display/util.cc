@@ -10,26 +10,25 @@
 
 namespace scenic_impl {
 
-bool ImportBufferCollection(
-    allocation::GlobalBufferCollectionId buffer_collection_id,
-    const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::ImageConfig& image_config) {
+bool ImportBufferCollection(allocation::GlobalBufferCollectionId buffer_collection_id,
+                            const fuchsia::hardware::display::ControllerSyncPtr& display_controller,
+                            fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+                            const fuchsia::hardware::display::ImageConfig& image_config) {
   zx_status_t status;
 
-  if (display_coordinator->ImportBufferCollection(buffer_collection_id, std::move(token),
-                                                  &status) != ZX_OK ||
+  if (display_controller->ImportBufferCollection(buffer_collection_id, std::move(token), &status) !=
+          ZX_OK ||
       status != ZX_OK) {
     FX_LOGS(ERROR) << "ImportBufferCollection failed - status: " << status;
     return false;
   }
 
-  if (display_coordinator->SetBufferCollectionConstraints(buffer_collection_id, image_config,
-                                                          &status) != ZX_OK ||
+  if (display_controller->SetBufferCollectionConstraints(buffer_collection_id, image_config,
+                                                         &status) != ZX_OK ||
       status != ZX_OK) {
     FX_LOGS(ERROR) << "SetBufferCollectionConstraints failed.";
 
-    if (display_coordinator->ReleaseBufferCollection(buffer_collection_id) != ZX_OK) {
+    if (display_controller->ReleaseBufferCollection(buffer_collection_id) != ZX_OK) {
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed.";
     }
     return false;
@@ -38,9 +37,8 @@ bool ImportBufferCollection(
   return true;
 }
 
-DisplayEventId ImportEvent(
-    const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    const zx::event& event) {
+DisplayEventId ImportEvent(const fuchsia::hardware::display::ControllerSyncPtr& display_controller,
+                           const zx::event& event) {
   static DisplayEventId id_generator = fuchsia::hardware::display::INVALID_DISP_ID + 1;
 
   zx::event dup;
@@ -54,7 +52,7 @@ DisplayEventId ImportEvent(
   DisplayEventId event_id = id_generator++;
 
   auto before = zx::clock::get_monotonic();
-  auto status = display_coordinator->ImportEvent(std::move(dup), event_id);
+  auto status = display_controller->ImportEvent(std::move(dup), event_id);
   if (status != ZX_OK) {
     auto after = zx::clock::get_monotonic();
     FX_LOGS(ERROR) << "Failed to import display controller event. Waited "
@@ -64,9 +62,9 @@ DisplayEventId ImportEvent(
   return event_id;
 }
 
-bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator) {
-  fuchsia::hardware::display::Coordinator_IsCaptureSupported_Result capture_supported_result;
-  auto status = display_coordinator->IsCaptureSupported(&capture_supported_result);
+bool IsCaptureSupported(const fuchsia::hardware::display::ControllerSyncPtr& display_controller) {
+  fuchsia::hardware::display::Controller_IsCaptureSupported_Result capture_supported_result;
+  auto status = display_controller->IsCaptureSupported(&capture_supported_result);
 
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "IsCaptureSupported status failure: " << status;
@@ -82,7 +80,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
 }
 
 uint64_t ImportImageForCapture(
-    const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
+    const fuchsia::hardware::display::ControllerSyncPtr& display_controller,
     const fuchsia::hardware::display::ImageConfig& image_config,
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx) {
   if (buffer_collection_id == 0) {
@@ -95,9 +93,9 @@ uint64_t ImportImageForCapture(
     return 0;
   }
 
-  fuchsia::hardware::display::Coordinator_ImportImageForCapture_Result import_result;
-  auto status = display_coordinator->ImportImageForCapture(image_config, buffer_collection_id,
-                                                           vmo_idx, &import_result);
+  fuchsia::hardware::display::Controller_ImportImageForCapture_Result import_result;
+  auto status = display_controller->ImportImageForCapture(image_config, buffer_collection_id,
+                                                          vmo_idx, &import_result);
 
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "FIDL transport error, status: " << status;

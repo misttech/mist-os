@@ -77,7 +77,7 @@ struct ConfigValues {
   bool flatland_enable_display_composition = true;
 #else
   // Uses the GPU/Vulkan compositor by default, instead of attempting to composite using the display
-  // coordinator.
+  // controller.
   bool flatland_enable_display_composition = false;
 #endif  // FLATLAND_DISABLE_DISPLAY_COMPOSITION
   // TODO(fxb/76985): Remove these when we have proper multi-display support.
@@ -93,7 +93,7 @@ struct ConfigValues {
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-      fpromise::promise<ui_display::DisplayCoordinatorHandles> dc_handles_promise,
+      fpromise::promise<ui_display::DisplayControllerHandles> dc_handles_promise,
       fit::closure quit_callback);
 
   ~App();

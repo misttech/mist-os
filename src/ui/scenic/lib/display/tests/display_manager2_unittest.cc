@@ -26,7 +26,7 @@ using DisplayManagerTest = gtest::TestLoopFixture;
 using OnDisplayAddedCallback = std::function<void(fuchsia::ui::display::Info)>;
 using OnDisplayRemovedCallback = std::function<void(fuchsia::ui::display::DisplayRef)>;
 using OnDisplayOwnershipChangedCallback = std::function<void(
-    std::vector<fuchsia::ui::display::DisplayRef> displays, bool owned_by_display_coordinator)>;
+    std::vector<fuchsia::ui::display::DisplayRef> displays, bool owned_by_display_controller)>;
 
 class MockDisplayListener : public fuchsia::ui::display::testing::DisplayListener_TestBase {
  public:
@@ -63,9 +63,9 @@ class MockDisplayListener : public fuchsia::ui::display::testing::DisplayListene
   }
 
   void OnDisplayOwnershipChanged(std::vector<fuchsia::ui::display::DisplayRef> displays,
-                                 bool owned_by_display_coordinator) {
+                                 bool owned_by_display_controller) {
     if (on_display_ownership_changed_cb_) {
-      on_display_ownership_changed_cb_(std::move(displays), owned_by_display_coordinator);
+      on_display_ownership_changed_cb_(std::move(displays), owned_by_display_controller);
     }
   }
 
@@ -90,11 +90,11 @@ static fuchsia::hardware::display::Info CreateFakeDisplayInfo(uint64_t display_i
   return display;
 }
 
-TEST_F(DisplayManagerTest, RemoveInvalidDisplayCoordinator) {
+TEST_F(DisplayManagerTest, RemoveInvalidDisplayController) {
   DisplayManager2 display_manager;
-  DisplayCoordinatorObjects display_coordinator_objs = CreateMockDisplayCoordinator();
-  display_manager.AddDisplayCoordinator(display_coordinator_objs.interface_ptr,
-                                        std::move(display_coordinator_objs.listener));
+  DisplayControllerObjects display_controller_objs = CreateMockDisplayController();
+  display_manager.AddDisplayController(display_controller_objs.interface_ptr,
+                                       std::move(display_controller_objs.listener));
 
   std::vector<fuchsia::ui::display::Info> displays_added;
   std::vector<fuchsia::ui::display::DisplayRef> displays_removed;
@@ -108,27 +108,27 @@ TEST_F(DisplayManagerTest, RemoveInvalidDisplayCoordinator) {
   });
 
   // Add display with id = 1
-  display_coordinator_objs.mock->events().OnDisplaysChanged(
+  display_controller_objs.mock->events().OnDisplaysChanged(
       /* added */ {CreateFakeDisplayInfo(/*display_id=*/1)},
       /* removed */ {});
   RunLoopUntilIdle();
   ASSERT_EQ(1u, displays_added.size());
 
-  // Invalidate display coordinator.
-  display_coordinator_objs.mock.reset();
+  // Invalidate display controller.
+  display_controller_objs.mock.reset();
   RunLoopUntilIdle();
   EXPECT_EQ(1u, displays_added.size());  // Unchanged.
 
-  // Displays are marked as removed if their display coordinator is destroyed.
+  // Displays are marked as removed if their display controller is destroyed.
   EXPECT_EQ(1u, displays_removed.size());
 }
 
 TEST_F(DisplayManagerTest, OnDisplaysChanged) {
-  DisplayCoordinatorObjects display_coordinator_objs = CreateMockDisplayCoordinator();
+  DisplayControllerObjects display_controller_objs = CreateMockDisplayController();
   {
     DisplayManager2 display_manager;
-    display_manager.AddDisplayCoordinator(display_coordinator_objs.interface_ptr,
-                                          std::move(display_coordinator_objs.listener));
+    display_manager.AddDisplayController(display_controller_objs.interface_ptr,
+                                         std::move(display_controller_objs.listener));
     std::vector<fuchsia::ui::display::Info> displays_added;
     std::vector<fuchsia::ui::display::DisplayRef> displays_removed;
 
@@ -143,7 +143,7 @@ TEST_F(DisplayManagerTest, OnDisplaysChanged) {
         });
 
     // Add display with id = 1
-    display_coordinator_objs.mock->events().OnDisplaysChanged(
+    display_controller_objs.mock->events().OnDisplaysChanged(
         /* added */ {CreateFakeDisplayInfo(/*display_id=*/1)},
         /* removed */ {});
     RunLoopUntilIdle();
@@ -151,7 +151,7 @@ TEST_F(DisplayManagerTest, OnDisplaysChanged) {
     EXPECT_EQ(0u, displays_removed.size());
 
     // Add another display with id = 1. Expect error.
-    display_coordinator_objs.mock->events().OnDisplaysChanged(
+    display_controller_objs.mock->events().OnDisplaysChanged(
         /* added */ {CreateFakeDisplayInfo(/*display_id=*/1)},
         /* removed */ {});
     RunLoopUntilIdle();
@@ -161,7 +161,7 @@ TEST_F(DisplayManagerTest, OnDisplaysChanged) {
     EXPECT_EQ(0u, displays_removed.size());
 
     // Remove display that doesn't exist.
-    display_coordinator_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {2u});
+    display_controller_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {2u});
     RunLoopUntilIdle();
     EXPECT_EQ(display_manager.last_error(),
               "DisplayManager: Got a display removed event for invalid display=2");
@@ -169,13 +169,13 @@ TEST_F(DisplayManagerTest, OnDisplaysChanged) {
     EXPECT_EQ(0u, displays_removed.size());
 
     // Remove display that exists.
-    display_coordinator_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {1u});
+    display_controller_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {1u});
     RunLoopUntilIdle();
     EXPECT_EQ(1u, displays_added.size());
     EXPECT_EQ(1u, displays_removed.size());
 
     // Add display with id = 2
-    display_coordinator_objs.mock->events().OnDisplaysChanged(
+    display_controller_objs.mock->events().OnDisplaysChanged(
         /* added */ {CreateFakeDisplayInfo(/*display_id=*/2)},
         /* removed */ {});
     RunLoopUntilIdle();
@@ -189,39 +189,39 @@ TEST_F(DisplayManagerTest, OnDisplaysChanged) {
 
   // Expect no crashes during teardown.
 
-  // Trigger display coordinator events after display manager is destroyed.
-  display_coordinator_objs.mock->events().OnDisplaysChanged(
+  // Trigger display controller events after display manager is destroyed.
+  display_controller_objs.mock->events().OnDisplaysChanged(
       /* added */ {CreateFakeDisplayInfo(/*display_id=*/3)},
       /* removed */ {});
-  display_coordinator_objs.mock->events().OnClientOwnershipChange(true);
+  display_controller_objs.mock->events().OnClientOwnershipChange(true);
 
-  // Invalidate display coordinator.
-  display_coordinator_objs.mock.reset();
+  // Invalidate display controller.
+  display_controller_objs.mock.reset();
   RunLoopUntilIdle();
 }
 
 TEST_F(DisplayManagerTest, OnDisplaysChangedBeforeAdddingListener) {
   DisplayManager2 display_manager;
-  DisplayCoordinatorObjects display_coordinator_objs = CreateMockDisplayCoordinator();
-  display_manager.AddDisplayCoordinator(display_coordinator_objs.interface_ptr,
-                                        std::move(display_coordinator_objs.listener));
+  DisplayControllerObjects display_controller_objs = CreateMockDisplayController();
+  display_manager.AddDisplayController(display_controller_objs.interface_ptr,
+                                       std::move(display_controller_objs.listener));
   std::vector<fuchsia::ui::display::Info> displays_added;
   std::vector<fuchsia::ui::display::DisplayRef> displays_removed;
   std::vector<fuchsia::ui::display::DisplayRef> displays_ownership_changed;
   bool has_ownership = false;
 
   // Add displays with id = 1 and id = 2
-  display_coordinator_objs.mock->events().OnDisplaysChanged(
+  display_controller_objs.mock->events().OnDisplaysChanged(
       /* added */ {CreateFakeDisplayInfo(/*display_id=*/1),
                    CreateFakeDisplayInfo(/*display_id=*/2)},
       /* removed */ {});
   RunLoopUntilIdle();
 
   // Remove display with id = 1.
-  display_coordinator_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {1u});
+  display_controller_objs.mock->events().OnDisplaysChanged(/* added */ {}, /* removed */ {1u});
   RunLoopUntilIdle();
 
-  display_coordinator_objs.mock->events().OnClientOwnershipChange(true);
+  display_controller_objs.mock->events().OnClientOwnershipChange(true);
   RunLoopUntilIdle();
 
   // Add a listener and expect it to receive an DisplayAdded with id = 1 and a display ownership
@@ -254,12 +254,12 @@ TEST_F(DisplayManagerTest, OnDisplaysChangedBeforeAdddingListener) {
 TEST_F(DisplayManagerTest, DisplayOwnershipChanged) {
   DisplayManager2 display_manager;
 
-  DisplayCoordinatorObjects display_coordinator_objs1 = CreateMockDisplayCoordinator();
-  display_manager.AddDisplayCoordinator(display_coordinator_objs1.interface_ptr,
-                                        std::move(display_coordinator_objs1.listener));
-  DisplayCoordinatorObjects display_coordinator_objs2 = CreateMockDisplayCoordinator();
-  display_manager.AddDisplayCoordinator(display_coordinator_objs2.interface_ptr,
-                                        std::move(display_coordinator_objs2.listener));
+  DisplayControllerObjects display_controller_objs1 = CreateMockDisplayController();
+  display_manager.AddDisplayController(display_controller_objs1.interface_ptr,
+                                       std::move(display_controller_objs1.listener));
+  DisplayControllerObjects display_controller_objs2 = CreateMockDisplayController();
+  display_manager.AddDisplayController(display_controller_objs2.interface_ptr,
+                                       std::move(display_controller_objs2.listener));
 
   std::vector<fuchsia::ui::display::Info> displays_added;
   std::vector<fuchsia::ui::display::DisplayRef> displays_ownership_changed;
@@ -278,24 +278,24 @@ TEST_F(DisplayManagerTest, DisplayOwnershipChanged) {
         has_ownership = owned;
       });
 
-  // Add displays with ids 1...4 from two display coordinators.
-  display_coordinator_objs1.mock->events().OnDisplaysChanged(
+  // Add displays with ids 1...4 from two display controllers.
+  display_controller_objs1.mock->events().OnDisplaysChanged(
       /*added=*/{CreateFakeDisplayInfo(/*display_id=*/1)},
       /*removed=*/{});
-  display_coordinator_objs1.mock->events().OnDisplaysChanged(
+  display_controller_objs1.mock->events().OnDisplaysChanged(
       /*added=*/{CreateFakeDisplayInfo(/*display_id=*/2)},
       /*removed=*/{});
-  // Make sure the operations for the first display coordinator are finished first, because we rely
+  // Make sure the operations for the first display controller are finished first, because we rely
   // on the order displays are added below.
   RunLoopUntilIdle();
-  display_coordinator_objs2.mock->events().OnDisplaysChanged(
+  display_controller_objs2.mock->events().OnDisplaysChanged(
       /*added=*/{CreateFakeDisplayInfo(/*display_id=*/3)},
       /*removed=*/{});
-  display_coordinator_objs2.mock->events().OnDisplaysChanged(
+  display_controller_objs2.mock->events().OnDisplaysChanged(
       /*added=*/{CreateFakeDisplayInfo(/*display_id=*/4)},
       /*removed=*/{});
 
-  display_coordinator_objs1.mock->events().OnClientOwnershipChange(true);
+  display_controller_objs1.mock->events().OnClientOwnershipChange(true);
   RunLoopUntilIdle();
   EXPECT_EQ(4u, displays_added.size());
   EXPECT_TRUE(has_ownership);
@@ -308,9 +308,9 @@ TEST_F(DisplayManagerTest, DisplayOwnershipChanged) {
 
 TEST_F(DisplayManagerTest, ClaimDisplay) {
   DisplayManager2 display_manager;
-  DisplayCoordinatorObjects display_coordinator_objs = CreateMockDisplayCoordinator();
-  display_manager.AddDisplayCoordinator(display_coordinator_objs.interface_ptr,
-                                        std::move(display_coordinator_objs.listener));
+  DisplayControllerObjects display_controller_objs = CreateMockDisplayController();
+  display_manager.AddDisplayController(display_controller_objs.interface_ptr,
+                                       std::move(display_controller_objs.listener));
 
   const uint64_t kTestDisplayId1 = 1u;
   const uint64_t kTestDisplayId2 = 2u;
@@ -318,7 +318,7 @@ TEST_F(DisplayManagerTest, ClaimDisplay) {
   const uint64_t kTestTimestamp = 111111u;
   const fuchsia::hardware::display::ConfigStamp kTestConfigStamp = {.value = 2u};
 
-  display_coordinator_objs.mock->events().OnDisplaysChanged(
+  display_controller_objs.mock->events().OnDisplaysChanged(
       /* added */ {CreateFakeDisplayInfo(kTestDisplayId1)},
       /* removed */ {});
 
@@ -332,49 +332,49 @@ TEST_F(DisplayManagerTest, ClaimDisplay) {
   EXPECT_EQ(1u, displays_added.size());
 
   {
-    DisplayCoordinatorUniquePtr display_coordinator =
+    DisplayControllerUniquePtr display_controller =
         display_manager.ClaimDisplay(fsl::GetKoid(displays_added[0].display_ref().reference.get()));
-    EXPECT_TRUE(display_coordinator);
-    EXPECT_EQ(1u, display_coordinator->displays()->size());
-    EXPECT_EQ(kTestDisplayId1, display_coordinator->displays()->at(0).display_id());
+    EXPECT_TRUE(display_controller);
+    EXPECT_EQ(1u, display_controller->displays()->size());
+    EXPECT_EQ(kTestDisplayId1, display_controller->displays()->at(0).display_id());
 
     // Try claiming the display a second time.
-    DisplayCoordinatorUniquePtr display_coordinator2 =
+    DisplayControllerUniquePtr display_controller2 =
         display_manager.ClaimDisplay(fsl::GetKoid(displays_added[0].display_ref().reference.get()));
-    EXPECT_FALSE(display_coordinator2);
+    EXPECT_FALSE(display_controller2);
 
     // Test display added/removed events.
     bool display_added_received = false;
     bool display_removed_received = false;
-    display_coordinator->set_on_display_added_callback([&](Display2* display) {
+    display_controller->set_on_display_added_callback([&](Display2* display) {
       display_added_received = true;
       EXPECT_EQ(kTestDisplayId2, display->display_id());
     });
-    display_coordinator->set_on_display_removed_callback([&](uint64_t display_id) {
+    display_controller->set_on_display_removed_callback([&](uint64_t display_id) {
       display_removed_received = true;
       EXPECT_EQ(kTestDisplayId1, display_id);
     });
 
-    display_coordinator_objs.mock->events().OnDisplaysChanged(
+    display_controller_objs.mock->events().OnDisplaysChanged(
         /* added */ {CreateFakeDisplayInfo(kTestDisplayId2)},
         /* removed */ {kTestDisplayId1});
     RunLoopUntilIdle();
     EXPECT_TRUE(display_added_received);
     EXPECT_TRUE(display_removed_received);
-    EXPECT_EQ(1u, display_coordinator->displays()->size());
-    EXPECT_EQ(kTestDisplayId2, display_coordinator->displays()->at(0).display_id());
+    EXPECT_EQ(1u, display_controller->displays()->size());
+    EXPECT_EQ(kTestDisplayId2, display_controller->displays()->at(0).display_id());
 
     // Test vsync delivery.
     bool vsync_received = false;
-    display_coordinator->displays()->at(0).set_on_vsync_callback(
+    display_controller->displays()->at(0).set_on_vsync_callback(
         [&](zx::time timestamp, fuchsia::hardware::display::ConfigStamp stamp) {
           vsync_received = true;
           EXPECT_EQ(zx::time(kTestTimestamp), timestamp);
           EXPECT_EQ(kTestConfigStamp.value, stamp.value);
         });
 
-    display_coordinator_objs.mock->events().OnVsync(kTestDisplayId2, kTestTimestamp,
-                                                    kTestConfigStamp, 0);
+    display_controller_objs.mock->events().OnVsync(kTestDisplayId2, kTestTimestamp,
+                                                   kTestConfigStamp, 0);
     RunLoopUntilIdle();
     EXPECT_TRUE(vsync_received);
   }
@@ -382,21 +382,21 @@ TEST_F(DisplayManagerTest, ClaimDisplay) {
   // The display is now unclaimed.
 
   // Trigger a few events to check that we don't need a claimed display.
-  display_coordinator_objs.mock->events().OnDisplaysChanged(
+  display_controller_objs.mock->events().OnDisplaysChanged(
       /* added */ {CreateFakeDisplayInfo(kTestDisplayId3)},
       /* removed */ {kTestDisplayId2});
-  display_coordinator_objs.mock->events().OnVsync(kTestDisplayId3, kTestTimestamp, kTestConfigStamp,
-                                                  0);
+  display_controller_objs.mock->events().OnVsync(kTestDisplayId3, kTestTimestamp, kTestConfigStamp,
+                                                 0);
   RunLoopUntilIdle();
 
   // Claim the display again.
   const size_t kDisplaysAddedSize = 3;
   ASSERT_EQ(kDisplaysAddedSize, displays_added.size());
-  DisplayCoordinatorUniquePtr display_coordinator = display_manager.ClaimDisplay(
+  DisplayControllerUniquePtr display_controller = display_manager.ClaimDisplay(
       fsl::GetKoid(displays_added[kDisplaysAddedSize - 1].display_ref().reference.get()));
-  EXPECT_TRUE(display_coordinator);
-  EXPECT_EQ(1u, display_coordinator->displays()->size());
-  EXPECT_EQ(kTestDisplayId3, display_coordinator->displays()->at(0).display_id());
+  EXPECT_TRUE(display_controller);
+  EXPECT_EQ(1u, display_controller->displays()->size());
+  EXPECT_EQ(kTestDisplayId3, display_controller->displays()->at(0).display_id());
 }
 
 }  // namespace test

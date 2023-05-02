@@ -46,7 +46,7 @@ using testing::display::PrimaryLayer;
 using testing::display::VirtualLayer;
 
 static zx_handle_t device_handle;
-static fidl::WireSyncClient<fhd::Coordinator> dc;
+static fidl::WireSyncClient<fhd::Controller> dc;
 static bool has_ownership;
 
 constexpr uint64_t kEventId = 13;
@@ -81,54 +81,54 @@ fbl::StringBuffer<sysinfo::wire::kBoardNameLen> board_name;
 Platforms GetPlatform();
 void Usage();
 
-static bool bind_display(const char* coordinator, fbl::Vector<Display>* displays) {
-  printf("Opening coordinator\n");
-  zx::result provider = component::Connect<fhd::Provider>(coordinator);
+static bool bind_display(const char* controller, fbl::Vector<Display>* displays) {
+  printf("Opening controller\n");
+  zx::result provider = component::Connect<fhd::Provider>(controller);
   if (provider.is_error()) {
-    printf("Failed to open display coordinator (%s)\n", provider.status_string());
+    printf("Failed to open display controller (%s)\n", provider.status_string());
     return false;
   }
 
-  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
+  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Controller>();
   if (dc_endpoints.is_error()) {
-    printf("Failed to create coordinator channel %d (%s)\n", dc_endpoints.error_value(),
+    printf("Failed to create controller channel %d (%s)\n", dc_endpoints.error_value(),
            dc_endpoints.status_string());
     return false;
   }
 
   fidl::WireResult open_response =
-      fidl::WireCall(provider.value())->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
+      fidl::WireCall(provider.value())->OpenController(std::move(dc_endpoints->server));
   if (!open_response.ok()) {
     printf("Failed to call service handle: %s\n", open_response.FormatDescription().c_str());
     return false;
   }
   if (open_response.value().s != ZX_OK) {
-    printf("Failed to open coordinator %d (%s)\n", open_response.value().s,
+    printf("Failed to open controller %d (%s)\n", open_response.value().s,
            zx_status_get_string(open_response.value().s));
     return false;
   }
 
   dc = fidl::WireSyncClient(std::move(dc_endpoints->client));
 
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
+  class EventHandler : public fidl::WireSyncEventHandler<fhd::Controller> {
    public:
     EventHandler(fbl::Vector<Display>* displays, bool& has_ownership)
         : displays_(displays), has_ownership_(has_ownership) {}
 
     bool invalid_message() const { return invalid_message_; }
 
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
+    void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
       for (size_t i = 0; i < event->added.count(); i++) {
         displays_->push_back(Display(/*info=*/event->added[i]));
       }
     }
 
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {
+    void OnVsync(fidl::WireEvent<fhd::Controller::OnVsync>* event) override {
       invalid_message_ = true;
     }
 
     void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
+        fidl::WireEvent<fhd::Controller::OnClientOwnershipChange>* event) override {
       has_ownership_ = event->has_ownership;
     }
 
@@ -241,19 +241,19 @@ std::optional<fhd::wire::ConfigStamp> apply_config() {
 }
 
 zx_status_t wait_for_vsync(fhd::wire::ConfigStamp expected_stamp) {
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
+  class EventHandler : public fidl::WireSyncEventHandler<fhd::Controller> {
    public:
     explicit EventHandler(fhd::wire::ConfigStamp expected_stamp)
         : expected_stamp_(expected_stamp) {}
 
     zx_status_t status() const { return status_; }
 
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
+    void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
       printf("Display disconnected\n");
       status_ = ZX_ERR_STOP;
     }
 
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {
+    void OnVsync(fidl::WireEvent<fhd::Controller::OnVsync>* event) override {
       // Acknowledge cookie if non-zero
       if (event->cookie) {
         // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
@@ -268,7 +268,7 @@ zx_status_t wait_for_vsync(fhd::wire::ConfigStamp expected_stamp) {
     }
 
     void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
+        fidl::WireEvent<fhd::Controller::OnClientOwnershipChange>* event) override {
       has_ownership = event->has_ownership;
       status_ = ZX_ERR_NEXT;
     }
@@ -576,7 +576,7 @@ void capture_release() {
 void usage(void) {
   printf(
       "Usage: display-test [OPTIONS]\n\n"
-      "--controller N           : open coordinator N [/dev/class/display-controller/N]\n"
+      "--controller N           : open controller N [/dev/class/display-controller/N]\n"
       "--dump                   : print properties of attached display\n"
       "--mode-set D N           : Set Display D to mode N (use dump option for choices)\n"
       "--format-set D N         : Set Display D to format N (use dump option for choices)\n"
@@ -673,7 +673,7 @@ int main(int argc, const char* argv[]) {
   int32_t delay = 0;
   bool capture = false;
   bool verify_capture = false;
-  const char* coordinator = "/dev/class/display-controller/000";
+  const char* controller = "/dev/class/display-controller/000";
 
   platform = GetPlatform();
 
@@ -694,12 +694,12 @@ int main(int argc, const char* argv[]) {
 
   for (int i = 1; i < argc - 1; i++) {
     if (!strcmp(argv[i], "--controller")) {
-      coordinator = argv[i + 1];
+      controller = argv[i + 1];
       break;
     }
   }
 
-  if (!bind_display(coordinator, &displays)) {
+  if (!bind_display(controller, &displays)) {
     usage();
     return -1;
   }

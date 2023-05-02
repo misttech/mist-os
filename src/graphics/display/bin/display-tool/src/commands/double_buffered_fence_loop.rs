@@ -9,7 +9,7 @@
 use {
     anyhow::{Context, Result},
     display_utils::{
-        Coordinator, DisplayConfig, DisplayInfo, Image, ImageId, ImageParameters, Layer,
+        Controller, DisplayConfig, DisplayInfo, Image, ImageId, ImageParameters, Layer,
         LayerConfig, PixelFormat,
     },
     fuchsia_trace::duration,
@@ -50,7 +50,7 @@ impl BouncingSquare {
     }
 }
 
-pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()> {
+pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
     // Obtain the display resolution based on the display's preferred mode.
     let (width, height) = {
         let mode = display.0.modes[0];
@@ -65,12 +65,12 @@ pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()>
     };
 
     // Construct a single layer and two images. This represents our swapchain.
-    let layer = coordinator.create_layer().await?;
+    let layer = controller.create_layer().await?;
     let images = vec![
-        MappedImage::create(Image::create(coordinator.clone(), ImageId(1), &params).await?)?,
-        MappedImage::create(Image::create(coordinator.clone(), ImageId(2), &params).await?)?,
+        MappedImage::create(Image::create(controller.clone(), ImageId(1), &params).await?)?,
+        MappedImage::create(Image::create(controller.clone(), ImageId(2), &params).await?)?,
     ];
-    let retirement_events = vec![coordinator.create_event()?, coordinator.create_event()?];
+    let retirement_events = vec![controller.create_event()?, controller.create_event()?];
 
     // Construct squares that start out at the 4 corners of the screen.
     let dim = height / 8;
@@ -104,7 +104,7 @@ pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()>
 
     // Apply the first config.
     let mut current_config = 0;
-    coordinator
+    controller
         .apply_config(&[DisplayConfig {
             id: display.id(),
             layers: vec![Layer {
@@ -157,7 +157,7 @@ pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()>
             // Request the swap.
             {
                 duration!("gfx", "apply config");
-                coordinator
+                controller
                     .apply_config(&[DisplayConfig {
                         id: display.id(),
                         layers: vec![Layer {

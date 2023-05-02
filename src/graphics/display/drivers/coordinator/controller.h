@@ -127,8 +127,7 @@ class Controller : public DeviceType,
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
-  zx_status_t CreateClient(bool is_vc,
-                           fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
+  zx_status_t CreateClient(bool is_vc, fidl::ServerEnd<fuchsia_hardware_display::Controller> client,
                            fit::function<void()> on_client_dead = nullptr);
 
   uint64_t GetNextBufferCollectionId();
@@ -140,10 +139,10 @@ class Controller : public DeviceType,
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& _completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& _completer) override;
+  void OpenVirtconController(OpenVirtconControllerRequestView request,
+                             OpenVirtconControllerCompleter::Sync& _completer) override;
+  void OpenController(OpenControllerRequestView request,
+                      OpenControllerCompleter::Sync& _completer) override;
 
   // Periodically reads |last_vsync_timestamp_| and increments |vsync_stalls_detected_| if no vsync
   // has been observed in a given time period.

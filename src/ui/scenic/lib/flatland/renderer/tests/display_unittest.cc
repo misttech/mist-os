@@ -44,14 +44,14 @@ class DisplayTest : public gtest::RealLoopFixture {
 
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
-    // TODO(fxbug.dev/122131): This reuses the display coordinator from previous
-    // test cases in the same test component, so the display coordinator may be
-    // in a dirty state. Tests should request a reset of display coordinator
+    // TODO(fxbug.dev/122131): This reuses the display controller from previous
+    // test cases in the same test component, so the display controller may be
+    // in a dirty state. Tests should request a reset of display controller
     // here.
-    auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
+    auto hdc_promise = ui_display::GetHardwareDisplayController();
     executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
-          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
+        hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
+          display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
@@ -67,18 +67,17 @@ class DisplayTest : public gtest::RealLoopFixture {
     gtest::RealLoopFixture::TearDown();
   }
 
-  uint64_t InitializeDisplayLayer(
-      fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator, Display* display) {
+  uint64_t InitializeDisplayLayer(fuchsia::hardware::display::ControllerSyncPtr& display_controller,
+                                  Display* display) {
     uint64_t layer_id;
     zx_status_t create_layer_status;
-    zx_status_t transport_status =
-        display_coordinator->CreateLayer(&create_layer_status, &layer_id);
+    zx_status_t transport_status = display_controller->CreateLayer(&create_layer_status, &layer_id);
     if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
       return 0;
     }
 
-    zx_status_t status = display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
+    zx_status_t status = display_controller->SetDisplayLayers(display->display_id(), {layer_id});
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to configure display layers. Error code: " << status;
       return 0;
@@ -98,9 +97,9 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   const uint64_t kWidth = 8;
   const uint64_t kHeight = 16;
 
-  // Grab the display coordinator.
-  auto display_coordinator = display_manager_->default_display_coordinator();
-  EXPECT_TRUE(display_coordinator);
+  // Grab the display controller.
+  auto display_controller = display_manager_->default_display_controller();
+  EXPECT_TRUE(display_controller);
 
   // Create the VK renderer.
   auto env = escher::test::EscherEnvironment::GetGlobalTestEnvironment();
@@ -135,16 +134,16 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
       renderer.ImportBufferImage(metadata, allocation::BufferCollectionUsage::kClientImage);
   EXPECT_FALSE(import_result);
 
-  // Set the display constraints on the display coordinator.
+  // Set the display constraints on the display controller.
   fuchsia::hardware::display::ImageConfig display_constraints;
-  bool res = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
+  bool res = scenic_impl::ImportBufferCollection(collection_id, *display_controller.get(),
                                                  std::move(display_token), display_constraints);
   ASSERT_TRUE(res);
   auto release_buffer_collection =
-      fit::defer([display_coordinator = display_coordinator.get(), collection_id] {
+      fit::defer([display_controller = display_controller.get(), collection_id] {
         // Release the buffer collection.
         zx_status_t release_buffer_collection_status =
-            (*display_coordinator)->ReleaseBufferCollection(collection_id);
+            (*display_controller)->ReleaseBufferCollection(collection_id);
         EXPECT_EQ(release_buffer_collection_status, ZX_OK);
       });
 
@@ -180,37 +179,37 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
       renderer.ImportBufferImage(metadata, allocation::BufferCollectionUsage::kClientImage);
   EXPECT_TRUE(import_result);
 
-  // We should now be able to also import an image to the display coordinator, using the
+  // We should now be able to also import an image to the display controller, using the
   // display-specific buffer collection id. If it returns OK, then we know that the renderer
   // did fully set the DC constraints.
   fuchsia::hardware::display::ImageConfig image_config{};
 
-  // Try to import the image into the display coordinator API and make sure it succeeds.
+  // Try to import the image into the display controller API and make sure it succeeds.
   uint64_t display_image_id = allocation::GenerateUniqueImageId();
   zx_status_t import_image_status = ZX_OK;
-  (*display_coordinator.get())
+  (*display_controller.get())
       ->ImportImage(image_config, collection_id, display_image_id, /*vmo_index*/ 0,
                     &import_image_status);
   EXPECT_EQ(import_image_status, ZX_OK);
 }
 
-// Test out event signaling on the Display Coordinator by importing a buffer collection and its 2
+// Test out event signaling on the Display Controller by importing a buffer collection and its 2
 // images, setting the first image to a display layer with a signal event, and
 // then setting the second image on the layer which has a wait event. When the wait event is
 // signaled, this will cause the second layer image to go up, which in turn will cause the first
 // layer image's event to be signaled.
 // TODO(fxbug.dev/55167): Check to see if there is a more appropriate place to test display
-// coordinator events and/or if there already exist adequate tests that cover all of the use cases
+// controller events and/or if there already exist adequate tests that cover all of the use cases
 // being covered by this test.
 VK_TEST_F(DisplayTest, SetDisplayImageTest) {
-  // Grab the display coordinator.
-  auto display_coordinator = display_manager_->default_display_coordinator();
-  ASSERT_TRUE(display_coordinator);
+  // Grab the display controller.
+  auto display_controller = display_manager_->default_display_controller();
+  ASSERT_TRUE(display_controller);
 
   auto display = display_manager_->default_display();
   ASSERT_TRUE(display);
 
-  auto layer_id = InitializeDisplayLayer(*display_coordinator.get(), display);
+  auto layer_id = InitializeDisplayLayer(*display_controller.get(), display);
   ASSERT_NE(layer_id, 0U);
 
   const uint32_t kWidth = display->width_in_px();
@@ -220,7 +219,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   // First create the pair of sysmem tokens, one for the client, one for the display.
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator_.get());
 
-  // Set the display constraints on the display coordinator.
+  // Set the display constraints on the display controller.
   fuchsia::hardware::display::ImageConfig image_config = {
       .width = kWidth,
       .height = kHeight,
@@ -228,7 +227,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto display_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(display_collection_id, 0U);
 
-  bool res = scenic_impl::ImportBufferCollection(display_collection_id, *display_coordinator.get(),
+  bool res = scenic_impl::ImportBufferCollection(display_collection_id, *display_controller.get(),
                                                  std::move(tokens.dup_token), image_config);
   ASSERT_TRUE(res);
 
@@ -240,7 +239,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();
     zx_status_t import_image_status = ZX_OK;
-    auto transport_status = (*display_coordinator.get())
+    auto transport_status = (*display_controller.get())
                                 ->ImportImage(image_config, display_collection_id, image_ids[i], i,
                                               &import_image_status);
     ASSERT_EQ(transport_status, ZX_OK);
@@ -249,7 +248,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   }
 
   // It is safe to release buffer collection because we are not going to import any more images.
-  (*display_coordinator.get())->ReleaseBufferCollection(display_collection_id);
+  (*display_controller.get())->ReleaseBufferCollection(display_collection_id);
 
   // Create the events used by the display.
   zx::event display_wait_fence, display_signal_fence;
@@ -259,26 +258,26 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Import the above events to the display.
   auto display_wait_event_id =
-      scenic_impl::ImportEvent(*display_coordinator.get(), display_wait_fence);
+      scenic_impl::ImportEvent(*display_controller.get(), display_wait_fence);
   auto display_signal_event_id =
-      scenic_impl::ImportEvent(*display_coordinator.get(), display_signal_fence);
+      scenic_impl::ImportEvent(*display_controller.get(), display_signal_fence);
   EXPECT_NE(display_wait_event_id, fuchsia::hardware::display::INVALID_DISP_ID);
   EXPECT_NE(display_signal_event_id, fuchsia::hardware::display::INVALID_DISP_ID);
   EXPECT_NE(display_wait_event_id, display_signal_event_id);
 
   // Set the layer image and apply the config.
-  (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_config);
+  (*display_controller.get())->SetLayerPrimaryConfig(layer_id, image_config);
 
-  status = (*display_coordinator.get())
+  status = (*display_controller.get())
                ->SetLayerImage(layer_id, image_ids[0], 0, display_signal_event_id);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
   fuchsia::hardware::display::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
+  (*display_controller.get())->CheckConfig(/*discard=*/false, &result, &ops);
   EXPECT_EQ(result, fuchsia::hardware::display::ConfigResult::OK);
-  status = (*display_coordinator.get())->ApplyConfig();
+  status = (*display_controller.get())->ApplyConfig();
   EXPECT_EQ(status, ZX_OK);
 
   // Attempt to wait here...this should time out because the event has not yet been signaled.
@@ -289,13 +288,13 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   // Set the layer image again, to the second image, so that our first call to SetLayerImage()
   // above will signal.
   status =
-      (*display_coordinator.get())->SetLayerImage(layer_id, image_ids[1], display_wait_event_id, 0);
+      (*display_controller.get())->SetLayerImage(layer_id, image_ids[1], display_wait_event_id, 0);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config to display the second image.
-  (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
+  (*display_controller.get())->CheckConfig(/*discard=*/false, &result, &ops);
   EXPECT_EQ(result, fuchsia::hardware::display::ConfigResult::OK);
-  status = (*display_coordinator.get())->ApplyConfig();
+  status = (*display_controller.get())->ApplyConfig();
   EXPECT_EQ(status, ZX_OK);
 
   // Attempt to wait again, this should also time out because we haven't signaled our wait fence.

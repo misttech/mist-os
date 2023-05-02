@@ -40,7 +40,7 @@ ImagePipeSurfaceDisplay::ImagePipeSurfaceDisplay()
 
 // Attempt to connect to /svc/fuchsia.hardware.display.Provider (not the device
 // node) in case that was injected for testing.
-static fuchsia::hardware::display::CoordinatorPtr ConnectToCoordinatorFromService(
+static fuchsia::hardware::display::ControllerPtr ConnectToControllerFromService(
     async_dispatcher_t* dispatcher) {
   fuchsia::hardware::display::ProviderSyncPtr provider;
   zx_status_t status = fdio_service_connect("/svc/fuchsia.hardware.display.Provider",
@@ -51,8 +51,8 @@ static fuchsia::hardware::display::CoordinatorPtr ConnectToCoordinatorFromServic
   }
 
   zx_status_t status2 = ZX_OK;
-  fuchsia::hardware::display::CoordinatorPtr coordinator;
-  status = provider->OpenCoordinatorForPrimary(coordinator.NewRequest(dispatcher), &status2);
+  fuchsia::hardware::display::ControllerPtr controller;
+  status = provider->OpenController(controller.NewRequest(dispatcher), &status2);
   if (status != ZX_OK) {
     // If the path isn't injected the failure will happen at this point.
     return {};
@@ -62,7 +62,7 @@ static fuchsia::hardware::display::CoordinatorPtr ConnectToCoordinatorFromServic
     fprintf(stderr, "Couldn't connect to display controller: %s\n", zx_status_get_string(status2));
     return {};
   }
-  return coordinator;
+  return controller;
 }
 
 bool ImagePipeSurfaceDisplay::Init() {
@@ -76,8 +76,8 @@ bool ImagePipeSurfaceDisplay::Init() {
 
   sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
 
-  display_coordinator_ = ConnectToCoordinatorFromService(loop_.dispatcher());
-  if (!display_coordinator_) {
+  display_controller_ = ConnectToControllerFromService(loop_.dispatcher());
+  if (!display_controller_) {
     // Probe /dev/class/display-controller/ for a display controller name.
     // When the display driver restarts it comes up with a new one (e.g. '001'
     // instead of '000'). For now, simply take the first file found in the
@@ -129,38 +129,38 @@ bool ImagePipeSurfaceDisplay::Init() {
     // depending on libsvc.so
     status = fdio_service_connect(filename.c_str(), provider->server.TakeChannel().release());
     if (status != ZX_OK) {
-      fprintf(stderr, "%s: Could not open display coordinator: %s\n", kTag,
+      fprintf(stderr, "%s: Could not open display controller: %s\n", kTag,
               zx_status_get_string(status));
       return false;
     }
 
-    zx::result dc_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+    zx::result dc_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
     if (dc_endpoints.is_error()) {
-      fprintf(stderr, "%s: Failed to create coordinator channel %d (%s)\n", kTag,
+      fprintf(stderr, "%s: Failed to create controller channel %d (%s)\n", kTag,
               dc_endpoints.error_value(), dc_endpoints.status_string());
       return false;
     }
 
-    fidl::WireResult result = fidl::WireCall(provider->client)
-                                  ->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
+    fidl::WireResult result =
+        fidl::WireCall(provider->client)->OpenController(std::move(dc_endpoints->server));
     if (!result.ok()) {
       fprintf(stderr, "%s: Failed to call service handle %d (%s)\n", kTag, result.status(),
               result.status_string());
       return false;
     }
     if (result->s != ZX_OK) {
-      fprintf(stderr, "%s: Failed to open coordinator %d (%s)\n", kTag, result->s,
+      fprintf(stderr, "%s: Failed to open controller %d (%s)\n", kTag, result->s,
               zx_status_get_string(result->s));
       return false;
     }
 
-    display_coordinator_.Bind(dc_endpoints->client.TakeChannel(), loop_.dispatcher());
+    display_controller_.Bind(dc_endpoints->client.TakeChannel(), loop_.dispatcher());
   }
 
-  display_coordinator_.set_error_handler(
+  display_controller_.set_error_handler(
       fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerError));
 
-  display_coordinator_.events().OnDisplaysChanged =
+  display_controller_.events().OnDisplaysChanged =
       fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged);
   while (!have_display_) {
     loop_.Run(zx::time::infinite(), true);
@@ -259,11 +259,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 
   constexpr uint32_t kBufferCollectionId = 1;
 
-  display_coordinator_->ImportBufferCollection(kBufferCollectionId, std::move(display_token),
-                                               [this, &status](zx_status_t import_status) {
-                                                 status = import_status;
-                                                 got_message_response_ = true;
-                                               });
+  display_controller_->ImportBufferCollection(kBufferCollectionId, std::move(display_token),
+                                              [this, &status](zx_status_t import_status) {
+                                                status = import_status;
+                                                got_message_response_ = true;
+                                              });
   if (!WaitForAsyncMessage()) {
     fprintf(stderr, "%s: Display Disconnected\n", kTag);
     return false;
@@ -288,7 +288,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   return false;
 #endif
 
-  display_coordinator_->SetBufferCollectionConstraints(
+  display_controller_->SetBufferCollectionConstraints(
       kBufferCollectionId, image_config, [this, &status](zx_status_t constraint_status) {
         status = constraint_status;
         got_message_response_ = true;
@@ -482,11 +482,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     }
 
     uint32_t image_id = next_image_id();
-    display_coordinator_->ImportImage(image_config, kBufferCollectionId, image_id, i,
-                                      [this, &status](zx_status_t import_status) {
-                                        status = import_status;
-                                        got_message_response_ = true;
-                                      });
+    display_controller_->ImportImage(image_config, kBufferCollectionId, image_id, i,
+                                     [this, &status](zx_status_t import_status) {
+                                       status = import_status;
+                                       got_message_response_ = true;
+                                     });
 
     if (!WaitForAsyncMessage()) {
       return false;
@@ -504,9 +504,9 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   }
 
   pDisp->DestroyBufferCollectionFUCHSIA(device, collection, pAllocator);
-  display_coordinator_->ReleaseBufferCollection(kBufferCollectionId);
+  display_controller_->ReleaseBufferCollection(kBufferCollectionId);
 
-  display_coordinator_->CreateLayer([this, &status](zx_status_t layer_status, uint64_t layer_id) {
+  display_controller_->CreateLayer([this, &status](zx_status_t layer_status, uint64_t layer_id) {
     status = layer_status;
     layer_id_ = layer_id;
     got_message_response_ = true;
@@ -519,8 +519,8 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  display_coordinator_->SetDisplayLayers(display_id_, std::vector<uint64_t>{layer_id_});
-  display_coordinator_->SetLayerPrimaryConfig(layer_id_, image_config);
+  display_controller_->SetDisplayLayers(display_id_, std::vector<uint64_t>{layer_id_});
+  display_controller_->SetLayerPrimaryConfig(layer_id_, image_config);
 
   return true;
 }
@@ -562,7 +562,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
       return;
     }
     wait_event_id = info.koid;
-    display_coordinator_->ImportEvent(std::move(event), wait_event_id);
+    display_controller_->ImportEvent(std::move(event), wait_event_id);
     if (status != ZX_OK) {
       fprintf(stderr, "%s: fb_import_event failed: %d\n", kTag, status);
       return;
@@ -581,7 +581,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
       return;
     }
     signal_event_id = info.koid;
-    display_coordinator_->ImportEvent(std::move(event), signal_event_id);
+    display_controller_->ImportEvent(std::move(event), signal_event_id);
     if (status != ZX_OK) {
       fprintf(stderr, "%s: fb_import_event failed: %d\n", kTag, status);
       return;
@@ -589,15 +589,15 @@ void ImagePipeSurfaceDisplay::PresentImage(
   }
 
   // image_id is also used in DisplayController interface.
-  display_coordinator_->SetLayerImage(layer_id_, image_id, wait_event_id, signal_event_id);
-  display_coordinator_->ApplyConfig();
+  display_controller_->SetLayerImage(layer_id_, image_id, wait_event_id, signal_event_id);
+  display_controller_->ApplyConfig();
 
   if (wait_event_id != fuchsia::hardware::display::INVALID_DISP_ID) {
-    display_coordinator_->ReleaseEvent(wait_event_id);
+    display_controller_->ReleaseEvent(wait_event_id);
   }
 
   if (signal_event_id != fuchsia::hardware::display::INVALID_DISP_ID) {
-    display_coordinator_->ReleaseEvent(signal_event_id);
+    display_controller_->ReleaseEvent(signal_event_id);
   }
 }
 

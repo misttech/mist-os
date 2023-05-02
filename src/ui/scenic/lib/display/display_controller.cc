@@ -22,19 +22,19 @@ void Display2::OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigSta
   }
 }
 
-DisplayCoordinator::DisplayCoordinator(
+DisplayController::DisplayController(
     std::vector<Display2> displays,
-    const std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr>& coordinator)
-    : displays_(std::move(displays)), coordinator_(coordinator) {}
+    const std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr>& controller)
+    : displays_(std::move(displays)), controller_(controller) {}
 
-void DisplayCoordinator::AddDisplay(Display2 display) {
+void DisplayController::AddDisplay(Display2 display) {
   displays_.push_back(std::move(display));
   if (on_display_added_listener_) {
     on_display_added_listener_(&displays_.back());
   }
 }
 
-bool DisplayCoordinator::RemoveDisplay(uint64_t display_id) {
+bool DisplayController::RemoveDisplay(uint64_t display_id) {
   auto it = std::find_if(displays_.begin(), displays_.end(), [display_id](const Display2& display) {
     return display.display_id() == display_id;
   });

@@ -28,8 +28,8 @@ TEST(DisplayTest, ClientVSyncOk) {
   constexpr uint64_t kControllerStampValue = 1u;
   constexpr uint64_t kClientStampValue = 2u;
 
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
   ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
 
@@ -47,12 +47,12 @@ TEST(DisplayTest, ClientVSyncOk) {
   fidl::WireSyncClient client(std::move(client_end));
 
   class EventHandler
-      : public fidl::testing::WireSyncEventHandlerTestBase<fuchsia_hardware_display::Coordinator> {
+      : public fidl::testing::WireSyncEventHandlerTestBase<fuchsia_hardware_display::Controller> {
    public:
     EventHandler(fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp)
         : expected_config_stamp_(expected_config_stamp) {}
 
-    void OnVsync(fidl::WireEvent<fuchsia_hardware_display::Coordinator::OnVsync>* event) override {
+    void OnVsync(fidl::WireEvent<fuchsia_hardware_display::Controller::OnVsync>* event) override {
       if (event->applied_config_stamp == expected_config_stamp_) {
         vsync_handled_ = true;
       }
@@ -72,8 +72,8 @@ TEST(DisplayTest, ClientVSyncOk) {
 }
 
 TEST(DisplayTest, ClientVSynPeerClosed) {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
   ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
 
@@ -87,8 +87,8 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
 }
 
 TEST(DisplayTest, ClientVSyncNotSupported) {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
   ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
 
@@ -104,8 +104,8 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
   ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
 

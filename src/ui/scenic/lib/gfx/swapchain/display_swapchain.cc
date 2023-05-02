@@ -25,15 +25,15 @@ namespace gfx {
 
 DisplaySwapchain::DisplaySwapchain(
     Sysmem* sysmem,
-    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
-    std::shared_ptr<display::DisplayCoordinatorListener> display_coordinator_listener,
+    std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
+    std::shared_ptr<display::DisplayControllerListener> display_controller_listener,
     uint64_t swapchain_image_count, display::Display* display, escher::Escher* escher)
     : escher_(escher),
       sysmem_(sysmem),
       swapchain_image_count_(swapchain_image_count),
       display_(display),
-      display_coordinator_(display_coordinator),
-      display_coordinator_listener_(display_coordinator_listener),
+      display_controller_(display_controller),
+      display_controller_listener_(display_controller_listener),
       swapchain_buffers_(/*count=*/0, /*environment=*/nullptr, /*use_protected_memory=*/false),
       protected_swapchain_buffers_(/*count=*/0, /*environment=*/nullptr,
                                    /*use_protected_memory=*/true) {
@@ -77,7 +77,7 @@ bool DisplaySwapchain::InitializeFramebuffers(escher::ResourceRecycler* resource
                                               bool use_protected_memory) {
   FX_CHECK(escher_);
   BufferPool::Environment environment = {
-      .display_coordinator = display_coordinator_,
+      .display_controller = display_controller_,
       .display = display_,
       .escher = escher_,
       .sysmem = sysmem_,
@@ -85,7 +85,7 @@ bool DisplaySwapchain::InitializeFramebuffers(escher::ResourceRecycler* resource
       .vk_device = device_,
   };
   BufferPool pool(swapchain_image_count_, &environment, use_protected_memory);
-  if ((*display_coordinator_)->SetLayerPrimaryConfig(primary_layer_id_, pool.image_config()) !=
+  if ((*display_controller_)->SetLayerPrimaryConfig(primary_layer_id_, pool.image_config()) !=
       ZX_OK) {
     FX_LOGS(ERROR) << "Failed to set layer primary config";
   }
@@ -124,17 +124,17 @@ DisplaySwapchain::~DisplaySwapchain() {
 
   // Stop displaying the layer, then destroy it.  Note that these are all feedforward operations, so
   // the error handling just verifies that we have a valid FIDL channel etc., it doesn't verify that
-  // the display coordinator is happy with the messages that we sent it.
-  if (ZX_OK != (*display_coordinator_)->SetDisplayLayers(display_->display_id(), {})) {
+  // the display controller is happy with the messages that we sent it.
+  if (ZX_OK != (*display_controller_)->SetDisplayLayers(display_->display_id(), {})) {
     FX_LOGS(ERROR) << "~DisplaySwapchain(): Failed to configure display layers";
-  } else if (ZX_OK != (*display_coordinator_)->ApplyConfig()) {
+  } else if (ZX_OK != (*display_controller_)->ApplyConfig()) {
     FX_LOGS(ERROR) << "~DisplaySwapchain(): Failed to apply config";
-  } else if (ZX_OK != (*display_coordinator_)->DestroyLayer(primary_layer_id_)) {
+  } else if (ZX_OK != (*display_controller_)->DestroyLayer(primary_layer_id_)) {
     FX_DLOGS(ERROR) << "~DisplaySwapchain(): Failed to destroy layer";
   }
 
-  swapchain_buffers_.Clear(display_coordinator_);
-  protected_swapchain_buffers_.Clear(display_coordinator_);
+  swapchain_buffers_.Clear(display_controller_);
+  protected_swapchain_buffers_.Clear(display_controller_);
 }
 
 std::unique_ptr<DisplaySwapchain::FrameRecord> DisplaySwapchain::NewFrameRecord() {
@@ -147,7 +147,7 @@ std::unique_ptr<DisplaySwapchain::FrameRecord> DisplaySwapchain::NewFrameRecord(
   frame_record->render_finished_event =
       GetEventForSemaphore(escher_->device(), frame_record->render_finished_escher_semaphore);
   frame_record->render_finished_event_id =
-      scenic_impl::ImportEvent(*display_coordinator_.get(), frame_record->render_finished_event);
+      scenic_impl::ImportEvent(*display_controller_.get(), frame_record->render_finished_event);
 
   if (!frame_record->render_finished_escher_semaphore ||
       (frame_record->render_finished_event_id == fuchsia::hardware::display::INVALID_DISP_ID)) {
@@ -167,9 +167,9 @@ std::unique_ptr<DisplaySwapchain::FrameRecord> DisplaySwapchain::NewFrameRecord(
   // Set to signaled
   frame_record->retired_event.signal(0, ZX_EVENT_SIGNALED);
 
-  // Import to display coordinator
+  // Import to display controller
   frame_record->retired_event_id =
-      scenic_impl::ImportEvent(*display_coordinator_.get(), frame_record->retired_event);
+      scenic_impl::ImportEvent(*display_controller_.get(), frame_record->retired_event);
   if (frame_record->retired_event_id == fuchsia::hardware::display::INVALID_DISP_ID) {
     FX_LOGS(ERROR) << "DisplaySwapchain::NewFrameRecord() failed to import retired event";
     return std::unique_ptr<FrameRecord>();
@@ -294,18 +294,18 @@ bool DisplaySwapchain::DrawAndPresentFrame(const std::shared_ptr<FrameTimings>& 
 bool DisplaySwapchain::SetDisplayColorConversion(const ColorTransform& transform) {
   FX_CHECK(display_);
   uint64_t display_id = display_->display_id();
-  return SetDisplayColorConversion(display_id, *display_coordinator_, transform);
+  return SetDisplayColorConversion(display_id, *display_controller_, transform);
 }
 
 bool DisplaySwapchain::SetDisplayColorConversion(
-    uint64_t display_id, fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
+    uint64_t display_id, fuchsia::hardware::display::ControllerSyncPtr& display_controller,
     const ColorTransform& transform) {
   // Attempt to apply color conversion.
-  zx_status_t status = display_coordinator->SetDisplayColorConversion(
+  zx_status_t status = display_controller->SetDisplayColorConversion(
       display_id, transform.preoffsets, transform.matrix, transform.postoffsets);
   if (status != ZX_OK) {
     FX_LOGS(WARNING)
-        << "DisplaySwapchain:SetDisplayColorConversion failed, coordinator returned status: "
+        << "DisplaySwapchain:SetDisplayColorConversion failed, controller returned status: "
         << status;
     return false;
   }
@@ -313,7 +313,7 @@ bool DisplaySwapchain::SetDisplayColorConversion(
   // Now check the config.
   fuchsia::hardware::display::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  display_coordinator->CheckConfig(/*discard=*/false, &result, &ops);
+  display_controller->CheckConfig(/*discard=*/false, &result, &ops);
 
   bool client_color_conversion_required = false;
   if (result != fuchsia::hardware::display::ConfigResult::OK) {
@@ -329,7 +329,7 @@ bool DisplaySwapchain::SetDisplayColorConversion(
 
   if (client_color_conversion_required) {
     // Clear config by calling |CheckConfig| once more with "discard" set to true.
-    display_coordinator->CheckConfig(/*discard=*/true, &result, &ops);
+    display_controller->CheckConfig(/*discard=*/true, &result, &ops);
     // TODO(fxbug.dev/24591): Implement scenic software fallback for color correction.
     FX_LOGS(ERROR) << "Software fallback for color conversion not implemented.";
     return true;
@@ -339,8 +339,8 @@ bool DisplaySwapchain::SetDisplayColorConversion(
 }
 
 bool DisplaySwapchain::SetMinimumRgb(uint8_t minimum_rgb) {
-  fuchsia::hardware::display::Coordinator_SetMinimumRgb_Result cmd_result;
-  auto status = (*display_coordinator_)->SetMinimumRgb(minimum_rgb, &cmd_result);
+  fuchsia::hardware::display::Controller_SetMinimumRgb_Result cmd_result;
+  auto status = (*display_controller_)->SetMinimumRgb(minimum_rgb, &cmd_result);
   if (status != ZX_OK || cmd_result.is_err()) {
     FX_LOGS(WARNING) << "gfx::DisplaySwapchain::SetMinimumRGB failed";
     return false;
@@ -361,7 +361,7 @@ vk::Format DisplaySwapchain::GetImageFormat() { return swapchain_buffers_.image_
 bool DisplaySwapchain::InitializeDisplayLayer() {
   zx_status_t create_layer_status;
   zx_status_t transport_status =
-      (*display_coordinator_)->CreateLayer(&create_layer_status, &primary_layer_id_);
+      (*display_controller_)->CreateLayer(&create_layer_status, &primary_layer_id_);
   if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create layer, op_status=" << create_layer_status
                    << " fidl_status=" << transport_status;
@@ -369,7 +369,7 @@ bool DisplaySwapchain::InitializeDisplayLayer() {
   }
 
   zx_status_t status =
-      (*display_coordinator_)->SetDisplayLayers(display_->display_id(), {primary_layer_id_});
+      (*display_controller_)->SetDisplayLayers(display_->display_id(), {primary_layer_id_});
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to configure display layers";
     return false;
@@ -451,21 +451,21 @@ void DisplaySwapchain::Flip(uint64_t layer_id, FrameRecord* frame_record) {
   uint64_t signal_event_id = frame_record->retired_event_id;
 
   zx_status_t status =
-      (*display_coordinator_)
+      (*display_controller_)
           ->SetLayerImage(layer_id, framebuffer_id, wait_event_id, signal_event_id);
   // TODO(fxbug.dev/23490): handle this more robustly.
   FX_CHECK(status == ZX_OK) << "DisplaySwapchain::Flip failed on SetLayerImage.";
 
   auto before = zx::clock::get_monotonic();
 
-  status = (*display_coordinator_)->ApplyConfig();
+  status = (*display_controller_)->ApplyConfig();
 
   // TODO(fxbug.dev/23490): handle this more robustly.
   FX_CHECK(status == ZX_OK) << "DisplaySwapchain::Flip failed on ApplyConfig. Waited "
                             << (zx::clock::get_monotonic() - before).to_msecs() << "msecs";
 
   fuchsia::hardware::display::ConfigStamp pending_config_stamp;
-  status = (*display_coordinator_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
+  status = (*display_controller_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
   FX_CHECK(status == ZX_OK) << "DisplaySwapchain::Flip failed on GetLatestAppliedConfigStamp: "
                             << status;
 

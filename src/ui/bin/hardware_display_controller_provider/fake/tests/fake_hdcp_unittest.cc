@@ -17,10 +17,10 @@ namespace {
 
 constexpr std::chrono::milliseconds kSleepTime(10);
 
-class FakeHardwareDisplayCoordinatorProviderTest : public gtest::TestLoopFixture {
+class FakeHardwareDisplayControllerProviderTest : public gtest::TestLoopFixture {
  public:
-  FakeHardwareDisplayCoordinatorProviderTest() = default;
-  ~FakeHardwareDisplayCoordinatorProviderTest() override = default;
+  FakeHardwareDisplayControllerProviderTest() = default;
+  ~FakeHardwareDisplayControllerProviderTest() override = default;
 
   void SetUp() override {
     TestLoopFixture::SetUp();
@@ -31,9 +31,9 @@ class FakeHardwareDisplayCoordinatorProviderTest : public gtest::TestLoopFixture
 
   void TearDown() override {
     // TODO(fxbug.dev/66466): this shouldn't be necessary, but without it there will be ASAN
-    // failures, as the coordinator connections established by the tests haven't finished being torn
+    // failures, as the controller connections established by the tests haven't finished being torn
     // down.
-    while (service_->coordinator_claimed() || service_->virtcon_coordinator_claimed()) {
+    while (service_->controller_claimed() || service_->virtcon_controller_claimed()) {
       std::this_thread::sleep_for(kSleepTime);
       RunLoopUntilIdle();
     }
@@ -49,55 +49,55 @@ class FakeHardwareDisplayCoordinatorProviderTest : public gtest::TestLoopFixture
 };
 
 struct Request {
-  fidl::InterfacePtr<fuchsia::hardware::display::Coordinator> coordinator;
+  fidl::InterfacePtr<fuchsia::hardware::display::Controller> controller;
 };
 
 Request NewRequest() { return Request(); }
 
 }  // anonymous namespace
 
-TEST_F(FakeHardwareDisplayCoordinatorProviderTest, NoConflictWithVirtcon) {
+TEST_F(FakeHardwareDisplayControllerProviderTest, NoConflictWithVirtcon) {
   // Count the number of connections that were ever made.
   uint32_t num_connections = 0;
   uint32_t num_virtcon_connections = 0;
 
   auto req = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req.coordinator.NewRequest(), [&num_connections](zx_status_t status) { ++num_connections; });
+  service()->OpenController(req.controller.NewRequest(),
+                            [&num_connections](zx_status_t status) { ++num_connections; });
 
   auto req2 = NewRequest();
-  service()->OpenCoordinatorForVirtcon(
-      req2.coordinator.NewRequest(),
+  service()->OpenVirtconController(
+      req2.controller.NewRequest(),
       [&num_virtcon_connections](zx_status_t status) { ++num_virtcon_connections; });
 
   EXPECT_EQ(num_connections, 1U);
   EXPECT_EQ(num_virtcon_connections, 1U);
 }
 
-TEST_F(FakeHardwareDisplayCoordinatorProviderTest, MultipleConnections) {
+TEST_F(FakeHardwareDisplayControllerProviderTest, MultipleConnections) {
   // Count the number of connections that were ever made.
   uint32_t num_connections = 0;
 
   auto req = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 1U); });
+  service()->OpenController(req.controller.NewRequest(), [&num_connections](zx_status_t status) {
+    EXPECT_EQ(++num_connections, 1U);
+  });
 
   auto req2 = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req2.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 2U); });
+  service()->OpenController(req2.controller.NewRequest(), [&num_connections](zx_status_t status) {
+    EXPECT_EQ(++num_connections, 2U);
+  });
 
   auto req3 = NewRequest();
-  service()->OpenCoordinatorForPrimary(
-      req3.coordinator.NewRequest(),
-      [&num_connections](zx_status_t status) { EXPECT_EQ(++num_connections, 3U); });
+  service()->OpenController(req3.controller.NewRequest(), [&num_connections](zx_status_t status) {
+    EXPECT_EQ(++num_connections, 3U);
+  });
 
   EXPECT_EQ(num_connections, 1U);
   EXPECT_EQ(service()->num_queued_requests(), 2U);
 
   // Drop the first connection, which will enable the second connection to be made.
-  req.coordinator.Unbind();
+  req.controller.Unbind();
   while (service()->num_queued_requests() == 2) {
     // Real wall clock time must elapse for the service to handle a kernel notification
     // that the channel has closed.
@@ -109,7 +109,7 @@ TEST_F(FakeHardwareDisplayCoordinatorProviderTest, MultipleConnections) {
   EXPECT_EQ(service()->num_queued_requests(), 1U);
 
   // Drop the second connection, which will enable the third connection to be made.
-  req2.coordinator.Unbind();
+  req2.controller.Unbind();
   while (service()->num_queued_requests() == 1) {
     // Real wall clock time must elapse for the service to handle a kernel notification
     // that the channel has closed.

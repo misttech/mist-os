@@ -64,14 +64,13 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
 
   std::unique_ptr<display::Controller> c(new Controller(mock_display));
   // Save a copy for test cases.
-  coordinator_controller_ = c.get();
+  controller_ = c.get();
   if (auto status = c->Bind(&c); status != ZX_OK) {
     ZX_PANIC("c->Bind(&c) return status was not ZX_OK. Error: %s.", zx_status_get_string(status));
   }
 
   auto display_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
-  fidl::BindServer(display_loop_.dispatcher(), std::move(display_endpoints->server),
-                   coordinator_controller_);
+  fidl::BindServer(display_loop_.dispatcher(), std::move(display_endpoints->server), controller_);
   display_loop_.StartThread("display-server-thread");
   display_provider_client_ = fidl::WireSyncClient<fuchsia_hardware_display::Provider>(
       std::move(display_endpoints->client));
@@ -125,8 +124,8 @@ void MockDisplayDeviceTree::AsyncShutdown() {
   }
   shutdown_ = true;
 
-  display_->DdkChildPreRelease(coordinator_controller_);
-  coordinator_controller_->DdkAsyncRemove();
+  display_->DdkChildPreRelease(controller_);
+  controller_->DdkAsyncRemove();
   display_->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(mock_root_.get());
 

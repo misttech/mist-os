@@ -42,24 +42,23 @@ uint64_t TestFidlClient::display_id() const { return displays_[0].id_; }
 
 bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& provider,
                                    bool is_vc) {
-  zx::result endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
+  zx::result endpoints = fidl::CreateEndpoints<fhd::Controller>();
   if (endpoints.is_error()) {
-    zxlogf(ERROR, "Could not create coordinator channels, error=%s", endpoints.status_string());
+    zxlogf(ERROR, "Could not create controller channels, error=%s", endpoints.status_string());
     return false;
   }
   auto& [dc_client, dc_server] = endpoints.value();
-  zxlogf(INFO, "Opening coordinator");
+  zxlogf(INFO, "Opening controller");
   if (is_vc) {
-    auto response = provider->OpenCoordinatorForVirtcon(std::move(dc_server));
+    auto response = provider->OpenVirtconController(std::move(dc_server));
     if (!response.ok()) {
-      zxlogf(ERROR, "Could not open Virtcon coordinator, error=%s",
-             response.FormatDescription().c_str());
+      zxlogf(ERROR, "Could not open VC controller, error=%s", response.FormatDescription().c_str());
       return false;
     }
   } else {
-    auto response = provider->OpenCoordinatorForPrimary(std::move(dc_server));
+    auto response = provider->OpenController(std::move(dc_server));
     if (!response.ok()) {
-      zxlogf(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
+      zxlogf(ERROR, "Could not open controller, error=%s", response.FormatDescription().c_str());
       return false;
     }
   }
@@ -133,22 +132,22 @@ bool TestFidlClient::Bind(async_dispatcher_t* dispatcher) {
   dispatcher_ = dispatcher;
   while (displays_.is_empty() || !has_ownership_) {
     fbl::AutoLock lock(mtx());
-    class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
+    class EventHandler : public fidl::WireSyncEventHandler<fhd::Controller> {
      public:
       explicit EventHandler(TestFidlClient* client) : client_(client) {}
 
       bool ok() const { return ok_; }
 
-      void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
+      void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
         for (size_t i = 0; i < event->added.count(); i++) {
           client_->displays_.push_back(Display(event->added[i]));
         }
       }
 
-      void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override { ok_ = false; }
+      void OnVsync(fidl::WireEvent<fhd::Controller::OnVsync>* event) override { ok_ = false; }
 
       void OnClientOwnershipChange(
-          fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
+          fidl::WireEvent<fhd::Controller::OnClientOwnershipChange>* event) override {
         client_->has_ownership_ = event->has_ownership;
       }
 
@@ -186,14 +185,14 @@ void TestFidlClient::OnEventMsgAsync(async_dispatcher_t* dispatcher, async::Wait
   }
 
   fbl::AutoLock lock(mtx());
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
+  class EventHandler : public fidl::WireSyncEventHandler<fhd::Controller> {
    public:
     explicit EventHandler(TestFidlClient* client) : client_(client) {}
 
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {}
+    void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {}
 
     // The FIDL bindings do not know that the caller holds mtx(), so we can't TA_REQ(mtx()) here.
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override
+    void OnVsync(fidl::WireEvent<fhd::Controller::OnVsync>* event) override
         TA_NO_THREAD_SAFETY_ANALYSIS {
       client_->vsync_count_++;
       client_->recent_presented_config_stamp_ = event->applied_config_stamp;
@@ -203,7 +202,7 @@ void TestFidlClient::OnEventMsgAsync(async_dispatcher_t* dispatcher, async::Wait
     }
 
     void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* message) override {}
+        fidl::WireEvent<fhd::Controller::OnClientOwnershipChange>* message) override {}
 
    private:
     TestFidlClient* const client_;

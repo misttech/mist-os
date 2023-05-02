@@ -32,7 +32,7 @@ typedef struct custom_layer {
 // A layer whose output can appear on multiple displays.
 class VirtualLayer {
  public:
-  typedef fuchsia_hardware_display::Coordinator Coordinator;
+  typedef fuchsia_hardware_display::Controller Controller;
 
   explicit VirtualLayer(Display* display);
   explicit VirtualLayer(const fbl::Vector<Display>& displays, bool tiled = true);
@@ -40,16 +40,16 @@ class VirtualLayer {
   virtual ~VirtualLayer() {}
 
   // Finish initializing the layer. All Set* methods should be called before this.
-  virtual bool Init(const fidl::WireSyncClient<Coordinator>& dc) = 0;
+  virtual bool Init(const fidl::WireSyncClient<Controller>& dc) = 0;
 
   // Steps the local layout state to frame_num.
   virtual void StepLayout(int32_t frame_num) = 0;
 
-  // Waits for the display coordinator to be done with the previous version of this frame.
+  // Waits for the display controller to be done with the previous version of this frame.
   virtual bool WaitForReady() = 0;
 
-  // Sets the current layout to the display coordinator.
-  virtual void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) = 0;
+  // Sets the current layout to the display controller.
+  virtual void SendLayout(const fidl::WireSyncClient<Controller>& dc) = 0;
 
   // Renders the current frame (and signals the fence if necessary).
   virtual void Render(int32_t frame_num) = 0;
@@ -57,7 +57,7 @@ class VirtualLayer {
   virtual void* GetCurrentImageBuf() = 0;
   virtual size_t GetCurrentImageSize() = 0;
 
-  // Gets the display coordinator layer ID for usage on the given display.
+  // Gets the display controller layer ID for usage on the given display.
   uint64_t id(uint64_t display_id) const {
     for (unsigned i = 0; i < displays_.size(); i++) {
       if (displays_[i]->id() == display_id && layers_[i].active) {
@@ -93,8 +93,8 @@ class VirtualLayer {
   }
 
  protected:
-  custom_layer_t* CreateLayer(const fidl::WireSyncClient<Coordinator>& dc);
-  void SetLayerImages(const fidl::WireSyncClient<Coordinator>& dc, bool alt_image);
+  custom_layer_t* CreateLayer(const fidl::WireSyncClient<Controller>& dc);
+  void SetLayerImages(const fidl::WireSyncClient<Controller>& dc, bool alt_image);
 
   fbl::Vector<Display*> displays_;
   fbl::Vector<custom_layer_t> layers_;
@@ -143,10 +143,10 @@ class PrimaryLayer : public VirtualLayer {
   }
   void SetFormatModifier(uint64_t modifier) { modifier_ = modifier; }
 
-  bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
+  bool Init(const fidl::WireSyncClient<Controller>& dc) override;
   void StepLayout(int32_t frame_num) override;
   bool WaitForReady() override;
-  void SendLayout(const fidl::WireSyncClient<Coordinator>& channel) override;
+  void SendLayout(const fidl::WireSyncClient<Controller>& channel) override;
   void Render(int32_t frame_num) override;
 
   void* GetCurrentImageBuf() override;
@@ -162,7 +162,7 @@ class PrimaryLayer : public VirtualLayer {
   }
 
  private:
-  void SetLayerPositions(const fidl::WireSyncClient<Coordinator>& dc);
+  void SetLayerPositions(const fidl::WireSyncClient<Controller>& dc);
   bool Wait(uint32_t idx);
   void InitImageDimens();
 
@@ -199,9 +199,9 @@ class CursorLayer : public VirtualLayer {
   explicit CursorLayer(Display* display);
   explicit CursorLayer(const fbl::Vector<Display>& displays);
 
-  bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
+  bool Init(const fidl::WireSyncClient<Controller>& dc) override;
   void StepLayout(int32_t frame_num) override;
-  void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) override;
+  void SendLayout(const fidl::WireSyncClient<Controller>& dc) override;
 
   bool WaitForReady() override { return true; }
   void Render(int32_t frame_num) override {}
@@ -230,9 +230,9 @@ class ColorLayer : public VirtualLayer {
   explicit ColorLayer(Display* display);
   explicit ColorLayer(const fbl::Vector<Display>& displays);
 
-  bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
+  bool Init(const fidl::WireSyncClient<Controller>& dc) override;
 
-  void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) override {}
+  void SendLayout(const fidl::WireSyncClient<Controller>& dc) override {}
   void StepLayout(int32_t frame_num) override {}
   bool WaitForReady() override { return true; }
   void Render(int32_t frame_num) override {}

@@ -117,7 +117,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
 // |ServerEnd| that owns the channel, both of which allows sending events
 // without unsafe channel borrowing.
 class DisplayControllerBindingState {
-  using Protocol = fuchsia_hardware_display::Coordinator;
+  using Protocol = fuchsia_hardware_display::Controller;
 
  public:
   // Constructs an invalid binding state. The user must populate it with an
@@ -169,26 +169,26 @@ class DisplayControllerBindingState {
       binding_state_;
 };
 
-// Manages the state associated with a display coordinator client connection.
+// Manages all state associated with an open display client connection.
 //
 // This class is not thread-safe. After initialization, all methods must be
 // executed on the same thread.
-class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
+class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
  public:
   // |controller| must outlive this and |proxy|.
   Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id);
 
   // This is used for testing
   Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id,
-         fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+         fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   Client(const Client&) = delete;
   Client& operator=(const Client&) = delete;
 
   ~Client() override;
 
-  fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t> Init(
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+  fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Controller>, zx_status_t> Init(
+      fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   void OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
                          const uint64_t* displays_removed, size_t removed_count);
@@ -219,7 +219,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   uint64_t LatestAckedCookie() const { return acked_cookie_; }
   size_t GetGammaTableSize() const { return gamma_table_map_.size(); }
 
-  // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
+  // fidl::WireServer<fuchsia_hardware_display::Controller> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
   void ReleaseImage(ReleaseImageRequestView request,
                     ReleaseImageCompleter::Sync& _completer) override;
@@ -369,11 +369,11 @@ class ClientProxy {
 
   // This is used for testing
   ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
-              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+              fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   ~ClientProxy();
   zx_status_t Init(inspect::Node* parent_node,
-                   fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+                   fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   // Schedule a task on the controller loop to close this ClientProxy and
   // have it be freed.

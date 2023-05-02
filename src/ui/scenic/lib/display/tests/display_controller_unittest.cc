@@ -10,9 +10,9 @@ namespace scenic_impl {
 namespace display {
 namespace test {
 
-class DisplayCoordinatorTest : public gtest::TestLoopFixture {};
+class DisplayControllerTest : public gtest::TestLoopFixture {};
 
-TEST_F(DisplayCoordinatorTest, Display2Test) {
+TEST_F(DisplayControllerTest, Display2Test) {
   const uint64_t kDisplayId = 2;
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
@@ -37,8 +37,8 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
   EXPECT_TRUE(invoked_vsync_callback);
 }
 
-TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
-  DisplayCoordinatorObjects display_controller_objs = CreateMockDisplayCoordinator();
+TEST_F(DisplayControllerTest, DisplayControllerTest) {
+  DisplayControllerObjects display_controller_objs = CreateMockDisplayController();
 
   const uint64_t kDisplayId1 = 1;
   const uint64_t kDisplayId2 = 2;
@@ -51,9 +51,9 @@ TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
 
   std::vector<Display2> displays;
   displays.push_back(std::move(display1));
-  DisplayCoordinator dc(std::move(displays), display_controller_objs.interface_ptr);
+  DisplayController dc(std::move(displays), display_controller_objs.interface_ptr);
 
-  EXPECT_EQ(display_controller_objs.interface_ptr.get(), dc.coordinator().get());
+  EXPECT_EQ(display_controller_objs.interface_ptr.get(), dc.controller().get());
 
   EXPECT_EQ(1u, dc.displays()->size());
   EXPECT_EQ(kDisplayId1, dc.displays()->at(0).display_id());

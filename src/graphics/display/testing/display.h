@@ -27,7 +27,7 @@ class Display {
  public:
   explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
-  void Init(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
+  void Init(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
             ColorCorrectionArgs color_correction_args = ColorCorrectionArgs());
 
   fuchsia_images2::wire::PixelFormat format() const { return pixel_formats_[format_idx_]; }

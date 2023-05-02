@@ -9,17 +9,17 @@
 
 namespace flatland {
 
-class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
+class MockDisplayController : public fuchsia::hardware::display::testing::Controller_TestBase {
  public:
-  explicit MockDisplayCoordinator() : binding_(this) {}
+  explicit MockDisplayController() : binding_(this) {}
 
   void WaitForMessage() { binding_.WaitForMessage(); }
 
-  void Bind(zx::channel device_channel, zx::channel coordinator_channel,
+  void Bind(zx::channel device_channel, zx::channel controller_channel,
             async_dispatcher_t* dispatcher = nullptr) {
     device_channel_ = std::move(device_channel);
-    binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator>(
-                      std::move(coordinator_channel)),
+    binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Controller>(
+                      std::move(controller_channel)),
                   dispatcher);
   }
 
@@ -72,7 +72,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
  private:
   void NotImplemented_(const std::string& name) final {}
 
-  fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
+  fidl::Binding<fuchsia::hardware::display::Controller> binding_;
   zx::channel device_channel_;
 };
 

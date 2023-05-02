@@ -79,7 +79,7 @@ class TestFidlClient {
   uint64_t display_id() const;
 
   fbl::Vector<Display> displays_;
-  fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> dc_ TA_GUARDED(mtx());
+  fidl::WireSyncClient<fuchsia_hardware_display::Controller> dc_ TA_GUARDED(mtx());
   bool has_ownership_ = false;
 
   uint64_t vsync_count() const {

@@ -32,24 +32,24 @@ ProviderService::ProviderService(std::shared_ptr<zx_device> mock_root,
 
 ProviderService::~ProviderService() { state_->tree->AsyncShutdown(); }
 
-void ProviderService::OpenCoordinatorForPrimary(
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
-    OpenCoordinatorForPrimaryCallback callback) {
+void ProviderService::OpenController(
+    ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller_request,
+    OpenControllerCallback callback) {
   ConnectOrDeferClient(Request{.is_virtcon = false,
-                               .coordinator_request = std::move(coordinator_request),
+                               .controller_request = std::move(controller_request),
                                .callback = std::move(callback)});
 }
 
-void ProviderService::OpenCoordinatorForVirtcon(
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
-    OpenCoordinatorForVirtconCallback callback) {
+void ProviderService::OpenVirtconController(
+    ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller_request,
+    OpenControllerCallback callback) {
   ConnectOrDeferClient(Request{.is_virtcon = true,
-                               .coordinator_request = std::move(coordinator_request),
+                               .controller_request = std::move(controller_request),
                                .callback = std::move(callback)});
 }
 
 void ProviderService::ConnectOrDeferClient(Request req) {
-  bool claimed = req.is_virtcon ? state_->virtcon_coordinator_claimed : state_->coordinator_claimed;
+  bool claimed = req.is_virtcon ? state_->virtcon_controller_claimed : state_->controller_claimed;
   if (claimed) {
     auto& queue = req.is_virtcon ? state_->virtcon_queued_requests : state_->queued_requests;
     queue.push(std::move(req));
@@ -63,15 +63,14 @@ void ProviderService::ConnectClient(Request req, const std::shared_ptr<State>& s
 
   // Claim the connection type specified in the request, which MUST not already be claimed.
   {
-    auto& claimed =
-        req.is_virtcon ? state->virtcon_coordinator_claimed : state->coordinator_claimed;
-    FX_CHECK(!claimed) << "coordinator already claimed.";
+    auto& claimed = req.is_virtcon ? state->virtcon_controller_claimed : state->controller_claimed;
+    FX_CHECK(!claimed) << "controller already claimed.";
     claimed = true;
   }
 
-  zx_status_t status = state->tree->coordinator_controller()->CreateClient(
+  zx_status_t status = state->tree->controller()->CreateClient(
       req.is_virtcon,
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator>{req.coordinator_request.TakeChannel()},
+      fidl::ServerEnd<fuchsia_hardware_display::Controller>{req.controller_request.TakeChannel()},
       [weak = std::weak_ptr<State>(state), is_virtcon{req.is_virtcon}]() mutable {
         // Redispatch, in case this callback is invoked on a different thread (this depends
         // on the implementation of MockDisplayDeviceTree, which makes no guarantees).
@@ -80,7 +79,7 @@ void ProviderService::ConnectClient(Request req, const std::shared_ptr<State>& s
             if (auto state = weak.lock()) {
               // Obtain the claim status and queue matching the connection that was just released.
               auto& claimed =
-                  is_virtcon ? state->virtcon_coordinator_claimed : state->coordinator_claimed;
+                  is_virtcon ? state->virtcon_controller_claimed : state->controller_claimed;
               auto& queue = is_virtcon ? state->virtcon_queued_requests : state->queued_requests;
 
               // The connection is no longer claimed.  If there is a queued connection request of

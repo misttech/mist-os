@@ -19,7 +19,7 @@ use {
 };
 
 use crate::{
-    controller::Coordinator,
+    controller::Controller,
     error::{Error, Result},
     pixel_format::PixelFormat,
     types::{CollectionId, ImageId},
@@ -71,7 +71,7 @@ pub struct Image {
     proxy: BufferCollectionProxy,
 
     // The display driver proxy that this image has been imported into.
-    coordinator: Coordinator,
+    ctrl: Controller,
 }
 
 impl Image {
@@ -79,12 +79,12 @@ impl Image {
     /// using `image_id`. If successful, the image can be assigned to a primary layer in a
     /// display configuration.
     pub async fn create(
-        coordinator: Coordinator,
+        ctrl: Controller,
         image_id: ImageId,
         params: &ImageParameters,
     ) -> Result<Image> {
-        let mut collection = allocate_image_buffer(coordinator.clone(), params).await?;
-        coordinator.import_image(collection.id, image_id, params.into()).await?;
+        let mut collection = allocate_image_buffer(ctrl.clone(), params).await?;
+        ctrl.import_image(collection.id, image_id, params.into()).await?;
         let vmo = collection.info.buffers[0]
             .vmo
             .as_ref()
@@ -100,7 +100,7 @@ impl Image {
             format_constraints: collection.info.settings.image_format_constraints,
             buffer_settings: collection.info.settings.buffer_settings,
             proxy: collection.proxy.clone(),
-            coordinator,
+            ctrl,
         })
     }
 }
@@ -108,7 +108,7 @@ impl Image {
 impl Drop for Image {
     fn drop(&mut self) {
         let _ = self.proxy.close();
-        let _ = self.coordinator.release_buffer_collection(self.collection_id);
+        let _ = self.ctrl.release_buffer_collection(self.collection_id);
     }
 }
 
@@ -131,7 +131,7 @@ struct BufferCollection {
     id: CollectionId,
     info: BufferCollectionInfo2,
     proxy: BufferCollectionProxy,
-    coordinator: Coordinator,
+    ctrl: Controller,
     released: bool,
 }
 
@@ -144,7 +144,7 @@ impl BufferCollection {
 impl Drop for BufferCollection {
     fn drop(&mut self) {
         if !self.released {
-            let _ = self.coordinator.release_buffer_collection(self.id);
+            let _ = self.ctrl.release_buffer_collection(self.id);
             let _ = self.proxy.close();
         }
     }
@@ -153,7 +153,7 @@ impl Drop for BufferCollection {
 // Allocate a sysmem buffer collection and register it with the display driver. The allocated
 // buffer can be used to construct a display layer image.
 async fn allocate_image_buffer(
-    coordinator: Coordinator,
+    ctrl: Controller,
     params: &ImageParameters,
 ) -> Result<BufferCollection> {
     let allocator =
@@ -184,13 +184,13 @@ async fn allocate_image_buffer(
     };
 
     // Register the collection with the display driver.
-    let id = coordinator.import_buffer_collection(display_duplicate).await?;
+    let id = ctrl.import_buffer_collection(display_duplicate).await?;
 
     // Tell sysmem to perform the buffer allocation and wait for the result. Clean up on error.
     match allocate_image_buffer_helper(params, allocator, collection_token).await {
-        Ok((info, proxy)) => Ok(BufferCollection { id, info, proxy, coordinator, released: false }),
+        Ok((info, proxy)) => Ok(BufferCollection { id, info, proxy, ctrl, released: false }),
         Err(error) => {
-            let _ = coordinator.release_buffer_collection(id);
+            let _ = ctrl.release_buffer_collection(id);
             Err(error)
         }
     }

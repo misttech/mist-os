@@ -68,17 +68,17 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
-    auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
+    auto hdc_promise = ui_display::GetHardwareDisplayController();
     executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
-          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
+        hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
+          display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
 
     // Enable Vsync so that vsync events will be given to this client.
-    auto display_coordinator = display_manager_->default_display_coordinator();
-    (*display_coordinator.get())->EnableVsync(true);
+    auto display_controller = display_manager_->default_display_controller();
+    (*display_controller.get())->EnableVsync(true);
   }
 
   void TearDown() override {
@@ -118,18 +118,18 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
   // To avoid flakes, tests call this function to ensure that config stamps applied by
-  // the display compositor are fully applied to the display coordinator before engaging
+  // the display compositor are fully applied to the display controller before engaging
   // in any operations (e.g. reading back pixels from the display) that first require
   // these processes to have been completed.
   void WaitOnVSync() {
     auto display = display_manager_->default_display();
-    auto display_coordinator = display_manager_->default_display_coordinator();
+    auto display_controller = display_manager_->default_display_controller();
 
     // Get the latest applied config stamp. This will be used to compare against the config
     // stamp in the OnSync callback function used by the display. If the two stamps match,
     // then we know that the vsync has completed and it is safe to do readbacks.
     fuchsia::hardware::display::ConfigStamp pending_config_stamp;
-    auto status = (*display_coordinator.get())->GetLatestAppliedConfigStamp(&pending_config_stamp);
+    auto status = (*display_controller.get())->GetLatestAppliedConfigStamp(&pending_config_stamp);
     ASSERT_TRUE(status == ZX_OK);
 
     // The callback will switch this bool to |true| if the two configs match. It is initialized
@@ -154,9 +154,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     display->SetVsyncCallback(nullptr);
   }
 
-  // Set up the buffer collections and images to be used for capturing the diplay coordinator's
+  // Set up the buffer collections and images to be used for capturing the diplay controller's
   // output. The only devices which currently implement the capture functionality on their
-  // display coordinators are the AMLOGIC devices, and so we hardcode some of those AMLOGIC
+  // display controllers are the AMLOGIC devices, and so we hardcode some of those AMLOGIC
   // assumptions here, such as making the pixel format for the capture image BGR24, as that
   // is the only capture format that AMLOGIC supports.
   //
@@ -169,12 +169,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       fuchsia::sysmem::PixelFormatType pixel_type,
       fuchsia::sysmem::BufferCollectionInfo_2* collection_info, uint64_t* image_id) {
     auto display = display_manager_->default_display();
-    auto display_coordinator = display_manager_->default_display_coordinator();
+    auto display_controller = display_manager_->default_display_controller();
     EXPECT_TRUE(display);
-    EXPECT_TRUE(display_coordinator);
+    EXPECT_TRUE(display_controller);
 
     // This should only be running on devices with capture support.
-    bool capture_supported = scenic_impl::IsCaptureSupported(*display_coordinator.get());
+    bool capture_supported = scenic_impl::IsCaptureSupported(*display_controller.get());
     if (!capture_supported) {
       FX_LOGS(WARNING) << "Capture is not supported on this device. Test skipped.";
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
@@ -185,7 +185,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
         .type = fuchsia::hardware::display::TYPE_CAPTURE};
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
-    auto result = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
+    auto result = scenic_impl::ImportBufferCollection(collection_id, *display_controller.get(),
                                                       std::move(tokens.dup_token), image_config);
     EXPECT_TRUE(result);
     fuchsia::sysmem::BufferCollectionSyncPtr collection;
@@ -248,7 +248,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       EXPECT_EQ(allocation_status, ZX_OK);
     }
 
-    *image_id = scenic_impl::ImportImageForCapture(*display_coordinator.get(), image_config,
+    *image_id = scenic_impl::ImportImageForCapture(*display_controller.get(), image_config,
                                                    collection_id, 0);
 
     return fpromise::ok(std::move(collection));
@@ -287,8 +287,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
     auto display = display_manager_->default_display();
-    auto display_coordinator = display_manager_->default_display_coordinator();
-    (*display_coordinator)->ReleaseBufferCollection(collection_id);
+    auto display_controller = display_manager_->default_display_controller();
+    (*display_controller)->ReleaseBufferCollection(collection_id);
   }
 
   static void ReleaseClientTextureBufferCollection(
@@ -307,16 +307,16 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     EXPECT_NE(capture_image_id, 0U);
 
     auto display = display_manager_->default_display();
-    auto display_coordinator = display_manager_->default_display_coordinator();
+    auto display_controller = display_manager_->default_display_controller();
 
     zx::event capture_signal_fence;
     auto status = zx::event::create(0, &capture_signal_fence);
     EXPECT_EQ(status, ZX_OK);
 
     auto capture_signal_fence_id =
-        scenic_impl::ImportEvent(*display_coordinator.get(), capture_signal_fence);
-    fuchsia::hardware::display::Coordinator_StartCapture_Result start_capture_result;
-    (*display_coordinator.get())
+        scenic_impl::ImportEvent(*display_controller.get(), capture_signal_fence);
+    fuchsia::hardware::display::Controller_StartCapture_Result start_capture_result;
+    (*display_controller.get())
         ->StartCapture(capture_signal_fence_id, capture_image_id, &start_capture_result);
     EXPECT_TRUE(start_capture_result.is_response()) << start_capture_result.err();
 
@@ -333,8 +333,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
                    });
 
     // Cleanup the capture.
-    fuchsia::hardware::display::Coordinator_ReleaseCapture_Result result_capture_result;
-    (*display_coordinator.get())->ReleaseCapture(capture_image_id, &result_capture_result);
+    fuchsia::hardware::display::Controller_ReleaseCapture_Result result_capture_result;
+    (*display_controller.get())->ReleaseCapture(capture_image_id, &result_capture_result);
     EXPECT_TRUE(result_capture_result.is_response());
   }
 
@@ -488,9 +488,9 @@ When tests run on environments with a virtual gpu, please include this line in t
 test body:
     SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
 
-Furthermore, please make sure to use GTEST_SKIP() when appropriate to prevent display-coordinator
+Furthermore, please make sure to use GTEST_SKIP() when appropriate to prevent display-controller
 related failures that may happen when using fake display or on certain devices where some
-display-coordinator functionality may not be implemented, and release the imported buffer collection
+display-controller functionality may not be implemented, and release the imported buffer collection
 when the test ends:
 
 For example, when using display capture:
@@ -515,12 +515,12 @@ And when importing textures to the display compositor:
         ReleaseClientTextureBufferCollection(display_compositor.get(), kTextureCollectionId);
       });
 
-If you are developing a test specifically for the DisplayCoordinator that does NOT need the
+If you are developing a test specifically for the DisplayController that does NOT need the
 Vulkan Renderer, try creating a DisplayCompositor with the NullRenderer
 
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       true);
 
@@ -528,7 +528,7 @@ Lastly, if you are specifically testing the Vulkan Renderer and do not need Disp
 creating a DisplayCompositor with enable_display_composition=false:
 
    auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       false);
 
@@ -543,23 +543,23 @@ class DisplayCompositorParameterizedPixelTest
 
 // Renders a fullscreen green rectangle to the provided display. This
 // tests the engine's ability to properly read in flatland uberstruct
-// data and then pass the data along to the display-coordinator interface
-// to be composited directly in hardware. The Astro display coordinator
+// data and then pass the data along to the display-controller interface
+// to be composited directly in hardware. The Astro display controller
 // only handles full screen rects.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -573,7 +573,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   auto release_capture_collection = fit::defer(
       [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
-  // Setup the collection for the texture. Due to display coordinator limitations, the size of
+  // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
@@ -694,17 +694,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition=*/true);
 
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kCompareCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -718,7 +718,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   auto release_capture_collection = fit::defer(
       [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
-  // Setup the collection for the texture. Due to display coordinator limitations, the size of
+  // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
@@ -819,17 +819,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangleTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kCompareCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -843,7 +843,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   auto release_capture_collection = fit::defer(
       [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
-  // Setup the collection for the texture. Due to display coordinator limitations, the size of
+  // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
@@ -954,17 +954,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kCompareCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -978,7 +978,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   auto release_capture_collection = fit::defer(
       [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
-  // Setup the collection for the texture. Due to display coordinator limitations, the size of
+  // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
@@ -1081,12 +1081,12 @@ class DisplayCompositorFallbackParameterizedPixelTest
 VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -1120,7 +1120,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   // Use the VK renderer here so we can make use of software rendering.
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
@@ -1264,12 +1264,12 @@ INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorFallbackParameterizedPix
 VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -1305,7 +1305,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Use the VK renderer here so we can make use of software rendering.
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
@@ -1458,19 +1458,19 @@ INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedTest,
 VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   // Use the VK renderer here so we can make use of software rendering.
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ false);
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =
@@ -1653,19 +1653,19 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto display = display_manager_->default_display();
-  auto display_coordinator = display_manager_->default_display_coordinator();
+  auto display_controller = display_manager_->default_display_controller();
 
   // Use the VK renderer here so we can make use of software rendering.
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_coordinator(), renderer,
+      dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition=*/false);
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Set up buffer collection and image for display_coordinator capture.
+  // Set up buffer collection and image for display_controller capture.
   uint64_t capture_image_id;
   fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
   auto capture_collection_result =

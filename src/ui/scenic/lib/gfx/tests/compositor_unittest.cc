@@ -79,18 +79,18 @@ class CompositorTest : public SessionTest {
 
  private:
   std::unique_ptr<Sysmem> sysmem_;
-  fuchsia::hardware::display::CoordinatorSyncPtr display_coordinator_;
+  fuchsia::hardware::display::ControllerSyncPtr display_controller_;
   std::unique_ptr<display::DisplayManager> display_manager_;
   sys::testing::ComponentContextProvider context_provider_;
   std::unique_ptr<SceneGraph> scene_graph_;
 };
 
 TEST_F(CompositorTest, Validation) {
-  ChannelPair coordinator_channel = CreateChannelPair();
+  ChannelPair controller_channel = CreateChannelPair();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayController(
+      fidl::InterfaceHandle<fuchsia::hardware::display::Controller>(
+          std::move(controller_channel.client)));
 
   std::array<float, 3> preoffsets = {0, 0, 0};
   std::array<float, 9> matrix = {0.3, 0.6, 0.1, 0.3, 0.6, 0.1, 0.3, 0.6, 0.1};
@@ -100,35 +100,35 @@ TEST_F(CompositorTest, Validation) {
   const int CompositorId = 15;
   ASSERT_TRUE(Apply(scenic::NewCreateDisplayCompositorCmd(CompositorId)));
 
-  // Create a mock display coordinator that runs on a separate thread.
+  // Create a mock display controller that runs on a separate thread.
   std::thread server([&preoffsets, &matrix, &postoffsets,
-                      coordinator_channel = std::move(coordinator_channel.server)]() mutable {
+                      controller_channel = std::move(controller_channel.server)]() mutable {
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-    display::test::MockDisplayCoordinator mock_display_coordinator;
+    display::test::MockDisplayController mock_display_controller;
 
-    mock_display_coordinator.set_display_color_conversion_fn(
+    mock_display_controller.set_display_color_conversion_fn(
         [&](uint64_t display_id, std::array<float, 3> preoffsets_out,
             std::array<float, 9> matrix_out, std::array<float, 3> postoffsets_out) {
-          // Check that the display coordinator got the color correction matrix we passed in.
+          // Check that the display controller got the color correction matrix we passed in.
           EXPECT_EQ(preoffsets, preoffsets_out);
           EXPECT_EQ(matrix, matrix_out);
           EXPECT_EQ(postoffsets, postoffsets_out);
         });
-    mock_display_coordinator.Bind(std::move(coordinator_channel));
+    mock_display_controller.Bind(std::move(controller_channel));
 
     // Waits for initial call to |SetOnVsyncCallback| by DisplayManager.
-    mock_display_coordinator.WaitForMessage();
+    mock_display_controller.WaitForMessage();
 
     // Waits for a call to |SetDisplayColorConversion| by client.
-    EXPECT_EQ(0U, mock_display_coordinator.set_display_color_conversion_count());
-    mock_display_coordinator.WaitForMessage();
-    EXPECT_EQ(1U, mock_display_coordinator.set_display_color_conversion_count());
+    EXPECT_EQ(0U, mock_display_controller.set_display_color_conversion_count());
+    mock_display_controller.WaitForMessage();
+    EXPECT_EQ(1U, mock_display_controller.set_display_color_conversion_count());
 
     // Wait for |CheckConfig|.
-    EXPECT_EQ(0U, mock_display_coordinator.check_config_count());
-    mock_display_coordinator.WaitForMessage();
-    EXPECT_EQ(1U, mock_display_coordinator.check_config_count());
+    EXPECT_EQ(0U, mock_display_controller.check_config_count());
+    mock_display_controller.WaitForMessage();
+    EXPECT_EQ(1U, mock_display_controller.check_config_count());
   });
 
   EXPECT_TRUE(Apply(
@@ -140,38 +140,38 @@ TEST_F(CompositorTest, Validation) {
 // Test to make sure that we can set the minimum RGB value for the display via the
 // standard GFX API, across a fidl channel.
 TEST_F(CompositorTest, ValidateMinimumRGB) {
-  ChannelPair coordinator_channel = CreateChannelPair();
+  ChannelPair controller_channel = CreateChannelPair();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayController(
+      fidl::InterfaceHandle<fuchsia::hardware::display::Controller>(
+          std::move(controller_channel.client)));
 
-  // Create a mock display coordinator that runs on a separate thread.
+  // Create a mock display controller that runs on a separate thread.
   uint8_t minimum = 10;
   std::thread server(
-      [&minimum, coordinator_channel = std::move(coordinator_channel.server)]() mutable {
+      [&minimum, controller_channel = std::move(controller_channel.server)]() mutable {
         async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-        display::test::MockDisplayCoordinator mock_display_coordinator;
+        display::test::MockDisplayController mock_display_controller;
 
-        mock_display_coordinator.set_minimum_rgb_fn([&](uint8_t minimum_out) {
-          // Check that the display coordinator got the right value.
+        mock_display_controller.set_minimum_rgb_fn([&](uint8_t minimum_out) {
+          // Check that the display controller got the right value.
           EXPECT_EQ(minimum, minimum_out);
         });
-        mock_display_coordinator.Bind(std::move(coordinator_channel));
+        mock_display_controller.Bind(std::move(controller_channel));
 
         // Waits for initial call to |SetOnVsyncCallback| by DisplayManager.
-        mock_display_coordinator.WaitForMessage();
+        mock_display_controller.WaitForMessage();
 
         // Waits for a call to |SetDisplayMinimumRgb| by client.
-        EXPECT_EQ(0U, mock_display_coordinator.set_minimum_rgb_count());
-        mock_display_coordinator.WaitForMessage();
-        EXPECT_EQ(1U, mock_display_coordinator.set_minimum_rgb_count());
+        EXPECT_EQ(0U, mock_display_controller.set_minimum_rgb_count());
+        mock_display_controller.WaitForMessage();
+        EXPECT_EQ(1U, mock_display_controller.set_minimum_rgb_count());
 
         // Wait for |CheckConfig|.
-        EXPECT_EQ(0U, mock_display_coordinator.check_config_count());
-        mock_display_coordinator.WaitForMessage();
-        EXPECT_EQ(1U, mock_display_coordinator.check_config_count());
+        EXPECT_EQ(0U, mock_display_controller.check_config_count());
+        mock_display_controller.WaitForMessage();
+        EXPECT_EQ(1U, mock_display_controller.check_config_count());
       });
 
   EXPECT_TRUE(Apply(scenic::NewSetDisplayMinimumRgbCmdHACK(minimum)));
@@ -182,14 +182,14 @@ TEST_F(CompositorTest, ValidateMinimumRGB) {
 using CompositorTestSimple = gtest::TestLoopFixture;
 
 TEST_F(CompositorTestSimple, ColorConversionConfigChecking) {
-  fuchsia::hardware::display::CoordinatorSyncPtr display_coordinator;
-  display::test::MockDisplayCoordinator mock_display_coordinator;
+  fuchsia::hardware::display::ControllerSyncPtr display_controller;
+  display::test::MockDisplayController mock_display_controller;
 
-  ChannelPair coordinator_channel = CreateChannelPair();
+  ChannelPair controller_channel = CreateChannelPair();
 
-  mock_display_coordinator.Bind(std::move(coordinator_channel.server));
+  mock_display_controller.Bind(std::move(controller_channel.server));
 
-  display_coordinator.Bind(std::move(coordinator_channel.client));
+  display_controller.Bind(std::move(controller_channel.client));
 
   ColorTransform transform;
 
@@ -207,20 +207,20 @@ TEST_F(CompositorTestSimple, ColorConversionConfigChecking) {
       should_discard_config = true;
     }
   };
-  mock_display_coordinator.set_check_config_fn(check_config_fn);
+  mock_display_controller.set_check_config_fn(check_config_fn);
 
-  std::thread client([display_coordinator = std::move(display_coordinator), transform]() mutable {
-    DisplaySwapchain::SetDisplayColorConversion(/*id=*/1, display_coordinator, transform);
+  std::thread client([display_controller = std::move(display_controller), transform]() mutable {
+    DisplaySwapchain::SetDisplayColorConversion(/*id=*/1, display_controller, transform);
   });
 
   // Wait for |SetDisplayColorConversion|.
-  mock_display_coordinator.WaitForMessage();
+  mock_display_controller.WaitForMessage();
 
   // Wait for |CheckConfig|.
-  mock_display_coordinator.WaitForMessage();
+  mock_display_controller.WaitForMessage();
 
   // Wait for |CheckConfig|.
-  mock_display_coordinator.WaitForMessage();
+  mock_display_controller.WaitForMessage();
 
   client.join();
 

@@ -771,9 +771,9 @@ static void PrintChannelKoids(bool is_vc, const zx::channel& channel) {
 }
 
 zx_status_t Controller::CreateClient(
-    bool is_vc, fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
+    bool is_vc, fidl::ServerEnd<fidl_display::Controller> controller_server_end,
     fit::function<void()> on_display_client_dead) {
-  PrintChannelKoids(is_vc, coordinator_server_end.channel());
+  PrintChannelKoids(is_vc, controller_server_end.channel());
   fbl::AllocChecker ac;
   std::unique_ptr<async::Task> task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
@@ -795,7 +795,7 @@ zx_status_t Controller::CreateClient(
   auto client = std::make_unique<ClientProxy>(this, is_vc, next_client_id_++,
                                               std::move(on_display_client_dead));
 
-  zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
+  zx_status_t status = client->Init(&root_, std::move(controller_server_end));
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Failed to init client %d", status);
     return status;
@@ -853,14 +853,14 @@ uint64_t Controller::GetNextBufferCollectionId() {
   return next_buffer_collection_id_++;
 }
 
-void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                           OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  completer.Reply(CreateClient(/*is_vc=*/true, std::move(request->coordinator)));
+void Controller::OpenVirtconController(OpenVirtconControllerRequestView request,
+                                       OpenVirtconControllerCompleter::Sync& completer) {
+  completer.Reply(CreateClient(/*is_vc=*/true, std::move(request->controller)));
 }
 
-void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                           OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  completer.Reply(CreateClient(/*is_vc=*/false, std::move(request->coordinator)));
+void Controller::OpenController(OpenControllerRequestView request,
+                                OpenControllerCompleter::Sync& completer) {
+  completer.Reply(CreateClient(/*is_vc=*/false, std::move(request->controller)));
 }
 
 void Controller::OnVsyncMonitor() {

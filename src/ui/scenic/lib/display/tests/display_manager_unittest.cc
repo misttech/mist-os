@@ -67,18 +67,18 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
   size_t num_vsync_display_received = 0;
   size_t num_vsync_acknowledgement = 0;
 
-  auto coordinator_channel = CreateChannelPair();
+  auto controller_channel = CreateChannelPair();
 
-  display_manager()->BindDefaultDisplayCoordinator(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator>(
-          std::move(coordinator_channel.client)));
+  display_manager()->BindDefaultDisplayController(
+      fidl::InterfaceHandle<fuchsia::hardware::display::Controller>(
+          std::move(controller_channel.client)));
 
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
-  display::test::MockDisplayCoordinator mock_display_coordinator;
-  mock_display_coordinator.Bind(std::move(coordinator_channel.server));
-  mock_display_coordinator.set_acknowledge_vsync_fn(
+  display::test::MockDisplayController mock_display_controller;
+  mock_display_controller.Bind(std::move(controller_channel.server));
+  mock_display_controller.set_acknowledge_vsync_fn(
       [&cookies_sent, &num_vsync_acknowledgement](uint64_t cookie) {
         ASSERT_TRUE(cookies_sent.find(cookie) != cookies_sent.end());
         ++num_vsync_acknowledgement;
@@ -95,13 +95,13 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
     uint64_t cookie = (vsync_id % kAcknowledgeRate == 0) ? vsync_id : 0;
 
     test_loop().AdvanceTimeByEpsilon();
-    mock_display_coordinator.events().OnVsync(kDisplayId, /* timestamp */ test_loop().Now().get(),
-                                              {.value = 1u}, cookie);
+    mock_display_controller.events().OnVsync(kDisplayId, /* timestamp */ test_loop().Now().get(),
+                                             {.value = 1u}, cookie);
     if (cookie) {
       cookies_sent.insert(cookie);
     }
 
-    // Display coordinator should handle the incoming Vsync message.
+    // Display controller should handle the incoming Vsync message.
     EXPECT_TRUE(RunLoopUntilIdle());
   }
 

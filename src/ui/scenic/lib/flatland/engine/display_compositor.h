@@ -32,32 +32,32 @@ class DisplayCompositorTest;
 using allocation::BufferCollectionUsage;
 
 // The DisplayCompositor is responsible for compositing Flatland render data onto the display(s).
-// It accomplishes this either by direct hardware compositing via the display coordinator
+// It accomplishes this either by direct hardware compositing via the display controller
 // interface, or rendering on the GPU via a custom renderer API. It also handles the
 // registration of sysmem buffer collections and importation of images to both the
-// display coordinator and the renderer via the BufferCollectionImporter interface. The
+// display controller and the renderer via the BufferCollectionImporter interface. The
 // BufferCollectionImporter interface is how Flatland instances communicate with the
 // DisplayCompositor, providing it with the necessary data to render without exposing to Flatland
-// the DisplayCoordinator or other dependencies.
+// the DisplayController or other dependencies.
 //
 // TODO(fxbug.dev/77414): we use a weak ptr to safely post a task that might outlive this
 // DisplayCompositor, see RenderFrame().  This task simulates a vsync callback that we aren't yet
-// receiving because the display coordinator doesn't yet implement the ApplyConfig2() method. It's
+// receiving because the display controller doesn't yet implement the ApplyConfig2() method. It's
 // likely that shared_from_this will become unnecessary at that time.
 class DisplayCompositor final : public allocation::BufferCollectionImporter,
                                 public std::enable_shared_from_this<DisplayCompositor> {
  public:
   // TODO(fxbug.dev/66807): The DisplayCompositor has multiple parts of its code where usage of the
-  // display coordinator is protected by locks, because of the multithreaded environment of
-  // flatland. Ideally, we'd want the DisplayCompositor to have sole ownership of the display
-  // coordinator - meaning that it would require a unique_ptr instead of a shared_ptr. But since
-  // access to the real display coordinator is provided to clients via a shared_ptr, we take in a
-  // shared_ptr as a parameter here. However, this could cause problems with our locking mechanisms,
-  // as other display-coordinator clients could be accessing the same functions and/or state at the
-  // same time as the DisplayCompositor without making use of locks.
+  // display controller is protected by locks, because of the multithreaded environment of flatland.
+  // Ideally, we'd want the DisplayCompositor to have sole ownership of the display controller -
+  // meaning that it would require a unique_ptr instead of a shared_ptr. But since access to the
+  // real display controller is provided to clients via a shared_ptr, we take in a shared_ptr as a
+  // parameter here. However, this could cause problems with our locking mechanisms, as other
+  // display-controller clients could be accessing the same functions and/or state at the same time
+  // as the DisplayCompositor without making use of locks.
   DisplayCompositor(
       async_dispatcher_t* main_dispatcher,
-      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
+      std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
       const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
       bool enable_display_composition);
 
@@ -186,7 +186,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       const allocation::ImageMetadata& metadata) const FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
-  // to reference that layer in the display coordinator API.
+  // to reference that layer in the display controller API.
   uint64_t CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
@@ -201,7 +201,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Does all the setup for applying the render data, which includes images and rectangles,
-  // onto the display via the display coordinator interface. Returns false if this cannot
+  // onto the display via the display controller interface. Returns false if this cannot
   // be completed.
   bool SetRenderDataOnDisplay(const RenderData& data) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -223,19 +223,19 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
                        scenic_impl::DisplayEventId wait_id, scenic_impl::DisplayEventId signal_id)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Checks if the display coordinator is capable of applying the configuration settings that
+  // Checks if the display controller is capable of applying the configuration settings that
   // have been set up until that point.
   bool CheckConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Erases the configuration that has been set on the display coordinator.
+  // Erases the configuration that has been set on the display controller.
   void DiscardConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Applies the config to the display coordinator and returns the ConfigStamp associated with this
-  // config. ConfigStamp is provided by the display coordinator. This should only be called after
+  // Applies the config to the display controller and returns the ConfigStamp associated with this
+  // config. ConfigStamp is provided by the display controller. This should only be called after
   // CheckConfig has verified that the config is okay, since ApplyConfig does not return any errors.
   fuchsia::hardware::display::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  bool ImportBufferCollectionToDisplayCoordinator(
+  bool ImportBufferCollectionToDisplayController(
       allocation::GlobalBufferCollectionId identifier,
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
       const fuchsia::hardware::display::ImageConfig& image_config)
@@ -247,16 +247,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // this.
   //
   // TODO(fxbug.dev/44335): Convert this to a lock-free structure. This is a unique
-  // case since we are talking to a FIDL interface (display_coordinator_) through a lock.
+  // case since we are talking to a FIDL interface (display_controller_) through a lock.
   // We either need lock-free threadsafe FIDL bindings, multiple channels to the display
-  // coordinator, or something else.
+  // controller, or something else.
   mutable std::mutex lock_;
 
-  // Handle to the display coordinator interface.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator_
+  // Handle to the display controller interface.
+  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller_
       FXL_GUARDED_BY(lock_);
 
-  // Maps the flatland global image id to the events used by the display coordinator.
+  // Maps the flatland global image id to the events used by the display controller.
   std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_
       FXL_GUARDED_BY(lock_);
 
