@@ -14,7 +14,7 @@ library_headers("headers") {
     "//zircon/kernel/lib/ktl:headers",
   ]
 
-  public_configs = [ ":limits-stub" ]
+  public_configs = [ ":headers.after" ]
 }
 
 static_library("libc") {
@@ -44,7 +44,7 @@ static_library("libc") {
   }
 }
 
-config("limits-stub") {
+config("headers.after") {
   visibility = [
     ":*",
     "//zircon/kernel:headers",
@@ -61,6 +61,11 @@ config("limits-stub") {
     "-idirafter",
     rebase_path("limits-stub", root_build_dir),
   ]
+
+  # This is propagated by :headers, but that's not used directly by the kernel
+  # toolchain.  It explicitly uses this config, so propagate it separately that
+  # way.
+  configs = [ "//zircon/kernel/lib/ktl:headers.after" ]
 }
 
 source_set("ctype") {

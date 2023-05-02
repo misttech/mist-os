@@ -15,6 +15,20 @@ library_headers("headers") {
   } else {
     public_deps = [ "//sdk/lib/stdcompat" ]
   }
+
+  # ktl headers come before libc++ headers so they can override a few.  But
+  # some libc++ headers use #include_next, so we need another directory that
+  # comes after the libc++ headers where ktl can provide the headers libc++
+  # expects to come from libc.
+  public_configs = [ ":headers.after" ]
+}
+
+config("headers.after") {
+  visibility = [ ":*" ]
+  cflags = [
+    "-idirafter",
+    rebase_path("include-after", root_build_dir),
+  ]
 }
 
 static_library("ktl") {

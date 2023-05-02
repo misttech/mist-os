@@ -1,4 +1,4 @@
-// Copyright 2018 The Fuchsia Authors
+// Copyright 2023 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
@@ -7,20 +7,17 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_WCHAR_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_WCHAR_H_
 
-#include <stddef.h>
+// This file is included by <cstdio> and the like that are used from other
+// libc++ headers that are wrapped by ktl.  This file exists to preempt those
+// inclusions so that libc++'s <wchar.h> wrapper header won't be used, since
+// it's not compatible with the kernel environment.  However, other libc++
+// headers also use `#include_next <wchar.h>` to get to "the system libc"
+// version of the header.  To satisfy those, include-after/wchar.h provides the
+// actual declarations needed from the standard C <wchar.h> API.  So this
+// header just defers to that one, but must exist separately in this directory
+// so that it preempt's libc++'s wrapper.  This can't itself use #include_next
+// because that would reach libc++'s wrapper before the include-after file.
 
-// The kernel doesn't want this file but some libc++ headers we need
-// wind up including it and they need these declarations.
-
-typedef struct {
-} mbstate_t;
-
-typedef unsigned int wint_t;
-#define WEOF (~wint_t{0})
-
-// <string_view> refers to these in code that's never actually used in ktl.
-wchar_t* wmemcpy(wchar_t* __restrict, const wchar_t* __restrict, size_t);
-wchar_t* wmemmove(wchar_t*, const wchar_t*, size_t);
-wchar_t* wmemset(wchar_t*, wchar_t, size_t);
+#include "../include-after/wchar.h"
 
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_WCHAR_H_
