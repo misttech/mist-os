@@ -15,7 +15,7 @@ use lock_order::{
 };
 use net_types::ethernet::Mac;
 use packet::{BufferMut, Serializer};
-use packet_formats::ethernet::{EtherType, EthernetFrame};
+use packet_formats::ethernet::EtherType;
 
 use crate::{
     context::SendFrameContext,
@@ -764,9 +764,9 @@ pub fn send_datagram<C: crate::NonSyncContext, B: BufferMut>(
 ///
 /// This is implemented on top of [`SyncContext`] and abstracts packet socket
 /// delivery from the rest of the system.
-pub(super) trait BufferSocketHandler<D: Device, C>: DeviceIdContext<D> {
+pub(crate) trait BufferSocketHandler<D: Device, C>: DeviceIdContext<D> {
     /// Dispatch a received frame to sockets.
-    fn handle_received_frame(
+    fn handle_frame(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
@@ -775,41 +775,78 @@ pub(super) trait BufferSocketHandler<D: Device, C>: DeviceIdContext<D> {
     );
 }
 
-/// A frame received on a socket.
+/// A frame received on a device.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Frame<B> {
+pub enum ReceivedFrame<B> {
     /// An ethernet frame received on a socket.
     Ethernet {
         /// Where the frame was destined.
-        frame_dst: FrameDestination,
-        /// The source address of the frame.
-        src_mac: Mac,
-        /// The destination address of the frame.
-        dst_mac: Mac,
-        /// The protocol of the frame, or `None` if there was none.
-        protocol: Option<u16>,
-        /// The body of the frame.
-        body: B,
+        destination: FrameDestination,
+        /// The parsed ethernet frame.
+        frame: EthernetFrame<B>,
     },
 }
 
-impl<'a> Frame<&'a [u8]> {
-    pub(super) fn from_ethernet(
-        frame: &'a EthernetFrame<&'a [u8]>,
-        frame_dst: FrameDestination,
-    ) -> Self {
-        Self::Ethernet {
-            frame_dst,
+/// Data from an Ethernet frame.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EthernetFrame<B> {
+    /// The source address of the frame.
+    pub src_mac: Mac,
+    /// The destination address of the frame.
+    pub dst_mac: Mac,
+    /// The protocol of the frame, or `None` if there was none.
+    pub protocol: Option<u16>,
+    /// The body of the frame.
+    pub body: B,
+}
+
+/// A frame sent or received on a device
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Frame<B> {
+    /// A received frame.
+    Received(ReceivedFrame<B>),
+}
+
+impl<B> From<ReceivedFrame<B>> for Frame<B> {
+    fn from(value: ReceivedFrame<B>) -> Self {
+        Self::Received(value)
+    }
+}
+
+impl<'a> From<packet_formats::ethernet::EthernetFrame<&'a [u8]>> for EthernetFrame<&'a [u8]> {
+    fn from(frame: packet_formats::ethernet::EthernetFrame<&'a [u8]>) -> Self {
+        Self {
             src_mac: frame.src_mac(),
             dst_mac: frame.dst_mac(),
             protocol: frame.ethertype().map(Into::into),
-            body: frame.body(),
+            body: frame.into_body(),
+        }
+    }
+}
+
+impl<'a> ReceivedFrame<&'a [u8]> {
+    pub(crate) fn from_ethernet(
+        frame: packet_formats::ethernet::EthernetFrame<&'a [u8]>,
+        destination: FrameDestination,
+    ) -> Self {
+        Self::Ethernet { destination, frame: frame.into() }
+    }
+}
+
+impl<B> Frame<B> {
+    fn protocol(&self) -> Option<u16> {
+        match self {
+            Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.protocol,
         }
     }
 
-    fn protocol(&self) -> Option<u16> {
+    /// Convenience method for consuming the `Frame` and producing the body.
+    pub fn into_body(self) -> B {
         match self {
-            Self::Ethernet { frame_dst: _, src_mac: _, dst_mac: _, protocol, body: _ } => *protocol,
+            Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => {
+                let EthernetFrame { src_mac: _, dst_mac: _, protocol: _, body } = frame;
+                body
+            }
         }
     }
 }
@@ -822,7 +859,7 @@ impl<
 where
     <SC as DeviceIdContext<D>>::DeviceId: Into<<SC as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
-    fn handle_received_frame(
+    fn handle_frame(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
@@ -1089,10 +1126,20 @@ mod tests {
     impl Frame<&[u8]> {
         fn cloned(self) -> Frame<Vec<u8>> {
             match self {
-                Self::Ethernet { frame_dst, src_mac, dst_mac, protocol, body } => {
-                    Frame::Ethernet { frame_dst, src_mac, dst_mac, protocol, body: Vec::from(body) }
+                Self::Received(super::ReceivedFrame::Ethernet { destination, frame }) => {
+                    Frame::Received(super::ReceivedFrame::Ethernet {
+                        destination,
+                        frame: frame.cloned(),
+                    })
                 }
             }
+        }
+    }
+
+    impl EthernetFrame<&[u8]> {
+        fn cloned(self) -> EthernetFrame<Vec<u8>> {
+            let Self { src_mac, dst_mac, protocol, body } = self;
+            EthernetFrame { src_mac, dst_mac, protocol, body: Vec::from(body) }
         }
     }
 
@@ -1612,9 +1659,13 @@ mod tests {
         ];
 
         /// Creates an EthernetFrame with the values specified above.
-        fn frame() -> EthernetFrame<&'static [u8]> {
+        fn frame() -> packet_formats::ethernet::EthernetFrame<&'static [u8]> {
             let mut buffer_view = Self::BUFFER;
-            EthernetFrame::parse(&mut buffer_view, EthernetFrameLengthCheck::NoCheck).unwrap()
+            packet_formats::ethernet::EthernetFrame::parse(
+                &mut buffer_view,
+                EthernetFrameLengthCheck::NoCheck,
+            )
+            .unwrap()
         }
     }
 
@@ -1673,11 +1724,15 @@ mod tests {
         let bound_any_right_protocol = make_bound(AnyDevice, Some(Specific(TestData::PROTO)));
         let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
 
-        BufferSocketHandler::handle_received_frame(
+        BufferSocketHandler::handle_frame(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &MultipleDevicesId::A,
-            Frame::from_ethernet(&TestData::frame(), FrameDestination::Individual { local: true }),
+            super::ReceivedFrame::from_ethernet(
+                TestData::frame(),
+                FrameDestination::Individual { local: true },
+            )
+            .into(),
             TestData::BUFFER,
         );
 
@@ -1697,13 +1752,15 @@ mod tests {
                 frames,
                 &[ReceivedFrame {
                     device: MultipleDevicesId::A,
-                    frame: Frame::Ethernet {
-                        frame_dst: FrameDestination::Individual { local: true },
-                        src_mac: TestData::SRC_MAC,
-                        dst_mac: TestData::DST_MAC,
-                        protocol: Some(TestData::PROTO.into()),
-                        body: Vec::from(TestData::BODY),
-                    },
+                    frame: Frame::Received(super::ReceivedFrame::Ethernet {
+                        destination: FrameDestination::Individual { local: true },
+                        frame: EthernetFrame {
+                            src_mac: TestData::SRC_MAC,
+                            dst_mac: TestData::DST_MAC,
+                            protocol: Some(TestData::PROTO.into()),
+                            body: Vec::from(TestData::BODY),
+                        }
+                    }),
                     raw: TestData::BUFFER.into(),
                 }]
             )
@@ -1741,14 +1798,15 @@ mod tests {
 
         const RECEIVE_COUNT: usize = 10;
         for _ in 0..RECEIVE_COUNT {
-            BufferSocketHandler::handle_received_frame(
+            BufferSocketHandler::handle_frame(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &MultipleDevicesId::A,
-                Frame::from_ethernet(
-                    &TestData::frame(),
+                super::ReceivedFrame::from_ethernet(
+                    TestData::frame(),
                     FrameDestination::Individual { local: true },
-                ),
+                )
+                .into(),
                 TestData::BUFFER,
             );
         }
@@ -1762,13 +1820,15 @@ mod tests {
             vec![
                 ReceivedFrame {
                     device: MultipleDevicesId::A,
-                    frame: Frame::Ethernet {
-                        frame_dst: FrameDestination::Individual { local: true },
-                        src_mac: TestData::SRC_MAC,
-                        dst_mac: TestData::DST_MAC,
-                        protocol: Some(TestData::PROTO.into()),
-                        body: Vec::from(TestData::BODY),
-                    },
+                    frame: Frame::Received(super::ReceivedFrame::Ethernet {
+                        destination: FrameDestination::Individual { local: true },
+                        frame: EthernetFrame {
+                            src_mac: TestData::SRC_MAC,
+                            dst_mac: TestData::DST_MAC,
+                            protocol: Some(TestData::PROTO.into()),
+                            body: Vec::from(TestData::BODY),
+                        }
+                    }),
                     raw: TestData::BUFFER.into()
                 };
                 RECEIVE_COUNT

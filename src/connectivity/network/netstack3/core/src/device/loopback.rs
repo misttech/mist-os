@@ -36,7 +36,10 @@ use crate::{
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
-        socket::{DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets},
+        socket::{
+            BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
+            ReceivedFrame,
+        },
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceLayerTypes, DeviceSendFrameError, FrameDestination,
@@ -462,16 +465,17 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
             };
 
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
+        let ethertype = frame.ethertype();
 
-        crate::device::socket::BufferSocketHandler::<LoopbackDevice, _>::handle_received_frame(
+        BufferSocketHandler::<LoopbackDevice, _>::handle_frame(
             self,
             ctx,
             device_id,
-            crate::device::socket::Frame::from_ethernet(&frame, frame_dest),
+            ReceivedFrame::from_ethernet(frame, frame_dest).into(),
             whole_body,
         );
 
-        let ethertype = match frame.ethertype() {
+        let ethertype = match ethertype {
             Some(e) => e,
             None => {
                 trace!("dropping ethernet frame without ethertype");

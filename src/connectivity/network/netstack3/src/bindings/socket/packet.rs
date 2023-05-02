@@ -17,9 +17,9 @@ use net_types::ethernet::Mac;
 use netstack3_core::{
     device::{
         socket::{
-            DeviceSocketTypes, Frame, NonSyncContext, Protocol, SendDatagramError,
-            SendDatagramParams, SendFrameError, SendFrameParams, SocketId, SocketInfo,
-            TargetDevice,
+            DeviceSocketTypes, EthernetFrame, Frame, NonSyncContext, Protocol, ReceivedFrame,
+            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SocketId,
+            SocketInfo, TargetDevice,
         },
         DeviceId, FrameDestination, WeakDeviceId,
     },
@@ -36,10 +36,10 @@ use crate::bindings::{
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
     },
     util::{
-        ConversionContext as _, DeviceNotFoundError, IntoCore as _, IntoFidl as _,
-        TryFromFidlWithContext, TryIntoCoreWithContext as _, TryIntoFidlWithContext,
+        DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidlWithContext,
+        TryIntoCoreWithContext as _, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx,
+    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
 };
 
 /// State held in the non-sync context for a single socket.
@@ -64,27 +64,13 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
     ) {
         let SocketState { queue, kind } = state;
 
-        let Frame::Ethernet { frame_dst, src_mac, dst_mac, protocol, body } = frame;
-        let packet_type = match frame_dst {
-            FrameDestination::Broadcast => fppacket::PacketType::Broadcast,
-            FrameDestination::Multicast => fppacket::PacketType::Multicast,
-            FrameDestination::Individual { local } => local
-                .then_some(fppacket::PacketType::Host)
-                .unwrap_or(fppacket::PacketType::OtherHost),
-        };
+        let data = MessageData::new(&frame, device);
+
         let message = match kind {
-            fppacket::Kind::Network => body,
+            fppacket::Kind::Network => frame.into_body(),
             fppacket::Kind::Link => raw,
         };
 
-        let data = MessageData {
-            dst_mac,
-            src_mac,
-            packet_type,
-            protocol: protocol.unwrap_or(0),
-            interface_type: iface_type(device),
-            interface_id: self.get_binding_id(device.clone()).get(),
-        };
         queue.lock().receive(IntoMessage(data, message));
     }
 }
@@ -150,12 +136,46 @@ struct Message {
 
 #[derive(Debug)]
 struct MessageData {
-    src_mac: Mac,
-    dst_mac: Mac,
-    protocol: u16,
+    info: MessageDataInfo,
     interface_type: fppacket::HardwareType,
     interface_id: u64,
     packet_type: fppacket::PacketType,
+}
+
+#[derive(Debug)]
+enum MessageDataInfo {
+    Ethernet { src_mac: Mac, protocol: u16 },
+}
+
+impl MessageData {
+    fn new(frame: &Frame<&[u8]>, device: &DeviceId<BindingsNonSyncCtxImpl>) -> Self {
+        let (packet_type, info) = match frame {
+            Frame::Received(ReceivedFrame::Ethernet { destination, frame }) => {
+                let packet_type = match destination {
+                    FrameDestination::Broadcast => fppacket::PacketType::Broadcast,
+                    FrameDestination::Multicast => fppacket::PacketType::Multicast,
+                    FrameDestination::Individual { local } => local
+                        .then_some(fppacket::PacketType::Host)
+                        .unwrap_or(fppacket::PacketType::OtherHost),
+                };
+                (packet_type, MessageDataInfo::new_ethernet(frame))
+            }
+        };
+
+        Self {
+            packet_type,
+            info,
+            interface_id: device.external_state().static_common_info().binding_id.get(),
+            interface_type: iface_type(device),
+        }
+    }
+}
+
+impl MessageDataInfo {
+    fn new_ethernet(frame: &EthernetFrame<&[u8]>) -> Self {
+        let EthernetFrame { src_mac, dst_mac: _, protocol, body: _ } = *frame;
+        Self::Ethernet { src_mac, protocol: protocol.unwrap_or(0) }
+    }
 }
 
 impl BodyLen for Message {
@@ -595,29 +615,25 @@ impl RecvMsgParams {
         let data_len = data_len.try_into().unwrap_or(usize::MAX);
 
         let Message { data, mut body } = response;
-        let MessageData { src_mac, dst_mac, packet_type, interface_id, interface_type, protocol } =
-            data;
 
         let truncated = body.len().saturating_sub(data_len);
         body.truncate(data_len);
 
-        let packet_info = if want_packet_info {
-            let info = fppacket::RecvPacketInfo {
-                packet_type,
-                interface_type,
-                packet_info: fppacket::PacketInfo {
+        let packet_info = want_packet_info.then(|| {
+            let MessageData { info, interface_type, interface_id, packet_type } = data;
+            let packet_info = match info {
+                MessageDataInfo::Ethernet { src_mac, protocol } => fppacket::PacketInfo {
                     protocol,
                     interface_id,
                     addr: fppacket::HardwareAddress::Eui48(src_mac.into_fidl()),
                 },
             };
-            Some(Box::new(info))
-        } else {
-            None
-        };
+
+            Box::new(fppacket::RecvPacketInfo { packet_type, interface_type, packet_info })
+        });
 
         // TODO(https://fxbug.dev/106735): Return control data and flags.
-        let _ = (want_control, flags, dst_mac);
+        let _ = (want_control, flags);
         let control = fppacket::RecvControlData::default();
 
         (packet_info, body, control, truncated.try_into().unwrap_or(u32::MAX))

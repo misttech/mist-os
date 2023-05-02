@@ -50,7 +50,10 @@ use crate::{
             },
             DequeueState, TransmitQueueFrameError,
         },
-        socket::{BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets},
+        socket::{
+            BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
+            ReceivedFrame,
+        },
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
@@ -803,14 +806,16 @@ pub(super) fn receive_frame<
         Some(frame_dest) => frame_dest,
     };
 
-    sync_ctx.handle_received_frame(
+    let ethertype = ethernet.ethertype();
+
+    sync_ctx.handle_frame(
         ctx,
         device_id,
-        crate::device::socket::Frame::from_ethernet(&ethernet, frame_dst),
+        ReceivedFrame::from_ethernet(ethernet, frame_dst).into(),
         whole_frame,
     );
 
-    match ethernet.ethertype() {
+    match ethertype {
         Some(EtherType::Arp) => {
             let types = if let Ok(types) = peek_arp_types(buffer.as_ref()) {
                 types

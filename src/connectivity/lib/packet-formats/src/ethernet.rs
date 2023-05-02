@@ -163,6 +163,14 @@ impl<B: ByteSlice> EthernetFrame<B> {
         &self.body
     }
 
+    /// Consumes the frame and returns the body.
+    pub fn into_body(self) -> B
+    where
+        B: Copy,
+    {
+        self.body
+    }
+
     /// The source MAC address.
     pub fn src_mac(&self) -> Mac {
         self.hdr_prefix.src_mac
