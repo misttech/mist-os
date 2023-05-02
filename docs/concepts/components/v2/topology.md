@@ -28,8 +28,6 @@ While components are identified by a [URL][doc-component-urls], component
 instances are identified by a [moniker](#monikers). Different instances of the
 same component thus share the same URL but have different monikers.
 
-<br>![Components and component instances](images/topology_instances.png)<br>
-
 ## Component instance tree {#composition}
 
 The _component instance tree_ expresses how components are assembled together to
