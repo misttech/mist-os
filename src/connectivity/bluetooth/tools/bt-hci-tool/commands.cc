@@ -187,9 +187,12 @@ void DisplayAdvertisingReport(const bt::hci_spec::LEAdvertisingReportData& data,
   }
 }
 
-void DisplayInquiryResult(const bt::hci_spec::InquiryResult& result) {
-  std::cout << "  Result: " << result.bd_addr.ToString() << " ("
-            << result.class_of_device.ToString() << ")" << std::endl;
+void DisplayInquiryResult(const pw::bluetooth::emboss::InquiryResultView& view) {
+  std::cout << "  Result: " << bt::DeviceAddressBytes{view.bd_addr()}.ToString() << " ("
+            << bt::DeviceClass{static_cast<unsigned char>(
+                                   view.class_of_device().BackingStorage().ReadUInt())}
+                   .ToString()
+            << ")\n";
 }
 
 bool HandleVersionInfo(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
@@ -736,17 +739,18 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
   };
 
   // Event handler to log when we receive advertising reports
-  auto inquiry_result_cb = [filter](const ::bt::hci::EventPacket& event) {
+  auto inquiry_result_cb = [filter](const ::bt::hci::EmbossEventPacket& event) {
     BT_ASSERT(event.event_code() == ::bt::hci_spec::kInquiryResultEventCode);
 
-    const auto& result = event.params<::bt::hci_spec::InquiryResultEventParams>();
+    auto view = event.view<pw::bluetooth::emboss::InquiryResultEventView>();
 
-    for (int i = 0; i < result.num_responses; i++) {
+    for (int i = 0; i < view.num_responses().Read(); i++) {
       if (!filter.empty() &&
-          !filter.compare(0, filter.length(), result.responses[i].bd_addr.ToString())) {
+          !filter.compare(0, filter.length(),
+                          bt::DeviceAddressBytes{view.responses()[i].bd_addr()}.ToString())) {
         continue;
       }
-      DisplayInquiryResult(result.responses[i]);
+      DisplayInquiryResult(view.responses()[i]);
     }
     return ::bt::hci::CommandChannel::EventCallbackResult::kContinue;
   };
