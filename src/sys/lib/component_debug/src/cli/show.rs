@@ -40,6 +40,7 @@ pub struct ShowCmdResolvedInfo {
     pub exposed_capabilities: Vec<String>,
     pub config: Option<Vec<ConfigField>>,
     pub started: Option<ShowCmdExecutionInfo>,
+    pub collections: Vec<String>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -135,6 +136,9 @@ async fn get_instance_by_query(
                             None => None,
                         };
 
+                        let collections =
+                            manifest.collections.into_iter().map(|c| c.name).collect();
+
                         Some(ShowCmdResolvedInfo {
                             resolved_url,
                             incoming_capabilities,
@@ -142,6 +146,7 @@ async fn get_instance_by_query(
                             merkle_root,
                             config: structured_config,
                             started: execution_info,
+                            collections,
                         })
                     }
                     None => None,
@@ -172,6 +177,7 @@ async fn get_instance_by_query(
                         exposed_capabilities: vec![],
                         config: None,
                         merkle_root: Some(merkle_root),
+                        collections: vec![],
                         started: Some(ShowCmdExecutionInfo {
                             runtime,
                             outgoing_capabilities,
@@ -244,6 +250,10 @@ fn add_resolved_info_to_table(table: &mut Table, resolved: Option<ShowCmdResolve
 
                 table.add_row(row!(r->"Configuration:", config_table));
             }
+        }
+
+        if !resolved.collections.is_empty() {
+            table.add_row(row!(r->"Collections:", resolved.collections.join("\n")));
         }
 
         add_execution_info_to_table(table, resolved.started)
@@ -410,6 +420,11 @@ mod tests {
                         target_name: Some("fuchsia.bar.baz".to_string()),
                         ..Default::default()
                     })]),
+                    collections: Some(vec![fdecl::Collection {
+                        name: Some("my-collection".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    }]),
                     ..Default::default()
                 },
             )]),
@@ -461,6 +476,8 @@ mod tests {
             config,
             vec![ConfigField { key: "foo".to_string(), value: "Bool(false)".to_string() }]
         );
+
+        assert_eq!(resolved.collections, vec!["my-collection"]);
 
         let started = resolved.started.unwrap();
         assert_eq!(started.outgoing_capabilities, vec!["diagnostics".to_string()]);
