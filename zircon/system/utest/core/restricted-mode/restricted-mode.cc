@@ -139,8 +139,8 @@ class ArchRegisterState {
     EXPECT_EQ(0x0303030303030304, fs_val_);
     EXPECT_EQ(0x0c0c0c0c0c0c0c0d, gs_val_);
   }
-  uintptr_t ip() { return state_.ip; }
-  void set_ip(uintptr_t ip) { state_.ip = ip; }
+  uintptr_t pc() { return state_.ip; }
+  void set_pc(uintptr_t pc) { state_.ip = pc; }
   zx_restricted_state_t& restricted_state() { return state_; }
 
  private:
@@ -379,8 +379,8 @@ class ArchRegisterState {
     // Check that thread local storage was updated correctly in restricted mode.
     EXPECT_EQ(0x0202020202020203, tls_val_);
   }
-  uintptr_t ip() { return state_.pc; }
-  void set_ip(uintptr_t ip) { state_.pc = ip; }
+  uintptr_t pc() { return state_.pc; }
+  void set_pc(uintptr_t pc) { state_.pc = pc; }
   zx_restricted_state_t& restricted_state() { return state_; }
 
  private:
@@ -645,7 +645,7 @@ TEST(RestrictedMode, Basic) {
 
   // Set the PC to the syscall_bounce routine, as the PC is where zx_restricted_enter
   // will jump to.
-  state.set_ip(reinterpret_cast<uint64_t>(syscall_bounce));
+  state.set_pc(reinterpret_cast<uint64_t>(syscall_bounce));
 
   // Write the state to the state VMO.
   ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
@@ -659,7 +659,7 @@ TEST(RestrictedMode, Basic) {
   ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ((uintptr_t)&syscall_bounce_post_syscall, state.ip());
+  EXPECT_EQ((uintptr_t)&syscall_bounce_post_syscall, state.pc());
   state.VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
 }
 
@@ -711,7 +711,7 @@ TEST(RestrictedMode, Bench) {
     // Set the state.
     ArchRegisterState state;
     state.InitializeRegisters();
-    state.set_ip(reinterpret_cast<uintptr_t>(syscall_bounce));
+    state.set_pc(reinterpret_cast<uintptr_t>(syscall_bounce));
     ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
@@ -760,7 +760,7 @@ TEST(RestrictedMode, Bench) {
                   : std::nullopt);
         }
       });
-      state.set_ip(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
+      state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
       ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
       t = zx::ticks::now();
       // Iteration happens in the handler thread; we only have a single restricted_enter
@@ -778,7 +778,7 @@ TEST(RestrictedMode, Bench) {
     if constexpr (ARCH_HAS_IN_THREAD_EXCEPTIONS) {
       constexpr int iter = 1000000;
       zx_restricted_reason_t reason_code;
-      state.set_ip(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
+      state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
       ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
       auto t = zx::ticks::now();
       for (int i = 0; i < iter; i++) {
@@ -801,7 +801,7 @@ TEST(RestrictedMode, ExceptionChannel) {
   // Configure the state for x86.
   ArchRegisterState state;
   state.InitializeRegisters();
-  state.set_ip(reinterpret_cast<uint64_t>(exception_bounce));
+  state.set_pc(reinterpret_cast<uint64_t>(exception_bounce));
 
   // Spawn a thread to receive exceptions.
   zx::channel exception_channel;
@@ -840,7 +840,7 @@ TEST(RestrictedMode, InThreadException) {
   // Configure initial register state.
   ArchRegisterState state;
   state.InitializeRegisters();
-  state.set_ip(reinterpret_cast<uint64_t>(exception_bounce));
+  state.set_pc(reinterpret_cast<uint64_t>(exception_bounce));
 
   // Enter restricted mode. The restricted code will twiddle some registers
   // and generate an exception.
@@ -883,29 +883,29 @@ TEST(RestrictedMode, EnterBadStateStruct) {
               zx_restricted_enter(kRestrictedEnterOptions, (uintptr_t)&vectab, 0));
   };
 
-  state.set_ip(-1);  // ip is outside of user space
+  state.set_pc(-1);  // pc is outside of user space
   set_state_and_enter();
 
 #ifdef __x86_64__
   state.InitializeRegisters();
-  state.set_ip((uint64_t)syscall_bounce);
+  state.set_pc((uint64_t)syscall_bounce);
   state.restricted_state().flags = (1UL << 31);  // set an invalid flag
   set_state_and_enter();
 
   state.InitializeRegisters();
-  state.set_ip((uint64_t)syscall_bounce);
+  state.set_pc((uint64_t)syscall_bounce);
   state.restricted_state().fs_base = (1UL << 63);  // invalid fs (non canonical)
   set_state_and_enter();
 
   state.InitializeRegisters();
-  state.set_ip((uint64_t)syscall_bounce);
+  state.set_pc((uint64_t)syscall_bounce);
   state.restricted_state().gs_base = (1UL << 63);  // invalid gs (non canonical)
   set_state_and_enter();
 #endif
 
 #ifdef __aarch64__
   state.InitializeRegisters();
-  state.set_ip((uint64_t)syscall_bounce);
+  state.set_pc((uint64_t)syscall_bounce);
   state.restricted_state().cpsr = 0x1;  // CPSR contains non-user settable flags.
   set_state_and_enter();
 #endif
