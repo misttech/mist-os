@@ -6,16 +6,13 @@ use {
     crate::{
         ap::{frame_writer, BufferedFrame, Context, TimedEvent},
         buffer::{InBuf, OutBuf},
-        ddk_converter,
         device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
     },
-    banjo_fuchsia_wlan_common as banjo_common,
-    banjo_fuchsia_wlan_ieee80211::*,
-    banjo_fuchsia_wlan_softmac::WlanTxInfoFlags,
+    banjo_fuchsia_wlan_softmac as banjo_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{MacAddr, Ssid},
     std::collections::VecDeque,
     tracing::warn,
@@ -435,46 +432,34 @@ impl RemoteClient {
             },
         )?;
 
-        let mut rates_arr = [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize];
-        rates_arr[..rates.len()].copy_from_slice(rates);
-
         if let State::Associated { .. } = self.state.as_ref() {
             // Reset the client's activeness as soon as it is associated, kicking off the BSS max
             // idle timer.
             self.reset_bss_max_idle_timeout(ctx);
             ctx.device
-                .notify_association_complete(banjo_fuchsia_wlan_softmac::WlanAssociationConfig {
-                    bssid: self.addr,
-                    aid: aid,
-                    listen_interval: 0, // This field is not used for AP.
-                    channel: banjo_common::WlanChannel {
+                .notify_association_complete(fidl_softmac::WlanAssociationConfig {
+                    bssid: Some(self.addr),
+                    aid: Some(aid),
+                    listen_interval: None, // This field is not used for AP.
+                    channel: Some(fidl_common::WlanChannel {
                         primary: channel,
                         // TODO(fxbug.dev/40917): Correctly support this.
-                        cbw: banjo_common::ChannelBandwidth::CBW20,
+                        cbw: fidl_common::ChannelBandwidth::Cbw20,
                         secondary80: 0,
-                    },
+                    }),
 
-                    qos: false,
-                    wmm_params: ddk_converter::blank_wmm_params(),
+                    qos: Some(false),
+                    wmm_params: None,
 
-                    rates_cnt: rates.len() as u16,
-                    rates: rates_arr,
-                    capability_info: capabilities.raw(),
+                    rates: Some(rates.to_vec()),
+                    capability_info: Some(capabilities.raw()),
 
                     // TODO(fxbug.dev/40917): Correctly support all of this.
-                    ht_cap_is_valid: false,
-                    // This is not read by the driver.
-                    ht_cap: HtCapabilities { bytes: Default::default() },
-                    ht_op_is_valid: false,
-                    // Safe: This is not read by the driver.
-                    ht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanHtOp>() },
-
-                    vht_cap_is_valid: false,
-                    // This is not read by the driver.
-                    vht_cap: VhtCapabilities { bytes: Default::default() },
-                    vht_op_is_valid: false,
-                    // Safe: This is not read by the driver.
-                    vht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanVhtOp>() },
+                    ht_cap: None,
+                    ht_op: None,
+                    vht_cap: None,
+                    vht_op: None,
+                    ..Default::default()
                 })
                 .map_err(|s| Error::Status(format!("failed to configure association"), s))?;
         }
@@ -581,8 +566,13 @@ impl RemoteClient {
         // SME on success. Our SME employs a timeout for EAPoL negotiation, so MLME-EAPOL.confirm is
         // redundant.
         let (in_buf, bytes_written) = ctx.make_eapol_frame(self.addr, src_addr, false, data)?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, WlanTxInfoFlags::FAVOR_RELIABILITY.0)
-            .map_err(|s| Error::Status(format!("error sending eapol frame"), s))
+        self.send_wlan_frame(
+            ctx,
+            in_buf,
+            bytes_written,
+            banjo_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
+        )
+        .map_err(|s| Error::Status(format!("error sending eapol frame"), s))
     }
 
     // WLAN frame handlers.

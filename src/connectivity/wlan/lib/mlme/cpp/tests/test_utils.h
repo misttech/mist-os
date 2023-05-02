@@ -33,47 +33,6 @@ struct RangeWrapper {
   }
 };
 
-static inline std::unique_ptr<Packet> MakeWlanPacket(std::initializer_list<uint8_t> bytes) {
-  auto packet = GetWlanPacket(bytes.size());
-  ZX_ASSERT(packet != nullptr);
-
-  std::copy(bytes.begin(), bytes.end(), packet->data());
-  packet->set_len(bytes.size());
-  return packet;
-}
-
-static inline std::unique_ptr<Packet> MakeWlanPacket(std::vector<uint8_t> bytes) {
-  auto packet = GetWlanPacket(bytes.size());
-  ZX_ASSERT(packet != nullptr);
-
-  std::copy(bytes.begin(), bytes.end(), packet->data());
-  packet->set_len(bytes.size());
-  return packet;
-}
-
-static inline std::unique_ptr<Packet> MakeEthPacket(const common::MacAddr& dest_addr,
-                                                    const common::MacAddr& src_addr,
-                                                    std::initializer_list<uint8_t> payload) {
-  auto packet = GetEthPacket(sizeof(EthernetII) + payload.size());
-  ZX_ASSERT(packet != nullptr);
-
-  BufferWriter w(*packet);
-  auto eth = w.Write<EthernetII>();
-  eth->dest = dest_addr;
-  eth->src = src_addr;
-  eth->ether_type_be = 0;
-
-  for (auto byte : payload) {
-    w.WriteByte(byte);
-  }
-
-  packet->set_len(w.WrittenBytes());
-  return packet;
-}
-
-wlan_association_config_t FakeDdkAssocCtx();
-wlan_softmac_band_capability_t FakeBandCapability(wlan_band_t band);
-
 }  // namespace test_utils
 }  // namespace wlan
 

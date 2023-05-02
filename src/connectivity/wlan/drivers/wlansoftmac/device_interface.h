@@ -5,8 +5,8 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_INTERFACE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_INTERFACE_H_
 
+#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/minstrel/cpp/fidl.h>
 #include <zircon/types.h>
 
@@ -68,7 +68,9 @@ class DeviceInterface {
   virtual zx_status_t StartActiveScan(
       const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;
-  virtual zx_status_t NotifyAssociationComplete(wlan_association_config_t* assoc_cfg) = 0;
+  virtual fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::NotifyAssociationComplete>
+  NotifyAssociationComplete(
+      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeNotifyAssociationCompleteRequest* request) = 0;
   virtual zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;

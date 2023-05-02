@@ -4,13 +4,9 @@
 
 use {
     anyhow::{format_err, Error},
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    ieee80211::Bssid,
-    wlan_common::{capabilities::StaCapabilities, ie, mac::Aid},
-    zerocopy::AsBytes,
 };
 
 #[macro_export]
@@ -70,59 +66,17 @@ pub fn ddk_channel_from_fidl(
     Ok(banjo_common::WlanChannel { primary: fc.primary, cbw, secondary80: fc.secondary80 })
 }
 
-pub fn build_ddk_assoc_cfg(
-    bssid: Bssid,
-    aid: Aid,
-    channel: banjo_common::WlanChannel,
-    negotiated_capabilities: StaCapabilities,
-    ht_op: Option<[u8; fidl_ieee80211::HT_OP_LEN as usize]>,
-    vht_op: Option<[u8; fidl_ieee80211::VHT_OP_LEN as usize]>,
-) -> banjo_wlan_softmac::WlanAssociationConfig {
-    let mut rates = [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize];
-    rates[..negotiated_capabilities.rates.len()]
-        .clone_from_slice(negotiated_capabilities.rates.as_bytes());
-    let ht_cap_is_valid = negotiated_capabilities.ht_cap.is_some();
-    let vht_cap_is_valid = negotiated_capabilities.vht_cap.is_some();
-    let mut ht_cap =
-        banjo_ieee80211::HtCapabilities { bytes: [0u8; fidl_ieee80211::HT_CAP_LEN as usize] };
-    let mut vht_cap =
-        banjo_ieee80211::VhtCapabilities { bytes: [0u8; fidl_ieee80211::VHT_CAP_LEN as usize] };
-    negotiated_capabilities
-        .ht_cap
-        .map(|negotiated_ht_cap| ht_cap.bytes.copy_from_slice(&negotiated_ht_cap.as_bytes()[..]));
-    negotiated_capabilities.vht_cap.map(|negotiated_vht_cap| {
-        vht_cap.bytes.copy_from_slice(&negotiated_vht_cap.as_bytes()[..])
-    });
-    let ht_op_bytes = ht_op.unwrap_or([0; fidl_ieee80211::HT_OP_LEN as usize]);
-    let vht_op_bytes = vht_op.unwrap_or([0; fidl_ieee80211::VHT_OP_LEN as usize]);
-    banjo_wlan_softmac::WlanAssociationConfig {
-        bssid: bssid.0,
-        aid,
-        // In the association request we sent out earlier, listen_interval is always set to 0,
-        // indicating the client never enters power save mode.
-        // TODO(fxbug.dev/42217): ath10k disregard this value and hard code it to 1.
-        // It is working now but we may need to revisit.
-        listen_interval: 0,
-        channel,
-        // TODO(fxbug.dev/29325): QoS works with Aruba/Ubiquiti for BlockAck session but it may need to be
-        // dynamically determined for each outgoing data frame.
-        // TODO(fxbug.dev/43938): Derive QoS flag and WMM parameters from device info
-        qos: ht_cap_is_valid,
-        wmm_params: blank_wmm_params(),
-
-        rates_cnt: negotiated_capabilities.rates.len() as u16, // will not overflow as MAX_RATES_LEN is u8
-        rates,
-        capability_info: negotiated_capabilities.capability_info.raw(),
-        // All the unwrap are safe because the size of the byte array follow wire format.
-        ht_cap_is_valid,
-        ht_cap,
-        ht_op_is_valid: ht_op.is_some(),
-        ht_op: { *ie::parse_ht_operation(&ht_op_bytes[..]).unwrap() }.into(),
-        vht_cap_is_valid,
-        vht_cap,
-        vht_op_is_valid: vht_op.is_some(),
-        vht_op: { *ie::parse_vht_operation(&vht_op_bytes[..]).unwrap() }.into(),
-    }
+pub fn fidl_channel_from_ddk(bc: banjo_common::WlanChannel) -> fidl_common::WlanChannel {
+    let cbw = match bc.cbw {
+        banjo_common::ChannelBandwidth::CBW20 => fidl_common::ChannelBandwidth::Cbw20,
+        banjo_common::ChannelBandwidth::CBW40 => fidl_common::ChannelBandwidth::Cbw40,
+        banjo_common::ChannelBandwidth::CBW40BELOW => fidl_common::ChannelBandwidth::Cbw40Below,
+        banjo_common::ChannelBandwidth::CBW80 => fidl_common::ChannelBandwidth::Cbw80,
+        banjo_common::ChannelBandwidth::CBW160 => fidl_common::ChannelBandwidth::Cbw160,
+        banjo_common::ChannelBandwidth::CBW80P80 => fidl_common::ChannelBandwidth::Cbw80P80,
+        _ => unreachable!(),
+    };
+    fidl_common::WlanChannel { primary: bc.primary, cbw, secondary80: bc.secondary80 }
 }
 
 pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
@@ -132,26 +86,6 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     {
         true => Some(rx_info.rssi_dbm),
         false => None,
-    }
-}
-
-pub fn blank_wmm_params() -> banjo_wlan_associnfo::WlanWmmParameters {
-    banjo_wlan_associnfo::WlanWmmParameters {
-        apsd: false,
-        ac_be_params: blank_wmm_ac_params(),
-        ac_bk_params: blank_wmm_ac_params(),
-        ac_vi_params: blank_wmm_ac_params(),
-        ac_vo_params: blank_wmm_ac_params(),
-    }
-}
-
-fn blank_wmm_ac_params() -> banjo_wlan_associnfo::WlanWmmAcParams {
-    banjo_wlan_associnfo::WlanWmmAcParams {
-        ecw_min: 0,
-        ecw_max: 0,
-        aifsn: 0,
-        txop_limit: 0,
-        acm: false,
     }
 }
 
@@ -287,10 +221,6 @@ mod tests {
             fake_discovery_support, fake_mac_sublayer_support, fake_security_support,
             fake_spectrum_management_support, QueryResponse,
         },
-        banjo_fuchsia_wlan_ieee80211 as banjo_80211,
-        std::convert::TryInto,
-        wlan_common::{ie, mac},
-        zerocopy::AsBytes,
     };
 
     #[test]
@@ -329,63 +259,6 @@ mod tests {
         };
         assert_eq!(&mac_header, banjo_buffer_to_slice!(banjo, mac_header));
         assert_eq!(&ies, banjo_buffer_to_slice!(banjo, ies));
-    }
-
-    #[test]
-    fn assoc_cfg_construction_successful() {
-        let ddk = build_ddk_assoc_cfg(
-            Bssid([1, 2, 3, 4, 5, 6]),
-            42,
-            banjo_common::WlanChannel {
-                primary: 149,
-                cbw: banjo_common::ChannelBandwidth::CBW40,
-                secondary80: 42,
-            },
-            StaCapabilities {
-                capability_info: mac::CapabilityInfo(0x1234),
-                rates: vec![111, 112, 113, 114, 115, 116, 117, 118, 119, 120]
-                    .into_iter()
-                    .map(ie::SupportedRate)
-                    .collect(),
-                ht_cap: Some(ie::fake_ht_capabilities()),
-                vht_cap: Some(ie::fake_vht_capabilities()),
-            },
-            Some(ie::fake_ht_operation().as_bytes().try_into().unwrap()),
-            Some(ie::fake_vht_operation().as_bytes().try_into().unwrap()),
-        );
-        assert_eq!([1, 2, 3, 4, 5, 6], ddk.bssid);
-        assert_eq!(42, ddk.aid);
-        assert_eq!(0, ddk.listen_interval);
-        assert_eq!(
-            banjo_common::WlanChannel {
-                primary: 149,
-                cbw: banjo_common::ChannelBandwidth::CBW40,
-                secondary80: 42
-            },
-            ddk.channel
-        );
-        assert_eq!(true, ddk.qos);
-
-        assert_eq!(10, ddk.rates_cnt);
-        assert_eq!([111, 112, 113, 114, 115, 116, 117, 118, 119, 120], ddk.rates[0..10]);
-        assert_eq!(&[0; 253][..], &ddk.rates[10..]);
-
-        assert_eq!(0x1234, ddk.capability_info);
-
-        assert_eq!(true, ddk.ht_cap_is_valid);
-        assert_eq!(&ie::fake_ht_capabilities().as_bytes()[..], &ddk.ht_cap.bytes[..]);
-
-        assert_eq!(true, ddk.ht_op_is_valid);
-        let expected_ht_op: banjo_wlan_softmac::WlanHtOp = ie::fake_ht_operation().into();
-        assert_eq!(expected_ht_op, ddk.ht_op);
-
-        assert_eq!(true, ddk.vht_cap_is_valid);
-        let expected_vht_cap: banjo_80211::VhtCapabilities = ie::fake_vht_capabilities().into();
-        assert_eq!(expected_vht_cap, ddk.vht_cap);
-
-        assert_eq!(true, ddk.vht_op_is_valid);
-        let expected_vht_op: banjo_wlan_softmac::WlanVhtOp = ie::fake_vht_operation().into();
-        assert_eq!(expected_vht_op, ddk.vht_op);
     }
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {

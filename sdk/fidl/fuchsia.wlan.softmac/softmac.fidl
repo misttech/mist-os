@@ -342,31 +342,22 @@ type WlanAssociationConfig = table {
     /// WFA WMM v1.2, 2.2.2
     6: wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
 
-    /// Coincatenation of SupportedRates and ExtendedSupportedRates
+    /// Concatenation of SupportedRates and ExtendedSupportedRates
     /// IEEE Std 802.11-2016, 9.4.2.3 & 9.4.2.13
-    7: rates_cnt uint16;
-    8: rates array<uint8, WLAN_MAC_MAX_RATES>;
+    7: rates vector<uint8>:WLAN_MAC_MAX_RATES;
 
     /// IEEE Std 802.11-2016, 9.4.1.4
-    9: capability_info uint16;
+    8: capability_info uint16;
 
     /// IEEE Std 802.11-2016, 9.4.2.56, 57
     /// Rx MCS Bitmask in Supported MCS Set field represents the set of MCS
     /// the peer can receive at from this device, considering this device's Tx capability.
-   10: ht_cap_is_valid bool;
-    /// This field is optional.
-   11: ht_cap ieee80211.HtCapabilities;
-   12: ht_op_is_valid bool;
-    /// This field is optional.
-   13: ht_op WlanHtOp;
+    9: ht_cap ieee80211.HtCapabilities;
+   10: ht_op WlanHtOp;
 
     /// IEEE Std 802.11-2016, 9.4.2.158, 159
-   14: vht_cap_is_valid bool;
-    /// This field is optional.
-   15: vht_cap ieee80211.VhtCapabilities;
-   16: vht_op_is_valid bool;
-    /// This field is optional.
-   17: vht_op WlanVhtOp;
+   11: vht_cap ieee80211.VhtCapabilities;
+   12: vht_op WlanVhtOp;
 };
 
 /// The wlansoftmac C++ driver establishes a FIDL channel serving the WlanSoftmacBridge
@@ -385,11 +376,22 @@ type WlanAssociationConfig = table {
 /// TODO(fxbug.dev/124830): This protocol allows wlansoftmac to eventually delete the
 /// use of Banjo from wlansoftmac. This TODO comment will exist until the migration off
 /// Banjo is complete.
-protocol WlanSoftmacBridge {};
+protocol WlanSoftmacBridge {
+    /// Notify the device of a successful association and configure additional
+    /// parameters necessary to participate in that association.
+    ///
+    /// Common errors include:
+    ///   ZX_ERR_BAD_STATE: The device was not previously informed of this BSS
+    ///       via WlanSoftmac.JoinBss().
+    NotifyAssociationComplete(struct {
+        assoc_cfg WlanAssociationConfig;
+    }) -> () error zx.Status;
+};
 
 @discoverable
 @transport("Driver")
 protocol WlanSoftmac {
+    compose WlanSoftmacBridge;
 
     // TODO(fxbug.dev/87050): the need to nest query response within a struct {} is no longer
     // necessary. However if the response is a struct, then ReplySuccess() expects each field to be
@@ -514,16 +516,6 @@ protocol WlanSoftmac {
     ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
     InstallKey(WlanKeyConfiguration) -> () error zx.Status;
-
-    /// Indicate the device of a successful association and configure additional
-    /// parameters necessary to participate in that association.
-    ///
-    /// Common errors include:
-    ///   ZX_ERR_BAD_STATE: The device was not previously informed of this BSS
-    ///       via WlanSoftmac.JoinBss().
-    NotifyAssociationComplete(struct {
-        assoc_cfg WlanAssociationConfig;
-    }) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
     ClearAssociation(struct {

@@ -7,8 +7,8 @@ use {
         buffer_reader::BufferReader, mac::ReasonCode, organization::Oui,
         unaligned_view::UnalignedView,
     },
-    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
     ieee80211::MacAddr,
     static_assertions::const_assert_eq,
     std::mem::size_of,
@@ -204,6 +204,44 @@ impl From<HtCapabilities> for banjo_ieee80211::HtCapabilities {
         let mut banjo_cap = Self { bytes: Default::default() };
         banjo_cap.bytes.copy_from_slice(&cap.as_bytes()[..]);
         banjo_cap
+    }
+}
+
+impl From<fidl_ieee80211::HtCapabilities> for HtCapabilities {
+    fn from(cap: fidl_ieee80211::HtCapabilities) -> Self {
+        // Safe to unwrap, since cap.bytes is fixed length.
+        const_assert_eq!(
+            std::mem::size_of::<HtCapabilities>(),
+            fidl_ieee80211::HT_CAP_LEN as usize,
+        );
+        HtCapabilities::read_from(&cap.bytes[..]).unwrap()
+    }
+}
+
+impl From<HtCapabilities> for fidl_ieee80211::HtCapabilities {
+    fn from(cap: HtCapabilities) -> Self {
+        let mut fidl_cap = Self { bytes: Default::default() };
+        fidl_cap.bytes.copy_from_slice(&cap.as_bytes()[..]);
+        fidl_cap
+    }
+}
+
+impl From<fidl_ieee80211::VhtCapabilities> for VhtCapabilities {
+    fn from(cap: fidl_ieee80211::VhtCapabilities) -> Self {
+        // Safe to unwrap, since cap.bytes is fixed length.
+        const_assert_eq!(
+            std::mem::size_of::<VhtCapabilities>(),
+            fidl_ieee80211::VHT_CAP_LEN as usize,
+        );
+        VhtCapabilities::read_from(&cap.bytes[..]).unwrap()
+    }
+}
+
+impl From<VhtCapabilities> for fidl_ieee80211::VhtCapabilities {
+    fn from(cap: VhtCapabilities) -> Self {
+        let mut fidl_cap = Self { bytes: Default::default() };
+        fidl_cap.bytes.copy_from_slice(&cap.as_bytes()[..]);
+        fidl_cap
     }
 }
 
@@ -510,7 +548,7 @@ pub struct HtOperation {
     pub basic_ht_mcs_set: SupportedMcsSet, // u128
 }
 
-impl From<HtOperation> for banjo_wlan_softmac::WlanHtOp {
+impl From<HtOperation> for fidl_softmac::WlanHtOp {
     fn from(op: HtOperation) -> Self {
         Self {
             primary_channel: op.primary_channel,
@@ -1218,7 +1256,7 @@ pub struct VhtOperation {
     pub basic_mcs_nss: VhtMcsNssMap, // u16
 }
 
-impl From<VhtOperation> for banjo_wlan_softmac::WlanVhtOp {
+impl From<VhtOperation> for fidl_softmac::WlanVhtOp {
     fn from(op: VhtOperation) -> Self {
         Self {
             // vht_cbw is a NewType for u8 instead of a bitfield, thus does not have raw() defined.
@@ -1401,28 +1439,28 @@ mod tests {
     }
 
     #[test]
-    fn ddk_conversion_ht_operation() {
+    fn successfully_convert_ht_operation_to_fidl() {
         let ht_op = crate::ie::fake_ies::fake_ht_operation();
-        let ddk: banjo_wlan_softmac::WlanHtOp = ht_op.into();
+        let fidl_ht_op: fidl_softmac::WlanHtOp = ht_op.into();
         // Local reference to avoid referring to an unaligned_reference
         let ht_op_ptr_head_0 = ht_op.ht_op_info_head.0;
 
-        assert_eq!(ht_op.primary_channel, ddk.primary_channel);
-        assert_eq!(ht_op_ptr_head_0, ddk.head);
-        assert_eq!(ht_op.ht_op_info_tail.0, ddk.tail);
-        assert_eq!(ht_op.basic_ht_mcs_set.0.to_be_bytes(), ddk.mcs_set);
+        assert_eq!(ht_op.primary_channel, fidl_ht_op.primary_channel);
+        assert_eq!(ht_op_ptr_head_0, fidl_ht_op.head);
+        assert_eq!(ht_op.ht_op_info_tail.0, fidl_ht_op.tail);
+        assert_eq!(ht_op.basic_ht_mcs_set.0.to_be_bytes(), fidl_ht_op.mcs_set);
     }
 
     #[test]
-    fn ddk_conversion_vht_operation() {
+    fn successfully_convert_vht_operation_to_fidl() {
         let vht_op = crate::ie::fake_ies::fake_vht_operation();
-        let ddk: banjo_wlan_softmac::WlanVhtOp = vht_op.into();
+        let fidl_vht_op: fidl_softmac::WlanVhtOp = vht_op.into();
         // Local reference to avoid referring to an unaligned_reference
         let vht_op_basic_mcs_nss_0 = vht_op.basic_mcs_nss.0;
 
-        assert_eq!(vht_op.vht_cbw.0, ddk.vht_cbw);
-        assert_eq!(vht_op.center_freq_seg0, ddk.center_freq_seg0);
-        assert_eq!(vht_op.center_freq_seg1, ddk.center_freq_seg1);
-        assert_eq!(vht_op_basic_mcs_nss_0, ddk.basic_mcs);
+        assert_eq!(vht_op.vht_cbw.0, fidl_vht_op.vht_cbw);
+        assert_eq!(vht_op.center_freq_seg0, fidl_vht_op.center_freq_seg0);
+        assert_eq!(vht_op.center_freq_seg1, fidl_vht_op.center_freq_seg1);
+        assert_eq!(vht_op_basic_mcs_nss_0, fidl_vht_op.basic_mcs);
     }
 }

@@ -573,17 +573,8 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
         .primary = 157,
         .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80,
     });
-    builder.rates_cnt(1);
-    builder.rates({
-        .data_ =
-            {
-                140,
-            },
-    });
-    builder.ht_cap_is_valid(false);
-    builder.vht_cap_is_valid(false);
-    builder.ht_op_is_valid(false);
-    builder.vht_op_is_valid(false);
+    builder.rates(fidl::VectorView(fidl_arena, std::vector<uint8_t>({140})));
+
     auto result = client_.buffer(test_arena_)->NotifyAssociationComplete(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
@@ -600,21 +591,16 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
         .primary = 157,
         .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80,
     });
-    builder.rates_cnt(8);
-    builder.rates({
-        .data_ =
-            {
-                140,
-                18,
-                152,
-                36,
-                176,
-                72,
-                96,
-                108,
-            },
-    });
-    builder.ht_cap_is_valid(true);
+    builder.rates(fidl::VectorView(fidl_arena, std::vector<uint8_t>({
+                                                   140,
+                                                   18,
+                                                   152,
+                                                   36,
+                                                   176,
+                                                   72,
+                                                   96,
+                                                   108,
+                                               })));
     builder.ht_cap(fuchsia_wlan_ieee80211::wire::HtCapabilities{
         .bytes =
             {
@@ -635,9 +621,6 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
                     },
             },
     });
-    builder.vht_cap_is_valid(false);
-    builder.ht_op_is_valid(false);
-    builder.vht_op_is_valid(false);
     auto result = client_.buffer(test_arena_)->NotifyAssociationComplete(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {

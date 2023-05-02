@@ -9,14 +9,14 @@ use {
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_internal::JoinBssRequest,
     banjo_fuchsia_wlan_softmac::{
-        self as banjo_wlan_softmac, WlanAssociationConfig, WlanRxPacket, WlanSoftmacQueryResponse,
-        WlanTxPacket,
+        self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
     },
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::MacAddr,
     std::{ffi::c_void, sync::Arc},
+    tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
 };
 
@@ -41,7 +41,6 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 
 pub struct Device {
     raw_device: DeviceInterface,
-    #[allow(dead_code)]
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
@@ -107,7 +106,7 @@ pub trait DeviceOps {
     fn disable_beaconing(&mut self) -> Result<(), zx::Status>;
     fn notify_association_complete(
         &mut self,
-        assoc_cfg: WlanAssociationConfig,
+        assoc_cfg: fidl_softmac::WlanAssociationConfig,
     ) -> Result<(), zx::Status>;
     fn clear_association(&mut self, addr: &MacAddr) -> Result<(), zx::Status>;
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>;
@@ -303,15 +302,18 @@ impl DeviceOps for Device {
 
     fn notify_association_complete(
         &mut self,
-        mut assoc_cfg: WlanAssociationConfig,
+        assoc_cfg: fidl_softmac::WlanAssociationConfig,
     ) -> Result<(), zx::Status> {
         if let Some(minstrel) = &self.minstrel {
-            minstrel.lock().add_peer(&assoc_cfg);
+            minstrel.lock().add_peer(&assoc_cfg)?;
         }
-        zx::ok((self.raw_device.notify_association_complete)(
-            self.raw_device.device,
-            &mut assoc_cfg as *mut WlanAssociationConfig,
-        ))
+        self.wlan_softmac_bridge_proxy
+            .notify_association_complete(assoc_cfg, zx::Time::INFINITE)
+            .map_err(|fidl_error| {
+                error!("FIDL error during ConfigureAssoc: {:?}", fidl_error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(|e| zx::Status::from_raw(e))
     }
 
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>> {
@@ -721,10 +723,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Disable beaconing on the device.
     disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
-    /// Notify about association completion.
-    /// |assoc_cfg| is mutable because the underlying API does not take a const wlan_association_config_t.
-    notify_association_complete:
-        extern "C" fn(device: *mut c_void, assoc_cfg: *mut WlanAssociationConfig) -> i32,
     /// Clear the association context.
     clear_association: extern "C" fn(device: *mut c_void, addr: &[u8; 6]) -> i32,
 }
@@ -891,7 +889,7 @@ pub mod test_utils {
         pub join_bss_request: Option<JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
-        pub assocs: std::collections::HashMap<MacAddr, WlanAssociationConfig>,
+        pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
         pub buffer_provider: BufferProvider,
         pub set_key_results: VecDeque<Result<(), zx::Status>>,
     }
@@ -1099,13 +1097,13 @@ pub mod test_utils {
 
         fn notify_association_complete(
             &mut self,
-            cfg: WlanAssociationConfig,
+            cfg: fidl_softmac::WlanAssociationConfig,
         ) -> Result<(), zx::Status> {
             let mut state = self.state.lock().unwrap();
             if let Some(minstrel) = &state.minstrel {
-                minstrel.lock().add_peer(&cfg);
+                minstrel.lock().add_peer(&cfg)?
             }
-            state.assocs.insert(cfg.bssid, cfg);
+            state.assocs.insert(cfg.bssid.unwrap(), cfg);
             Ok(())
         }
 
@@ -1264,14 +1262,15 @@ mod tests {
         super::*,
         crate::{
             banjo_list_to_slice,
-            ddk_converter::{self, cssid_from_ssid_unchecked, test_utils::band_capability_eq},
+            ddk_converter::{cssid_from_ssid_unchecked, test_utils::band_capability_eq},
             zeroed_array_from_prefix,
         },
         banjo_fuchsia_wlan_ieee80211::*,
-        banjo_fuchsia_wlan_internal as banjo_internal, fuchsia_async as fasync,
-        ieee80211::{Bssid, Ssid},
+        banjo_fuchsia_wlan_internal as banjo_internal, fidl_fuchsia_wlan_common as fidl_common,
+        fuchsia_async as fasync,
+        ieee80211::Ssid,
         std::convert::TryFrom,
-        wlan_common::{assert_variant, capabilities::StaCapabilities, mac},
+        wlan_common::assert_variant,
     };
 
     fn make_deauth_confirm_msg() -> fidl_mlme::DeauthenticateConfirm {
@@ -1769,39 +1768,29 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .notify_association_complete(WlanAssociationConfig {
-                bssid: [1, 2, 3, 4, 5, 6],
-                aid: 1,
-                listen_interval: 2,
-                channel: banjo_common::WlanChannel {
+            .notify_association_complete(fidl_softmac::WlanAssociationConfig {
+                bssid: Some([1, 2, 3, 4, 5, 6]),
+                aid: Some(1),
+                listen_interval: Some(2),
+                channel: Some(fidl_common::WlanChannel {
                     primary: 3,
-                    cbw: banjo_common::ChannelBandwidth::CBW20,
+                    cbw: fidl_common::ChannelBandwidth::Cbw20,
                     secondary80: 0,
-                },
-                qos: false,
-                wmm_params: ddk_converter::blank_wmm_params(),
-
-                rates_cnt: 4,
-                rates: [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize],
-                capability_info: 0x0102,
-
-                ht_cap_is_valid: false,
-                // Safe: This is not read by the driver.
-                ht_cap: unsafe { std::mem::zeroed::<HtCapabilities>() },
-                ht_op_is_valid: false,
-                // Safe: This is not read by the driver.
-                ht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanHtOp>() },
-
-                vht_cap_is_valid: false,
-                // Safe: This is not read by the driver.
-                vht_cap: unsafe { std::mem::zeroed::<VhtCapabilities>() },
-                vht_op_is_valid: false,
-                // Safe: This is not read by the driver.
-                vht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanVhtOp>() },
+                }),
+                qos: Some(false),
+                wmm_params: None,
+                rates: None,
+                capability_info: Some(0x0102),
+                ht_cap: None,
+                ht_op: None,
+                vht_cap: None,
+                vht_op: None,
+                ..Default::default()
             })
             .expect("error configuring assoc");
         assert!(fake_device_state.lock().unwrap().assocs.contains_key(&[1, 2, 3, 4, 5, 6]));
     }
+
     #[test]
     fn clear_association() {
         let exec = fasync::TestExecutor::new();
@@ -1814,23 +1803,18 @@ mod tests {
                 beacon_period: 100,
             })
             .expect("error configuring bss");
-        let assoc_cfg = ddk_converter::build_ddk_assoc_cfg(
-            Bssid([1, 2, 3, 4, 5, 6]),
-            1,
-            banjo_common::WlanChannel {
+
+        let assoc_cfg = fidl_softmac::WlanAssociationConfig {
+            bssid: Some([1, 2, 3, 4, 5, 6]),
+            aid: Some(1),
+            channel: Some(fidl_common::WlanChannel {
                 primary: 149,
-                cbw: banjo_common::ChannelBandwidth::CBW40,
+                cbw: fidl_common::ChannelBandwidth::Cbw40,
                 secondary80: 42,
-            },
-            StaCapabilities {
-                capability_info: mac::CapabilityInfo(0),
-                rates: vec![],
-                ht_cap: None,
-                vht_cap: None,
-            },
-            None,
-            None,
-        );
+            }),
+            ..Default::default()
+        };
+
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
         fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 1);

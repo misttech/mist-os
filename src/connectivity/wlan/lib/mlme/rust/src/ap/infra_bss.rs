@@ -811,7 +811,6 @@ mod tests {
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
-
         bss.handle_mlme_assoc_resp(
             &mut ctx,
             fidl_mlme::AssociateResponse {

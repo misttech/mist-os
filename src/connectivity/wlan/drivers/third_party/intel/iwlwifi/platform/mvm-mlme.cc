@@ -48,7 +48,8 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/mvm-mlme.h"
 
-#include <fidl/fuchsia.wlan.ieee80211/cpp/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <stdio.h>
@@ -497,10 +498,9 @@ zx_status_t mac_notify_association_complete(
     return ZX_ERR_BAD_STATE;
   }
 
-  if (!assoc_cfg->has_channel() || !assoc_cfg->has_rates_cnt() ||
-      !assoc_cfg->has_listen_interval()) {
-    IWL_ERR(mvmif, "Fields channel(%d), rates_cnt(%d) and listen_interval(%d) are required.\n",
-            assoc_cfg->has_channel(), assoc_cfg->has_rates_cnt(), assoc_cfg->has_listen_interval());
+  if (!assoc_cfg->has_channel() || !assoc_cfg->has_rates() || !assoc_cfg->has_listen_interval()) {
+    IWL_ERR(mvmif, "Fields channel(%d), rates(%d) and listen_interval(%d) are required.\n",
+            assoc_cfg->has_channel(), assoc_cfg->has_rates(), assoc_cfg->has_listen_interval());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -530,10 +530,11 @@ zx_status_t mac_notify_association_complete(
       return ZX_ERR_INVALID_ARGS;
   }
   // Record the intersection of AP and station supported rate to mvm_sta.
-  ZX_ASSERT(assoc_cfg->rates_cnt() <= sizeof(mvm_sta->supp_rates));
-  memcpy(mvm_sta->supp_rates, assoc_cfg->rates().data(), assoc_cfg->rates_cnt());
+  ZX_ASSERT(assoc_cfg->rates().count() * sizeof(assoc_cfg->rates()[0]) <=
+            sizeof(mvm_sta->supp_rates));
+  std::copy(assoc_cfg->rates().begin(), assoc_cfg->rates().end(), mvm_sta->supp_rates);
 
-  // Copy HT related fields from fuchsia_wlan_softmac::wire::WlanAssociationConfig.
+  // Copy HT related fields.
   mvm_sta->support_ht = assoc_cfg->has_ht_cap();
   if (assoc_cfg->has_ht_cap()) {
     memcpy(&mvm_sta->ht_cap, assoc_cfg->ht_cap().bytes.data(), sizeof(ht_capabilities_t));

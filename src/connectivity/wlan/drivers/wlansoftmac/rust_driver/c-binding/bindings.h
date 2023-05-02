@@ -143,12 +143,6 @@ typedef struct {
    */
   int32_t (*disable_beaconing)(void *device);
   /**
-   * Notify about association completion.
-   * |assoc_cfg| is mutable because the underlying API does not take a const
-   * wlan_association_config_t.
-   */
-  int32_t (*notify_association_complete)(void *device, wlan_association_config_t *assoc_cfg);
-  /**
    * Clear the association context.
    */
   int32_t (*clear_association)(void *device, const uint8_t (*addr)[6]);

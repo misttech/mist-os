@@ -12,6 +12,7 @@
 #include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
+#include <lib/fit/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -35,7 +36,7 @@
 #include <wlan/mlme/wlan.h>
 
 #include "convert.h"
-#include "fidl/fuchsia.wlan.common/cpp/wire_types.h"
+#include "device_interface.h"
 
 namespace wlan {
 
@@ -114,10 +115,17 @@ static constexpr inline DeviceInterface* DEVICE(void* c) {
 // https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server.
 class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
+  explicit WlanSoftmacBridgeImpl(DeviceInterface* device) : device_(device) {}
+
+  void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
+                                 NotifyAssociationCompleteCompleter::Sync& completer) override {
+    completer.Reply(device_->NotifyAssociationComplete(request));
+  }
+
   static void BindSelfManagedServer(
-      async_dispatcher_t* dispatcher,
+      async_dispatcher_t* dispatcher, DeviceInterface* device,
       fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
-    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>();
+    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(device);
     WlanSoftmacBridgeImpl* impl_ptr = impl.get();
     fidl::ServerBindingRef binding_ref =
         fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
@@ -138,6 +146,7 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   }
 
  private:
+  DeviceInterface* device_;
   std::optional<fidl::ServerBindingRef<fuchsia_wlan_softmac::WlanSoftmacBridge>> binding_ref_;
 };
 
@@ -220,8 +229,6 @@ zx_status_t WlanSoftmacHandle::Init() {
       .disable_beaconing = [](void* device) -> zx_status_t {
         return DEVICE(device)->DisableBeaconing();
       },
-      .notify_association_complete = [](void* device, wlan_association_config_t* assoc_cfg)
-          -> zx_status_t { return DEVICE(device)->NotifyAssociationComplete(assoc_cfg); },
       .clear_association = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
         return DEVICE(device)->ClearAssociation(*addr);
       },
@@ -229,7 +236,7 @@ zx_status_t WlanSoftmacHandle::Init() {
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
   WlanSoftmacBridgeImpl::BindSelfManagedServer(wlan_softmac_bridge_server_loop_.dispatcher(),
-                                               std::move(endpoints->server));
+                                               this->device_, std::move(endpoints->server));
   wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
 
   inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider,
@@ -940,32 +947,27 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
   return result.status();
 }
 
-zx_status_t Device::NotifyAssociationComplete(wlan_association_config_t* assoc_cfg) {
+fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::NotifyAssociationComplete>
+Device::NotifyAssociationComplete(
+    fuchsia_wlan_softmac::wire::WlanSoftmacBridgeNotifyAssociationCompleteRequest* request) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
-  zx_status_t status = ZX_OK;
-  fuchsia_wlan_softmac::wire::WlanAssociationConfig fidl_assoc_cfg;
-  fidl::Arena fidl_arena;
-  if ((status = ConvertAssocCtx(*assoc_cfg, fidl_arena, &fidl_assoc_cfg)) != ZX_OK) {
-    errorf("WlanAssociationConfig conversion failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto result = client_.sync().buffer(*std::move(arena))->NotifyAssociationComplete(fidl_assoc_cfg);
+  auto result =
+      client_.sync().buffer(*std::move(arena))->NotifyAssociationComplete(request->assoc_cfg);
   if (!result.ok()) {
     lerror("NotifyAssociationComplete failed (FIDL error %s)", result.status_string());
-    return result.status();
+    return fit::error(result.status());
   }
   if (result->is_error()) {
     lerror("NotifyAssociationComplete failed (status %s)",
            zx_status_get_string(result->error_value()));
-    return result->error_value();
+    return fit::error(result->error_value());
   }
-  return ZX_OK;
+  return fit::success();
 }
 
 zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {

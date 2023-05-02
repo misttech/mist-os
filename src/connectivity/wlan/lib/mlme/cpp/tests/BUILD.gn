@@ -18,7 +18,6 @@ source_set("test_main") {
     "test_data.cc",
     "test_data.h",
     "test_main.cc",
-    "test_utils.cc",
     "test_utils.h",
   ]
 

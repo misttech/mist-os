@@ -22,10 +22,9 @@ use {
     },
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_zircon as zx,
     ieee80211::MacAddr,
-    static_assertions::assert_eq_size,
-    std::convert::TryInto,
     tracing::{debug, error, info, trace, warn},
     wlan_common::{
         buffer_reader::BufferReader,
@@ -38,7 +37,7 @@ use {
         timer::{EventId, Timer},
     },
     wlan_statemachine::*,
-    zerocopy::{AsBytes, ByteSlice},
+    zerocopy::{ByteSlice, LayoutVerified},
 };
 
 /// Reconnect timeout in Beacon periods.
@@ -51,9 +50,6 @@ pub const DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT: u32 = 100;
 
 /// Number of beacon intervals between association status check (signal report or auto-deatuh).
 pub const ASSOCIATION_STATUS_TIMEOUT_BEACON_COUNT: u32 = 10;
-
-type HtOpByteArray = [u8; fidl_ieee80211::HT_OP_LEN as usize];
-type VhtOpByteArray = [u8; fidl_ieee80211::VHT_OP_LEN as usize];
 
 /// Client joined a BSS (synchronized timers and prepared its underlying hardware).
 /// At this point the Client is able to listen to frames on the BSS' channel.
@@ -334,6 +330,7 @@ impl Associating {
             };
 
         let (ap_ht_op, ap_vht_op) = extract_ht_vht_op(&elements[..]);
+
         let main_channel = match sta.channel_state.get_main_channel() {
             Some(main_channel) => main_channel,
             None => {
@@ -342,21 +339,32 @@ impl Associating {
                 return Err(());
             }
         };
-        let assoc_cfg = ddk::build_ddk_assoc_cfg(
-            sta.sta.bssid(),
-            assoc_resp_hdr.aid,
-            main_channel,
-            negotiated_cap,
-            ap_ht_op,
-            ap_vht_op,
-        );
+
         // TODO(fxbug.dev/29325): Determine for each outbound data frame,
         // given the result of the dynamic capability negotiation, data frame
         // classification, and QoS policy.
         //
         // Aruba / Ubiquiti are confirmed to be compatible with QoS field for the
         // BlockAck session, independently of 40MHz operation.
-        let qos = assoc_cfg.qos.into();
+        let qos = negotiated_cap.ht_cap.is_some();
+
+        let assoc_cfg = fidl_softmac::WlanAssociationConfig {
+            bssid: Some(sta.sta.bssid().0),
+            aid: Some(assoc_resp_hdr.aid),
+            // In the association request we sent out earlier, listen_interval is always set to 0,
+            // indicating the client never enters power save mode.
+            listen_interval: Some(0),
+            channel: Some(ddk::fidl_channel_from_ddk(main_channel)),
+            qos: Some(qos),
+            wmm_params: None,
+            rates: Some(negotiated_cap.rates.iter().map(|r| r.0).collect()),
+            capability_info: Some(negotiated_cap.capability_info.raw()),
+            ht_cap: negotiated_cap.ht_cap.map(Into::into),
+            vht_cap: negotiated_cap.vht_cap.map(Into::into),
+            ht_op: ap_ht_op.as_ref().map(|x| x.read().into()),
+            vht_op: ap_vht_op.as_ref().map(|x| x.read().into()),
+            ..Default::default()
+        };
 
         if let Err(status) = sta.ctx.device.notify_association_complete(assoc_cfg) {
             // Device cannot handle this association. Something is seriously wrong.
@@ -385,9 +393,9 @@ impl Associating {
             aid: assoc_resp_hdr.aid,
             assoc_resp_ies: elements.to_vec(),
             controlled_port_open,
-            ap_ht_op,
-            ap_vht_op,
-            qos,
+            ap_ht_op: ap_ht_op.as_ref().map(|x| x.read()),
+            ap_vht_op: ap_vht_op.as_ref().map(|x| x.read()),
+            qos: Qos::from(qos),
             lost_bss_counter,
             status_check_timeout,
             signal_strength_average: SignalStrengthAverage::new(),
@@ -439,27 +447,22 @@ impl Associating {
 
 /// Extract HT Operation and VHT Operation IEs from the association response frame.
 /// If either IE is of an incorrect length, it will be ignored.
-fn extract_ht_vht_op<B: ByteSlice>(elements: B) -> (Option<HtOpByteArray>, Option<VhtOpByteArray>) {
-    // Note the assert_eq_size!() that guarantees these structs match at compile time.
-    let mut ht_op: Option<HtOpByteArray> = None;
-    let mut vht_op: Option<VhtOpByteArray> = None;
+fn extract_ht_vht_op<B: ByteSlice>(
+    elements: B,
+) -> (Option<LayoutVerified<B, ie::HtOperation>>, Option<LayoutVerified<B, ie::VhtOperation>>) {
+    let mut ht_op = None;
+    let mut vht_op = None;
     for (id, body) in ie::Reader::new(elements) {
         match id {
             ie::Id::HT_OPERATION => match ie::parse_ht_operation(body) {
-                Ok(h) => {
-                    assert_eq_size!(ie::HtOperation, HtOpByteArray);
-                    ht_op = Some(h.as_bytes().try_into().unwrap());
-                }
+                Ok(parsed_ht_op) => ht_op = Some(parsed_ht_op),
                 Err(e) => {
                     error!("Invalid HT Operation: {}", e);
                     continue;
                 }
             },
             ie::Id::VHT_OPERATION => match ie::parse_vht_operation(body) {
-                Ok(v) => {
-                    assert_eq_size!(ie::VhtOperation, VhtOpByteArray);
-                    vht_op = Some(v.as_bytes().try_into().unwrap());
-                }
+                Ok(parsed_vht_op) => vht_op = Some(parsed_vht_op),
                 Err(e) => {
                     error!("Invalid VHT Operation: {}", e);
                     continue;
@@ -520,8 +523,8 @@ pub struct Association {
     /// A closed controlled port only processes EAP frames while an open one processes any frames.
     pub controlled_port_open: bool,
 
-    pub ap_ht_op: Option<HtOpByteArray>,
-    pub ap_vht_op: Option<VhtOpByteArray>,
+    pub ap_ht_op: Option<ie::HtOperation>,
+    pub ap_vht_op: Option<ie::VhtOperation>,
 
     /// Whether to set QoS bit when MLME constructs an outgoing WLAN data frame.
     /// Currently, QoS is enabled if the associated PHY is HT or VHT.
@@ -1356,9 +1359,9 @@ mod free_function_tests {
         let mut buf = Vec::<u8>::new();
         ie::write_ht_operation(&mut buf, &ie::fake_ht_operation()).expect("valid HT Op");
         ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_bytes, vht_bytes) = extract_ht_vht_op(&buf[..]);
-        assert_eq!(ht_bytes.unwrap(), ie::fake_ht_op_bytes());
-        assert_eq!(vht_bytes.unwrap(), ie::fake_vht_op_bytes());
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
+        assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
     }
 
     #[test]
@@ -1368,9 +1371,9 @@ mod free_function_tests {
         buf[1] -= 1; // Make length shorter
         buf.truncate(buf.len() - 1);
         ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_bytes, vht_bytes) = extract_ht_vht_op(&buf[..]);
-        assert_eq!(ht_bytes, None);
-        assert_eq!(vht_bytes.unwrap(), ie::fake_vht_op_bytes());
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        assert_eq!(ht_operation, None);
+        assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
     }
 
     #[test]
@@ -1381,9 +1384,9 @@ mod free_function_tests {
         ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
         buf[ht_end + 1] -= 1; // Make VHT operation shorter.
         buf.truncate(buf.len() - 1);
-        let (ht_bytes, vht_bytes) = extract_ht_vht_op(&buf[..]);
-        assert_eq!(ht_bytes.unwrap(), ie::fake_ht_op_bytes());
-        assert_eq!(vht_bytes, None);
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
+        assert_eq!(vht_operation, None);
     }
 }
 
@@ -1403,7 +1406,7 @@ mod tests {
         },
         akm::AkmAlgorithm,
         banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
         ieee80211::Bssid,
         std::sync::{Arc, Mutex},
         test_case::test_case,
@@ -1545,24 +1548,19 @@ mod tests {
         }
     }
 
-    fn fake_ddk_assoc_cfg() -> banjo_wlan_softmac::WlanAssociationConfig {
-        ddk::build_ddk_assoc_cfg(
-            BSSID,
-            42,
-            banjo_common::WlanChannel {
+    fn fake_assoc_cfg() -> fidl_softmac::WlanAssociationConfig {
+        fidl_softmac::WlanAssociationConfig {
+            bssid: Some(BSSID.0),
+            aid: Some(42),
+            channel: Some(fidl_common::WlanChannel {
                 primary: 149,
-                cbw: banjo_common::ChannelBandwidth::CBW40,
+                cbw: fidl_common::ChannelBandwidth::Cbw40,
                 secondary80: 42,
-            },
-            StaCapabilities {
-                capability_info: mac::CapabilityInfo(0),
-                rates: vec![],
-                ht_cap: None,
-                vht_cap: None,
-            },
-            None,
-            None,
-        )
+            }),
+            rates: None,
+            capability_info: None,
+            ..Default::default()
+        }
     }
 
     fn fake_deauth_req() -> wlan_sme::MlmeRequest {
@@ -1822,18 +1820,17 @@ mod tests {
             .get(&BSSID.0)
             .expect("expect assoc ctx to be set")
             .clone();
-        assert_eq!(assoc_cfg.aid, 42);
-        assert_eq!(assoc_cfg.qos, true);
-        assert_eq!(assoc_cfg.rates_cnt, 12);
+        assert_eq!(assoc_cfg.aid, Some(42));
+        assert_eq!(assoc_cfg.qos, Some(true));
         assert_eq!(
-            assoc_cfg.rates[..12],
-            [0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c]
+            assoc_cfg.rates,
+            Some(vec![0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c])
         );
-        assert_eq!(assoc_cfg.capability_info, 2);
-        assert!(assoc_cfg.ht_cap_is_valid);
-        assert!(assoc_cfg.vht_cap_is_valid);
-        assert!(assoc_cfg.ht_op_is_valid);
-        assert!(assoc_cfg.vht_op_is_valid);
+        assert_eq!(assoc_cfg.capability_info, Some(2));
+        assert!(assoc_cfg.ht_cap.is_some());
+        assert!(assoc_cfg.vht_cap.is_some());
+        assert!(assoc_cfg.ht_op.is_some());
+        assert!(assoc_cfg.vht_op.is_some());
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m
@@ -2049,10 +2046,11 @@ mod tests {
         let mut state = Associated(empty_association(&mut sta));
 
         assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
-        // ddk_assoc_cfg will be cleared when MLME receives deauth frame.
+
+        // Association configuration will be cleared when MLME receives deauth frame.
         sta.ctx
             .device
-            .notify_association_complete(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
@@ -2098,10 +2096,10 @@ mod tests {
 
         assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state.0.controlled_port_open = true;
-        // ddk_assoc_cfg must be cleared when MLME receives disassociation frame later.
+
         sta.ctx
             .device
-            .notify_association_complete(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
@@ -3433,9 +3431,10 @@ mod tests {
             controlled_port_open: true,
             ..empty_association(&mut sta)
         })));
+
         sta.ctx
             .device
-            .notify_association_complete(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_assoc_cfg())
             .expect("valid assoc ctx should not fail");
         assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
