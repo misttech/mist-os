@@ -316,17 +316,19 @@ rustc_binary("starnix_kernel_bin") {
   } else if (current_cpu == "arm64") {
     arch_dir = "arch/aarch64"
   }
-  sources += [
-    "${arch_dir}/execution.rs",
-    "${arch_dir}/loader.rs",
-    "${arch_dir}/mod.rs",
-    "${arch_dir}/registers.rs",
-    "${arch_dir}/signal_handling.rs",
-    "${arch_dir}/syscalls.rs",
-    "${arch_dir}/task.rs",
-    "${arch_dir}/uapi.rs",
-    "${arch_dir}/vdso.rs",
-  ]
+  if (arch_dir != "") {
+    sources += [
+      "${arch_dir}/execution.rs",
+      "${arch_dir}/loader.rs",
+      "${arch_dir}/mod.rs",
+      "${arch_dir}/registers.rs",
+      "${arch_dir}/signal_handling.rs",
+      "${arch_dir}/syscalls.rs",
+      "${arch_dir}/task.rs",
+      "${arch_dir}/uapi.rs",
+      "${arch_dir}/vdso.rs",
+    ]
+  }
 
   features = []
   if (starnix_restricted_mode) {
