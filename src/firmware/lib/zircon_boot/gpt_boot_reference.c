@@ -158,7 +158,7 @@ static void Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity) {
 // Note: For firmware A/B/R, we strongly recommend that implementation of `first stage firmware`
 // boots bootloader_a/b/r using the same libabr logic and according to the same A/B/R metadata on
 // the `durable_boot` partition. A/B/R metadata should be in read-only mode. We suggest using the
-// GetActiveBootSlot() API in the firmware SDK for making slot decision.
+// LoadAbrFirmware() API in the firmware SDK for loading firmware.
 
 // A global variable for storing the current firmware slot. See GptBootMain() for how it should be
 // set.
@@ -370,9 +370,10 @@ ZirconBootResult GptBootMain(void) {
 
   // In this reference code, we assume firmware A/B/R is used and thus need to store current
   // firmware slot in `g_firmware_slot_index` so that FirmwareCanBootKernelSlot() can work
-  // correctly. We assume and strongly recommend that firmware A/B/R uses the GetActiveBootSlot()
-  // API for firmware slot decision. Given this, we can call the same API again before any changes
-  // is made to the A/B/R metadata to know the firmware slot.
+  // correctly. We assume and strongly recommend that firmware A/B/R uses the LoadAbrFirmware()
+  // API for ABR firmware loading. Given this, we can call the GetActiveBootSlot() API to know the
+  // firmware slot. Note that this needs to be done before any changes is made to the A/B/R
+  // metadata.
   g_firmware_slot_index = GetActiveBootSlot(&zircon_boot_ops);
 
   // Process force recovery request. This should typically be done by listening a key press from

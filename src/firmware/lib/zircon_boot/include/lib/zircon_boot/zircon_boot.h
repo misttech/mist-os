@@ -334,6 +334,25 @@ bool ZirconVbootGenerateUnlockChallenge(ZirconBootOps* ops,
 bool ZirconVbootValidateUnlockCredential(ZirconBootOps* ops,
                                          const AvbAtxUnlockCredential* unlock_credential);
 
+// Loads firmware from bootloader_a/b/r partition according to current ABR metadata. The API
+// internally calls GetActiveBootSlot() and uses the result to decide which of
+// bootloader_a/b/r partition to load the firmware.
+//
+// Note: The API will not modify ABR metadata on the storage. In the case of one-shot-recovery,
+// the API will load from bootloader_r but will not clear the flag. It is strongly suggested that
+// the next stage firmware use `LoadAndBoot()` with `ZirconBootOps::firmware_can_boot_kernel_slot()`
+// implemented to continue boting. This makes sure that ABR metadata is properly updated.
+// `firmware_can_boot_kernel_slot()` shall indicate which OS slot a firmware slot is allowed to boot
+// to. This should usually be exact same slot, i.e. bootloader_a only boots to zircon_a. See
+// src/firmware/lib/zircon_boot/gpt_boot_reference.c for intended usage.
+//
+// @ops: Required operations. Only the `read_from_partition` callback is required.
+// @dst: Destination address.
+// @size: Firmware image size.
+//
+// Returns true if succeed.
+bool LoadAbrFirmware(ZirconBootOps* ops, void* dst, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

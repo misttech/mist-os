@@ -32,6 +32,23 @@ const char* GetSlotPartitionName(const AbrSlotIndex* slot) {
   return NULL;
 }
 
+static const char* GetFirmwareSlotPartitionName(const AbrSlotIndex slot) {
+  if (slot == kAbrSlotIndexA) {
+    return GPT_BOOTLOADER_A_NAME;
+  } else if (slot == kAbrSlotIndexB) {
+    return GPT_BOOTLOADER_B_NAME;
+  } else if (slot == kAbrSlotIndexR) {
+    return GPT_BOOTLOADER_R_NAME;
+  }
+  return NULL;
+}
+
+bool LoadAbrFirmware(ZirconBootOps* ops, void* dst, size_t size) {
+  AbrSlotIndex slot_index = GetActiveBootSlot(ops);
+  return ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, GetFirmwareSlotPartitionName(slot_index), 0,
+                              size, dst, &size);
+}
+
 static bool ReadAbrMetaData(void* context, size_t size, uint8_t* buffer) {
   ZirconBootOps* ops = (ZirconBootOps*)context;
   size_t read_size;

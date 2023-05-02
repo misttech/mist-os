@@ -93,6 +93,11 @@ void CreateMockZirconBootOps(std::unique_ptr<MockZirconBootOps>* out) {
       {GPT_ZIRCON_B_NAME, kTestZirconBImage, sizeof(kTestZirconBImage)},
       {GPT_ZIRCON_R_NAME, kTestZirconRImage, sizeof(kTestZirconRImage)},
       {GPT_ZIRCON_SLOTLESS_NAME, kTestZirconSlotlessImage, sizeof(kTestZirconSlotlessImage)},
+
+      // Re-use the test zircon image for bootloader_a/b/r partition testing
+      {GPT_BOOTLOADER_A_NAME, kTestZirconAImage, sizeof(kTestZirconAImage)},
+      {GPT_BOOTLOADER_B_NAME, kTestZirconBImage, sizeof(kTestZirconBImage)},
+      {GPT_BOOTLOADER_R_NAME, kTestZirconRImage, sizeof(kTestZirconRImage)},
   };
   for (auto& ele : zircon_partitions) {
     device->AddPartition(ele.name, kZirconPartitionSize);
@@ -1151,6 +1156,29 @@ TEST(BootTests, ValidateCredentialFailsOnIncorrectCredential) {
   AvbAtxUnlockCredential unlock_credential;
   memcpy(&unlock_credential, kUnlockCredential, sizeof(unlock_credential));
   ASSERT_FALSE(ZirconVbootValidateUnlockCredential(&ops, &unlock_credential));
+}
+
+void LoadAbrFirmwareTest(AbrSlotIndex slot, const void* expected_data, size_t size) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  ZirconBootOps zircon_boot_ops = dev->GetZirconBootOps();
+
+  // Create another zircon boot ops with only the `read_from_partition` callback.
+  ZirconBootOps zircon_boot_ops_abr_fw;
+  memset(&zircon_boot_ops_abr_fw, 0, sizeof(zircon_boot_ops_abr_fw));
+  zircon_boot_ops_abr_fw.context = zircon_boot_ops.context;
+  zircon_boot_ops_abr_fw.read_from_partition = zircon_boot_ops.read_from_partition;
+
+  MarkSlotActive(dev.get(), slot);
+  std::vector<uint8_t> read_buffer(size);
+  ASSERT_TRUE(LoadAbrFirmware(&zircon_boot_ops_abr_fw, read_buffer.data(), read_buffer.size()));
+  ASSERT_EQ(memcmp(expected_data, read_buffer.data(), read_buffer.size()), 0);
+}
+
+TEST(ZirconBootTest, LoadAbrFirmware) {
+  LoadAbrFirmwareTest(kAbrSlotIndexA, kTestZirconAImage, sizeof(kTestZirconAImage));
+  LoadAbrFirmwareTest(kAbrSlotIndexB, kTestZirconBImage, sizeof(kTestZirconBImage));
+  LoadAbrFirmwareTest(kAbrSlotIndexR, kTestZirconRImage, sizeof(kTestZirconRImage));
 }
 
 }  // namespace
