@@ -7,7 +7,6 @@
 // Explicitly declare usage for cbindgen.
 
 use {
-    fuchsia_zircon::{self as zx, HandleBased},
     tracing::error,
     wlan_mlme::{buffer::BufferProvider, device::DeviceInterface},
     wlan_span::CSpan,
@@ -52,21 +51,4 @@ pub unsafe extern "C" fn delete_sta(softmac: *mut WlanSoftmacHandle) {
 #[no_mangle]
 pub extern "C" fn sta_queue_eth_frame_tx(softmac: &mut WlanSoftmacHandle, frame: CSpan<'_>) {
     let _ = softmac.queue_eth_frame_tx(frame.into());
-}
-
-#[no_mangle]
-pub extern "C" fn duplicate_inspect_vmo(
-    softmac: &mut WlanSoftmacHandle,
-    inspect_vmo: &mut u32,
-) -> zx::sys::zx_status_t {
-    match softmac.duplicate_inspect_vmo() {
-        Some(vmo) => {
-            *inspect_vmo = vmo.into_raw();
-            zx::sys::ZX_OK
-        }
-        None => {
-            error!("Unable to retrieve Inspect VMO");
-            zx::sys::ZX_ERR_NOT_SUPPORTED
-        }
-    }
 }

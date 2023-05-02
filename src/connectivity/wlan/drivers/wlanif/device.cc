@@ -37,12 +37,7 @@ Device::Device(zx_device_t* parent, wlan_fullmac_impl_protocol_t wlan_fullmac_im
 Device::~Device() { ltrace_fn(); }
 
 zx_status_t Device::AddDevice() {
-  auto dev_add_args = ::ddk::DeviceAddArgs("wlanif");
-  auto vmo_handle = mlme_->DuplicateInspectVmo();
-  if (vmo_handle) {
-    dev_add_args = dev_add_args.set_inspect_vmo(zx::vmo(*vmo_handle));
-  }
-  return DdkAdd(dev_add_args);
+  return DdkAdd(::ddk::DeviceAddArgs("wlanif"));
 }
 
 #define VERIFY_IMPL_PROTO_OP(fn)                                \

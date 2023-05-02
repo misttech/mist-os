@@ -33,6 +33,7 @@ async fn serve_fidl(
     watcher_service: watcher_service::WatcherService<device::PhyDevice, device::IfaceDevice>,
     new_iface_sink: mpsc::UnboundedSender<device::NewIface>,
     iface_counter: Arc<service::IfaceCounter>,
+    devices_node: fuchsia_inspect::Node,
     cfg: wlandevicemonitor_config::Config,
 ) -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(move |reqs| {
@@ -43,6 +44,7 @@ async fn serve_fidl(
             watcher_service.clone(),
             new_iface_sink.clone(),
             iface_counter.clone(),
+            devices_node.clone_weak(),
             wlandevicemonitor_config::Config { ..cfg },
         )
         .unwrap_or_else(|e| error!("error serving device monitor API: {}", e));
@@ -85,6 +87,7 @@ async fn main() -> Result<(), Error> {
     inspect_runtime::serve(&inspector, &mut fs)?;
     let cfg = wlandevicemonitor_config::Config::take_from_startup_handle();
     inspector.root().record_child("config", |config_node| cfg.record_inspect(config_node));
+    let ifaces_node = inspector.root().create_child("ifaces");
     let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
 
     let phy_server = serve_phys(phys.clone(), inspect_tree.clone());
@@ -99,11 +102,16 @@ async fn main() -> Result<(), Error> {
         watcher_service,
         new_iface_sink,
         iface_counter,
+        ifaces_node.clone_weak(),
         cfg,
     );
 
-    let new_iface_fut =
-        service::handle_new_iface_stream(phys.clone(), ifaces.clone(), new_iface_stream);
+    let new_iface_fut = service::handle_new_iface_stream(
+        phys.clone(),
+        ifaces.clone(),
+        ifaces_node.clone_weak(),
+        new_iface_stream,
+    );
 
     let ((), (), (), ()) = try_join4(
         fidl_fut,

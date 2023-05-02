@@ -110,13 +110,4 @@ void FullmacMlme::Init() {
 
 void FullmacMlme::StopMainLoop() { stop_fullmac_mlme(rust_mlme_.get()); }
 
-std::optional<zx_handle_t> FullmacMlme::DuplicateInspectVmo() {
-  zx_handle_t vmo;
-  auto status = duplicate_inspect_vmo(rust_mlme_.get(), &vmo);
-  if (status != ZX_OK) {
-    return {};
-  }
-  return vmo;
-}
-
 }  // namespace wlanif

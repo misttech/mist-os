@@ -213,18 +213,6 @@ zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
   return ZX_OK;
 }
 
-std::optional<zx_handle_t> WlanSoftmacHandle::DuplicateInspectVmo() {
-  if (inner_handle_ == nullptr) {
-    return ZX_ERR_BAD_STATE;
-  }
-  zx_handle_t vmo;
-  auto status = duplicate_inspect_vmo(inner_handle_, &vmo);
-  if (status != ZX_OK) {
-    return {};
-  }
-  return vmo;
-}
-
 Device::Device(zx_device_t* device)
     : ddk::Device<Device, ddk::Unbindable>(device), parent_(device) {
   ldebug(0, NULL, "Entering.");
@@ -407,12 +395,6 @@ zx_status_t Device::AddEthDevice() {
   args.ops = &eth_device_ops;
   args.proto_id = ZX_PROTOCOL_ETHERNET_IMPL;
   args.proto_ops = &ethernet_impl_ops;
-  auto vmo = softmac_handle_->DuplicateInspectVmo();
-  if (vmo) {
-    linfo("Adding VMO at addr %p", &*vmo);
-    args.inspect_vmo = *vmo;
-  }
-
   return device_add(parent_, &args, &ethdev_);
 }
 

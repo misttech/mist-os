@@ -41,6 +41,10 @@ pub enum FullmacMlmeError {
     UsmeBootstrapStreamFailed(fidl::Error),
     #[error("USME bootstrap stream terminated")]
     UsmeBootstrapStreamTerminated,
+    #[error("Failed to duplicate inspect VMO")]
+    FailedToDuplicateInspectVmo,
+    #[error("Failed to respond to usme bootstrap request: {0}")]
+    FailedToRespondToUsmeBootstrapRequest(fidl::Error),
     #[error("Failed to get generic SME stream: {0}")]
     FailedToGetGenericSmeStream(fidl::Error),
     #[error("Failed to convert DeviceInfo: {0}")]
@@ -86,7 +90,6 @@ pub enum FullmacDriverEvent {
 
 pub struct FullmacMlmeHandle {
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
-    inspector: Inspector,
     mlme_loop_join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -110,10 +113,6 @@ impl FullmacMlmeHandle {
             warn!("Called delete on FullmacMlmeHandle before calling stop.");
             self.stop()
         }
-    }
-
-    pub fn duplicate_inspect_vmo(&self) -> Option<zx::Vmo> {
-        self.inspector.duplicate_vmo()
     }
 }
 
@@ -148,6 +147,7 @@ impl FullmacMlme {
                 device,
                 driver_event_sender_clone,
                 driver_event_stream,
+                inspector,
                 inspect_usme_node,
                 startup_sender,
             );
@@ -158,7 +158,6 @@ impl FullmacMlme {
         match startup_result.map_err(|_e| FullmacMlmeError::UnableToGetStartupResult) {
             Ok(Ok(())) => Ok(FullmacMlmeHandle {
                 driver_event_sender,
-                inspector,
                 mlme_loop_join_handle: Some(mlme_loop_join_handle),
             }),
             Err(err) | Ok(Err(err)) => match mlme_loop_join_handle.join() {
@@ -174,6 +173,7 @@ impl FullmacMlme {
         device: FullmacDeviceInterface,
         driver_event_sink: mpsc::UnboundedSender<FullmacDriverEvent>,
         driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
+        inspector: Inspector,
         inspect_usme_node: fuchsia_inspect::Node,
         startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
     ) {
@@ -202,13 +202,16 @@ impl FullmacMlme {
                 }
             };
 
-        let (generic_sme_server, legacy_privacy_support) = match usme_bootstrap_stream.next().await
+        let (generic_sme_server, legacy_privacy_support, responder) = match usme_bootstrap_stream
+            .next()
+            .await
         {
             Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
                 generic_sme_server,
                 legacy_privacy_support,
+                responder,
                 ..
-            })) => (generic_sme_server, legacy_privacy_support),
+            })) => (generic_sme_server, legacy_privacy_support, responder),
             Some(Err(e)) => {
                 startup_sender.send(Err(FullmacMlmeError::UsmeBootstrapStreamFailed(e))).unwrap();
                 return;
@@ -218,6 +221,19 @@ impl FullmacMlme {
                 return;
             }
         };
+        let inspect_vmo = match inspector.duplicate_vmo() {
+            Some(vmo) => vmo,
+            None => {
+                startup_sender.send(Err(FullmacMlmeError::FailedToDuplicateInspectVmo)).unwrap();
+                return;
+            }
+        };
+        if let Err(e) = responder.send(inspect_vmo).into() {
+            startup_sender
+                .send(Err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest(e)))
+                .unwrap();
+            return;
+        }
         let generic_sme_stream = match generic_sme_server.into_stream() {
             Ok(stream) => stream,
             Err(e) => {
@@ -678,6 +694,7 @@ mod tests {
         fake_device: Pin<Box<FakeFullmacDevice>>,
         driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
         usme_bootstrap_proxy: Option<fidl_sme::UsmeBootstrapProxy>,
+        _usme_bootstrap_result: Option<fidl::client::QueryResponseFut<zx::Vmo>>,
         generic_sme_proxy: fidl_sme::GenericSmeProxy,
         startup_receiver: oneshot::Receiver<Result<(), FullmacMlmeError>>,
         exec: fasync::TestExecutor,
@@ -705,17 +722,17 @@ mod tests {
             let (generic_sme_proxy, generic_sme_server_end) =
                 fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()
                     .expect("creating GenericSmeProxy should succeed");
-            if bootstrap {
-                usme_bootstrap_proxy
-                    .start(
-                        generic_sme_server_end,
-                        &mut fidl_sme::LegacyPrivacySupport {
-                            wep_supported: false,
-                            wpa1_supported: false,
-                        },
-                    )
-                    .expect("boostraping USME should succeed");
-            }
+            let usme_bootstrap_result = if bootstrap {
+                Some(usme_bootstrap_proxy.start(
+                    generic_sme_server_end,
+                    &mut fidl_sme::LegacyPrivacySupport {
+                        wep_supported: false,
+                        wpa1_supported: false,
+                    },
+                ))
+            } else {
+                None
+            };
 
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
             let inspector = Inspector::default();
@@ -726,6 +743,7 @@ mod tests {
                 fake_device.as_mut().as_device(),
                 driver_event_sender.clone(),
                 driver_event_stream,
+                inspector,
                 inspect_usme_node,
                 startup_sender,
             ));
@@ -734,6 +752,7 @@ mod tests {
                 fake_device,
                 driver_event_sender,
                 usme_bootstrap_proxy: Some(usme_bootstrap_proxy),
+                _usme_bootstrap_result: usme_bootstrap_result,
                 generic_sme_proxy,
                 startup_receiver,
                 exec,

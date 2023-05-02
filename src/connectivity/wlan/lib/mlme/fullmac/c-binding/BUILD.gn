@@ -13,7 +13,6 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
 
   deps = [
     "//src/connectivity/wlan/lib/mlme/fullmac:wlan-fullmac-mlme",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:tracing",
   ]
 

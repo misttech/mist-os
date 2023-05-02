@@ -56,7 +56,6 @@ const WSC_IE_BODY: &'static [u8] = &[
 
 // The moniker must match the component name as defined in the manifest
 const DEVICEMONITOR_MONIKER: &'static str = "wlandevicemonitor";
-const USME_MONIKER: &'static str = "driver_test_realm/realm_builder\\:0/driver_manager";
 // const WLANSTACK_MONIKER: &'static str = "wlanstack";
 const POLICY_MONIKER: &'static str = "wlancfg";
 
@@ -153,31 +152,6 @@ async fn verify_wlan_inspect() {
             .await;
     }
 
-    let usme_hierarchy = get_usme_inspect_hierarchy().await.expect("expect Inspect data");
-    assert_data_tree!(usme_hierarchy, usme: contains {
-        last_pulse: contains {
-            status: contains {
-                status_str: "connected",
-                connected_to: contains {
-                    bssid: BSSID.0.to_mac_string(),
-                    bssid_hash: AnyProperty,
-                    ssid: AP_SSID.to_string(),
-                    ssid_hash: AnyProperty,
-                    wsc: {
-                        device_name: "ASUS Router",
-                        manufacturer: "ASUSTek Computer Inc.",
-                        model_name: "RT-AC58U",
-                        model_number: "123",
-                    }
-                }
-            }
-        },
-        state_events: contains {
-            "0": contains {},
-            "1": contains {},
-        }
-    });
-
     let policy_hierarchy =
         get_inspect_hierarchy(POLICY_MONIKER).await.expect("expect Inspect data");
     assert_data_tree!(policy_hierarchy, root: contains {
@@ -206,6 +180,33 @@ async fn verify_wlan_inspect() {
         device_events: contains {
             "0": contains {},
         },
+        ifaces: contains {
+            "0": contains {
+                usme: contains {
+                    last_pulse: contains {
+                        status: contains {
+                            status_str: "connected",
+                            connected_to: contains {
+                                bssid: BSSID.0.to_mac_string(),
+                                bssid_hash: AnyProperty,
+                                ssid: AP_SSID.to_string(),
+                                ssid_hash: AnyProperty,
+                                wsc: {
+                                    device_name: "ASUS Router",
+                                    manufacturer: "ASUSTek Computer Inc.",
+                                    model_name: "RT-AC58U",
+                                    model_number: "123",
+                                }
+                            }
+                        }
+                    },
+                    state_events: contains {
+                        "0": contains {},
+                        "1": contains {},
+                    },
+                },
+            },
+        },
     });
 
     remove_network(
@@ -221,31 +222,6 @@ async fn verify_wlan_inspect() {
         has_id_and_state(update, &id, fidl_policy::ConnectionState::Disconnected)
     })
     .await;
-
-    let usme_hierarchy = get_usme_inspect_hierarchy().await.expect("expect Inspect data");
-    assert_data_tree!(usme_hierarchy, usme: contains {
-        last_pulse: contains {
-            status: contains {
-                status_str: "idle",
-                prev_connected_to: contains {
-                    bssid: BSSID.0.to_mac_string(),
-                    bssid_hash: AnyProperty,
-                    ssid: AP_SSID.to_string(),
-                    ssid_hash: AnyProperty,
-                    wsc: {
-                        device_name: "ASUS Router",
-                        manufacturer: "ASUSTek Computer Inc.",
-                        model_name: "RT-AC58U",
-                        model_number: "123",
-                    }
-                }
-            }
-        },
-        state_events: contains {
-            "0": contains {},
-            "1": contains {},
-        }
-    });
 
     let policy_hierarchy =
         get_inspect_hierarchy(POLICY_MONIKER).await.expect("expect Inspect data");
@@ -275,6 +251,33 @@ async fn verify_wlan_inspect() {
         device_events: contains {
             "0": contains {},
         },
+        ifaces: contains {
+            "0": contains {
+                usme: contains {
+                    last_pulse: contains {
+                        status: contains {
+                            status_str: "idle",
+                            prev_connected_to: contains {
+                                bssid: BSSID.0.to_mac_string(),
+                                bssid_hash: AnyProperty,
+                                ssid: AP_SSID.to_string(),
+                                ssid_hash: AnyProperty,
+                                wsc: {
+                                    device_name: "ASUS Router",
+                                    manufacturer: "ASUSTek Computer Inc.",
+                                    model_name: "RT-AC58U",
+                                    model_number: "123",
+                                }
+                            }
+                        }
+                    },
+                    state_events: contains {
+                        "0": contains {},
+                        "1": contains {},
+                    }
+                },
+            },
+        },
     });
 
     helper.stop().await;
@@ -288,17 +291,5 @@ async fn get_inspect_hierarchy(component: &str) -> Result<DiagnosticsHierarchy, 
         .into_iter()
         .next()
         .and_then(|result| result.payload)
-        .ok_or(format_err!("expected one inspect hierarchy"))
-}
-
-async fn get_usme_inspect_hierarchy() -> Result<DiagnosticsHierarchy, Error> {
-    ArchiveReader::new()
-        .add_selector(ComponentSelector::new(vec![USME_MONIKER.to_string()]))
-        .snapshot::<Inspect>()
-        .await
-        .expect("Failed to get Inspect data")
-        .into_iter()
-        .filter_map(|node| node.payload.and_then(|p| p.get_child_by_path(&["usme"]).cloned()))
-        .next()
         .ok_or(format_err!("expected one inspect hierarchy"))
 }

@@ -12,8 +12,12 @@ use {
     fidl::endpoints::create_endpoints,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
     fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest},
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
-    futures::{channel::mpsc, select, stream::FuturesUnordered, StreamExt, TryStreamExt},
+    fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_inspect::{self, Inspector},
+    fuchsia_zircon as zx,
+    futures::{
+        channel::mpsc, select, stream::FuturesUnordered, FutureExt, StreamExt, TryStreamExt,
+    },
     std::sync::{atomic::Ordering, Arc},
     tracing::{error, info},
 };
@@ -39,6 +43,7 @@ pub(crate) async fn serve_monitor_requests(
     watcher_service: watcher_service::WatcherService<PhyDevice, IfaceDevice>,
     new_iface_sink: mpsc::UnboundedSender<NewIface>,
     iface_counter: Arc<IfaceCounter>,
+    mut ifaces_node: fuchsia_inspect::Node,
     cfg: wlandevicemonitor_config::Config,
 ) -> Result<(), Error> {
     while let Some(req) = req_stream.try_next().await.context("error running DeviceService")? {
@@ -77,7 +82,16 @@ pub(crate) async fn serve_monitor_requests(
                 &mut get_power_save_mode(&phys, phy_id).await.map_err(|status| status.into_raw()),
             ),
             DeviceMonitorRequest::CreateIface { req, responder } => {
-                match create_iface(&new_iface_sink, &phys, req, &iface_counter, &cfg).await {
+                match create_iface(
+                    &new_iface_sink,
+                    &phys,
+                    req,
+                    &iface_counter,
+                    &cfg,
+                    &mut ifaces_node,
+                )
+                .await
+                {
                     Ok(new_iface) => {
                         info!("iface #{} started ({:?})", new_iface.id, new_iface.phy_ownership);
                         ifaces.insert(
@@ -85,6 +99,8 @@ pub(crate) async fn serve_monitor_requests(
                             IfaceDevice {
                                 phy_ownership: new_iface.phy_ownership,
                                 generic_sme: new_iface.generic_sme,
+                                inspect_node: new_iface.inspect_node,
+                                inspect_vmo: new_iface.inspect_vmo,
                             },
                         );
 
@@ -99,7 +115,8 @@ pub(crate) async fn serve_monitor_requests(
                 responder.send(&mut result.map_err(|e| e.into_raw()))
             }
             DeviceMonitorRequest::DestroyIface { req, responder } => {
-                let result = destroy_iface(&phys, &ifaces, req.iface_id).await;
+                let result =
+                    destroy_iface(&phys, &ifaces, ifaces_node.clone_weak(), req.iface_id).await;
                 let status = into_status_and_opt(result).0;
                 responder.send(status.into_raw())
             }
@@ -132,6 +149,7 @@ pub(crate) async fn serve_monitor_requests(
 pub(crate) async fn handle_new_iface_stream(
     phys: Arc<PhyMap>,
     ifaces: Arc<IfaceMap>,
+    ifaces_node: fuchsia_inspect::Node,
     mut iface_stream: mpsc::UnboundedReceiver<NewIface>,
 ) -> Result<(), Error> {
     let mut futures_unordered = FuturesUnordered::new();
@@ -144,6 +162,7 @@ pub(crate) async fn handle_new_iface_stream(
                         handle_single_new_iface(
                             phys.clone(),
                             ifaces.clone(),
+                            ifaces_node.clone_weak(),
                             new_iface
                         )
                     );
@@ -153,7 +172,12 @@ pub(crate) async fn handle_new_iface_stream(
     }
 }
 
-async fn handle_single_new_iface(phys: Arc<PhyMap>, ifaces: Arc<IfaceMap>, new_iface: NewIface) {
+async fn handle_single_new_iface(
+    phys: Arc<PhyMap>,
+    ifaces: Arc<IfaceMap>,
+    ifaces_node: fuchsia_inspect::Node,
+    new_iface: NewIface,
+) {
     let mut event_stream = new_iface.generic_sme.take_event_stream().fuse();
     // GenericSme does not currently have any client-bound messages, so this is
     // exclusively to monitor for the channel epitaph and respond appropriately.
@@ -181,7 +205,7 @@ async fn handle_single_new_iface(phys: Arc<PhyMap>, ifaces: Arc<IfaceMap>, new_i
             }
         }
     }
-    match destroy_iface(&phys, &ifaces, new_iface.id).await {
+    match destroy_iface(&phys, &ifaces, ifaces_node, new_iface.id).await {
         Ok(()) => info!("Destroyed iface {}", new_iface.id),
         Err(e) => error!("Error while destroying iface {}: {}", new_iface.id, e),
     }
@@ -307,6 +331,7 @@ async fn create_iface(
     req: fidl_svc::CreateIfaceRequest,
     iface_counter: &Arc<IfaceCounter>,
     cfg: &wlandevicemonitor_config::Config,
+    ifaces_node: &mut fuchsia_inspect::Node,
 ) -> Result<NewIface, zx::Status> {
     let phy_id = req.phy_id;
     let phy = phys.get(&req.phy_id).ok_or(zx::Status::NOT_FOUND)?;
@@ -334,11 +359,10 @@ async fn create_iface(
     };
 
     // Pipeline the GenericSme channel and the legacy privacy support configuration, via
-    // the bootstrap channel.
-    usme_bootstrap_proxy.start(generic_sme_server, &mut legacy_privacy_support).map_err(|e| {
-        error!("Failed to bootstrap USME: {}", e);
-        zx::Status::INTERNAL
-    })?;
+    // the bootstrap channel. This request will be handled after our call to
+    // create_iface in the phy proxy, so we cannot await the result yet.
+    let bootstrap_result =
+        usme_bootstrap_proxy.start(generic_sme_server, &mut legacy_privacy_support);
 
     // Send a CreateIfaceRequest. The vendor device will then spawn a USME device and pass
     // the bootstrap to it. The USME device will then read the config and GenericSme channel,
@@ -360,11 +384,31 @@ async fn create_iface(
             error!("CreateIface failed: phy {}, error {}", phy_id, e);
             zx::Status::ok(e)
         })?;
+
+    let inspect_vmo = std::sync::Arc::new(bootstrap_result.await.map_err(|e| {
+        error!("Failed to bootstrap USME: {}", e);
+        zx::Status::INTERNAL
+    })?);
+
     let iface_id = iface_counter.next_iface_id() as u16;
+    let iface_node_name = std::format!("{}", iface_id);
+    let inspect_vmo_clone = Arc::clone(&inspect_vmo);
+    let inspect_node = ifaces_node.create_lazy_child(iface_node_name, move || {
+        let inspect_vmo_inner_clone = Arc::clone(&inspect_vmo_clone);
+        async {
+            let iface_inspector = Inspector::new(
+                fuchsia_inspect::InspectorConfig::default().vmo(inspect_vmo_inner_clone),
+            );
+            Ok(iface_inspector)
+        }
+        .boxed()
+    });
     let new_iface = NewIface {
         id: iface_id,
         phy_ownership: device::PhyOwnership { phy_id, phy_assigned_id: phy_assigned_iface_id },
         generic_sme: generic_sme_proxy,
+        inspect_node: Some(std::sync::Arc::new(inspect_node)),
+        inspect_vmo: Some(inspect_vmo),
     };
     new_iface_sink.unbounded_send(new_iface.clone()).map_err(|e| {
         error!("Failed to register Generic SME event stream with internal handler: {}", e);
@@ -391,7 +435,12 @@ async fn query_iface(
     })
 }
 
-async fn destroy_iface(phys: &PhyMap, ifaces: &IfaceMap, id: u16) -> Result<(), zx::Status> {
+async fn destroy_iface(
+    phys: &PhyMap,
+    ifaces: &IfaceMap,
+    _ifaces_node: fuchsia_inspect::Node,
+    id: u16,
+) -> Result<(), zx::Status> {
     info!("destroy_iface(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
     let phy_ownership = &iface.phy_ownership;
@@ -515,6 +564,8 @@ mod tests {
         new_iface_stream: mpsc::UnboundedReceiver<NewIface>,
         new_iface_sink: mpsc::UnboundedSender<NewIface>,
         iface_counter: Arc<IfaceCounter>,
+        inspector: Inspector,
+        ifaces_node: fuchsia_inspect::Node,
     }
 
     fn test_setup() -> TestValues {
@@ -534,6 +585,9 @@ mod tests {
 
         let iface_counter = Arc::new(IfaceCounter::new());
 
+        let inspector = Inspector::default();
+        let ifaces_node = inspector.root().create_child("devices");
+
         TestValues {
             monitor_proxy,
             monitor_req_stream,
@@ -544,6 +598,8 @@ mod tests {
             new_iface_stream: new_iface_stream,
             new_iface_sink,
             iface_counter,
+            inspector,
+            ifaces_node,
         }
     }
 
@@ -575,6 +631,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -639,6 +696,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -664,6 +722,8 @@ mod tests {
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
             generic_sme,
+            inspect_node: None,
+            inspect_vmo: None,
         };
         test_values.ifaces.insert(0, fake_iface);
 
@@ -697,6 +757,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -729,6 +790,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -761,6 +823,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -805,6 +868,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -840,6 +904,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -895,6 +960,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -953,6 +1019,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -983,6 +1050,8 @@ mod tests {
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
             generic_sme,
+            inspect_node: None,
+            inspect_vmo: None,
         };
         test_values.ifaces.insert(0, fake_iface);
         assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
@@ -1014,6 +1083,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1027,6 +1097,8 @@ mod tests {
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
             generic_sme,
+            inspect_node: None,
+            inspect_vmo: None,
         };
         test_values.ifaces.insert(0, fake_iface);
         assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
@@ -1399,6 +1471,8 @@ mod tests {
         test_values.phys.insert(10, phy);
 
         let iface_counter = Arc::new(IfaceCounter::new());
+        let inspector = Inspector::default();
+        let mut ifaces_node = inspector.root().create_child("devices");
 
         // Initiate a CreateIface request. The returned future should not be able
         // to produce a result immediately
@@ -1412,12 +1486,13 @@ mod tests {
             },
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
+            &mut ifaces_node,
         );
         pin_mut!(create_fut);
         assert_variant!(exec.run_until_stalled(&mut create_fut), Poll::Pending);
 
         // Validate the PHY request
-        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
 
@@ -1430,6 +1505,8 @@ mod tests {
                 } else {
                     responder.send(&mut Ok(123)).expect("failed to send iface id");
                 };
+
+                req.mlme_channel
             }
         );
 
@@ -1441,6 +1518,22 @@ mod tests {
                 Poll::Ready(Err(zx::Status::NOT_SUPPORTED))
             );
             return;
+        }
+
+        if let Some(channel) = bootstrap_channel {
+            let bootstrap_server =
+                fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
+            let mut bootstrap_stream =
+                bootstrap_server.into_stream().expect("Failed to make bootstrap stream");
+
+            let responder = assert_variant!(
+                exec.run_until_stalled(&mut bootstrap_stream.next()),
+                Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
+                    responder, ..
+                }))) => responder);
+            responder
+                .send(inspector.duplicate_vmo().unwrap())
+                .expect("Failed to send bootstrap result");
         }
 
         // The original future should resolve into a response.
@@ -1473,6 +1566,7 @@ mod tests {
             test_values.watcher_service,
             test_values.new_iface_sink,
             test_values.iface_counter,
+            test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1509,12 +1603,26 @@ mod tests {
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
             // Validate the PHY request
-            assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
                 assert_eq!(req.init_sta_addr, sta_addr);
                 responder.send(&mut Ok(phy_assigned_iface_id)).expect("failed to send iface id");
+                req.mlme_channel.expect("no MLME channel")
             });
+
+            // Complete the USME bootstrap.
+            let mut bootstrap_stream =
+                fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
+                    .into_stream()
+                    .expect("Failed to make bootstrap stream");
+            assert_variant!(
+                exec.run_until_stalled(&mut bootstrap_stream.next()),
+                Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
+                    responder, ..
+                }))) => responder
+                    .send(test_values.inspector.duplicate_vmo().unwrap())
+                    .expect("Failed to send bootstrap result"));
 
             // The original future should resolve into a response.
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1549,6 +1657,8 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let iface_counter = Arc::new(IfaceCounter::new());
+        let inspector = Inspector::default();
+        let mut ifaces_node = inspector.root().create_child("devices");
 
         let fut = super::create_iface(
             &test_values.new_iface_sink,
@@ -1560,6 +1670,7 @@ mod tests {
             },
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
+            &mut ifaces_node,
         );
         pin_mut!(fut);
         assert_variant!(
@@ -1583,6 +1694,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
         phy_stream
@@ -1594,7 +1707,12 @@ mod tests {
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
-        let destroy_fut = super::destroy_iface(&test_values.phys, &test_values.ifaces, 42);
+        let destroy_fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            42,
+        );
         pin_mut!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
@@ -1618,7 +1736,12 @@ mod tests {
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
-        let destroy_fut = super::destroy_iface(&test_values.phys, &test_values.ifaces, 42);
+        let destroy_fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            42,
+        );
         pin_mut!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
@@ -1647,7 +1770,12 @@ mod tests {
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
-        let destroy_fut = super::destroy_iface(&test_values.phys, &test_values.ifaces, 42);
+        let destroy_fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            42,
+        );
         pin_mut!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
@@ -1680,7 +1808,12 @@ mod tests {
         let test_values = test_setup();
         let _phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
-        let fut = super::destroy_iface(&test_values.phys, &test_values.ifaces, 43);
+        let fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            43,
+        );
         pin_mut!(fut);
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
     }
@@ -1701,6 +1834,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: generic_sme_proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
@@ -1745,6 +1880,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: generic_sme_proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
@@ -1781,6 +1918,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: generic_sme_proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
@@ -1811,6 +1950,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: generic_sme_proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
@@ -1843,6 +1984,8 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
                 generic_sme: generic_sme_proxy,
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
@@ -1882,6 +2025,7 @@ mod tests {
         let new_iface_fut = handle_new_iface_stream(
             test_values.phys.clone(),
             test_values.ifaces.clone(),
+            test_values.ifaces_node,
             test_values.new_iface_stream,
         );
         pin_mut!(new_iface_fut);
@@ -1901,10 +2045,18 @@ mod tests {
             device::IfaceDevice {
                 phy_ownership: phy_ownership.clone(),
                 generic_sme: generic_sme_proxy.clone(),
+                inspect_node: None,
+                inspect_vmo: None,
             },
         );
 
-        let new_iface = NewIface { id, phy_ownership, generic_sme: generic_sme_proxy };
+        let new_iface = NewIface {
+            id,
+            phy_ownership,
+            generic_sme: generic_sme_proxy,
+            inspect_node: None,
+            inspect_vmo: None,
+        };
         test_values.new_iface_sink.unbounded_send(new_iface).expect("Failed to send new iface");
         assert_variant!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
 

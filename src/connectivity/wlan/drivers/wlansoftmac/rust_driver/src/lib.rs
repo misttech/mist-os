@@ -29,7 +29,6 @@ use {
 pub struct WlanSoftmacHandle {
     driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
     join_handle: Option<std::thread::JoinHandle<()>>,
-    inspector: Inspector,
 }
 
 impl std::fmt::Debug for WlanSoftmacHandle {
@@ -63,10 +62,6 @@ impl WlanSoftmacHandle {
         self.driver_event_sink
             .unbounded_send(DriverEvent::EthFrameTx { bytes })
             .map_err(|e| e.into())
-    }
-
-    pub fn duplicate_inspect_vmo(&self) -> Option<zx::Vmo> {
-        self.inspector.duplicate_vmo()
     }
 }
 
@@ -102,6 +97,7 @@ async fn start_wlansoftmac_async(
             buf_provider,
             driver_event_sink_clone,
             driver_event_stream,
+            inspector,
             inspect_usme_node,
             startup_sender,
         );
@@ -109,9 +105,7 @@ async fn start_wlansoftmac_async(
     });
 
     match startup_receiver.await.map_err(|e| anyhow::Error::from(e)) {
-        Ok(Ok(())) => {
-            Ok(WlanSoftmacHandle { driver_event_sink, join_handle: Some(join_handle), inspector })
-        }
+        Ok(Ok(())) => Ok(WlanSoftmacHandle { driver_event_sink, join_handle: Some(join_handle) }),
         Err(err) | Ok(Err(err)) => match join_handle.join() {
             Ok(()) => bail!("Failed to start the wlansoftmac event loop: {:?}", err),
             Err(panic_err) => {
@@ -126,6 +120,7 @@ async fn wlansoftmac_thread(
     buf_provider: BufferProvider,
     driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
+    inspector: Inspector,
     inspect_usme_node: fuchsia_inspect::Node,
     startup_sender: oneshot::Sender<Result<(), anyhow::Error>>,
 ) {
@@ -161,12 +156,16 @@ async fn wlansoftmac_thread(
             }
         };
 
-    let (generic_sme_server, legacy_privacy_support) = match usme_bootstrap_stream.next().await {
+    let (generic_sme_server, legacy_privacy_support, responder) = match usme_bootstrap_stream
+        .next()
+        .await
+    {
         Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
             generic_sme_server,
             legacy_privacy_support,
+            responder,
             ..
-        })) => (generic_sme_server, legacy_privacy_support),
+        })) => (generic_sme_server, legacy_privacy_support, responder),
         Some(Err(e)) => {
             startup_sender.send(Err(format_err!("USME bootstrap stream failed: {}", e))).unwrap();
             return;
@@ -176,6 +175,19 @@ async fn wlansoftmac_thread(
             return;
         }
     };
+    let inspect_vmo = match inspector.duplicate_vmo() {
+        Some(vmo) => vmo,
+        None => {
+            startup_sender.send(Err(format_err!("Failed to duplicate inspect VMO"))).unwrap();
+            return;
+        }
+    };
+    if let Err(e) = responder.send(inspect_vmo).into() {
+        startup_sender
+            .send(Err(format_err!("Failed to respond to USME bootstrap: {}", e)))
+            .unwrap();
+        return;
+    }
     let generic_sme_stream = match generic_sme_server.into_stream() {
         Ok(stream) => stream,
         Err(e) => {
@@ -350,9 +362,11 @@ mod tests {
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
         let (generic_sme_proxy, generic_sme_server) =
             fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()?;
-        usme_client_proxy.start(generic_sme_server, &mut legacy_privacy_support)?;
 
+        let start_fut = usme_client_proxy.start(generic_sme_server, &mut legacy_privacy_support);
         let handle = exec.run_singlethreaded(handle_fut)?;
+        exec.run_singlethreaded(start_fut).expect("USME boostrap failed");
+
         Ok((handle, generic_sme_proxy))
     }
 

@@ -25,11 +25,6 @@ class FullmacMlme {
   ~FullmacMlme() = default;
   void Init();
   void StopMainLoop();
-  /**
-   * Provide a read-only Inspect VMO. Intended to be surfaced through the driver framework
-   * so that MLME's Inspect data is available for diagnostics.
-   */
-  std::optional<zx_handle_t> DuplicateInspectVmo();
 
  private:
   Device* device_;

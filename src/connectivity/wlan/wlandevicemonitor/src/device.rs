@@ -34,6 +34,10 @@ pub struct NewIface {
     pub phy_ownership: PhyOwnership,
     // The handle for connecting channels to this iface's SME.
     pub generic_sme: fidl_wlan_sme::GenericSmeProxy,
+    // The lazy inspect node populated by this ifaces USME.
+    pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
+    // The VMO backing the inspect node.
+    pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
 }
 
 pub struct PhyDevice {
@@ -44,6 +48,8 @@ pub struct PhyDevice {
 pub struct IfaceDevice {
     pub phy_ownership: PhyOwnership,
     pub generic_sme: fidl_wlan_sme::GenericSmeProxy,
+    pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
+    pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
 }
 
 pub type PhyMap = WatchableMap<u16, PhyDevice>;

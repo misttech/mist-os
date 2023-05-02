@@ -105,7 +105,4 @@ extern "C" void stop_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
  */
 extern "C" void delete_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
 
-extern "C" zx_status_t duplicate_inspect_vmo(wlan_fullmac_mlme_handle_t *mlme,
-                                             zx_handle_t *inspect_vmo);
-
 #endif  // SRC_CONNECTIVITY_WLAN_LIB_MLME_FULLMAC_C_BINDING_BINDINGS_H_

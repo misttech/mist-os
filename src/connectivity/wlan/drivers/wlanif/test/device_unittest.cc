@@ -98,7 +98,7 @@ struct BindTestFixture : public ::gtest::TestLoopFixture {
         .wep_supported = false,
         .wpa1_supported = false,
     };
-    usme_bootstrap_->Start(std::move(generic_sme_server), legacy_privacy_support);
+    usme_bootstrap_->Start(std::move(generic_sme_server), legacy_privacy_support, [](auto vmo) {});
 
     wlan_fullmac_impl_ifc_ = *ifc;
     *out_usme_bootstrap_channel = usme_bootstrap_server.release();

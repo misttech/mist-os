@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_zircon as zx,
     tracing::error,
     wlan_fullmac_mlme::{device::FullmacDeviceInterface, FullmacMlme, FullmacMlmeHandle},
 };
@@ -37,22 +36,5 @@ pub unsafe extern "C" fn delete_fullmac_mlme(mlme: *mut FullmacMlmeHandle) {
     if !mlme.is_null() {
         let mlme = Box::from_raw(mlme);
         mlme.delete();
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn duplicate_inspect_vmo(
-    mlme: &mut FullmacMlmeHandle,
-    inspect_vmo: &mut zx::Vmo,
-) -> zx::sys::zx_status_t {
-    match mlme.duplicate_inspect_vmo() {
-        Some(vmo) => {
-            *inspect_vmo = vmo;
-            zx::sys::ZX_OK
-        }
-        None => {
-            error!("Unable to retrieve Inspect VMO");
-            zx::sys::ZX_ERR_NOT_SUPPORTED
-        }
     }
 }

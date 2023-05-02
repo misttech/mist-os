@@ -360,6 +360,8 @@ protocol UsmeBootstrap {
     Start(resource struct {
         generic_sme_server server_end:GenericSme;
         legacy_privacy_support LegacyPrivacySupport;
+    }) -> (resource struct {
+        inspect_vmo zx.Handle:VMO;
     });
 };
 
