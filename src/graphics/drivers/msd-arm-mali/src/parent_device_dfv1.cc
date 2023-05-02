@@ -68,7 +68,8 @@ std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv1::RegisterInterrupt(un
 
 zx_status_t ParentDeviceDFv1::ConnectRuntimeProtocol(const char* service_name, const char* name,
                                                      fdf::Channel server_end) {
-  return device_connect_runtime_protocol(parent_, service_name, name, server_end.release());
+  return device_connect_fragment_runtime_protocol(parent_, "mali", service_name, name,
+                                                  server_end.release());
 }
 
 // static
@@ -79,7 +80,7 @@ std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_han
   zx_device_t* zx_device = reinterpret_cast<zx_device_t*>(device_handle);
 
   pdev_protocol_t pdev;
-  zx_status_t status = device_get_protocol(zx_device, ZX_PROTOCOL_PDEV, &pdev);
+  zx_status_t status = device_get_fragment_protocol(zx_device, "pdev", ZX_PROTOCOL_PDEV, &pdev);
   if (status != ZX_OK) {
     return DRETP(nullptr, "Error requesting protocol: %d", status);
   }

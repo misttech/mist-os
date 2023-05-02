@@ -12,7 +12,10 @@ assert(
 _base_driver_packages = [
   {
     package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-test"
-    driver_components = [ "meta/libmsd_arm_test.cm" ]
+    driver_components = [
+      "meta/libmsd_arm_test.cm",
+      "meta/libmsd_arm_rebind.cm",
+    ]
   },
   {
     package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen-test"

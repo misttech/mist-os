@@ -77,7 +77,7 @@ class TestDeviceBase {
 
   static void RebindParentDeviceFromId(uint64_t id, const std::string& url_suffix = "") {
     fidl::ClientEnd parent = GetParentDeviceFromId(id);
-    RebindDevice(parent);
+    RebindDevice(parent, url_suffix);
   }
 
   static void RebindDevice(fidl::UnownedClientEnd<fuchsia_device::Controller> device,

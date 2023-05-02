@@ -92,7 +92,9 @@ static void test_shutdown(uint32_t iters) {
         // connections while the device is torn down, just so it's easier to test that device
         // creation is working.
         std::unique_lock lock(connection_create_mutex);
-        magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
+        // TODO(fxbug.dev/124976): Unify rebind and production drivers.
+        const char* kRebindDriverPath = "libmsd_arm_rebind.cm";
+        magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI, kRebindDriverPath);
         count += kRestartCount;
       }
       std::this_thread::yield();

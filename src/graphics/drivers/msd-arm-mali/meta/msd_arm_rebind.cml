@@ -4,7 +4,7 @@
 {
     include: [ "//src/graphics/drivers/msd-arm-mali/meta/msd_arm.shard.cml" ],
     program: {
-        bind: "meta/bind/msd_arm_bind.bindbc",
+        bind: "meta/bind/msd_arm_rebind_bind.bindbc",
         compat: "driver/libmsd_arm.so",
     },
 }

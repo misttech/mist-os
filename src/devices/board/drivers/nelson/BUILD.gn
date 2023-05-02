@@ -73,11 +73,11 @@ driver_bind_rules("nelson_emmc_bind") {
   ]
 }
 
-driver_bind_rules("nelson_mali_bind") {
-  rules = "bind/nelson_mali.bind"
-  header_output = "nelson_mali_bind.h"
-  bind_output = "nelson_mali_bind.bc"
-  tests = "bind-tests/nelson_mali-test.json"
+driver_bind_rules("nelson_aml_gpu_bind") {
+  rules = "bind/nelson_aml_gpu.bind"
+  header_output = "nelson_aml_gpu_bind.h"
+  bind_output = "nelson_aml_gpu_bind.bc"
+  tests = "bind-tests/nelson_aml_gpu-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.hardware.registers",
@@ -341,13 +341,13 @@ fuchsia_driver("nelson-module-driver") {
     ":aml_thermal_pll_bind_header",
     ":gt6853_touch_bind_header",
     ":nelson-bind",
+    ":nelson_aml_gpu_bind_header",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
     ":nelson_bt_uart_bind_header",
     ":nelson_buttons_bind_header",
     ":nelson_dwc2_bind_header",
     ":nelson_emmc_bind_header",
-    ":nelson_mali_bind_header",
     ":nelson_ot_radio_bind_header",
     ":nelson_selina_bind_header",
     ":nelson_tee_bind_header",
@@ -378,6 +378,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
+    "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
@@ -441,12 +442,12 @@ group("tests") {
     ":aml_thermal_pll_bind_test",
     ":gt6853_touch_bind_test",
     ":nelson-bind_test",
+    ":nelson_aml_gpu_bind_test",
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_bt_uart_bind_test",
     ":nelson_dwc2_bind_test",
-    ":nelson_mali_bind_test",
     ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",
     ":nelson_wifi_bind_test",

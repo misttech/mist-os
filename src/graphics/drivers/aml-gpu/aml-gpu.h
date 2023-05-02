@@ -67,8 +67,7 @@ class TestAmlGpu;
 
 class AmlGpu;
 using DdkDeviceType =
-    ddk::Device<AmlGpu, ddk::Messageable<fuchsia_hardware_gpu_clock::Clock>::Mixin,
-                ddk::GetProtocolable>;
+    ddk::Device<AmlGpu, ddk::Messageable<fuchsia_hardware_gpu_clock::Clock>::Mixin>;
 
 class AmlGpu final : public DdkDeviceType,
                      public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali>,
@@ -81,7 +80,6 @@ class AmlGpu final : public DdkDeviceType,
   zx_status_t Bind();
 
   void DdkRelease() { delete this; }
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
   void GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) override;
   void EnterProtectedMode(fdf::Arena& arena, EnterProtectedModeCompleter::Sync& completer) override;

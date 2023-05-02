@@ -202,18 +202,6 @@ void AmlGpu::InitClock() {
   gpu_buffer_->Write32(0xfff | (0x20 << 16), 4 * kPwrOverride1);
 }
 
-zx_status_t AmlGpu::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
-  if (proto_id == bind_fuchsia_platform::BIND_PROTOCOL_DEVICE) {
-    pdev_protocol_t* gpu_proto = static_cast<pdev_protocol_t*>(out_proto);
-    // Forward the underlying ops.
-    pdev_.GetProto(gpu_proto);
-    return ZX_OK;
-  } else {
-    zxlogf(ERROR, "Invalid protocol requested: %d", proto_id);
-    return ZX_ERR_INVALID_ARGS;
-  }
-}
-
 void AmlGpu::GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) {
   completer.buffer(arena).Reply(properties_);
 }
@@ -474,10 +462,7 @@ zx_status_t AmlGpu::Bind() {
   };
 
   zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE},
-      {BIND_PLATFORM_DEV_VID, 0, bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_VID_ARM},
-      {BIND_PLATFORM_DEV_PID, 0, bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC},
-      {BIND_PLATFORM_DEV_DID, 0, bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_DID_MAGMA_MALI},
+      {BIND_PROTOCOL, 0, bind_fuchsia_arm_platform::BIND_PROTOCOL_ARM_MALI},
   };
 
   status = DdkAdd(ddk::DeviceAddArgs("aml-gpu")

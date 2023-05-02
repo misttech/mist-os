@@ -66,11 +66,12 @@ driver_bind_rules("astro-cpu-bind") {
   ]
 }
 
-driver_bind_rules("astro-mali-bind") {
-  rules = "bind/astro-mali.bind"
-  header_output = "astro-mali-bind.h"
-  bind_output = "astro-mali-bind.bc"
-  tests = "bind-tests/astro-mali-test.json"
+driver_bind_rules("astro-aml-gpu-bind") {
+  rules = "bind/astro-aml-gpu.bind"
+  header_output = "astro-aml-gpu-bind.h"
+  bind_output = "astro-aml-gpu-bind.bc"
+
+  tests = "bind-tests/astro-aml-gpu-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.hardware.registers",
@@ -249,6 +250,7 @@ fuchsia_driver("astro-driver") {
     "astro.cc",
   ]
   deps = [
+    ":astro-aml-gpu-bind_header",
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
     ":astro-bind",
@@ -256,7 +258,6 @@ fuchsia_driver("astro-driver") {
     ":astro-buttons-bind_header",
     ":astro-cpu-bind_header",
     ":astro-dwc2-phy-bind_header",
-    ":astro-mali-bind_header",
     ":astro-pwm-bind_header",
     ":astro-securemem-bind_header",
     ":astro-tee-bind_header",
@@ -282,6 +283,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
+    "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
@@ -338,6 +340,7 @@ fuchsia_driver_component("astro") {
 group("tests") {
   testonly = true
   deps = [
+    ":astro-aml-gpu-bind_test",
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
     ":astro-bind_test",
@@ -345,7 +348,6 @@ group("tests") {
     ":astro-buttons-bind_test",
     ":astro-cpu-bind_test",
     ":astro-dwc2-phy-bind_test",
-    ":astro-mali-bind_test",
     ":astro-pwm-bind_test",
     ":astro-securemem-bind_test",
     ":astro-tee-bind_test",

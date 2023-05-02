@@ -32,10 +32,10 @@ driver_bind_rules("vim3-sdio-bind") {
   ]
 }
 
-driver_bind_rules("vim3-mali-bind") {
-  rules = "vim3-mali.bind"
-  header_output = "vim3-mali-bind.h"
-  bind_output = "vim3-mali-bind.bc"
+driver_bind_rules("vim3-aml-gpu-bind") {
+  rules = "vim3-aml-gpu.bind"
+  header_output = "vim3-aml-gpu-bind.h"
+  bind_output = "vim3-aml-gpu-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.hardware.registers",
@@ -136,10 +136,10 @@ fuchsia_driver("vim3-driver") {
     "vim3.cc",
   ]
   deps = [
+    ":vim3-aml-gpu-bind_header",
     ":vim3-bind",
     ":vim3-cpu-bind_header",
     ":vim3-emmc-bind_header",
-    ":vim3-mali-bind_header",
     ":vim3-pwm-bind_header",
     ":vim3-sdio-bind_header",
     ":vim3-video-bind_header",
@@ -161,6 +161,7 @@ fuchsia_driver("vim3-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d:fuchsia.amlogic.platform.a311d_cpp",
+    "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
     "//src/devices/bind/fuchsia.ethboard:fuchsia.ethboard_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",

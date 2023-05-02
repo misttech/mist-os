@@ -19,9 +19,25 @@ fuchsia_driver("msd_arm-driver") {
 
 fuchsia_driver_component("msd_arm") {
   component_name = "libmsd_arm"
-  deps = [ ":msd_arm-driver" ]
+  deps = [
+    ":msd_arm-driver",
+    ":msd_arm_bind",
+  ]
   info = "msd_arm-info.json"
   manifest = "meta/msd_arm.cml"
+}
+
+# The driver framework can't use the initial composite bind rules when rebinding a driver, so the
+# "rebind" driver has different bind rules so it can be bound the second time.
+# TODO(fxbug.dev/124976): Unify rebind and production drivers.
+fuchsia_driver_component("msd_arm_rebind") {
+  component_name = "libmsd_arm_rebind"
+  deps = [
+    ":msd_arm-driver",
+    ":msd_arm_rebind_bind",
+  ]
+  info = "msd_arm-info.json"
+  manifest = "meta/msd_arm_rebind.cml"
 }
 
 fuchsia_driver("msd_arm_test-driver") {
@@ -44,14 +60,16 @@ fuchsia_driver("msd_arm_test-driver") {
 fuchsia_driver_component("msd_arm_test") {
   testonly = true
   component_name = "libmsd_arm_test"
-  deps = [ ":msd_arm_test-driver" ]
+  deps = [
+    ":msd_arm_test-driver",
+    ":msd_arm_test_bind",
+  ]
   info = "msd_arm_test-info.json"
   manifest = "meta/msd_arm_test.cml"
 }
 
 driver_bind_rules("msd_arm_bind") {
   rules = "msd_arm.bind"
-  header_output = "bind.h"
   tests = "tests/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.arm.platform",
@@ -59,14 +77,14 @@ driver_bind_rules("msd_arm_bind") {
   ]
 }
 
+driver_bind_rules("msd_arm_rebind_bind") {
+  rules = "msd_arm_rebind.bind"
+}
+
 driver_bind_rules("msd_arm_test_bind") {
   rules = "msd_arm_test.bind"
-  header_output = "test_bind.h"
   disable_autobind = true
-  deps = [
-    "//src/devices/bind/fuchsia.arm.platform",
-    "//src/devices/bind/fuchsia.platform",
-  ]
+  disable_fragment_gen = true
 }
 
 entry_deps = [
@@ -92,10 +110,7 @@ entry_deps = [
 
 source_set("msd_arm_entry") {
   sources = [ "src/driver_entry.cc" ]
-  deps = entry_deps + [
-           ":msd_arm_bind",
-           "src",
-         ]
+  deps = entry_deps + [ "src" ]
 }
 
 source_set("msd_arm_test_entry") {
@@ -107,7 +122,6 @@ source_set("msd_arm_test_entry") {
   ]
   defines = [ "MAGMA_TEST_DRIVER=1" ]
   deps = entry_deps + [
-           ":msd_arm_test_bind",
            "src",
            "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
            "//third_party/googletest:gtest",
@@ -136,7 +150,10 @@ fuchsia_driver_package("msd-arm-mali") {
 
 fuchsia_driver_package("msd-arm-mali-test") {
   testonly = true
-  driver_components = [ ":msd_arm_test" ]
+  driver_components = [
+    ":msd_arm_test",
+    ":msd_arm_rebind",
+  ]
   deps = [ "//src/graphics/lib/magma/tests/unit_tests:test_firmware" ]
 }
 

@@ -28,7 +28,11 @@ TEST(UnitTests, UnitTests) {
   // The test driver will run unit tests on startup.
   magma::TestDeviceBase::RebindDevice(parent_device, kTestDriverPath);
   // Reload the production driver so later tests shouldn't be affected.
-  auto cleanup = fit::defer([&]() { magma::TestDeviceBase::RebindDevice(parent_device); });
+  auto cleanup = fit::defer([&]() {
+    // TODO(fxbug.dev/124976): Unify rebind and production drivers.
+    const char* kRebindDriverPath = "libmsd_arm_rebind.cm";
+    magma::TestDeviceBase::RebindDevice(parent_device, kRebindDriverPath);
+  });
 
   magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_MALI);
 

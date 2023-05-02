@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -28,12 +29,6 @@
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_device.h"
-
-#if !MAGMA_TEST_DRIVER
-#include "src/graphics/drivers/msd-arm-mali/bind.h"  //nogncheck
-#else
-#include "src/graphics/drivers/msd-arm-mali/test_bind.h"  //nogncheck
-#endif
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(zx_device_t* device);
