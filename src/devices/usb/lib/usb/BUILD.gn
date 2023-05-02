@@ -45,6 +45,18 @@ source_set("usb") {
   public_configs = [ ":includes" ]
 }
 
+source_set("usb-fidl") {
+  public = [ "include/usb/request-fidl.h" ]
+  sources = [
+    "include/usb/usb-request.h",
+    "include/usb/usb.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
+  ]
+  public_configs = [ ":includes" ]
+}
+
 source_set("audio") {
   public = [ "include/usb/audio.h" ]
   public_configs = [ ":includes" ]
