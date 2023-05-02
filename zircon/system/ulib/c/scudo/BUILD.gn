@@ -284,31 +284,28 @@ libc_test("gwp_asan-unittests") {
 
   sources = [
     "tests/alignment.cpp",
-
-    # TODO(kostyak): enable when we have backtrace support
-    #"tests/backtrace.cpp",
-
     "tests/basic.cpp",
     "tests/compression.cpp",
     "tests/crash_handler_api.cpp",
 
     # TODO(kostyak): fork() based, see if it can apply to Fuchsia
     #"tests/enable_disable.cpp",
-
     "tests/harness.cpp",
     "tests/harness.h",
     "tests/iterate.cpp",
 
     # TODO(fxbug.dev/65522): flaky due to TLS pollution
     #"tests/late_init.cpp",
-
     "tests/mutex_test.cpp",
     "tests/slot_reuse.cpp",
     "tests/thread_contention.cpp",
+
+    # Exclude because signal handlers used in recoverable tests are unsupported
+    #"tests/recoverable.cpp"
   ]
 
-  # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp to sources after gwp_asan
-  # successfully rolls.
+  # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp and tests/backtrace.cpp
+  # to sources after gwp_asan successfully rolls.
   if (submodules) {
     gwp_asan_git_link_path_list =
         read_file("${gwp_asan_common_vars.dir}/.git", "list lines")
@@ -322,8 +319,12 @@ libc_test("gwp_asan-unittests") {
     gwp_asan_git_revision =
         read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
   }
+
   if (gwp_asan_git_revision != [ "f36df953a3bab8b8e54e1ce7214cb710a5605a1a" ]) {
-    sources += [ "tests/never_allocated.cpp" ]
+    sources += [
+      "tests/backtrace.cpp",
+      "tests/never_allocated.cpp",
+    ]
   }
 
   deps += [
