@@ -11,7 +11,7 @@ use ffx_writer::Writer;
 
 #[ffx_plugin()]
 pub async fn cmd_cat(cmd: CatCommand, mut writer: Writer) -> Result<()> {
-    let mut archive_reader: Box<dyn FarListReader> = Box::new(FarArchiveReader::new(&cmd.archive)?);
+    let mut archive_reader = FarArchiveReader::new(&cmd.archive)?;
 
     cat_implementation(cmd, &mut writer, &mut archive_reader)
 }
@@ -19,7 +19,7 @@ pub async fn cmd_cat(cmd: CatCommand, mut writer: Writer) -> Result<()> {
 fn cat_implementation<W: std::io::Write>(
     cmd: CatCommand,
     writer: &mut W,
-    reader: &mut Box<dyn FarListReader>,
+    reader: &mut dyn FarListReader,
 ) -> Result<()> {
     let file_name = cmd.far_path.to_string_lossy();
 
@@ -37,9 +37,8 @@ fn cat_implementation<W: std::io::Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_package_archive_utils::{
-        test_utils::{create_mockreader, test_contents, LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH},
-        MockFarListReader,
+    use ffx_package_archive_utils::test_utils::{
+        create_mockreader, test_contents, LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH,
     };
     use std::path::PathBuf;
 
@@ -52,13 +51,9 @@ mod tests {
 
         let mut output: Vec<u8> = vec![];
 
-        let mock_reader: MockFarListReader = create_mockreader();
-
         let expected = test_contents(LIB_RUN_SO_BLOB);
 
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mock_reader);
-
-        cat_implementation(cmd, &mut output, &mut boxed_reader)?;
+        cat_implementation(cmd, &mut output, &mut create_mockreader())?;
         assert_eq!(expected, output);
 
         Ok(())

@@ -12,7 +12,7 @@ use prettytable::{cell, format::TableFormat, row, Row, Table};
 
 #[ffx_plugin()]
 pub async fn cmd_list(cmd: ListCommand, mut writer: Writer) -> Result<()> {
-    let mut archive_reader: Box<dyn FarListReader> = Box::new(FarArchiveReader::new(&cmd.archive)?);
+    let mut archive_reader = FarArchiveReader::new(&cmd.archive)?;
     list_implementaion(cmd, /*table_format=*/ None, &mut writer, &mut archive_reader)
 }
 
@@ -22,7 +22,7 @@ fn list_implementaion(
     cmd: ListCommand,
     table_format: Option<TableFormat>,
     writer: &mut Writer,
-    reader: &mut Box<dyn FarListReader>,
+    reader: &mut dyn FarListReader,
 ) -> Result<()> {
     let mut entries = read_file_entries(reader)?;
 
@@ -96,8 +96,7 @@ mod test {
         let cmd = ListCommand { archive: PathBuf::from("some_empty.far"), long_format: false };
 
         let mut writer = Writer::new_test(None);
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mockreader);
-        list_implementaion(cmd, None, &mut writer, &mut boxed_reader)?;
+        list_implementaion(cmd, None, &mut writer, &mut mockreader)?;
 
         assert_eq!(writer.test_output()?, "\n".to_string());
         Ok(())
@@ -132,8 +131,7 @@ mod test {
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
         let mut writer = Writer::new_test(None);
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mockreader);
-        list_implementaion(cmd, None, &mut writer, &mut boxed_reader)?;
+        list_implementaion(cmd, None, &mut writer, &mut mockreader)?;
 
         let expected = r#"
 +-----------------------+
@@ -154,13 +152,10 @@ mod test {
 
     #[test]
     fn test_list_with_meta() -> Result<()> {
-        let mockreader = create_mockreader();
-
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
         let mut writer = Writer::new_test(None);
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mockreader);
-        list_implementaion(cmd, None, &mut writer, &mut boxed_reader)?;
+        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 +-----------------------+
@@ -189,13 +184,10 @@ mod test {
 
     #[test]
     fn test_list_long_format() -> Result<()> {
-        let mockreader = create_mockreader();
-
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: true };
 
         let mut writer = Writer::new_test(None);
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mockreader);
-        list_implementaion(cmd, None, &mut writer, &mut boxed_reader)?;
+        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 +-----------------------+------------------------------------------------------------------+-----------+
@@ -223,13 +215,10 @@ mod test {
 
     #[test]
     fn test_list_machine() -> Result<()> {
-        let mockreader = create_mockreader();
-
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
         let mut writer = Writer::new_test(Some(Format::JsonPretty));
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mockreader);
-        list_implementaion(cmd, None, &mut writer, &mut boxed_reader)?;
+        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 [

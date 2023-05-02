@@ -9,9 +9,14 @@ use fuchsia_merkle::{from_read, MerkleTree};
 use fuchsia_pkg::MetaContents;
 use mockall::automock;
 use serde::Serialize;
-use std::{collections::HashMap, fs::File, io::Cursor, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::Cursor,
+    path::PathBuf,
+};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Hash)]
 pub struct ArchiveEntry {
     pub name: String,
     pub path: String,
@@ -63,22 +68,19 @@ impl FarListReader for FarArchiveReader {
     }
 
     fn list_meta_contents(&mut self) -> Result<(Vec<ArchiveEntry>, HashMap<String, Hash>)> {
-        let meta_entries: Vec<ArchiveEntry>;
-        let meta_contents: HashMap<String, Hash>;
-
         let (meta_entries, meta_contents) = match self.archive.read_file("meta.far") {
             Ok(meta_far_blob) => {
                 let meta_cursor = Cursor::new(meta_far_blob);
                 let mut meta_archive = fuchsia_archive::Utf8Reader::new(meta_cursor)?;
-                meta_entries = meta_archive.list().map(|e| e.into()).collect();
+                let meta_entries = meta_archive.list().map(|e| e.into()).collect();
 
-                let contents_blob = meta_archive.read_file("meta/contents")?;
-                meta_contents =
+                let contents_blob = meta_archive.read_file(MetaContents::PATH)?;
+                let meta_contents =
                     MetaContents::deserialize(contents_blob.as_slice())?.into_contents();
                 (meta_entries, meta_contents)
             }
             Err(Error::PathNotPresent(_)) => (vec![], HashMap::new()),
-            Err(e) => bail!("Error reading meta.far: {}", e),
+            Err(e) => bail!("Error reading meta.far: {:#}", e),
         };
         Ok((meta_entries, meta_contents))
     }
@@ -104,27 +106,21 @@ pub fn get_merkleroot(far_file: &mut File) -> Result<MerkleTree> {
     return Ok(from_read(far_file)?);
 }
 
-pub fn read_file_entries(reader: &mut Box<dyn FarListReader>) -> Result<Vec<ArchiveEntry>> {
+pub fn read_file_entries(reader: &mut dyn FarListReader) -> Result<Vec<ArchiveEntry>> {
     // Create a map of hash to entry. This will be matched against
-    // the file names to has in meta/contents.
-    let mut blob_map: HashMap<String, ArchiveEntry> = HashMap::new();
+    // the file names in meta/contents.
+    let archive_entries: HashMap<_, _> =
+        reader.list_contents()?.into_iter().map(|e| (e.path.clone(), e)).collect();
 
-    for b in reader.list_contents()? {
-        // Map the entries to the ArchiveEntry struct which is serializable. Serialize
-        // is used to support the machine readable interface.
-        blob_map.insert(b.path.to_string(), b);
-    }
-    let mut entries: Vec<ArchiveEntry> = vec![];
-
-    let (meta_list, meta_contents) = reader.list_meta_contents()?;
-
-    entries.extend(meta_list);
+    let (mut entries, meta_contents) = reader.list_meta_contents()?;
 
     // Match the hash of the file from the contents list to a
     // blob entry in the archive. If it is missing, mark the length
     // and offset as zero.
+    let mut used_archive_entries = HashSet::new();
     for (name, hash) in meta_contents {
-        if let Some(mut blob) = blob_map.remove(&hash.to_string()) {
+        if let Some(mut blob) = archive_entries.get(&hash.to_string()).cloned() {
+            used_archive_entries.insert(hash.to_string());
             blob.name = name.to_string();
             entries.push(blob);
         } else {
@@ -139,8 +135,10 @@ pub fn read_file_entries(reader: &mut Box<dyn FarListReader>) -> Result<Vec<Arch
     // After processing meta/contents, or if there is no meta.far in this archive,
     // there will be unreferenced blob entries listed, so add them to the
     // output.
-    for (_, v) in blob_map.drain() {
-        entries.push(v);
+    for (path, entry) in archive_entries {
+        if !used_archive_entries.contains(&path) {
+            entries.push(entry);
+        }
     }
 
     Ok(entries)
@@ -214,5 +212,39 @@ pub mod test_utils {
 
     pub fn test_contents(value: &str) -> Vec<u8> {
         format!("Contents for {}", value).into_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::test_utils::BLOB1, super::*};
+
+    #[test]
+    fn read_file_entries_handles_duplicate_content_blobs() {
+        let mut mockreader = MockFarListReader::new();
+        mockreader.expect_list_contents().returning(|| {
+            Ok(vec![ArchiveEntry { name: BLOB1.into(), path: BLOB1.into(), length: 1 }])
+        });
+        mockreader.expect_list_meta_contents().returning(|| {
+            Ok((
+                vec![],
+                HashMap::from([
+                    ("first-copy".into(), BLOB1.parse().unwrap()),
+                    ("second-copy".into(), BLOB1.parse().unwrap()),
+                ]),
+            ))
+        });
+
+        let mut entries = read_file_entries(&mut mockreader).unwrap();
+        entries.sort_unstable();
+
+        // Both package entries that are backed by BLOB1 will be present and have the correct size.
+        assert_eq!(
+            entries,
+            vec![
+                ArchiveEntry { name: "first-copy".into(), path: BLOB1.into(), length: 1 },
+                ArchiveEntry { name: "second-copy".into(), path: BLOB1.into(), length: 1 }
+            ]
+        );
     }
 }

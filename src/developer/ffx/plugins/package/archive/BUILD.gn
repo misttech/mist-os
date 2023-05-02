@@ -36,6 +36,9 @@ rustc_library("lib") {
     "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:serde",
   ]
+}
 
-  test_deps = []
+group("tests") {
+  testonly = true
+  public_deps = [ ":lib_test($host_toolchain)" ]
 }
