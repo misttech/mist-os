@@ -11,14 +11,15 @@ impl DefineSubsystemConfiguration<()> for RadarSubsystemConfig {
         _: &(),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let is_eng_or_user_debug =
-            matches!(context.build_type, BuildType::Eng | BuildType::UserDebug);
+        if context.board_info.provides_feature("fuchsia::radar") {
+            let is_eng_or_user_debug =
+                matches!(context.build_type, BuildType::Eng | BuildType::UserDebug);
 
-        // TODO(fxbug.dev/125806): Only configure radar-proxy if it is included in the build.
-        builder
-            .package("radar-proxy")
-            .component("meta/radar-proxy.cm")?
-            .field("proxy_radar_burst_reader", is_eng_or_user_debug)?;
+            builder
+                .package("radar-proxy")
+                .component("meta/radar-proxy.cm")?
+                .field("proxy_radar_burst_reader", is_eng_or_user_debug)?;
+        }
 
         Ok(())
     }
