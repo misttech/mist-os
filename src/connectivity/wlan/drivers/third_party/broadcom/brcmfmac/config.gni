@@ -19,33 +19,40 @@ import("//build/drivers.gni")
 # driver_library_files list.
 
 template("brcmfmac_driver") {
-  forward_variables_from(invoker,
-                         [
-                           "board",
-                           "chip",
-                           "bus",
-                           "clm_present",
-                         ])
+  if (internal_access) {
+    forward_variables_from(invoker,
+                           [
+                             "board",
+                             "chip",
+                             "bus",
+                             "clm_present",
+                           ])
+  } else {
+    not_needed(invoker, "*")
+  }
   orig_target_name = target_name
+  _deps = []
 
-  resource("brcmfmac-firmware-${orig_target_name}") {
-    sources = [ "firmware/${chip}-${bus}-${board}.bin" ]
-    outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.bin" ]
-  }
-  resource("brcmfmac-nvram-${orig_target_name}") {
-    sources = [ "firmware/${chip}-${bus}-${board}.txt" ]
-    outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.txt" ]
-  }
-  _deps = [
-    ":brcmfmac-firmware-${orig_target_name}",
-    ":brcmfmac-nvram-${orig_target_name}",
-  ]
-  if (clm_present) {
-    resource("brcmfmac-clm-${orig_target_name}") {
-      sources = [ "firmware/${chip}-${bus}-${board}.clm_blob" ]
-      outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.clm_blob" ]
+  if (internal_access) {
+    resource("brcmfmac-firmware-${orig_target_name}") {
+      sources = [ "firmware/${chip}-${bus}-${board}.bin" ]
+      outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.bin" ]
     }
-    _deps += [ ":brcmfmac-clm-${orig_target_name}" ]
+    resource("brcmfmac-nvram-${orig_target_name}") {
+      sources = [ "firmware/${chip}-${bus}-${board}.txt" ]
+      outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.txt" ]
+    }
+    _deps += [
+      ":brcmfmac-firmware-${orig_target_name}",
+      ":brcmfmac-nvram-${orig_target_name}",
+    ]
+    if (clm_present) {
+      resource("brcmfmac-clm-${orig_target_name}") {
+        sources = [ "firmware/${chip}-${bus}-${board}.clm_blob" ]
+        outputs = [ "lib/firmware/brcmfmac/${chip}-${bus}.clm_blob" ]
+      }
+      _deps += [ ":brcmfmac-clm-${orig_target_name}" ]
+    }
   }
 
   # Targets not needed for the driver itself, but should be included whenever
