@@ -328,24 +328,6 @@ class UsbXhci : public UsbXhciType,
   // number we create to save resources for now.
   static constexpr uint16_t kMaxInterrupters = 2;
 
-  struct UsbRequestState;
-
-  // Performs the allocation phase of the control request
-  // (allocates TRBs for the request)
-  void ControlRequestAllocationPhase(UsbRequestState* state);
-
-  // Performs the status phase of a control request
-  static void ControlRequestStatusPhase(UsbRequestState* state);
-
-  // Performs the data transfer phase of a control request
-  void ControlRequestDataPhase(UsbRequestState* state);
-
-  // Performs the setup phase of a control request
-  static void ControlRequestSetupPhase(UsbRequestState* state);
-
-  // Starts the transfer of a control request
-  void ControlRequestCommit(UsbRequestState* state);
-
   template <typename T>
   void PostCallback(T&& callback) {
     ddk_interaction_executor_.schedule_task(fpromise::make_ok_promise().then(

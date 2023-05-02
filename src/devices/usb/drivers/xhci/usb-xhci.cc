@@ -90,89 +90,6 @@ int ComputeInterval(const usb_endpoint_descriptor_t* ep, usb_speed_t speed) {
 
 }  // namespace
 
-// Tracks the state of a USB request
-// This state is passed around to the various transfer request
-// queueing methods, and its lifetime should not outlast
-// the lifetime of the transaction. This struct should be
-// stack-allocated.
-// None of the values in this field should be accessed
-// after the USB transaction has been sent to hardware.
-struct UsbXhci::UsbRequestState {
-  // Invokes the completion callback if the request was marked as completed.
-  // Returns true if the completer was called, false otherwise.
-  bool Complete();
-
-  // Request status
-  zx_status_t status;
-
-  // Number of bytes transferred
-  size_t bytes_transferred = 0;
-
-  // Whether or not the request is complete
-  bool complete = false;
-
-  // Size of the slot in bytes
-  size_t slot_size_bytes;
-
-  // Max burst size (value of the max burst size register + 1, since it is zero-based)
-  uint32_t burst_size;
-
-  // Max packet size
-  uint32_t max_packet_size;
-
-  // True if the current transfer is isochronous
-  bool is_isochronous_transfer;
-
-  // First TRB in the transfer
-  // This is owned by the transfer ring.
-  TRB* first_trb = nullptr;
-
-  // Value to set the cycle bit on the first TRB to
-  bool first_cycle;
-
-  // TransferRing transaction state
-  TransferRing::State transaction;
-
-  ContiguousTRBInfo info;
-
-  // The transfer ring to post transactions to
-  // This is owned by UsbXhci and is valid for
-  // the duration of this transaction.
-  TransferRing* transfer_ring;
-
-  // Index of the transfer ring
-  uint8_t index;
-
-  // Transfer context
-  std::unique_ptr<TRBContext> context;
-
-  // The number of packets in the transfer
-  size_t packet_count = 0;
-
-  // The slot ID of the transfer
-  uint8_t slot;
-
-  // Total length of the transfer
-  uint32_t total_len = 0;
-
-  // The setup TRB
-  // This is owned by the transfer ring.
-  TRB* setup;
-
-  // The interrupter to use
-  uint8_t interrupter = 0;
-
-  // Pointer to the status TRB
-  // This is owned by the transfer ring.
-  TRB* status_trb_ptr = nullptr;
-
-  // Cycle bit of the setup TRB during the allocation phase
-  bool setup_cycle;
-  // Last TRB in the transfer
-  // This is owned by the transfer ring.
-  TRB* last_trb;
-};
-
 bool UsbXhci::Running() const { return running_; }
 
 void UsbXhci::RingDoorbell(uint8_t slot, uint8_t target) {
@@ -719,10 +636,6 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
 
   request.TraceFlow();
 
-  if (!running_) {
-    request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-    return;
-  }
   if (request.request()->header.device_id >= params_.MaxSlots()) {
     request.Complete(ZX_ERR_INVALID_ARGS, 0);
     return;
@@ -734,243 +647,28 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
     return;
   }
   Endpoint* ep;
+  uint8_t slot;
+  uint8_t ep_addr = request.request()->header.ep_address;
+  uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(ep_addr) - 1);
   {
     fbl::AutoLock _(&state->transaction_lock());
-    if (state->IsDisconnecting()) {
+    slot = state->GetSlot();
+    if (!slot) {
       request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
       return;
     }
-    if (!state->GetSlot()) {
-      request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-      return;
-    }
-    if (request.request()->header.ep_address) {
-      uint8_t index =
-          static_cast<uint8_t>(XhciEndpointIndex(request.request()->header.ep_address) - 1);
+    if (unlikely(ep_addr == 0)) {
+      ep = &state->GetEndpoint();
+    } else {
       ep = &state->GetEndpoint(index);
     }
   }
-  if (unlikely(request.request()->header.ep_address == 0)) {
-    UsbHciControlRequestQueue(std::move(request));
+  ep->QueueRequest(std::move(request));
+  if (unlikely(ep_addr == 0)) {
+    RingDoorbell(slot, 1);
   } else {
-    ep->NormalRequestQueue(std::move(request));
+    RingDoorbell(slot, 2 + index);
   }
-}
-
-bool UsbXhci::UsbRequestState::Complete() {
-  if (complete) {
-    std::get<Request>(*context->request).Complete(status, bytes_transferred);
-    return true;
-  }
-  return false;
-}
-
-void UsbXhci::UsbHciControlRequestQueue(Request req) {
-  auto device_state = device_state_[req.request()->header.device_id];
-  if (!device_state) {
-    zxlogf(ERROR, "%s expects that slot is in use. device_state should not be nullptr", __func__);
-    req.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-    return;
-  }
-  fbl::AutoLock transaction_lock(&device_state->transaction_lock());
-  if (device_state->IsDisconnecting()) {
-    // Device is disconnecting. Release lock because we no longer will be using device_state,
-    // complete request, and return from function.
-    transaction_lock.release();
-    req.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-    return;
-  }
-  auto& transfer_ring = device_state->GetEndpoint().transfer_ring();
-  if (transfer_ring.stalled()) {
-    transaction_lock.release();
-    req.Complete(ZX_ERR_IO_REFUSED, 0);
-    return;
-  }
-  auto context = transfer_ring.AllocateContext();
-  if (!context) {
-    transaction_lock.release();
-    req.Complete(ZX_ERR_NO_MEMORY, 0);
-    return;
-  }
-  TransferRing::State transaction;
-  TRB* setup;
-  zx_status_t status = transfer_ring.AllocateTRB(&setup, &transaction);
-  auto rollback_transaction = [&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    transfer_ring.Restore(transaction);
-  };
-  if (status != ZX_OK) {
-    rollback_transaction();
-    transaction_lock.release();
-    req.Complete(status, 0);
-    return;
-  }
-
-  context->request = std::move(req);
-  UsbRequestState pending_transfer;
-  pending_transfer.context = std::move(context);
-  pending_transfer.setup = setup;
-  pending_transfer.transaction = transaction;
-  pending_transfer.transfer_ring = &transfer_ring;
-  pending_transfer.slot = device_state->GetSlot();
-  ControlRequestAllocationPhase(&pending_transfer);
-  auto call = fit::defer([&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    rollback_transaction();
-    transaction_lock.release();
-    pending_transfer.Complete();
-  });
-  if (pending_transfer.complete) {
-    return;
-  }
-  ControlRequestStatusPhase(&pending_transfer);
-  if (pending_transfer.complete) {
-    return;
-  }
-  ControlRequestDataPhase(&pending_transfer);
-  if (pending_transfer.complete) {
-    return;
-  }
-  ControlRequestSetupPhase(&pending_transfer);
-  if (pending_transfer.complete) {
-    return;
-  }
-  ControlRequestCommit(&pending_transfer);
-  call.cancel();
-}
-
-void UsbXhci::ControlRequestAllocationPhase(UsbRequestState* state) {
-  state->setup_cycle = state->setup->status;
-  state->setup->status = 0;
-  if (std::get<Request>(*state->context->request).request()->header.length) {
-    zx_status_t status = std::get<Request>(*state->context->request).PhysMap(bti_);
-    if (status != ZX_OK) {
-      state->status = status;
-      state->complete = true;
-      state->bytes_transferred = 0;
-      return;
-    }
-    TRB* current_trb = nullptr;
-    for (auto [paddr, len] : std::get<Request>(*state->context->request).phys_iter(k64KiB)) {
-      if (!len) {
-        break;
-      }
-      state->packet_count++;
-      TRB* prev = current_trb;
-      zx_status_t status = state->transfer_ring->AllocateTRB(&current_trb, nullptr);
-      if (status != ZX_OK) {
-        state->status = status;
-        state->complete = true;
-        state->bytes_transferred = 0;
-        return;
-      }
-      static_assert(sizeof(TRB*) == sizeof(uint64_t));
-      if (likely(prev)) {
-        prev->ptr = reinterpret_cast<uint64_t>(current_trb);
-      } else {
-        state->first_trb = current_trb;
-      }
-    }
-  }
-}
-
-void UsbXhci::ControlRequestStatusPhase(UsbRequestState* state) {
-  state->interrupter = 0;
-  bool status_in = true;
-  // See table 4-7 in section 4.11.2.2
-  if (state->first_trb &&
-      (std::get<Request>(*state->context->request).request()->setup.bm_request_type & USB_DIR_IN)) {
-    status_in = false;
-  }
-  zx_status_t status = state->transfer_ring->AllocateTRB(&state->status_trb_ptr, nullptr);
-  if (status != ZX_OK) {
-    state->status = status;
-    state->complete = true;
-    state->bytes_transferred = 0;
-    return;
-  }
-  Control::FromTRB(state->status_trb_ptr)
-      .set_Cycle(state->status_trb_ptr->status)
-      .set_Type(Control::Status)
-      .ToTrb(state->status_trb_ptr);
-  state->status_trb_ptr->status = 0;
-  auto* status_trb = static_cast<Status*>(state->status_trb_ptr);
-  status_trb->set_DIRECTION(status_in).set_INTERRUPTER(state->interrupter).set_IOC(1);
-}
-
-void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
-  // Data stage
-  if (state->first_trb) {
-    TRB* current = state->first_trb;
-    for (auto [paddr, len] : std::get<Request>(*state->context->request).phys_iter(k64KiB)) {
-      if (!len) {
-        break;
-      }
-      state->packet_count--;
-      TRB* next = reinterpret_cast<TRB*>(current->ptr);
-      uint32_t pcs = current->status;
-      current->status = 0;
-      enum Control::Type type;
-      if (current == state->first_trb) {
-        type = Control::Data;
-        ControlData* data = reinterpret_cast<ControlData*>(current);
-        // Control transfers always get interrupter 0 (we consider those to be low-priority)
-        // TODO (fxbug.dev/34068): Change bus snooping options based on input from higher-level
-        // drivers.
-        data->set_CHAIN(next != nullptr)
-            .set_DIRECTION(
-                (std::get<Request>(*state->context->request).request()->setup.bm_request_type &
-                 USB_DIR_IN) != 0)
-            .set_INTERRUPTER(0)
-            .set_LENGTH(len)
-            .set_SIZE(state->packet_count)
-            .set_ISP(true)
-            .set_NO_SNOOP(!has_coherent_cache_);
-      } else {
-        type = Control::Normal;
-        Normal* data = reinterpret_cast<Normal*>(current);
-        data->set_CHAIN(next != nullptr)
-            .set_INTERRUPTER(0)
-            .set_LENGTH(len)
-            .set_SIZE(state->packet_count)
-            .set_ISP(true)
-            .set_NO_SNOOP(!has_coherent_cache_);
-      }
-      current->ptr = paddr;
-      Control::FromTRB(current).set_Cycle(pcs).set_Type(type).ToTrb(current);
-      current = next;
-    }
-  }
-}
-
-void UsbXhci::ControlRequestSetupPhase(UsbRequestState* state) {
-  // Setup phase (4.11.2.2)
-  memcpy(&state->setup->ptr, &std::get<Request>(*state->context->request).request()->setup,
-         sizeof(std::get<Request>(*state->context->request).request()->setup));
-  Setup* setup_trb = reinterpret_cast<Setup*>(state->setup);
-  setup_trb->set_INTERRUPTER(state->interrupter)
-      .set_length(8)
-      .set_IDT(1)
-      .set_TRT(((std::get<Request>(*state->context->request).request()->setup.bm_request_type &
-                 USB_DIR_IN) != 0)
-                   ? Setup::IN
-                   : Setup::OUT);
-  hw_mb();
-}
-
-void UsbXhci::ControlRequestCommit(UsbRequestState* state) {
-  // Start the transaction!
-  if (!has_coherent_cache_) {
-    usb_request_cache_flush_invalidate(
-        std::get<Request>(*state->context->request).request(), 0,
-        std::get<Request>(*state->context->request).request()->header.length);
-  }
-  state->transfer_ring->AssignContext(state->status_trb_ptr, std::move(state->context),
-                                      state->first_trb);
-  Control::FromTRB(state->setup)
-      .set_Type(Control::Setup)
-      .set_Cycle(state->setup_cycle)
-      .ToTrb(state->setup);
-  state->transfer_ring->CommitTransaction(state->transaction);
-  DOORBELL::Get(doorbell_offset_, state->slot).FromValue(0).set_Target(1).WriteTo(&mmio_.value());
 }
 
 void UsbXhci::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf) {

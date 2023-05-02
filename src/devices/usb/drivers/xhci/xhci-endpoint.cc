@@ -15,6 +15,20 @@ Endpoint::Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address)
   loop_.StartThread("endpoint-thread");
 }
 
+namespace {
+
+inline usb_setup_t ToBanjo(fuchsia_hardware_usb_descriptor::UsbSetup setup) {
+  return usb_setup_t{
+      .bm_request_type = setup.bm_request_type(),
+      .b_request = setup.b_request(),
+      .w_value = setup.w_value(),
+      .w_index = setup.w_index(),
+      .w_length = setup.w_length(),
+  };
+}
+
+}  // namespace
+
 zx_status_t Endpoint::Init(EventRing* event_ring, fdf::MmioBuffer* mmio) {
   return transfer_ring_.Init(hci_->GetPageSize(), hci_->bti(), event_ring,
                              hci_->Is32BitController(), mmio, hci_);
@@ -44,7 +58,7 @@ void Endpoint::QueueRequests(QueueRequestsRequest& request,
     QueueRequest(usb::FidlRequest{std::move(req)});
   }
   uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(ep_addr()) - 1);
-  hci_->RingDoorbell(hci_->GetDeviceState()[device_id_]->GetSlot(), 2 + index);
+  hci_->RingDoorbell(hci_->GetDeviceState()[device_id_]->GetSlot(), ep_addr() ? 2 + index : 1);
 }
 
 void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
@@ -56,7 +70,7 @@ void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
   completer.Reply(fit::ok());
 }
 
-void Endpoint::QueueRequest(usb::FidlRequest request) {
+void Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
   if (!hci_->Running()) {
     RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
     return;
@@ -69,10 +83,243 @@ void Endpoint::QueueRequest(usb::FidlRequest request) {
     }
   }
   if (unlikely(ep_addr() == 0)) {
-    RequestComplete(ZX_ERR_NOT_SUPPORTED, 0, std::move(request));
-    return;
+    return ControlRequestQueue(std::move(request));
   }
   NormalRequestQueue(std::move(request));
+}
+
+void Endpoint::ControlRequestQueue(usb_endpoint::RequestVariant request) {
+  fbl::AutoLock transaction_lock(&hci_->GetDeviceState()[device_id_]->transaction_lock());
+  if (hci_->GetDeviceState()[device_id_]->IsDisconnecting()) {
+    // Device is disconnecting. Release lock because we no longer will be using device_state,
+    // complete request, and return from function.
+    transaction_lock.release();
+    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
+    return;
+  }
+  if (transfer_ring_.stalled()) {
+    transaction_lock.release();
+    RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(request));
+    return;
+  }
+  auto context = transfer_ring_.AllocateContext();
+  if (!context) {
+    transaction_lock.release();
+    RequestComplete(ZX_ERR_NO_MEMORY, 0, std::move(request));
+    return;
+  }
+  TransferRing::State transaction;
+  TRB* setup;
+  zx_status_t status = transfer_ring_.AllocateTRB(&setup, &transaction);
+  auto rollback_transaction = [=]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    transfer_ring_.Restore(transaction);
+  };
+  if (status != ZX_OK) {
+    rollback_transaction();
+    transaction_lock.release();
+    RequestComplete(status, 0, std::move(request));
+    return;
+  }
+
+  context->request.emplace(std::move(request));
+  UsbRequestState pending_transfer;
+  pending_transfer.context = std::move(context);
+  pending_transfer.setup = setup;
+  pending_transfer.transaction = transaction;
+  status = ControlRequestAllocationPhase(&pending_transfer);
+  auto call = fit::defer([&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    rollback_transaction();
+    transaction_lock.release();
+    RequestComplete(status, 0, std::move(*context->request));
+  });
+  if (status != ZX_OK) {
+    return;
+  }
+  status = ControlRequestStatusPhase(&pending_transfer);
+  if (status != ZX_OK) {
+    return;
+  }
+  status = ControlRequestDataPhase(&pending_transfer);
+  if (status != ZX_OK) {
+    return;
+  }
+  ControlRequestSetupPhase(&pending_transfer);
+  ControlRequestCommit(&pending_transfer);
+  call.cancel();
+}
+
+zx_status_t Endpoint::ControlRequestAllocationPhase(UsbRequestState* state) {
+  state->setup_cycle = state->setup->status;
+  state->setup->status = 0;
+  size_t length = std::holds_alternative<usb::FidlRequest>(*state->context->request)
+                      ? std::get<usb::FidlRequest>(*state->context->request).length()
+                      : std::get<Request>(*state->context->request).request()->header.length;
+  if (length) {
+    auto status = std::visit([&](auto&& req) -> zx_status_t { return req.PhysMap(hci_->bti()); },
+                             *state->context->request);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    auto iters = get_iter(*state->context->request, k64KiB);
+    if (iters.is_error()) {
+      return iters.error_value();
+    }
+
+    TRB* current_trb = nullptr;
+    for (auto& iter : iters.value()) {
+      for (auto [paddr, len] : iter) {
+        if (!len) {
+          break;
+        }
+        state->packet_count++;
+        TRB* prev = current_trb;
+        zx_status_t status = transfer_ring_.AllocateTRB(&current_trb, nullptr);
+        if (status != ZX_OK) {
+          return status;
+        }
+        static_assert(sizeof(TRB*) == sizeof(uint64_t));
+        if (likely(prev)) {
+          prev->ptr = reinterpret_cast<uint64_t>(current_trb);
+        } else {
+          state->first_trb = current_trb;
+        }
+      }
+    }
+  }
+  return ZX_OK;
+}
+
+zx_status_t Endpoint::ControlRequestStatusPhase(UsbRequestState* state) {
+  state->interrupter = 0;
+  bool status_in = true;
+  // See table 4-7 in section 4.11.2.2
+  auto bm_request_type =
+      std::holds_alternative<Request>(*state->context->request)
+          ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
+          : std::get<usb::FidlRequest>(*state->context->request)
+                .request()
+                .information()
+                ->control()
+                ->setup()
+                ->bm_request_type();
+  if (state->first_trb && (bm_request_type & USB_DIR_IN)) {
+    status_in = false;
+  }
+  zx_status_t status = transfer_ring_.AllocateTRB(&state->status_trb_ptr, nullptr);
+  if (status != ZX_OK) {
+    return status;
+  }
+  Control::FromTRB(state->status_trb_ptr)
+      .set_Cycle(state->status_trb_ptr->status)
+      .set_Type(Control::Status)
+      .ToTrb(state->status_trb_ptr);
+  state->status_trb_ptr->status = 0;
+  auto* status_trb = static_cast<Status*>(state->status_trb_ptr);
+  status_trb->set_DIRECTION(status_in).set_INTERRUPTER(state->interrupter).set_IOC(1);
+  return ZX_OK;
+}
+
+zx_status_t Endpoint::ControlRequestDataPhase(UsbRequestState* state) {
+  // Data stage
+  if (state->first_trb) {
+    auto iters = get_iter(*state->context->request, k64KiB);
+    if (iters.is_error()) {
+      return iters.error_value();
+    }
+
+    TRB* current = state->first_trb;
+    for (auto& iter : iters.value()) {
+      for (auto [paddr, len] : iter) {
+        if (!len) {
+          break;
+        }
+        state->packet_count--;
+        TRB* next = reinterpret_cast<TRB*>(current->ptr);
+        uint32_t pcs = current->status;
+        current->status = 0;
+        enum Control::Type type;
+        if (current == state->first_trb) {
+          type = Control::Data;
+          ControlData* data = reinterpret_cast<ControlData*>(current);
+          auto bm_request_type =
+              std::holds_alternative<Request>(*state->context->request)
+                  ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
+                  : std::get<usb::FidlRequest>(*state->context->request)
+                        .request()
+                        .information()
+                        ->control()
+                        ->setup()
+                        ->bm_request_type();
+          // Control transfers always get interrupter 0 (we consider those to be low-priority)
+          // TODO (fxbug.dev/34068): Change bus snooping options based on input from higher-level
+          // drivers.
+          data->set_CHAIN(next != nullptr)
+              .set_DIRECTION((bm_request_type & USB_DIR_IN) != 0)
+              .set_INTERRUPTER(0)
+              .set_LENGTH(len)
+              .set_SIZE(state->packet_count)
+              .set_ISP(true)
+              .set_NO_SNOOP(!hci_->HasCoherentCache());
+        } else {
+          type = Control::Normal;
+          Normal* data = reinterpret_cast<Normal*>(current);
+          data->set_CHAIN(next != nullptr)
+              .set_INTERRUPTER(0)
+              .set_LENGTH(len)
+              .set_SIZE(state->packet_count)
+              .set_ISP(true)
+              .set_NO_SNOOP(!hci_->HasCoherentCache());
+        }
+        current->ptr = paddr;
+        Control::FromTRB(current).set_Cycle(pcs).set_Type(type).ToTrb(current);
+        current = next;
+      }
+    }
+  }
+  return ZX_OK;
+}
+
+void Endpoint::ControlRequestSetupPhase(UsbRequestState* state) {
+  // Setup phase (4.11.2.2)
+  auto bm_request_type =
+      std::holds_alternative<Request>(*state->context->request)
+          ? std::get<Request>(*state->context->request).request()->setup.bm_request_type
+          : std::get<usb::FidlRequest>(*state->context->request)
+                .request()
+                .information()
+                ->control()
+                ->setup()
+                ->bm_request_type();
+  const auto& setup = std::holds_alternative<Request>(*state->context->request)
+                          ? std::get<Request>(*state->context->request).request()->setup
+                          : ToBanjo(*std::get<usb::FidlRequest>(*state->context->request)
+                                         .request()
+                                         .information()
+                                         ->control()
+                                         ->setup());
+  memcpy(&state->setup->ptr, &setup, sizeof(setup));
+  Setup* setup_trb = reinterpret_cast<Setup*>(state->setup);
+  setup_trb->set_INTERRUPTER(state->interrupter)
+      .set_length(8)
+      .set_IDT(1)
+      .set_TRT(((bm_request_type & USB_DIR_IN) != 0) ? Setup::IN : Setup::OUT);
+  hw_mb();
+}
+
+void Endpoint::ControlRequestCommit(UsbRequestState* state) {
+  // Start the transaction!
+  if (std::holds_alternative<Request>(*state->context->request) && !hci_->HasCoherentCache()) {
+    usb_request_cache_flush_invalidate(
+        std::get<Request>(*state->context->request).request(), 0,
+        std::get<Request>(*state->context->request).request()->header.length);
+  }
+  transfer_ring_.AssignContext(state->status_trb_ptr, std::move(state->context), state->first_trb);
+  Control::FromTRB(state->setup)
+      .set_Type(Control::Setup)
+      .set_Cycle(state->setup_cycle)
+      .ToTrb(state->setup);
+  transfer_ring_.CommitTransaction(state->transaction);
 }
 
 void Endpoint::NormalRequestQueue(usb_endpoint::RequestVariant request) {
@@ -357,8 +604,7 @@ zx_status_t Endpoint::ContinueNormalTransaction(UsbRequestState* state) {
 void Endpoint::CommitNormalTransaction(UsbRequestState* state) {
   hw_mb();
   // Start the transaction!
-  bool is_banjo = std::holds_alternative<Request>(*state->context->request);
-  if (is_banjo) {
+  if (std::holds_alternative<Request>(*state->context->request) && !hci_->HasCoherentCache()) {
     usb_request_cache_flush_invalidate(
         std::get<Request>(*state->context->request).request(), 0,
         std::get<Request>(*state->context->request).request()->header.length);
@@ -368,10 +614,6 @@ void Endpoint::CommitNormalTransaction(UsbRequestState* state) {
   Control::FromTRB(state->first_trb).set_Cycle(state->first_cycle).ToTrb(state->first_trb);
 
   transfer_ring_.CommitTransaction(state->transaction);
-  if (is_banjo) {
-    uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(ep_addr()) - 1);
-    hci_->RingDoorbell(hci_->GetDeviceState()[device_id_]->GetSlot(), 2 + index);
-  }
 }
 
 }  // namespace usb_xhci

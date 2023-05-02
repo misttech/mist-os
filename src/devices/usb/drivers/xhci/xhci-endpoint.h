@@ -57,8 +57,7 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
   TransferRing& transfer_ring() { return transfer_ring_; }
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
-  // TODO: move this back to private when control requests are also migrated
-  void NormalRequestQueue(usb_endpoint::RequestVariant request);
+  void QueueRequest(usb_endpoint::RequestVariant request);
 
  private:
   // In addition to usb_endpoint::UsbEndpoint::OnUnbound, calls CancelAll and DisableEndpoint.
@@ -93,17 +92,34 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
     // Total length of the transfer
     uint32_t total_len = 0;
 
+    // The setup TRB
+    // This is owned by the transfer ring.
+    TRB* setup;
+
     // The interrupter to use
     uint8_t interrupter = 0;
 
+    // Pointer to the status TRB
+    // This is owned by the transfer ring.
+    TRB* status_trb_ptr = nullptr;
+
+    // Cycle bit of the setup TRB during the allocation phase
+    bool setup_cycle;
     // Last TRB in the transfer
     // This is owned by the transfer ring.
     TRB* last_trb;
   };
 
-  // Queues a single usb::FidlRequest
-  void QueueRequest(usb::FidlRequest request);
+  // Helper functions for ControlRequestQueue
+  void ControlRequestQueue(usb_endpoint::RequestVariant request);
+  zx_status_t ControlRequestAllocationPhase(UsbRequestState* state);
+  zx_status_t ControlRequestStatusPhase(UsbRequestState* state);
+  zx_status_t ControlRequestDataPhase(UsbRequestState* state);
+  void ControlRequestSetupPhase(UsbRequestState* state);
+  void ControlRequestCommit(UsbRequestState* state);
+
   // Helper functions for NormalRequestQueue
+  void NormalRequestQueue(usb_endpoint::RequestVariant request);
   zx_status_t WaitForIsochronousReady(uint64_t target_frame);
   zx_status_t StartNormalTransaction(UsbRequestState* state, uint8_t interrupter_target);
   zx_status_t ContinueNormalTransaction(UsbRequestState* state);
