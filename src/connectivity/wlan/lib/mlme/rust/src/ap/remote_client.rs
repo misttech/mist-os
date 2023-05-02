@@ -7,6 +7,7 @@ use {
         ap::{frame_writer, BufferedFrame, Context, TimedEvent},
         buffer::{InBuf, OutBuf},
         ddk_converter,
+        device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
     },
@@ -197,7 +198,11 @@ impl RemoteClient {
         }
     }
 
-    fn change_state(&mut self, ctx: &mut Context, next_state: State) -> Result<(), Error> {
+    fn change_state<D: DeviceOps>(
+        &mut self,
+        ctx: &mut Context<D>,
+        next_state: State,
+    ) -> Result<(), Error> {
         match self.state.as_mut() {
             State::Associated { .. } => {
                 ctx.device
@@ -210,16 +215,16 @@ impl RemoteClient {
         Ok(())
     }
 
-    fn schedule_after(
+    fn schedule_after<D>(
         &self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         duration: zx::Duration,
         event: ClientEvent,
     ) -> EventId {
         ctx.schedule_after(duration, TimedEvent::ClientEvent(self.addr, event))
     }
 
-    fn schedule_bss_idle_timeout(&self, ctx: &mut Context) -> EventId {
+    fn schedule_bss_idle_timeout<D>(&self, ctx: &mut Context<D>) -> EventId {
         self.schedule_after(
             ctx,
             // dot11BssMaxIdlePeriod (IEEE Std 802.11-2016, 11.24.13 and Annex C.3) is measured in
@@ -231,9 +236,9 @@ impl RemoteClient {
         )
     }
 
-    fn handle_bss_idle_timeout(
+    fn handle_bss_idle_timeout<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         event_id: EventId,
     ) -> Result<(), ClientRejection> {
         match self.state.as_ref() {
@@ -278,7 +283,7 @@ impl RemoteClient {
     ///
     /// If we receive a WLAN frame, we need to reset the clock on disassociating the client after
     /// timeout.
-    fn reset_bss_max_idle_timeout(&mut self, ctx: &mut Context) {
+    fn reset_bss_max_idle_timeout<D>(&mut self, ctx: &mut Context<D>) {
         // TODO(fxbug.dev/37891): IEEE Std 802.11-2016, 9.4.2.79 specifies a "Protected Keep-Alive Required"
         // option that indicates that only a protected frame indicates activity. It is unclear how
         // this interacts with open networks.
@@ -302,9 +307,9 @@ impl RemoteClient {
         frame_class <= self.state.as_ref().max_frame_class()
     }
 
-    pub fn handle_event(
+    pub fn handle_event<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         event_id: EventId,
         event: ClientEvent,
     ) -> Result<(), ClientRejection> {
@@ -320,9 +325,9 @@ impl RemoteClient {
     /// If result_code is Success, the SME will have authenticated this client.
     ///
     /// Otherwise, the MLME should forget about this client.
-    pub fn handle_mlme_auth_resp(
+    pub fn handle_mlme_auth_resp<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         result_code: fidl_mlme::AuthenticateResultCode,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
@@ -378,9 +383,9 @@ impl RemoteClient {
     /// The SME has already deauthenticated this client.
     ///
     /// After this function is called, the MLME must forget about this client.
-    pub fn handle_mlme_deauth_req(
+    pub fn handle_mlme_deauth_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         reason_code: fidl_ieee80211::ReasonCode,
     ) -> Result<(), Error> {
         self.change_state(ctx, State::Deauthenticated)?;
@@ -402,9 +407,9 @@ impl RemoteClient {
     ///
     /// Otherwise, the SME has not associated this client. However, the SME has not forgotten about
     /// the client either until MLME-DEAUTHENTICATE.request is received.
-    pub fn handle_mlme_assoc_resp(
+    pub fn handle_mlme_assoc_resp<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         is_rsn: bool,
         channel: u8,
         capabilities: mac::CapabilityInfo,
@@ -526,9 +531,9 @@ impl RemoteClient {
     ///
     /// The MLME doesn't have to do anything other than change its state to acknowledge the
     /// disassociation.
-    pub fn handle_mlme_disassoc_req(
+    pub fn handle_mlme_disassoc_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         reason_code: u16,
     ) -> Result<(), Error> {
         self.change_state(ctx, State::Authenticated)?;
@@ -566,9 +571,9 @@ impl RemoteClient {
     /// Handles MLME-EAPOL.request (IEEE Std 802.11-2016, 6.3.22.1) from the SME.
     ///
     /// The MLME should forward these frames to the PHY layer.
-    pub fn handle_mlme_eapol_req(
+    pub fn handle_mlme_eapol_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         src_addr: MacAddr,
         data: &[u8],
     ) -> Result<(), Error> {
@@ -585,9 +590,9 @@ impl RemoteClient {
     /// Handles disassociation frames (IEEE Std 802.11-2016, 9.3.3.5) from the PHY.
     ///
     /// self is mutable here as receiving a disassociation immediately disassociates us.
-    fn handle_disassoc_frame(
+    fn handle_disassoc_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         reason_code: ReasonCode,
     ) -> Result<(), ClientRejection> {
         self.change_state(ctx, State::Authenticated).map_err(ClientRejection::DeviceError)?;
@@ -601,9 +606,9 @@ impl RemoteClient {
     }
 
     /// Handles association request frames (IEEE Std 802.11-2016, 9.3.3.6) from the PHY.
-    fn handle_assoc_req_frame(
+    fn handle_assoc_req_frame<D: DeviceOps>(
         &self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         capabilities: mac::CapabilityInfo,
         listen_interval: u16,
         ssid: Option<Ssid>,
@@ -618,9 +623,9 @@ impl RemoteClient {
     ///
     /// self is mutable here as we may deauthenticate without even getting to the SME if we don't
     /// recognize the authentication algorithm.
-    fn handle_auth_frame(
+    fn handle_auth_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         auth_alg_num: AuthAlgorithmNumber,
     ) -> Result<(), ClientRejection> {
         ctx.send_mlme_auth_ind(
@@ -661,9 +666,9 @@ impl RemoteClient {
     /// Handles deauthentication frames (IEEE Std 802.11-2016, 9.3.3.13) from the PHY.
     ///
     /// self is mutable here as receiving a deauthentication immediately deauthenticates us.
-    fn handle_deauth_frame(
+    fn handle_deauth_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         reason_code: ReasonCode,
     ) -> Result<(), ClientRejection> {
         self.change_state(ctx, State::Deauthenticated).map_err(ClientRejection::DeviceError)?;
@@ -677,13 +682,17 @@ impl RemoteClient {
     }
 
     /// Handles action frames (IEEE Std 802.11-2016, 9.3.3.14) from the PHY.
-    fn handle_action_frame(&self, _ctx: &mut Context) -> Result<(), ClientRejection> {
+    fn handle_action_frame<D>(&self, _ctx: &mut Context<D>) -> Result<(), ClientRejection> {
         // TODO(fxbug.dev/37891): Implement me!
         Ok(())
     }
 
     /// Handles PS-Poll (IEEE Std 802.11-2016, 9.3.1.5) from the PHY.
-    pub fn handle_ps_poll(&mut self, ctx: &mut Context, aid: Aid) -> Result<(), ClientRejection> {
+    pub fn handle_ps_poll<D: DeviceOps>(
+        &mut self,
+        ctx: &mut Context<D>,
+        aid: Aid,
+    ) -> Result<(), ClientRejection> {
         // All PS-Poll frames are Class 3.
         self.reject_frame_class_if_not_permitted(ctx, mac::FrameClass::Class3)?;
 
@@ -756,7 +765,7 @@ impl RemoteClient {
     /// Moves an associated remote client's power saving state into Awake.
     ///
     /// This will also send all buffered frames.
-    fn wake(&mut self, ctx: &mut Context) -> Result<(), ClientRejection> {
+    fn wake<D: DeviceOps>(&mut self, ctx: &mut Context<D>) -> Result<(), ClientRejection> {
         match self.state.as_mut() {
             State::Associated { ps_state, .. } => {
                 let mut old_ps_state = PowerSaveState::Awake;
@@ -805,9 +814,9 @@ impl RemoteClient {
         Ok(())
     }
 
-    pub fn set_power_state(
+    pub fn set_power_state<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         power_state: mac::PowerState,
     ) -> Result<(), ClientRejection> {
         match power_state {
@@ -817,9 +826,9 @@ impl RemoteClient {
     }
 
     /// Handles EAPoL requests (IEEE Std 802.1X-2010, 11.3) from PHY data frames.
-    fn handle_eapol_llc_frame(
+    fn handle_eapol_llc_frame<D: DeviceOps>(
         &self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         dst_addr: MacAddr,
         src_addr: MacAddr,
         body: &[u8],
@@ -828,9 +837,9 @@ impl RemoteClient {
     }
 
     // Handles LLC frames from PHY data frames.
-    fn handle_llc_frame(
+    fn handle_llc_frame<D: DeviceOps>(
         &self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         dst_addr: MacAddr,
         src_addr: MacAddr,
         ether_type: u16,
@@ -845,9 +854,9 @@ impl RemoteClient {
     ///
     /// If a frame is sent, the client's state is not in sync with the AP's, e.g. the AP may have
     /// been restarted and the client needs to reset its state.
-    fn reject_frame_class_if_not_permitted(
+    fn reject_frame_class_if_not_permitted<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         frame_class: FrameClass,
     ) -> Result<(), ClientRejection> {
         if self.is_frame_class_permitted(frame_class) {
@@ -901,9 +910,9 @@ impl RemoteClient {
     // Public handler functions.
 
     /// Handles management frames (IEEE Std 802.11-2016, 9.3.3) from the PHY.
-    pub fn handle_mgmt_frame<B: ByteSlice>(
+    pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         capabilities: mac::CapabilityInfo,
         ssid: Option<Ssid>,
         mgmt_hdr: mac::MgmtHdr,
@@ -989,9 +998,9 @@ impl RemoteClient {
     /// These data frames may be in A-MSDU format (IEEE Std 802.11-2016, 9.3.2.2). However, the
     /// individual frames will be passed to |handle_msdu| and we don't need to care what format
     /// they're in.
-    pub fn handle_data_frame<B: ByteSlice>(
+    pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         fixed_data_fields: mac::FixedDataHdrFields,
         addr4: Option<mac::Addr4>,
         qos_ctrl: Option<mac::QosControl>,
@@ -1036,9 +1045,9 @@ impl RemoteClient {
     }
 
     /// Handles Ethernet II frames from the netstack.
-    pub fn handle_eth_frame(
+    pub fn handle_eth_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         dst_addr: MacAddr,
         src_addr: MacAddr,
         ether_type: u16,
@@ -1070,9 +1079,9 @@ impl RemoteClient {
         })
     }
 
-    pub fn send_wlan_frame(
+    pub fn send_wlan_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         in_buf: InBuf,
         bytes_written: usize,
         tx_flags: u32,
@@ -1096,11 +1105,7 @@ impl RemoteClient {
 mod tests {
     use {
         super::*,
-        crate::{
-            ap::TimedEvent,
-            buffer::FakeBufferProvider,
-            device::{Device, FakeDevice},
-        },
+        crate::{ap::TimedEvent, buffer::FakeBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         ieee80211::Bssid,
         std::convert::TryFrom,
@@ -1121,24 +1126,24 @@ mod tests {
         RemoteClient::new(CLIENT_ADDR)
     }
 
-    fn make_context(device: Device) -> (Context, TimeStream<TimedEvent>) {
+    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(device, FakeBufferProvider::new(), timer, AP_ADDR), time_stream)
+        (Context::new(fake_device, FakeBufferProvider::new(), timer, AP_ADDR), time_stream)
     }
 
     #[test]
     fn handle_mlme_auth_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1156,9 +1161,9 @@ mod tests {
     #[test]
     fn handle_mlme_auth_resp_failure() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_auth_resp(
                 &mut ctx,
@@ -1166,9 +1171,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1193,17 +1198,17 @@ mod tests {
         }; "in associated state")]
     fn handle_mlme_deauth_req(init_state: State) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b11000000, 0, // Frame Control
             0, 0, // Duration
@@ -1219,9 +1224,9 @@ mod tests {
     #[test]
     fn handle_mlme_assoc_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, mut time_stream) = make_context(fake_device.as_device());
+        let (mut ctx, mut time_stream) = make_context(fake_device);
         r_sta
             .handle_mlme_assoc_resp(
                 &mut ctx,
@@ -1253,9 +1258,9 @@ mod tests {
             _ => panic!("no active timeout?"),
         };
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1276,15 +1281,15 @@ mod tests {
             time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
         assert_eq!(timed_event.id, *active_timeout_event_id);
 
-        assert!(fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
     fn handle_mlme_assoc_resp_then_handle_mlme_disassoc_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_mlme_assoc_resp(
@@ -1297,7 +1302,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        assert!(fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
 
         r_sta
             .handle_mlme_disassoc_req(
@@ -1305,15 +1310,15 @@ mod tests {
                 fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc as u16,
             )
             .expect("expected OK");
-        assert!(!fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(!fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
     fn handle_mlme_assoc_resp_then_handle_mlme_deauth_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_mlme_assoc_resp(
@@ -1326,20 +1331,20 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        assert!(fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
 
         r_sta
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
             .expect("expected OK");
-        assert!(!fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(!fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
     fn handle_mlme_assoc_resp_no_rsn() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_assoc_resp(
                 &mut ctx,
@@ -1360,9 +1365,9 @@ mod tests {
     #[test]
     fn handle_mlme_assoc_resp_failure_reason_unspecified() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_assoc_resp(
                 &mut ctx,
@@ -1375,9 +1380,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1395,9 +1400,9 @@ mod tests {
     #[test]
     fn handle_mlme_assoc_resp_failure_emergency_services_not_supported() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_assoc_resp(
                 &mut ctx,
@@ -1410,9 +1415,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1430,9 +1435,9 @@ mod tests {
     #[test]
     fn handle_mlme_disassoc_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_disassoc_req(
                 &mut ctx,
@@ -1440,9 +1445,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -1537,13 +1542,13 @@ mod tests {
     #[test]
     fn handle_mlme_eapol_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta.handle_mlme_eapol_req(&mut ctx, CLIENT_ADDR2, &[1, 2, 3][..]).expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b00000010, // Frame Control
             0, 0, // Duration
@@ -1562,9 +1567,9 @@ mod tests {
     #[test]
     fn handle_disassoc_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_disassoc_frame(
                 &mut ctx,
@@ -1572,7 +1577,9 @@ mod tests {
             )
             .expect("expected OK");
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1596,10 +1603,10 @@ mod tests {
         }; "in associated state")]
     fn handle_assoc_req_frame(init_state: State) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_assoc_req_frame(
                 &mut ctx,
@@ -1611,7 +1618,9 @@ mod tests {
             )
             .expect("expected OK");
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1637,13 +1646,15 @@ mod tests {
         }; "in associated state")]
     fn handle_auth_frame(init_state: State) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber::SHARED_KEY).expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1658,14 +1669,14 @@ mod tests {
     #[test]
     fn handle_auth_frame_unknown_algorithm() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber(0xffff)).expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1685,12 +1696,12 @@ mod tests {
     #[test_case(true; "while already authenticated")]
     fn handle_deauth_frame(already_authenticated: bool) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         if already_authenticated {
             r_sta.state = StateMachine::new(State::Authenticated);
         }
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_deauth_frame(
@@ -1698,7 +1709,9 @@ mod tests {
                 ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth as u16),
             )
             .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1720,8 +1733,8 @@ mod tests {
     #[test]
     fn handle_ps_poll() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -1742,12 +1755,12 @@ mod tests {
             .expect("expected OK");
 
         // Make sure nothing has been actually sent to the WLAN queue.
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00100010, // Frame Control
@@ -1765,9 +1778,9 @@ mod tests {
         );
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device.wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
         assert_eq!(
-            &fake_device.wlan_queue[1].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[1].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -1785,14 +1798,14 @@ mod tests {
         );
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device.wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
     }
 
     #[test]
     fn handle_ps_poll_not_buffered() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -1810,8 +1823,8 @@ mod tests {
     #[test]
     fn handle_ps_poll_wrong_aid() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -1832,8 +1845,8 @@ mod tests {
     #[test]
     fn handle_ps_poll_not_dozing() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -1852,9 +1865,9 @@ mod tests {
     #[test]
     fn handle_eapol_llc_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -1865,7 +1878,9 @@ mod tests {
         r_sta
             .handle_eapol_llc_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1881,9 +1896,9 @@ mod tests {
     #[test]
     fn handle_llc_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -1894,9 +1909,9 @@ mod tests {
         r_sta
             .handle_llc_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device.eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.eth_queue[0][..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[0][..], &[
             3, 3, 3, 3, 3, 3,  // dest
             1, 1, 1, 1, 1, 1,  // src
             0x12, 0x34,        // ether_type
@@ -1908,9 +1923,9 @@ mod tests {
     #[test]
     fn handle_eth_frame_no_eapol_controlled_port() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -1921,9 +1936,9 @@ mod tests {
         r_sta
             .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b00000010, // Frame Control
             0, 0, // Duration
@@ -1942,9 +1957,9 @@ mod tests {
     #[test]
     fn handle_eth_frame_not_associated() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Authenticated);
         assert_variant!(
@@ -1958,9 +1973,9 @@ mod tests {
     #[test]
     fn handle_eth_frame_eapol_controlled_port_closed() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -1979,9 +1994,9 @@ mod tests {
     #[test]
     fn handle_eth_frame_eapol_controlled_port_open() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -1992,9 +2007,9 @@ mod tests {
         r_sta
             .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b01000010, // Frame Control
             0, 0, // Duration
@@ -2013,10 +2028,10 @@ mod tests {
     #[test]
     fn handle_data_frame_not_permitted() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         assert_variant!(
             r_sta
@@ -2044,7 +2059,9 @@ mod tests {
             ClientRejection::NotPermitted
         );
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2056,9 +2073,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device.wlan_queue[0].0,
+            fake_device_state.lock().unwrap().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -2076,10 +2093,10 @@ mod tests {
     #[test]
     fn handle_data_frame_not_permitted_disassoc() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         assert_variant!(
             r_sta
@@ -2107,7 +2124,9 @@ mod tests {
             ClientRejection::NotPermitted
         );
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2119,9 +2138,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device.wlan_queue[0].0,
+            fake_device_state.lock().unwrap().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b10100000, 0b00000000, // Frame Control
@@ -2139,7 +2158,7 @@ mod tests {
     #[test]
     fn handle_data_frame_single_llc() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2147,7 +2166,7 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         });
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_data_frame(
@@ -2172,7 +2191,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        assert_eq!(fake_device.eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         assert_ne!(
             match r_sta.state.as_ref() {
                 State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
@@ -2185,7 +2204,7 @@ mod tests {
     #[test]
     fn handle_data_frame_amsdu() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2193,7 +2212,7 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         });
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut amsdu_data_frame_body = vec![];
         amsdu_data_frame_body.extend(&[
@@ -2231,7 +2250,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        assert_eq!(fake_device.eth_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 2);
         assert_ne!(
             match r_sta.state.as_ref() {
                 State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
@@ -2244,10 +2263,10 @@ mod tests {
     #[test]
     fn handle_mgmt_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_mgmt_frame(
@@ -2276,10 +2295,10 @@ mod tests {
     #[test_case(Ssid::try_from("coolnet").unwrap(), false; "without rsne")]
     fn handle_mgmt_frame_assoc_req(ssid: Ssid, has_rsne: bool) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut assoc_frame_body = vec![
             0, 0, // Capability info
@@ -2309,7 +2328,9 @@ mod tests {
             )
             .expect("expected OK");
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         let expected_rsne = if has_rsne { Some(vec![48, 2, 77, 88]) } else { None };
@@ -2348,10 +2369,10 @@ mod tests {
         expected_rates: Vec<u8>,
     ) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         let mut ies = vec![
             0, 0, // Capability info
             10, 0, // Listen interval
@@ -2376,7 +2397,9 @@ mod tests {
             )
             .expect("parsing should not fail");
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2395,10 +2418,10 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_not_permitted() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         assert_variant!(
             r_sta
@@ -2423,7 +2446,9 @@ mod tests {
             ClientRejection::NotPermitted
         );
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2435,9 +2460,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device.wlan_queue[0].0,
+            fake_device_state.lock().unwrap().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -2455,7 +2480,7 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_not_handled() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2463,7 +2488,7 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         });
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         assert_variant!(
             r_sta
@@ -2493,7 +2518,7 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_resets_active_timer() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
+        let (fake_device, _) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2501,7 +2526,7 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         });
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
 
         r_sta
             .handle_mgmt_frame(
@@ -2534,8 +2559,8 @@ mod tests {
     #[test]
     fn handle_bss_idle_timeout() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         let event_id = r_sta.schedule_bss_idle_timeout(&mut ctx);
@@ -2548,9 +2573,9 @@ mod tests {
 
         r_sta.handle_bss_idle_timeout(&mut ctx, event_id).expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -2561,7 +2586,9 @@ mod tests {
             // Disassoc header:
             4, 0, // reason code
         ][..]);
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2577,8 +2604,8 @@ mod tests {
     #[test]
     fn doze_then_wake() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2601,14 +2628,14 @@ mod tests {
         assert!(r_sta.has_buffered_frames());
 
         // Make sure nothing has been actually sent to the WLAN queue.
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         r_sta.set_power_state(&mut ctx, mac::PowerState::AWAKE).expect("expected wake OK");
         assert!(!r_sta.has_buffered_frames());
-        assert_eq!(fake_device.wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
 
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00100010, // Frame Control
@@ -2625,7 +2652,7 @@ mod tests {
             ][..]
         );
         assert_eq!(
-            &fake_device.wlan_queue[1].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[1].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -2646,8 +2673,8 @@ mod tests {
     #[test]
     fn doze_then_doze() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2664,8 +2691,8 @@ mod tests {
     #[test]
     fn wake_then_wake() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2682,8 +2709,8 @@ mod tests {
     #[test]
     fn doze_not_associated() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
@@ -2699,8 +2726,8 @@ mod tests {
     #[test]
     fn wake_not_associated() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);

@@ -10,6 +10,7 @@ use {
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
         buffer::{InBuf, OutBuf},
+        device::DeviceOps,
         error::Error,
         key::KeyConfig,
     },
@@ -61,8 +62,8 @@ fn make_client_error(addr: MacAddr, e: Error) -> Error {
 }
 
 impl InfraBss {
-    pub fn new(
-        ctx: &mut Context,
+    pub fn new<D: DeviceOps>(
+        ctx: &mut Context<D>,
         ssid: Ssid,
         beacon_interval: TimeUnit,
         dtim_period: u8,
@@ -109,7 +110,7 @@ impl InfraBss {
         Ok(bss)
     }
 
-    pub fn stop(&self, ctx: &mut Context) -> Result<(), Error> {
+    pub fn stop<D: DeviceOps>(&self, ctx: &mut Context<D>) -> Result<(), Error> {
         ctx.device
             .disable_beaconing()
             .map_err(|s| Error::Status(format!("failed to disable beaconing"), s))
@@ -129,9 +130,9 @@ impl InfraBss {
         tim
     }
 
-    pub fn handle_mlme_setkeys_req(
+    pub fn handle_mlme_setkeys_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         keylist: &[fidl_mlme::SetKeyDescriptor],
     ) -> Result<(), Error> {
         if self.rsne.is_none() {
@@ -149,9 +150,9 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_mlme_auth_resp(
+    pub fn handle_mlme_auth_resp<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         resp: fidl_mlme::AuthenticateResponse,
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, resp.peer_sta_address)?;
@@ -160,9 +161,9 @@ impl InfraBss {
             .map_err(|e| make_client_error(client.addr, e))
     }
 
-    pub fn handle_mlme_deauth_req(
+    pub fn handle_mlme_deauth_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         req: fidl_mlme::DeauthenticateRequest,
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
@@ -175,9 +176,9 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_mlme_assoc_resp(
+    pub fn handle_mlme_assoc_resp<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         resp: fidl_mlme::AssociateResponse,
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, resp.peer_sta_address)?;
@@ -195,9 +196,9 @@ impl InfraBss {
             .map_err(|e| make_client_error(client.addr, e))
     }
 
-    pub fn handle_mlme_disassoc_req(
+    pub fn handle_mlme_disassoc_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         req: fidl_mlme::DisassociateRequest,
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
@@ -216,9 +217,9 @@ impl InfraBss {
             .map_err(|e| make_client_error(client.addr, e))
     }
 
-    pub fn handle_mlme_eapol_req(
+    pub fn handle_mlme_eapol_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         req: fidl_mlme::EapolRequest,
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, req.dst_addr)?;
@@ -239,9 +240,9 @@ impl InfraBss {
         }
     }
 
-    fn make_beacon_frame(
+    fn make_beacon_frame<D>(
         &self,
-        ctx: &Context,
+        ctx: &Context<D>,
     ) -> Result<(InBuf, usize, BeaconOffloadParams), Error> {
         let tim = self.make_tim();
         let (pvb_offset, pvb_bitmap) = tim.make_partial_virtual_bitmap();
@@ -264,9 +265,9 @@ impl InfraBss {
         )
     }
 
-    fn handle_probe_req(
+    fn handle_probe_req<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         client_addr: MacAddr,
     ) -> Result<(), Rejection> {
         // According to IEEE Std 802.11-2016, 11.1.4.1, we should intersect our IEs with the probe
@@ -294,9 +295,9 @@ impl InfraBss {
         })
     }
 
-    pub fn handle_mgmt_frame<B: ByteSlice>(
+    pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         mgmt_hdr: mac::MgmtHdr,
         body: B,
     ) -> Result<(), Rejection> {
@@ -394,9 +395,9 @@ impl InfraBss {
     /// Handles an incoming data frame.
     ///
     ///
-    pub fn handle_data_frame<B: ByteSlice>(
+    pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         fixed_fields: mac::FixedDataHdrFields,
         addr4: Option<mac::Addr4>,
         qos_ctrl: Option<mac::QosControl>,
@@ -442,9 +443,9 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_ctrl_frame<B: ByteSlice>(
+    pub fn handle_ctrl_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         frame_ctrl: mac::FrameControl,
         body: B,
     ) -> Result<(), Rejection> {
@@ -473,9 +474,9 @@ impl InfraBss {
         }
     }
 
-    pub fn handle_multicast_eth_frame(
+    pub fn handle_multicast_eth_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         hdr: EthernetIIHdr,
         body: &[u8],
     ) -> Result<(), Rejection> {
@@ -510,9 +511,9 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_eth_frame(
+    pub fn handle_eth_frame<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         hdr: EthernetIIHdr,
         body: &[u8],
     ) -> Result<(), Rejection> {
@@ -534,7 +535,10 @@ impl InfraBss {
 
     // TODO(fxbug.dev/88968): Determine whether this is still needed and add an API path if so.
     #[allow(unused)]
-    pub fn handle_bcn_tx_complete_indication(&mut self, ctx: &mut Context) -> Result<(), Error> {
+    pub fn handle_bcn_tx_complete_indication<D: DeviceOps>(
+        &mut self,
+        ctx: &mut Context<D>,
+    ) -> Result<(), Error> {
         if self.dtim_count > 0 {
             self.dtim_count -= 1;
             return Ok(());
@@ -558,9 +562,9 @@ impl InfraBss {
     // Timed event functions
 
     /// Handles timed events.
-    pub fn handle_timed_event(
+    pub fn handle_timed_event<D: DeviceOps>(
         &mut self,
-        ctx: &mut Context,
+        ctx: &mut Context<D>,
         event_id: EventId,
         event: TimedEvent,
     ) -> Result<(), Rejection> {
@@ -583,11 +587,14 @@ mod tests {
         crate::{
             ap::remote_client::{ClientEvent, ClientRejection},
             buffer::FakeBufferProvider,
-            device::{Device, FakeDevice},
+            device::{FakeDevice, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
         ieee80211::Bssid,
-        std::convert::TryFrom,
+        std::{
+            convert::TryFrom,
+            sync::{Arc, Mutex},
+        },
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -603,12 +610,12 @@ mod tests {
     const CLIENT_ADDR2: MacAddr = [6u8; 6];
     const REMOTE_ADDR: MacAddr = [123u8; 6];
 
-    fn make_context(device: Device) -> (Context, TimeStream<TimedEvent>) {
+    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(device, FakeBufferProvider::new(), timer, BSSID), time_stream)
+        (Context::new(fake_device, FakeBufferProvider::new(), timer, BSSID), time_stream)
     }
 
-    fn make_infra_bss(ctx: &mut Context) -> InfraBss {
+    fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
         InfraBss::new(
             ctx,
             Ssid::try_from("coolnet").unwrap(),
@@ -622,7 +629,7 @@ mod tests {
         .expect("expected InfraBss::new ok")
     }
 
-    fn make_protected_infra_bss(ctx: &mut Context) -> InfraBss {
+    fn make_protected_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
         InfraBss::new(
             ctx,
             Ssid::try_from("coolnet").unwrap(),
@@ -639,8 +646,8 @@ mod tests {
     #[test]
     fn new() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -654,7 +661,7 @@ mod tests {
         .expect("expected InfraBss::new ok");
 
         assert_eq!(
-            fake_device.wlan_channel,
+            fake_device_state.lock().unwrap().wlan_channel,
             banjo_common::WlanChannel {
                 primary: 1,
                 cbw: banjo_common::ChannelBandwidth::CBW20,
@@ -682,26 +689,31 @@ mod tests {
         ];
 
         assert_eq!(
-            fake_device.beacon_config.expect("expected beacon_config"),
-            (beacon_tmpl, 49, TimeUnit::DEFAULT_BEACON_INTERVAL)
+            fake_device_state
+                .lock()
+                .unwrap()
+                .beacon_config
+                .as_ref()
+                .expect("expected beacon_config"),
+            &(beacon_tmpl, 49, TimeUnit::DEFAULT_BEACON_INTERVAL)
         );
     }
 
     #[test]
     fn stop() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let bss = make_infra_bss(&mut ctx);
         bss.stop(&mut ctx).expect("expected InfraBss::stop ok");
-        assert!(fake_device.beacon_config.is_none());
+        assert!(fake_device_state.lock().unwrap().beacon_config.is_none());
     }
 
     #[test]
     fn handle_mlme_auth_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -714,9 +726,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_auth_resp ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10110000, 0, // Frame Control
@@ -736,8 +748,8 @@ mod tests {
     #[test]
     fn handle_mlme_auth_resp_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_eq!(
@@ -758,8 +770,8 @@ mod tests {
     #[test]
     fn handle_mlme_deauth_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -772,9 +784,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_deauth_req ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b11000000, 0, // Frame Control
@@ -794,8 +806,8 @@ mod tests {
     #[test]
     fn handle_mlme_assoc_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -811,9 +823,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -832,14 +844,14 @@ mod tests {
                 90, 3, 90, 0, 0, // BSS max idle period
             ][..]
         );
-        assert!(fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
     fn handle_mlme_assoc_resp_with_caps() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from("coolnet").unwrap(),
@@ -865,9 +877,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -886,14 +898,14 @@ mod tests {
                 90, 3, 90, 0, 0, // BSS max idle period
             ][..]
         );
-        assert!(fake_device.assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
     fn handle_mlme_disassoc_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -906,9 +918,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_disassoc_req ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10100000, 0, // Frame Control
@@ -926,8 +938,8 @@ mod tests {
     #[test]
     fn handle_mlme_set_controlled_port_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -954,8 +966,8 @@ mod tests {
     #[test]
     fn handle_mlme_eapol_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -969,9 +981,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_eapol_req ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Header
                 0b00001000, 0b00000010, // Frame Control
@@ -988,7 +1000,9 @@ mod tests {
             ][..]
         );
 
-        let confirm = fake_device
+        let confirm = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolConfirm>()
             .expect("Did not receive valid Eapol Confirm msg");
         assert_eq!(confirm.result_code, fidl_mlme::EapolResultCode::Success);
@@ -998,8 +1012,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_auth() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.handle_mgmt_frame(
@@ -1025,7 +1039,9 @@ mod tests {
 
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), true);
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1040,8 +1056,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_assoc_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -1076,7 +1092,9 @@ mod tests {
 
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), true);
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1095,8 +1113,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_bad_ds_bits_to_ds() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1130,8 +1148,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_bad_ds_bits_from_ds() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1165,8 +1183,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1197,8 +1215,8 @@ mod tests {
     #[test]
     fn handle_mgmt_frame_bogus() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1228,8 +1246,8 @@ mod tests {
     #[test]
     fn handle_data_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -1275,9 +1293,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device.eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         assert_eq!(
-            &fake_device.eth_queue[0][..],
+            &fake_device_state.lock().unwrap().eth_queue[0][..],
             &[
                 6, 6, 6, 6, 6, 6, // dest
                 4, 4, 4, 4, 4, 4, // src
@@ -1291,8 +1309,8 @@ mod tests {
     #[test]
     fn handle_data_frame_bad_ds_bits() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1322,14 +1340,14 @@ mod tests {
             Rejection::BadDsBits
         );
 
-        assert_eq!(fake_device.eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
     }
 
     #[test]
     fn handle_client_event() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, mut time_stream) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, mut time_stream) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -1351,7 +1369,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         let (_, timed_event) =
             time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
@@ -1363,9 +1381,9 @@ mod tests {
         .expect("expected OK");
 
         // Check that we received a disassociation frame.
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -1377,7 +1395,9 @@ mod tests {
             4, 0, // reason code
         ][..]);
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1393,8 +1413,8 @@ mod tests {
     #[test]
     fn handle_data_frame_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1424,11 +1444,11 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotPermitted)
         );
 
-        assert_eq!(fake_device.eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device.wlan_queue[0].0,
+            fake_device_state.lock().unwrap().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -1446,8 +1466,8 @@ mod tests {
     #[test]
     fn handle_data_frame_client_not_associated() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
@@ -1459,7 +1479,7 @@ mod tests {
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
             .expect("expected OK");
 
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         assert_variant!(
             bss.handle_data_frame(
@@ -1488,11 +1508,11 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotPermitted)
         );
 
-        assert_eq!(fake_device.eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device.wlan_queue[0].0,
+            fake_device_state.lock().unwrap().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b10100000, 0b00000000, // Frame Control
@@ -1510,8 +1530,8 @@ mod tests {
     #[test]
     fn handle_eth_frame_no_rsn() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -1530,7 +1550,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         bss.handle_eth_frame(
             &mut ctx,
@@ -1543,9 +1563,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -1566,8 +1586,8 @@ mod tests {
     #[test]
     fn handle_eth_frame_no_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
         assert_variant!(
@@ -1584,14 +1604,14 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotAssociated)
         );
 
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
     }
 
     #[test]
     fn handle_eth_frame_is_rsn_eapol_controlled_port_closed() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -1610,7 +1630,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         assert_variant!(
             bss.handle_eth_frame(
@@ -1630,8 +1650,8 @@ mod tests {
     #[test]
     fn handle_eth_frame_is_rsn_eapol_controlled_port_open() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -1650,7 +1670,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         client
             .handle_mlme_set_controlled_port_req(fidl_mlme::ControlledPortState::Open)
@@ -1667,9 +1687,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b01000010, // Frame Control
@@ -1691,8 +1711,8 @@ mod tests {
     #[test_case(true; "Controlled port open")]
     fn handle_data_frame_is_rsn_eapol(controlled_port_open: bool) {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -1711,7 +1731,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         if controlled_port_open {
             client
@@ -1744,15 +1764,15 @@ mod tests {
         .expect("expected OK");
 
         if controlled_port_open {
-            assert_eq!(fake_device.eth_queue.len(), 1);
+            assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         } else {
-            assert!(fake_device.eth_queue.is_empty());
+            assert!(fake_device_state.lock().unwrap().eth_queue.is_empty());
         }
     }
 
     fn authenticate_client(
-        fake_device: &mut FakeDevice,
-        ctx: &mut Context,
+        fake_device_state: Arc<Mutex<FakeDeviceState>>,
+        ctx: &mut Context<FakeDevice>,
         bss: &mut InfraBss,
         client_addr: MacAddr,
     ) {
@@ -1777,7 +1797,9 @@ mod tests {
         )
         .expect("failed to handle auth req frame");
 
-        fake_device
+        fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected auth indication");
         bss.handle_mlme_auth_resp(
@@ -1788,13 +1810,13 @@ mod tests {
             },
         )
         .expect("failed to handle auth resp");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
-        fake_device.wlan_queue.clear();
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        fake_device_state.lock().unwrap().wlan_queue.clear();
     }
 
     fn associate_client(
-        fake_device: &mut FakeDevice,
-        ctx: &mut Context,
+        fake_device_state: Arc<Mutex<FakeDeviceState>>,
+        ctx: &mut Context<FakeDevice>,
         bss: &mut InfraBss,
         client_addr: MacAddr,
         association_id: u16,
@@ -1822,7 +1844,9 @@ mod tests {
             ][..],
         )
         .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected assoc indication");
         bss.handle_mlme_assoc_resp(
@@ -1836,12 +1860,12 @@ mod tests {
             },
         )
         .expect("failed to handle assoc resp");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
-        fake_device.wlan_queue.clear();
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        fake_device_state.lock().unwrap().wlan_queue.clear();
     }
 
     fn send_eth_frame_from_ds_to_client(
-        ctx: &mut Context,
+        ctx: &mut Context<FakeDevice>,
         bss: &mut InfraBss,
         client_addr: MacAddr,
     ) {
@@ -1860,15 +1884,15 @@ mod tests {
     #[test]
     fn handle_multiple_complete_associations() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        authenticate_client(&mut fake_device, &mut ctx, &mut bss, CLIENT_ADDR);
-        authenticate_client(&mut fake_device, &mut ctx, &mut bss, CLIENT_ADDR2);
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR);
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR2);
 
-        associate_client(&mut fake_device, &mut ctx, &mut bss, CLIENT_ADDR, 1);
-        associate_client(&mut fake_device, &mut ctx, &mut bss, CLIENT_ADDR2, 2);
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR, 1);
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR2, 2);
 
         assert!(bss.clients.contains_key(&CLIENT_ADDR));
         assert!(bss.clients.contains_key(&CLIENT_ADDR2));
@@ -1876,14 +1900,14 @@ mod tests {
         send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, CLIENT_ADDR);
         send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, CLIENT_ADDR2);
 
-        assert_eq!(fake_device.wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
     }
 
     #[test]
     fn handle_ps_poll() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -1903,7 +1927,7 @@ mod tests {
             )
             .expect("expected OK");
         client.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze ok");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         bss.handle_eth_frame(
             &mut ctx,
@@ -1915,7 +1939,7 @@ mod tests {
             &[1, 2, 3, 4, 5][..],
         )
         .expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         bss.handle_ctrl_frame(
             &mut ctx,
@@ -1929,9 +1953,9 @@ mod tests {
             ][..],
         )
         .expect("expected OK");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -1952,8 +1976,8 @@ mod tests {
     #[test]
     fn handle_mlme_setkeys_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.handle_mlme_setkeys_req(
             &mut ctx,
@@ -1968,28 +1992,23 @@ mod tests {
             }][..],
         )
         .expect("expected InfraBss::handle_mlme_setkeys_req OK");
-        assert_eq!(fake_device.keys.len(), 1);
-        assert_eq!(
-            fake_device.keys[0].protection,
-            banjo_fuchsia_wlan_softmac::WlanProtection::RX_TX
-        );
-        assert_eq!(fake_device.keys[0].cipher_oui, [1, 2, 3]);
-        assert_eq!(fake_device.keys[0].cipher_type, 4);
-        assert_eq!(
-            fake_device.keys[0].key_type,
-            banjo_fuchsia_hardware_wlan_associnfo::WlanKeyType::PAIRWISE
-        );
-        assert_eq!(fake_device.keys[0].peer_addr, [5; 6]);
-        assert_eq!(fake_device.keys[0].key_idx, 6);
-        assert_eq!(fake_device.keys_vec[0], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(fake_device.keys[0].rsc, 8);
+        assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);
+        let key = &fake_device_state.lock().unwrap().keys[0];
+        assert_eq!(key.protection, crate::key::Protection::RX_TX);
+        assert_eq!(key.cipher_oui, [1, 2, 3]);
+        assert_eq!(key.cipher_type, 4);
+        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
+        assert_eq!(key.peer_addr, [5; 6]);
+        assert_eq!(key.key_idx, 6);
+        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(key.rsc, 8);
     }
 
     #[test]
     fn handle_mlme_setkeys_req_no_rsne() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         assert_variant!(
             bss.handle_mlme_setkeys_req(
@@ -2007,14 +2026,14 @@ mod tests {
             .expect_err("expected InfraBss::handle_mlme_setkeys_req error"),
             Error::Status(_, zx::Status::BAD_STATE)
         );
-        assert!(fake_device.keys.is_empty());
+        assert!(fake_device_state.lock().unwrap().keys.is_empty());
     }
 
     #[test]
     fn handle_probe_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -2029,9 +2048,9 @@ mod tests {
 
         bss.handle_probe_req(&mut ctx, CLIENT_ADDR)
             .expect("expected InfraBss::handle_probe_req ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -2056,10 +2075,10 @@ mod tests {
     #[test]
     fn handle_probe_req_has_offload() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        fake_device.discovery_support.probe_response_offload.supported = true;
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        fake_device_state.lock().unwrap().discovery_support.probe_response_offload.supported = true;
 
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -2092,8 +2111,8 @@ mod tests {
     #[test]
     fn handle_probe_req_wildcard_ssid() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -2124,9 +2143,9 @@ mod tests {
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -2151,8 +2170,8 @@ mod tests {
     #[test]
     fn handle_probe_req_matching_ssid() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -2181,9 +2200,9 @@ mod tests {
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -2208,8 +2227,8 @@ mod tests {
     #[test]
     fn handle_probe_req_mismatching_ssid() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
             Ssid::try_from([1, 2, 3, 4, 5]).unwrap(),
@@ -2245,8 +2264,8 @@ mod tests {
     #[test]
     fn make_tim() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
 
@@ -2287,8 +2306,8 @@ mod tests {
     #[test]
     fn make_tim_empty() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let bss = make_infra_bss(&mut ctx);
 
         let tim = bss.make_tim();

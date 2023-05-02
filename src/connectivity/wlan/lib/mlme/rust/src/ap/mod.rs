@@ -10,7 +10,7 @@ mod remote_client;
 use {
     crate::{
         buffer::{BufferProvider, InBuf},
-        device::Device,
+        device::DeviceOps,
         error::Error,
         logger,
     },
@@ -109,8 +109,8 @@ pub enum TimedEvent {
     ClientEvent(MacAddr, ClientEvent),
 }
 
-pub struct Ap {
-    ctx: Context,
+pub struct Ap<D> {
+    ctx: Context<D>,
     bss: Option<InfraBss>,
 }
 
@@ -126,12 +126,14 @@ impl<T: std::borrow::Borrow<InfraBss>> BssOptionExt<T> for Option<T> {
     }
 }
 
-impl crate::MlmeImpl for Ap {
+impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     type Config = Bssid;
+    type Device = D;
     type TimerEvent = TimedEvent;
+
     fn new(
-        config: Bssid,
-        device: Device,
+        config: Self::Config,
+        device: D,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Self {
@@ -158,14 +160,14 @@ impl crate::MlmeImpl for Ap {
     fn handle_timeout(&mut self, event_id: EventId, event: TimedEvent) {
         Self::handle_timed_event(self, event_id, event)
     }
-    fn access_device(&mut self) -> &mut Device {
+    fn access_device(&mut self) -> &mut Self::Device {
         &mut self.ctx.device
     }
 }
 
-impl Ap {
+impl<D> Ap<D> {
     pub fn new(
-        device: Device,
+        device: D,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
@@ -174,6 +176,32 @@ impl Ap {
         Self { ctx: Context::new(device, buf_provider, timer, bssid), bss: None }
     }
 
+    fn handle_sme_list_minstrel_peers(
+        &self,
+        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelListResponse>,
+    ) -> Result<(), Error> {
+        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
+        error!("ListMinstrelPeers is not supported.");
+        let peers = fidl_minstrel::Peers { addrs: vec![] };
+        let resp = fidl_mlme::MinstrelListResponse { peers };
+        responder.respond(resp);
+        Ok(())
+    }
+
+    fn handle_sme_get_minstrel_stats(
+        &self,
+        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
+        _addr: &[u8; 6],
+    ) -> Result<(), Error> {
+        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
+        error!("GetMinstrelStats is not supported.");
+        let resp = fidl_mlme::MinstrelStatsResponse { peer: None };
+        responder.respond(resp);
+        Ok(())
+    }
+}
+
+impl<D: DeviceOps> Ap<D> {
     // Timer handler functions.
     pub fn handle_timed_event(&mut self, event_id: EventId, event: TimedEvent) {
         let bss = match self.bss.as_mut() {
@@ -253,7 +281,7 @@ impl Ap {
     }
 
     pub fn handle_mlme_query_device_info(
-        &self,
+        &mut self,
         responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
         let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
@@ -265,7 +293,7 @@ impl Ap {
     }
 
     pub fn handle_mlme_query_discovery_support(
-        &self,
+        &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.discovery_support();
@@ -275,7 +303,7 @@ impl Ap {
     }
 
     pub fn handle_mlme_query_mac_sublayer_support(
-        &self,
+        &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.mac_sublayer_support();
@@ -285,7 +313,7 @@ impl Ap {
     }
 
     pub fn handle_mlme_query_security_support(
-        &self,
+        &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.security_support();
@@ -295,36 +323,12 @@ impl Ap {
     }
 
     pub fn handle_mlme_query_spectrum_management_support(
-        &self,
+        &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.spectrum_management_support();
         let support = crate::ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
         responder.respond(support);
-        Ok(())
-    }
-
-    fn handle_sme_list_minstrel_peers(
-        &self,
-        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelListResponse>,
-    ) -> Result<(), Error> {
-        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
-        error!("ListMinstrelPeers is not supported.");
-        let peers = fidl_minstrel::Peers { addrs: vec![] };
-        let resp = fidl_mlme::MinstrelListResponse { peers };
-        responder.respond(resp);
-        Ok(())
-    }
-
-    fn handle_sme_get_minstrel_stats(
-        &self,
-        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
-        _addr: &[u8; 6],
-    ) -> Result<(), Error> {
-        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
-        error!("GetMinstrelStats is not supported.");
-        let resp = fidl_mlme::MinstrelStatsResponse { peer: None };
-        responder.respond(resp);
         Ok(())
     }
 
@@ -498,7 +502,7 @@ mod tests {
         buf
     }
 
-    fn make_ap(fake_device: Device) -> (Ap, timer::TimeStream<TimedEvent>) {
+    fn make_ap(fake_device: FakeDevice) -> (Ap<FakeDevice>, timer::TimeStream<TimedEvent>) {
         let (timer, time_stream) = timer::create_timer();
         (Ap::new(fake_device, FakeBufferProvider::new(), timer, BSSID), time_stream)
     }
@@ -506,8 +510,8 @@ mod tests {
     #[test]
     fn ap_handle_eth_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -538,7 +542,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         ap.handle_eth_frame_tx(&make_eth_frame(
             CLIENT_ADDR,
@@ -547,9 +551,9 @@ mod tests {
             &[1, 2, 3, 4, 5][..],
         ));
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -570,8 +574,8 @@ mod tests {
     #[test]
     fn ap_handle_eth_frame_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -593,7 +597,7 @@ mod tests {
         ));
     }
 
-    fn mock_rx_info(ap: &Ap) -> banjo_wlan_softmac::WlanRxInfo {
+    fn mock_rx_info(ap: &Ap<FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
         let channel = banjo_common::WlanChannel {
             primary: ap.bss.as_ref().unwrap().channel,
             cbw: banjo_common::ChannelBandwidth::CBW20,
@@ -605,8 +609,8 @@ mod tests {
     #[test]
     fn ap_handle_mac_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -639,7 +643,9 @@ mod tests {
 
         assert_eq!(ap.bss.as_mut().unwrap().clients.contains_key(&CLIENT_ADDR), true);
 
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -654,8 +660,8 @@ mod tests {
     #[test]
     fn ap_handle_mac_frame_ps_poll() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -686,7 +692,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
 
         // Put the client into dozing.
         ap.handle_mac_frame_rx(
@@ -707,7 +713,7 @@ mod tests {
             0x1234,
             &[1, 2, 3, 4, 5][..],
         ));
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         // Send a PS-Poll.
         ap.handle_mac_frame_rx(
@@ -721,9 +727,9 @@ mod tests {
             mock_rx_info(&ap),
         );
 
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -744,8 +750,8 @@ mod tests {
     #[test]
     fn ap_handle_mac_frame_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -780,8 +786,8 @@ mod tests {
     #[test]
     fn ap_handle_mac_frame_bogus() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -817,8 +823,8 @@ mod tests {
     #[test]
     fn ap_handle_mac_frame_wrong_channel_drop() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -860,7 +866,7 @@ mod tests {
         ap.handle_mac_frame_rx(&probe_req[..], rx_info_wrong_channel.clone());
 
         // Probe Request from the wrong channel should be dropped and no probe response sent.
-        assert_eq!(fake_device.wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         // Frame from the same channel must be processed and a probe response sent.
         let rx_info_same_channel = banjo_wlan_softmac::WlanRxInfo {
@@ -871,16 +877,16 @@ mod tests {
             },
             ..rx_info_wrong_channel
         };
-        fake_device.wlan_queue.clear();
+        fake_device_state.lock().unwrap().wlan_queue.clear();
         ap.handle_mac_frame_rx(&probe_req[..], rx_info_same_channel);
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
     }
 
     #[test]
     fn ap_handle_mlme_start_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.handle_mlme_start_req(fidl_mlme::StartRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
             bss_type: fidl_internal::BssType::Infrastructure,
@@ -899,7 +905,7 @@ mod tests {
 
         assert!(ap.bss.is_some());
         assert_eq!(
-            fake_device.wlan_channel,
+            fake_device_state.lock().unwrap().wlan_channel,
             banjo_common::WlanChannel {
                 primary: 2,
                 // TODO(fxbug.dev/40917): Correctly support this.
@@ -908,8 +914,11 @@ mod tests {
             }
         );
 
-        let msg =
-            fake_device.next_mlme_msg::<fidl_mlme::StartConfirm>().expect("expected MLME message");
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::StartConfirm>()
+            .expect("expected MLME message");
         assert_eq!(
             msg,
             fidl_mlme::StartConfirm { result_code: fidl_mlme::StartResultCode::Success },
@@ -919,8 +928,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_start_req_already_started() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -951,8 +960,11 @@ mod tests {
         })
         .expect("expected Ap::handle_mlme_start_request OK");
 
-        let msg =
-            fake_device.next_mlme_msg::<fidl_mlme::StartConfirm>().expect("expected MLME message");
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::StartConfirm>()
+            .expect("expected MLME message");
         assert_eq!(
             msg,
             fidl_mlme::StartConfirm {
@@ -964,8 +976,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_stop_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -986,16 +998,19 @@ mod tests {
         .expect("expected Ap::handle_mlme_stop_request OK");
         assert!(ap.bss.is_none());
 
-        let msg =
-            fake_device.next_mlme_msg::<fidl_mlme::StopConfirm>().expect("expected MLME message");
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::StopConfirm>()
+            .expect("expected MLME message");
         assert_eq!(msg, fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::Success },);
     }
 
     #[test]
     fn ap_handle_mlme_stop_req_already_stopped() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         ap.handle_mlme_stop_req(fidl_mlme::StopRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
@@ -1003,8 +1018,11 @@ mod tests {
         .expect("expected Ap::handle_mlme_stop_request OK");
         assert!(ap.bss.is_none());
 
-        let msg =
-            fake_device.next_mlme_msg::<fidl_mlme::StopConfirm>().expect("expected MLME message");
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::StopConfirm>()
+            .expect("expected MLME message");
         assert_eq!(
             msg,
             fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::BssAlreadyStopped },
@@ -1014,8 +1032,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_setkeys_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1042,28 +1060,23 @@ mod tests {
             }],
         })
         .expect("expected Ap::handle_mlme_setkeys_req OK");
-        assert_eq!(fake_device.keys.len(), 1);
-        assert_eq!(
-            fake_device.keys[0].protection,
-            banjo_fuchsia_wlan_softmac::WlanProtection::RX_TX
-        );
-        assert_eq!(fake_device.keys[0].cipher_oui, [1, 2, 3]);
-        assert_eq!(fake_device.keys[0].cipher_type, 4);
-        assert_eq!(
-            fake_device.keys[0].key_type,
-            banjo_fuchsia_hardware_wlan_associnfo::WlanKeyType::PAIRWISE
-        );
-        assert_eq!(fake_device.keys[0].peer_addr, [5; 6]);
-        assert_eq!(fake_device.keys[0].key_idx, 6);
-        assert_eq!(fake_device.keys_vec[0], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(fake_device.keys[0].rsc, 8);
+        assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);
+        let key = &fake_device_state.lock().unwrap().keys[0];
+        assert_eq!(key.protection, crate::key::Protection::RX_TX);
+        assert_eq!(key.cipher_oui, [1, 2, 3]);
+        assert_eq!(key.cipher_type, 4);
+        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
+        assert_eq!(key.peer_addr, [5; 6]);
+        assert_eq!(key.key_idx, 6);
+        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(key.rsc, 8);
     }
 
     #[test]
     fn ap_handle_mlme_setkeys_req_no_bss() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         assert_variant!(
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
@@ -1084,8 +1097,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_setkeys_req_bss_no_rsne() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1120,8 +1133,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_auth_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1142,9 +1155,9 @@ mod tests {
             result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::AuthenticateResp) ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10110000, 0, // Frame Control
@@ -1164,8 +1177,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_auth_resp_no_bss() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         assert_eq!(
             zx::Status::from(
@@ -1186,8 +1199,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_auth_resp_no_such_client() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1221,8 +1234,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_deauth_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1245,9 +1258,9 @@ mod tests {
             },
         ))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::DeauthenticateReq) ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b11000000, 0, // Frame Control
@@ -1265,8 +1278,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_assoc_resp() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1290,9 +1303,9 @@ mod tests {
             rates: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::AssociateResp) ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -1316,8 +1329,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_disassoc_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1338,9 +1351,9 @@ mod tests {
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::DisassociateReq) ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10100000, 0, // Frame Control
@@ -1358,8 +1371,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_set_controlled_port_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1396,8 +1409,8 @@ mod tests {
     #[test]
     fn ap_handle_mlme_req_handle_mlme_eapol_req() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1419,9 +1432,9 @@ mod tests {
             data: vec![1, 2, 3],
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::EapolReq) ok");
-        assert_eq!(fake_device.wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device.wlan_queue[0].0[..],
+            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Header
                 0b00001000, 0b00000010, // Frame Control
@@ -1442,8 +1455,8 @@ mod tests {
     #[test]
     fn ap_mlme_respond_to_query_device_info() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
@@ -1451,17 +1464,18 @@ mod tests {
             Ok(())
         );
         let info = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
-        let expected =
-            crate::ddk_converter::device_info_from_wlan_softmac_query_response(fake_device.info)
-                .expect("Failed to convert DDK WlanSoftmacInfo");
+        let expected = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
+            fake_device_state.lock().unwrap().info,
+        )
+        .expect("Failed to convert DDK WlanSoftmacInfo");
         assert_eq!(info, expected);
     }
 
     #[test]
     fn ap_mlme_respond_to_query_discovery_support() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
@@ -1476,8 +1490,8 @@ mod tests {
     #[test]
     fn ap_mlme_respond_to_query_mac_sublayer_support() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
@@ -1498,8 +1512,8 @@ mod tests {
     #[test]
     fn ap_mlme_respond_to_query_security_support() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
@@ -1515,8 +1529,8 @@ mod tests {
     #[test]
     fn ap_mlme_respond_to_query_spectrum_management_support() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ap, _) = make_ap(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ap, _) = make_ap(fake_device);
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(

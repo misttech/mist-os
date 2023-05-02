@@ -21,7 +21,7 @@ use {
     wlan_inspect,
     wlan_mlme::{
         buffer::BufferProvider,
-        device::{DeviceInterface, WlanSoftmacIfcProtocol},
+        device::{Device, DeviceInterface, DeviceOps, WlanSoftmacIfcProtocol},
     },
     wlan_sme::{self, serve::create_sme},
 };
@@ -70,15 +70,15 @@ pub fn start_wlansoftmac(
     buf_provider: BufferProvider,
 ) -> Result<WlanSoftmacHandle, anyhow::Error> {
     let mut executor = fasync::LocalExecutor::new();
-    executor.run_singlethreaded(start_wlansoftmac_async(device, buf_provider))
+    executor.run_singlethreaded(start_wlansoftmac_async(Device::new(device), buf_provider))
 }
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 
 /// This is a helper function for running wlansoftmac inside a test. For non-test
 /// use cases, it should generally be invoked via `start_wlansoftmac`.
-async fn start_wlansoftmac_async(
-    device: DeviceInterface,
+async fn start_wlansoftmac_async<D: DeviceOps + Send + 'static>(
+    device: D,
     buf_provider: BufferProvider,
 ) -> Result<WlanSoftmacHandle, anyhow::Error> {
     let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
@@ -115,8 +115,8 @@ async fn start_wlansoftmac_async(
     }
 }
 
-async fn wlansoftmac_thread(
-    device: DeviceInterface,
+async fn wlansoftmac_thread<D: DeviceOps>(
+    mut device: D,
     buf_provider: BufferProvider,
     driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
@@ -198,8 +198,6 @@ async fn wlansoftmac_thread(
         }
     };
 
-    let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
-
     let softmac_info = device.wlan_softmac_query_response();
     let device_info = match wlan_mlme::device_info_from_wlan_softmac_query_response(softmac_info) {
         Ok(info) => info,
@@ -277,9 +275,18 @@ async fn wlansoftmac_thread(
         wpa1_supported: legacy_privacy_support.wpa1_supported,
     };
 
+    // TODO(fxbug.dev/126324): The MLME event stream should be moved out
+    // of DeviceOps entirely.
+    let mlme_event_stream = match device.take_mlme_event_stream() {
+        Some(mlme_event_stream) => mlme_event_stream,
+        None => {
+            startup_sender.send(Err(format_err!("Failed to take MLME event stream."))).unwrap();
+            return;
+        }
+    };
     let (mlme_request_stream, sme_fut) = match create_sme(
         config,
-        mlme_event_receiver,
+        mlme_event_stream,
         &device_info,
         mac_sublayer_support,
         security_support,
@@ -302,12 +309,11 @@ async fn wlansoftmac_thread(
             let config = wlan_mlme::client::ClientConfig {
                 ensure_on_channel_time: fasync::Duration::from_millis(500).into_nanos(),
             };
-            Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::client::ClientMlme>(
+            Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::client::ClientMlme<D>>(
                 config,
                 device,
                 buf_provider,
                 mlme_request_stream,
-                mlme_event_sender,
                 driver_event_stream,
                 startup_sender,
             ))
@@ -315,12 +321,11 @@ async fn wlansoftmac_thread(
         banjo_common::WlanMacRole::AP => {
             info!("Running wlansoftmac with AP role");
             let config = ieee80211::Bssid(softmac_info.sta_addr);
-            Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::ap::Ap>(
+            Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::ap::Ap<D>>(
                 config,
                 device,
                 buf_provider,
                 mlme_request_stream,
-                mlme_event_sender,
                 driver_event_stream,
                 startup_sender,
             ))
@@ -350,14 +355,27 @@ mod tests {
 
     fn run_wlansoftmac_setup(
         exec: &mut fasync::TestExecutor,
-        fake_device: &mut FakeDevice,
+    ) -> Result<(WlanSoftmacHandle, fidl_sme::GenericSmeProxy), anyhow::Error> {
+        run_wlansoftmac_setup_with_device(exec, FakeDevice::new(exec).0)
+    }
+
+    fn run_wlansoftmac_setup_with_device(
+        exec: &mut fasync::TestExecutor,
+        fake_device: FakeDevice,
     ) -> Result<(WlanSoftmacHandle, fidl_sme::GenericSmeProxy), anyhow::Error> {
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let handle_fut = start_wlansoftmac_async(fake_device.as_raw_device(), fake_buf_provider);
+        let handle_fut = start_wlansoftmac_async(fake_device.clone(), fake_buf_provider);
+
         pin_mut!(handle_fut);
         assert_variant!(exec.run_until_stalled(&mut handle_fut), Poll::Pending);
-        let usme_client_proxy =
-            fake_device.usme_bootstrap_client_end.take().unwrap().into_proxy()?;
+        let usme_client_proxy = fake_device
+            .state()
+            .lock()
+            .unwrap()
+            .usme_bootstrap_client_end
+            .take()
+            .unwrap()
+            .into_proxy()?;
         let mut legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
         let (generic_sme_proxy, generic_sme_server) =
@@ -373,9 +391,8 @@ mod tests {
     #[test]
     fn wlansoftmac_delete_no_crash() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
-        let (mut handle, _generic_sme_proxy) = run_wlansoftmac_setup(&mut exec, &mut fake_device)
-            .expect("Failed to start wlansoftmac");
+        let (mut handle, _generic_sme_proxy) =
+            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
         handle.stop();
         handle.delete();
     }
@@ -383,18 +400,16 @@ mod tests {
     #[test]
     fn wlansoftmac_delete_without_stop_no_crash() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
-        let (handle, _generic_sme_proxy) = run_wlansoftmac_setup(&mut exec, &mut fake_device)
-            .expect("Failed to start wlansoftmac");
+        let (handle, _generic_sme_proxy) =
+            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
         handle.delete();
     }
 
     #[test]
     fn wlansoftmac_handle_use_after_stop() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
-        let (mut handle, _generic_sme_proxy) = run_wlansoftmac_setup(&mut exec, &mut fake_device)
-            .expect("Failed to start wlansoftmac");
+        let (mut handle, _generic_sme_proxy) =
+            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
 
         handle
             .queue_eth_frame_tx(vec![0u8; 10])
@@ -408,9 +423,8 @@ mod tests {
     #[test]
     fn generic_sme_stops_on_shutdown() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
-        let (mut handle, generic_sme_proxy) = run_wlansoftmac_setup(&mut exec, &mut fake_device)
-            .expect("Failed to start wlansoftmac");
+        let (mut handle, generic_sme_proxy) =
+            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
         let (client_proxy, client_server) =
@@ -432,22 +446,23 @@ mod tests {
     #[test]
     fn wlansoftmac_bad_mac_role_fails_startup_with_bad_features() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
-        fake_device.mac_sublayer_support.device.is_synthetic = true;
-        fake_device.mac_sublayer_support.device.mac_implementation_type =
+        let (fake_device, fake_device_state) = FakeDevice::new(&mut exec);
+        fake_device_state.lock().unwrap().mac_sublayer_support.device.is_synthetic = true;
+        fake_device_state.lock().unwrap().mac_sublayer_support.device.mac_implementation_type =
             banjo_common::MacImplementationType::FULLMAC;
-        run_wlansoftmac_setup(&mut exec, &mut fake_device).expect_err("Softmac setup should fail");
+        run_wlansoftmac_setup_with_device(&mut exec, fake_device)
+            .expect_err("Softmac setup should fail");
     }
 
     #[test]
     fn wlansoftmac_startup_fails_on_bad_bootstrap() {
         let mut exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&mut exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&mut exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let handle_fut = start_wlansoftmac_async(fake_device.as_raw_device(), fake_buf_provider);
+        let handle_fut = start_wlansoftmac_async(fake_device.clone(), fake_buf_provider);
         pin_mut!(handle_fut);
         assert_variant!(exec.run_until_stalled(&mut handle_fut), Poll::Pending);
-        fake_device.usme_bootstrap_client_end = None; // Drop the client end.
+        fake_device_state.lock().unwrap().usme_bootstrap_client_end = None; // Drop the client end.
         exec.run_singlethreaded(handle_fut).expect_err("Bootstrap failure should be fatal");
     }
 }

@@ -6,7 +6,7 @@ use {
     crate::{
         ap::TimedEvent,
         buffer::{BufferProvider, InBuf},
-        device::Device,
+        device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
     },
@@ -33,17 +33,17 @@ pub struct BeaconOffloadParams {
     pub tim_ele_offset: usize,
 }
 
-pub struct Context {
-    pub device: Device,
+pub struct Context<D> {
+    pub device: D,
     pub buf_provider: BufferProvider,
     pub timer: Timer<TimedEvent>,
     pub seq_mgr: SequenceManager,
     pub bssid: Bssid,
 }
 
-impl Context {
+impl<D> Context<D> {
     pub fn new(
-        device: Device,
+        device: D,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
@@ -54,132 +54,6 @@ impl Context {
     pub fn schedule_after(&mut self, duration: zx::Duration, event: TimedEvent) -> EventId {
         self.timer.schedule_after(duration, event)
     }
-
-    // MLME sender functions.
-
-    /// Sends MLME-START.confirm (IEEE Std 802.11-2016, 6.3.11.3) to the SME.
-    pub fn send_mlme_start_conf(
-        &self,
-        result_code: fidl_mlme::StartResultCode,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::StartConf {
-                resp: fidl_mlme::StartConfirm { result_code },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends MLME-STOP.confirm to the SME.
-    pub fn send_mlme_stop_conf(&self, result_code: fidl_mlme::StopResultCode) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::StopConf {
-                resp: fidl_mlme::StopConfirm { result_code },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends EAPOL.conf (fuchsia.wlan.mlme.EapolConfirm) to the SME.
-    pub fn send_mlme_eapol_conf(
-        &self,
-        result_code: fidl_mlme::EapolResultCode,
-        dst_addr: MacAddr,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::EapolConf {
-                resp: fidl_mlme::EapolConfirm { result_code, dst_addr },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends MLME-AUTHENTICATE.indication (IEEE Std 802.11-2016, 6.3.5.4) to the SME.
-    pub fn send_mlme_auth_ind(
-        &self,
-        peer_sta_address: MacAddr,
-        auth_type: fidl_mlme::AuthenticationTypes,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::AuthenticateInd {
-                ind: fidl_mlme::AuthenticateIndication { peer_sta_address, auth_type },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends MLME-DEAUTHENTICATE.indication (IEEE Std 802.11-2016, 6.3.6.4) to the SME.
-    pub fn send_mlme_deauth_ind(
-        &self,
-        peer_sta_address: MacAddr,
-        reason_code: fidl_ieee80211::ReasonCode,
-        locally_initiated: LocallyInitiated,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateInd {
-                ind: fidl_mlme::DeauthenticateIndication {
-                    peer_sta_address,
-                    reason_code,
-                    locally_initiated: locally_initiated.0,
-                },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends MLME-ASSOCIATE.indication (IEEE Std 802.11-2016, 6.3.7.4) to the SME.
-    pub fn send_mlme_assoc_ind(
-        &self,
-        peer_sta_address: MacAddr,
-        listen_interval: u16,
-        ssid: Option<Ssid>,
-        capabilities: mac::CapabilityInfo,
-        rates: Vec<ie::SupportedRate>,
-        rsne: Option<Vec<u8>>,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::AssociateInd {
-                ind: fidl_mlme::AssociateIndication {
-                    peer_sta_address,
-                    listen_interval,
-                    ssid: ssid.map(|s| s.into()),
-                    capability_info: capabilities.raw(),
-                    rates: rates.iter().map(|r| r.0).collect(),
-                    rsne,
-                    // TODO(fxbug.dev/37891): Send everything else (e.g. HT capabilities).
-                },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends MLME-DISASSOCIATE.indication (IEEE Std 802.11-2016, 6.3.9.3) to the SME.
-    pub fn send_mlme_disassoc_ind(
-        &self,
-        peer_sta_address: MacAddr,
-        reason_code: fidl_ieee80211::ReasonCode,
-        locally_initiated: LocallyInitiated,
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
-                ind: fidl_mlme::DisassociateIndication {
-                    peer_sta_address,
-                    reason_code,
-                    locally_initiated: locally_initiated.0,
-                },
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Sends EAPOL.indication (fuchsia.wlan.mlme.EapolIndication) to the SME.
-    pub fn send_mlme_eapol_ind(
-        &self,
-        dst_addr: MacAddr,
-        src_addr: MacAddr,
-        data: &[u8],
-    ) -> Result<(), Error> {
-        self.device
-            .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
-                ind: fidl_mlme::EapolIndication { dst_addr, src_addr, data: data.to_vec() },
-            })
-            .map_err(|e| e.into())
-    }
-
-    // WLAN frame sender functions.
 
     /// Sends a WLAN authentication frame (IEEE Std 802.11-2016, 9.3.3.12) to the PHY.
     pub fn make_auth_frame(
@@ -480,6 +354,135 @@ impl Context {
             eapol_frame,
         )
     }
+}
+
+impl<D: DeviceOps> Context<D> {
+    // MLME sender functions.
+
+    /// Sends MLME-START.confirm (IEEE Std 802.11-2016, 6.3.11.3) to the SME.
+    pub fn send_mlme_start_conf(
+        &mut self,
+        result_code: fidl_mlme::StartResultCode,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::StartConf {
+                resp: fidl_mlme::StartConfirm { result_code },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends MLME-STOP.confirm to the SME.
+    pub fn send_mlme_stop_conf(
+        &mut self,
+        result_code: fidl_mlme::StopResultCode,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::StopConf {
+                resp: fidl_mlme::StopConfirm { result_code },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends EAPOL.conf (fuchsia.wlan.mlme.EapolConfirm) to the SME.
+    pub fn send_mlme_eapol_conf(
+        &mut self,
+        result_code: fidl_mlme::EapolResultCode,
+        dst_addr: MacAddr,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolConf {
+                resp: fidl_mlme::EapolConfirm { result_code, dst_addr },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends MLME-AUTHENTICATE.indication (IEEE Std 802.11-2016, 6.3.5.4) to the SME.
+    pub fn send_mlme_auth_ind(
+        &mut self,
+        peer_sta_address: MacAddr,
+        auth_type: fidl_mlme::AuthenticationTypes,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::AuthenticateInd {
+                ind: fidl_mlme::AuthenticateIndication { peer_sta_address, auth_type },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends MLME-DEAUTHENTICATE.indication (IEEE Std 802.11-2016, 6.3.6.4) to the SME.
+    pub fn send_mlme_deauth_ind(
+        &mut self,
+        peer_sta_address: MacAddr,
+        reason_code: fidl_ieee80211::ReasonCode,
+        locally_initiated: LocallyInitiated,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateInd {
+                ind: fidl_mlme::DeauthenticateIndication {
+                    peer_sta_address,
+                    reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends MLME-ASSOCIATE.indication (IEEE Std 802.11-2016, 6.3.7.4) to the SME.
+    pub fn send_mlme_assoc_ind(
+        &mut self,
+        peer_sta_address: MacAddr,
+        listen_interval: u16,
+        ssid: Option<Ssid>,
+        capabilities: mac::CapabilityInfo,
+        rates: Vec<ie::SupportedRate>,
+        rsne: Option<Vec<u8>>,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::AssociateInd {
+                ind: fidl_mlme::AssociateIndication {
+                    peer_sta_address,
+                    listen_interval,
+                    ssid: ssid.map(|s| s.into()),
+                    capability_info: capabilities.raw(),
+                    rates: rates.iter().map(|r| r.0).collect(),
+                    rsne,
+                    // TODO(fxbug.dev/37891): Send everything else (e.g. HT capabilities).
+                },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends MLME-DISASSOCIATE.indication (IEEE Std 802.11-2016, 6.3.9.3) to the SME.
+    pub fn send_mlme_disassoc_ind(
+        &mut self,
+        peer_sta_address: MacAddr,
+        reason_code: fidl_ieee80211::ReasonCode,
+        locally_initiated: LocallyInitiated,
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
+                ind: fidl_mlme::DisassociateIndication {
+                    peer_sta_address,
+                    reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
+            })
+            .map_err(|e| e.into())
+    }
+
+    /// Sends EAPOL.indication (fuchsia.wlan.mlme.EapolIndication) to the SME.
+    pub fn send_mlme_eapol_ind(
+        &mut self,
+        dst_addr: MacAddr,
+        src_addr: MacAddr,
+        data: &[u8],
+    ) -> Result<(), Error> {
+        self.device
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
+                ind: fidl_mlme::EapolIndication { dst_addr, src_addr, data: data.to_vec() },
+            })
+            .map_err(|e| e.into())
+    }
 
     // Netstack delivery functions.
 
@@ -525,19 +528,21 @@ mod test {
     const BSSID: Bssid = Bssid([2u8; 6]);
     const CLIENT_ADDR2: MacAddr = [3u8; 6];
 
-    fn make_context(device: Device) -> (Context, TimeStream<TimedEvent>) {
+    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(device, FakeBufferProvider::new(), timer, BSSID), time_stream)
+        (Context::new(fake_device, FakeBufferProvider::new(), timer, BSSID), time_stream)
     }
 
     #[test]
     fn send_mlme_auth_ind() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.send_mlme_auth_ind(CLIENT_ADDR, fidl_mlme::AuthenticationTypes::OpenSystem)
             .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -552,15 +557,17 @@ mod test {
     #[test]
     fn send_mlme_deauth_ind() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.send_mlme_deauth_ind(
             CLIENT_ADDR,
             fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             LocallyInitiated(true),
         )
         .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -576,8 +583,8 @@ mod test {
     #[test]
     fn send_mlme_assoc_ind() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.send_mlme_assoc_ind(
             CLIENT_ADDR,
             1,
@@ -587,7 +594,9 @@ mod test {
             None,
         )
         .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -606,15 +615,17 @@ mod test {
     #[test]
     fn send_mlme_disassoc_ind() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.send_mlme_disassoc_ind(
             CLIENT_ADDR,
             fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
             LocallyInitiated(true),
         )
         .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -630,11 +641,13 @@ mod test {
     #[test]
     fn send_mlme_eapol_ind() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.send_mlme_eapol_ind(CLIENT_ADDR2, CLIENT_ADDR, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        let msg = fake_device
+        let msg = fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -650,8 +663,8 @@ mod test {
     #[test]
     fn schedule_after() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, mut time_stream) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, mut time_stream) = make_context(fake_device);
         let event_id = ctx.schedule_after(
             zx::Duration::from_seconds(5),
             TimedEvent::ClientEvent([1, 1, 1, 1, 1, 1], ClientEvent::BssIdleTimeout),
@@ -670,8 +683,8 @@ mod test {
     #[test]
     fn make_auth_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_auth_frame(
                 CLIENT_ADDR,
@@ -701,8 +714,8 @@ mod test {
     #[test]
     fn make_assoc_resp_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_assoc_resp_frame(
                 CLIENT_ADDR,
@@ -737,8 +750,8 @@ mod test {
     #[test]
     fn make_assoc_resp_frame_error() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_assoc_resp_frame_error(
                 CLIENT_ADDR,
@@ -767,8 +780,8 @@ mod test {
     #[test]
     fn make_assoc_resp_frame_no_bss_max_idle_period() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_assoc_resp_frame(
                 CLIENT_ADDR,
@@ -802,8 +815,8 @@ mod test {
     #[test]
     fn make_disassoc_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_disassoc_frame(
                 CLIENT_ADDR,
@@ -829,8 +842,8 @@ mod test {
     #[test]
     fn make_probe_resp_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_probe_resp_frame(
                 CLIENT_ADDR,
@@ -869,8 +882,8 @@ mod test {
     #[test]
     fn make_beacon_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (ctx, _) = make_context(fake_device);
 
         let (in_buf, bytes_written, params) = ctx
             .make_beacon_frame(
@@ -913,8 +926,8 @@ mod test {
     #[test]
     fn make_data_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_data_frame(CLIENT_ADDR2, CLIENT_ADDR, false, false, 0x1234, &[1, 2, 3, 4, 5])
             .expect("error making data frame");
@@ -940,8 +953,8 @@ mod test {
     #[test]
     fn make_data_frame_ipv4_qos() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_data_frame(
                 CLIENT_ADDR2,
@@ -977,8 +990,8 @@ mod test {
     #[test]
     fn make_data_frame_ipv6_qos() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_data_frame(
                 CLIENT_ADDR2,
@@ -1014,8 +1027,8 @@ mod test {
     #[test]
     fn make_eapol_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, _) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         let (in_buf, bytes_written) = ctx
             .make_eapol_frame(CLIENT_ADDR2, CLIENT_ADDR, false, &[1, 2, 3, 4, 5])
             .expect("error making eapol frame");
@@ -1041,13 +1054,13 @@ mod test {
     #[test]
     fn deliver_eth_frame() {
         let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let (mut ctx, _) = make_context(fake_device.as_device());
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut ctx, _) = make_context(fake_device);
         ctx.deliver_eth_frame(CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device.eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device.eth_queue[0][..], &[
+        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[0][..], &[
             3, 3, 3, 3, 3, 3,  // dest
             1, 1, 1, 1, 1, 1,  // src
             0x12, 0x34,        // ether_type

@@ -31,8 +31,8 @@ pub use {ddk_converter::*, wlan_common as common};
 use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    device::{Device, DeviceInterface},
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    device::DeviceOps,
+    fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         select, StreamExt,
@@ -46,10 +46,11 @@ use {
 
 pub trait MlmeImpl {
     type Config: Send;
+    type Device: DeviceOps;
     type TimerEvent;
     fn new(
         config: Self::Config,
-        device: Device,
+        device: Self::Device,
         buf_provider: buffer::BufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
     ) -> Self;
@@ -58,7 +59,7 @@ pub trait MlmeImpl {
     fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), Error>;
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64);
     fn handle_timeout(&mut self, event_id: common::timer::EventId, event: Self::TimerEvent);
-    fn access_device(&mut self) -> &mut Device;
+    fn access_device(&mut self) -> &mut Self::Device;
 }
 
 pub struct MinstrelTimer {
@@ -114,10 +115,9 @@ const MINSTREL_UPDATE_INTERVAL_HW_SIM: std::time::Duration = std::time::Duration
 
 pub async fn mlme_main_loop<T: MlmeImpl>(
     config: T::Config,
-    device: DeviceInterface,
+    mut device: T::Device,
     buf_provider: buffer::BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
-    mlme_event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     startup_sender: oneshot::Sender<Result<(), Error>>,
 ) {
@@ -131,18 +131,19 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     let minstrel = if should_enable_minstrel(&device_mac_sublayer_support) {
         let timer_manager = MinstrelTimer { timer: minstrel_timer, current_timer: None };
         let probe_sequence = probe_sequence::ProbeSequence::random_new();
-        Some(Arc::new(Mutex::new(minstrel::MinstrelRateSelector::new(
+        let minstrel = Arc::new(Mutex::new(minstrel::MinstrelRateSelector::new(
             timer_manager,
             update_interval,
             probe_sequence,
-        ))))
+        )));
+        device.set_minstrel(minstrel.clone());
+        Some(minstrel)
     } else {
         None
     };
-    let new_device = Device::new(device, minstrel.clone(), mlme_event_sink);
     let (timer, time_stream) = common::timer::create_timer();
 
-    let mlme_impl = T::new(config, new_device, buf_provider, timer);
+    let mlme_impl = T::new(config, device, buf_provider, timer);
 
     // Startup is complete. Signal the main thread to proceed.
     // Failure to unwrap indicates a critical failure in the driver init thread.
@@ -231,20 +232,23 @@ async fn main_loop_impl<T: MlmeImpl>(
 
 #[cfg(test)]
 pub mod test_utils {
-    use {super::*, banjo_fuchsia_wlan_common as banjo_common, wlan_common::channel};
+    use {
+        super::*, crate::device::FakeDevice, banjo_fuchsia_wlan_common as banjo_common,
+        fidl_fuchsia_wlan_mlme as fidl_mlme, wlan_common::channel,
+    };
 
     pub struct FakeMlme {
-        device: Device,
+        device: FakeDevice,
     }
 
     impl MlmeImpl for FakeMlme {
         type Config = ();
-
+        type Device = FakeDevice;
         type TimerEvent = ();
 
         fn new(
             _config: Self::Config,
-            device: Device,
+            device: Self::Device,
             _buf_provider: buffer::BufferProvider,
             _scheduler: wlan_common::timer::Timer<Self::TimerEvent>,
         ) -> Self {
@@ -278,7 +282,7 @@ pub mod test_utils {
             unimplemented!()
         }
 
-        fn access_device(&mut self) -> &mut Device {
+        fn access_device(&mut self) -> &mut Self::Device {
             &mut self.device
         }
     }
@@ -368,18 +372,16 @@ mod tests {
     #[test]
     fn start_and_stop_main_loop() {
         let mut exec = TestExecutor::new();
-        let mut device = FakeDevice::new(&exec);
+        let (device, _device_state) = FakeDevice::new(&exec);
         let buf_provider = FakeBufferProvider::new();
         let (device_sink, device_stream) = mpsc::unbounded();
         let (startup_sender, mut startup_receiver) = oneshot::channel();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
-        let (mlme_event_sink, _mlme_event_stream) = mpsc::unbounded();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
             (),
-            device.as_raw_device(),
+            device,
             buf_provider,
             mlme_request_stream,
-            mlme_event_sink,
             device_stream,
             startup_sender,
         ));

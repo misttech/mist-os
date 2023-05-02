@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::client::{scanner::Scanner, Context, TimedEvent},
+    crate::{
+        client::{scanner::Scanner, Context, TimedEvent},
+        device::DeviceOps,
+    },
     anyhow::{self, bail},
     banjo_fuchsia_wlan_common as banjo_common, fuchsia_async as fasync, fuchsia_zircon as zx,
     thiserror,
@@ -24,12 +27,12 @@ pub trait ChannelActions {
     fn enable_tx(&mut self);
 }
 
-pub struct ChannelActionHandle<'a> {
-    ctx: &'a mut Context,
+pub struct ChannelActionHandle<'a, D> {
+    ctx: &'a mut Context<D>,
     scanner: &'a mut Scanner,
 }
 
-impl<'a> ChannelActions for ChannelActionHandle<'a> {
+impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
     fn switch_channel(
         &mut self,
         new_main_channel: banjo_common::WlanChannel,
@@ -79,11 +82,11 @@ impl ChannelState {
         self.main_channel
     }
 
-    pub fn bind<'a>(
+    pub fn bind<'a, D>(
         &'a mut self,
-        ctx: &'a mut Context,
+        ctx: &'a mut Context<D>,
         scanner: &'a mut Scanner,
-    ) -> BoundChannelState<'a, ChannelActionHandle<'a>> {
+    ) -> BoundChannelState<'a, ChannelActionHandle<'a, D>> {
         BoundChannelState { channel_state: self, actions: ChannelActionHandle { ctx, scanner } }
     }
 

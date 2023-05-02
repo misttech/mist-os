@@ -6,7 +6,7 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::{ActiveScanArgs, Device, PassiveScanArgs},
+        device::{ActiveScanArgs, DeviceOps, PassiveScanArgs},
         error::Error,
     },
     anyhow::format_err,
@@ -80,7 +80,7 @@ impl Scanner {
         Self { ongoing_scan: None, iface_mac, scanning_enabled: true }
     }
 
-    pub fn bind<'a>(&'a mut self, ctx: &'a mut Context) -> BoundScanner<'a> {
+    pub fn bind<'a, D>(&'a mut self, ctx: &'a mut Context<D>) -> BoundScanner<'a, D> {
         BoundScanner { scanner: self, ctx }
     }
 
@@ -89,9 +89,9 @@ impl Scanner {
     }
 }
 
-pub struct BoundScanner<'a> {
+pub struct BoundScanner<'a, D> {
     scanner: &'a mut Scanner,
-    ctx: &'a mut Context,
+    ctx: &'a mut Context<D>,
 }
 
 enum OngoingScan {
@@ -129,7 +129,7 @@ struct ChannelList {
     channels: Vec<u8>,
 }
 
-impl<'a> BoundScanner<'a> {
+impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     /// Temporarily disable scanning. If scan cancellation is supported, any
     /// ongoing scan will be cancelled when scanning is disabled. If a scan
     /// is in progress but cannot be cancelled, this function returns
@@ -491,7 +491,7 @@ fn active_scan_args_series(
     Ok(active_scan_args_series)
 }
 
-fn send_scan_result(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut Device) {
+fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut D) {
     device
         .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
@@ -510,13 +510,16 @@ mod tests {
         crate::{
             buffer::FakeBufferProvider,
             client::TimedEvent,
-            device::FakeDevice,
+            device::{FakeDevice, FakeDeviceState},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
         ieee80211::Ssid,
         lazy_static::lazy_static,
-        std::convert::TryFrom,
+        std::{
+            convert::TryFrom,
+            sync::{Arc, Mutex},
+        },
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -635,7 +638,9 @@ mod tests {
         let scan_req = fidl_mlme::ScanRequest { txn_id: 1338, ..passive_scan_req() };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
         assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
@@ -650,7 +655,9 @@ mod tests {
         scanner.bind(&mut ctx).disable_scanning().expect("Failed to disable scanning");
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
         assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
 
@@ -669,7 +676,9 @@ mod tests {
         let scan_req = fidl_mlme::ScanRequest { channel_list: vec![], ..passive_scan_req() };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
         assert_variant!(result, Err(Error::ScanError(ScanError::EmptyChannelList)));
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
@@ -688,7 +697,9 @@ mod tests {
         };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
         assert_variant!(result, Err(Error::ScanError(ScanError::MaxChannelTimeLtMin)));
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
@@ -698,7 +709,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -706,22 +717,23 @@ mod tests {
 
         // Verify that passive offload scan is requested
         assert_variant!(
-            m.fake_device.captured_passive_scan_args,
+            m.fake_device_state.lock().unwrap().captured_passive_scan_args,
             Some(ref passive_scan_args) => {
-                assert_eq!(passive_scan_args.channels.len(), 1);
-                assert_eq!(passive_scan_args.channels, &[6]);
+                assert_eq!(passive_scan_args.channels, vec![6]);
                 assert_eq!(passive_scan_args.min_channel_time, 102_400_000);
                 assert_eq!(passive_scan_args.max_channel_time, 307_200_000);
                 assert_eq!(passive_scan_args.min_home_time, 0);
             },
             "passive offload scan not initiated"
         );
-        let expected_scan_id = m.fake_device.next_scan_id - 1;
+        let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
 
         // Mock receiving a beacon
         handle_beacon_foo(&mut scanner, &mut ctx);
         let scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading ScanResult");
         assert_eq!(scan_result.txn_id, 1337);
@@ -731,7 +743,9 @@ mod tests {
         // Verify ScanEnd sent after handle_scan_complete
         scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, expected_scan_id);
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -801,7 +815,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -816,7 +830,7 @@ mod tests {
                 Some(ExpectedDynamicActiveScanArgs { channels, ies, .. }) => {
                     // Verify that active offload scan is requested
                     assert_variant!(
-                        m.fake_device.captured_active_scan_args,
+                        m.fake_device_state.lock().unwrap().captured_active_scan_args,
                         Some(ref active_scan_args) => {
                             assert_eq!(active_scan_args.min_channel_time, 102_400_000);
                             assert_eq!(active_scan_args.max_channel_time, 307_200_000);
@@ -843,12 +857,14 @@ mod tests {
                         },
                         "active offload scan not initiated"
                     );
-                    let expected_scan_id = m.fake_device.next_scan_id - 1;
+                    let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
 
                     // Mock receiving beacons
                     handle_beacon_foo(&mut scanner, &mut ctx);
                     let scan_result = m
-                        .fake_device
+                        .fake_device_state
+                        .lock()
+                        .unwrap()
                         .next_mlme_msg::<fidl_mlme::ScanResult>()
                         .expect("error reading ScanResult");
                     assert_eq!(scan_result.txn_id, 1337);
@@ -857,7 +873,9 @@ mod tests {
 
                     handle_beacon_bar(&mut scanner, &mut ctx);
                     let scan_result = m
-                        .fake_device
+                        .fake_device_state
+                        .lock()
+                        .unwrap()
                         .next_mlme_msg::<fidl_mlme::ScanResult>()
                         .expect("error reading ScanResult");
                     assert_eq!(scan_result.txn_id, 1337);
@@ -870,7 +888,9 @@ mod tests {
             }
         }
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -883,9 +903,9 @@ mod tests {
     fn test_start_passive_scan_fails() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-        let device = m.fake_device.as_device_fail_start_passive_scan();
-        let mut ctx = m.make_ctx_with_device(device);
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().config.start_passive_scan_fails = true;
+        let mut ctx = m.make_ctx();
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
@@ -893,7 +913,9 @@ mod tests {
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
         );
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
@@ -902,9 +924,9 @@ mod tests {
     fn test_start_active_scan_fails() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-        let device = m.fake_device.as_device_fail_start_active_scan();
-        let mut ctx = m.make_ctx_with_device(device);
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().config.start_active_scan_fails = true;
+        let mut ctx = m.make_ctx();
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6]));
@@ -912,7 +934,9 @@ mod tests {
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
         );
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
@@ -922,7 +946,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -930,16 +954,18 @@ mod tests {
 
         // Verify that passive offload scan is requested
         assert_variant!(
-            m.fake_device.captured_passive_scan_args,
+            m.fake_device_state.lock().unwrap().captured_passive_scan_args,
             Some(_),
             "passive offload scan not initiated"
         );
-        let expected_scan_id = m.fake_device.next_scan_id - 1;
+        let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
 
         // Mock receiving a beacon
         handle_beacon_foo(&mut scanner, &mut ctx);
         let scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading ScanResult");
         assert_eq!(scan_result.txn_id, 1337);
@@ -949,7 +975,9 @@ mod tests {
         // Verify ScanEnd sent after handle_scan_complete
         scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id);
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -963,7 +991,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device.discovery_support.scan_offload.supported = true;
+        m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
         let mut scanner = Scanner::new(IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -974,16 +1002,18 @@ mod tests {
 
         // Verify that active offload scan is requested
         assert_variant!(
-            m.fake_device.captured_active_scan_args,
+            m.fake_device_state.lock().unwrap().captured_active_scan_args,
             Some(_),
             "active offload scan not initiated"
         );
-        let expected_scan_id = m.fake_device.next_scan_id - 1;
+        let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
 
         // Mock receiving a beacon
         handle_beacon_foo(&mut scanner, &mut ctx);
         let scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading ScanResult");
         assert_eq!(scan_result.txn_id, 1337);
@@ -993,7 +1023,9 @@ mod tests {
         // Verify ScanEnd sent after handle_scan_complete
         scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id);
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -1016,7 +1048,9 @@ mod tests {
         scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, ongoing_scan_id);
 
         let scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading MLME ScanResult");
         assert_eq!(scan_result.txn_id, 1337);
@@ -1024,7 +1058,9 @@ mod tests {
         assert_eq!(scan_result.bss, *BSS_DESCRIPTION_FOO);
 
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -1050,7 +1086,9 @@ mod tests {
 
         // Verify that one scan result is sent for each beacon
         let foo_scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading MLME ScanResult");
         assert_eq!(foo_scan_result.txn_id, 1337);
@@ -1058,7 +1096,9 @@ mod tests {
         assert_eq!(foo_scan_result.bss, *BSS_DESCRIPTION_FOO);
 
         let bar_scan_result = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanResult>()
             .expect("error reading MLME ScanResult");
         assert_eq!(bar_scan_result.txn_id, 1337);
@@ -1066,7 +1106,9 @@ mod tests {
         assert_eq!(bar_scan_result.bss, *BSS_DESCRIPTION_BAR);
 
         let scan_end = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ScanEnd>()
             .expect("error reading MLME ScanEnd");
         assert_eq!(
@@ -1087,7 +1129,7 @@ mod tests {
         assert_eq!(true, scanner.is_scanning());
     }
 
-    fn handle_beacon_foo(scanner: &mut Scanner, ctx: &mut Context) {
+    fn handle_beacon_foo(scanner: &mut Scanner, ctx: &mut Context<FakeDevice>) {
         scanner.bind(ctx).handle_ap_advertisement(
             BSSID_FOO,
             TimeUnit(BEACON_INTERVAL_FOO),
@@ -1097,7 +1139,7 @@ mod tests {
         );
     }
 
-    fn handle_beacon_bar(scanner: &mut Scanner, ctx: &mut Context) {
+    fn handle_beacon_bar(scanner: &mut Scanner, ctx: &mut Context<FakeDevice>) {
         scanner.bind(ctx).handle_ap_advertisement(
             BSSID_BAR,
             TimeUnit(BEACON_INTERVAL_BAR),
@@ -1109,6 +1151,7 @@ mod tests {
 
     struct MockObjects {
         fake_device: FakeDevice,
+        fake_device_state: Arc<Mutex<FakeDeviceState>>,
         _time_stream: TimeStream<TimedEvent>,
         timer: Option<Timer<TimedEvent>>,
     }
@@ -1116,18 +1159,14 @@ mod tests {
     impl MockObjects {
         fn new(exec: &fasync::TestExecutor) -> Self {
             let (timer, _time_stream) = create_timer();
-            Self { fake_device: FakeDevice::new(exec), _time_stream, timer: Some(timer) }
+            let (fake_device, fake_device_state) = FakeDevice::new(exec);
+            Self { fake_device, fake_device_state, _time_stream, timer: Some(timer) }
         }
 
-        fn make_ctx(&mut self) -> Context {
-            let device = self.fake_device.as_device();
-            self.make_ctx_with_device(device)
-        }
-
-        fn make_ctx_with_device(&mut self, device: Device) -> Context {
+        fn make_ctx(&mut self) -> Context<FakeDevice> {
             Context {
                 _config: Default::default(),
-                device,
+                device: self.fake_device.clone(),
                 buf_provider: FakeBufferProvider::new(),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),

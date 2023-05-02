@@ -15,6 +15,7 @@ use {
             lost_bss::LostBssCounter, BoundClient, Client, Context, ParsedAssociateResp, TimedEvent,
         },
         ddk_converter as ddk,
+        device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
         key::KeyConfig,
@@ -64,7 +65,10 @@ impl Joined {
     /// The returned state is unchanged in an error case. Otherwise, the state transitions into
     /// "Authenticating".
     /// Returns Ok(AkmAlgorithm) if authentication request was sent successfully, Err(()) otherwise.
-    fn start_authenticating(&self, sta: &mut BoundClient<'_>) -> Result<akm::AkmAlgorithm, ()> {
+    fn start_authenticating<D: DeviceOps>(
+        &self,
+        sta: &mut BoundClient<'_, D>,
+    ) -> Result<akm::AkmAlgorithm, ()> {
         let auth_type = sta.sta.connect_req.auth_type;
         let algorithm_candidate = match auth_type {
             fidl_mlme::AuthenticationTypes::OpenSystem => Ok(akm::AkmAlgorithm::OpenSupplicant),
@@ -94,7 +98,7 @@ impl Joined {
         })
     }
 
-    fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
+    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         // Clear assoc context at the device
         if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             warn!("SME Deauthenticate: Error clearing association in vendor driver: {}", e);
@@ -118,9 +122,13 @@ pub struct Authenticating {
 }
 
 impl Authenticating {
-    fn akm_state_update_notify_sme(
+    fn new(algorithm: akm::AkmAlgorithm) -> Self {
+        Self { algorithm }
+    }
+
+    fn akm_state_update_notify_sme<D: DeviceOps>(
         &self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         state: Result<akm::AkmState, anyhow::Error>,
     ) -> AuthProgress {
         match state {
@@ -153,7 +161,7 @@ impl Authenticating {
     /// Initiates an association with the currently joined BSS.
     /// Returns Ok(()) if association request was sent successfully.
     /// Otherwise an Err(()) is returned and a CONNECT.confirm message to its SME peer.
-    fn start_associating(&self, sta: &mut BoundClient<'_>) -> Result<(), ()> {
+    fn start_associating<D: DeviceOps>(&self, sta: &mut BoundClient<'_, D>) -> Result<(), ()> {
         sta.send_assoc_req_frame().map_err(|e| {
             error!("Error sending association request frame: {}", e);
             sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedTemporarily);
@@ -166,9 +174,9 @@ impl Authenticating {
     //  association has started.
     /// Returns AuthProgress::InProgress if authentication is still ongoing.
     /// Returns AuthProgress::Failed if failed to authenticate or start association request.
-    fn on_auth_frame(
+    fn on_auth_frame<D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         auth_hdr: &mac::AuthHdr,
         body: &[u8],
     ) -> AuthProgress {
@@ -179,9 +187,9 @@ impl Authenticating {
     /// Processes an SAE response from SME.
     /// This indicates that an SAE handshake has completed, successful or otherwise.
     /// On success, authentication is complete and association has started.
-    fn on_sme_sae_resp(
+    fn on_sme_sae_resp<D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         resp: fidl_mlme::SaeHandshakeResponse,
     ) -> AuthProgress {
         let state = self.algorithm.handle_sae_resp(sta, resp.status_code);
@@ -189,9 +197,9 @@ impl Authenticating {
     }
 
     /// Processes a request from SME to transmit an SAE authentication frame to a peer.
-    fn on_sme_sae_tx(
+    fn on_sme_sae_tx<D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         tx: fidl_mlme::SaeFrame,
     ) -> AuthProgress {
         let state =
@@ -202,7 +210,11 @@ impl Authenticating {
     /// Processes an inbound deauthentication frame.
     /// This always results in an MLME-AUTHENTICATE.confirm message to MLME's SME peer.
     /// The pending authentication timeout will be canceled in this process.
-    fn on_deauth_frame(&mut self, sta: &mut BoundClient<'_>, deauth_hdr: &mac::DeauthHdr) {
+    fn on_deauth_frame<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        deauth_hdr: &mac::DeauthHdr,
+    ) {
         info!(
             "received spurious deauthentication frame while authenticating with BSS (unusual); \
              authentication failed: {:?}",
@@ -216,7 +228,7 @@ impl Authenticating {
         }
     }
 
-    fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
+    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
         // Clear assoc context at the device
         if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
@@ -229,9 +241,9 @@ impl Authenticating {
 pub struct Authenticated;
 
 impl Authenticated {
-    fn on_sme_reconnect(
+    fn on_sme_reconnect<D: DeviceOps>(
         &self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::ReconnectRequest,
     ) -> Result<EventId, ()> {
         if req.peer_sta_address == sta.sta.connect_req.selected_bss.bssid.0 {
@@ -268,14 +280,18 @@ pub struct Associating {
 }
 
 impl Associating {
+    fn new_with_reconnect_timeout(reconnect_timeout: EventId) -> Self {
+        Self { reconnect_timeout: Some(reconnect_timeout) }
+    }
+
     /// Processes an inbound association response frame.
     /// SME will be notified via an MLME-ASSOCIATE.confirm message whether the association
     /// with the BSS was successful.
     /// Returns Ok(()) if the association was successful, otherwise Err(()).
     /// Note: The pending authentication timeout will be canceled in any case.
-    fn on_assoc_resp_frame<B: ByteSlice>(
+    fn on_assoc_resp_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         assoc_resp_hdr: &mac::AssocRespHdr,
         elements: B,
     ) -> Result<Association, ()> {
@@ -384,7 +400,11 @@ impl Associating {
     /// association with the Client. However, to maximize interoperability disassociation frames
     /// are handled in this state as well and treated similar to unsuccessful association responses.
     /// This always results in an MLME-ASSOCIATE.confirm message to MLME's SME peer.
-    fn on_disassoc_frame(&mut self, sta: &mut BoundClient<'_>, _disassoc_hdr: &mac::DisassocHdr) {
+    fn on_disassoc_frame<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        _disassoc_hdr: &mac::DisassocHdr,
+    ) {
         warn!("received unexpected disassociation frame while associating");
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
     }
@@ -392,7 +412,11 @@ impl Associating {
     /// Processes an inbound deauthentication frame.
     /// This always results in an MLME-ASSOCIATE.confirm message to MLME's SME peer.
     /// The pending association timeout will be canceled in this process.
-    fn on_deauth_frame(&mut self, sta: &mut BoundClient<'_>, deauth_hdr: &mac::DeauthHdr) {
+    fn on_deauth_frame<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        deauth_hdr: &mac::DeauthHdr,
+    ) {
         info!(
             "received spurious deauthentication frame while associating with BSS (unusual); \
              association failed: {:?}",
@@ -404,7 +428,7 @@ impl Associating {
         }
     }
 
-    fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
+    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
         // Clear assoc context at the device
         if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
@@ -524,7 +548,11 @@ pub struct Associated(pub Association);
 impl Associated {
     /// Processes an inbound disassociation frame.
     /// This always results in an MLME-DISASSOCIATE.indication message to MLME's SME peer.
-    fn on_disassoc_frame(&mut self, sta: &mut BoundClient<'_>, disassoc_hdr: &mac::DisassocHdr) {
+    fn on_disassoc_frame<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        disassoc_hdr: &mac::DisassocHdr,
+    ) {
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(disassoc_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -532,7 +560,11 @@ impl Associated {
     }
 
     /// Sends an MLME-DEAUTHENTICATE.indication message to MLME's SME peer.
-    fn on_deauth_frame(&mut self, sta: &mut BoundClient<'_>, deauth_hdr: &mac::DeauthHdr) {
+    fn on_deauth_frame<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        deauth_hdr: &mac::DeauthHdr,
+    ) {
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -544,15 +576,19 @@ impl Associated {
 
     /// Process every inbound management frame before its being handed off to a more specific
     /// handler.
-    fn on_any_mgmt_frame(&self, sta: &mut BoundClient<'_>, mgmt_hdr: &mac::MgmtHdr) {
+    fn on_any_mgmt_frame<D: DeviceOps>(
+        &self,
+        sta: &mut BoundClient<'_, D>,
+        mgmt_hdr: &mac::MgmtHdr,
+    ) {
         self.request_bu_if_available(sta, mgmt_hdr.frame_ctrl, mgmt_hdr.addr1);
     }
 
     /// Sends PS-POLL requests if the FrameControl's more_data bit is set, and the received frame
     /// was addressed for this STA. No-op if the controlled port is closed.
-    fn request_bu_if_available(
+    fn request_bu_if_available<D: DeviceOps>(
         &self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         fc: mac::FrameControl,
         dst_addr: MacAddr,
     ) {
@@ -572,9 +608,9 @@ impl Associated {
 
     /// Process and inbound beacon frame.
     /// Resets LostBssCounter, check buffered frame if available.
-    fn on_beacon_frame<B: ByteSlice>(
+    fn on_beacon_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         header: &BeaconHdr,
         elements: B,
     ) {
@@ -609,9 +645,9 @@ impl Associated {
     /// Fuchsia's Netstack if the STA's controlled port is open.
     /// NULL-Data frames are interpreted as "Keep Alive" requests and responded with NULL data
     /// frames if the STA's controlled port is open.
-    fn on_data_frame<B: ByteSlice>(
+    fn on_data_frame<B: ByteSlice, D: DeviceOps>(
         &self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         fixed_data_fields: &mac::FixedDataHdrFields,
         addr4: Option<mac::Addr4>,
         qos_ctrl: Option<mac::QosControl>,
@@ -657,7 +693,11 @@ impl Associated {
         }
     }
 
-    fn on_eth_frame<B: ByteSlice>(&self, sta: &mut BoundClient<'_>, frame: B) -> Result<(), Error> {
+    fn on_eth_frame<B: ByteSlice, D: DeviceOps>(
+        &self,
+        sta: &mut BoundClient<'_, D>,
+        frame: B,
+    ) -> Result<(), Error> {
         let mac::EthernetFrame { hdr, body } = match mac::EthernetFrame::parse(frame) {
             Some(eth_frame) => eth_frame,
             None => {
@@ -685,9 +725,9 @@ impl Associated {
         )
     }
 
-    fn on_block_ack_frame<B: ByteSlice>(
+    fn on_block_ack_frame<B: ByteSlice, D>(
         &mut self,
-        _sta: &mut BoundClient<'_>,
+        _sta: &mut BoundClient<'_, D>,
         _action: mac::BlockAckAction,
         _body: B,
     ) {
@@ -698,9 +738,9 @@ impl Associated {
         //self.0.block_ack_state.replace_state(|state| state.on_block_ack_frame(sta, action, body));
     }
 
-    fn on_spectrum_mgmt_frame<B: ByteSlice>(
+    fn on_spectrum_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         action: mac::SpectrumMgmtAction,
         body: B,
     ) {
@@ -718,7 +758,11 @@ impl Associated {
         }
     }
 
-    fn on_sme_eapol(&self, sta: &mut BoundClient<'_>, req: fidl_mlme::EapolRequest) {
+    fn on_sme_eapol<D: DeviceOps>(
+        &self,
+        sta: &mut BoundClient<'_, D>,
+        req: fidl_mlme::EapolRequest,
+    ) {
         // Drop EAPoL frame if it is not a protected network.
         if !sta.sta.eapol_required() {
             error!("Unexpected MLME-EAPOL.request message: BSS not protected");
@@ -730,7 +774,11 @@ impl Associated {
         sta.send_eapol_frame(req.src_addr, req.dst_addr, protected, &req.data);
     }
 
-    fn on_sme_set_keys(&self, sta: &BoundClient<'_>, req: fidl_mlme::SetKeysRequest) {
+    fn on_sme_set_keys<D: DeviceOps>(
+        &self,
+        sta: &mut BoundClient<'_, D>,
+        req: fidl_mlme::SetKeysRequest,
+    ) {
         if !sta.sta.eapol_required() {
             error!("Unexpected MLME-SetKeys.request message: BSS not protected");
             return;
@@ -756,9 +804,9 @@ impl Associated {
         }
     }
 
-    fn on_sme_set_controlled_port(
+    fn on_sme_set_controlled_port<D: DeviceOps>(
         &mut self,
-        sta: &BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::SetControlledPortRequest,
     ) {
         if !sta.sta.eapol_required() {
@@ -779,9 +827,9 @@ impl Associated {
         }
     }
 
-    fn on_sme_deauthenticate(
+    fn on_sme_deauthenticate<D: DeviceOps>(
         &mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::DeauthenticateRequest,
     ) {
         if let Err(e) = sta.send_deauth_frame(mac::ReasonCode(req.reason_code.into_primitive())) {
@@ -801,7 +849,7 @@ impl Associated {
         }
     }
 
-    fn pre_leaving_associated_state(&mut self, sta: &mut BoundClient<'_>) {
+    fn pre_leaving_associated_state<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         self.0.status_check_timeout.next_id.take();
         self.0.controlled_port_open = false;
         if let Err(e) = sta.ctx.device.set_ethernet_down() {
@@ -812,7 +860,11 @@ impl Associated {
     #[must_use]
     /// Reports average signal strength to SME and check if auto deauthentication is due.
     /// Returns true if there auto deauthentication is triggered by lack of beacon frames.
-    fn on_timeout(&mut self, sta: &mut BoundClient<'_>, event_id: EventId) -> bool {
+    fn on_timeout<D: DeviceOps>(
+        &mut self,
+        sta: &mut BoundClient<'_, D>,
+        event_id: EventId,
+    ) -> bool {
         if self.0.status_check_timeout.next_id != Some(event_id) {
             // Do nothing if we've canceled the timeout (e.g. by going off-channel).
             return false;
@@ -849,7 +901,7 @@ impl Associated {
         auto_deauth
     }
 
-    fn off_channel(&mut self, sta: &mut Client, ctx: &mut Context) {
+    fn off_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
         if let Err(e) = sta.send_power_state_frame(ctx, PowerState::DOZE) {
             warn!("unable to send doze frame: {:?}", e);
         }
@@ -857,7 +909,7 @@ impl Associated {
         self.0.status_check_timeout.next_id.take();
     }
 
-    fn on_channel(&mut self, sta: &mut Client, ctx: &mut Context) {
+    fn on_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
         if let Err(e) = sta.send_power_state_frame(ctx, PowerState::AWAKE) {
             warn!("unable to send awake frame: {:?}", e);
         }
@@ -901,7 +953,7 @@ impl States {
     /// Begin the 802.11 connect operation, starting with authentication.
     /// This method only has an effect if the initial state is Joined.
     /// Otherwise it is no-op.
-    pub fn start_connecting(self, sta: &mut BoundClient<'_>) -> States {
+    pub fn start_connecting<D: DeviceOps>(self, sta: &mut BoundClient<'_, D>) -> States {
         match self {
             States::Joined(state) => {
                 // Setting timeout in term of beacon period allows us to adjust the realtime
@@ -911,7 +963,7 @@ impl States {
                 let timeout = sta.ctx.timer.schedule_after(duration, TimedEvent::Connecting);
                 sta.sta.connect_timeout.replace(timeout);
                 match state.start_authenticating(sta) {
-                    Ok(algorithm) => state.transition_to(Authenticating { algorithm }).into(),
+                    Ok(algorithm) => state.transition_to(Authenticating::new(algorithm)).into(),
                     Err(()) => state.transition_to(Joined).into(),
                 }
             }
@@ -929,9 +981,9 @@ impl States {
     /// - frames are from a foreign BSS
     /// - frames are unicast but destined for a MAC address that is different from this STA.
     // TODO(fxbug.dev/43456): Implement a packet counter and add tests to verify frames are dropped correctly.
-    pub fn on_mac_frame<B: ByteSlice>(
+    pub fn on_mac_frame<B: ByteSlice, D: DeviceOps>(
         mut self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
@@ -991,9 +1043,9 @@ impl States {
 
     /// Processes inbound management frames.
     /// Only frames from the joined BSS are processed. Frames from other STAs are dropped.
-    fn on_mgmt_frame<B: ByteSlice>(
+    fn on_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         mgmt_hdr: &mac::MgmtHdr,
         body: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
@@ -1089,9 +1141,9 @@ impl States {
         }
     }
 
-    pub fn on_eth_frame<B: ByteSlice>(
+    pub fn on_eth_frame<B: ByteSlice, D: DeviceOps>(
         &self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         frame: B,
     ) -> Result<(), Error> {
         match self {
@@ -1104,9 +1156,9 @@ impl States {
     }
 
     /// Callback when a previously scheduled event fired.
-    pub fn on_timed_event(
+    pub fn on_timed_event<D: DeviceOps>(
         self,
-        sta: &mut BoundClient<'_>,
+        sta: &mut BoundClient<'_, D>,
         event: TimedEvent,
         event_id: EventId,
     ) -> States {
@@ -1163,7 +1215,11 @@ impl States {
         }
     }
 
-    pub fn handle_mlme_req(self, sta: &mut BoundClient<'_>, req: wlan_sme::MlmeRequest) -> States {
+    pub fn handle_mlme_req<D: DeviceOps>(
+        self,
+        sta: &mut BoundClient<'_, D>,
+        req: wlan_sme::MlmeRequest,
+    ) -> States {
         use wlan_sme::MlmeRequest as MlmeReq;
 
         match self {
@@ -1208,7 +1264,7 @@ impl States {
             States::Authenticated(state) => match req {
                 MlmeReq::Reconnect(req) => match state.on_sme_reconnect(sta, req) {
                     Ok(timeout) => {
-                        state.transition_to(Associating { reconnect_timeout: Some(timeout) }).into()
+                        state.transition_to(Associating::new_with_reconnect_timeout(timeout)).into()
                     }
                     Err(()) => state.into(),
                 },
@@ -1272,7 +1328,7 @@ impl States {
         }
     }
 
-    pub fn pre_switch_off_channel(&mut self, sta: &mut Client, ctx: &mut Context) {
+    pub fn pre_switch_off_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
         match self {
             States::Associated(state) => {
                 state.off_channel(sta, ctx);
@@ -1281,7 +1337,7 @@ impl States {
         }
     }
 
-    pub fn handle_back_on_channel(&mut self, sta: &mut Client, ctx: &mut Context) {
+    pub fn handle_back_on_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
         match self {
             States::Associated(state) => {
                 state.on_channel(sta, ctx);
@@ -1342,13 +1398,14 @@ mod tests {
                 channel_switch::ChannelState, scanner::Scanner, test_utils::drain_timeouts, Client,
                 Context, ParsedConnectRequest, TimedEventClass,
             },
-            device::{Device, FakeDevice},
+            device::{DeviceOps, FakeDevice, FakeDeviceState},
             test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
         },
         akm::AkmAlgorithm,
         banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         ieee80211::Bssid,
+        std::sync::{Arc, Mutex},
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -1372,6 +1429,7 @@ mod tests {
 
     struct MockObjects {
         fake_device: FakeDevice,
+        fake_device_state: Arc<Mutex<FakeDeviceState>>,
         timer: Option<Timer<TimedEvent>>,
         time_stream: TimeStream<TimedEvent>,
         scanner: Scanner,
@@ -1381,8 +1439,10 @@ mod tests {
     impl MockObjects {
         fn new(exec: &fasync::TestExecutor) -> Self {
             let (timer, time_stream) = create_timer();
+            let (fake_device, fake_device_state) = FakeDevice::new(exec);
             Self {
-                fake_device: FakeDevice::new(exec),
+                fake_device,
+                fake_device_state,
                 timer: Some(timer),
                 time_stream,
                 scanner: Scanner::new(IFACE_MAC),
@@ -1390,16 +1450,18 @@ mod tests {
             }
         }
 
-        fn make_ctx(&mut self) -> Context {
-            let device = self.fake_device.as_device();
-            device.set_channel(fake_wlan_channel().into()).expect("fake device is obedient");
-            self.make_ctx_with_device(device)
+        fn make_ctx(&mut self) -> Context<FakeDevice> {
+            self.fake_device
+                .set_channel(fake_wlan_channel().into())
+                .expect("fake device is obedient");
+            self.make_base_ctx()
         }
 
-        fn make_ctx_with_bss(&mut self) -> Context {
-            let device = self.fake_device.as_device();
-            device.set_channel(fake_wlan_channel().into()).expect("fake device is obedient");
-            device
+        fn make_ctx_with_bss(&mut self) -> Context<FakeDevice> {
+            self.fake_device
+                .set_channel(fake_wlan_channel().into())
+                .expect("fake device is obedient");
+            self.fake_device
                 .join_bss(banjo_internal::JoinBssRequest {
                     bssid: [1, 2, 3, 4, 5, 6],
                     bss_type: banjo_internal::BssType::PERSONAL,
@@ -1407,13 +1469,13 @@ mod tests {
                     beacon_period: 100,
                 })
                 .expect("error configuring bss");
-            self.make_ctx_with_device(device)
+            self.make_base_ctx()
         }
 
-        fn make_ctx_with_device(&mut self, device: Device) -> Context {
+        fn make_base_ctx(&mut self) -> Context<FakeDevice> {
             Context {
                 _config: Default::default(),
-                device,
+                device: self.fake_device.clone(),
                 buf_provider: FakeBufferProvider::new(),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
@@ -1463,7 +1525,7 @@ mod tests {
         }
     }
 
-    fn empty_association(sta: &mut BoundClient<'_>) -> Association {
+    fn empty_association(sta: &mut BoundClient<'_, FakeDevice>) -> Association {
         let status_check_timeout =
             schedule_association_status_timeout(sta.sta.beacon_period(), &mut sta.ctx.timer);
         Association {
@@ -1510,8 +1572,8 @@ mod tests {
         })
     }
 
-    fn open_authenticating(sta: &mut BoundClient<'_>) -> Authenticating {
-        let mut auth = Authenticating { algorithm: AkmAlgorithm::OpenSupplicant };
+    fn open_authenticating(sta: &mut BoundClient<'_, FakeDevice>) -> Authenticating {
+        let mut auth = Authenticating::new(AkmAlgorithm::OpenSupplicant);
         auth.algorithm.initiate(sta).expect("Failed to initiate open auth");
         auth
     }
@@ -1520,8 +1582,8 @@ mod tests {
     fn connect_authenticate_tx_failure() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-        let device = m.fake_device.as_device_fail_wlan_tx();
-        let mut ctx = m.make_ctx_with_device(device);
+        m.fake_device_state.lock().unwrap().config.send_wlan_frame_fails = true;
+        let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -1532,7 +1594,12 @@ mod tests {
         assert!(m.time_stream.try_next().is_err());
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1562,11 +1629,16 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Joined;
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let _state = state.start_authenticating(&mut sta).expect_err("should fail authenticating");
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1577,7 +1649,7 @@ mod tests {
             }
         );
 
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -1589,7 +1661,7 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = open_authenticating(&mut sta);
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Verify authentication failed.
         assert_variant!(
             state.on_auth_frame(
@@ -1605,7 +1677,12 @@ mod tests {
         );
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1615,7 +1692,7 @@ mod tests {
                 association_ies: vec![],
             }
         );
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -1627,14 +1704,19 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = open_authenticating(&mut sta);
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state.on_deauth_frame(
             &mut sta,
             &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::NoMoreStas.into() },
         );
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1644,7 +1726,7 @@ mod tests {
                 association_ies: vec![],
             }
         );
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -1655,7 +1737,7 @@ mod tests {
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let mut state = Associating::default();
         let assoc_resp_ies = fake_bss_description!(Wpa2, ies_overrides: IesOverrides::new()
             .set(IeType::HT_CAPABILITIES, ie::fake_ht_cap_bytes().to_vec())
@@ -1678,7 +1760,12 @@ mod tests {
         assert_eq!(true, controlled_port_open);
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1688,7 +1775,7 @@ mod tests {
                 association_ies: assoc_resp_ies,
             }
         );
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -1702,7 +1789,7 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = Associating::default();
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let assoc_resp_ies =
             fake_bss_description!(Wpa2, bssid: BSSID.0, ies_overrides: IesOverrides::new()
                 .set(IeType::HT_CAPABILITIES, ie::fake_ht_cap_bytes().to_vec())
@@ -1725,8 +1812,16 @@ mod tests {
         assert_eq!(false, controlled_port_open);
 
         // Verify association context is set
-        assert_eq!(m.fake_device.assocs.len(), 1);
-        let assoc_cfg = m.fake_device.assocs.get(&BSSID.0).expect("expect assoc ctx to be set");
+        assert_eq!(m.fake_device_state.lock().unwrap().assocs.len(), 1);
+
+        let assoc_cfg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .assocs
+            .get(&BSSID.0)
+            .expect("expect assoc ctx to be set")
+            .clone();
         assert_eq!(assoc_cfg.aid, 42);
         assert_eq!(assoc_cfg.qos, true);
         assert_eq!(assoc_cfg.rates_cnt, 12);
@@ -1741,7 +1836,12 @@ mod tests {
         assert!(assoc_cfg.vht_op_is_valid);
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -1751,7 +1851,7 @@ mod tests {
                 association_ies: assoc_resp_ies,
             }
         );
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -1764,7 +1864,7 @@ mod tests {
 
         let mut state = Associating::default();
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Verify authentication was considered successful.
         state
             .on_assoc_resp_frame(
@@ -1779,9 +1879,14 @@ mod tests {
             .expect_err("expected failure processing association response frame");
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(msg, connect_conf_failure(fidl_ieee80211::StatusCode::NotInSameBss));
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -1794,7 +1899,7 @@ mod tests {
 
         let mut state = Associating::default();
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state
             .on_assoc_resp_frame(
                 &mut sta,
@@ -1808,12 +1913,17 @@ mod tests {
             .expect_err("expected failure processing association response frame");
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(
             msg,
             connect_conf_failure(fidl_ieee80211::StatusCode::RefusedCapabilitiesMismatch)
         );
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -1826,16 +1936,21 @@ mod tests {
 
         let mut state = Associating::default();
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state.on_deauth_frame(
             &mut sta,
             &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
         );
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(msg, connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc));
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -1848,19 +1963,24 @@ mod tests {
 
         let mut state = Associating::default();
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state.on_disassoc_frame(
             &mut sta,
             &mac::DisassocHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
         );
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("no message");
         assert_eq!(msg, connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc));
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
-    fn mock_rx_info<'a>(client: &BoundClient<'a>) -> banjo_wlan_softmac::WlanRxInfo {
+    fn mock_rx_info<'a>(client: &BoundClient<'a, FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
         let channel = client.channel_state.get_main_channel().unwrap();
         MockWlanRxInfo::with_channel(channel).into()
     }
@@ -1928,16 +2048,16 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = Associated(empty_association(&mut sta));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // ddk_assoc_cfg will be cleared when MLME receives deauth frame.
         sta.ctx
             .device
             .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
-        assert_eq!(1, m.fake_device.assocs.len());
+        assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
         sta.ctx.device.set_ethernet_up().expect("should succeed");
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
+        assert_eq!(m.fake_device_state.lock().unwrap().link_status, crate::device::LinkStatus::UP);
 
         let _joined = state.on_deauth_frame(
             &mut sta,
@@ -1946,7 +2066,9 @@ mod tests {
 
         // Verify MLME-ASSOCIATE.confirm message was sent.
         let msg = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("no message");
         assert_eq!(
@@ -1958,8 +2080,11 @@ mod tests {
             }
         );
         // Verify ethernet port is shut down.
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -1971,17 +2096,17 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = Associated(empty_association(&mut sta));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         state.0.controlled_port_open = true;
         // ddk_assoc_cfg must be cleared when MLME receives disassociation frame later.
         sta.ctx
             .device
             .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
-        assert_eq!(1, m.fake_device.assocs.len());
+        assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
         sta.ctx.device.set_ethernet_up().expect("should succeed");
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
+        assert_eq!(m.fake_device_state.lock().unwrap().link_status, crate::device::LinkStatus::UP);
 
         let _authenticated = state.on_disassoc_frame(
             &mut sta,
@@ -1989,8 +2114,12 @@ mod tests {
         );
 
         // Verify MLME-ASSOCIATE.confirm message was sent.
-        let msg =
-            m.fake_device.next_mlme_msg::<fidl_mlme::DisassociateIndication>().expect("no message");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
+            .expect("no message");
         assert_eq!(
             msg,
             fidl_mlme::DisassociateIndication {
@@ -2001,8 +2130,11 @@ mod tests {
         );
 
         // Verify ethernet port is shut down.
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -2019,7 +2151,7 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify data frame was dropped.
-        assert_eq!(m.fake_device.eth_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 0);
     }
 
     #[test]
@@ -2037,9 +2169,9 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify data frame was processed.
-        assert_eq!(m.fake_device.eth_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(m.fake_device.eth_queue[0], [
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue[0], [
             3, 3, 3, 3, 3, 3, // dst_addr
             4, 4, 4, 4, 4, 4, // src_addr
             9, 10, // ether_type
@@ -2062,7 +2194,7 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify data frame was discarded.
-        assert!(m.fake_device.eth_queue.is_empty());
+        assert!(m.fake_device_state.lock().unwrap().eth_queue.is_empty());
     }
 
     #[test_case(true, true; "port open and protected")]
@@ -2086,9 +2218,10 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify data frame was not forwarded up.
-        assert!(m.fake_device.eth_queue.is_empty());
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
-        let (resp_header, _, _, resp_body) = parse_data_frame(&m.fake_device.wlan_queue[0].0[..]);
+        assert!(m.fake_device_state.lock().unwrap().eth_queue.is_empty());
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        let data_frame = &m.fake_device_state.lock().unwrap().wlan_queue[0].0;
+        let (resp_header, _, _, resp_body) = parse_data_frame(&data_frame[..]);
         let fc = resp_header.frame_ctrl;
         assert_eq!(fc.to_ds(), true);
         assert_eq!(fc.from_ds(), false);
@@ -2109,11 +2242,13 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify EAPOL frame was not sent to netstack.
-        assert_eq!(m.fake_device.eth_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 0);
 
         // Verify EAPoL frame was sent to SME.
         let eapol_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("error reading EAPOL.indication");
         assert_eq!(
@@ -2136,11 +2271,13 @@ mod tests {
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
         // Verify EAPOL frame was not sent to netstack.
-        assert_eq!(m.fake_device.eth_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 0);
 
         // Verify EAPoL frame was sent to SME.
         let eapol_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("error reading EAPOL.indication");
         assert_eq!(
@@ -2163,7 +2300,7 @@ mod tests {
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
-        let queue = &m.fake_device.eth_queue;
+        let queue = &m.fake_device_state.lock().unwrap().eth_queue;
         assert_eq!(queue.len(), 2);
         #[rustfmt::skip]
         let mut expected_first_eth_frame = vec![
@@ -2201,10 +2338,10 @@ mod tests {
         fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
 
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&m
-            .fake_device.wlan_queue[0].0[..], &[
+            .fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Frame Control:
             0b10100100, 0b00000000, // FC
             42, 0b11_000000, // Id
@@ -2241,10 +2378,10 @@ mod tests {
             },
         );
 
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&m
-            .fake_device.wlan_queue[0].0[..], &[
+            .fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Frame Control:
             0b10100100, 0b00000000, // FC
             42, 0b11_000000, // Id
@@ -2267,7 +2404,7 @@ mod tests {
         let (mut fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
         fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
         state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         // Foreign management frame
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -2287,7 +2424,7 @@ mod tests {
         ];
         let rx_info = mock_rx_info(&sta);
         state.on_mac_frame(&mut sta, &beacon[..], rx_info);
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
     }
 
     #[test]
@@ -2327,7 +2464,7 @@ mod tests {
         ];
         let rx_info = mock_rx_info(&sta);
         state.on_mac_frame(&mut sta, &bytes[..], rx_info);
-        assert_eq!(m.fake_device.eth_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 0);
     }
 
     #[test]
@@ -2348,7 +2485,12 @@ mod tests {
         assert_variant!(state, States::Joined(_), "not in joined state");
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -2400,7 +2542,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Failure: Joined > Authenticating > Joined
         #[rustfmt::skip]
         let auth_resp_failure = vec![
@@ -2419,7 +2561,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &auth_resp_failure[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -2432,7 +2574,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Deauthenticate: Authenticating > Joined
         #[rustfmt::skip]
         let deauth = vec![
@@ -2449,7 +2591,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -2521,7 +2663,12 @@ mod tests {
         assert_variant!(state, States::Authenticating(_), "not in authenticating state");
 
         // Verify MLME-CONNECT.confirm message was sent.
-        let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("expect msg");
+        let msg = m
+            .fake_device_state
+            .lock()
+            .unwrap()
+            .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
+            .expect("expect msg");
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
@@ -2560,7 +2707,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &auth_resp_wrong[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -2611,7 +2758,7 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Failure: Associating > Joined
         #[rustfmt::skip]
         let assoc_resp_failure = vec![
@@ -2630,7 +2777,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &assoc_resp_failure[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
     }
 
     #[test]
@@ -2642,7 +2789,7 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Deauthentication: Associating > Joined
         #[rustfmt::skip]
         let deauth = vec![
@@ -2659,7 +2806,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -2671,17 +2818,19 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // (sme->mlme) Send a reconnect request
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: BSSID.0,
         });
         state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify no connect conf is sent
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect_err("unexpected Connect.confirm");
     }
@@ -2695,7 +2844,7 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // (sme->mlme) Send a reconnect request
         let sus_bssid = [b's', b'u', b's', b'r', b'e', b'q'];
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
@@ -2703,11 +2852,13 @@ mod tests {
         });
         state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a connect conf was sent
         let connect_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect("error reading Connect.confirm");
         assert_eq!(
@@ -2731,7 +2882,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Disassociation: Associated > Associating
         #[rustfmt::skip]
         let disassoc = vec![
@@ -2748,11 +2899,13 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a disassoc ind was sent
         let disassoc_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("error reading Disassociate.ind");
         assert_eq!(
@@ -2772,9 +2925,9 @@ mod tests {
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify associate request frame was sent
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &m.fake_device.wlan_queue[0].0[..22],
+            &m.fake_device_state.lock().unwrap().wlan_queue[0].0[..22],
             &[
                 // Mgmt header:
                 0, 0, // FC
@@ -2816,7 +2969,9 @@ mod tests {
 
         // Verify a successful connect conf is sent
         let connect_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect("error reading Connect.confirm");
         assert_eq!(connect_conf.peer_sta_address, BSSID.0);
@@ -2834,7 +2989,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Disassociation: Associated > Associating
         #[rustfmt::skip]
         let disassoc = vec![
@@ -2851,11 +3006,13 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a disassoc ind was sent
         let _disassoc_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("error reading Disassociate.ind");
 
@@ -2875,11 +3032,13 @@ mod tests {
         // Notify reconnecting timeout
         let state = state.on_timed_event(&mut sta, event, id);
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a connect conf was sent
         let connect_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect("error reading Connect.confirm");
         assert_eq!(
@@ -2903,7 +3062,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Disassociation: Associated > Associating
         #[rustfmt::skip]
         let disassoc = vec![
@@ -2920,11 +3079,13 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a disassoc ind was sent
         let _disassoc_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("error reading Disassociate.ind");
 
@@ -2938,7 +3099,9 @@ mod tests {
 
         // Verify a connect conf was sent
         let connect_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect("error reading Connect.confirm");
         assert_eq!(
@@ -2969,7 +3132,7 @@ mod tests {
         };
         let mut state = States::from(statemachine::testing::new_state(Associated(association)));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // (sme->mlme) Send a reconnect request
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
@@ -2977,11 +3140,13 @@ mod tests {
         });
         state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associated(_), "not in associated state");
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
 
         // Verify a successful connect conf is sent
         let connect_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::ConnectConfirm>()
             .expect("error reading Connect.confirm");
         assert_eq!(connect_conf.peer_sta_address, BSSID.0);
@@ -2999,7 +3164,7 @@ mod tests {
         let mut state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         // Deauthentication: Associated > Joined
         #[rustfmt::skip]
         let deauth = vec![
@@ -3016,7 +3181,7 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
         assert_variant!(state, States::Joined(_), "not in joined state");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     fn parse_data_frame(
@@ -3073,8 +3238,8 @@ mod tests {
 
         state.on_eth_frame(&mut sta, &eth_frame[..]).expect("all good");
 
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
-        let (data_frame, _tx_flags) = m.fake_device.wlan_queue.remove(0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        let (data_frame, _tx_flags) = m.fake_device_state.lock().unwrap().wlan_queue.remove(0);
         let mut fc_byte_2 = 0b00000001;
         if protected {
             fc_byte_2 |= 0b01000000;
@@ -3199,14 +3364,16 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Joined));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
         assert_variant!(state, States::Joined(_), "Joined should stay in Joined");
         // No MLME message was sent because MLME already deauthenticated.
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect_err("should be no outgoing message");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -3218,16 +3385,18 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
         // No need to notify SME since it already deauthenticated
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateConfirm>()
             .expect_err("should not see more MLME messages");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -3239,16 +3408,18 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associating::default()));
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
         // No need to notify SME since it already deauthenticated
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateConfirm>()
             .expect_err("should not see more MLME messages");
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     #[test]
@@ -3266,29 +3437,36 @@ mod tests {
             .device
             .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc ctx should not fail");
-        assert_eq!(1, m.fake_device.assocs.len());
+        assert_eq!(1, m.fake_device_state.lock().unwrap().assocs.len());
 
-        assert!(m.fake_device.join_bss_request.is_some());
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_some());
         sta.ctx.device.set_ethernet_up().expect("should succeed");
-        assert_eq!(crate::device::LinkStatus::UP, m.fake_device.link_status);
+        assert_eq!(crate::device::LinkStatus::UP, m.fake_device_state.lock().unwrap().link_status);
 
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
         // Should accept the deauthentication request and send back confirm.
         let deauth_conf = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateConfirm>()
             .expect("should see deauth conf");
         assert_eq!(deauth_conf, fidl_mlme::DeauthenticateConfirm { peer_sta_address: BSSID.0 });
-        m.fake_device
+        m.fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateConfirm>()
             .expect_err("should not see more MLME messages");
         // Verify association context cleared.
-        assert_eq!(0, m.fake_device.assocs.len());
+        assert_eq!(0, m.fake_device_state.lock().unwrap().assocs.len());
         // Verify ethernet link status is down.
-        assert_eq!(crate::device::LinkStatus::DOWN, m.fake_device.link_status);
-        assert!(m.fake_device.join_bss_request.is_none());
+        assert_eq!(
+            crate::device::LinkStatus::DOWN,
+            m.fake_device_state.lock().unwrap().link_status
+        );
+        assert!(m.fake_device_state.lock().unwrap().join_bss_request.is_none());
     }
 
     fn fake_eapol_req() -> wlan_sme::MlmeRequest {
@@ -3310,16 +3488,16 @@ mod tests {
 
         let state = States::from(statemachine::testing::new_state(Joined));
         let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
-        m.fake_device.wlan_queue.clear();
+        m.fake_device_state.lock().unwrap().wlan_queue.clear();
         let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
         let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
     }
 
     #[test]
@@ -3334,7 +3512,7 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
     }
 
     #[test]
@@ -3349,9 +3527,9 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &m.fake_device.wlan_queue[0].0[..],
+            &m.fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 // Data header (EAPoL frames are data frames)
                 0b00001000, 0b00000001, // Frame Control
@@ -3380,15 +3558,15 @@ mod tests {
 
         let state = States::from(statemachine::testing::new_state(Joined));
         let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
-        assert_eq!(m.fake_device.keys.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
         let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
-        assert_eq!(m.fake_device.keys.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
         let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
-        assert_eq!(m.fake_device.keys.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 0);
     }
 
     #[test]
@@ -3403,7 +3581,7 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
-        assert_eq!(m.fake_device.keys.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 0);
     }
 
     #[test]
@@ -3418,28 +3596,23 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
-        assert_eq!(m.fake_device.keys.len(), 1);
-        let conf = assert_variant!(m.fake_device.next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
+        assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 1);
+        let conf = assert_variant!(m.fake_device_state.lock().unwrap().next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 1);
         assert_eq!(
             conf.results[0],
             fidl_mlme::SetKeyResult { key_id: 6, status: zx::Status::OK.into_raw() }
         );
 
-        assert_eq!(
-            m.fake_device.keys[0].protection,
-            banjo_fuchsia_wlan_softmac::WlanProtection::RX_TX
-        );
-        assert_eq!(m.fake_device.keys[0].cipher_oui, [1, 2, 3]);
-        assert_eq!(m.fake_device.keys[0].cipher_type, 4);
-        assert_eq!(
-            m.fake_device.keys[0].key_type,
-            banjo_fuchsia_hardware_wlan_associnfo::WlanKeyType::PAIRWISE
-        );
-        assert_eq!(m.fake_device.keys[0].peer_addr, BSSID.0);
-        assert_eq!(m.fake_device.keys[0].key_idx, 6);
-        assert_eq!(m.fake_device.keys_vec[0], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(m.fake_device.keys[0].rsc, 8);
+        let key = &m.fake_device_state.lock().unwrap().keys[0];
+        assert_eq!(key.protection, crate::key::Protection::RX_TX,);
+        assert_eq!(key.cipher_oui, [1, 2, 3]);
+        assert_eq!(key.cipher_type, 4);
+        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE,);
+        assert_eq!(key.peer_addr, BSSID.0);
+        assert_eq!(key.key_idx, 6);
+        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(key.rsc, 8);
     }
 
     #[test]
@@ -3453,8 +3626,8 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        m.fake_device.set_key_results.push(zx::Status::BAD_STATE);
-        m.fake_device.set_key_results.push(zx::Status::OK);
+        m.fake_device_state.lock().unwrap().set_key_results.push_back(Err(zx::Status::BAD_STATE));
+        m.fake_device_state.lock().unwrap().set_key_results.push_back(Ok(()));
         // Create a SetKeysReq with one success and one failure.
         let mut set_keys_req = fake_set_keys_req(BSSID.0);
         match &mut set_keys_req {
@@ -3465,7 +3638,7 @@ mod tests {
             _ => panic!(),
         }
         let _state = state.handle_mlme_req(&mut sta, set_keys_req);
-        let conf = assert_variant!(m.fake_device.next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
+        let conf = assert_variant!(m.fake_device_state.lock().unwrap().next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 2);
         assert_eq!(
             conf.results[0],
@@ -3497,15 +3670,24 @@ mod tests {
 
         let state = States::from(statemachine::testing::new_state(Joined));
         let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
         let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
         let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
     }
 
     #[test]
@@ -3519,7 +3701,10 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
     }
 
     #[test]
@@ -3532,11 +3717,17 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
         let state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
+        assert_eq!(m.fake_device_state.lock().unwrap().link_status, crate::device::LinkStatus::UP);
         let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(false));
-        assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().link_status,
+            crate::device::LinkStatus::DOWN
+        );
     }
 
     #[test_case(true; "while scanning")]
@@ -3592,7 +3783,7 @@ mod tests {
 
         let rx_info = mock_rx_info(&sta);
         state.on_mac_frame(&mut sta, &data_frame[..], rx_info);
-        assert_eq!(m.fake_device.eth_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 1);
     }
 
     #[test]
@@ -3634,7 +3825,7 @@ mod tests {
         // drivers report it consistently.
         rx_info.channel.cbw = banjo_common::ChannelBandwidth::CBW80;
         state.on_mac_frame(&mut sta, &data_frame[..], rx_info);
-        assert_eq!(m.fake_device.eth_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().eth_queue.len(), 1);
     }
 
     #[test]
@@ -3667,9 +3858,9 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state.on_mac_frame(&mut sta, &beacon[..], rx_info);
 
-        assert_eq!(m.fake_device.wlan_queue.len(), 1);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
-            &m.fake_device.wlan_queue[0].0[..],
+            &m.fake_device_state.lock().unwrap().wlan_queue[0].0[..],
             &[
                 0b10100100, 0, // Frame control
                 1, 0b11000000, // ID (2 MSBs are set to 1 from the AID)
@@ -3708,11 +3899,11 @@ mod tests {
         let rx_info = mock_rx_info(&sta);
         state.on_mac_frame(&mut sta, &beacon[..], rx_info);
 
-        assert_eq!(m.fake_device.wlan_queue.len(), 0);
+        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
     }
 
     fn rx_info_with_dbm<'a>(
-        client: &BoundClient<'a>,
+        client: &BoundClient<'a, FakeDevice>,
         rssi_dbm: i8,
     ) -> banjo_wlan_softmac::WlanRxInfo {
         let mut rx_info = banjo_wlan_softmac::WlanRxInfo { rssi_dbm, ..mock_rx_info(client) };
@@ -3737,7 +3928,9 @@ mod tests {
         let state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id);
 
         let signal_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_internal::SignalReportIndication>()
             .expect("should see a signal report");
 
@@ -3767,7 +3960,9 @@ mod tests {
         let _state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id);
 
         let signal_ind = m
-            .fake_device
+            .fake_device_state
+            .lock()
+            .unwrap()
             .next_mlme_msg::<fidl_internal::SignalReportIndication>()
             .expect("should see a signal report");
 
