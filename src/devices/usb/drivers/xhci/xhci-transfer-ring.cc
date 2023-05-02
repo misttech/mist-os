@@ -266,7 +266,7 @@ void TransferRing::RestoreLocked(const State& state) {
 }
 
 zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* ring, bool is_32bit,
-                               fdf::MmioBuffer* mmio, const UsbXhci& hci) {
+                               fdf::MmioBuffer* mmio, UsbXhci* hci) {
   fbl::AutoLock l(&mutex_);
   if (trbs_ != nullptr) {
     return ZX_ERR_BAD_STATE;
@@ -279,7 +279,7 @@ zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* 
   dma_buffer::ContiguousBuffer* container;
   isochronous_ = false;
   token_++;
-  hci_ = &hci;
+  hci_ = hci;
   stalled_ = false;
   return AllocBuffer(&container);
 }

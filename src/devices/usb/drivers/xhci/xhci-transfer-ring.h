@@ -90,7 +90,7 @@ class TransferRing {
   void Restore(const State& state);
   void RestoreLocked(const State& state) __TA_REQUIRES(mutex_);
   zx_status_t Init(size_t page_size, const zx::bti& bti, EventRing* ring, bool is_32bit,
-                   fdf::MmioBuffer* mmio, const UsbXhci& hci);
+                   fdf::MmioBuffer* mmio, UsbXhci* hci);
   // Assumption: This function must ONLY be called from the interrupt
   // thread. Otherwise thread-safety assumptions are violated.
   zx_status_t DeinitIfActive() __TA_NO_THREAD_SAFETY_ANALYSIS;
@@ -170,7 +170,7 @@ class CommandRing : public TransferRing {
  public:
   zx_status_t Init(size_t page_size, zx::bti* bti, EventRing* ring, bool is_32bit,
                    fdf::MmioBuffer* mmio, UsbXhci* hci) {
-    return TransferRing::Init(page_size, *bti, ring, is_32bit, mmio, *hci);
+    return TransferRing::Init(page_size, *bti, ring, is_32bit, mmio, hci);
   }
   // Generates a NOP command
   TRB Nop() {

@@ -31,6 +31,7 @@ fuchsia_driver("xhci-driver") {
   sources = [
     "usb-xhci.cc",
     "xhci-device-state.cc",
+    "xhci-endpoint.cc",
     "xhci-enumeration.cc",
     "xhci-event-ring.cc",
     "xhci-interrupter.cc",
@@ -44,14 +45,18 @@ fuchsia_driver("xhci-driver") {
     "//sdk/banjo/fuchsia.hardware.usb.hub:fuchsia.hardware.usb.hub_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit-promise",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/devices/lib/synchronous-executor",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb-endpoint",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async",
@@ -83,6 +88,7 @@ source_set("test-libs") {
     "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit-promise",
@@ -96,6 +102,7 @@ source_set("test-libs") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb-endpoint",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -143,8 +150,12 @@ test("xhci-core-unittest-bin") {
     "usb-xhci-test.cc",
     "usb-xhci.cc",
     "xhci-device-state.cc",
+    "xhci-endpoint.cc",
   ]
-  deps = [ ":test-libs" ]
+  deps = [
+    ":test-libs",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
 }
 
 test("xhci-event-ring-unittest-bin") {

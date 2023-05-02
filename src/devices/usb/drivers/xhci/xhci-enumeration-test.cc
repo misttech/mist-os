@@ -121,6 +121,11 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return bridge.consumer.promise().discard_value();
 }
 
+void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                                ConnectToEndpointCompleter::Sync& completer) {
+  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+}
+
 void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub) {
   auto state = reinterpret_cast<TestState*>(parent_);
   auto context = state->trb_context_allocator_.New();
@@ -137,7 +142,7 @@ void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::option
   state->pending_operations.push_back(std::move(context));
 
   // slot must exist in device_state_ so it's reported as connected.
-  device_state_[slot - 1] = fbl::MakeRefCounted<DeviceState>(this);
+  device_state_[slot - 1] = fbl::MakeRefCounted<DeviceState>(slot - 1, this);
 }
 
 std::optional<usb_speed_t> UsbXhci::GetDeviceSpeed(uint8_t slot) {
@@ -360,6 +365,17 @@ fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupte
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
+zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
+
+Endpoint::Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address)
+    : usb_endpoint::UsbEndpoint(hci->bti(), address) {}
+void Endpoint::QueueRequests(QueueRequestsRequest& request,
+                             QueueRequestsCompleter::Sync& completer) {}
+void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
+  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+}
+void Endpoint::OnUnbound(fidl::UnbindInfo info,
+                         fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {}
 DeviceState::~DeviceState() = default;
 
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {}
@@ -367,7 +383,8 @@ void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_
 class EnumerationTests : public zxtest::Test {
  public:
   EnumerationTests()
-      : controller_(reinterpret_cast<zx_device_t*>(&state_), ddk_fake::CreateBufferFactory()) {
+      : controller_(reinterpret_cast<zx_device_t*>(&state_), ddk_fake::CreateBufferFactory(),
+                    loop_.dispatcher()) {
     controller_.InitThread();
   }
   TestState& state() { return state_; }
@@ -376,7 +393,7 @@ class EnumerationTests : public zxtest::Test {
 
   std::optional<HubInfo> TestHubInfo(uint8_t hub_depth, uint8_t hub_slot, uint8_t hub_port,
                                      usb_speed_t speed, bool multi_tt) {
-    auto hub_state = fbl::MakeRefCounted<DeviceState>(&controller_);
+    auto hub_state = fbl::MakeRefCounted<DeviceState>(hub_slot - 1, &controller_);
     {
       fbl::AutoLock _(&hub_state->transaction_lock());
       hub_state->SetDeviceInformation(hub_slot, hub_port, std::nullopt);
@@ -394,6 +411,7 @@ class EnumerationTests : public zxtest::Test {
   }
 
  private:
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   TestState state_;
   UsbXhci controller_;
 };
@@ -608,40 +626,40 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   controller().RunUntilIdle(0);
   // GetMaxPacketSize
   auto get_max_packet_size = state().pending_operations.pop_front();
-  auto get_max_packet_size_request = std::move(get_max_packet_size->request);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.device_id, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.length, 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.bm_request_type,
+  auto get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_index, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_length, 8);
-  ASSERT_TRUE(get_max_packet_size_request->request()->direct);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_TRUE(get_max_packet_size_request.request()->direct);
   usb_device_descriptor_t* descriptor;
-  ASSERT_OK(get_max_packet_size_request->Mmap(reinterpret_cast<void**>(&descriptor)));
+  ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 42;
-  get_max_packet_size_request->Complete(ZX_OK, 8);
+  get_max_packet_size_request.Complete(ZX_OK, 8);
   controller().RunUntilIdle(0);
 
   // GetDeviceDescriptor
   auto get_descriptor = state().pending_operations.pop_front();
-  auto get_descriptor_request = std::move(get_descriptor->request);
-  ASSERT_EQ(get_descriptor_request->request()->header.device_id, 0);
-  ASSERT_EQ(get_descriptor_request->request()->header.ep_address, 0);
-  ASSERT_EQ(get_descriptor_request->request()->header.length, sizeof(usb_device_descriptor_t));
-  ASSERT_EQ(get_descriptor_request->request()->setup.bm_request_type,
+  auto get_descriptor_request = std::move(std::get<Request>(*get_descriptor->request));
+  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 0);
+  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_descriptor_request.request()->header.length, sizeof(usb_device_descriptor_t));
+  ASSERT_EQ(get_descriptor_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_index, 0);
-  ASSERT_EQ(get_descriptor_request->request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_length, sizeof(usb_device_descriptor_t));
-  ASSERT_TRUE(get_descriptor_request->request()->direct);
-  ASSERT_OK(get_descriptor_request->Mmap(reinterpret_cast<void**>(&descriptor)));
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_value, USB_DT_DEVICE << 8);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_descriptor_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_length, sizeof(usb_device_descriptor_t));
+  ASSERT_TRUE(get_descriptor_request.request()->direct);
+  ASSERT_OK(get_descriptor_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
-  get_descriptor_request->Complete(ZX_OK, sizeof(usb_device_descriptor_t));
+  get_descriptor_request.Complete(ZX_OK, sizeof(usb_device_descriptor_t));
   controller().RunUntilIdle(0);
 
   // Online Device
@@ -747,22 +765,22 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
 
   // GetMaxPacketSize
   auto get_max_packet_size = state().pending_operations.pop_front();
-  auto get_max_packet_size_request = std::move(get_max_packet_size->request);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.device_id, 1);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.length, 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.bm_request_type,
+  auto get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_index, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_length, 8);
-  ASSERT_TRUE(get_max_packet_size_request->request()->direct);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_TRUE(get_max_packet_size_request.request()->direct);
   usb_device_descriptor_t* descriptor;
-  ASSERT_OK(get_max_packet_size_request->Mmap(reinterpret_cast<void**>(&descriptor)));
+  ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 42;
-  get_max_packet_size_request->Complete(ZX_OK, 8);
+  get_max_packet_size_request.Complete(ZX_OK, 8);
   controller().RunUntilIdle(0);
 
   // SetMaxPacketSize
@@ -795,21 +813,21 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
 
   // GetMaxPacketSize
   get_max_packet_size = state().pending_operations.pop_front();
-  get_max_packet_size_request = std::move(get_max_packet_size->request);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.device_id, 1);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->header.length, 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.bm_request_type,
+  get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_index, 0);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request->request()->setup.w_length, 8);
-  ASSERT_TRUE(get_max_packet_size_request->request()->direct);
-  ASSERT_OK(get_max_packet_size_request->Mmap(reinterpret_cast<void**>(&descriptor)));
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_TRUE(get_max_packet_size_request.request()->direct);
+  ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 32;
-  get_max_packet_size_request->Complete(ZX_OK, 8);
+  get_max_packet_size_request.Complete(ZX_OK, 8);
   controller().RunUntilIdle(0);
 
   // SetMaxPacketSize (full-speed device requires setting this again)
@@ -825,20 +843,20 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
 
   // GetDeviceDescriptor
   auto get_descriptor = state().pending_operations.pop_front();
-  auto get_descriptor_request = std::move(get_descriptor->request);
-  ASSERT_EQ(get_descriptor_request->request()->header.device_id, 1);
-  ASSERT_EQ(get_descriptor_request->request()->header.ep_address, 0);
-  ASSERT_EQ(get_descriptor_request->request()->header.length, sizeof(usb_device_descriptor_t));
-  ASSERT_EQ(get_descriptor_request->request()->setup.bm_request_type,
+  auto get_descriptor_request = std::move(std::get<Request>(*get_descriptor->request));
+  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 1);
+  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_descriptor_request.request()->header.length, sizeof(usb_device_descriptor_t));
+  ASSERT_EQ(get_descriptor_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_index, 0);
-  ASSERT_EQ(get_descriptor_request->request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_descriptor_request->request()->setup.w_length, sizeof(usb_device_descriptor_t));
-  ASSERT_TRUE(get_descriptor_request->request()->direct);
-  ASSERT_OK(get_descriptor_request->Mmap(reinterpret_cast<void**>(&descriptor)));
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_value, USB_DT_DEVICE << 8);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_descriptor_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_length, sizeof(usb_device_descriptor_t));
+  ASSERT_TRUE(get_descriptor_request.request()->direct);
+  ASSERT_OK(get_descriptor_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
-  get_descriptor_request->Complete(ZX_OK, sizeof(usb_device_descriptor_t));
+  get_descriptor_request.Complete(ZX_OK, sizeof(usb_device_descriptor_t));
   controller().RunUntilIdle(0);
 
   // Online Device

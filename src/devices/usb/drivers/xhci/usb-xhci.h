@@ -5,12 +5,14 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_XHCI_USB_XHCI_H_
 #define SRC_DEVICES_USB_DRIVERS_XHCI_USB_XHCI_H_
 
+#include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/dma-buffer/buffer.h>
@@ -70,9 +72,12 @@ struct Inspect {
 // Refer to 3.1 for general architectural information on xHCI.
 class UsbXhci;
 using UsbXhciType = ddk::Device<UsbXhci, ddk::Initializable, ddk::Suspendable, ddk::Unbindable>;
-class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::base_protocol> {
+class UsbXhci : public UsbXhciType,
+                public ddk::UsbHciProtocol<UsbXhci, ddk::base_protocol>,
+                public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
  public:
-  explicit UsbXhci(zx_device_t* parent, std::unique_ptr<dma_buffer::BufferFactory> buffer_factory)
+  explicit UsbXhci(zx_device_t* parent, std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
+                   async_dispatcher_t* dispatcher)
       : UsbXhciType(parent),
 #ifdef ENABLE_DFV2
         // TODO(fxbug.dev/93333): Remove this when DFv2 has stabilised.
@@ -83,14 +88,18 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
         pdev_(parent),
         buffer_factory_(std::move(buffer_factory)),
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()) {
+        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()),
+        dispatcher_(dispatcher),
+        outgoing_(dispatcher) {
   }
 
   // Constructor for unit testing (to allow interception of MMIO read/write)
-  explicit UsbXhci(zx_device_t* parent, fdf::MmioBuffer buffer)
+  explicit UsbXhci(zx_device_t* parent, fdf::MmioBuffer buffer, async_dispatcher_t* dispatcher)
       : UsbXhciType(parent),
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()) {}
+        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()),
+        dispatcher_(dispatcher),
+        outgoing_(dispatcher) {}
 
   // Called by the DDK bind operation.
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -104,6 +113,10 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
+
+  // fuchsia_hardware_usb_new.UsbHciNew protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override;
 
   // USB HCI protocol implementation.
   // Control TRBs must be run on the primary interrupter. Section 4.9.4.3: secondary interrupters
@@ -139,13 +152,14 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   fpromise::promise<void, zx_status_t> UsbHciEnableEndpoint(
       uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
       const usb_ss_ep_comp_descriptor_t* ss_com_desc);
+  fpromise::promise<void, zx_status_t> UsbHciDisableEndpoint(uint32_t device_id, uint8_t ep_addr);
   fpromise::promise<void, zx_status_t> UsbHciDisableEndpoint(
       uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
       const usb_ss_ep_comp_descriptor_t* ss_com_desc);
   fpromise::promise<void, zx_status_t> UsbHciResetEndpointAsync(uint32_t device_id,
                                                                 uint8_t ep_address);
 
-  bool Running() const { return running_; }
+  bool Running() const;
 
   // Offlines a device slot, removing its device node from the topology.
   fpromise::promise<void, zx_status_t> DeviceOffline(uint32_t slot);
@@ -305,6 +319,8 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
 
   inspect::Node& inspect_root_node() { return inspect_.root; }
 
+  void RingDoorbell(uint8_t slot, uint8_t target);
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbXhci);
 
@@ -313,18 +329,6 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   static constexpr uint16_t kMaxInterrupters = 2;
 
   struct UsbRequestState;
-
-  // Waits for a time interval when it is suitable to schedule an isochronous transfer
-  void WaitForIsochronousReady(UsbRequestState* state);
-
-  // Starts a normal transfer
-  void StartNormalTransaction(UsbRequestState* state, uint8_t interrupter);
-
-  // Continues a normal transfer
-  void ContinueNormalTransaction(UsbRequestState* state);
-
-  // Commits a normal transfer
-  void CommitNormalTransaction(UsbRequestState* state);
 
   // Performs the allocation phase of the control request
   // (allocates TRBs for the request)
@@ -357,8 +361,6 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   // UsbHci Helper Functions
   // Queues a control request
   void UsbHciControlRequestQueue(Request request);
-  // Queues a normal request
-  void UsbHciNormalRequestQueue(Request request);
   fpromise::promise<void, zx_status_t> UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address);
   fpromise::promise<void, zx_status_t> UsbHciHubDeviceAddedAsync(uint32_t device_id, uint32_t port,
                                                                  usb_speed_t speed);
@@ -509,6 +511,10 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   std::optional<ddk::InitTxn> init_txn_;
 
   Inspect inspect_;
+
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_hci::UsbHci> bindings_;
 };
 
 }  // namespace usb_xhci

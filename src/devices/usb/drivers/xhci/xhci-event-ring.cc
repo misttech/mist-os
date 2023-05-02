@@ -414,18 +414,19 @@ void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
 void EventRing::RunUntilIdle() { executor_.run_until_idle(); }
 
 bool EventRing::StallWorkaroundForDefectiveHubs(std::unique_ptr<TRBContext>& context) {
+  ZX_ASSERT(std::holds_alternative<Request>(*context->request));
   // Workaround for full-speed hub issue in Gateway keyboard
-  auto request = context->request->request();
+  auto request = std::get<Request>(*context->request).request();
   if ((request->header.ep_address == 0) && (request->setup.b_request == USB_REQ_GET_DESCRIPTOR) &&
       (request->setup.w_index == 0) && (request->setup.w_value == (USB_DT_DEVICE_QUALIFIER << 8))) {
     usb_device_qualifier_descriptor_t* desc;
-    if ((context->request->Mmap(reinterpret_cast<void**>(&desc)) == ZX_OK) &&
+    if ((std::get<Request>(*context->request).Mmap(reinterpret_cast<void**>(&desc)) == ZX_OK) &&
         (request->header.length >= sizeof(desc))) {
       desc->b_device_protocol =
           0;  // Don't support multi-TT unless we're sure the device supports it.
       ScheduleTask(hci_->UsbHciResetEndpointAsync(request->header.device_id, 0)
                        .and_then([ctx = std::move(context)]() {
-                         ctx->request->Complete(ZX_OK, sizeof(*desc));
+                         std::get<Request>(*ctx->request).Complete(ZX_OK, sizeof(*desc));
                          return fpromise::ok();
                        }));
 
@@ -725,12 +726,12 @@ void EventRing::HandleTransferInterrupt() {
     return;
   }
 
-  TransferRing* ring;
+  Endpoint* ep;
   uint8_t endpoint_id = static_cast<uint8_t>(transfer_event->EndpointID() - 1);
   if (unlikely(endpoint_id == 0)) {
-    ring = &device_state->GetTransferRing();
+    ep = &device_state->GetEndpoint();
   } else {
-    ring = &device_state->GetTransferRing(endpoint_id - 1);
+    ep = &device_state->GetEndpoint(endpoint_id - 1);
   }
 
   if (transfer_event->CompletionCode() == CommandCompletionEvent::RingOverrun) {
@@ -750,12 +751,13 @@ void EventRing::HandleTransferInterrupt() {
     return;
   }
 
+  auto& ring = ep->transfer_ring();
   if (transfer_event->CompletionCode() == CommandCompletionEvent::MissedServiceError) {
     zxlogf(DEBUG, "Missed service error on slot %u endpoint %u", transfer_event->SlotID(),
            transfer_event->EndpointID());
     std::unique_ptr<TRBContext> context;
-    ring->CompleteTRB(nullptr, &context);
-    context->request->Complete(ZX_ERR_IO_MISSED_DEADLINE, 0);
+    ring.CompleteTRB(nullptr, &context);
+    ep->RequestComplete(ZX_ERR_IO_MISSED_DEADLINE, 0, std::move(*context->request));
 
     // set resynchronize_ to wait for next successful transfer.
     resynchronize_ = true;
@@ -765,14 +767,14 @@ void EventRing::HandleTransferInterrupt() {
   if (transfer_event->CompletionCode() == CommandCompletionEvent::StallError) {
     zxlogf(DEBUG, "Transfer ring stall on slot %u endpoint %u", transfer_event->SlotID(),
            transfer_event->EndpointID());
-    ring->set_stall(true);
-    auto completions = ring->TakePendingTRBs();
+    ring.set_stall(true);
+    auto completions = ring.TakePendingTRBs();
 
     // A stall error may not have an associated transfer TRB. Section 4.17.4.
     std::unique_ptr<TRBContext> context;
     if (erdp_virt_->ptr) {
-      TRB* trb = ring->PhysToVirt(erdp_virt_->ptr);
-      ring->CompleteTRB(trb, &context);
+      TRB* trb = ring.PhysToVirt(erdp_virt_->ptr);
+      ring.CompleteTRB(trb, &context);
     }
     l.release();
 
@@ -784,10 +786,14 @@ void EventRing::HandleTransferInterrupt() {
           return;
         }
       }
-      context->request->Complete(ZX_ERR_IO_REFUSED, 0);
+      ep->RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(*context->request));
     }
-    for (auto& completion : completions) {
-      completion.request->Complete(ZX_ERR_IO_REFUSED, 0);
+    while (true) {
+      auto completion = completions.pop_front();
+      if (!completion) {
+        break;
+      }
+      ep->RequestComplete(ZX_ERR_IO_REFUSED, 0, std::move(*completion->request));
     }
     return;
   }
@@ -800,11 +806,11 @@ void EventRing::HandleTransferInterrupt() {
     return;
   }
 
-  TRB* trb = ring->PhysToVirt(erdp_virt_->ptr);
+  TRB* trb = ring.PhysToVirt(erdp_virt_->ptr);
 
   if (transfer_event->CompletionCode() == CommandCompletionEvent::ShortPacket) {
     TRB* last_trb = trb;
-    zx_status_t status = ring->HandleShortPacket(trb, transfer_event->TransferLength(), &last_trb);
+    zx_status_t status = ring.HandleShortPacket(trb, transfer_event->TransferLength(), &last_trb);
 
     // If the TRB is not at the head of the pending list then we're out of sync with the device,
     // which indicates a bug in the driver.
@@ -818,43 +824,52 @@ void EventRing::HandleTransferInterrupt() {
   }
 
   fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> resynchronize_completions;
-  auto cleanup = fit::defer([&resynchronize_completions]() {
-    for (auto& completion : resynchronize_completions) {
-      completion.request->Complete(ZX_ERR_IO_MISSED_DEADLINE, 0);
+  auto cleanup = fit::defer([&resynchronize_completions, &ep]() {
+    while (true) {
+      auto completion = resynchronize_completions.pop_front();
+      if (!completion) {
+        break;
+      }
+      ep->RequestComplete(ZX_ERR_IO_MISSED_DEADLINE, 0, std::move(*completion->request));
     }
   });
   if (resynchronize_) {
     resynchronize_ = false;
     // Resynchronize (4.11.2.5.2). Just find the next successful TRB.
-    resynchronize_completions = ring->TakePendingTRBsUntil(trb);
+    resynchronize_completions = ring.TakePendingTRBsUntil(trb);
   }
 
   // If the TRB is not at the head of the pending list then we're out of sync with the device, which
   // indicates a bug in the driver.
   std::unique_ptr<TRBContext> context;
-  zx_status_t status = ring->CompleteTRB(trb, &context);
+  zx_status_t status = ring.CompleteTRB(trb, &context);
 
   // TODO(fxbug.dev/107934): Once we reliably keep track of TRBs, this error handling should be
   // removed and replaced by: ZX_ASSERT(status == ZX_OK).
   if (status != ZX_OK) {
     zxlogf(ERROR, "Lost a TRB! Completion code is %u", transfer_event->CompletionCode());
 
-    auto completions = ring->TakePendingTRBs();
+    auto completions = ring.TakePendingTRBs();
     l.release();
 
     // CompleteTRB already popped the head off the list, so complete it first.
     if (context) {
-      context->request->Complete(ZX_ERR_IO, 0);
+      ep->RequestComplete(ZX_ERR_IO, 0, std::move(*context->request));
     }
 
     size_t index = 1;
     bool found = false;
-    for (auto& completion : completions) {
-      if (completion.trb == trb) {
+    while (true) {
+      auto completion = completions.pop_front();
+      if (!completion) {
+        break;
+      }
+
+      if (completion->trb == trb) {
         zxlogf(ERROR, "Current TRB was found at index %zd", index);
         found = true;
       }
-      completion.request->Complete(ZX_ERR_IO, 0);
+      ep->RequestComplete(ZX_ERR_IO, 0, std::move(*completion->request));
       index++;
     }
     if (!found) {
@@ -871,16 +886,20 @@ void EventRing::HandleTransferInterrupt() {
     // asix-88179 will stall the endpoint if we're sending data too fast. The driver expects us to
     // give it a ZX_ERR_IO_INVALID response when this happens.
     zxlogf(WARNING, "transfer_event->CompletionCode() == %u", transfer_event->CompletionCode());
-    context->request->Complete(ZX_ERR_IO_INVALID, 0);
+    ep->RequestComplete(ZX_ERR_IO_INVALID, 0, std::move(*context->request));
     return;
   }
 
+  size_t length;
   if (context->short_transfer_len.has_value()) {
-    context->request->Complete(ZX_OK, context->short_transfer_len.value());
-    return;
+    length = context->short_transfer_len.value();
+  } else {
+    length = std::holds_alternative<Request>(*context->request)
+                 ? std::get<Request>(*context->request).request()->header.length
+                 : std::get<usb::FidlRequest>(*context->request).length();
   }
 
-  context->request->Complete(ZX_OK, context->request->request()->header.length);
+  ep->RequestComplete(ZX_OK, length, std::move(*context->request));
 }
 
 fpromise::promise<void, zx_status_t> EventRing::LinkUp(uint8_t port_id) {

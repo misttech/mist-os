@@ -4,6 +4,7 @@
 
 #ifndef SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_CONTEXT_H_
 #define SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_CONTEXT_H_
+
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/synchronous-executor/executor.h>
@@ -18,6 +19,7 @@
 #include "lib/fpromise/promise.h"
 #include "src/devices/usb/drivers/xhci/registers.h"
 #include "src/devices/usb/drivers/xhci/xhci-hub.h"
+#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint.h"
 
 namespace usb_xhci {
 struct TRBContext;
@@ -33,7 +35,7 @@ struct TRBContext : fbl::DoublyLinkedListable<std::unique_ptr<TRBContext>>,
   // Root hub port number
   uint8_t port_number = 0;
   std::optional<HubInfo> hub_info;
-  std::optional<Request> request;
+  std::optional<usb_endpoint::RequestVariant> request;
   std::optional<fpromise::completer<TRB*, zx_status_t>> completer;
   uint64_t token;
 

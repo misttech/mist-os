@@ -10,14 +10,14 @@
 
 #include <optional>
 
+#include "src/devices/usb/drivers/xhci/xhci-endpoint.h"
 #include "src/devices/usb/drivers/xhci/xhci-hub.h"
-#include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
 #include "zircon/compiler.h"
 
 namespace usb_xhci {
 
 // The maximum number of endpoints a USB device can support
-constexpr size_t kMaxEndpoints = 32;
+constexpr uint8_t kMaxEndpoints = 32;
 
 // DeviceState is RefCounted. The device itself holds a reference to DeviceState and all its direct
 // descendents (if the device is a hub) hold references to DeviceState. DeviceState calls its
@@ -29,7 +29,8 @@ constexpr size_t kMaxEndpoints = 32;
 // descendents is removed or when the hub itself is removed.
 class DeviceState : public fbl::RefCounted<DeviceState> {
  public:
-  explicit DeviceState(UsbXhci* hci) : hci_(hci) {}
+  DeviceState(uint32_t device_id, UsbXhci* hci)
+      : device_id_(device_id), hci_(hci), tr_(hci, device_id, 0) {}
   ~DeviceState();
 
   void Disconnect() __TA_REQUIRES(transaction_lock_) { disconnecting_ = true; }
@@ -60,10 +61,16 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
 
   bool IsDisconnecting() const __TA_REQUIRES(transaction_lock_) { return disconnecting_; }
 
-  TransferRing& GetTransferRing() __TA_REQUIRES(transaction_lock_) { return tr_; }
+  Endpoint& GetEndpoint() __TA_REQUIRES(transaction_lock_) { return tr_; }
 
-  TransferRing& GetTransferRing(size_t endpoint) __TA_REQUIRES(transaction_lock_) {
-    return rings_[endpoint];
+  zx_status_t InitEndpoint(uint8_t ep_addr, EventRing* event_ring, fdf::MmioBuffer* mmio)
+      __TA_REQUIRES(transaction_lock_);
+  // idx should correspond to XhciEndpointIndex
+  Endpoint& GetEndpoint(uint8_t idx) __TA_REQUIRES(transaction_lock_) {
+    if (!rings_[idx]) {
+      rings_[idx].emplace(hci_, device_id_, XhciEndpointIndexInverse(idx + 1));
+    }
+    return *rings_[idx];
   }
 
   std::unique_ptr<dma_buffer::PagedBuffer>& GetInputContext() __TA_REQUIRES(transaction_lock_) {
@@ -88,6 +95,8 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
 
   void CreateInspectNode(inspect::Node node, uint16_t vendor_id, uint16_t product_id);
 
+  uint32_t device_id() const { return device_id_; }
+
  private:
   zx_status_t InitializeSlotBuffer(const UsbXhci& hci, uint8_t slot_id, uint8_t port_id,
                                    const std::optional<HubInfo>& hub_info,
@@ -102,6 +111,7 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
                                             std::unique_ptr<dma_buffer::PagedBuffer>* out)
       __TA_REQUIRES(transaction_lock_);
 
+  uint32_t device_id_;
   UsbXhci* hci_;
   uint8_t slot_ = 0;
   uint8_t port_ = 0;
@@ -109,8 +119,8 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
   fbl::Mutex transaction_lock_;
   std::optional<HubInfo> hub_ __TA_GUARDED(transaction_lock_);
   bool disconnecting_ __TA_GUARDED(transaction_lock_) = false;
-  TransferRing tr_ __TA_GUARDED(transaction_lock_);
-  TransferRing rings_[kMaxEndpoints] __TA_GUARDED(transaction_lock_);
+  Endpoint tr_ __TA_GUARDED(transaction_lock_);
+  std::optional<Endpoint> rings_[kMaxEndpoints] __TA_GUARDED(transaction_lock_);
   std::unique_ptr<dma_buffer::PagedBuffer> input_context_ __TA_GUARDED(transaction_lock_);
   std::unique_ptr<dma_buffer::PagedBuffer> device_context_ __TA_GUARDED(transaction_lock_);
 

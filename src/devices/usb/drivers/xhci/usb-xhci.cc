@@ -88,15 +88,6 @@ int ComputeInterval(const usb_endpoint_descriptor_t* ep, usb_speed_t speed) {
   }
 }
 
-uint8_t XhciEndpointIndex(uint8_t ep_address) {
-  if (ep_address == 0)
-    return 0;
-  uint8_t index = static_cast<uint8_t>(2 * (ep_address & ~USB_ENDPOINT_DIR_MASK));
-  if ((ep_address & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_OUT)
-    index--;
-  return index;
-}
-
 }  // namespace
 
 // Tracks the state of a USB request
@@ -181,6 +172,12 @@ struct UsbXhci::UsbRequestState {
   // This is owned by the transfer ring.
   TRB* last_trb;
 };
+
+bool UsbXhci::Running() const { return running_; }
+
+void UsbXhci::RingDoorbell(uint8_t slot, uint8_t target) {
+  DOORBELL::Get(doorbell_offset_, slot).FromValue(0).set_Target(target).WriteTo(&mmio_.value());
+}
 
 uint16_t UsbXhci::InterrupterMapping() {
   // No inactive interrupters. Find one with least pressure.
@@ -318,7 +315,7 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id,
 }
 
 void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub) {
-  auto state = fbl::MakeRefCounted<DeviceState>(this);
+  auto state = fbl::MakeRefCounted<DeviceState>(slot - 1, this);
   fbl::AutoLock _(&state->transaction_lock());
   state->SetDeviceInformation(slot, port, hub);
   if (hub) {
@@ -432,20 +429,20 @@ fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
       zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
       return ZX_ERR_IO_NOT_PRESENT;
     }
-    for (size_t i = 0; i < kMaxEndpoints; i++) {
+    for (uint8_t i = 0; i < kMaxEndpoints; i++) {
       fbl::AutoLock _(&state->transaction_lock());
-      auto trbs = state->GetTransferRing(i).TakePendingTRBs();
+      auto trbs = state->GetEndpoint(i).transfer_ring().TakePendingTRBs();
       for (auto& trb : trbs) {
-        trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+        std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
       }
     }
     fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
     {
       fbl::AutoLock _(&state->transaction_lock());
-      trbs = state->GetTransferRing().TakePendingTRBs();
+      trbs = state->GetEndpoint().transfer_ring().TakePendingTRBs();
     }
     for (auto& trb : trbs) {
-      trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+      std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     }
     zx_status_t status = bus.RemoveDevice(slot - 1);
     if (status != ZX_OK) {
@@ -668,21 +665,21 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
         fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
         {
           fbl::AutoLock _(&state->transaction_lock());
-          trbs = state->GetTransferRing().TakePendingTRBs();
+          trbs = state->GetEndpoint().transfer_ring().TakePendingTRBs();
         }
         for (auto& trb : trbs) {
           pending = true;
-          trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+          std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
         }
-        for (size_t c = 0; c < 32; c++) {
+        for (uint8_t c = 0; c < 32; c++) {
           fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
           {
             fbl::AutoLock _(&state->transaction_lock());
-            trbs = state->GetTransferRing(c).TakePendingTRBs();
+            trbs = state->GetEndpoint(c).transfer_ring().TakePendingTRBs();
           }
           for (auto& trb : trbs) {
             pending = true;
-            trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+            std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
           }
         }
       }
@@ -736,6 +733,7 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
     request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     return;
   }
+  Endpoint* ep;
   {
     fbl::AutoLock _(&state->transaction_lock());
     if (state->IsDisconnecting()) {
@@ -746,306 +744,25 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
       request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
       return;
     }
+    if (request.request()->header.ep_address) {
+      uint8_t index =
+          static_cast<uint8_t>(XhciEndpointIndex(request.request()->header.ep_address) - 1);
+      ep = &state->GetEndpoint(index);
+    }
   }
   if (unlikely(request.request()->header.ep_address == 0)) {
     UsbHciControlRequestQueue(std::move(request));
   } else {
-    UsbHciNormalRequestQueue(std::move(request));
+    ep->NormalRequestQueue(std::move(request));
   }
-}
-
-void UsbXhci::WaitForIsochronousReady(UsbRequestState* state) {
-  // Cannot schedule more than 895 ms into the future per section 4.11.2.5
-  // in the xHCI specification (revision 1.2)
-  constexpr int kMaxSchedulingInterval = 895;
-  if (state->context->request->request()->header.frame) {
-    uint64_t frame = UsbHciGetCurrentFrame();
-    while (static_cast<int32_t>(state->context->request->request()->header.frame - frame) >
-           kMaxSchedulingInterval) {
-      uint32_t time = static_cast<uint32_t>(
-          (state->context->request->request()->header.frame - frame) - kMaxSchedulingInterval);
-      zx::nanosleep(zx::deadline_after(zx::msec(time)));
-      frame = UsbHciGetCurrentFrame();
-    }
-
-    if (state->context->request->request()->header.frame < frame) {
-      state->complete = true;
-      state->status = ZX_ERR_IO_MISSED_DEADLINE;
-      state->bytes_transferred = 0;
-    }
-  }
-}
-
-void UsbXhci::StartNormalTransaction(UsbRequestState* state, uint8_t interrupter_target) {
-  size_t packet_count = 0;
-
-  // Normal transfer
-  zx_status_t status = state->context->request->PhysMap(bti_);
-  if (status != ZX_OK) {
-    state->complete = true;
-    state->status = status;
-    state->bytes_transferred = 0;
-    return;
-  }
-  size_t pending_len = state->context->request->request()->header.length;
-  uint32_t total_len = 0;
-  for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
-    if (len > pending_len) {
-      len = pending_len;
-    }
-    if (!paddr) {
-      break;
-    }
-    if (!len) {
-      continue;
-    }
-    total_len += static_cast<uint32_t>(len);
-    packet_count++;
-    pending_len -= len;
-  }
-
-  if (pending_len) {
-    // Something doesn't add up here....
-    state->complete = true;
-    state->status = ZX_ERR_BAD_STATE;
-    state->bytes_transferred = 0;
-    return;
-  }
-  // Allocate contiguous memory
-  auto contig_trb_info = state->transfer_ring->AllocateContiguous(packet_count);
-  if (contig_trb_info.is_error()) {
-    state->complete = true;
-    state->status = contig_trb_info.error_value();
-    state->bytes_transferred = 0;
-    return;
-  }
-  state->info = contig_trb_info.value();
-  state->total_len = total_len;
-  state->packet_count = packet_count;
-  state->first_cycle = state->info.first()[0].status;
-  state->first_trb = state->info.first().data();
-  state->last_trb = state->info.trbs.data() + (packet_count - 1);
-  state->interrupter = static_cast<uint8_t>(interrupter_target);
-}
-
-void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
-  // Data stage
-  size_t pending_len = state->context->request->request()->header.length;
-  auto current_nop = state->info.nop.data();
-  if (current_nop) {
-    while (Control::FromTRB(current_nop).Type() == Control::Nop) {
-      bool producer_cycle_state = current_nop->status;
-      bool cycle = (current_nop == state->first_trb) ? !producer_cycle_state : producer_cycle_state;
-      Control::FromTRB(current_nop).set_Cycle(cycle).ToTrb(current_nop);
-      current_nop->status = 0;
-      current_nop++;
-    }
-  }
-  if (state->first_trb) {
-    TRB* current = state->info.trbs.data();
-    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
-      if (!len) {
-        break;
-      }
-      len = std::min(len, pending_len);
-      pending_len -= len;
-      state->packet_count--;
-      TRB* next = current + 1;
-      if (next == state->last_trb + 1) {
-        next = nullptr;
-      }
-      uint32_t pcs = current->status;
-      current->status = 0;
-      enum Control::Type type;
-      if (((state->is_isochronous_transfer) && state->first_trb == current)) {
-        // Force direct mode as workaround for USB audio latency issue.
-        type = Control::Isoch;
-        Isoch* data = reinterpret_cast<Isoch*>(current);
-        // Burst size is number of packets, not bytes
-        uint32_t burst_size = state->burst_size;
-        uint32_t packet_size = state->max_packet_size;
-        uint32_t packet_count = state->total_len / packet_size;
-        if (!packet_count) {
-          packet_count = 1;
-        }
-        // Number of bursts - 1
-        uint32_t burst_count = packet_count / burst_size;
-        if (burst_count) {
-          burst_count--;
-        }
-        // Zero-based last-burst-packet count (where 0 == 1 packet)
-        uint32_t last_burst_packet_count = packet_count % burst_size;
-        if (last_burst_packet_count) {
-          last_burst_packet_count--;
-        }
-
-        data->set_CHAIN(next != nullptr)
-            .set_SIA(state->context->request->request()->header.frame == 0)
-            .set_TLBPC(last_burst_packet_count)
-            .set_FrameID(
-                static_cast<uint32_t>(state->context->request->request()->header.frame % 2048))
-            .set_TBC(burst_count)
-            .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(len)
-            .set_SIZE(packet_count)
-            .set_NO_SNOOP(!has_coherent_cache_)
-            .set_IOC(next == nullptr)
-            .set_ISP(true);
-      } else {
-        type = Control::Normal;
-        Normal* data = reinterpret_cast<Normal*>(current);
-        data->set_CHAIN(next != nullptr)
-            .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(len)
-            .set_SIZE(state->packet_count)
-            .set_NO_SNOOP(!has_coherent_cache_)
-            .set_IOC(next == nullptr)
-            .set_ISP(true);
-      }
-
-      current->ptr = paddr;
-      Control::FromTRB(current)
-          .set_Cycle(unlikely(current == state->first_trb) ? !pcs : pcs)
-          .set_Type(type)
-          .ToTrb(current);
-      current = next;
-    }
-  }
-}
-
-void UsbXhci::CommitNormalTransaction(UsbRequestState* state) {
-  hw_mb();
-  // Start the transaction!
-  if (!has_coherent_cache_) {
-    usb_request_cache_flush_invalidate(state->context->request->request(), 0,
-                                       state->context->request->request()->header.length);
-  }
-  state->transfer_ring->AssignContext(state->last_trb, std::move(state->context), state->first_trb);
-  Control::FromTRB(state->first_trb).set_Cycle(state->first_cycle).ToTrb(state->first_trb);
-
-  state->transfer_ring->CommitTransaction(state->transaction);
-  DOORBELL::Get(doorbell_offset_, state->slot)
-      .FromValue(0)
-      .set_Target(2 + state->index)
-      .WriteTo(&mmio_.value());
 }
 
 bool UsbXhci::UsbRequestState::Complete() {
   if (complete) {
-    context->request->Complete(status, bytes_transferred);
+    std::get<Request>(*context->request).Complete(status, bytes_transferred);
     return true;
   }
   return false;
-}
-
-void UsbXhci::UsbHciNormalRequestQueue(Request request) {
-  UsbRequestState pending_transfer;
-  uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(request.request()->header.ep_address) - 1);
-  auto state = device_state_[request.request()->header.device_id];
-  if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
-    request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-    return;
-  }
-  fbl::AutoLock transaction_lock(&state->transaction_lock());
-  if (state->IsDisconnecting()) {
-    transaction_lock.release();
-    request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-    return;
-  }
-  if (state->GetTransferRing(index).stalled()) {
-    transaction_lock.release();
-    request.Complete(ZX_ERR_IO_REFUSED, 0);
-    return;
-  }
-  auto* control = reinterpret_cast<uint32_t*>(state->GetInputContext()->virt());
-  auto* endpoint_context = reinterpret_cast<EndpointContext*>(
-      reinterpret_cast<unsigned char*>(control) + (slot_size_bytes_ * (2 + (index + 1))));
-  if (!state->GetTransferRing((index)).active()) {
-    transaction_lock.release();
-    request.Complete(ZX_ERR_INTERNAL, 0);
-    return;
-  }
-  pending_transfer.is_isochronous_transfer = state->GetTransferRing(index).IsIsochronous();
-  pending_transfer.transfer_ring = &state->GetTransferRing(index);
-  pending_transfer.burst_size = endpoint_context->MaxBurstSize() + 1;
-  pending_transfer.max_packet_size = endpoint_context->MAX_PACKET_SIZE();
-  pending_transfer.slot_size_bytes = slot_size_bytes_;
-  pending_transfer.complete = false;
-  pending_transfer.index = index;
-  pending_transfer.context = state->GetTransferRing(index).AllocateContext();
-  if (!pending_transfer.context) {
-    transaction_lock.release();
-    request.Complete(ZX_ERR_NO_MEMORY, 0);
-    return;
-  }
-  pending_transfer.context->request = std::move(request);
-  pending_transfer.slot = state->GetSlot();
-
-  if (pending_transfer.is_isochronous_transfer) {
-    // Isoc endpoints of the default interface (i.e. b_alternate_setting=0) are required to have a
-    // w_max_packet_size=0 to prevent enumerated devices from reserving bandwidth by default. We'll
-    // consider any request for a zero-length pipe as invalid (see USB 2.0 spec. 5.6.2).
-    if (pending_transfer.max_packet_size == 0) {
-      transaction_lock.release();
-      pending_transfer.status = ZX_ERR_INVALID_ARGS;
-      pending_transfer.Complete();
-      return;
-    }
-
-    // Release the lock while we're sleeping to avoid blocking
-    // other operations.
-    state->transaction_lock().Release();
-    WaitForIsochronousReady(&pending_transfer);
-    if (pending_transfer.Complete()) {
-      state->transaction_lock().Acquire();
-      return;
-    }
-    state->transaction_lock().Acquire();
-
-    // Check again since we've re-acquired lock
-    if (state->IsDisconnecting()) {
-      transaction_lock.release();
-      pending_transfer.status = ZX_ERR_IO_NOT_PRESENT;
-      pending_transfer.Complete();
-      return;
-    }
-    if (state->GetTransferRing(index).stalled()) {
-      transaction_lock.release();
-      pending_transfer.status = ZX_ERR_IO_REFUSED;
-      pending_transfer.Complete();
-      return;
-    }
-    if (!state->GetTransferRing((index)).active()) {
-      transaction_lock.release();
-      pending_transfer.status = ZX_ERR_INTERNAL;
-      pending_transfer.Complete();
-      return;
-    }
-  }
-
-  // Start the transaction
-  pending_transfer.transaction = state->GetTransferRing(index).SaveState();
-  auto rollback_transaction = [&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    state->GetTransferRing(index).Restore(pending_transfer.transaction);
-  };
-  StartNormalTransaction(&pending_transfer, static_cast<uint8_t>(state->GetInterrupterTarget()));
-  if (pending_transfer.complete) {
-    rollback_transaction();
-    transaction_lock.release();
-    pending_transfer.Complete();
-    return;
-  }
-  // Continue the transaction
-  ContinueNormalTransaction(&pending_transfer);
-  if (pending_transfer.complete) {
-    rollback_transaction();
-    transaction_lock.release();
-    pending_transfer.Complete();
-    return;
-  }
-  // Commit the transaction -- starting the actual transfer
-  CommitNormalTransaction(&pending_transfer);
 }
 
 void UsbXhci::UsbHciControlRequestQueue(Request req) {
@@ -1063,12 +780,13 @@ void UsbXhci::UsbHciControlRequestQueue(Request req) {
     req.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     return;
   }
-  if (device_state->GetTransferRing().stalled()) {
+  auto& transfer_ring = device_state->GetEndpoint().transfer_ring();
+  if (transfer_ring.stalled()) {
     transaction_lock.release();
     req.Complete(ZX_ERR_IO_REFUSED, 0);
     return;
   }
-  auto context = device_state->GetTransferRing().AllocateContext();
+  auto context = transfer_ring.AllocateContext();
   if (!context) {
     transaction_lock.release();
     req.Complete(ZX_ERR_NO_MEMORY, 0);
@@ -1076,9 +794,9 @@ void UsbXhci::UsbHciControlRequestQueue(Request req) {
   }
   TransferRing::State transaction;
   TRB* setup;
-  zx_status_t status = device_state->GetTransferRing().AllocateTRB(&setup, &transaction);
-  auto rollback_transaction = [=]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    device_state->GetTransferRing().Restore(transaction);
+  zx_status_t status = transfer_ring.AllocateTRB(&setup, &transaction);
+  auto rollback_transaction = [&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    transfer_ring.Restore(transaction);
   };
   if (status != ZX_OK) {
     rollback_transaction();
@@ -1092,7 +810,7 @@ void UsbXhci::UsbHciControlRequestQueue(Request req) {
   pending_transfer.context = std::move(context);
   pending_transfer.setup = setup;
   pending_transfer.transaction = transaction;
-  pending_transfer.transfer_ring = &device_state->GetTransferRing();
+  pending_transfer.transfer_ring = &transfer_ring;
   pending_transfer.slot = device_state->GetSlot();
   ControlRequestAllocationPhase(&pending_transfer);
   auto call = fit::defer([&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -1122,8 +840,8 @@ void UsbXhci::UsbHciControlRequestQueue(Request req) {
 void UsbXhci::ControlRequestAllocationPhase(UsbRequestState* state) {
   state->setup_cycle = state->setup->status;
   state->setup->status = 0;
-  if (state->context->request->request()->header.length) {
-    zx_status_t status = state->context->request->PhysMap(bti_);
+  if (std::get<Request>(*state->context->request).request()->header.length) {
+    zx_status_t status = std::get<Request>(*state->context->request).PhysMap(bti_);
     if (status != ZX_OK) {
       state->status = status;
       state->complete = true;
@@ -1131,7 +849,7 @@ void UsbXhci::ControlRequestAllocationPhase(UsbRequestState* state) {
       return;
     }
     TRB* current_trb = nullptr;
-    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
+    for (auto [paddr, len] : std::get<Request>(*state->context->request).phys_iter(k64KiB)) {
       if (!len) {
         break;
       }
@@ -1159,7 +877,7 @@ void UsbXhci::ControlRequestStatusPhase(UsbRequestState* state) {
   bool status_in = true;
   // See table 4-7 in section 4.11.2.2
   if (state->first_trb &&
-      (state->context->request->request()->setup.bm_request_type & USB_DIR_IN)) {
+      (std::get<Request>(*state->context->request).request()->setup.bm_request_type & USB_DIR_IN)) {
     status_in = false;
   }
   zx_status_t status = state->transfer_ring->AllocateTRB(&state->status_trb_ptr, nullptr);
@@ -1182,7 +900,7 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
   // Data stage
   if (state->first_trb) {
     TRB* current = state->first_trb;
-    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
+    for (auto [paddr, len] : std::get<Request>(*state->context->request).phys_iter(k64KiB)) {
       if (!len) {
         break;
       }
@@ -1199,7 +917,8 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
         // drivers.
         data->set_CHAIN(next != nullptr)
             .set_DIRECTION(
-                (state->context->request->request()->setup.bm_request_type & USB_DIR_IN) != 0)
+                (std::get<Request>(*state->context->request).request()->setup.bm_request_type &
+                 USB_DIR_IN) != 0)
             .set_INTERRUPTER(0)
             .set_LENGTH(len)
             .set_SIZE(state->packet_count)
@@ -1224,13 +943,14 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
 
 void UsbXhci::ControlRequestSetupPhase(UsbRequestState* state) {
   // Setup phase (4.11.2.2)
-  memcpy(&state->setup->ptr, &state->context->request->request()->setup,
-         sizeof(state->context->request->request()->setup));
+  memcpy(&state->setup->ptr, &std::get<Request>(*state->context->request).request()->setup,
+         sizeof(std::get<Request>(*state->context->request).request()->setup));
   Setup* setup_trb = reinterpret_cast<Setup*>(state->setup);
   setup_trb->set_INTERRUPTER(state->interrupter)
       .set_length(8)
       .set_IDT(1)
-      .set_TRT(((state->context->request->request()->setup.bm_request_type & USB_DIR_IN) != 0)
+      .set_TRT(((std::get<Request>(*state->context->request).request()->setup.bm_request_type &
+                 USB_DIR_IN) != 0)
                    ? Setup::IN
                    : Setup::OUT);
   hw_mb();
@@ -1239,8 +959,9 @@ void UsbXhci::ControlRequestSetupPhase(UsbRequestState* state) {
 void UsbXhci::ControlRequestCommit(UsbRequestState* state) {
   // Start the transaction!
   if (!has_coherent_cache_) {
-    usb_request_cache_flush_invalidate(state->context->request->request(), 0,
-                                       state->context->request->request()->header.length);
+    usb_request_cache_flush_invalidate(
+        std::get<Request>(*state->context->request).request(), 0,
+        std::get<Request>(*state->context->request).request()->header.length);
   }
   state->transfer_ring->AssignContext(state->status_trb_ptr, std::move(state->context),
                                       state->first_trb);
@@ -1273,6 +994,10 @@ zx_status_t UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
                                           const usb_endpoint_descriptor_t* ep_desc,
                                           const usb_ss_ep_comp_descriptor_t* ss_com_desc,
                                           bool enable) {
+  if (!ep_desc) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   if (!running_) {
     return ZX_ERR_IO_NOT_PRESENT;
   }
@@ -1320,13 +1045,13 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
     // Allocate the transfer ring (see section 4.9)
     control[0] = 0;
     control[1] = 1 | (1 << (index + 1));
-    zx_status_t status = state->GetTransferRing(index - 1).Init(
-        page_size_, bti_, &this->interrupter(state->GetInterrupterTarget()).ring(), is_32bit_,
-        &mmio_.value(), *this);
+    zx_status_t status = state->InitEndpoint(
+        ep_desc->b_endpoint_address, &this->interrupter(state->GetInterrupterTarget()).ring(),
+        &mmio_.value());
     if (status != ZX_OK) {
       return fpromise::make_error_promise<zx_status_t>(status);
     }
-    CRCR trb_phys = state->GetTransferRing(index - 1).phys(cap_length_);
+    CRCR trb_phys = state->GetEndpoint(index - 1).transfer_ring().phys(cap_length_);
     // Initialize endpoint context 0
     // Set CERR to 3, TR dequeue pointer, max packet size, EP type = control, DCS = 1
     auto endpoint_context = reinterpret_cast<EndpointContext*>(
@@ -1335,7 +1060,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
     // See section 4.3.6
     uint32_t ep_type = ep_desc->bm_attributes & USB_ENDPOINT_TYPE_MASK;
     if (ep_type == USB_ENDPOINT_ISOCHRONOUS) {
-      state->GetTransferRing(index - 1).SetIsochronous();
+      state->GetEndpoint(index - 1).transfer_ring().SetIsochronous();
     }
     uint32_t ep_index = ep_type;
     if ((ep_desc->b_endpoint_address & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_IN) {
@@ -1376,7 +1101,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
           [=](fpromise::result<TRB*, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
             auto free_buffers = fit::defer([=]() {
               fbl::AutoLock _(&state->transaction_lock());
-              state->GetTransferRing(index - 1).Deinit();
+              state->GetEndpoint(index - 1).transfer_ring().Deinit();
               slot_context->set_CONTEXT_ENTRIES(context_entries);
             });
             if (result.is_error()) {
@@ -1402,13 +1127,18 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
 fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(
     uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
     const usb_ss_ep_comp_descriptor_t* ss_com_desc) {
+  return UsbHciDisableEndpoint(device_id, ep_desc->b_endpoint_address);
+}
+
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
+                                                                    uint8_t ep_addr) {
   auto context = command_ring_.AllocateContext();
   auto state = device_state_[device_id];
   if (!state) {
     zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
-  uint8_t index = XhciEndpointIndex(ep_desc->b_endpoint_address);
+  uint8_t index = XhciEndpointIndex(ep_addr);
   TRB trb;
   uint32_t* control;
   {
@@ -1448,7 +1178,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(
             if (state->IsDisconnecting()) {
               return fpromise::error(ZX_ERR_IO_NOT_PRESENT);
             }
-            zx_status_t status = state->GetTransferRing(index - 1).Deinit();
+            zx_status_t status = state->GetEndpoint(index - 1).transfer_ring().Deinit();
             // If we can't deinit the ring something is seriously wrong.
             if (status != ZX_OK) {
               return fpromise::error(ZX_ERR_BAD_STATE);
@@ -1554,24 +1284,24 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
     fbl::AutoLock _(&device_state->transaction_lock());
     device_state->Disconnect();
   }
-  for (size_t i = 0; i < 32; i++) {
+  for (uint8_t i = 0; i < 32; i++) {
     fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
     {
       fbl::AutoLock _(&device_state->transaction_lock());
-      trbs = device_state->GetTransferRing(i).TakePendingTRBs();
+      trbs = device_state->GetEndpoint(i).transfer_ring().TakePendingTRBs();
     }
     for (auto& trb : trbs) {
-      trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+      std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     }
   }
   RunUntilIdle();
   fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
   {
     fbl::AutoLock _(&device_state->transaction_lock());
-    trbs = device_state->GetTransferRing().TakePendingTRBs();
+    trbs = device_state->GetEndpoint().transfer_ring().TakePendingTRBs();
   }
   for (auto& trb : trbs) {
-    trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+    std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
   }
   RunUntilIdle();
   // Bus should always be valid since we're getting a callback from a hub
@@ -1602,7 +1332,6 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
     zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
-  uint8_t index = XhciEndpointIndex(ep_address) - 1;
   ResetEndpoint reset_command;
   {
     fbl::AutoLock _(&state->transaction_lock());
@@ -1621,10 +1350,9 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
   {
     fbl::AutoLock l(&state->transaction_lock());
     if (ep_address == 0) {
-      ring = &state->GetTransferRing();
-      index = 0;
+      ring = &state->GetEndpoint().transfer_ring();
     } else {
-      ring = &state->GetTransferRing(index);
+      ring = &state->GetEndpoint(XhciEndpointIndex(ep_address) - 1).transfer_ring();
     }
     if (!ring->stalled()) {
       return fpromise::make_error_promise<zx_status_t>(ZX_ERR_INVALID_ARGS);
@@ -1731,21 +1459,22 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciCancelAllAsync(uint32_t devi
             return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
           }
           index = static_cast<uint8_t>(XhciEndpointIndex(ep_address) - 1);
-          if (!state->GetTransferRing(index).active()) {
+          auto& transfer_ring = state->GetEndpoint(index).transfer_ring();
+          if (!transfer_ring.active()) {
             return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
           }
-          trbs = state->GetTransferRing(index).TakePendingTRBs();
+          trbs = transfer_ring.TakePendingTRBs();
           for (auto& trb : trbs) {
             new_ptr = trb.trb;
             auto control = Control::FromTRB(trb.trb);
             control.set_Cycle(!control.Cycle());
           }
           if (new_ptr) {
-            new_ptr_phys = state->GetTransferRing(index).VirtToPhys(new_ptr + 1);
+            new_ptr_phys = transfer_ring.VirtToPhys(new_ptr + 1);
           }
         }
         for (auto& trb : trbs) {
-          trb.request->Complete(ZX_ERR_CANCELED, 0);
+          std::get<Request>(*trb.request).Complete(ZX_ERR_CANCELED, 0);
         }
 
         if (!new_ptr_phys) {
@@ -2179,8 +1908,32 @@ zx_status_t UsbXhci::Init() {
   if (!(pci_.is_valid() || pdev_.is_valid())) {
     return ZX_ERR_IO_INVALID;
   }
-  zx_status_t status =
-      DdkAdd(ddk::DeviceAddArgs("xhci").set_inspect_vmo(inspect_.inspector.DuplicateVmo()));
+
+  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_hci::UsbHciService>(
+      fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service %s", result.status_string());
+    return result.status_value();
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb_hci::UsbHciService::Name,
+  };
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("xhci")
+                                  .set_inspect_vmo(inspect_.inspector.DuplicateVmo())
+                                  .set_fidl_service_offers(offers)
+                                  .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd() error: %s", zx_status_get_string(status));
     return status;
@@ -2204,6 +1957,25 @@ void UsbXhci::DdkInit(ddk::InitTxn txn) {
   init_thread_ = init_thread;
   // The init thread will reply to |init_txn_| once it is ready to make the device visible
   // and able to be unbound.
+}
+
+void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                                ConnectToEndpointCompleter::Sync& completer) {
+  auto state = device_state_[request.device_id()];
+  if (!state) {
+    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    completer.Reply(fit::as_error(ZX_ERR_IO_NOT_PRESENT));
+    return;
+  }
+  uint8_t index = XhciEndpointIndex(request.ep_addr());
+  fbl::AutoLock _(&state->transaction_lock());
+  if (state->IsDisconnecting()) {
+    completer.Reply(fit::as_error(ZX_ERR_IO_NOT_PRESENT));
+    return;
+  }
+  auto& ep = state->GetEndpoint(index - 1);
+  ep.Connect(ep.dispatcher(), std::move(request.ep()));
+  completer.Reply(fit::ok());
 }
 
 TRBPromise UsbXhci::SubmitCommand(const TRB& command, std::unique_ptr<TRBContext> trb_context) {
@@ -2235,7 +2007,9 @@ void Inspect::Init(uint16_t hci_version_in, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1) 
 // Static function; called by the DDK bind operation.
 zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
   fbl::AllocChecker ac;
-  auto dev = std::unique_ptr<UsbXhci>(new (&ac) UsbXhci(parent, dma_buffer::CreateBufferFactory()));
+  auto dev = std::unique_ptr<UsbXhci>(
+      new (&ac) UsbXhci(parent, dma_buffer::CreateBufferFactory(),
+                        fdf::Dispatcher::GetCurrent()->async_dispatcher()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -2253,10 +2027,6 @@ zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
              pdev_result.status_string());
       return ZX_ERR_NOT_SUPPORTED;
     }
-  }
-
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
   }
 
   zx_status_t status = dev->Init();

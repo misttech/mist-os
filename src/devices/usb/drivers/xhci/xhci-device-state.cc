@@ -26,10 +26,11 @@ DeviceState::~DeviceState() {
   device_context_.reset();
   slot_ = 0;
   hub_.reset();
-  tr_.Deinit();
-  for (auto& ring : rings_) {
-    ring.DeinitIfActive();
-  }
+}
+
+zx_status_t DeviceState::InitEndpoint(uint8_t ep_addr, EventRing* event_ring, fdf::MmioBuffer* mmio)
+    __TA_REQUIRES(transaction_lock_) {
+  return GetEndpoint(XhciEndpointIndex(ep_addr) - 1).Init(event_ring, mmio);
 }
 
 zx_status_t DeviceState::InitializeSlotBuffer(const UsbXhci& hci, uint8_t slot_id, uint8_t port_id,
@@ -73,7 +74,7 @@ zx_status_t DeviceState::InitializeEndpointContext(const UsbXhci& hci, uint8_t s
                                                    uint8_t port_id,
                                                    std::optional<HubInfo>& hub_info,
                                                    dma_buffer::PagedBuffer* slot_context_buffer) {
-  CRCR trb_phys = tr_.phys(hci.CapLength());
+  CRCR trb_phys = tr_.transfer_ring().phys(hci.CapLength());
   auto* control = static_cast<uint32_t*>(slot_context_buffer->virt());
   size_t slot_size = hci.slot_size_bytes();
   auto slot_context =
@@ -158,8 +159,7 @@ TRBPromise DeviceState::AddressDeviceCommand(UsbXhci* hci, uint8_t slot, uint8_t
 
   // Allocate the transfer ring (see section 4.9)
   fbl::AutoLock _(&transaction_lock_);
-  status = tr_.Init(hci->GetPageSize(), hci->bti(), &hci->interrupter(interrupter_target).ring(),
-                    hci->Is32BitController(), mmio, *hci);
+  status = tr_.Init(&hci->interrupter(interrupter_target).ring(), mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate the transfer ring: %s", zx_status_get_string(status));
     return fpromise::make_result_promise(

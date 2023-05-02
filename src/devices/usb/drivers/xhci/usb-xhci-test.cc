@@ -108,10 +108,9 @@ class FakeDevice {
     });
 
     region()[kXecp].SetReadCallback([=]() {
-      auto xecp = (XECP::Get(HCCPARAMS1::Get()
-                             .FromValue(static_cast<uint32_t>(region()[4 * sizeof(uint32_t)]
-                             .Read())))
-                      .FromValue(0));
+      auto xecp = (XECP::Get(HCCPARAMS1::Get().FromValue(
+                                 static_cast<uint32_t>(region()[4 * sizeof(uint32_t)].Read())))
+                       .FromValue(0));
       xecp.set_NEXT(0);
       xecp.set_ID(XECP::UsbLegacySupport);
       if (driver_owned_controller_) {
@@ -450,7 +449,8 @@ class XhciMmioHarness : public XhciHarness {
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(outgoing_endpoints->client));
 
-    auto dev = std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory());
+    auto dev =
+        std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory(), loop_.dispatcher());
     dev->SetTestHarness(this);
     dev->DdkAdd("xhci");
     ASSERT_EQ(1, root_->child_count());
@@ -466,6 +466,9 @@ class XhciMmioHarness : public XhciHarness {
     mock_ddk_xhci_->UnbindOp();
     ASSERT_OK(mock_ddk_xhci_->WaitUntilUnbindReplyCalled());
   }
+
+ private:
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> TransferRing::TakePendingTRBs() {
@@ -554,7 +557,7 @@ zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> co
 zx_status_t xhci_start_root_hubs(UsbXhci* xhci) { return ZX_OK; }
 
 zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* ring, bool is_32bit,
-                               fdf::MmioBuffer* mmio, const UsbXhci& hci) {
+                               fdf::MmioBuffer* mmio, UsbXhci* hci) {
   fbl::AutoLock _(&mutex_);
   if (trbs_ != nullptr) {
     return ZX_ERR_BAD_STATE;
@@ -567,7 +570,7 @@ zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* 
   isochronous_ = false;
   token_++;
   stalled_ = false;
-  hci_ = &hci;
+  hci_ = hci;
   trbs_ = static_cast<XhciHarness*>(hci_->GetTestHarness())->CreateTRB();
   static_assert(sizeof(uint64_t) == sizeof(this));
   trbs_->ptr = reinterpret_cast<uint64_t>(this);
@@ -800,7 +803,7 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   TransferRing* ring = reinterpret_cast<TransferRing*>(initial_trb->ptr);
   std::unique_ptr<TRBContext> context;
   ring->CompleteTRB(trb, &context);
-  context->request->Complete(ZX_OK, sizeof(void*));
+  std::get<Request>(*context->request).Complete(ZX_OK, sizeof(void*));
   ASSERT_TRUE(invoked);
 }
 
@@ -865,18 +868,12 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
   TransferRing* ring = reinterpret_cast<TransferRing*>(trb_start->ptr);
   std::unique_ptr<TRBContext> context;
   ring->CompleteTRB(trb, &context);
-  context->request->Complete(ZX_OK, sizeof(void*));
+  std::get<Request>(*context->request).Complete(ZX_OK, sizeof(void*));
   ASSERT_TRUE(invoked);
 }
 
 TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
   ConnectDevice(1, USB_SPEED_HIGH);
-  {
-    auto& state = xhci_->GetDeviceState()[0];
-    ASSERT_NOT_NULL(state);
-    fbl::AutoLock _(&state->transaction_lock());
-    state->GetTransferRing(0).set_stall(true);
-  }
   zx_status_t cancel_status;
   auto cr = FakeTRB::get(crcr()->next);
   Control control_trb = Control::FromTRB(cr);
@@ -907,14 +904,15 @@ TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
 
 TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
   ConnectDevice(1, USB_SPEED_HIGH);
-  EnableEndpoint(0, 1, true);
+  EnableEndpoint(0, 1, false);
   uint64_t paddr;
   {
     auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock l(&state->transaction_lock());
-    state->GetTransferRing(0).set_stall(true);
-    paddr = state->GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
+    auto& transfer_ring = state->GetEndpoint(0).transfer_ring();
+    transfer_ring.set_stall(true);
+    paddr = transfer_ring.PeekCommandRingControlRegister(0).value().reg_value();
   }
   zx_status_t reset_status;
   auto cr = FakeTRB::get(crcr()->next);
@@ -961,12 +959,12 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
 
 TEST_F(XhciMmioHarness, ResetEndpointFailsIfNotStalled) {
   ConnectDevice(1, USB_SPEED_HIGH);
-  EnableEndpoint(0, 1, true);
+  EnableEndpoint(0, 1, false);
   {
     auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock l(&state->transaction_lock());
-    state->GetTransferRing(0).set_stall(false);
+    state->GetEndpoint(0).transfer_ring().set_stall(false);
   }
   ASSERT_EQ(ResetEndpointCommand(0, 1), ZX_ERR_INVALID_ARGS);
 }
