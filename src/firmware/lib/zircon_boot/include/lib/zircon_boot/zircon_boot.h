@@ -162,7 +162,7 @@ struct ZirconBootOps {
   // (NUL-terminated UTF-8 string). Returns the value in
   // |out|.
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @part: Name of the partition.
   // @out: Output pointer storing the result.
   //
@@ -173,7 +173,7 @@ struct ZirconBootOps {
   // |rollback_index_location|. The value is returned in
   // |out_rollback_index|.
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @rollback_index_location: Location to write rollback index.
   // @out_rollback_index: Output pointer for storing the index value.
   //
@@ -188,7 +188,7 @@ struct ZirconBootOps {
   // Sets the rollback index corresponding to the location given by
   // |rollback_index_location| to |rollback_index|.
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @rollback_index_location: Location to rollback index to write.
   // @rollback_index: Value of the rollback index to write.
   //
@@ -203,7 +203,7 @@ struct ZirconBootOps {
   // Gets whether the device is locked. The value is returned in
   // |out_is_locked| (true if locked, false otherwise).
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @out_is_locked: Output pointer for storing the status.
   //
   // Returns true on success.
@@ -212,7 +212,7 @@ struct ZirconBootOps {
   // Reads permanent |attributes| data. There are no restrictions on where this
   // data is stored.
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @attribute: Output pointer for storing the permanent attribute.
   //
   // Returns true on success.
@@ -222,12 +222,22 @@ struct ZirconBootOps {
   // Reads a |hash| of permanent attributes. This hash MUST be retrieved from a
   // permanently read-only location (e.g. fuses) when a device is LOCKED.
   //
-  // @ops: Pointer to the ZirconBootOps that host this ZirconVBootOps object.
+  // @ops: Pointer to the ZirconBootOps the device implements.
   // @hash: Output buffer that stores the hash values. The buffer must be able to hold
   //        |AVB_SHA256_DIGEST_SIZE| bytes.
   //
   // Returns true on success.
   bool (*verified_boot_read_permanent_attributes_hash)(ZirconBootOps* ops, uint8_t* hash);
+
+  // Generate requested number of random bytes. The function is used for generating unlock
+  // challenge.
+  //
+  // @ops: Pointer to the ZirconBootOps the device implements.
+  // @num_bytes: Number of requested random bytes to generate.
+  // @output: Output buffer that stores the generated random bytes.
+  //
+  // Returns true on success.
+  bool (*verified_boot_get_random)(ZirconBootOps* ops, size_t num_bytes, uint8_t* output);
 
   // Returns a buffer of at least 'size' bytes.
   // This function will be called during boot to locate the buffer into which the
@@ -261,7 +271,7 @@ typedef enum ZirconBootMode {
 // boots according to firwmare ABR. Otherwise it boots according to OS ABR.
 //
 // @ops: Required operations.
-// @force_recovery: Enable/Disable force recovery.
+// @boot_mode: boot moade as defined in ZirconBootMode
 //
 // The function is not expected to return if boot is successful.
 ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode);
@@ -303,6 +313,26 @@ AbrOps GetAbrOpsFromZirconBootOps(ZirconBootOps* ops);
 // Returns the zircon partition name of a given slot, the slotless partition
 // name if |slot| is NULL.
 const char* GetSlotPartitionName(const AbrSlotIndex* slot);
+
+// The API can be used in the firmware (i.e. fastboot) to generate an unlock challenge
+// for the host side avb tooling to perform authenticated unlocking.
+//
+// @ops: Pointer to the ZirconBootOps the device implements.
+// @out_unlock_challenge: Pointer to the output unlock challenge .
+//
+// Returns true if successful.
+bool ZirconVbootGenerateUnlockChallenge(ZirconBootOps* ops,
+                                        AvbAtxUnlockChallenge* out_unlock_challenge);
+
+// The API is used in the firmware to validate the authenticated unlock credential sent from
+// the host.
+//
+// @ops: Pointer to the ZirconBootOps the device implements.
+// @unlock_credential: Pointer to the input unlock credential data.
+//
+// Returns true if credential is verified successfully without error.
+bool ZirconVbootValidateUnlockCredential(ZirconBootOps* ops,
+                                         const AvbAtxUnlockCredential* unlock_credential);
 
 #ifdef __cplusplus
 }

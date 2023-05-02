@@ -194,6 +194,16 @@ static AvbIOResult ReadPermanentAttributesHash(AvbAtxOps* atx_ops,
   return AVB_IO_RESULT_OK;
 }
 
+static AvbIOResult GetRandom(AvbAtxOps* atx_ops, size_t num_bytes, uint8_t* output) {
+  VBootContext* context = (VBootContext*)atx_ops->ops->user_data;
+  ZirconBootOps* zb_ops = (ZirconBootOps*)context->ops;
+  if (!ZIRCON_BOOT_OPS_CALL(zb_ops, verified_boot_get_random, num_bytes, output)) {
+    zircon_boot_dlog("Failed to get random bytes\n");
+    return AVB_IO_RESULT_ERROR_IO;
+  }
+  return AVB_IO_RESULT_OK;
+}
+
 static void CreateAvbAndAvbAtxOps(ZirconBootOps* zb_ops, VBootContext* ctx, AvbOps* avb_ops,
                                   AvbAtxOps* atx_ops) {
   ctx->ops = zb_ops;
@@ -216,7 +226,7 @@ static void CreateAvbAndAvbAtxOps(ZirconBootOps* zb_ops, VBootContext* ctx, AvbO
   atx_ops->read_permanent_attributes = ReadPermanentAttributes;
   atx_ops->read_permanent_attributes_hash = ReadPermanentAttributesHash;
   atx_ops->set_key_version = SetKeyVersion;
-  atx_ops->get_random = NULL;
+  atx_ops->get_random = GetRandom;
 }
 
 struct property_lookup_user_data {
@@ -398,4 +408,25 @@ static bool PropertyLookupDescForeach(const AvbDescriptor* header, void* user_da
                     (struct property_lookup_user_data*)user_data);
   }
   return true;
+}
+
+bool ZirconVbootGenerateUnlockChallenge(ZirconBootOps* zb_ops,
+                                        AvbAtxUnlockChallenge* out_unlock_challenge) {
+  AvbOps avb_ops;
+  AvbAtxOps atx_ops;
+  VBootContext ctx;
+  CreateAvbAndAvbAtxOps(zb_ops, &ctx, &avb_ops, &atx_ops);
+  AvbIOResult ret = avb_atx_generate_unlock_challenge(&atx_ops, out_unlock_challenge);
+  return ret == AVB_IO_RESULT_OK;
+}
+
+bool ZirconVbootValidateUnlockCredential(ZirconBootOps* zb_ops,
+                                         const AvbAtxUnlockCredential* unlock_credential) {
+  AvbOps avb_ops;
+  AvbAtxOps atx_ops;
+  VBootContext ctx;
+  CreateAvbAndAvbAtxOps(zb_ops, &ctx, &avb_ops, &atx_ops);
+  bool trusted = false;
+  AvbIOResult ret = avb_atx_validate_unlock_credential(&atx_ops, unlock_credential, &trusted);
+  return ret == AVB_IO_RESULT_OK && trusted;
 }

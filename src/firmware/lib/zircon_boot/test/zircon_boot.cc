@@ -1099,4 +1099,58 @@ INSTANTIATE_TEST_SUITE_P(AllImageFormats, RambootTest,
                            return "AndroidV" + std::to_string(*info.param);
                          });
 
+TEST(BootTests, GenerateUnlockChallenge) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  std::vector<uint8_t> random_data(kUnlockChallengeRandom,
+                                   kUnlockChallengeRandom + sizeof(kUnlockChallengeRandom));
+  dev->SetRandomData(random_data);
+  ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
+
+  AvbAtxUnlockChallenge out_unlock_challenge;
+  ASSERT_TRUE(ZirconVbootGenerateUnlockChallenge(&ops, &out_unlock_challenge));
+  // kTestUnlockChallenge is generated using the same libavb process in `generate_test_data.py`
+  // The generated challenge here should be the same.
+  ASSERT_BYTES_EQ(&out_unlock_challenge, kTestUnlockChallenge, sizeof(out_unlock_challenge));
+}
+
+TEST(BootTests, ValidateCredential) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  std::vector<uint8_t> random_data(kUnlockChallengeRandom,
+                                   kUnlockChallengeRandom + sizeof(kUnlockChallengeRandom));
+  dev->SetRandomData(random_data);
+  ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
+
+  // libavb internally stores the generated unlock challenge and will use it in the next
+  // credential validation.
+  AvbAtxUnlockChallenge out_unlock_challenge;
+  ASSERT_TRUE(ZirconVbootGenerateUnlockChallenge(&ops, &out_unlock_challenge));
+
+  AvbAtxUnlockCredential unlock_credential;
+  memcpy(&unlock_credential, kUnlockCredential, sizeof(unlock_credential));
+
+  ASSERT_TRUE(ZirconVbootValidateUnlockCredential(&ops, &unlock_credential));
+}
+
+TEST(BootTests, ValidateCredentialFailsOnIncorrectCredential) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+
+  // Generate a different unlock challenge by using a different random data.
+  std::vector<uint8_t> random_data(kUnlockChallengeRandom,
+                                   kUnlockChallengeRandom + sizeof(kUnlockChallengeRandom));
+  // Change some byte.
+  random_data[0]++;
+  dev->SetRandomData(random_data);
+
+  ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
+  AvbAtxUnlockChallenge out_unlock_challenge;
+  ASSERT_TRUE(ZirconVbootGenerateUnlockChallenge(&ops, &out_unlock_challenge));
+
+  AvbAtxUnlockCredential unlock_credential;
+  memcpy(&unlock_credential, kUnlockCredential, sizeof(unlock_credential));
+  ASSERT_FALSE(ZirconVbootValidateUnlockCredential(&ops, &unlock_credential));
+}
+
 }  // namespace

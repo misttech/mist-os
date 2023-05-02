@@ -6,9 +6,11 @@
 """The code is to provide a reference of how test_images.h is generated"""
 
 import os
+import hashlib
 import pathlib
 import tempfile
 from typing import List
+import struct
 import subprocess
 
 MY_DIR = os.path.dirname(__file__)
@@ -18,6 +20,12 @@ AVB_REPO = os.path.join(
 AVB_TOOL = os.path.join(f'{AVB_REPO}', 'avbtool.py')
 ZBI_TOOL = os.path.join(f'{FUCHSIA_DIR}', 'out', 'default', 'host_x64', 'zbi')
 PSK = os.path.join(f'{AVB_REPO}', 'test', 'data', 'testkey_atx_psk.pem')
+PUK = os.path.join(f'{AVB_REPO}', 'test', 'data', 'testkey_atx_puk.pem')
+UNLOCK_CHALLENGE_RANDOM_DATA = os.path.join(
+    f'{AVB_REPO}', 'test', 'data', 'atx_unlock_challenge.bin')
+UNLOCK_CREDENTIAL = os.path.join(
+    f'{AVB_REPO}', 'test', 'data', 'atx_unlock_credential.bin')
+PRODUCT_ID = os.path.join(f'{AVB_REPO}', 'test', 'data', 'atx_product_id.bin')
 ATX_METADATA = os.path.join(f'{AVB_REPO}', 'test', 'data', 'atx_metadata.bin')
 ATX_PERMANENT_ATTRIBUTES = os.path.join(
     f'{AVB_REPO}', 'test', 'data', 'atx_permanent_attributes.bin')
@@ -144,10 +152,10 @@ def GenerateTestImageCArrayDeclaration(
     return decls
 
 
-def GeneratePermanentAttributesDeclaration(file_name: str) -> str:
-    with open(file_name, 'rb') as perm_attr:
-        data = perm_attr.read()
-        return GetCArrayDeclaration(data, 'kPermanentAttributes')
+def GenerateBinaryFileDeclaration(file_name: str, var_name: str) -> str:
+    with open(file_name, 'rb') as bin_file:
+        data = bin_file.read()
+        return GetCArrayDeclaration(data, var_name)
 
 
 def GenerateVariableDeclarationHeader(decls: List[str], out_file: str):
@@ -192,6 +200,23 @@ def GenerateTestGptDeclaration() -> str:
         return GetCArrayDeclaration(filepath.read_bytes(), "kTestGptDisk")
 
 
+def GenerateTestUnlockChallenge() -> bytes:
+    """Generate a test unlock challenge
+
+    The test unlock challenge is generated using the test keys and
+    pre-generated fixed random data.
+    """
+    # An unlock challenge is version + product id hash + 16 byte random data
+    ret = struct.pack("<I", 1)
+    with open(PRODUCT_ID, 'rb') as product_id:
+        ret += hashlib.sha256(product_id.read()).digest()
+
+    with open(UNLOCK_CHALLENGE_RANDOM_DATA, 'rb') as random_data:
+        ret += random_data.read()
+
+    return ret
+
+
 if __name__ == '__main__':
     decls = []
     # slot images
@@ -202,7 +227,16 @@ if __name__ == '__main__':
         GenerateTestImageCArrayDeclaration('slotless', rollback_index=2))
     # permanent attributes
     decls.append(
-        GeneratePermanentAttributesDeclaration(ATX_PERMANENT_ATTRIBUTES))
+        GenerateBinaryFileDeclaration(
+            ATX_PERMANENT_ATTRIBUTES, 'kPermanentAttributes'))
+    decls.append(
+        GenerateBinaryFileDeclaration(
+            UNLOCK_CHALLENGE_RANDOM_DATA, 'kUnlockChallengeRandom'))
+    decls.append(
+        GenerateBinaryFileDeclaration(UNLOCK_CREDENTIAL, 'kUnlockCredential'))
+    decls.append(
+        GetCArrayDeclaration(
+            GenerateTestUnlockChallenge(), 'kTestUnlockChallenge'))
     decls.append(GenerateTestGptDeclaration())
     GenerateVariableDeclarationHeader(
         decls, os.path.join(MY_DIR, 'test_images.h'))

@@ -238,6 +238,16 @@ uint8_t* MockZirconBootOps::GetKernelLoadBuffer(ZirconBootOps* ops, size_t* size
   return dev->GetKernelLoadBuffer(size);
 }
 
+bool MockZirconBootOps::GetRandom(ZirconBootOps* ops, size_t num_bytes, uint8_t* output) {
+  MockZirconBootOps* dev = static_cast<MockZirconBootOps*>(ops->context);
+  if (dev->random_data_.size() < num_bytes) {
+    return false;
+  }
+
+  memcpy(output, dev->random_data_.data(), num_bytes);
+  return true;
+}
+
 ZirconBootOps MockZirconBootOps::GetZirconBootOps() {
   ZirconBootOps zircon_boot_ops;
   zircon_boot_ops.context = this;
@@ -254,6 +264,7 @@ ZirconBootOps MockZirconBootOps::GetZirconBootOps() {
   zircon_boot_ops.verified_boot_read_is_device_locked = nullptr;
   zircon_boot_ops.verified_boot_read_permanent_attributes = nullptr;
   zircon_boot_ops.verified_boot_read_permanent_attributes_hash = nullptr;
+  zircon_boot_ops.verified_boot_get_random = nullptr;
   return zircon_boot_ops;
 }
 
@@ -265,5 +276,6 @@ ZirconBootOps MockZirconBootOps::GetZirconBootOpsWithAvb() {
   zircon_boot_ops.verified_boot_read_is_device_locked = ReadIsDeviceLocked;
   zircon_boot_ops.verified_boot_read_permanent_attributes = ReadPermanentAttributes;
   zircon_boot_ops.verified_boot_read_permanent_attributes_hash = ReadPermanentAttributesHash;
+  zircon_boot_ops.verified_boot_get_random = GetRandom;
   return zircon_boot_ops;
 }
