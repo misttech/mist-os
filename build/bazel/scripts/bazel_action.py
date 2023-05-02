@@ -1012,10 +1012,17 @@ def main():
         # first bazel build command being performed in a clean build, that
         # directory might not be generated yet. To enfore this, run
         # `bazel build @legacy_ninja_build_outputs//:BUILD.bazel`
+        #
+        # Use --ui_event_filters=-info,-warning to remove a warning that is
+        # printed because Bazel will complain that BUILD.bazel file is a
+        # source file and that nothing needs to be built. However, doing
+        # this command is the only way to force Bazel to generate the
+        # repository's content.
         if not os.path.exists(legacy_inputs_repository_dir):
             ret = subprocess.run(
                 [
                     args.bazel_launcher, 'build', '--config=quiet',
+                    '--ui_event_filters=-info,-warning',
                     '@legacy_ninja_build_outputs//:BUILD.bazel'
                 ])
             ret.check_returncode()
