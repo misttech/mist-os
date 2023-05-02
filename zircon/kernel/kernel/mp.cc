@@ -38,6 +38,7 @@
 #include <kernel/stats.h>
 #include <kernel/thread_lock.h>
 #include <kernel/timer.h>
+#include <ktl/bit.h>
 #include <lk/init.h>
 #include <platform/timer.h>
 
@@ -442,24 +443,33 @@ void mp_mbx_interrupt_irq(void*) {
 zx_status_t platform_mp_cpu_hotplug(cpu_num_t cpu_id) { return arch_mp_cpu_hotplug(cpu_id); }
 
 namespace {
-ktl::atomic<uint32_t> mp_all_cpu_startup_count{0};
-Event mp_all_cpu_startup_event;
+
+// Tracks the CPUs that are "ready".
+ktl::atomic<cpu_mask_t> ready_cpu_mask{0};
+
+// Signals when all CPUs are ready.
+Event ready_cpu_event;
+
 }  // namespace
 
-static void mp_all_cpu_startup_checkin_hook(unsigned int rl) {
-  uint32_t count = mp_all_cpu_startup_count.fetch_add(1) + 1;
-  if (count >= arch_max_num_cpus()) {
-    mp_all_cpu_startup_event.Signal();
+void mp_signal_curr_cpu_ready() {
+  cpu_num_t num = arch_curr_cpu_num();
+  DEBUG_ASSERT_MSG(mp_is_cpu_active(num), "CPU %u cannot be ready if it is not yet active", num);
+  cpu_mask_t mask = cpu_num_to_mask(num);
+  cpu_mask_t ready = ready_cpu_mask.fetch_or(mask) | mask;
+  int ready_count = ktl::popcount(ready);
+  int max_count = static_cast<int>(arch_max_num_cpus());
+  DEBUG_ASSERT(ready_count <= max_count);
+  if (ready_count == max_count) {
+    ready_cpu_event.Signal();
   }
 }
 
-zx_status_t mp_wait_for_all_cpus_started(Deadline deadline) {
-  return mp_all_cpu_startup_event.Wait(deadline);
-}
+zx_status_t mp_wait_for_all_cpus_ready(Deadline deadline) { return ready_cpu_event.Wait(deadline); }
 
 static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // Before proceeding any further, wait for a _really_ long time to make sure
-  // that all of the CPUs have started.  We really don't want to start user-mode
+  // that all of the CPUs are ready.  We really don't want to start user-mode
   // until we have seen all of our CPUs start up.  In addition, there are
   // decisions to be made while setting up the VDSO which can only be made once
   // we have seen all CPUs start up and check-in.  Specifically, on ARM, we may
@@ -473,7 +483,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // environments, but not bad enough to panic the system and send it into a
   // boot-loop.
   constexpr zx_duration_t kCpuStartupTimeout = ZX_SEC(30);
-  zx_status_t status = mp_wait_for_all_cpus_started(Deadline::after(kCpuStartupTimeout));
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(kCpuStartupTimeout));
   if (status != ZX_OK) {
     const auto online_mask = mp_get_online_mask();
     KERNEL_OOPS(
@@ -496,25 +506,6 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
     }
   }
 }
-
-// Notes about the startup check-in.
-//
-// In order to know when all of the all CPUs have started, we must first
-// know the number of CPUs that we plan to start.  This happens at different
-// points in the startup process for ARM64 vs. x64.
-//
-// On ARM64, this happens indirectly during arch_init just before
-// LK_INIT_LEVEL_ARCH is executed.  This is where ZBI topology info from the
-// bootloader is processed just before before the CPUs are started.
-//
-// On x64, this happens during platform_init just before LK_INIT_LEVEL_PLATFORM.
-// ACPI topology info is parsed just before the all CPUs are started.
-//
-// The PLATFORM hook comes right after the ARCH hook, so to keep this mechanism
-// generic, we have all of our CPUs check in once we reach the PLATFORM
-// initialization level.
-LK_INIT_HOOK_FLAGS(mp_all_cpu_startup_checkin, mp_all_cpu_startup_checkin_hook,
-                   LK_INIT_LEVEL_PLATFORM, LK_INIT_FLAG_ALL_CPUS)
 
 // Before allowing the system to proceed to the USER init level, wait to be sure
 // that all of the CPUs have started and made it to the check-in point (see

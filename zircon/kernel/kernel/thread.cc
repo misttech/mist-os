@@ -1432,6 +1432,8 @@ void Thread::Current::BecomeIdle() {
   t->preemption_state().PreemptSetPending();
   arch_set_blocking_disallowed(false);
 
+  mp_signal_curr_cpu_ready();
+
   // Enable preemption to start scheduling. Preemption is disabled during early
   // threading startup on each CPU to prevent incidental thread wakeups (e.g.
   // due to logging) from rescheduling on the local CPU before the idle thread
@@ -1483,6 +1485,8 @@ void thread_secondary_cpu_entry() {
     Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
     Scheduler::RemoveFirstThread(Thread::Current::Get());
   }
+
+  mp_signal_curr_cpu_ready();
 
   // Exit from our bootstrap thread, and enter the scheduler on this cpu
   Thread::Current::Exit(0);

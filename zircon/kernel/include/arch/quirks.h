@@ -23,7 +23,7 @@
 // counter.
 //
 // Do not call this function until all of the cores have been started and had a
-// chance to identify themselves.  Use mp_wait_for_all_cpus_started
+// chance to identify themselves.  Use mp_wait_for_all_cpus_ready
 // (kernel/mp.h) to establish this if needed.
 #if __aarch64__
 bool arch_quirks_needs_arm_erratum_858921_mitigation();

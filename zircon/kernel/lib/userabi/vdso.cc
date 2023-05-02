@@ -284,7 +284,7 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
     // on all cores.
     //
     // see arch/quirks.h for details about the quirk itself.
-    const zx_status_t status = mp_wait_for_all_cpus_started(Deadline::no_slack(0));
+    const zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::no_slack(0));
     if ((status != ZX_OK) || arch_quirks_needs_arm_erratum_858921_mitigation()) {
       if (status != ZX_OK) {
         dprintf(ALWAYS,

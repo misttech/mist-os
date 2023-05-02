@@ -56,7 +56,7 @@ zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
   // The deadline here should be long enough that the secondary CPUs have had
   // ample time to startup but small enough that we don't hold up the shutdown
   // process "too long".
-  zx_status_t status = mp_wait_for_all_cpus_started(Deadline::after(ZX_SEC(5)));
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(ZX_SEC(5)));
   if (status != ZX_OK) {
     printf("failed to wait for cpus to start: %d\n", status);
   }

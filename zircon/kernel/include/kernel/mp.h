@@ -135,16 +135,24 @@ static inline bool mp_is_cpu_active(cpu_num_t cpu) {
   return mp_get_active_mask() & cpu_num_to_mask(cpu);
 }
 
-// Wait until all of the CPUs in the system have started up.
+// We say a CPU is "ready" once it is active and generally ready for tasks.
+// This function signals that the current CPU is ready, allowing for
+// synchronization based on all CPUs reaching this state.
+//
+// This function is expected to be called once - and only once - within each
+// CPU's start-up, after it has been set as active.
+void mp_signal_curr_cpu_ready();
+
+// Wait until all of the CPUs in the system are ready (i.e., once all CPUs have
+// called `mp_signal_curr_cpu_ready()`).
 //
 // Note: Do not call this until at least LK_INIT_LEVEL_PLATFORM + 1, or later.
 // PLATFORM is the point at which CPUs check in.  If a call it made to wait
 // before this, there is a chance that we are on the primary CPU and before the
 // point that CPUs have been told to start, or that we are on a secondary CPU
-// during early startup, and we have not reached our check-in point yet.
-//
+// during early start-up, and we have not reached our check-in point yet.
 // Calling this function at a point in a situation like that is a guaranteed
 // timeout.
-zx_status_t mp_wait_for_all_cpus_started(Deadline deadline);
+zx_status_t mp_wait_for_all_cpus_ready(Deadline deadline);
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_MP_H_
