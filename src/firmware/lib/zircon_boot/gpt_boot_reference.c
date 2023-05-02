@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <crc32.h>
-#include <gpt_utils.h>
 #include <lib/abr/data.h>
+#include <lib/storage/gpt_utils.h>
+#include <lib/storage/storage.h>
 #include <lib/zircon_boot/zbi_utils.h>
 #include <lib/zircon_boot/zircon_boot.h>
-#include <storage.h>
 #include <zircon/hw/gpt.h>
 
 // This file gives an example of using the firmware SDK to implement firmware for booting Zircon on

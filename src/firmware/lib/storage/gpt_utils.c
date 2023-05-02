@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "gpt_utils.h"
+#include <lib/storage/gpt_utils.h>
 
 static bool CheckAdd(size_t lhs, size_t rhs, size_t* out) {
   *out = lhs + rhs;

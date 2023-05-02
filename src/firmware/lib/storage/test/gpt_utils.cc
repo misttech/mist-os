@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "gpt_utils.h"
-
 #include <lib/fit/defer.h>
+#include <lib/storage/gpt_utils.h>
 
 #include <gtest/gtest.h>
 

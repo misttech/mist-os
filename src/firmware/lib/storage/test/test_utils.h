@@ -5,10 +5,10 @@
 #ifndef SRC_FIRMWARE_LIB_STORAGE_TEST_TEST_UTILS_H_
 #define SRC_FIRMWARE_LIB_STORAGE_TEST_TEST_UTILS_H_
 
+#include <lib/storage/storage.h>
+
 #include <memory>
 #include <vector>
-
-#include "storage.h"
 
 // A helper class that creates a buffer meeting `FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT`.
 class AlignedBuffer {

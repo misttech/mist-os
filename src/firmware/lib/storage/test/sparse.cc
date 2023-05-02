@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sparse.h"
-
 #include <lib/stdcompat/span.h>
+#include <lib/storage/gpt_utils.h>
+#include <lib/storage/sparse.h>
+#include <lib/storage/storage.h>
 #include <sparse_format.h>
 
 #include <array>
@@ -14,9 +15,7 @@
 
 #include <gtest/gtest.h>
 
-#include "gpt_utils.h"
 #include "src/firmware/lib/zircon_boot/test/test_data/test_images.h"
-#include "storage.h"
 #include "test_utils.h"
 
 // In the generated gpt data, the block size is 512

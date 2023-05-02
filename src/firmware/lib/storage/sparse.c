@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sparse.h"
-
+#include <lib/storage/gpt_utils.h>
+#include <lib/storage/sparse.h>
 #include <sparse_format.h>
 #include <string.h>
-
-#include "gpt_utils.h"
 
 // Can't reliably depend on endian macros, so just define them ourselves
 #ifndef __BYTE_ORDER__

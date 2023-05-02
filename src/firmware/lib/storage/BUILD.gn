@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 import("//build/cpp/sdk_source_set.gni")
 
+# include scheme should be lib/storage/*.h
 config("includes") {
-  include_dirs = [ "." ]
+  include_dirs = [ "//src/firmware" ]
 }
 
 sdk_source_set("storage") {
@@ -18,6 +19,7 @@ sdk_source_set("storage") {
   ]
   sdk_name = "firmware_sdk_storage"
   category = "experimental"
+  include_base = "//src/firmware"
   public_deps = [
     "//third_party/android/platform/system:sparse_format",
     "//third_party/vboot_reference/firmware/lib:gpt_misc",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "storage.h"
+#include <lib/storage/storage.h>
 
 #ifdef ENABLE_FIRMWARE_STORAGE_LOG
 #define firmware_storage_log printf
@@ -75,7 +75,7 @@ static bool ReadWithAlignedOffsetAndDma(FuchsiaFirmwareStorage* ops, size_t offs
 }
 
 // Second, relax both the `offset` and `size` alignment requirement, assume aligned buffer.
-bool ReadWithAlignedDma(FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* dst) {
+static bool ReadWithAlignedDma(FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* dst) {
   if (FIRMWARE_STORAGE_IS_ALIGNED(offset, ops->block_size)) {
     return ReadWithAlignedOffsetAndDma(ops, offset, size, dst);
   }
@@ -235,7 +235,8 @@ static void RotateMemoryLeft(uint8_t* mem, size_t size, size_t rotate);
 // A write API that relaxes the `size` and `offset` alignment requirement and only assumes aligned
 // buffer. The `src` buffer needs to be non-const because it needs to be temporarily modified
 // internally.
-bool WriteWithAlignedDma(FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* src) {
+static bool WriteWithAlignedDma(FuchsiaFirmwareStorage* ops, size_t offset, size_t size,
+                                void* src) {
   if (FIRMWARE_STORAGE_IS_ALIGNED(offset, ops->block_size)) {
     return WriteWithAlignedOffsetAndDma(ops, offset, size, src);
   }

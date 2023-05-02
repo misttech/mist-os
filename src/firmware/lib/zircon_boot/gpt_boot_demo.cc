@@ -5,9 +5,9 @@
 // This file sets up an executable to run the example in
 // src/firmware/lib/zircon_boot/gpt_boot_reference.c. See the source file for detail explanation.
 
-#include <gpt_utils.h>
+#include <lib/storage/gpt_utils.h>
+#include <lib/storage/storage.h>
 #include <lib/zircon_boot/zircon_boot.h>
-#include <storage.h>
 
 #include <atomic>
 #include <chrono>
