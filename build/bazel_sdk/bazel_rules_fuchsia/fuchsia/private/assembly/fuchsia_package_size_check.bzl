@@ -12,8 +12,8 @@ def _fuchsia_package_size_check_impl(ctx):
     images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
 
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-    size_report = ctx.actions.declare_file(ctx.label.name + "_size_report_blobfs.json")
-    verbose_output = ctx.actions.declare_file(ctx.label.name + "_verbose_output_blobfs.json")
+    size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
+    verbose_output = ctx.actions.declare_file(ctx.label.name + "_verbose_output.json")
     budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
     size_checker_file = ctx.file.size_checker_file
     platform_aibs = ctx.attr.product_image[FuchsiaProductImageInfo].platform_aibs

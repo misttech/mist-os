@@ -66,7 +66,7 @@ def _fuchsia_update_package_impl(ctx):
         progress_message = "Create update package for %s" % ctx.label.name,
     )
     return [
-        DefaultInfo(files = depset(direct = outputs)),
+        DefaultInfo(files = depset(direct = outputs + inputs)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
             all_files = depset([out_dir, ffx_isolate_dir] + inputs),
