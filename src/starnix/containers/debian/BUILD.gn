@@ -3,21 +3,22 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/storage/ext4/ext4_to_pkg.gni")
 
 group("debian") {
   deps = [ ":debian_package" ]
 }
 
-resource("system_image") {
+ext4_to_pkg("system_image") {
   if (target_cpu == "x64") {
-    sources = [ "//prebuilt/starnix/linux-amd64/amd64_system.img" ]
+    input = "//prebuilt/starnix/linux-amd64/amd64_system.img"
   } else if (target_cpu == "arm64") {
-    sources = [ "//prebuilt/starnix/linux-arm64/arm64_system.img" ]
+    input = "//prebuilt/starnix/linux-arm64/arm64_system.img"
   } else {
     # Define an empty value to allow builds for "other" target_cpus.
-    sources = []
+    input = ""
   }
-  outputs = [ "data/system.img" ]
+  prefix = "data/system"
 }
 
 fuchsia_package_with_single_component("debian_package") {

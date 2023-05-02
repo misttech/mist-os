@@ -12,7 +12,7 @@
         init: [],
         kernel_cmdline: "",
         mounts: [
-            "/:ext4:data/system.img",
+            "/:remote_bundle:data/system",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/dev/pts:devpts",
