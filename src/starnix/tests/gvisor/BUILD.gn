@@ -10,12 +10,15 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 
 group("tests") {
   testonly = true
-  if (target_cpu == "x64" && !is_asan) {
-    deps = [ ":starnix_gvisor_tests" ]
-    if (data_filesystem_format == "fxfs") {
-      deps += [ ":starnix_gvisor_tests_on_fxfs" ]
-    }
-  }
+  deps = []
+
+  # Disabled until roller has rolled backwards-incompatible binaries.
+  # if (target_cpu == "x64" && !is_asan) {
+  # deps = [ ":starnix_gvisor_tests" ]
+  # if (data_filesystem_format == "fxfs") {
+  # deps += [ ":starnix_gvisor_tests_on_fxfs" ]
+  # }
+  # }
 }
 
 gvisor_tests = [
