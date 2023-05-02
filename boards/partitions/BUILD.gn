@@ -59,7 +59,7 @@ generated_partitions_config("x64-fxfs") {
   hw_revision = "x64"
 
   forward_variables_from(_standard_names, "*", [ "fvm" ])
-  fxfs = "fxfs"
+  fxfs = "fvm"
 }
 
 generated_partitions_config("arm64") {

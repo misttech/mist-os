@@ -6,6 +6,6 @@ import("x64.gni")
 
 fxfs_blob = true
 fvm_partition = ""
-fxfs_partition = "fxfs"
+fxfs_partition = "fvm"
 partitions_config_label = "//boards/partitions:x64-fxfs"
 images_config_label = "//boards/images:x64-fxfs"

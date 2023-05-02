@@ -78,6 +78,7 @@ legacy_fuchsia_image_metadata_overrides = {
       name = "storage-full"
       type = "fxfs-blk"
       archive = add_qemu_to_build_archives
+      fastboot_flash = [ fxfs_partition ]
     }
   } else {
     fvm = {

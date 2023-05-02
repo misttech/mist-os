@@ -188,7 +188,20 @@ foreach(info, firmware_info) {
     },
   ]
 }
-if (supports_fastboot_fvm) {
+if (fxfs_blob) {
+  flash_script_args += [
+    "--fvm-image=" + rebase_path(files.fxfs, root_build_dir),
+    "--fvm=${fxfs_partition}",
+  ]
+  flash_script_deps += [ "//build/images/fuchsia" ]
+
+  parts += [
+    {
+      name = fxfs_partition
+      path = rebase_path(files.fxfs, root_build_dir)
+    },
+  ]
+} else if (supports_fastboot_fvm) {
   flash_script_args += [
     "--fvm-image=" + rebase_path(files.fvm_fastboot, root_build_dir),
     "--fvm=${fvm_partition}",

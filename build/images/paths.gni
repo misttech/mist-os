@@ -80,7 +80,8 @@ labels = {
   qemu_kernel = _qemu_kernel_target
 }
 
-supports_fastboot_fvm = fvm_partition != "" && !use_bringup_assembly
+supports_fastboot_fvm =
+    !fxfs_blob && fvm_partition != "" && !use_bringup_assembly
 
 # These are the common assembly-related files.
 files = {
