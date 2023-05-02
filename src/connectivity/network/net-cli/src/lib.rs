@@ -286,7 +286,7 @@ async fn do_if<C: NetCliDepsConnector>(
             }
             let response = response.into_values().map(|properties| async {
                 let finterfaces_ext::Properties { id, .. } = &properties;
-                let mac = debug_interfaces.get_mac(*id).await.context("call get_mac")?;
+                let mac = debug_interfaces.get_mac(id.get()).await.context("call get_mac")?;
                 Ok::<_, Error>((properties, mac))
             });
             let response = futures::future::try_join_all(response).await?;
@@ -324,7 +324,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 }
                 finterfaces_ext::InterfaceState::Known(properties) => {
                     let finterfaces_ext::Properties { id, .. } = &properties;
-                    let mac = debug_interfaces.get_mac(*id).await.context("call get_mac")?;
+                    let mac = debug_interfaces.get_mac(id.get()).await.context("call get_mac")?;
                     match mac {
                         Err(fdebug::InterfacesGetMacError::NotFound) => {
                             return Err(user_facing_error(format!(
@@ -1521,7 +1521,7 @@ mod tests {
     ) -> (finterfaces_ext::Properties, Option<fnet::MacAddress>) {
         (
             finterfaces_ext::Properties {
-                id,
+                id: id.try_into().unwrap(),
                 name: name.to_string(),
                 device_class,
                 online: true,
@@ -1581,7 +1581,7 @@ mod tests {
         .into_iter()
         .map(|(properties, _): (_, Option<fnet::MacAddress>)| {
             let finterfaces_ext::Properties { id, .. } = &properties;
-            (*id, properties)
+            (id.get(), properties)
         })
         .collect();
         let () = shortlist_interfaces(name_pattern, &mut interfaces);
@@ -2327,7 +2327,7 @@ mac             -
                          has_default_ipv6_route,
                      }| {
                         finterfaces::Event::Existing(finterfaces::Properties {
-                            id: Some(id),
+                            id: Some(id.get()),
                             name: Some(name),
                             device_class: Some(device_class),
                             online: Some(online),
@@ -2360,7 +2360,7 @@ mac             -
                 let () = responder
                     .send(
                         &mut mac_addresses
-                            .get(&id)
+                            .get(&id.try_into().unwrap())
                             .copied()
                             .map(|option| option.map(Box::new))
                             .ok_or(fdebug::InterfacesGetMacError::NotFound),

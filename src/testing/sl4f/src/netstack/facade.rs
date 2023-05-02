@@ -101,7 +101,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
                 },
             );
         Self {
-            id,
+            id: id.get(),
             name,
             device_class,
             online,
@@ -207,12 +207,14 @@ impl NetstackFacade {
         let interfaces_state = self.get_interfaces_state().await?;
         let debug_interfaces = self.get_debug_interfaces().await?;
         let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(interfaces_state)?;
-        let response =
-            fidl_fuchsia_net_interfaces_ext::existing(stream, std::collections::HashMap::new())
-                .await?;
+        let response = fidl_fuchsia_net_interfaces_ext::existing(
+            stream,
+            std::collections::HashMap::<u64, _>::new(),
+        )
+        .await?;
         let response = response.into_values().map(|properties| async {
             let fidl_fuchsia_net_interfaces_ext::Properties { id, .. } = &properties;
-            match debug_interfaces.get_mac(*id).await? {
+            match debug_interfaces.get_mac(id.get()).await? {
                 Ok(mac) => {
                     let mac = mac.map(|boxed_mac| *boxed_mac);
                     let view: Properties = (properties, mac).into();

@@ -675,7 +675,7 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
 
                 if online {
                     bridge
-                        .handle_interface_online(id, allowed_for_bridge_upstream)
+                        .handle_interface_online(id.get(), allowed_for_bridge_upstream)
                         .await
                         .context("handle new interface online")?;
                 }
@@ -692,13 +692,13 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                 match (*previously_online, online) {
                     (Some(false), true) => {
                         bridge
-                            .handle_interface_online(id, allowed_for_bridge_upstream)
+                            .handle_interface_online(id.get(), allowed_for_bridge_upstream)
                             .await
                             .context("handle interface online")?;
                     }
                     (Some(true), false) => {
                         bridge
-                            .handle_interface_offline(id, allowed_for_bridge_upstream)
+                            .handle_interface_offline(id.get(), allowed_for_bridge_upstream)
                             .await
                             .context("handle interface offline")?;
                     }
@@ -714,7 +714,10 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                 id,
                 ..
             }) => {
-                bridge.handle_interface_removed(*id).await.context("handle interface removed")?;
+                bridge
+                    .handle_interface_removed(id.get())
+                    .await
+                    .context("handle interface removed")?;
             }
             fnet_interfaces_ext::UpdateResult::NoChange => {}
         }

@@ -135,7 +135,7 @@ async fn inspect_nic<N: Netstack>(name: &str) {
     let (loopback_props, netdev_props) = fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
             .expect("failed to create event stream"),
-        &mut HashMap::new(),
+        &mut HashMap::<u64, _>::new(),
         |if_map| {
             let loopback =
                 if_map.values().find_map(|properties| match properties.device_class {

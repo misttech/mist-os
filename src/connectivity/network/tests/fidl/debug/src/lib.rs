@@ -29,7 +29,7 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
     } = realm.loopback_properties().await.expect("loopback properties").expect("loopback missing");
-    id
+    id.get()
 }
 
 #[netstack_test]

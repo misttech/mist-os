@@ -433,7 +433,7 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 .any(|NetworkClient { interface_map, network_proxy: _ }| !interface_map.is_empty())
             {
                 if step.may_reconstruct_bridge() {
-                    let mut interfaces_map = HashMap::new();
+                    let mut interfaces_map = HashMap::<u64, _>::new();
                     let bridge_id = fnet_interfaces_ext::wait_interface(
                         fnet_interfaces_ext::event_stream_from_state(&host_interfaces_state)
                             .expect("initialize interface event stream"),
@@ -452,7 +452,9 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                                     match device_class {
                                         fnet_interfaces::DeviceClass::Device(
                                             fhardware_network::DeviceClass::Bridge,
-                                        ) if Some(id) != bridge.as_ref().map(ping::Node::id) => {
+                                        ) if Some(id.get())
+                                            != bridge.as_ref().map(ping::Node::id) =>
+                                        {
                                             Some(id)
                                         }
                                         _ => None,
@@ -463,11 +465,16 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                     )
                     .await
                     .expect("failed to wait for bridge interface");
-                    let v6_ll = interfaces::wait_for_v6_ll(&host_interfaces_state, bridge_id)
+                    let v6_ll = interfaces::wait_for_v6_ll(&host_interfaces_state, bridge_id.get())
                         .await
                         .expect("failed to wait for IPv6 link-local address on bridge");
 
-                    bridge = Some(ping::Node::new(&host_realm, bridge_id, Vec::new(), vec![v6_ll]));
+                    bridge = Some(ping::Node::new(
+                        &host_realm,
+                        bridge_id.get(),
+                        Vec::new(),
+                        vec![v6_ll],
+                    ));
                 }
 
                 let nodes = futures::stream::iter(

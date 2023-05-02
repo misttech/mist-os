@@ -1283,7 +1283,7 @@ mod tests {
         internet_ping_address: std::net::IpAddr,
     ) -> State {
         let properties = &fnet_interfaces_ext::Properties {
-            id: interface_id,
+            id: interface_id.try_into().expect("should be nonzero"),
             name: name.to_string(),
             device_class: fnet_interfaces::DeviceClass::Device(
                 fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
@@ -1338,7 +1338,7 @@ mod tests {
                     error!("begin had an issue calculating state: {:?}", e)
                 }
             }
-            monitor.state().get(properties.id)
+            monitor.state().get(properties.id.get())
         };
 
         futures::pin_mut!(network_check_fut);
@@ -1783,7 +1783,7 @@ mod tests {
     #[test]
     fn test_network_check_varying_properties() {
         let properties = fnet_interfaces_ext::Properties {
-            id: ID1,
+            id: ID1.try_into().expect("should be nonzero"),
             name: ETHERNET_INTERFACE_NAME.to_string(),
             device_class: fnet_interfaces::DeviceClass::Device(
                 fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
@@ -1841,7 +1841,7 @@ mod tests {
         let got = run_network_check(
             &mut exec,
             &fnet_interfaces_ext::Properties {
-                id: ID1,
+                id: ID1.try_into().expect("should be nonzero"),
                 name: NON_ETHERNET_INTERFACE_NAME.to_string(),
                 device_class: fnet_interfaces::DeviceClass::Device(
                     fidl_fuchsia_hardware_network::DeviceClass::Virtual,

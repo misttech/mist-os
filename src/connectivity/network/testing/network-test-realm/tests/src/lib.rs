@@ -452,7 +452,7 @@ async fn add_interface(
         let ifaces_state = fnet_interfaces_ext::existing(
             fnet_interfaces_ext::event_stream_from_state(&hermetic_network_state_proxy)
                 .expect("failed getting interfaces event stream"),
-            HashMap::new(),
+            HashMap::<u64, _>::new(),
         )
         .await
         .expect("failed getting existing interfaces state");

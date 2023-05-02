@@ -593,14 +593,14 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         IpInvariant((loopback_id, interface_id)),
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v4::<N>(loopback_id)
+                initial_loopback_routes_v4::<N>(loopback_id.get())
                     .chain(initial_ethernet_routes_v4(interface_id))
                     .collect::<Vec<_>>(),
             )
         },
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v6::<N>(loopback_id)
+                initial_loopback_routes_v6::<N>(loopback_id.get())
                     .chain(initial_ethernet_routes_v6(interface_id))
                     .collect::<Vec<_>>(),
             )

@@ -69,7 +69,7 @@ pub fn is_globally_routable(
 pub fn to_reachability_stream(
     event_stream: impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
 ) -> impl Stream<Item = Result<bool, WatcherOperationError<HashMap<u64, Properties>>>> {
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
     let mut reachable = None;
     let mut reachable_ids = HashSet::new();
     event_stream.map_err(WatcherOperationError::EventStream).try_filter_map(move |event| {

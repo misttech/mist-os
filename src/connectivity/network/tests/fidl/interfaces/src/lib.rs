@@ -53,7 +53,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                 Expectation::Loopback(id) => {
                     other
                         == &fidl_fuchsia_net_interfaces_ext::Properties {
-                            id: *id,
+                            id: (*id).try_into().expect("should be nonzero"),
                             name: "lo".to_owned(),
                             device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
                                 fidl_fuchsia_net_interfaces::Empty,
@@ -97,7 +97,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                         valid_until: zx::sys::ZX_TIME_INFINITE,
                     }) && *online
                         && name == rhs_name
-                        && id == rhs_id
+                        && id == &rhs_id.get()
                         && has_default_ipv4_route == rhs_ipv4_route
                         && has_default_ipv6_route == rhs_ipv6_route
                         && device_class
@@ -114,7 +114,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
         .expect("connect to protocol");
 
     let mut eps = Vec::new();
-    let mut expectations = HashMap::new();
+    let mut expectations = HashMap::<u64, _>::new();
     for (idx, (has_default_ipv4_route, has_default_ipv6_route)) in
         [true, false].into_iter().cartesian_product([true, false]).enumerate()
     {
@@ -202,7 +202,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
             .expect("get interface event stream"),
-        &mut HashMap::new(),
+        &mut HashMap::<u64, _>::new(),
         |properties_map| {
             (properties_map
                 .iter()
@@ -231,7 +231,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     let mut interfaces = fidl_fuchsia_net_interfaces_ext::existing(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
             .expect("get interface event stream"),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("fetch existing interfaces");
@@ -243,7 +243,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
         );
     }
 
-    assert_eq!(interfaces, HashMap::new());
+    assert_eq!(interfaces, HashMap::<u64, _>::new());
 }
 
 #[netstack_test]
@@ -262,14 +262,14 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
         event_stream
     };
 
-    let interfaces = fidl_fuchsia_net_interfaces_ext::existing(stream, HashMap::new())
+    let interfaces = fidl_fuchsia_net_interfaces_ext::existing(stream, HashMap::<u64, _>::new())
         .await
         .expect("collect interfaces");
     let expected = match N::VERSION {
         NetstackVersion::Netstack3 | NetstackVersion::Netstack2 => std::iter::once((
             1,
             fidl_fuchsia_net_interfaces_ext::Properties {
-                id: 1,
+                id: 1.try_into().expect("should be nonzero"),
                 name: "lo".to_owned(),
                 device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
                     fidl_fuchsia_net_interfaces::Empty,
@@ -319,7 +319,7 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
         .expect("get interface event stream");
     futures::pin_mut!(event_stream);
 
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
         event_stream.by_ref(),
         &mut if_map,
@@ -357,7 +357,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
     let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("get interface event stream");
     futures::pin_mut!(event_stream);
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
     fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
         if_map.contains_key(&id).then_some(())
     })
@@ -441,7 +441,7 @@ async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str,
     let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("get interface event stream");
     futures::pin_mut!(event_stream);
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
         event_stream.by_ref(),
         &mut if_map,
@@ -473,7 +473,7 @@ async fn test_down_close_race<N: Netstack>(name: &str) {
     let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("event stream from state");
     futures::pin_mut!(event_stream);
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
 
     for _ in 0..10u64 {
         let dev = sandbox
@@ -540,7 +540,7 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
     let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("get interface event stream");
     futures::pin_mut!(event_stream);
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, _>::new();
     for _ in 0..10u64 {
         let dev = net
             .create_endpoint("ep")
@@ -656,7 +656,7 @@ async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let mut existing = fidl_fuchsia_net_interfaces_ext::existing(
         event_stream.by_ref().map(std::result::Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");
@@ -723,7 +723,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         event_stream.by_ref().map(std::result::Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");

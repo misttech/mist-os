@@ -2822,7 +2822,7 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let stream = fnet_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("error getting interface state event stream");
     futures::pin_mut!(stream);
-    let mut state = std::collections::HashMap::new();
+    let mut state = std::collections::HashMap::<u64, _>::new();
 
     // Wait for the interface to be present.
     fnet_interfaces_ext::wait_interface(stream.by_ref(), &mut state, |interfaces| {

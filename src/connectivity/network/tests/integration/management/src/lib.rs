@@ -345,7 +345,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
                 .expect("get interface event stream");
         futures::pin_mut!(event_stream);
-        let mut if_map = HashMap::new();
+        let mut if_map = HashMap::<u64, _>::new();
         let (wlan_ap_id, wlan_ap_name) = fidl_fuchsia_net_interfaces_ext::wait_interface(
             event_stream.by_ref(),
             &mut if_map,

@@ -218,10 +218,11 @@ where
 
         let interface = view.properties.id;
 
-        let InterfaceState { diagnostics_state } = match interfaces.entry(interface) {
+        let InterfaceState { diagnostics_state } = match interfaces.entry(interface.get()) {
             std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
             std::collections::hash_map::Entry::Vacant(vacant) => vacant.insert(InterfaceState {
-                diagnostics_state: Self::initialize_interface_state(now, sys, interface).await,
+                diagnostics_state: Self::initialize_interface_state(now, sys, interface.get())
+                    .await,
             }),
         };
 
@@ -282,7 +283,7 @@ where
         let mut neighbors = neighbors.as_ref()?.iter_health();
         let found_healthy_gateway = neighbors
             .fold_while(None, |found_healthy_gateway, (neighbor, health)| {
-                let is_router = routes.device_routes(interface).any(|route| {
+                let is_router = routes.device_routes(interface.get()).any(|route| {
                     route.next_hop.map(|next_hop| *neighbor == next_hop).unwrap_or(false)
                 });
 
@@ -838,7 +839,7 @@ mod tests {
         ) -> Self {
             Self {
                 properties: fnet_interfaces_ext::Properties {
-                    id,
+                    id: id.try_into().expect("should be nonzero"),
                     name: "foo".to_owned(),
                     device_class: fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}),
                     online: true,

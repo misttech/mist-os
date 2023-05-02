@@ -264,10 +264,11 @@ async fn find_interface_id_and_status(
         fntr::Error::Internal
     })?;
 
-    let interfaces = fnet_interfaces_ext::existing(stream, HashMap::new()).await.map_err(|e| {
-        error!("failed to read existing interfaces: {:?}", e);
-        fntr::Error::Internal
-    })?;
+    let interfaces =
+        fnet_interfaces_ext::existing(stream, HashMap::<u64, _>::new()).await.map_err(|e| {
+            error!("failed to read existing interfaces: {:?}", e);
+            fntr::Error::Internal
+        })?;
 
     let debug_interfaces_proxy = connector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
 
@@ -277,7 +278,7 @@ async fn find_interface_id_and_status(
         interfaces_stream.filter_map(|fnet_interfaces_ext::Properties { id, online, .. }| {
             let debug_interfaces_proxy = &debug_interfaces_proxy;
             async move {
-                match debug_interfaces_proxy.get_mac(id).await {
+                match debug_interfaces_proxy.get_mac(id.get()).await {
                     Err(e) => {
                         let _: fidl::Error = e;
                         warn!("get_mac failure: {:?}", e);
@@ -290,7 +291,7 @@ async fn find_interface_id_and_status(
                         }
                         Ok(mac_address) => mac_address.and_then(|mac_address| {
                             (mac_address.octets == expected_mac_address.octets)
-                                .then(move || (id, online))
+                                .then(move || (id.get(), online))
                         }),
                     },
                 }

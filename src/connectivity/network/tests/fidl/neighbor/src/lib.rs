@@ -76,7 +76,7 @@ async fn create_realm<'a>(
     // Get IPv6 address.
     let ipv6 = fidl_fuchsia_net_interfaces_ext::wait_interface(
         ep.get_interface_event_stream().expect("get interface event stream"),
-        &mut std::collections::HashMap::new(),
+        &mut std::collections::HashMap::<u64, _>::new(),
         |interfaces| {
             interfaces.get(&ep.id())?.addresses.iter().find_map(
                 |&fidl_fuchsia_net_interfaces_ext::Address {
@@ -92,7 +92,7 @@ async fn create_realm<'a>(
     .await
     .expect("failed to retrieve IPv6 address");
 
-    NeighborRealm { realm, ep, ipv6, loopback_id }
+    NeighborRealm { realm, ep, ipv6, loopback_id: loopback_id.get() }
 }
 
 /// Helper function that creates two realms in the same `network` with

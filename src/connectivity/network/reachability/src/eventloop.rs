@@ -444,7 +444,7 @@ impl EventLoop {
                 )
                 .await;
 
-                return Ok(Some(id));
+                return Ok(Some(id.get()));
             }
             fnet_interfaces_ext::UpdateResult::Changed {
                 previous:
@@ -494,7 +494,7 @@ impl EventLoop {
                 }
             }
             fnet_interfaces_ext::UpdateResult::Removed(properties) => {
-                self.watchdog.handle_interface_removed(properties.id);
+                self.watchdog.handle_interface_removed(properties.id.get());
                 self.monitor.handle_interface_removed(properties);
             }
             fnet_interfaces_ext::UpdateResult::NoChange => {}
@@ -555,7 +555,7 @@ impl EventLoop {
         let view = InterfaceView {
             properties,
             routes,
-            neighbors: neighbor_cache.get_interface_neighbors(properties.id),
+            neighbors: neighbor_cache.get_interface_neighbors(properties.id.get()),
         };
 
         // TODO(fxbug.dev/123564): Move watchdog into its own future in the eventloop to prevent

@@ -10,7 +10,10 @@ use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
-use std::convert::{TryFrom as _, TryInto as _};
+use std::{
+    convert::{TryFrom as _, TryInto as _},
+    num::NonZeroU64,
+};
 
 pub(crate) mod dhcpd;
 pub(crate) mod dns;
@@ -153,11 +156,14 @@ impl InterfaceIdentifier {
             Self::Name(name) => {
                 let interfaces_state = crate::connect_with_context(connector).await?;
                 let stream = finterfaces_ext::event_stream_from_state(&interfaces_state)?;
-                let response =
-                    finterfaces_ext::existing(stream, std::collections::HashMap::new()).await?;
+                let response = finterfaces_ext::existing(
+                    stream,
+                    std::collections::HashMap::<NonZeroU64, _>::new(),
+                )
+                .await?;
                 response
                     .values()
-                    .find_map(|interface| (&interface.name == name).then(|| interface.id))
+                    .find_map(|interface| (&interface.name == name).then(|| interface.id.get()))
                     .ok_or_else(|| user_facing_error(format!("No interface with name {}", name)))
             }
         }

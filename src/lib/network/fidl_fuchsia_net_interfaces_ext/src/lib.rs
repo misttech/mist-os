@@ -19,6 +19,7 @@ use fuchsia_zircon_types as zx;
 use futures::{Stream, TryStreamExt as _};
 use std::collections::hash_map::{self, HashMap};
 use std::convert::TryFrom as _;
+use std::num::NonZeroU64;
 use thiserror::Error;
 
 // TODO(https://fxbug.dev/66175): Prevent this type from becoming stale.
@@ -28,7 +29,7 @@ use thiserror::Error;
 pub struct Properties {
     /// An opaque identifier for the interface. Its value will not be reused
     /// even if the device is removed and subsequently re-added. Immutable.
-    pub id: u64,
+    pub id: NonZeroU64,
     /// The name of the interface. Immutable.
     pub name: String,
     /// The device class of the interface. Immutable.
@@ -103,6 +104,9 @@ pub enum UpdateError {
     /// The event removed an interface that did not exist in local state.
     #[error("unknown interface with id {0} deleted")]
     UnknownRemoved(u64),
+    /// The event included an interface id = 0, which should never happen.
+    #[error("encountered 0 interface id")]
+    ZeroInterfaceId,
 }
 
 /// The result of updating network interface state with an event.
@@ -164,7 +168,7 @@ impl Update for Properties {
                     ..
                 } = &mut change;
                 if let Some(id) = *id {
-                    if self.id == id {
+                    if self.id.get() == id {
                         let mut changed = false;
                         macro_rules! swap_if_some {
                             ($field:ident) => {
@@ -222,7 +226,7 @@ impl Update for Properties {
                 }
             }
             fnet_interfaces::Event::Removed(removed_id) => {
-                if self.id == removed_id {
+                if self.id.get() == removed_id {
                     return Err(UpdateError::Removed);
                 }
             }
@@ -247,14 +251,14 @@ impl Update for InterfaceState {
             InterfaceState::Unknown(id) => match event {
                 fnet_interfaces::Event::Existing(existing) => {
                     let existing = Properties::try_from(existing)?;
-                    if existing.id == *id {
+                    if existing.id.get() == *id {
                         *self = InterfaceState::Known(existing);
                         return Ok(UpdateResult::Existing(get_properties(self)));
                     }
                 }
                 fnet_interfaces::Event::Added(added) => {
                     let added = Properties::try_from(added)?;
-                    if added.id == *id {
+                    if added.id.get() == *id {
                         *self = InterfaceState::Known(added);
                         return Ok(UpdateResult::Added(get_properties(self)));
                     }
@@ -281,12 +285,31 @@ impl Update for InterfaceState {
     }
 }
 
-impl Update for HashMap<u64, Properties> {
+trait TryFromMaybeNonzero: Sized {
+    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError>;
+}
+
+impl TryFromMaybeNonzero for u64 {
+    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError> {
+        Ok(value)
+    }
+}
+
+impl TryFromMaybeNonzero for NonZeroU64 {
+    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError> {
+        NonZeroU64::new(value).ok_or(UpdateError::ZeroInterfaceId)
+    }
+}
+
+impl<K> Update for HashMap<K, Properties>
+where
+    K: TryFromMaybeNonzero + Copy + From<NonZeroU64> + Eq + std::hash::Hash,
+{
     fn update(&mut self, event: fnet_interfaces::Event) -> Result<UpdateResult<'_>, UpdateError> {
         match event {
             fnet_interfaces::Event::Existing(existing) => {
                 let existing = Properties::try_from(existing)?;
-                match self.entry(existing.id) {
+                match self.entry(existing.id.into()) {
                     hash_map::Entry::Occupied(_) => {
                         Err(UpdateError::DuplicateExisting(existing.into()))
                     }
@@ -297,7 +320,7 @@ impl Update for HashMap<u64, Properties> {
             }
             fnet_interfaces::Event::Added(added) => {
                 let added = Properties::try_from(added)?;
-                match self.entry(added.id) {
+                match self.entry(added.id.into()) {
                     hash_map::Entry::Occupied(_) => Err(UpdateError::DuplicateAdded(added.into())),
                     hash_map::Entry::Vacant(entry) => Ok(UpdateResult::Added(entry.insert(added))),
                 }
@@ -308,14 +331,14 @@ impl Update for HashMap<u64, Properties> {
                 } else {
                     return Err(UpdateError::MissingId(change));
                 };
-                if let Some(properties) = self.get_mut(&id) {
+                if let Some(properties) = self.get_mut(&K::try_from_maybe_nonzero(id)?) {
                     properties.update(fnet_interfaces::Event::Changed(change))
                 } else {
                     Err(UpdateError::UnknownChanged(change))
                 }
             }
             fnet_interfaces::Event::Removed(removed_id) => {
-                if let Some(properties) = self.remove(&removed_id) {
+                if let Some(properties) = self.remove(&K::try_from_maybe_nonzero(removed_id)?) {
                     Ok(UpdateResult::Removed(properties))
                 } else {
                     Err(UpdateError::UnknownRemoved(removed_id))
@@ -596,7 +619,7 @@ mod tests {
         );
     }
 
-    #[test_case(&mut HashMap::new(); "hashmap")]
+    #[test_case(&mut HashMap::<u64, _>::new(); "hashmap")]
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
     fn test_unknown_error(state: &mut impl Update) {
         let unknown =
@@ -620,7 +643,7 @@ mod tests {
         );
     }
 
-    #[test_case(&mut HashMap::new(); "hashmap")]
+    #[test_case(&mut HashMap::<u64, _>::new(); "hashmap")]
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]

@@ -126,7 +126,7 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
 
     let (control, server_end) =
         fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
-    let () = debug.get_admin(loopback_id, server_end).expect("get admin");
+    let () = debug.get_admin(loopback_id.get(), server_end).expect("get admin");
 
     futures::stream::iter([IPV4_LOOPBACK, IPV6_LOOPBACK].into_iter())
         .for_each_concurrent(None, |mut addr| {

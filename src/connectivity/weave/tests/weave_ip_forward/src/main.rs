@@ -46,7 +46,7 @@ fn get_interface_id(
                  addresses: _,
                  has_default_ipv4_route: _,
                  has_default_ipv6_route: _,
-             }| if name == want_name { Some(*id) } else { None },
+             }| if name == want_name { Some(id.get()) } else { None },
         )
         .ok_or(anyhow::format_err!("failed to find {}", want_name))
 }

@@ -122,7 +122,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             mac,
         ) = t;
         InterfaceView {
-            nicid: id,
+            nicid: id.get(),
             name,
             device_class: device_class.into(),
             online,

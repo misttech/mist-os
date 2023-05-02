@@ -266,7 +266,7 @@ pub async fn setup_masquerade_nat_network<'a>(
                 has_default_ipv4_route: _,
                 has_default_ipv6_route: _,
             }) => {
-                assert_eq!(*id, router_ep2_id);
+                assert_eq!(id.get(), router_ep2_id);
                 name.clone()
             }
             fnet_interfaces_ext::InterfaceState::Unknown(id) => {
@@ -288,7 +288,7 @@ pub async fn setup_masquerade_nat_network<'a>(
                  has_default_ipv4_route: _,
                  has_default_ipv6_route: _,
              }| {
-                assert_eq!(*id, router_ep2_id);
+                assert_eq!(id.get(), router_ep2_id);
                 None
             },
         )

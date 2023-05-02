@@ -82,7 +82,7 @@ impl EventQueue {
             } = state;
             finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
-                    id: id.get(),
+                    id: *id,
                     name: name.clone(),
                     device_class: device_class.clone(),
                     online: *online,
@@ -431,7 +431,7 @@ impl Worker {
                     Some(old) => Err(WorkerError::AddedDuplicateInterface { interface: id, old }),
                     None => Ok(Some(finterfaces::Event::Added(
                         finterfaces_ext::Properties {
-                            id: id.get(),
+                            id,
                             name,
                             device_class,
                             online,
@@ -767,7 +767,7 @@ mod tests {
             watcher.next().await,
             Some(finterfaces::Event::Added(
                 finterfaces_ext::Properties {
-                    id: IFACE1_ID.get(),
+                    id: IFACE1_ID,
                     addresses: Vec::new(),
                     online: false,
                     device_class: IFACE1_CLASS,
@@ -850,7 +850,7 @@ mod tests {
             new_watcher.next().await,
             Some(finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
-                    id: IFACE1_ID.get(),
+                    id: IFACE1_ID,
                     name: IFACE1_NAME.to_string(),
                     device_class: IFACE1_CLASS,
                     online: true,
@@ -945,7 +945,7 @@ mod tests {
             Worker::consume_event(&mut state, event.clone()),
             Ok(Some(finterfaces::Event::Added(
                 finterfaces_ext::Properties {
-                    id: id.get(),
+                    id,
                     name: initial_state.properties.name.clone(),
                     device_class: initial_state.properties.device_class.clone(),
                     online: false,

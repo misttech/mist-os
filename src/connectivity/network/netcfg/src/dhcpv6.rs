@@ -5,6 +5,7 @@
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
+    num::NonZeroU64,
     pin::Pin,
 };
 
@@ -29,14 +30,14 @@ use crate::{dns, DnsServerWatchers};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) struct PrefixOnInterface {
-    interface_id: u64,
+    interface_id: NonZeroU64,
     prefix: net_types::ip::Subnet<net_types::ip::Ipv6Addr>,
     lifetimes: Lifetimes,
 }
 
 pub(super) type Prefixes = HashMap<net_types::ip::Subnet<net_types::ip::Ipv6Addr>, Lifetimes>;
-pub(super) type InterfaceIdTaggedPrefixesStream = Tagged<u64, PrefixesStream>;
-pub(super) type PrefixesStreamMap = StreamMap<u64, InterfaceIdTaggedPrefixesStream>;
+pub(super) type InterfaceIdTaggedPrefixesStream = Tagged<NonZeroU64, PrefixesStream>;
+pub(super) type PrefixesStreamMap = StreamMap<NonZeroU64, InterfaceIdTaggedPrefixesStream>;
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -119,7 +120,7 @@ pub(super) fn from_fidl_prefixes(
 /// Start a DHCPv6 client for the specified host interface.
 pub(super) fn start_client(
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
-    interface_id: u64,
+    interface_id: NonZeroU64,
     sockaddr: fnet::Ipv6SocketAddress,
     prefix_delegation_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
 ) -> Result<
@@ -127,7 +128,7 @@ pub(super) fn start_client(
     errors::Error,
 > {
     let params = fnet_dhcpv6::NewClientParams {
-        interface_id: Some(interface_id),
+        interface_id: Some(interface_id.get()),
         address: Some(sockaddr),
         config: Some(fnet_dhcpv6::ClientConfig {
             information_config: Some(fnet_dhcpv6::InformationConfig {
@@ -161,7 +162,7 @@ pub(super) fn start_client(
 
 fn get_suitable_dhcpv6_prefix(
     current_prefix: Option<PrefixOnInterface>,
-    interface_states: &HashMap<u64, crate::InterfaceState>,
+    interface_states: &HashMap<NonZeroU64, crate::InterfaceState>,
     allowed_upstream_device_classes: &HashSet<crate::DeviceClass>,
     interface_config: AcquirePrefixInterfaceConfig,
 ) -> Option<PrefixOnInterface> {
@@ -223,7 +224,7 @@ fn get_suitable_dhcpv6_prefix(
                 AcquirePrefixInterfaceConfig::Upstreams => {
                     allowed_upstream_device_classes.contains(&device_class)
                 }
-                AcquirePrefixInterfaceConfig::Id(want_id) => *interface_id == want_id,
+                AcquirePrefixInterfaceConfig::Id(want_id) => interface_id.get() == want_id,
             }
             .then(|| {
                 prefixes.iter().map(|(&prefix, &lifetimes)| PrefixOnInterface {
@@ -255,7 +256,7 @@ fn get_suitable_dhcpv6_prefix(
 }
 
 pub(super) fn maybe_send_watch_prefix_response(
-    interface_states: &HashMap<u64, crate::InterfaceState>,
+    interface_states: &HashMap<NonZeroU64, crate::InterfaceState>,
     allowed_upstream_device_classes: &HashSet<crate::DeviceClass>,
     prefix_provider_handler: Option<&mut PrefixProviderHandler>,
 ) -> Result<(), anyhow::Error> {
@@ -308,11 +309,11 @@ pub(super) fn maybe_send_watch_prefix_response(
 pub(super) async fn stop_client(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
-    interface_id: u64,
+    interface_id: NonZeroU64,
     watchers: &mut DnsServerWatchers<'_>,
     prefixes_streams: &mut PrefixesStreamMap,
 ) {
-    let source = DnsServersUpdateSource::Dhcpv6 { interface_id };
+    let source = DnsServersUpdateSource::Dhcpv6 { interface_id: interface_id.get() };
 
     // Dropping all fuchsia.net.dhcpv6/Client proxies will stop the DHCPv6 client.
     let _: Pin<Box<BoxStream<'_, _>>> = watchers.remove(&source).unwrap_or_else(|| {
@@ -418,7 +419,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -426,7 +427,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -438,7 +439,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -446,7 +447,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -458,7 +459,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });
@@ -466,7 +467,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: 1,
+            interface_id: nonzero_ext::nonzero!(1u64),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -482,7 +483,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: 2,
+            interface_id: nonzero_ext::nonzero!(2u64),
             prefix: net_subnet_v6!("efff::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });
@@ -496,6 +497,7 @@ mod tests {
         want: Option<PrefixOnInterface>,
     ) {
         let interface_states = (1..)
+            .flat_map(NonZeroU64::new)
             .zip(interface_state_iter.into_iter().map(|(device_class, prefixes)| {
                 let (control, _control_server_end) =
                     fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()

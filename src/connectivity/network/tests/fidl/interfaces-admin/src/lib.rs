@@ -220,7 +220,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
         .expect("loopback not found");
 
     let control = realm
-        .interface_control(loopback_id)
+        .interface_control(loopback_id.get())
         .expect("failed to get loopback interface control client proxy");
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
@@ -783,7 +783,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
     assert_eq!(
         properties,
         fidl_fuchsia_net_interfaces_ext::Properties {
-            id: iface_id,
+            id: iface_id.try_into().expect("should be nonzero"),
             name: IF_NAME.to_string(),
             device_class: fidl_fuchsia_net_interfaces::DeviceClass::Device(
                 fidl_fuchsia_hardware_network::DeviceClass::Virtual
@@ -834,7 +834,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");
@@ -1535,7 +1535,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");
@@ -1623,7 +1623,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");
@@ -1934,7 +1934,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::new(),
+        HashMap::<u64, _>::new(),
     )
     .await
     .expect("existing");
@@ -2170,7 +2170,7 @@ async fn get_set_forwarding_loopback<N: Netstack>(
                 addresses: _,
                 has_default_ipv4_route: _,
                 has_default_ipv6_route: _,
-            })) => id
+            })) => id.get()
         ))
         .unwrap();
 
@@ -2439,7 +2439,7 @@ async fn no_remove_loopback<N: Netstack>(name: &str) {
         .expect("fetching loopback properties")
         .expect("no loopback interface");
 
-    let control = realm.interface_control(id).expect("get interface control");
+    let control = realm.interface_control(id.get()).expect("get interface control");
 
     assert_eq!(
         control.remove().await.expect("remove"),
@@ -2448,7 +2448,7 @@ async fn no_remove_loopback<N: Netstack>(name: &str) {
 
     // Reach out again to ensure the interface hasn't been removed and that the
     // channel is still open.
-    assert_eq!(control.get_id().await.expect("get id"), id);
+    assert_eq!(control.get_id().await.expect("get id"), id.get());
 }
 
 #[netstack_test]

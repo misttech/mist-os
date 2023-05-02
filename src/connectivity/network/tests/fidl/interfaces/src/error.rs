@@ -43,7 +43,7 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
         NetstackVersion::Netstack3 | NetstackVersion::Netstack2 => std::iter::once((
             1,
             fidl_fuchsia_net_interfaces_ext::Properties {
-                id: 1,
+                id: nonzero_ext::nonzero!(1u64),
                 name: "lo".to_owned(),
                 device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
                     fidl_fuchsia_net_interfaces::Empty,
