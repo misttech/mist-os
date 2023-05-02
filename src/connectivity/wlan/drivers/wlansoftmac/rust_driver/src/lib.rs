@@ -5,7 +5,8 @@
 use {
     anyhow::{self, bail, format_err},
     banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
+    fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_async as fasync,
     fuchsia_inspect::{self, Inspector},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_zircon as zx,
@@ -68,9 +69,18 @@ impl WlanSoftmacHandle {
 pub fn start_wlansoftmac(
     device: DeviceInterface,
     buf_provider: BufferProvider,
+    wlan_softmac_bridge_proxy_raw_handle: fuchsia_zircon::sys::zx_handle_t,
 ) -> Result<WlanSoftmacHandle, anyhow::Error> {
+    let wlan_softmac_bridge_proxy = {
+        let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_proxy_raw_handle) };
+        let channel = fidl::Channel::from(handle);
+        fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
+    };
     let mut executor = fasync::LocalExecutor::new();
-    executor.run_singlethreaded(start_wlansoftmac_async(Device::new(device), buf_provider))
+    executor.run_singlethreaded(start_wlansoftmac_async(
+        Device::new(device, wlan_softmac_bridge_proxy),
+        buf_provider,
+    ))
 }
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;

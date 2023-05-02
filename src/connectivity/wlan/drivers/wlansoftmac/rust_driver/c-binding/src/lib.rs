@@ -7,6 +7,7 @@
 // Explicitly declare usage for cbindgen.
 
 use {
+    fuchsia_zircon::sys::zx_handle_t,
     tracing::error,
     wlan_mlme::{buffer::BufferProvider, device::DeviceInterface},
     wlan_span::CSpan,
@@ -17,8 +18,9 @@ use {
 pub extern "C" fn start_sta(
     device: DeviceInterface,
     buf_provider: BufferProvider,
+    wlan_softmac_bridge_client_handle: zx_handle_t,
 ) -> *mut WlanSoftmacHandle {
-    match start_wlansoftmac(device, buf_provider) {
+    match start_wlansoftmac(device, buf_provider, wlan_softmac_bridge_client_handle) {
         Ok(handle) => Box::into_raw(Box::new(handle)),
         Err(e) => {
             error!("Failed to start WLAN Softmac STA: {}", e);

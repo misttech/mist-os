@@ -4,11 +4,13 @@
 
 #include "device.h"
 
+#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/softmac/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
@@ -91,7 +93,9 @@ static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
 };
 
 WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
-    : device_(device), inner_handle_(nullptr) {
+    : device_(device),
+      inner_handle_(nullptr),
+      wlan_softmac_bridge_server_loop_(&kAsyncLoopConfigNeverAttachToThread) {
   ldebug(0, NULL, "Entering.");
 }
 
@@ -105,6 +109,37 @@ WlanSoftmacHandle::~WlanSoftmacHandle() {
 static constexpr inline DeviceInterface* DEVICE(void* c) {
   return static_cast<DeviceInterface*>(c);
 }
+// WlanSoftmacBridgeImpl hosts methods migrated from Banjo data structures
+// to FIDL data structures. This server implementation was modeled after
+// https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server.
+class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
+ public:
+  static void BindSelfManagedServer(
+      async_dispatcher_t* dispatcher,
+      fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
+    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>();
+    WlanSoftmacBridgeImpl* impl_ptr = impl.get();
+    fidl::ServerBindingRef binding_ref =
+        fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
+                         std::mem_fn(&WlanSoftmacBridgeImpl::OnUnbound));
+    impl_ptr->binding_ref_.emplace(std::move(binding_ref));
+  }
+
+  void OnUnbound(fidl::UnbindInfo info,
+                 fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
+    if (info.is_user_initiated()) {
+      return;
+    }
+    if (info.is_peer_closed()) {
+      linfo("WlanSoftmacBridge client disconnected");
+      return;
+    }
+    lerror("WlanSoftmacBridge server error: %s", info.status_string());
+  }
+
+ private:
+  std::optional<fidl::ServerBindingRef<fuchsia_wlan_softmac::WlanSoftmacBridge>> binding_ref_;
+};
 
 zx_status_t WlanSoftmacHandle::Init() {
   if (inner_handle_ != nullptr) {
@@ -192,7 +227,14 @@ zx_status_t WlanSoftmacHandle::Init() {
       },
   };
 
-  inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
+  WlanSoftmacBridgeImpl::BindSelfManagedServer(wlan_softmac_bridge_server_loop_.dispatcher(),
+                                               std::move(endpoints->server));
+  wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
+
+  inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider,
+                            endpoints->client.TakeHandle().release());
+
   return ZX_OK;
 }
 

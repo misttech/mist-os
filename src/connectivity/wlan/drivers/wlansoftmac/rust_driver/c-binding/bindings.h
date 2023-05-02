@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <zircon/types.h>
 
 typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
@@ -142,8 +143,6 @@ typedef struct {
    */
   int32_t (*disable_beaconing)(void *device);
   /**
-   */
-  /**
    * Notify about association completion.
    * |assoc_cfg| is mutable because the underlying API does not take a const
    * wlan_association_config_t.
@@ -193,7 +192,8 @@ typedef struct {
 } wlan_span_t;
 
 extern "C" wlansoftmac_handle_t *start_sta(rust_device_interface_t device,
-                                           wlansoftmac_buffer_provider_ops_t buf_provider);
+                                           wlansoftmac_buffer_provider_ops_t buf_provider,
+                                           zx_handle_t wlan_softmac_bridge_client_handle);
 
 extern "C" void stop_sta(wlansoftmac_handle_t *softmac);
 

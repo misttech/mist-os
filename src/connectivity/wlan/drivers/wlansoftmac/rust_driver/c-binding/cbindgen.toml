@@ -13,6 +13,8 @@ include_guard = "SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING
 language = "C"
 
 sys_includes = [
+    "zircon/types.h",
+
     # Banjo types.
     "fuchsia/wlan/softmac/c/banjo.h",   # wlan_softmac_query_response_t, wlan_hw_scan_config_t,
                                                  # wlan_softmac_passive_scan_args_t, wlan_rx_info_t

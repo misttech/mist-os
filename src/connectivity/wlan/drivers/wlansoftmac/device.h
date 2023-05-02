@@ -10,6 +10,7 @@
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/softmac/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/channel_read.h>
@@ -51,6 +52,8 @@ class WlanSoftmacHandle {
  private:
   DeviceInterface* device_;
   wlansoftmac_handle_t* inner_handle_;
+
+  async::Loop wlan_softmac_bridge_server_loop_;
 };
 
 class Device : public DeviceInterface,

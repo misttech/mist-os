@@ -54,6 +54,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
   deps = [
     ":wlansoftmac_bind",
     ":wlansoftmac_convert",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
@@ -62,6 +63,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/inspect",
   ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

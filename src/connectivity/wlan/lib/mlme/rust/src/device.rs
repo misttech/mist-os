@@ -12,7 +12,8 @@ use {
         self as banjo_wlan_softmac, WlanAssociationConfig, WlanRxPacket, WlanSoftmacQueryResponse,
         WlanTxPacket,
     },
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::MacAddr,
     std::{ffi::c_void, sync::Arc},
@@ -40,6 +41,8 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 
 pub struct Device {
     raw_device: DeviceInterface,
+    #[allow(dead_code)]
+    wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
     event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
@@ -48,9 +51,18 @@ pub struct Device {
 unsafe impl Send for Device {}
 
 impl Device {
-    pub fn new(raw_device: DeviceInterface) -> Device {
+    pub fn new(
+        raw_device: DeviceInterface,
+        wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
+    ) -> Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
-        Device { raw_device, minstrel: None, event_receiver: Some(event_receiver), event_sink }
+        Device {
+            raw_device,
+            wlan_softmac_bridge_proxy,
+            minstrel: None,
+            event_receiver: Some(event_receiver),
+            event_sink,
+        }
     }
 }
 
@@ -709,7 +721,7 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Disable beaconing on the device.
     disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
-    /// Configure the association context.
+    /// Notify about association completion.
     /// |assoc_cfg| is mutable because the underlying API does not take a const wlan_association_config_t.
     notify_association_complete:
         extern "C" fn(device: *mut c_void, assoc_cfg: *mut WlanAssociationConfig) -> i32,

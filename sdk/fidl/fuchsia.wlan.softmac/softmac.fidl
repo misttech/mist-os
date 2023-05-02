@@ -369,6 +369,24 @@ type WlanAssociationConfig = table {
    17: vht_op WlanVhtOp;
 };
 
+/// The wlansoftmac C++ driver establishes a FIDL channel serving the WlanSoftmacBridge
+/// protocol to the wlan-mlme Rust library. The WlanSoftmacBridge protocol is similar to
+/// WlanSoftmac but may not contain methods where the additional FIDL channel hinders
+/// performance.
+///
+/// WlanSoftmac composes a subset of its methods from WlanSoftmacBridge so
+/// the wlansoftmac driver can trivially convert messages between the Zircon channel
+/// transported WlanSoftmacBridge messages to the Driver transported WlanSoftmac messages.
+///
+/// TODO(fxbug.dev/126613): Merge WlanSoftmacBridge into WlanSoftmac when FIDL supports
+/// generating multiple transports for the same protocol, or generating Rust bindings
+/// for Driver transported protocols.
+///
+/// TODO(fxbug.dev/124830): This protocol allows wlansoftmac to eventually delete the
+/// use of Banjo from wlansoftmac. This TODO comment will exist until the migration off
+/// Banjo is complete.
+protocol WlanSoftmacBridge {};
+
 @discoverable
 @transport("Driver")
 protocol WlanSoftmac {
