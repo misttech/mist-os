@@ -133,20 +133,16 @@ def _merge_duplicate_licenses(document: SpdxDocument):
 
     license_id_factory = SpdxLicenseIdFactory()
     id_replacer = SpdxIdReplacer()
-    unique_licenses: dict[Tuple, SpdxExtractedLicensingInfo] = {}
+    unique_licenses: dict[str, SpdxExtractedLicensingInfo] = {}
     for license in document.extracted_licenses:
-        # What makes a unique license are the name and the text:
-        key = (license.name, license.extracted_text)
-        if key not in unique_licenses:
-            new_id = license_id_factory.new_id()
-            id_replacer.replace_id(old_id=license.license_id, new_id=new_id)
-            unique_licenses[key] = dataclasses.replace(
-                license, license_id=new_id)
+        content_id = license_id_factory.make_content_based_id(license)
+        id_replacer.replace_id(old_id=license.license_id, new_id=content_id)
+        if content_id not in unique_licenses:
+            unique_licenses[content_id] = dataclasses.replace(
+                license, license_id=content_id)
         else:
-            unique_license = unique_licenses[key]
-            id_replacer.replace_id(
-                old_id=license.license_id, new_id=unique_license.license_id)
-            unique_licenses[key] = unique_license.merge_with(license)
+            unique_license = unique_licenses[content_id]
+            unique_licenses[content_id] = unique_license.merge_with(license)
 
     updated_licenses = list(unique_licenses.values())
     updated_packages = [

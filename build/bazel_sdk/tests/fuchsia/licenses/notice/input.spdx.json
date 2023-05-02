@@ -32,7 +32,7 @@
         {
             "SPDXID": "SPDXRef-Package-2",
             "name": "Package B",
-            "licenseConcluded": "LicenseRef-X",
+            "licenseConcluded": "LicenseRef-X-2",
             "copyrightText": "copyright B"
         },
         {
@@ -90,6 +90,11 @@
             ]
         },
         {
+            "name": "License X 2",
+            "licenseId": "LicenseRef-X-2",
+            "extractedText": "\nTest License X\n"
+        },
+        {
             "name": "License Y",
             "licenseId": "LicenseRef-Y",
             "extractedText": "Test\nLicense\nY",
@@ -109,5 +114,5 @@
                 }
             ]
         }
-   ]
+    ]
 }

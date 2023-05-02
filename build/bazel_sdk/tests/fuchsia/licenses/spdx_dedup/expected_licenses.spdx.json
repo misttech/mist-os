@@ -25,27 +25,27 @@
         {
             "SPDXID": "SPDXRef-Package-1",
             "name": "license foo",
-            "licenseConcluded": "LicenseRef-0"
+            "licenseConcluded": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6"
         },
         {
             "SPDXID": "SPDXRef-Package-2",
             "name": "license bar",
-            "licenseConcluded": "LicenseRef-1"
+            "licenseConcluded": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053"
         },
         {
             "SPDXID": "SPDXRef-Package-3",
             "name": "license bar",
-            "licenseConcluded": "LicenseRef-2"
+            "licenseConcluded": "LicenseRef-ea07f3176348d446c17a1a8d2b831105"
         },
         {
             "SPDXID": "SPDXRef-Package-4",
             "name": "license foo",
-            "licenseConcluded": "LicenseRef-0"
+            "licenseConcluded": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6"
         },
         {
             "SPDXID": "SPDXRef-Package-5",
             "name": "license foo",
-            "licenseConcluded": "LicenseRef-3"
+            "licenseConcluded": "LicenseRef-3e1e113f1c9d9686bd37c9e76d6f1c98"
         }
     ],
     "relationships": [
@@ -78,7 +78,7 @@
     "hasExtractedLicensingInfos": [
         {
             "name": "license foo",
-            "licenseId": "LicenseRef-0",
+            "licenseId": "LicenseRef-9f6f610a28625e454a3ea1cd259c6ae6",
             "extractedText": "I am test license 1",
             "crossRefs": [
                 {
@@ -91,7 +91,7 @@
         },
         {
             "name": "license bar",
-            "licenseId": "LicenseRef-1",
+            "licenseId": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053",
             "extractedText": "I am test license 2",
             "crossRefs": [
                 {
@@ -101,7 +101,7 @@
         },
         {
             "name": "license bar",
-            "licenseId": "LicenseRef-2",
+            "licenseId": "LicenseRef-ea07f3176348d446c17a1a8d2b831105",
             "extractedText": "I am test license 1",
             "crossRefs": [
                 {
@@ -111,7 +111,7 @@
         },
         {
             "name": "license foo",
-            "licenseId": "LicenseRef-3",
+            "licenseId": "LicenseRef-3e1e113f1c9d9686bd37c9e76d6f1c98",
             "extractedText": "I am test license 2",
             "crossRefs": [
                 {

@@ -7,6 +7,7 @@ from collections import defaultdict
 import dataclasses
 import json
 import re
+import hashlib
 from fuchsia.tools.licenses.common_types import *
 from typing import Any, Dict, List, Set, Tuple, Type
 
@@ -532,6 +533,14 @@ class SpdxLicenseIdFactory:
     def new_id(self):
         self._next_id = self._next_id + 1
         return "LicenseRef-{id}".format(id=self._next_id)
+
+    def make_content_based_id(self, license: SpdxExtractedLicensingInfo):
+        """Returns an ids that is based on the content of the license: Name and Text (stripped)"""
+        md5 = hashlib.md5()
+        md5.update(license.name.strip().encode("utf-8"))
+        md5.update(license.extracted_text.strip().encode("utf-8"))
+        digest = md5.hexdigest()
+        return f"LicenseRef-{digest}"
 
 
 class SpdxIdReplacer:

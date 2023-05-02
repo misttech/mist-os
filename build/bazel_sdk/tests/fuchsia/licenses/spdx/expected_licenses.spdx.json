@@ -25,7 +25,7 @@
         {
             "SPDXID": "SPDXRef-Package-1",
             "name": "Component A",
-            "licenseConcluded": "LicenseRef-0"
+            "licenseConcluded": "LicenseRef-4a9f2d73c15392b0cbf6c2d90f832a51"
         },
         {
             "SPDXID": "SPDXRef-Package-2",
@@ -39,13 +39,13 @@
             "SPDXID": "SPDXRef-Package-4",
             "name": "Component Bar from SPDX",
             "copyrightText": "Copyright for Bar",
-            "licenseConcluded": "LicenseRef-1 OR LicenseRef-2"
+            "licenseConcluded": "LicenseRef-9f8ea96302b96ee92cae20abce1d9e94 OR LicenseRef-ee9219a68620e8975db00e0fd09e1d78"
         },
         {
             "SPDXID": "SPDXRef-Package-5",
             "name": "Package with default license",
             "copyrightText": "Test Copyright",
-            "licenseConcluded": "LicenseRef-3"
+            "licenseConcluded": "LicenseRef-e098e6470cf46e4ece31231215d180e7"
         }
     ],
     "relationships": [
@@ -78,7 +78,7 @@
     "hasExtractedLicensingInfos": [
         {
             "name": "Component A",
-            "licenseId": "LicenseRef-0",
+            "licenseId": "LicenseRef-4a9f2d73c15392b0cbf6c2d90f832a51",
             "extractedText": "License for Test Component A.\nThis is not a real software license. This is just for testing.\n",
             "crossRefs": [
                 {
@@ -88,7 +88,7 @@
         },
         {
             "name": "Bar's license from SPDX",
-            "licenseId": "LicenseRef-1",
+            "licenseId": "LicenseRef-9f8ea96302b96ee92cae20abce1d9e94",
             "extractedText": "License for Bar.\nThis is not a real software license. This is just for testing.\n",
             "crossRefs": [
                 {
@@ -101,12 +101,12 @@
         },
         {
             "name": "Baz license",
-            "licenseId": "LicenseRef-2",
+            "licenseId": "LicenseRef-ee9219a68620e8975db00e0fd09e1d78",
             "extractedText": "Baz License. This is not a real software license. This is just for testing.\n"
         },
         {
             "name": "Package with default license",
-            "licenseId": "LicenseRef-3",
+            "licenseId": "LicenseRef-e098e6470cf46e4ece31231215d180e7",
             "extractedText": "Default License.\nThis is not a real software license. This is just for testing.\n",
             "crossRefs": [
                 {

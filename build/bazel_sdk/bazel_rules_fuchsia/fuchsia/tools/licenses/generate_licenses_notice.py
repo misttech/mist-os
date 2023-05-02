@@ -5,11 +5,7 @@
 '''Utility that produces OSS licenses notice text file.'''
 
 import argparse
-import csv
-import os
 from sys import stderr
-from typing import Set, List
-import zipfile
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
@@ -59,9 +55,10 @@ def main():
     output_path = args.output_file
     _log(f'Writing {output_path}...')
 
-    licenses_by_unique_text = defaultdict(list)
+    licenses_by_unique_stripped_text = defaultdict(list)
     for license in spdx_doc.extracted_licenses:
-        licenses_by_unique_text[license.extracted_text].append(license)
+        licenses_by_unique_stripped_text[license.extracted_text.strip()].append(
+            license)
 
     packages_by_unique_copyright = defaultdict(list)
     for package in spdx_doc.packages:
@@ -78,19 +75,19 @@ def main():
                 '================================================================================\n'
             )
 
-        for unique_text, licenses in licenses_by_unique_text.items():
+        for grouped_licenses in licenses_by_unique_stripped_text.values():
             write_delimiter()
             unique_package_names = set()
             unique_public_source_mirrors = set()
-            for license in licenses:
+            for license in grouped_licenses:
                 for package in spdx_index.get_packages_by_license(license):
                     unique_package_names.add(package.name)
 
-            if license.license_id in classifications.classifications_by_id:
-                classification = classifications.classifications_by_id[
-                    license.license_id]
-                unique_public_source_mirrors.update(
-                    classification.all_public_source_mirrors())
+                if license.license_id in classifications.classifications_by_id:
+                    classification = classifications.classifications_by_id[
+                        license.license_id]
+                    unique_public_source_mirrors.update(
+                        classification.all_public_source_mirrors())
 
             write('The following license text(s) applies to these projects:\n')
             for package_name in sorted(list(unique_package_names)):
@@ -101,7 +98,7 @@ def main():
                     write(f' • {mirror}\n')
 
             write('\n')
-            write(unique_text)
+            write(grouped_licenses[0].extracted_text)
             write('\n')
 
         for unique_text, packages in packages_by_unique_copyright.items():
