@@ -34,16 +34,16 @@ int main(int argc, const char** argv) {
   // Set up an inspect::Node to inject into the App.
   sys::ComponentInspector inspector(app_context.get());
 
-  // Obtain the default display controller via the fuchsia.hardware.display.Provider service that we
-  // find in our environment. Scenic provides its own default implementation through
+  // Obtain the default display coordinator via the fuchsia.hardware.display.Provider service that
+  // we find in our environment. Scenic provides its own default implementation through
   // |hdcp_service_impl|, which can be overridden by the environment (e.g. by a test's
   // "injected-services" facet).
-  ui_display::HardwareDisplayControllerProviderImpl hdcp_service_impl(app_context.get());
-  auto display_controller_promise = ui_display::GetHardwareDisplayController(&hdcp_service_impl);
+  ui_display::HardwareDisplayCoordinatorProviderImpl hdcp_service_impl(app_context.get());
+  auto display_coordinator_promise = ui_display::GetHardwareDisplayCoordinator(&hdcp_service_impl);
 
   // Instantiate Scenic app.
   scenic_impl::App app(std::move(app_context), inspector.root().CreateChild("scenic"),
-                       std::move(display_controller_promise), [&loop] { loop.Quit(); });
+                       std::move(display_coordinator_promise), [&loop] { loop.Quit(); });
 
   // Apply the scheduler role defined for Scenic.
   const zx_status_t status = util::SetSchedulerRole(zx::thread::self(), "fuchsia.scenic.main");

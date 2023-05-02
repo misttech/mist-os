@@ -18,15 +18,15 @@ namespace ui_display {
 
 static const std::string kDisplayDir = "/dev/class/display-controller";
 
-HardwareDisplayControllerProviderImpl::HardwareDisplayControllerProviderImpl(
+HardwareDisplayCoordinatorProviderImpl::HardwareDisplayCoordinatorProviderImpl(
     sys::ComponentContext* app_context) {
   app_context->outgoing()->AddPublicService(bindings_.GetHandler(this));
 }
 
 // |fuchsia::hardware::display::Provider|.
-void HardwareDisplayControllerProviderImpl::OpenController(
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> request,
-    OpenControllerCallback callback) {
+void HardwareDisplayCoordinatorProviderImpl::OpenCoordinatorForPrimary(
+    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> request,
+    OpenCoordinatorForPrimaryCallback callback) {
   // Watcher's lifetime needs to be at most as long as the lifetime of |this|,
   // and otherwise as long as the lifetime of |callback|.  |this| will own
   // the references to outstanding watchers, and each watcher will notify |this|
@@ -54,12 +54,12 @@ void HardwareDisplayControllerProviderImpl::OpenController(
         }
 
         // TODO(fxbug.dev/57269): it would be nice to simply pass |callback| asynchronously into
-        // OpenController(), rather than blocking on a synchronous call.  However, it is non-trivial
-        // to do so, so for now we use a blocking call to proxy the request.
+        // OpenCoordinator(), rather than blocking on a synchronous call.  However, it is
+        // non-trivial to do so, so for now we use a blocking call to proxy the request.
         fidl::WireResult result =
             fidl::WireCall(client.value())
-                ->OpenController(
-                    fidl::ServerEnd<fuchsia_hardware_display::Controller>(request.TakeChannel()));
+                ->OpenCoordinatorForPrimary(
+                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator>(request.TakeChannel()));
         if (!result.ok()) {
           FX_PLOGS(ERROR, result.status()) << "Failed to call service handle";
 
@@ -70,7 +70,7 @@ void HardwareDisplayControllerProviderImpl::OpenController(
           return;
         }
         if (result->s != ZX_OK) {
-          FX_PLOGS(ERROR, result->s) << "Failed to open display controller";
+          FX_PLOGS(ERROR, result->s) << "Failed to open display coordinator";
           callback(result->s);
           return;
         }
@@ -84,7 +84,7 @@ void HardwareDisplayControllerProviderImpl::OpenController(
   holders_[id] = std::move(watcher);
 }
 
-void HardwareDisplayControllerProviderImpl::BindDisplayProvider(
+void HardwareDisplayCoordinatorProviderImpl::BindDisplayProvider(
     fidl::InterfaceRequest<fuchsia::hardware::display::Provider> request) {
   bindings_.AddBinding(this, std::move(request));
 }

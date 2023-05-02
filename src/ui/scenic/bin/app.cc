@@ -217,7 +217,7 @@ void DisplayInfoDelegate::GetDisplayOwnershipEvent(
 }
 
 App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-         fpromise::promise<ui_display::DisplayControllerHandles> dc_handles_promise,
+         fpromise::promise<ui_display::DisplayCoordinatorHandles> dc_handles_promise,
          fit::closure quit_callback)
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
@@ -338,7 +338,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       });
   FX_DCHECK(device_watcher_);
 
-  // Instantiate DisplayManager and schedule a task to inject the display controller into it, once
+  // Instantiate DisplayManager and schedule a task to inject the display coordinator into it, once
   // it becomes available.
   display_manager_.emplace(config_values_.i_can_haz_display_id,
                            config_values_.i_can_haz_display_mode,
@@ -346,8 +346,8 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
   executor_.schedule_task(dc_handles_promise.then(
-      [this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
-        display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
+      [this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+        display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
       }));
 
   // Schedule a task to finish initialization once all promises have been completed.
@@ -493,7 +493,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     TRACE_DURATION("gfx", "App::InitializeServices[flatland_display_compositor]");
 
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
-        async_get_default_dispatcher(), display_manager_->default_display_controller(),
+        async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
         config_values_.flatland_enable_display_composition);
   }

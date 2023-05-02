@@ -34,7 +34,7 @@ class BufferPool {
   };
 
   struct Environment {
-    std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller = nullptr;
+    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator = nullptr;
     display::Display* display = nullptr;
     escher::Escher* escher = nullptr;
     Sysmem* sysmem = nullptr;
@@ -49,7 +49,7 @@ class BufferPool {
   BufferPool& operator=(BufferPool&& rhs);
 
   // Destroys all buffers. The pool is no longer usable after this.
-  void Clear(std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller);
+  void Clear(std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator);
 
   // Gets an unused buffer or returns null.
   Framebuffer* GetUnused();

@@ -17,7 +17,8 @@
 namespace scenic_impl {
 namespace display {
 
-// Discovers and owns the default display controller, and waits for and exposes the default display.
+// Discovers and owns the default display coordinator, and waits for and exposes the default
+// display.
 class DisplayManager {
  public:
   // |display_available_cb| is a one-shot callback that is triggered when the first display is
@@ -27,8 +28,8 @@ class DisplayManager {
                  std::optional<size_t> i_can_haz_display_mode, fit::closure display_available_cb);
   ~DisplayManager() = default;
 
-  void BindDefaultDisplayController(
-      fidl::InterfaceHandle<fuchsia::hardware::display::Controller> controller);
+  void BindDefaultDisplayCoordinator(
+      fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator> coordinator);
 
   // Gets information about the default display.
   // May return null if there isn't one.
@@ -37,12 +38,12 @@ class DisplayManager {
   // Only use this during Scenic initialization to pass a reference to FrameScheduler.
   std::shared_ptr<Display> default_display_shared() const { return default_display_; }
 
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> default_display_controller() {
-    return default_display_controller_;
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator() {
+    return default_display_coordinator_;
   }
 
-  std::shared_ptr<display::DisplayControllerListener> default_display_controller_listener() {
-    return default_display_controller_listener_;
+  std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener() {
+    return default_display_coordinator_listener_;
   }
 
   // For testing.
@@ -66,8 +67,8 @@ class DisplayManager {
   void OnVsync(uint64_t display_id, uint64_t timestamp,
                fuchsia::hardware::display::ConfigStamp applied_config_stamp, uint64_t cookie);
 
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> default_display_controller_;
-  std::shared_ptr<display::DisplayControllerListener> default_display_controller_listener_;
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator_;
+  std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener_;
 
   std::shared_ptr<Display> default_display_;
 
@@ -81,8 +82,8 @@ class DisplayManager {
 
   fit::closure display_available_cb_;
   // A boolean indicating whether or not we have ownership of the display
-  // controller (not just individual displays). The default is no.
-  bool owns_display_controller_ = false;
+  // coordinator (not just individual displays). The default is no.
+  bool owns_display_coordinator_ = false;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(DisplayManager);
 };

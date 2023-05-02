@@ -6,7 +6,7 @@ use anyhow::{ensure, format_err, Context as _, Error};
 use display_utils::{get_bytes_per_pixel, PixelFormat};
 use fidl::endpoints::{self, ClientEnd};
 use fidl_fuchsia_hardware_display::{
-    ConfigStamp, ControllerEvent, ControllerMarker, ControllerProxy, ImageConfig,
+    ConfigStamp, CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ImageConfig,
     ProviderSynchronousProxy, VirtconMode,
 };
 use fidl_fuchsia_sysmem::{ImageFormatConstraints, PixelFormatType};
@@ -230,10 +230,10 @@ impl Frame {
 
         let image_id = framebuffer.next_image_id();
         let status = framebuffer
-            .controller
+            .coordinator
             .import_image(&mut image_config, collection_id, image_id, index)
             .await
-            .context("controller import_image")?;
+            .context("coordinator import_image")?;
 
         if status != 0 {
             return Err(format_err!(
@@ -252,7 +252,7 @@ impl Frame {
         let their_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let event_id = event.get_koid()?.raw_koid();
         framebuffer
-            .controller
+            .coordinator
             .import_event(Event::from_handle(their_event.into_handle()), event_id)?;
         Ok((event, event_id))
     }
@@ -539,7 +539,7 @@ pub enum Message {
 }
 
 pub struct FrameBuffer {
-    pub controller: ControllerProxy,
+    pub coordinator: CoordinatorProxy,
     config: Config,
     layer_id: u64,
     pub usage: FrameUsage,
@@ -549,7 +549,7 @@ pub struct FrameBuffer {
 
 impl FrameBuffer {
     async fn create_config_from_event_stream(
-        stream: &mut fidl_fuchsia_hardware_display::ControllerEventStream,
+        stream: &mut fidl_fuchsia_hardware_display::CoordinatorEventStream,
     ) -> Result<Config, Error> {
         let display_id;
         let pixel_format;
@@ -564,7 +564,7 @@ impl FrameBuffer {
             let timeout = 2_i64.seconds().after_now();
             let event = stream.next().on_timeout(timeout, || None).await;
             if let Some(event) = event {
-                if let Ok(ControllerEvent::OnDisplaysChanged { added, .. }) = event {
+                if let Ok(CoordinatorEvent::OnDisplaysChanged { added, .. }) = event {
                     let first_added = &added[0];
                     display_id = first_added.id;
                     pixel_format = first_added.pixel_format[0];
@@ -578,7 +578,7 @@ impl FrameBuffer {
                 }
             } else {
                 return Err(format_err!(
-                    "Timed out waiting for display controller to send a OnDisplaysChanged event"
+                    "Timed out waiting for display coordinator to send a OnDisplaysChanged event"
                 ));
             }
         }
@@ -598,15 +598,15 @@ impl FrameBuffer {
     }
 
     async fn create_layer(&mut self) -> Result<u64, Error> {
-        let (status, layer_id) = self.controller.create_layer().await?;
+        let (status, layer_id) = self.coordinator.create_layer().await?;
         ensure!(status == zx::sys::ZX_OK, "Failed to create layer {}", Status::from_raw(status));
         Ok(layer_id)
     }
 
     pub fn configure_layer(&mut self, config: &Config, image_type: u32) -> Result<(), Error> {
         let mut image_config = Frame::create_image_config(image_type, config);
-        self.controller.set_layer_primary_config(self.layer_id, &mut image_config)?;
-        self.controller.set_display_layers(config.display_id, &[self.layer_id])?;
+        self.coordinator.set_layer_primary_config(self.layer_id, &mut image_config)?;
+        self.coordinator.set_display_layers(config.display_id, &[self.layer_id])?;
         Ok(())
     }
 
@@ -615,7 +615,7 @@ impl FrameBuffer {
         buffer_collection_id: u64,
         buffer_collection: endpoints::ClientEnd<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>,
     ) -> Result<(), Error> {
-        self.controller.import_buffer_collection(buffer_collection_id, buffer_collection).await?;
+        self.coordinator.import_buffer_collection(buffer_collection_id, buffer_collection).await?;
         Ok(())
     }
 
@@ -623,7 +623,7 @@ impl FrameBuffer {
         &mut self,
         buffer_collection_id: u64,
     ) -> Result<(), Error> {
-        self.controller.release_buffer_collection(buffer_collection_id)?;
+        self.coordinator.release_buffer_collection(buffer_collection_id)?;
         Ok(())
     }
 
@@ -634,7 +634,7 @@ impl FrameBuffer {
         config: &Config,
     ) -> Result<(), Error> {
         let mut image_config = Frame::create_image_config(image_type, config);
-        self.controller
+        self.coordinator
             .set_buffer_collection_constraints(buffer_collection_id, &mut image_config)
             .await?;
 
@@ -651,7 +651,7 @@ impl FrameBuffer {
             format!("/dev/class/display-controller/{:03}", index)
         } else {
             // If the caller did not supply a display index, we watch the
-            // display-controller directory and use the first controller
+            // display-controller directory and use the first coordinator
             // that appears.
             let dir = fuchsia_fs::directory::open_in_namespace(
                 "/dev/class/display-controller",
@@ -672,7 +672,7 @@ impl FrameBuffer {
                 .on_timeout(timeout, || None)
                 .await;
             let filename =
-                filename.ok_or_else(|| format_err!("No display controller available"))?;
+                filename.ok_or_else(|| format_err!("No display coordinator available"))?;
             let filename = filename?;
             format!("/dev/class/display-controller/{}", filename.display())
         };
@@ -681,11 +681,11 @@ impl FrameBuffer {
         fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, &device_path)?;
         let provider = ProviderSynchronousProxy::new(client_end);
 
-        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>();
+        let (dc_client, dc_server) = endpoints::create_endpoints::<CoordinatorMarker>();
         let status = if virtcon_mode.is_some() {
-            provider.open_virtcon_controller(dc_server, zx::Time::INFINITE)
+            provider.open_coordinator_for_virtcon(dc_server, zx::Time::INFINITE)
         } else {
-            provider.open_controller(dc_server, zx::Time::INFINITE)
+            provider.open_coordinator_for_primary(dc_server, zx::Time::INFINITE)
         }?;
         let () = zx::Status::ok(status)?;
 
@@ -699,7 +699,7 @@ impl FrameBuffer {
     async fn new_with_proxy(
         initial_virtcon_mode: Option<VirtconMode>,
         usage: FrameUsage,
-        proxy: ControllerProxy,
+        proxy: CoordinatorProxy,
         sender: Option<futures::channel::mpsc::UnboundedSender<Message>>,
     ) -> Result<FrameBuffer, Error> {
         let mut stream = proxy.take_event_stream();
@@ -710,7 +710,7 @@ impl FrameBuffer {
             fasync::Task::local(
                 stream
                     .map_ok(move |request| match request {
-                        ControllerEvent::OnVsync {
+                        CoordinatorEvent::OnVsync {
                             display_id,
                             timestamp,
                             applied_config_stamp,
@@ -725,7 +725,7 @@ impl FrameBuffer {
                                 }))
                                 .unwrap_or_else(|e| eprintln!("{:?}", e));
                         }
-                        ControllerEvent::OnClientOwnershipChange { has_ownership } => {
+                        CoordinatorEvent::OnClientOwnershipChange { has_ownership } => {
                             sender
                                 .unbounded_send(Message::Ownership(has_ownership))
                                 .unwrap_or_else(|e| eprintln!("{:?}", e));
@@ -740,7 +740,7 @@ impl FrameBuffer {
 
         let mut fb = FrameBuffer {
             initial_virtcon_mode,
-            controller: proxy,
+            coordinator: proxy,
             config,
             layer_id: 0,
             usage,
@@ -755,7 +755,7 @@ impl FrameBuffer {
 
     pub fn set_virtcon_mode(&mut self, virtcon_mode: VirtconMode) -> Result<(), Error> {
         ensure!(self.initial_virtcon_mode.is_some());
-        self.controller.set_virtcon_mode(virtcon_mode as u8)?;
+        self.coordinator.set_virtcon_mode(virtcon_mode as u8)?;
         Ok(())
     }
 
@@ -789,8 +789,8 @@ impl FrameBuffer {
         sender: Option<futures::channel::mpsc::UnboundedSender<ImageInCollection>>,
         signal_wait_event: bool,
     ) -> Result<(), Error> {
-        self.controller.set_display_layers(self.config.display_id, &[self.layer_id])?;
-        self.controller
+        self.coordinator.set_display_layers(self.config.display_id, &[self.layer_id])?;
+        self.coordinator
             .set_layer_image(
                 self.layer_id,
                 frame.image_id,
@@ -798,7 +798,7 @@ impl FrameBuffer {
                 frame.signal_event_id,
             )
             .context("Frame::present() set_layer_image")?;
-        self.controller.apply_config().context("Frame::present() apply_config")?;
+        self.coordinator.apply_config().context("Frame::present() apply_config")?;
         if signal_wait_event {
             frame.wait_event.as_handle_ref().signal(Signals::NONE, Signals::EVENT_SIGNALED)?;
         }
@@ -821,7 +821,7 @@ impl FrameBuffer {
     }
 
     pub fn acknowledge_vsync(&mut self, cookie: u64) -> Result<(), Error> {
-        self.controller.acknowledge_vsync(cookie)?;
+        self.coordinator.acknowledge_vsync(cookie)?;
         Ok(())
     }
 
@@ -835,13 +835,13 @@ impl FrameBuffer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_hardware_display::ControllerRequest;
+    use fidl_fuchsia_hardware_display::CoordinatorRequest;
     use std::cell::Cell;
     use std::rc::Rc;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_vsync() -> Result<(), anyhow::Error> {
-        let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>();
+        let (client, server) = fidl::endpoints::create_endpoints::<CoordinatorMarker>();
         let mut stream = server.into_stream()?;
         let vsync_enabled = Rc::new(Cell::new(false));
         let vsync_enabled_clone = Rc::clone(&vsync_enabled);
@@ -849,10 +849,10 @@ mod test {
         fasync::Task::local(async move {
             while let Some(req) = stream.try_next().await.expect("Failed to get request!") {
                 match req {
-                    ControllerRequest::EnableVsync { enable: true, control_handle: _ } => {
+                    CoordinatorRequest::EnableVsync { enable: true, control_handle: _ } => {
                         vsync_enabled_clone.set(true)
                     }
-                    ControllerRequest::EnableVsync { enable: false, control_handle: _ } => {
+                    CoordinatorRequest::EnableVsync { enable: false, control_handle: _ } => {
                         vsync_enabled_clone.set(false)
                     }
                     _ => panic!("Unexpected request"),

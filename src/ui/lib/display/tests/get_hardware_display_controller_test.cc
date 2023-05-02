@@ -21,18 +21,18 @@ struct fake_context : fpromise::context {
   fpromise::suspended_task suspend_task() override { return fpromise::suspended_task(); }
 };
 
-class GetHardwareDisplayControllerTest : public gtest::RealLoopFixture {};
+class GetHardwareDisplayCoordinatorTest : public gtest::RealLoopFixture {};
 
-TEST_F(GetHardwareDisplayControllerTest, ErrorCase) {
-  auto promise = GetHardwareDisplayController();
+TEST_F(GetHardwareDisplayCoordinatorTest, ErrorCase) {
+  auto promise = GetHardwareDisplayCoordinator();
   fake_context context;
   EXPECT_TRUE(promise(context).is_error());
 }
 
-TEST_F(GetHardwareDisplayControllerTest, WithHardwareDisplayControllerProviderImpl) {
+TEST_F(GetHardwareDisplayCoordinatorTest, WithHardwareDisplayCoordinatorProviderImpl) {
   std::unique_ptr<sys::ComponentContext> app_context = sys::ComponentContext::Create();
-  ui_display::HardwareDisplayControllerProviderImpl hdcp_service_impl(app_context.get());
-  auto promise = GetHardwareDisplayController(&hdcp_service_impl);
+  ui_display::HardwareDisplayCoordinatorProviderImpl hdcp_service_impl(app_context.get());
+  auto promise = GetHardwareDisplayCoordinator(&hdcp_service_impl);
   fake_context context;
   EXPECT_FALSE(promise(context).is_error());
 }

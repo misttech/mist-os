@@ -4,7 +4,7 @@
 
 use {
     anyhow::{format_err, Result},
-    display_utils::{Controller, PixelFormat},
+    display_utils::{Coordinator, PixelFormat},
 };
 
 mod display_color_layer;
@@ -13,8 +13,8 @@ mod static_config_vsync_loop;
 
 use crate::rgb::Rgb888;
 
-pub fn show_display_info(controller: &Controller, id: Option<u64>, fidl: bool) -> Result<()> {
-    let displays = controller.displays();
+pub fn show_display_info(coordinator: &Coordinator, id: Option<u64>, fidl: bool) -> Result<()> {
+    let displays = coordinator.displays();
     println!("{} display(s) available", displays.len());
     for display in displays.iter().filter(|&info| id.map_or(true, |id| info.0.id == id)) {
         if fidl {
@@ -27,12 +27,12 @@ pub fn show_display_info(controller: &Controller, id: Option<u64>, fidl: bool) -
 }
 
 pub async fn vsync(
-    controller: &Controller,
+    coordinator: &Coordinator,
     id: Option<u64>,
     color: Rgb888,
     pixel_format: PixelFormat,
 ) -> Result<()> {
-    let displays = controller.displays();
+    let displays = coordinator.displays();
     if displays.is_empty() {
         return Err(format_err!("no displays found"));
     }
@@ -47,19 +47,19 @@ pub async fn vsync(
     };
 
     static_config_vsync_loop::run(
-        controller,
+        coordinator,
         static_config_vsync_loop::Args { display, color, pixel_format },
     )
     .await
 }
 
 pub async fn color(
-    controller: &Controller,
+    coordinator: &Coordinator,
     id: Option<u64>,
     color: Rgb888,
     pixel_format: PixelFormat,
 ) -> Result<()> {
-    let displays = controller.displays();
+    let displays = coordinator.displays();
     if displays.is_empty() {
         return Err(format_err!("no displays found"));
     }
@@ -73,12 +73,15 @@ pub async fn color(
             .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
     };
 
-    display_color_layer::run(controller, display_color_layer::Args { display, color, pixel_format })
-        .await
+    display_color_layer::run(
+        coordinator,
+        display_color_layer::Args { display, color, pixel_format },
+    )
+    .await
 }
 
-pub async fn squares(controller: &Controller, id: Option<u64>) -> Result<()> {
-    let displays = controller.displays();
+pub async fn squares(coordinator: &Coordinator, id: Option<u64>) -> Result<()> {
+    let displays = coordinator.displays();
     if displays.is_empty() {
         return Err(format_err!("no displays found"));
     }
@@ -92,5 +95,5 @@ pub async fn squares(controller: &Controller, id: Option<u64>) -> Result<()> {
             .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
     };
 
-    double_buffered_fence_loop::run(controller, display).await
+    double_buffered_fence_loop::run(coordinator, display).await
 }

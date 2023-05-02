@@ -11,8 +11,8 @@ std::unique_ptr<DisplaySwapchain> SwapchainFactory::CreateDisplaySwapchain(
     uint64_t swapchain_image_count, display::Display* display, Sysmem* sysmem,
     display::DisplayManager* display_manager, escher::Escher* escher) {
   FX_DCHECK(!display->is_claimed());
-  return std::make_unique<DisplaySwapchain>(sysmem, display_manager->default_display_controller(),
-                                            display_manager->default_display_controller_listener(),
+  return std::make_unique<DisplaySwapchain>(sysmem, display_manager->default_display_coordinator(),
+                                            display_manager->default_display_coordinator_listener(),
                                             swapchain_image_count, display, escher);
 }
 

@@ -24,7 +24,7 @@ const INVALID_DISP_ID uint64 = 0;
 ///
 /// Performing illegal actions on the interface will result in the interface
 /// being closed.
-protocol Controller {
+protocol Coordinator {
     // Event fired when displays are added or removed. This event will be fired
     // when the callback is registered if there are any connected displays.
     //
@@ -307,7 +307,7 @@ protocol Controller {
     // if the new ImageConfig matches the old ImageConfig.
     //
     // An image cannot be used for multiple layers simultaneously, nor can an
-    // image be given back to the display controller while it is still in use.
+    // image be given back to the display coordinator while it is still in use.
     // An image is considered in use when it is part of a pending configuration
     // or from when its configuration is applied until its signal_event_id is
     // signaled.
@@ -369,7 +369,7 @@ protocol Controller {
     ///
     /// For each event in `signal_fences`, once the pending configuration is
     /// applied to and contents are displayed on all the displays connected to
-    /// the Controller, it will be signaled immediately.
+    /// the Coordinator, it will be signaled immediately.
     ///
     /// Arguments
     ///
@@ -426,7 +426,7 @@ protocol Controller {
     ///   contains images that are still waiting to be ready, the configuration
     ///   will be only partially applied (without the pending image), and thus
     ///   the stamp of this configuration will not appear in Vsync messages
-    ///   unless that image becomes ready and display controller reapplies
+    ///   unless that image becomes ready and display coordinator reapplies
     ///   the configuration fully with the pending image.
     ///
     ///   The `value` of the stamp MUST NOT be INVALID_CONFIG_STAMP_VALUE.
@@ -505,12 +505,12 @@ protocol Controller {
         supported bool;
     }) error zx.Status;
 
-    /// Imports a buffer collection backed VMO into the display controller. The VMO
-    /// will be used by display controller to capture the image being displayed.
+    /// Imports a buffer collection backed VMO into the display coordinator. The VMO
+    /// will be used by display coordinator to capture the image being displayed.
     /// Returns ZX_OK along with an image_id.
     /// image_id must be used by the client to start capture and/or release
     /// resources allocated for capture.
-    /// Returns ZX_ERR_NOT_SUPPORTED if controller does not support capture
+    /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     ImportImageForCapture(struct {
         image_config ImageConfig;
         collection_id uint64;
@@ -523,14 +523,14 @@ protocol Controller {
     /// image_id. signal_event_id must have been imported into the driver
     /// using ImportEvent FIDL API. Image_id is the id from ImportImageForCapture.
     /// The client will get notified once capture is complete via signal_event_id.
-    /// Returns ZX_ERR_NOT_SUPPORTED if controller does not support capture
+    /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     StartCapture(struct {
         signal_event_id uint64;
         image_id uint64;
     }) -> () error zx.Status;
 
     /// Releases resources allocated for capture.
-    /// Returns ZX_ERR_NOT_SUPPORTED if controller does not support capture
+    /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
     ReleaseCapture(struct {
         image_id uint64;
     }) -> () error zx.Status;
@@ -564,7 +564,7 @@ protocol Controller {
     ///
     /// Newly added displays are turned on by default.
     ///
-    /// Returns ZX_ERR_NOT_FOUND if `display_id` is invalid when Controller
+    /// Returns ZX_ERR_NOT_FOUND if `display_id` is invalid when Coordinator
     /// handles this method.
     /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
     /// turning on/off displays.

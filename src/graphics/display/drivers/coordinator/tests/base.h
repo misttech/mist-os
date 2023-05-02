@@ -35,7 +35,7 @@ class TestBase : public testing::Test {
   void SetUp() override;
   void TearDown() override;
 
-  Controller* controller() { return tree_->controller(); }
+  Controller* controller() { return tree_->coordinator_controller(); }
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
   const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_fidl();

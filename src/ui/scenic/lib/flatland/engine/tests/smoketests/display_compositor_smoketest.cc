@@ -67,14 +67,14 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
-    // TODO(fxbug.dev/122131): This reuses the display controller from previous
-    // test cases in the same test component, so the display controller may be
-    // in a dirty state. Tests should request a reset of display controller
+    // TODO(fxbug.dev/122131): This reuses the display coordinator from previous
+    // test cases in the same test component, so the display coordinator may be
+    // in a dirty state. Tests should request a reset of display coordinator
     // here.
-    auto hdc_promise = ui_display::GetHardwareDisplayController();
+    auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
     executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
-          display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
+        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });
@@ -151,25 +151,25 @@ class DisplayCompositorParameterizedSmokeTest
       public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
 // Renders a fullscreen rectangle to the provided display. This tests the engine's ability to
-// properly read in flatland uberstruct data and then pass the data along to the display-controller
-// interface to be composited directly in hardware. The Astro display controller only handles full
+// properly read in flatland uberstruct data and then pass the data along to the display-coordinator
+// interface to be composited directly in hardware. The Astro display coordinator only handles full
 // screen rects.
 VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
-  // Even though we are rendering directly with the display controller in this test,
+  // Even though we are rendering directly with the display coordinator in this test,
   // we still use the VkRenderer so that all of the same constraints we'd expect to
   // see set in a real production setting are reproduced here.
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
-      dispatcher(), display_manager_->default_display_controller(), renderer,
+      dispatcher(), display_manager_->default_display_coordinator(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
       /*enable_display_composition*/ true);
 
   auto display = display_manager_->default_display();
-  auto display_controller = display_manager_->default_display_controller();
+  auto display_coordinator = display_manager_->default_display_coordinator();
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
-  // Setup the collection for the texture. Due to display controller limitations, the size of
+  // Setup the collection for the texture. Due to display coordinator limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();

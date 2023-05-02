@@ -16,9 +16,9 @@
 namespace scenic_impl {
 namespace display {
 
-// DisplayControllerListener wraps a |fuchsia::hardware::display::Controller| interface, allowing
+// DisplayCoordinatorListener wraps a |fuchsia::hardware::display::Coordinator| interface, allowing
 // registering for event callbacks.
-class DisplayControllerListener {
+class DisplayCoordinatorListener {
  public:
   using OnDisplaysChangedCallback = std::function<void(
       std::vector<fuchsia::hardware::display::Info> added, std::vector<uint64_t> removed)>;
@@ -27,16 +27,16 @@ class DisplayControllerListener {
       uint64_t display_id, uint64_t timestamp,
       fuchsia::hardware::display::ConfigStamp applied_config_stamp, uint64_t cookie)>;
 
-  // Binds to a Display fuchsia::hardware::display::Controller with channels |device| and
-  // with display controller |controller|. |controller_handle| is the raw handle wrapped by
-  // |controller|; unfortunately it must be passed separately since there's no  way to get it from
-  // |controller|.
+  // Binds to a Display fuchsia::hardware::display::Coordinator with channels |device| and
+  // with display coordinator |coordinator|. |coordinator_handle| is the raw handle wrapped by
+  // |coordinator|; unfortunately it must be passed separately since there's no  way to get it from
+  // |coordinator|.
   //
-  // If |device| or |controller_handle| is invalid, or |controller| is not bound, this instance is
+  // If |device| or |coordinator_handle| is invalid, or |coordinator| is not bound, this instance is
   // invalid.
-  DisplayControllerListener(
-      std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> controller);
-  ~DisplayControllerListener();
+  DisplayCoordinatorListener(
+      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> coordinator);
+  ~DisplayCoordinatorListener();
 
   // If any of the channels gets disconnected, |on_invalid| is invoked and this object becomes
   // invalid.
@@ -49,7 +49,7 @@ class DisplayControllerListener {
 
   void SetOnVsyncCallback(OnVsyncCallback vsync_callback);
 
-  // Whether the connection to the display controller driver is still valid.
+  // Whether the connection to the display coordinator driver is still valid.
   bool valid() { return valid_; }
 
  private:
@@ -58,30 +58,30 @@ class DisplayControllerListener {
   void OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
                        const zx_packet_signal_t* signal);
 
-  // The display controller driver binding.
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> controller_;
+  // The display coordinator driver binding.
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> coordinator_;
 
-  // True if we're connected to |controller_|.
+  // True if we're connected to |coordinator_|.
   bool valid_ = false;
 
-  // |controller_| owns |controller_channel_handle_|, but save its handle here for use.
-  zx_handle_t controller_channel_handle_ = 0;
+  // |coordinator_| owns |coordinator_channel_handle_|, but save its handle here for use.
+  zx_handle_t coordinator_channel_handle_ = 0;
 
-  // Callback to invoke if we disconnect from |controller_|.
+  // Callback to invoke if we disconnect from |coordinator_|.
   fit::closure on_invalid_cb_ = nullptr;
 
   // True if InitializeCallbacks was called; it can only be called once.
   bool initialized_callbacks_ = false;
 
   // Waits for a ZX_CHANNEL_READABLE signal.
-  async::WaitMethod<DisplayControllerListener, &DisplayControllerListener::OnEventMsgAsync>
+  async::WaitMethod<DisplayCoordinatorListener, &DisplayCoordinatorListener::OnEventMsgAsync>
       wait_event_msg_{this};
-  async::WaitMethod<DisplayControllerListener, &DisplayControllerListener::OnPeerClosedAsync>
-      wait_controller_closed_{this};
+  async::WaitMethod<DisplayCoordinatorListener, &DisplayCoordinatorListener::OnPeerClosedAsync>
+      wait_coordinator_closed_{this};
 
-  // Used for dispatching events that we receive over the controller channel.
+  // Used for dispatching events that we receive over the coordinator channel.
   // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
-  fidl::InterfacePtr<fuchsia::hardware::display::Controller> event_dispatcher_;
+  fidl::InterfacePtr<fuchsia::hardware::display::Coordinator> event_dispatcher_;
 };
 
 }  // namespace display

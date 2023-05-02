@@ -16,7 +16,7 @@ use crate::{
     IdGenerator2,
 };
 use anyhow::{bail, format_err, Context as _, Error};
-use fidl_fuchsia_hardware_display::{ControllerEvent, VirtconMode};
+use fidl_fuchsia_hardware_display::{CoordinatorEvent, VirtconMode};
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::{self as component};
@@ -101,7 +101,7 @@ pub enum ViewMode {
     Auto,
     /// Only create views hosted by Scenic.
     Hosted,
-    /// Only create views directly running directly on the display controller.
+    /// Only create views directly running directly on the display coordinator.
     Direct,
 }
 
@@ -158,7 +158,7 @@ pub struct Config {
     /// and deallocated when switching quickly between virtcon and the regular display.
     pub display_resource_release_delay: std::time::Duration,
     #[serde(default)]
-    /// In a bringup build the display controller might not support multiple
+    /// In a bringup build the display coordinator might not support multiple
     /// buffers so Carnelian might have to run with only a
     /// single buffer. This configuration option is to allow testing rendering
     /// with a single buffer even in build that supports multiple.
@@ -242,7 +242,7 @@ impl AppSender {
             .expect("AppSender::request_render - unbounded_send");
     }
 
-    /// Mode for applications running directly on the display controller.
+    /// Mode for applications running directly on the display coordinator.
     /// Used by Virtcon and the screen saver but not generally useful.
     pub fn set_virtcon_mode(&self, virtcon_mode: VirtconMode) {
         self.sender
@@ -342,7 +342,7 @@ pub struct ViewCreationParameters {
     /// App sender that might be of use to the new view assistant.
     pub app_sender: AppSender,
     /// Display ID of the hosting display for views running directly
-    /// on the display controller.
+    /// on the display coordinator.
     pub display_id: Option<u64>,
     /// Options passed to `create_additional_view()`, if this view is being created
     /// by that function and if the caller passed any.
@@ -449,8 +449,8 @@ pub(crate) enum MessageInternal {
     FlatlandOnNextFrameBegin(ViewKey, fidl_fuchsia_ui_composition::OnNextFrameBeginValues),
     FlatlandOnFramePresented(ViewKey, fidl_fuchsia_scenic_scheduling::FramePresentedInfo),
     FlatlandOnError(ViewKey, fuchsia_scenic::flatland::FlatlandError),
-    NewDisplayController(PathBuf),
-    DisplayControllerEvent(ControllerEvent),
+    NewDisplayCoordinator(PathBuf),
+    DisplayCoordinatorEvent(CoordinatorEvent),
     SetVirtconMode(VirtconMode),
     ImportAndSetGamaTable(u64, u64, BoxedGammaValues, BoxedGammaValues, BoxedGammaValues),
     UserInputMessage(ViewKey, UserInputMessage),
@@ -622,16 +622,16 @@ impl App {
             MessageInternal::FlatlandOnError(view_id, error) => {
                 eprintln!("flatland error view: {}, error: {:#?}", view_id, error);
             }
-            MessageInternal::NewDisplayController(display_path) => {
-                self.strategy.handle_new_display_controller(display_path).await;
+            MessageInternal::NewDisplayCoordinator(display_path) => {
+                self.strategy.handle_new_display_coordinator(display_path).await;
             }
-            MessageInternal::DisplayControllerEvent(event) => match event {
-                ControllerEvent::OnVsync { display_id, .. } => {
+            MessageInternal::DisplayCoordinatorEvent(event) => match event {
+                CoordinatorEvent::OnVsync { display_id, .. } => {
                     if let Some(view_key) =
                         self.strategy.get_visible_view_key_for_display(display_id)
                     {
                         if let Ok(view) = self.get_view(view_key) {
-                            view.handle_display_controller_event(event).await;
+                            view.handle_display_coordinator_event(event).await;
                         } else {
                             // We seem to get two vsyncs after the display is removed.
                             // Log it to help run down why that is.
@@ -640,7 +640,7 @@ impl App {
                     }
                 }
 
-                _ => self.strategy.handle_display_controller_event(event).await,
+                _ => self.strategy.handle_display_coordinator_event(event).await,
             },
             MessageInternal::SetVirtconMode(virtcon_mode) => {
                 self.strategy.set_virtcon_mode(virtcon_mode);

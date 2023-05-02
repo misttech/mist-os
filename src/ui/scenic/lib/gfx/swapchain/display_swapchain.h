@@ -33,13 +33,13 @@ class DisplaySwapchainTest;
 }  // namespace test
 
 // DisplaySwapchain implements the Swapchain interface to present images to a physical display using
-// the Zircon display controller API.
+// the Zircon display coordinator API.
 class DisplaySwapchain : public Swapchain {
  public:
   DisplaySwapchain(
       Sysmem* sysmem,
-      std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
-      std::shared_ptr<display::DisplayControllerListener> display_controller_listener,
+      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
+      std::shared_ptr<display::DisplayCoordinatorListener> display_coordinator_listener,
       uint64_t swapchain_image_count, display::Display* display, escher::Escher* escher);
   ~DisplaySwapchain() override;
 
@@ -62,7 +62,7 @@ class DisplaySwapchain : public Swapchain {
 
   // Static function made accessible for tests.
   static bool SetDisplayColorConversion(
-      uint64_t display_id, fuchsia::hardware::display::ControllerSyncPtr& display_controller,
+      uint64_t display_id, fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       const ColorTransform& transform);
 
  private:
@@ -118,7 +118,7 @@ class DisplaySwapchain : public Swapchain {
 
   void OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp applied_config_stamp);
 
-  // Import a buffer collection token into the display controller so the constraints will be set on
+  // Import a buffer collection token into the display coordinator so the constraints will be set on
   // it. Returns an id that can be used to refer to the collection.
   uint64_t ImportBufferCollection(fuchsia::sysmem::BufferCollectionTokenSyncPtr token);
 
@@ -143,11 +143,11 @@ class DisplaySwapchain : public Swapchain {
   display::Display* const display_;
   uint64_t primary_layer_id_ = fuchsia::hardware::display::INVALID_DISP_ID;
 
-  // The display controller driver binding.
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller_;
-  std::shared_ptr<display::DisplayControllerListener> display_controller_listener_;
+  // The display coordinator driver binding.
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator_;
+  std::shared_ptr<display::DisplayCoordinatorListener> display_coordinator_listener_;
 
-  // Ids used to talk to display controller. If we use |display_controller_|
+  // Ids used to talk to display coordinator. If we use |display_coordinator_|
   // in multiple places, we'll have to centralize this logic.
   uint64_t next_buffer_collection_id_ = fuchsia::hardware::display::INVALID_DISP_ID + 1;
 

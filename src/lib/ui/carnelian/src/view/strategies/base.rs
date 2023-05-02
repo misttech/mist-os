@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{
-    app::strategies::framebuffer::ControllerProxyPtr,
+    app::strategies::framebuffer::CoordinatorProxyPtr,
     geometry::{IntSize, Size},
     view::{UserInputMessage, ViewAssistantPtr, ViewDetails},
     ViewAssistantContext, ViewKey,
@@ -77,9 +77,9 @@ pub(crate) trait ViewStrategy {
     ) {
     }
 
-    async fn handle_display_controller_event(
+    async fn handle_display_coordinator_event(
         &mut self,
-        _event: fidl_fuchsia_hardware_display::ControllerEvent,
+        _event: fidl_fuchsia_hardware_display::CoordinatorEvent,
     ) {
     }
 
@@ -95,7 +95,7 @@ pub(crate) type ViewStrategyPtr = Box<dyn ViewStrategy>;
 #[derive(Debug)]
 pub(crate) struct DisplayDirectParams {
     pub view_key: Option<ViewKey>,
-    pub controller: ControllerProxyPtr,
+    pub coordinator: CoordinatorProxyPtr,
     pub info: fidl_fuchsia_hardware_display::Info,
     pub preferred_size: IntSize,
 }

@@ -15,17 +15,17 @@
 namespace scenic_impl {
 namespace display {
 
-class DisplayController;
+class DisplayCoordinator;
 class Display2;
 class DisplayManager;
 class DisplayManager2;
 
 namespace test {
-class DisplayControllerTest_DisplayControllerTest_Test;
+class DisplayCoordinatorTest_DisplayCoordinatorTest_Test;
 }
 
-using DisplayControllerUniquePtr =
-    std::unique_ptr<DisplayController, std::function<void(DisplayController*)>>;
+using DisplayCoordinatorUniquePtr =
+    std::unique_ptr<DisplayCoordinator, std::function<void(DisplayCoordinator*)>>;
 using OnDisplayRemovedCallback = fit::function<void(/*display_id=*/uint64_t)>;
 using OnDisplayAddedCallback = fit::function<void(Display2*)>;
 using OnVsyncCallback =
@@ -37,7 +37,7 @@ class Display2 {
   Display2(uint64_t display_id, std::vector<fuchsia::hardware::display::Mode> display_modes,
            std::vector<fuchsia_images2::PixelFormat> pixel_formats);
 
-  // The display's ID in the context of DisplayManager's DisplayController.
+  // The display's ID in the context of DisplayManager's DisplayCoordinator.
   uint64_t display_id() const { return display_id_; }
 
   const std::vector<fuchsia::hardware::display::Mode>& display_modes() const {
@@ -58,16 +58,16 @@ class Display2 {
   OnVsyncCallback on_vsync_callback_;
 };
 
-// Wraps a display controller interface, and provides a live-updated list of displays
-// attached to the display controller.
-class DisplayController {
+// Wraps a display coordinator interface, and provides a live-updated list of displays
+// attached to the display coordinator.
+class DisplayCoordinator {
  public:
-  DisplayController(
+  DisplayCoordinator(
       std::vector<Display2> displays,
-      const std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr>& controller);
+      const std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr>& coordinator);
 
-  const std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr>& controller() {
-    return controller_;
+  const std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr>& coordinator() {
+    return coordinator_;
   }
   std::vector<Display2>* displays() { return &displays_; }
 
@@ -79,14 +79,14 @@ class DisplayController {
     on_display_removed_listener_ = std::move(on_display_removed);
   }
 
-  DisplayController(const DisplayController&) = delete;
-  DisplayController(DisplayController&&) = delete;
-  DisplayController& operator=(const DisplayController&) = delete;
-  DisplayController& operator=(DisplayController&&) = delete;
+  DisplayCoordinator(const DisplayCoordinator&) = delete;
+  DisplayCoordinator(DisplayCoordinator&&) = delete;
+  DisplayCoordinator& operator=(const DisplayCoordinator&) = delete;
+  DisplayCoordinator& operator=(DisplayCoordinator&&) = delete;
 
  private:
   friend class DisplayManager2;
-  friend class scenic_impl::display::test::DisplayControllerTest_DisplayControllerTest_Test;
+  friend class scenic_impl::display::test::DisplayCoordinatorTest_DisplayCoordinatorTest_Test;
 
   // Adds a display. Should only be called by DisplayManager or during testing.
   void AddDisplay(Display2 display);
@@ -96,7 +96,7 @@ class DisplayController {
 
   std::vector<Display2> displays_;
   // TODO(fxbug.dev/42795): Replace with a fxl::WeakPtr.
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> controller_;
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> coordinator_;
   OnDisplayRemovedCallback on_display_removed_listener_;
   OnDisplayAddedCallback on_display_added_listener_;
 };

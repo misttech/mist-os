@@ -30,27 +30,27 @@ class ProviderService : public fuchsia::hardware::display::Provider {
   ~ProviderService();
 
   // |fuchsia::hardware::display::Provider|.
-  void OpenVirtconController(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller_request,
-      OpenVirtconControllerCallback callback) override;
+  void OpenCoordinatorForVirtcon(
+      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
+      OpenCoordinatorForVirtconCallback callback) override;
 
   // |fuchsia::hardware::display::Provider|.
-  void OpenController(
-      ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller_request,
-      OpenControllerCallback callback) override;
+  void OpenCoordinatorForPrimary(
+      ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request,
+      OpenCoordinatorForPrimaryCallback callback) override;
 
   // For tests.
   size_t num_queued_requests() const { return state_->queued_requests.size(); }
   size_t num_virtcon_queued_requests() const { return state_->virtcon_queued_requests.size(); }
-  bool controller_claimed() const { return state_->controller_claimed; }
-  bool virtcon_controller_claimed() const { return state_->virtcon_controller_claimed; }
+  bool coordinator_claimed() const { return state_->coordinator_claimed; }
+  bool virtcon_coordinator_claimed() const { return state_->virtcon_coordinator_claimed; }
 
  private:
   struct Request {
     bool is_virtcon;
     zx::channel device;
-    ::fidl::InterfaceRequest<fuchsia::hardware::display::Controller> controller_request;
-    OpenControllerCallback callback;
+    ::fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator> coordinator_request;
+    OpenCoordinatorForPrimaryCallback callback;
   };
 
   // Encapsulates state for thread safety, since |display::MockDisplayDeviceTree| invokes callbacks
@@ -60,13 +60,13 @@ class ProviderService : public fuchsia::hardware::display::Provider {
 
     std::unique_ptr<display::MockDisplayDeviceTree> tree;
 
-    bool controller_claimed = false;
-    bool virtcon_controller_claimed = false;
+    bool coordinator_claimed = false;
+    bool virtcon_coordinator_claimed = false;
     std::queue<Request> queued_requests;
     std::queue<Request> virtcon_queued_requests;
   };
 
-  // Called by OpenVirtconController() and OpenController().
+  // Called by OpenVirtconCoordinator() and OpenCoordinator().
   void ConnectOrDeferClient(Request request);
 
   // Must be called from main dispatcher thread.
