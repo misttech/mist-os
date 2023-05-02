@@ -68,4 +68,42 @@ TEST(SeccompTest, RetTrapBypassesIgn) {
   EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
 }
 
+// Test to ensure strict mode works.
+TEST(SeccompTest, Strict) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+    EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
+    syscall(kFilteredSyscall);
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) << "status " << status;
+}
+
+// Cannot change from Filtered to Strict
+TEST(SeccompTest, FilterToStrictErrors) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+
+    sock_filter filter[] = {
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    sock_fprog prog = {.len = sizeof(filter) / sizeof(sock_filter), .filter = filter};
+    EXPECT_EQ(0, syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog));
+
+    EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0))
+        << "Was able to set a seccomp filter to strict when there was a filter " << errno;
+
+    EXPECT_EQ(EINVAL, errno);
+    exit_with_failure_code();
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+}
+
 }  // anonymous namespace

@@ -655,7 +655,6 @@ pub fn sys_prctl(
         }
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {
-                not_implemented!(current_task, "prctl(PR_SET_SECCOMP, {})", arg2);
                 return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
             } else if arg2 == SECCOMP_MODE_FILTER as u64 {
                 return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
@@ -971,8 +970,8 @@ pub fn sys_seccomp(
             if flags != 0 {
                 return error!(EINVAL);
             }
-            not_implemented!(current_task, "seccomp not implemented");
-            error!(ENOSYS)
+            current_task.set_seccomp_state(SeccompFilterState::Strict)?;
+            Ok(().into())
         }
         SECCOMP_SET_MODE_FILTER => match flags {
             0

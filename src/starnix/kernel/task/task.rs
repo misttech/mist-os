@@ -8,6 +8,7 @@ use std::cmp;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::fmt;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use ubpf::program::EbpfProgram;
 
@@ -59,10 +60,6 @@ pub struct CurrentTask {
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
     pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
-
-    /// Variable that can tell you whether there are currently seccomp
-    /// filters without holding a lock
-    pub has_seccomp_filters: bool,
 }
 
 type SyscallRestartFunc =
@@ -328,6 +325,10 @@ pub struct Task {
     /// Whether the restricted mode executor should ignore exceptions associated with this Task's thread
     // TODO(https://fxbug.dev/124427): Remove this mechanism once exceptions are handled inline.
     pub ignore_exceptions: std::sync::atomic::AtomicBool,
+
+    /// Variable that can tell you whether there are currently seccomp
+    /// filters without holding a lock
+    pub has_seccomp_filters: AtomicU8,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -363,6 +364,7 @@ impl Task {
         priority: u8,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
+        has_seccomp_filters: AtomicU8,
         seccomp_filters: Vec<EbpfProgram>,
     ) -> Self {
         let fs = {
@@ -399,6 +401,7 @@ impl Task {
                 seccomp_filters,
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
+            has_seccomp_filters,
         };
         #[cfg(any(test, debug_assertions))]
         {
@@ -502,6 +505,7 @@ impl Task {
             DEFAULT_TASK_PRIORITY,
             kernel.root_uts_ns.clone(),
             false,
+            std::sync::atomic::AtomicU8::new(0),
             vec![],
         ));
         current_task.thread_group.add(&current_task.task)?;
@@ -674,6 +678,7 @@ impl Task {
             priority,
             uts_ns,
             no_new_privs,
+            AtomicU8::new(self.has_seccomp_filters.load(Ordering::Acquire)),
             seccomp_filters,
         ));
 
@@ -937,17 +942,40 @@ impl Task {
             _ => ExceptionResult::Unhandled,
         }
     }
+
+    pub fn set_seccomp_state(&self, state: SeccompFilterState) -> Result<(), Errno> {
+        let ustate: u8 = state as u8;
+        loop {
+            let seccomp_filter_status = self.has_seccomp_filters.load(Ordering::Acquire);
+            if seccomp_filter_status == ustate {
+                return Ok(());
+            }
+            if seccomp_filter_status != SeccompFilterState::None as u8 {
+                return Err(errno!(EINVAL));
+            }
+            if self
+                .has_seccomp_filters
+                .compare_exchange(
+                    seccomp_filter_status,
+                    ustate,
+                    Ordering::Release,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                return Ok(());
+            }
+        }
+    }
 }
 
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
-        let hsf = !task.read().seccomp_filters.is_empty();
         CurrentTask {
             task: Arc::new(task),
             dt_debug_address: None,
             registers: RegisterState::default(),
             syscall_restart_func: None,
-            has_seccomp_filters: hsf,
         }
     }
 
@@ -1374,7 +1402,7 @@ impl CurrentTask {
                     state.seccomp_filters.push(program);
                 }
 
-                self.has_seccomp_filters = true
+                self.set_seccomp_state(SeccompFilterState::UserDefined)?;
             }
             Err(errmsg) => log_warn!("{}", errmsg),
         }
@@ -1383,6 +1411,27 @@ impl CurrentTask {
     }
 
     pub fn run_seccomp_filters(&self, syscall: &Syscall) -> Option<Errno> {
+        // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
+        // from user-defined seccomp filters.
+        if self.has_seccomp_filters.load(Ordering::Acquire) & SeccompFilterState::Strict as u8 != 0
+            && syscall.decl.number as u32 != __NR_exit
+            && syscall.decl.number as u32 != __NR_read
+            && syscall.decl.number as u32 != __NR_write
+        {
+            send_signal(
+                self,
+                SignalInfo {
+                    signal: SIGKILL,
+                    errno: 0,
+                    code: 0,
+                    detail: SignalDetail::default(),
+                    force: false,
+                },
+            );
+            return Some(errno_from_code!(0));
+        }
+
+        // After that is done, execute any other seccomp filters.
         #[cfg(target_arch = "x86_64")]
         let arch_val = AUDIT_ARCH_X86_64;
         #[cfg(target_arch = "aarch64")]
@@ -1433,26 +1482,49 @@ impl CurrentTask {
                     force: false,
                 };
 
-                {
-                    let is_last_thread = self.thread_group.read().tasks.len() == 1;
-                    let mut task_state = self.write();
+                let is_last_thread = self.thread_group.read().tasks.len() == 1;
+                let mut task_state = self.write();
 
-                    if is_last_thread {
-                        task_state.dump_on_exit = true;
-                        task_state.exit_status.get_or_insert(ExitStatus::CoreDump(siginfo));
-                    } else {
-                        task_state.exit_status.get_or_insert(ExitStatus::Kill(siginfo));
-                    }
+                if is_last_thread {
+                    task_state.dump_on_exit = true;
+                    task_state.exit_status.get_or_insert(ExitStatus::CoreDump(siginfo));
+                } else {
+                    task_state.exit_status.get_or_insert(ExitStatus::Kill(siginfo));
                 }
                 Some(errno_from_code!(0))
+            }
+            SECCOMP_RET_LOG => {
+                let creds = self.creds();
+                let uid = creds.uid;
+                let gid = creds.gid;
+                let comm_r = self.command();
+                let comm = if let Ok(c) = comm_r.to_str() { c } else { "???" };
+
+                let arch = if cfg!(target_arch = "x86_64") {
+                    "x86_64"
+                } else if cfg!(target_arch = "aarch64") {
+                    "aarch64"
+                } else {
+                    "unknown"
+                };
+                crate::logging::log_info!(
+                    "uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
+                    uid,
+                    gid,
+                    self.thread_group.leader,
+                    comm,
+                    syscall.decl.number,
+                    self.registers.instruction_pointer_register(),
+                    arch,
+                    syscall.decl.name
+                );
+                None
             }
             SECCOMP_RET_TRACE => {
                 // TODO(fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
                 Some(errno!(ENOSYS))
             }
             SECCOMP_RET_TRAP => {
-                // TODO: There may be additional work around making sure the registers the
-                // signal returns have the correct value.
                 let siginfo = SignalInfo {
                     signal: SIGSYS,
                     errno: (result & SECCOMP_RET_DATA) as i32,
@@ -1474,6 +1546,15 @@ impl CurrentTask {
             }
         }
     }
+}
+
+/// Possible values for the current status of the seccomp filters for
+/// this process.
+#[repr(u8)]
+pub enum SeccompFilterState {
+    None = 0,
+    UserDefined = 1,
+    Strict = 2,
 }
 
 impl fmt::Debug for Task {

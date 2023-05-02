@@ -11,6 +11,7 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use process_builder::elf_parse;
 use std::convert::TryFrom;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::arch::execution::generate_interrupt_instructions;
@@ -73,7 +74,7 @@ pub fn execute_syscall(
 
     // Inlined fast path for seccomp, so that we don't incur the cost
     // of a method call when running the filters.
-    if current_task.has_seccomp_filters {
+    if current_task.has_seccomp_filters.load(Ordering::Acquire) != SeccompFilterState::None as u8 {
         if let Some(errno) = current_task.run_seccomp_filters(&syscall) {
             current_task.registers.set_return_register(errno.return_value());
             return Some(ErrorContext { error: errno, syscall });
