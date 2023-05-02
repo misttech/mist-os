@@ -2,28 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    program: {
-        apex_hack: [ "com.android.runtime" ],
-        features: [
-            "binder",
-            "test_data",
-        ],
-        init: [],
-        kernel_cmdline: "androidboot.hardware=starnix",
-        mounts: [
-            "/:ext4:data/system.img",
-            "/vendor:ext4:data/testcases.img",
-            "/data:remotefs:data",
-            "/dev:devtmpfs",
-            "/dev/shm:tmpfs",
-            "/data/tmp:tmpfs",
-            "/dev/shm:tmpfs",
-            "/dev/pts:devpts",
-            "/proc:proc",
-            "/sys:sysfs",
-            "/sys/fs/selinux:selinuxfs",
-        ],
-        name: "gvisor_test",
-        startup_file_path: "",
-    },
+    // TODO: Move to the debian container.
+    include: [ "//src/starnix/containers/bionic/meta/bionic_container.shard.cml" ],
 }

@@ -26,6 +26,9 @@ import("//build/dist/distribution_manifest.gni")
 #   deps
 #   testonly
 template("ext4_to_pkg") {
+  assert(defined(invoker.input), "input must be defined for ext4_to_pkg")
+  assert(defined(invoker.prefix), "prefix must be defined for ext4_to_pkg")
+
   _gen_dir = "$target_gen_dir/$target_name"
   _fini_manifest = "$_gen_dir/manifest.fini"
 

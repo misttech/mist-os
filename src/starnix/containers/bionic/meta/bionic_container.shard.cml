@@ -11,8 +11,8 @@
         init: [],
         kernel_cmdline: "androidboot.hardware=starnix",
         mounts: [
-            "/:ext4:data/system.img",
-            "/vendor:ext4:data/testcases.img",
+            "/:remote_bundle:data/system",
+            "/vendor:remote_bundle:data/testcases",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/dev/shm:tmpfs",

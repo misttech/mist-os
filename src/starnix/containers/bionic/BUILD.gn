@@ -3,16 +3,17 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/storage/ext4/ext4_to_pkg.gni")
 
 # The system image for the container.
-resource("system_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
-  outputs = [ "data/system.img" ]
+ext4_to_pkg("system_image") {
+  input = "//prebuilt/starnix/android-image-amd64/system.img"
+  prefix = "data/system"
 }
 
 # The filesystem image containing tests built in the Android tree but not included in the system
 # image.
-resource("testcases_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
-  outputs = [ "data/testcases.img" ]
+ext4_to_pkg("testcases_image") {
+  input = "//prebuilt/starnix/android-image-amd64/starnix_testcases.img"
+  prefix = "data/testcases"
 }
