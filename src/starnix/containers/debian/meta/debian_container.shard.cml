@@ -11,12 +11,12 @@
             "test_data",
         ],
         init: [],
-        kernel_cmdline: "",
         mounts: [
             "/:remote_bundle:data/system",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/dev/pts:devpts",
+            "/dev/shm:tmpfs",
             "/proc:proc",
             "/sys:sysfs",
             "/sys/fs/bpf:bpf",
