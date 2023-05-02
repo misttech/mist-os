@@ -25,6 +25,9 @@ use {
     futures::FutureExt,
 };
 
+#[cfg(feature = "fxblob")]
+use fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions};
+
 mod migration;
 mod wipe_storage;
 mod write_data_file;
@@ -794,5 +797,26 @@ async fn migration_to_minfs() {
 
     fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
     fixture.check_test_data_file().await;
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn verify_blobs() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    let blobfs_verifier = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<BlobfsVerifierMarker>()
+        .expect("connect_to_protcol_at_exposed_dir failed");
+    blobfs_verifier
+        .verify(VerifyOptions::default())
+        .await
+        .expect("FIDL failure")
+        .expect("verify failure");
+
     fixture.tear_down().await;
 }

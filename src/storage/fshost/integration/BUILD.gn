@@ -47,6 +47,7 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/fxfs-crypt",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/lib/cm_rust",
+    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
@@ -62,6 +63,9 @@ rustc_library("fshost_test_fixture") {
 
 # Generates an fshost integration test component. Includes the fshost component on which the test
 # is exectuted.
+#
+#   extra_deps (optional)
+#     [array] A list of extra deps
 #
 #   options.data_filesystem_format (required)
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
@@ -128,6 +132,9 @@ template("fshost_integration_test") {
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:tracing",
     ]
+    if (defined(invoker.extra_deps)) {
+      deps += invoker.extra_deps
+    }
   }
 
   _shard_target = "${target_name}-shard"
@@ -192,6 +199,8 @@ fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
     data_filesystem_format = "fxfs"
     use_disk_migration = false
   }
+  extra_deps =
+      [ "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust" ]
 }
 
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {

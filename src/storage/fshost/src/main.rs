@@ -18,7 +18,9 @@ use {
     inspect_runtime,
     std::{collections::HashSet, sync::Arc},
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
+        directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+        execution_scope::ExecutionScope,
+        path::Path,
         remote::remote_dir,
     },
 };
@@ -29,6 +31,7 @@ mod copier;
 mod crypt;
 mod device;
 mod environment;
+mod fxblob;
 mod inspect;
 mod manager;
 mod matcher;
@@ -94,17 +97,6 @@ async fn main() -> Result<(), Error> {
     let data_root = env.data_root()?;
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let export = vfs::pseudo_directory! {
-        "svc" => vfs::pseudo_directory! {
-            fshost::AdminMarker::PROTOCOL_NAME =>
-                service::fshost_admin(
-                    config.clone(),
-                    ramdisk_path.clone(),
-                    launcher,
-                    matcher_lock.clone()
-                ),
-            fshost::BlockWatcherMarker::PROTOCOL_NAME =>
-                service::fshost_block_watcher(watcher),
-        },
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_root),
             "data" => remote_dir(data_root),
@@ -114,6 +106,26 @@ async fn main() -> Result<(), Error> {
             inspector.clone(),
         ),
     };
+    let svc_dir = vfs::pseudo_directory! {
+        fshost::AdminMarker::PROTOCOL_NAME =>
+            service::fshost_admin(
+                config.clone(),
+                ramdisk_path.clone(),
+                launcher,
+                matcher_lock.clone()
+            ),
+        fshost::BlockWatcherMarker::PROTOCOL_NAME =>
+            service::fshost_block_watcher(watcher),
+    };
+    if config.fxfs_blob {
+        svc_dir
+            .add_entry(
+                fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
+                fxblob::blobfs_verifier_service(),
+            )
+            .unwrap();
+    }
+    export.add_entry("svc", svc_dir).unwrap();
 
     // The inspector is global and will maintain strong references to callbacks used to gather
     // inspect data which will include env.data_root() which is a proxy with an async channel that

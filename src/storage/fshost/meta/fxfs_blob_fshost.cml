@@ -97,8 +97,6 @@
             protocol: "fuchsia.fxfs.Volumes",
             from: "#fxfs",
         },
-
-        // TODO(fxbug.dev/122125): Do we need this?
         {
             protocol: "fuchsia.update.verify.BlobfsVerifier",
             from: "self",
