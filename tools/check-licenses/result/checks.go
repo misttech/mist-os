@@ -90,29 +90,25 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 }
 
 func AllLicenseTextsMustBeRecognized() error {
-	// TODO(fxbug.dev/126193): Remove this allowlist.
-	tempAllowlist := map[string]bool{
-		"third_party/zlib/contrib/iostream3/LICENSE":                                 true,
-		"src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/firmware/License.txt": true,
-		"third_party/rust_crates/vendor/siphasher-0.3.10/COPYING":                    true,
-		"third_party/rust_crates/vendor/siphasher-0.2.3/COPYING":                     true,
-		"third_party/rust_crates/ask2patch/aho-corasick/COPYING":                     true,
-		"third_party/rust_crates/ask2patch/walkdir/COPYING":                          true,
-		"third_party/rust_crates/ask2patch/memchr/COPYING":                           true,
-		"third_party/rust_crates/ask2patch/csv/COPYING":                              true,
-		"third_party/rust_crates/ask2patch/csv-core/COPYING":                         true,
-		"third_party/rust_crates/ask2patch/same-file/COPYING":                        true,
-		"third_party/rust_crates/ask2patch/termcolor/COPYING":                        true,
-		"third_party/rust_crates/ask2patch/byteorder/COPYING":                        true,
-	}
+	name := "AllProjectsMustHaveALicense"
 
 	var foundUnrecognizedMatch bool
 	var b strings.Builder
 
+	// Retrieve allowlists from config files
+	allowlist := make(map[string]bool, 0)
+	for _, c := range Config.Checks {
+		if c.Name == name {
+			for k, v := range c.Allowlist {
+				allowlist[k] = v
+			}
+		}
+	}
+
 	b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
 	for _, m := range license.Unrecognized.Matches {
-		if !tempAllowlist[m.File().RelPath()] {
-			foundUnrecognizedMatch = true
+		if _, ok := allowlist[m.File().RelPath()]; ok {
+			continue
 		}
 
 		b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
@@ -126,18 +122,23 @@ func AllLicenseTextsMustBeRecognized() error {
 }
 
 func AllLicensePatternUsagesMustBeApproved() error {
-	// TODO(fxbug.dev/126193): Remove this temporary allowlist.
-	tempAllowlist := map[string]bool{
-		"prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/external/SPIRV-Headers/LICENSE": true,
-		"prebuilt/third_party/vulkansdk/linux/source/SPIRV-Headers/LICENSE":                                true,
-		"third_party/dart-pkg/pub/dds/tool/dap/external_dap_spec/debugAdapterProtocol.license.txt":         true,
-		"third_party/shaderc/third_party/LICENSE.glslang":                                                  true,
-	}
+	name := "AllLicensePatternUsagesMustBeApproved"
 
 	var b strings.Builder
+
+	// Retrieve allowlists from config files
+	allowlist := make(map[string]bool, 0)
+	for _, c := range Config.Checks {
+		if c.Name == name {
+			for k, v := range c.Allowlist {
+				allowlist[k] = v
+			}
+		}
+	}
+
 OUTER:
 	for _, sr := range license.AllSearchResults {
-		if tempAllowlist[sr.LicenseData.File().RelPath()] {
+		if _, ok := allowlist[sr.LicenseData.File().RelPath()]; ok {
 			continue
 		}
 

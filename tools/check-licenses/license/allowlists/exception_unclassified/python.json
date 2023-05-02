@@ -6,7 +6,8 @@
           {
             "bug": "",
             "projects": [
-              "prebuilt/third_party/python3/linux-x64"
+              "prebuilt/third_party/python3/linux-x64",
+              "prebuilt/third_party/vpython"
             ]
           }
         ],
