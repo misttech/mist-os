@@ -18,7 +18,7 @@ use crate::fs::{
 };
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::not_implemented;
-use crate::task::{syscalls::do_clone, CurrentTask};
+use crate::task::{syscalls::do_clone, CurrentTask, Waiter};
 use crate::types::*;
 
 pub fn sys_access(
@@ -226,6 +226,13 @@ pub fn sys_open(
     mode: FileMode,
 ) -> Result<FdNumber, Errno> {
     sys_openat(current_task, FdNumber::AT_FDCWD, user_path, flags, mode)
+}
+
+pub fn sys_pause(current_task: &CurrentTask) -> Result<(), Errno> {
+    let waiter = Waiter::new();
+    waiter.wait(current_task)?;
+
+    Ok(())
 }
 
 pub fn sys_pipe(current_task: &CurrentTask, user_pipe: UserRef<FdNumber>) -> Result<(), Errno> {
