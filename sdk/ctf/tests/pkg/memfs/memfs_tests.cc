@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #include <fbl/unique_fd.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -51,7 +51,7 @@ TEST(MemfsTests, TestMemfsBasic) {
   fd = openat(dirfd(d), filename, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
   ASSERT_GE(fd, 0);
   const char* data = "hello";
-  size_t datalen = strlen(data);
+  ssize_t datalen = strlen(data);
   ASSERT_EQ(write(fd, data, datalen), datalen);
   ASSERT_EQ(lseek(fd, 0, SEEK_SET), 0);
   char buf[32];
@@ -61,11 +61,11 @@ TEST(MemfsTests, TestMemfsBasic) {
 
   // Readdir the file
   struct dirent* de;
-  ASSERT_NOT_NULL((de = readdir(d)));
+  ASSERT_NE((de = readdir(d)), nullptr);
   ASSERT_EQ(strcmp(de->d_name, "."), 0);
-  ASSERT_NOT_NULL((de = readdir(d)));
+  ASSERT_NE((de = readdir(d)), nullptr);
   ASSERT_EQ(strcmp(de->d_name, filename), 0);
-  ASSERT_NULL(readdir(d));
+  ASSERT_EQ(readdir(d), nullptr);
 
   ASSERT_EQ(closedir(d), 0);
   sync_completion_t unmounted;
@@ -92,7 +92,7 @@ TEST(MemfsTests, TestMemfsAppend) {
   fd = openat(dirfd(d), filename, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR);
   ASSERT_GE(fd, 0);
   const char* data = "hello";
-  size_t datalen = strlen(data);
+  ssize_t datalen = strlen(data);
   ASSERT_EQ(write(fd, data, datalen), datalen);
   ASSERT_EQ(lseek(fd, 0, SEEK_SET), 0);
   data = ", world";
@@ -130,7 +130,7 @@ TEST(MemfsTests, TestMemfsInstall) {
   fd = openat(dirfd(d), filename, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
   ASSERT_GE(fd, 0);
   const char* data = "hello";
-  size_t datalen = strlen(data);
+  ssize_t datalen = strlen(data);
   ASSERT_EQ(write(fd, data, datalen), datalen);
   ASSERT_EQ(lseek(fd, 0, SEEK_SET), 0);
   char buf[32];
@@ -140,11 +140,11 @@ TEST(MemfsTests, TestMemfsInstall) {
 
   // Readdir the file
   struct dirent* de;
-  ASSERT_NOT_NULL((de = readdir(d)));
+  ASSERT_NE((de = readdir(d)), nullptr);
   ASSERT_EQ(strcmp(de->d_name, "."), 0);
-  ASSERT_NOT_NULL((de = readdir(d)));
+  ASSERT_NE((de = readdir(d)), nullptr);
   ASSERT_EQ(strcmp(de->d_name, filename), 0);
-  ASSERT_NULL(readdir(d));
+  ASSERT_EQ(readdir(d), nullptr);
 
   ASSERT_EQ(closedir(d), 0);
   memfs_filesystem_t* fs_2;
@@ -177,7 +177,7 @@ TEST(MemfsTests, TestMemfsCloseDuringAccess) {
 
     // Access files within the filesystem.
     DIR* d = fdopendir(fd);
-    ASSERT_NOT_NULL(d);
+    ASSERT_NE(d, nullptr);
     thrd_t worker;
 
     struct thread_args {
@@ -220,7 +220,7 @@ TEST(MemfsTests, TestMemfsCloseDuringAccess) {
     // Now that the filesystem has terminated, we should be
     // unable to access it.
     ASSERT_LT(openat(dirfd(d), "foo", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR), 0);
-    ASSERT_EQ(errno, EPIPE, "Expected connection to remote server to be closed");
+    ASSERT_EQ(errno, EPIPE) << "Expected connection to remote server to be closed";
 
     // Since the filesystem has terminated, this will
     // only close the client side of the connection.
@@ -241,7 +241,7 @@ TEST(MemfsTests, TestMemfsOverflow) {
 
   // Access files within the filesystem.
   DIR* d = fdopendir(root_fd);
-  ASSERT_NOT_NULL(d);
+  ASSERT_NE(d, nullptr);
 
   // Issue writes to the file in an order that previously would have triggered
   // an overflow in the memfs write path.
@@ -274,7 +274,7 @@ TEST(MemfsTests, TestMemfsDetachLinkedFilesystem) {
 
   // Access files within the filesystem.
   DIR* d = fdopendir(root_fd);
-  ASSERT_NOT_NULL(d);
+  ASSERT_NE(d, nullptr);
 
   // Leave a regular file.
   fbl::unique_fd fd(openat(dirfd(d), "file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
