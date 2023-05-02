@@ -23,7 +23,7 @@ class ParentDevice {
  public:
   virtual ~ParentDevice() { DLOG("ParentDevice dtor"); }
 
-  virtual zx::bti GetBusTransactionInitiator() const = 0;
+  virtual zx::bti GetBusTransactionInitiator() = 0;
 
   virtual bool SetThreadRole(const char* role_name) = 0;
 

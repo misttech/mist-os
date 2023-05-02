@@ -17,5 +17,6 @@
         { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.gpu.mali.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

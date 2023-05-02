@@ -18,7 +18,7 @@ bool ParentDeviceDFv1::SetThreadRole(const char* role_name) {
   return magma::PlatformThreadHelper::SetRole(parent_, role_name);
 }
 
-zx::bti ParentDeviceDFv1::GetBusTransactionInitiator() const {
+zx::bti ParentDeviceDFv1::GetBusTransactionInitiator() {
   zx::bti bti;
   zx_status_t status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK) {
@@ -79,11 +79,10 @@ std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_han
 
   zx_device_t* zx_device = reinterpret_cast<zx_device_t*>(device_handle);
 
-  pdev_protocol_t pdev;
-  zx_status_t status = device_get_fragment_protocol(zx_device, "pdev", ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
-    return DRETP(nullptr, "Error requesting protocol: %d", status);
+  auto pdev = ddk::PDevFidl::Create(zx_device, "pdev");
+  if (pdev.is_error()) {
+    return DRETP(nullptr, "Error requesting pdev: %s", pdev.status_string());
   }
 
-  return std::make_unique<ParentDeviceDFv1>(zx_device, pdev);
+  return std::make_unique<ParentDeviceDFv1>(zx_device, std::move(*pdev));
 }

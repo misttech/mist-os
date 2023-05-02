@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV1_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV1_H_
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
@@ -16,13 +15,13 @@ msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device);
 
 class ParentDeviceDFv1 : public ParentDevice {
  public:
-  explicit ParentDeviceDFv1(zx_device_t* parent, pdev_protocol_t pdev)
-      : parent_(parent), pdev_(&pdev) {}
+  explicit ParentDeviceDFv1(zx_device_t* parent, ddk::PDevFidl pdev)
+      : parent_(parent), pdev_(std::move(pdev)) {}
 
   virtual ~ParentDeviceDFv1() override { DLOG("ParentDevice dtor"); }
 
   bool SetThreadRole(const char* role_name) override;
-  zx::bti GetBusTransactionInitiator() const override;
+  zx::bti GetBusTransactionInitiator() override;
 
   // Map an MMIO listed at |index| in the platform device
   std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
@@ -36,7 +35,7 @@ class ParentDeviceDFv1 : public ParentDevice {
 
  private:
   zx_device_t* parent_;
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV1_H_

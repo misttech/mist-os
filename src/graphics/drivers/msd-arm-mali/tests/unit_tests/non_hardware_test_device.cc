@@ -79,7 +79,7 @@ class FakeParentDevice : public ParentDevice {
   FakeParentDevice() : ParentDevice() {}
 
   bool SetThreadRole(const char* role_name) override { return true; }
-  zx::bti GetBusTransactionInitiator() const override { return zx::bti(); }
+  zx::bti GetBusTransactionInitiator() override { return zx::bti(); }
 
   std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
       unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) override {
