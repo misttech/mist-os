@@ -10,10 +10,7 @@ use assembly_manifest::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 use sdk_metadata::{ProductBundle, VirtualDevice, VirtualDeviceManifest};
-use serde::Serialize;
-use std::collections::HashSet;
 use std::fs::File;
-use std::str::FromStr;
 use transfer_manifest::{
     ArtifactEntry, ArtifactType, TransferEntry, TransferManifest, TransferManifestV1,
 };
@@ -27,20 +24,9 @@ pub struct GenerateTransferManifest {
     #[argh(option)]
     product_bundle: Utf8PathBuf,
 
-    /// path to the directory to write the transfer manifest, all_blobs.json, images.json, and
-    /// targets.json.
+    /// path to the directory to write the transfer.json manifest.
     #[argh(option)]
     out_dir: Utf8PathBuf,
-}
-
-/// The format of all_blobs.json.
-type AllBlobsJson = Vec<AllBlobsEntry>;
-
-/// A single blob entry in all_blobs.json.
-#[derive(Serialize, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
-struct AllBlobsEntry {
-    /// The merkle-root hash of the blob.
-    merkle: fuchsia_merkle::Hash,
 }
 
 impl GenerateTransferManifest {
@@ -60,10 +46,7 @@ impl GenerateTransferManifest {
             .context("canonicalizing product bundle path")?;
 
         let mut entries = vec![];
-
         // Add all the blobs to the transfer manifest.
-        // And collect them into all_blobs.json.
-        let mut all_blobs = HashSet::new();
         for repository in &product_bundle.repositories {
             let canonical_blobs_path = canonical_product_bundle_path.join(&repository.blobs_path);
             let blobs = repository
@@ -73,11 +56,7 @@ impl GenerateTransferManifest {
             let mut blob_entries: Vec<ArtifactEntry> =
                 blobs.iter().map(|p| ArtifactEntry { name: p.into() }).collect();
             blob_entries.sort();
-            for blob in blobs.iter() {
-                let merkle = fuchsia_merkle::Hash::from_str(&blob.to_string())?;
-                all_blobs.insert(AllBlobsEntry { merkle });
-            }
-            let local = diff_utf8_paths(canonical_blobs_path, canonical_out_dir)
+            let local = diff_utf8_paths(canonical_blobs_path, &canonical_out_dir)
                 .context("rebasing blobs path")?;
             let blob_transfer = TransferEntry {
                 artifact_type: ArtifactType::Blobs,
@@ -116,7 +95,7 @@ impl GenerateTransferManifest {
                 for image in system.iter() {
                     product_bundle_entries.push(ArtifactEntry {
                         name: diff_utf8_paths(image.source(), &canonical_product_bundle_path)
-                            .context("rebasing systemp image")?,
+                            .context("rebasing system image")?,
                     });
                 }
             }
@@ -189,60 +168,13 @@ impl GenerateTransferManifest {
         }
         product_bundle_entries.sort();
 
-        let rebased_product_bundle_path =
-            diff_utf8_paths(canonical_product_bundle_path, canonical_out_dir)
-                .context("rebasing product bundle directory")?;
+        let local = diff_utf8_paths(&canonical_product_bundle_path, &canonical_out_dir)
+            .context("rebasing product_bundle path")?;
         entries.push(TransferEntry {
             artifact_type: ArtifactType::Files,
-            local: rebased_product_bundle_path,
+            local,
             remote: "product_bundle".into(),
             entries: product_bundle_entries,
-        });
-
-        // Add targets.json for MOS if we have a repository.
-        let mut mos_entries = vec![];
-        if let Some(repository) = product_bundle.repositories.get(0) {
-            let targets_path = self.out_dir.join("targets.json");
-            std::fs::copy(repository.targets_path(), &targets_path)
-                .context("copying the targets.json")?;
-            mos_entries.push(ArtifactEntry { name: "targets.json".into() });
-        }
-
-        // Add all_blobs.json for MOS.
-        let mut all_blobs = AllBlobsJson::from_iter(all_blobs);
-        let all_blobs_path = self.out_dir.join("all_blobs.json");
-        let all_blobs_file = File::create(&all_blobs_path).context("creating all_blobs.json")?;
-        all_blobs.sort();
-        serde_json::to_writer(all_blobs_file, &all_blobs).context("writing all_blobs.json")?;
-        mos_entries.push(ArtifactEntry { name: "all_blobs.json".into() });
-
-        // Add images.json for MOS and tests.
-        // Find the first assembly in the preferential order of A, B, then R.
-        let mut assembly = if let Some(a) = product_bundle.system_a {
-            a.clone()
-        } else if let Some(b) = product_bundle.system_b {
-            b.clone()
-        } else if let Some(r) = product_bundle.system_r {
-            r.clone()
-        } else {
-            bail!("The product bundle does not have any assembly systems");
-        };
-        for image in assembly.iter_mut() {
-            image.set_source(
-                diff_utf8_paths(image.source(), canonical_out_dir)
-                    .context("rebasing image path")?,
-            );
-        }
-        let images_path = self.out_dir.join("images.json");
-        let images_file = File::create(&images_path).context("creating images.json")?;
-        serde_json::to_writer(images_file, &assembly).context("writing images.json")?;
-        mos_entries.push(ArtifactEntry { name: "images.json".into() });
-
-        entries.push(TransferEntry {
-            artifact_type: ArtifactType::Files,
-            local: "".into(),
-            remote: "".into(),
-            entries: mos_entries,
         });
 
         // Write the transfer manifest.
@@ -264,8 +196,6 @@ mod tests {
     use fuchsia_repo::test_utils;
     use sdk_metadata::virtual_device::Hardware;
     use sdk_metadata::{ProductBundleV2, Repository, VirtualDeviceV1};
-    use serde_json::json;
-    use serde_json::Value;
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -393,79 +323,13 @@ mod tests {
                             ArtifactEntry { name: "zbi".into() },
                         ]
                     },
-                    TransferEntry {
-                        artifact_type: transfer_manifest::ArtifactType::Files,
-                        local: "".into(),
-                        remote: "".into(),
-                        entries: vec![
-                            ArtifactEntry { name: "targets.json".into() },
-                            ArtifactEntry { name: "all_blobs.json".into() },
-                            ArtifactEntry { name: "images.json".into() },
-                        ]
-                    }
                 ]
             }),
         );
 
-        let all_blobs_path = tempdir.join("all_blobs.json");
-        let all_blobs_file = File::open(&all_blobs_path).unwrap();
-        let all_blobs_value: serde_json::Value = serde_json::from_reader(all_blobs_file).unwrap();
-        assert_eq!(
-            all_blobs_value,
-            json!([
-                   {
-                       "merkle": "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458"
-                   },
-                   {
-                       "merkle": "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d"
-                   },
-                   {
-                       "merkle": "548981eb310ddc4098fb5c63692e19ac4ae287b13d0e911fbd9f7819ac22491c"
-                   },
-                   {
-                       "merkle": "72e1e7a504f32edf4f23e7e8a3542c1d77d12541142261cfe272decfa75f542d"
-                   },
-                   {
-                       "merkle": "8a8a5f07f935a4e8e1fd1a1eda39da09bb2438ec0adfb149679ddd6e7e1fbb4f"
-                   },
-                   {
-                       "merkle": "ecc11f7f4b763c5a21be2b4159c9818bbe22ca7e6d8100a72f6a41d3d7b827a9"
-                   },
-                ]
-            )
-        );
-
-        let images_path = tempdir.join("images.json");
-        let images_manifest_file = File::open(images_path).unwrap();
-        let images: Value = serde_json::from_reader(images_manifest_file).unwrap();
-        assert_eq!(
-            images,
-            serde_json::from_str::<Value>(
-                r#"
-            [
-                {
-                    "name": "zircon-a",
-                    "type": "zbi",
-                    "path": "product_bundle/zbi",
-                    "signed": false
-                },
-                {
-                    "type": "blk",
-                    "name": "storage-full",
-                    "path": "product_bundle/fvm"
-                },
-                {
-                    "type": "kernel",
-                    "name": "qemu-kernel",
-                    "path": "product_bundle/kernel"
-                }
-            ]
-            "#
-            )
-            .unwrap()
-        );
-
-        let targets_path = tempdir.join("targets.json");
-        assert!(targets_path.exists());
+        // These were previously generated and should not be created now.
+        assert!(!tempdir.join("all_blobs.json").exists());
+        assert!(!tempdir.join("images.json").exists());
+        assert!(!tempdir.join("targets.json").exists());
     }
 }

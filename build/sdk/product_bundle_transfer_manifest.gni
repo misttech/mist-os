@@ -58,12 +58,7 @@ template("product_bundle_transfer_manifest") {
 
     deps = [ _product_bundle_target ]
     inputs = [ "${_product_bundle_dir}/product_bundle.json" ]
-    outputs = [
-      "${_out_dir}/all_blobs.json",
-      "${_out_dir}/images.json",
-      "${_out_dir}/targets.json",
-      "${_out_dir}/transfer.json",
-    ]
+    outputs = [ "${_out_dir}/transfer.json" ]
 
     args = [
       "generate-transfer-manifest",
