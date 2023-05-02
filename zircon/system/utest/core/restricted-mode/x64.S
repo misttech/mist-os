@@ -2,6 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// do something to all the registers so we can read the state on the way out
+.macro twiddle_registers
+  inc  %rax
+  inc  %rbx
+  inc  %rcx
+  inc  %rdx
+  inc  %rsi
+  inc  %rdi
+  inc  %rbp
+  inc  %rsp
+  inc  %r8
+  inc  %r9
+  inc  %r10
+  inc  %r11
+  inc  %r12
+  inc  %r13
+  inc  %r14
+  inc  %r15
+
+  // write rcx and r11 to fs and gs base since they are both
+  // trashed by the syscall. also tests that fs and gs base are
+  // set properly.
+  mov   %rcx, %fs:0
+  mov   %r11, %gs:0
+
+.endm
+
 .globl vectab
 vectab:
   // back from restricted mode
@@ -29,31 +56,7 @@ vectab:
 
 .globl syscall_bounce
 syscall_bounce:
-  // do something to all the registers so we can read
-  // the state on the way out
-  inc  %rax
-  inc  %rbx
-  inc  %rcx
-  inc  %rdx
-  inc  %rsi
-  inc  %rdi
-  inc  %rbp
-  inc  %rsp
-  inc  %r8
-  inc  %r9
-  inc  %r10
-  inc  %r11
-  inc  %r12
-  inc  %r13
-  inc  %r14
-  inc  %r15
-
-  // write rcx and r11 to fs and gs base since they are both
-  // trashed by the syscall. also tests that fs and gs base are
-  // set properly.
-  mov   %rcx, %fs:0
-  mov   %r11, %gs:0
-
+  twiddle_registers
 0:
   syscall
 .globl syscall_bounce_post_syscall
@@ -62,31 +65,7 @@ syscall_bounce_post_syscall:
 
 .globl exception_bounce
 exception_bounce:
-  // do something to all the registers so we can read
-  // the state on the way out
-  inc  %rax
-  inc  %rbx
-  inc  %rcx
-  inc  %rdx
-  inc  %rsi
-  inc  %rdi
-  inc  %rbp
-  inc  %rsp
-  inc  %r8
-  inc  %r9
-  inc  %r10
-  inc  %r11
-  inc  %r12
-  inc  %r13
-  inc  %r14
-  inc  %r15
-
-  // write rcx and r11 to fs and gs base since they are both
-  // trashed by the syscall. also tests that fs and gs base are
-  // set properly.
-  mov   %rcx, %fs:0
-  mov   %r11, %gs:0
-
+  twiddle_registers
 .globl exception_bounce_exception_address
 exception_bounce_exception_address:
   ud2
