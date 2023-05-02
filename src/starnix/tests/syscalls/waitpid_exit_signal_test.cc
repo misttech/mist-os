@@ -47,26 +47,42 @@ class WaitpidExitSignalTest : public testing::Test {
  * On termination, P1 sends its exit signal (if any) to P0.
  */
 TEST_F(WaitpidExitSignalTest, childProcessSendsDefaultSignalOnTerminationToParentProcess) {
-  CloneHelper testCloneHelper;
-  int pid = testCloneHelper.runInClonedChild(SIGCHLD, CloneHelper::doNothing);
-  ensureWait(pid, __WALL);
-  EXPECT_TRUE(receivedSignals.size() == 1);
-  EXPECT_EQ(receivedSignals[0], SIGCHLD);
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([] {
+    CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGCHLD, CloneHelper::doNothing);
+    ensureWait(pid, __WALL);
+    EXPECT_TRUE(receivedSignals.size() == 1);
+    EXPECT_EQ(receivedSignals[0], SIGCHLD);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST_F(WaitpidExitSignalTest, childProcessSendsCustomExitSignalOnTerminationToParentProcess) {
-  CloneHelper testCloneHelper;
-  int pid = testCloneHelper.runInClonedChild(SIGUSR1, CloneHelper::doNothing);
-  ensureWait(pid, __WALL);
-  EXPECT_TRUE(receivedSignals.size() == 1);
-  EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([] {
+    CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGUSR1, CloneHelper::doNothing);
+    ensureWait(pid, __WALL);
+    EXPECT_TRUE(receivedSignals.size() == 1);
+    EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST_F(WaitpidExitSignalTest, childProcessSendsNoExitSignalOnTerminationToParentProcess) {
-  CloneHelper testCloneHelper;
-  int pid = testCloneHelper.runInClonedChild(0, CloneHelper::doNothing);
-  ensureWait(pid, __WALL);
-  EXPECT_TRUE(receivedSignals.empty());
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([] {
+    CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(0, CloneHelper::doNothing);
+    ensureWait(pid, __WALL);
+    EXPECT_TRUE(receivedSignals.empty());
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 /*
@@ -88,17 +104,27 @@ int processThatFinishBeforeChildThread(void *) {
 }
 
 TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesLast) {
-  CloneHelper testCloneHelper;
-  int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishAfterChildThread);
-  ensureWait(pid, __WALL);
-  EXPECT_TRUE(receivedSignals.size() == 1);
-  EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([] {
+    CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishAfterChildThread);
+    ensureWait(pid, __WALL);
+    EXPECT_TRUE(receivedSignals.size() == 1);
+    EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesFirst) {
-  CloneHelper testCloneHelper;
-  int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishBeforeChildThread);
-  ensureWait(pid, __WALL);
-  EXPECT_TRUE(receivedSignals.size() == 1);
-  EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([] {
+    CloneHelper testCloneHelper;
+    int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishBeforeChildThread);
+    ensureWait(pid, __WALL);
+    EXPECT_TRUE(receivedSignals.size() == 1);
+    EXPECT_EQ(receivedSignals[0], SIGUSR1);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
