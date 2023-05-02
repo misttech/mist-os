@@ -679,10 +679,10 @@ assembly_input_bundle("driver_framework_v2") {
 # valid build-types: all
 #
 assembly_input_bundle("starnix_support") {
-  cache_packages = [ "//src/starnix/runner:starnix_package" ]
-  if (target_cpu == "x64") {
-    cache_packages += [ "//src/starnix/kernel:starnix_kernel_package" ]
-  }
+  cache_packages = [
+    "//src/starnix/runner:starnix_package",
+    "//src/starnix/kernel:starnix_kernel_package",
+  ]
   compiled_packages = [
     {
       name = "core"
