@@ -39,4 +39,13 @@
             from: "self",
         },
     ],
+    config: {
+        // If set, the font manager will log extra font information that may help
+        // debugging fonts issues.  The default value for production builds should
+        // be "false".
+        //
+        // We expect that `eng` and `userdebug` builds would have this
+        // config option set to "true".
+        verbose_logging: { type: "bool" },
+    },
 }

@@ -155,7 +155,7 @@ where
             &fallback_collection,
         );
 
-        let is_internal_build = debug::is_internal_build();
+        let is_internal_build = debug::is_verbose_logging();
 
         Ok(FontService {
             assets,

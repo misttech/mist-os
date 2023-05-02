@@ -3,11 +3,17 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/components/fuchsia_structured_config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/type/config.gni")
 import("//src/fonts/build/fonts.gni")
+
+declare_args() {
+  # Used in the structured configuration below.
+  src_fonts_verbose_logging = false
+}
 
 group("fonts") {
   public_deps = [
@@ -55,6 +61,7 @@ rustc_binary("font_provider") {
   edition = "2021"
 
   deps = [
+    ":config",
     "char_set",
     "font_info",
     "manifest",
@@ -120,31 +127,71 @@ rustc_binary("font_provider") {
   ]
 }
 
-fuchsia_component("font_provider_cm") {
+fuchsia_component_manifest("manifest") {
   manifest = "meta/fonts.cml"
   component_name = "fonts"
+}
+
+fuchsia_component("font_provider_cm") {
+  cm_label = ":manifest"
   deps = [ ":font_provider" ]
+}
+
+fuchsia_structured_config_values("config_values") {
+  cm_label = ":manifest"
+  values = {
+    # Use `--args=src_fonts_verbose_logging=true` to change this value from
+    # the `fx` command line.
+    verbose_logging = src_fonts_verbose_logging
+  }
+}
+
+fuchsia_structured_config_rust_lib("config") {
+  cm_label = ":manifest"
 }
 
 fuchsia_package("pkg") {
   package_name = "fonts"
-  deps = [ ":font_provider_cm" ]
+  deps = [
+    ":config_values",
+    ":font_provider_cm",
+  ]
 }
 
 build_type_config_data("build_type") {
   for_pkg = "fonts"
 }
 
+fuchsia_component_manifest("font_provider_unit_tests_cmp_manifest") {
+  manifest = "meta/font_provider_bin_test.cml"
+  component_name = "font_provider_bin_test"
+}
+
 fuchsia_component("font_provider_unit_tests_cmp") {
   testonly = true
-  manifest = "meta/font_provider_bin_test.cml"
+  cm_label = ":font_provider_unit_tests_cmp_manifest"
   component_name = "font_provider_bin_test"
   deps = [ ":font_provider_test" ]
 }
 
-fuchsia_component("font_provider_hermetic_for_test") {
+fuchsia_component_manifest("font_provider_hermetic_for_test_manifest") {
   testonly = true
   manifest = "meta/fonts_for_test.cml"
+  component_name = "font_provider_hermetic_for_test"
+}
+
+fuchsia_structured_config_values(
+    "font_provider_hermetic_for_test_config_values") {
+  testonly = true
+  cm_label = ":font_provider_hermetic_for_test_manifest"
+  values = {
+    verbose_logging = true
+  }
+}
+
+fuchsia_component("font_provider_hermetic_for_test") {
+  testonly = true
+  cm_label = ":font_provider_hermetic_for_test_manifest"
   deps = [
     ":font_provider",
     "//src/fonts/collections:downstream-test-fonts-collection",
@@ -161,6 +208,7 @@ fuchsia_component("font_provider_hermetic_for_test") {
 
 fuchsia_test_package("font_provider_unit_tests") {
   test_components = [ ":font_provider_unit_tests_cmp" ]
+  validate_structured_config = false
 }
 
 # Deprecated.

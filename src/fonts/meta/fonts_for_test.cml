@@ -36,4 +36,7 @@
             from: "self",
         },
     ],
+    config: {
+        verbose_logging: { type: "bool" },
+    },
 }

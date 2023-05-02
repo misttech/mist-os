@@ -2,12 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use config::Config;
 use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_fonts::{self as fonts},
-    std::{fs, stringify},
-    tracing::{debug, warn},
+    anyhow::{Error, Result},
+    fidl_fuchsia_fonts as fonts,
+    std::stringify,
+    tracing::debug,
 };
+
+// Once-only initialized structured configuration.
+//
+// In tests, we only need the config to be present, and initialized to true.
+static mut CONFIG: Option<Config> =
+    if cfg!(test) { Some(Config { verbose_logging: true }) } else { None };
+
+// For CONFIG above.
+#[cfg(not(test))]
+static INIT: std::sync::Once = std::sync::Once::new();
 
 macro_rules! format_field {
     ($debug_struct:expr, $parent:expr, $field:ident, $wrapper:path) => {
@@ -22,79 +33,72 @@ macro_rules! format_field {
     };
 }
 
-const BUILD_TYPE_PATH: &str = "/config/data/build/type";
-
-/// Tries to read the build type from `/config/data`. Returns true if the build
-/// is "eng" or "userdebug", false if "user". Also returns false if the build type could not be
-/// read.
-pub fn is_internal_build() -> bool {
-    BuildType::load_from_config_data().map_or_else(
-        |e| {
-            warn!("Failed to read Fuchsia build type: {:?}", e);
-            // Fail closed, i.e. assume a production build unless we know otherwise.
-            false
-        },
-        |build_type| {
-            debug!("Build type: {}", build_type);
-            build_type.is_internal_build()
-        },
-    )
+/// Returns true if this configuration allows verbose logging.
+pub fn is_verbose_logging() -> bool {
+    let verbosity = Verbosity::load_from_config_data();
+    let verbose = verbosity.is_verbose_logging();
+    debug!("verbosity: {}", verbose);
+    verbose
 }
 
-/// Fuchsia build flavors
-pub enum BuildType {
-    User,
-    UserDebug,
-    Eng,
+/// Logging verbosity settings.
+///
+/// Allows printing different verbosity log lines, depending on the
+/// product configuration.
+struct Verbosity {
+    // The verbatim structured configuration.
+    verbose_logging: bool,
 }
 
-impl BuildType {
-    /// Loads the current Fuchsia environment's build type from a file in `/config/data`.
-    ///
-    /// The file must be supplied using a [`build_type_config_data` GN target][config-gni].
-    ///
-    /// [config-gni]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/type/config.gni
-    pub fn load_from_config_data() -> Result<BuildType, Error> {
-        fs::read_to_string(BUILD_TYPE_PATH)?.trim().parse()
+impl Verbosity {
+    // Loads the verbosity configuration. It may be called only once.
+    fn load_from_config_data() -> Verbosity {
+        // Safety: this should be the only function that ever gets called
+        // to modify the value of `CONFIG`.
+        let verbose_logging = unsafe {
+            #[cfg(not(test))]
+            INIT.call_once(|| {
+                // The "take" call may only be made once.
+                CONFIG = Some(Config::take_from_startup_handle());
+            });
+            CONFIG.as_ref().expect("config is loaded").verbose_logging
+        };
+        Verbosity { verbose_logging }
     }
 
-    /// Returns true if this is an internal Fuchsia build.
-    pub fn is_internal_build(&self) -> bool {
-        match self {
-            BuildType::UserDebug | BuildType::Eng => true,
-            BuildType::User => false,
-        }
+    /// Returns true if logging should be verbose.
+    pub fn is_verbose_logging(&self) -> bool {
+        self.verbose_logging
     }
 }
 
-impl std::fmt::Display for BuildType {
+impl std::fmt::Display for Verbosity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            BuildType::User => "user",
-            BuildType::UserDebug => "userdebug",
-            BuildType::Eng => "eng",
+        let s = match self.is_verbose_logging() {
+            true => "debug",
+            _ => "silent",
         };
         write!(f, "{}", s)
     }
 }
 
 /// Same strings as `Display`.
-impl std::fmt::Debug for BuildType {
+impl std::fmt::Debug for Verbosity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self, f)
     }
 }
 
-impl std::str::FromStr for BuildType {
+impl std::str::FromStr for Verbosity {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "user" => Ok(BuildType::User),
-            "userdebug" => Ok(BuildType::UserDebug),
-            "eng" => Ok(BuildType::Eng),
-            _ => Err(format_err!("Unknown build type: {}", s)),
-        }
+        Ok(Verbosity {
+            verbose_logging: match s {
+                "debug" => true,
+                _ => false,
+            },
+        })
     }
 }
 
