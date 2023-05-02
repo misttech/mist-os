@@ -13,6 +13,7 @@ use assembly_tool::ToolProvider;
 use assembly_util::read_config;
 use assembly_util::write_json_file;
 use camino::{Utf8Path, Utf8PathBuf};
+use errors::ffx_bail;
 use ffx_assembly_args::PackageSizeCheckArgs;
 use fuchsia_hash::Hash;
 use fuchsia_pkg::PackageManifest;
@@ -247,6 +248,11 @@ fn verify_budgets_with_tools(
 #[allow(clippy::ptr_arg)]
 fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result<Vec<BudgetBlobs>> {
     let mut budget_blobs = Vec::new();
+    if budgets.is_empty() {
+        ffx_bail!(
+            "Packages budget is empty, check the `package_set_budgets` field in your budget file."
+        );
+    }
     for budget in budgets.iter() {
         let mut budget_blob = BudgetBlobs {
             budget: BudgetResult {
@@ -595,7 +601,7 @@ mod tests {
             },
             Box::new(FakeToolProvider::default()),
         );
-        assert_failed(err, "Unable to open file:");
+        assert_failed(err, "Packages budget is empty");
     }
 
     #[test]
