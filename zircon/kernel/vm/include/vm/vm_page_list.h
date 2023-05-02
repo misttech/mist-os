@@ -504,7 +504,6 @@ class VmPageOrMarkerRef {
   // Forward dirty state updates as an allowed mutation.
   void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
     DEBUG_ASSERT(page_or_marker_);
-    DEBUG_ASSERT(page_or_marker_->IsIntervalZero());
     page_or_marker_->SetZeroIntervalAwaitingCleanLength(len);
   }
 
@@ -1198,8 +1197,7 @@ class VmPageList final {
     uint64_t expected_next_off = start_offset;
     // Set to true when we encounter an interval start but haven't yet encountered the end.
     bool in_interval = false;
-    auto per_page_wrapper_fn = [&expected_next_off, &in_interval, start_offset, end_offset,
-                                per_page_func, &per_gap_func](auto* p, uint64_t off) {
+    auto per_page_wrapper_fn = [&](auto* p, uint64_t off) {
       zx_status_t status = ZX_ERR_NEXT;
       // We can move ahead of expected_next_off in the case of an interval too, which represents a
       // run of pages. Make sure this is not an interval before calling the per_gap_func.
@@ -1210,11 +1208,17 @@ class VmPageList final {
         if (p->IsIntervalStart()) {
           // We should not already have been tracking an interval.
           DEBUG_ASSERT(!in_interval);
+          // Start and end sentinel interval types should match. Since we only support zero
+          // intervals currently, we can simply check for that.
+          DEBUG_ASSERT(p->IsIntervalZero());
           in_interval = true;
         } else if (p->IsIntervalEnd()) {
           // If this is not the first populated slot we encountered, we should have been tracking a
           // valid interval.
           DEBUG_ASSERT(in_interval || expected_next_off == start_offset);
+          // Start and end sentinel interval types should match. Since we only support zero
+          // intervals currently, we can simply check for that.
+          DEBUG_ASSERT(p->IsIntervalZero());
           // Reset interval tracking.
           in_interval = false;
         }

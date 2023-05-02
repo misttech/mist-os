@@ -3808,6 +3808,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       // Handle the last partial interval. Or the case where we did not advance next_start_offset at
       // all, which can only happen if the range fell entirely inside an interval.
       if (in_interval || next_start_offset == prev_start_offset) {
+        // If the range fell entirely inside an interval, verify that it was indeed a zero interval.
+        DEBUG_ASSERT(next_start_offset != prev_start_offset ||
+                     page_list_.IsOffsetInZeroInterval(next_start_offset));
         *zeroed_len_out += (end - interval_start);
         next_start_offset = end;
       }
@@ -4042,6 +4045,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   zx_status_t status = page_list_.RemovePagesAndIterateGaps(
       [&](VmPageOrMarker* slot, uint64_t offset) {
         AssertHeld(lock_ref());
+
+        // We don't expect intervals in non pager-backed VMOs.
+        DEBUG_ASSERT(!slot->IsInterval());
 
         // Contiguous VMOs cannot have markers.
         DEBUG_ASSERT(!direct_source_supplies_zero_pages() || !slot->IsMarker());
@@ -4453,8 +4459,10 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
 #endif
 
   uint64_t unpin_count = 0;
+  bool found_page_or_gap = false;
   zx_status_t status = page_list_.ForEveryPageAndGapInRange(
       [&](const auto* page, uint64_t off) {
+        found_page_or_gap = true;
         if (page->IsMarker()) {
           // So far, allow_gaps is only used on contiguous VMOs which have no markers.  We'd need
           // to decide if a marker counts as a gap to allow before removing this assert.
@@ -4491,7 +4499,8 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
         ++unpin_count;
         return ZX_ERR_NEXT;
       },
-      [allow_gaps](uint64_t gap_start, uint64_t gap_end) {
+      [allow_gaps, &found_page_or_gap](uint64_t gap_start, uint64_t gap_end) {
+        found_page_or_gap = true;
         if (!allow_gaps) {
           return ZX_ERR_NOT_FOUND;
         }
@@ -4499,6 +4508,10 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
       },
       start_page_offset, end_page_offset);
   ASSERT_MSG(status == ZX_OK, "Tried to unpin an uncommitted page with allow_gaps false");
+
+  // If we did not find a page or a gap, we were entirely inside a sparse interval without any
+  // committed pages, so cannot be pinned/unpinned.
+  ASSERT(found_page_or_gap);
 
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // Check any leftover range.
@@ -4612,6 +4625,9 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
       [skip_split_bits, sibling_visible, page_remover,
        left = this == &parent_->left_child_locked()](VmPageOrMarker* page_or_mark,
                                                      uint64_t offset) {
+        // Hidden VMO hierarchies do not support intervals.
+        ASSERT(!page_or_mark->IsInterval());
+
         if (page_or_mark->IsMarker()) {
           // If this marker is in a range still visible to the sibling then we just leave it, no
           // split bits or anything to be updated. If the sibling cannot see it, then we can clear
@@ -5479,7 +5495,9 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         found_page_or_gap = true;
         if (p->IsMarker()) {
           zero_pages_count++;
-        } else if (p->IsIntervalZero()) {
+          return ZX_ERR_NEXT;
+        }
+        if (p->IsIntervalZero()) {
           if (p->IsIntervalStart()) {
             interval_start = off;
             unmatched_interval_start = true;
@@ -5490,8 +5508,10 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
             DEBUG_ASSERT(p->IsIntervalSlot());
             zero_pages_count++;
           }
+          return ZX_ERR_NEXT;
         }
-        DEBUG_ASSERT(!p->IsReference());
+        // Pager-backed VMOs cannot have compressed references, so the only other type is a page.
+        DEBUG_ASSERT(p->IsPage());
         return ZX_ERR_NEXT;
       },
       [&found_page_or_gap](uint64_t start, uint64_t end) {
@@ -5715,7 +5735,6 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
         // Enumerate both AwaitingClean and Dirty pages, i.e. anything that is not Clean.
         // AwaitingClean pages are "dirty" too for the purposes of this enumeration, since their
         // modified contents are still in the process of being written back.
-        DEBUG_ASSERT(!p->IsReference());
         if (p->IsPage()) {
           vm_page_t* page = p->Page();
           DEBUG_ASSERT(is_page_dirty_tracked(page));
@@ -5728,6 +5747,8 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
           DEBUG_ASSERT(!p->IsZeroIntervalClean());
           return !p->IsZeroIntervalClean();
         }
+        // Pager-backed VMOs cannot have compressed references, so the only other type is a marker.
+        DEBUG_ASSERT(p->IsMarker());
         return false;
       },
       [](const VmPageOrMarker* p, uint64_t off) {
@@ -5819,7 +5840,9 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
         if (p->IsPage() && is_page_dirty(p->Page())) {
           AssertHeld(lock_ref());
           UpdateDirtyStateLocked(p->Page(), off, DirtyState::AwaitingClean);
-        } else if (p->IsIntervalZero()) {
+          return ZX_ERR_NEXT;
+        }
+        if (p->IsIntervalZero()) {
           // Transition zero intervals to AwaitingClean.
           DEBUG_ASSERT(p->IsZeroIntervalDirty());
           if (p->IsIntervalStart() || p->IsIntervalSlot()) {
@@ -5843,7 +5866,10 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
             // Reset the interval start so we can track a new one later.
             interval_start = VmPageOrMarkerRef(nullptr);
           }
+          return ZX_ERR_NEXT;
         }
+        // This was either a marker (which is already clean), or a non-Dirty page.
+        DEBUG_ASSERT(p->IsMarker() || !is_page_dirty(p->Page()));
         return ZX_ERR_NEXT;
       },
       start_offset, end_offset);
@@ -5920,7 +5946,9 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
         if (p->IsPage() && is_page_awaiting_clean(p->Page())) {
           AssertHeld(lock_ref());
           UpdateDirtyStateLocked(p->Page(), off, DirtyState::Clean);
-        } else if (p->IsIntervalZero()) {
+          return ZX_ERR_NEXT;
+        }
+        if (p->IsIntervalZero()) {
           // Handle zero intervals.
           DEBUG_ASSERT(p->IsZeroIntervalDirty());
           if (p->IsIntervalStart() || p->IsIntervalSlot()) {
@@ -5964,7 +5992,10 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
               interval_start = nullptr;
             }
           }
+          return ZX_ERR_NEXT;
         }
+        // This was either a marker (which is already clean), or a non-AwaitingClean page.
+        DEBUG_ASSERT(p->IsMarker() || !is_page_awaiting_clean(p->Page()));
         return ZX_ERR_NEXT;
       },
       start_offset, end_offset);
