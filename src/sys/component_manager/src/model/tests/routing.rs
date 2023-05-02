@@ -1923,10 +1923,11 @@ async fn use_runner_from_environment_not_found() {
     let err = match err {
         ModelError::StartActionError {
             err:
-                StartActionError::ResolveRunnerFailed {
+                StartActionError::ResolveRunnerError {
                     err: RouteAndOpenCapabilityError::RoutingError { err },
+                    moniker,
                 },
-        } => err,
+        } if moniker == vec!["b"].try_into().unwrap() => err,
         err => panic!("Unexpected error trying to start b: {}", err),
     };
 

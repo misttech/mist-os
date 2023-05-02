@@ -14,6 +14,7 @@ use {
     ::routing_test_helpers::{
         component_id_index::make_index_file, storage::CommonStorageTest, RoutingTestModel,
     },
+    assert_matches::assert_matches,
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::*,
     cm_rust_testing::*,
@@ -577,14 +578,15 @@ async fn use_restricted_storage_start_failure() {
     let child_bind_result = test
         .start_instance(&AbsoluteMoniker::parse_str("/parent_consumer/child_consumer").unwrap())
         .await;
-    assert!(matches!(
+    assert_matches!(
         child_bind_result,
         Err(ModelError::StartActionError {
             err: StartActionError::NamespacePopulateError {
-                err: NamespacePopulateError::InstanceNotInInstanceIdIndex(_)
+                err: NamespacePopulateError::InstanceNotInInstanceIdIndex(_),
+                moniker,
             }
-        })
-    ));
+        }) if moniker == AbsoluteMoniker::try_from(vec!["parent_consumer", "child_consumer"]).unwrap()
+    );
 }
 
 ///   component manager's namespace
@@ -713,12 +715,12 @@ async fn use_restricted_storage_open_failure() {
         },
     )
     .await;
-    assert!(matches!(
+    assert_matches!(
         result,
         Err(RouteAndOpenCapabilityError::RoutingError {
-            err: RoutingError::ComponentNotInIdIndex { moniker: _ }
+            err: RoutingError::ComponentNotInIdIndex { .. }
         })
-    ));
+    );
 }
 
 ///   component manager's namespace

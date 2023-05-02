@@ -119,12 +119,12 @@ pub enum ModelError {
     },
     #[error("timed out after {:?}", duration)]
     Timeout { duration: zx::Duration },
-    #[error("error with resolve action: {err}")]
+    #[error("{err}")]
     ResolveActionError {
         #[from]
         err: ResolveActionError,
     },
-    #[error("error with start action: {err}")]
+    #[error("{err}")]
     StartActionError {
         #[from]
         err: StartActionError,
@@ -532,44 +532,55 @@ impl RouteAndOpenCapabilityError {
 
 #[derive(Debug, Clone, Error)]
 pub enum StartActionError {
-    #[error("instance {moniker} was shut down")]
+    #[error("Couldn't start `{moniker}` because it was shutdown")]
     InstanceShutDown { moniker: AbsoluteMoniker },
-    #[error("instance {moniker} was destroyed")]
+    #[error("Couldn't start `{moniker}` because it has been destroyed")]
     InstanceDestroyed { moniker: AbsoluteMoniker },
-    #[error("failed to resolve component: {}", err)]
+    #[error("Couldn't start `{moniker}` because it couldn't resolve: {err}")]
     ResolveActionError {
-        #[from]
+        moniker: AbsoluteMoniker,
+        #[source]
         err: ResolveActionError,
     },
-    #[error("failed to resolve runner: {}", err)]
-    ResolveRunnerFailed {
-        #[from]
+    #[error("Couldn't start `{moniker}` because its runner couldn't resolve: {err}")]
+    ResolveRunnerError {
+        moniker: AbsoluteMoniker,
+        #[source]
         err: RouteAndOpenCapabilityError,
     },
-    #[error("reboot on terminate forbidden: {}", err)]
+    #[error("Couldn't start `{moniker}` because it uses reboot_on_terminate but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {
+        moniker: AbsoluteMoniker,
         #[source]
         err: PolicyError,
     },
-    #[error("failed to populate namespace: {}", err)]
+    #[error("Couldn't start `{moniker}` because we failed to populate its namespace: {err}")]
     NamespacePopulateError {
-        #[from]
+        moniker: AbsoluteMoniker,
+        #[source]
         err: NamespacePopulateError,
     },
-    #[error("structured config error: {}", err)]
+    #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
-        #[from]
+        moniker: AbsoluteMoniker,
+        #[source]
         err: StructuredConfigError,
+    },
+    #[error("Couldn't start `{moniker}` because one of its eager children failed to start: {err}")]
+    EagerStartError {
+        moniker: AbsoluteMoniker,
+        #[source]
+        err: Box<StartActionError>,
     },
 }
 
 impl StartActionError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::RebootOnTerminateForbidden { err } => err.as_zx_status(),
-            Self::ResolveRunnerFailed { err } => err.as_zx_status(),
+            Self::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
+            Self::ResolveRunnerError { err, .. } => err.as_zx_status(),
             Self::InstanceDestroyed { .. } | Self::InstanceShutDown { .. } => zx::Status::NOT_FOUND,
-            Self::NamespacePopulateError { err } => err.as_zx_status(),
+            Self::NamespacePopulateError { err, .. } => err.as_zx_status(),
             _ => zx::Status::INTERNAL,
         }
     }
@@ -579,7 +590,7 @@ impl StartActionError {
 impl Into<fsys::StartError> for StartActionError {
     fn into(self) -> fsys::StartError {
         match self {
-            StartActionError::ResolveActionError { err } => err.into(),
+            StartActionError::ResolveActionError { err, .. } => err.into(),
             StartActionError::InstanceDestroyed { .. } => fsys::StartError::InstanceNotFound,
             StartActionError::InstanceShutDown { .. } => fsys::StartError::InstanceNotFound,
             _ => fsys::StartError::Internal,
@@ -732,7 +743,7 @@ pub enum NamespacePopulateError {
     #[error("failed to clone pkg dir: {0}")]
     ClonePkgDirFailed(#[source] ClonableError),
 
-    #[error("component uses a instance ID based storage capability but is not in the instance ID index: {0}")]
+    #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 }
 

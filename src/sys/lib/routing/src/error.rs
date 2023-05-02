@@ -108,11 +108,11 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to use a storage capability which is restricted to the component ID index. \
-        To add this component, visit https://fuchsia.dev/go/components/instance-id.",
-        moniker
+        "`{}` tried to use a storage capability from `{}` but it is not in the component id index. \
+        See: https://fuchsia.dev/go/components/instance-id.",
+        target_moniker, source_moniker
     )]
-    ComponentNotInIdIndex { moniker: AbsoluteMoniker },
+    ComponentNotInIdIndex { source_moniker: AbsoluteMoniker, target_moniker: AbsoluteMoniker },
 
     #[error("`{}` is not a built-in capability.", capability_id)]
     UseFromComponentManagerNotFound { capability_id: String },

@@ -811,11 +811,11 @@ pub fn verify_instance_in_component_id_index<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let storage_decl = match source {
+    let (storage_decl, source_component) = match source {
         CapabilitySource::Component {
             capability: ComponentCapability::Storage(storage_decl),
-            component: _,
-        } => storage_decl,
+            component,
+        } => (storage_decl, component),
         _ => unreachable!("unexpected storage source"),
     };
 
@@ -823,7 +823,8 @@ where
         && instance.component_id_index().look_up_moniker(instance.abs_moniker()) == None
     {
         return Err(RoutingError::ComponentNotInIdIndex {
-            moniker: instance.abs_moniker().clone(),
+            source_moniker: source_component.abs_moniker.clone(),
+            target_moniker: instance.abs_moniker().clone(),
         });
     }
     Ok(())

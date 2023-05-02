@@ -533,7 +533,12 @@ impl ComponentInstance {
                 relative_path: "".into(),
                 server_chan: &mut server_channel,
             };
-            route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options).await?;
+            route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
+                .await
+                .map_err(|err| StartActionError::ResolveRunnerError {
+                    err,
+                    moniker: self.abs_moniker.clone(),
+                })?;
 
             return Ok(Arc::new(RemoteRunner::new(client)) as Arc<dyn Runner>);
         }
@@ -938,7 +943,10 @@ impl ComponentInstance {
         };
         Self::start_eager_children_recursive(eager_children).await.or_else(|e| match e {
             StartActionError::InstanceShutDown { .. } => Ok(()),
-            _ => Err(e),
+            _ => Err(StartActionError::EagerStartError {
+                moniker: self.abs_moniker.clone(),
+                err: Box::new(e),
+            }),
         })?;
         Ok(fsys::StartResult::Started)
     }

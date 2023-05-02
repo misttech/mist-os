@@ -480,13 +480,18 @@ async fn reboot_on_terminate_disabled() {
 
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
-    assert_matches!(res, Err(ModelError::StartActionError {
-        err: StartActionError::RebootOnTerminateForbidden {
-            err: PolicyError::Unsupported {
-                policy, moniker
+    let expected_moniker = AbsoluteMoniker::try_from(vec!["system"]).unwrap();
+    assert_matches!(
+        res,
+        Err(ModelError::StartActionError {
+            err: StartActionError::RebootOnTerminateForbidden {
+                err: PolicyError::Unsupported {
+                    policy, moniker: m2
+                },
+                moniker: m1
             }
-        }
-    }) if &policy == "reboot_on_terminate" && moniker == AbsoluteMoniker::try_from(vec!["system"]).unwrap());
+        }) if &policy == "reboot_on_terminate" && m1 == expected_moniker && m2 == expected_moniker
+    );
 }
 
 #[fuchsia::test]
@@ -512,13 +517,16 @@ async fn reboot_on_terminate_disallowed() {
 
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
+    let expected_moniker = AbsoluteMoniker::try_from(vec!["system"]).unwrap();
     assert_matches!(res, Err(ModelError::StartActionError {
         err: StartActionError::RebootOnTerminateForbidden {
             err: PolicyError::ChildPolicyDisallowed {
-                policy, moniker
-            }
+                policy,
+                moniker: m2
+            },
+            moniker: m1
         }
-    }) if &policy == "reboot_on_terminate" && moniker == AbsoluteMoniker::try_from(vec!["system"]).unwrap());
+    }) if &policy == "reboot_on_terminate" && m1 == expected_moniker && m2 == expected_moniker);
 }
 
 const REBOOT_PROTOCOL: &str = fstatecontrol::AdminMarker::DEBUG_NAME;

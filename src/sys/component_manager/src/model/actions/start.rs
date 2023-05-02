@@ -74,7 +74,9 @@ async fn do_start(
 
     let result = async move {
         // Resolve the component.
-        let component_info = component.resolve().await?;
+        let component_info = component.resolve().await.map_err(|err|
+            StartActionError::ResolveActionError { moniker: component.abs_moniker.clone(), err }
+        )?;
 
         // Find the runner to use.
         let runner = component.resolve_runner().await.map_err(|err| {
@@ -233,9 +235,12 @@ async fn make_execution_runtime(
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
-            checker
-                .reboot_on_terminate_allowed(&component.abs_moniker)
-                .map_err(|err| StartActionError::RebootOnTerminateForbidden { err })?;
+            checker.reboot_on_terminate_allowed(&component.abs_moniker).map_err(|err| {
+                StartActionError::RebootOnTerminateForbidden {
+                    moniker: component.abs_moniker.clone(),
+                    err,
+                }
+            })?;
         }
         fdecl::OnTerminate::None => {}
     }
@@ -244,7 +249,9 @@ async fn make_execution_runtime(
     let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
     let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
-    let ns = namespace.populate(component, decl).await?;
+    let ns = namespace.populate(component, decl).await.map_err(|err| {
+        StartActionError::NamespacePopulateError { moniker: component.abs_moniker.clone(), err }
+    })?;
 
     let (controller_client, controller_server) =
         endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
@@ -264,11 +271,18 @@ async fn make_execution_runtime(
     });
 
     let encoded_config = if let Some(config) = config {
-        let encoded = config.encode_as_fidl_struct();
-        let encoded_size = encoded.len() as u64;
-        let vmo = Vmo::create(encoded_size).map_err(StructuredConfigError::VmoCreateFailed)?;
-        vmo.write(&encoded, 0).map_err(StructuredConfigError::VmoWriteFailed)?;
-        Some(fmem::Data::Buffer(fmem::Buffer { vmo, size: encoded_size }))
+        let (vmo, size) = (|| {
+            let encoded = config.encode_as_fidl_struct();
+            let size = encoded.len() as u64;
+            let vmo = Vmo::create(size)?;
+            vmo.write(&encoded, 0)?;
+            Ok((vmo, size))
+        })()
+        .map_err(|s| StartActionError::StructuredConfigError {
+            err: StructuredConfigError::VmoCreateFailed(s),
+            moniker: component.abs_moniker.clone(),
+        })?;
+        Some(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
     } else {
         None
     };
