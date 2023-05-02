@@ -17,21 +17,27 @@ pub fn path_relative_from(
     path: impl AsRef<Utf8Path>,
     base: impl AsRef<Utf8Path>,
 ) -> Result<Utf8PathBuf> {
-    let path = normalized_absolute_path(&path).with_context(|| {
-        format!("converting path to normalized absolute path: {}", path.as_ref())
-    })?;
-    let base = normalized_absolute_path(&base).with_context(|| {
-        format!("converting base to normalized absolute path: {}", base.as_ref())
-    })?;
+    fn inner(path: &Utf8Path, base: &Utf8Path) -> Result<Utf8PathBuf> {
+        let path = normalized_absolute_path(path)
+            .with_context(|| format!("converting path to normalized absolute path: {path}"))?;
 
-    diff_utf8_paths(&path, &base)
-        .ok_or_else(|| anyhow!("unable to compute relative path to {} from {}", path, base))
+        let base = normalized_absolute_path(base)
+            .with_context(|| format!("converting base to normalized absolute path: {base}"))?;
+
+        diff_utf8_paths(&path, &base)
+            .ok_or_else(|| anyhow!("unable to compute relative path to {path} from {base}"))
+    }
+
+    inner(path.as_ref(), base.as_ref())
 }
 
 /// Helper to convert an absolute path into a path relative to the current directory
 pub fn path_relative_from_current_dir(path: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
-    let current_dir = std::env::current_dir()?;
-    path_relative_from(path, Utf8PathBuf::try_from(current_dir)?)
+    fn inner(path: &Utf8Path) -> Result<Utf8PathBuf> {
+        let current_dir = std::env::current_dir()?;
+        path_relative_from(path, Utf8PathBuf::try_from(current_dir)?)
+    }
+    inner(path.as_ref())
 }
 
 /// Helper to make a path relative to the path to a file.  This is the same as
@@ -41,18 +47,19 @@ pub fn path_relative_from_file(
     path: impl AsRef<Utf8Path>,
     file: impl AsRef<Utf8Path>,
 ) -> Result<Utf8PathBuf> {
-    let file = file.as_ref();
-    let base = file.parent().ok_or_else(|| {
-        anyhow!(
-            "The path to the file to be relative to does not appear to be the path to a file: {}",
-            file
-        )
-    })?;
-    path_relative_from(path, base)
+    fn inner(path: &Utf8Path, file: &Utf8Path) -> Result<Utf8PathBuf> {
+        let base = file.parent().ok_or_else(|| {
+            anyhow!(
+                "The path to the file to be relative to does not appear to be the path to a file: {}",
+                file
+            )
+        })?;
+        path_relative_from(path, base)
+    }
+    inner(path.as_ref(), file.as_ref())
 }
 
-fn normalized_absolute_path(path: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
-    let path = path.as_ref();
+fn normalized_absolute_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
     if path.is_relative() {
         let current_dir = std::env::current_dir()?;
         normalize_path_impl(Utf8PathBuf::try_from(current_dir)?.join(path).components())
@@ -80,10 +87,13 @@ pub fn resolve_path_from_file(
     path: impl AsRef<Utf8Path>,
     resolve_from: impl AsRef<Utf8Path>,
 ) -> Result<Utf8PathBuf> {
-    let resolve_from = resolve_from.as_ref();
-    let resolve_from_dir =
-        resolve_from.parent().with_context(|| format!("Not a path to a file: {}", resolve_from))?;
-    resolve_path(path, resolve_from_dir)
+    fn inner(path: &Utf8Path, resolve_from: &Utf8Path) -> Result<Utf8PathBuf> {
+        let resolve_from_dir = resolve_from
+            .parent()
+            .with_context(|| format!("Not a path to a file: {resolve_from}"))?;
+        resolve_path(path, resolve_from_dir)
+    }
+    inner(path.as_ref(), resolve_from.as_ref())
 }
 /// Helper to resolve a path that's relative to some other path into a
 /// normalized path.
@@ -104,14 +114,15 @@ pub fn resolve_path(
     path: impl AsRef<Utf8Path>,
     resolve_from: impl AsRef<Utf8Path>,
 ) -> Result<Utf8PathBuf> {
-    let path = path.as_ref();
-    let resolve_from = resolve_from.as_ref();
-    if path.is_absolute() {
-        Ok(path.to_owned())
-    } else {
-        normalize_path_impl(resolve_from.components().chain(path.components()))
-            .with_context(|| format!("resolving {} from {}", path, resolve_from))
+    fn inner(path: &Utf8Path, resolve_from: &Utf8Path) -> Result<Utf8PathBuf> {
+        if path.is_absolute() {
+            Ok(path.to_owned())
+        } else {
+            normalize_path_impl(resolve_from.components().chain(path.components()))
+                .with_context(|| format!("resolving {} from {}", path, resolve_from))
+        }
     }
+    inner(path.as_ref(), resolve_from.as_ref())
 }
 
 /// Given a path with internal `.` and `..`, normalize out those path segments.
@@ -119,8 +130,10 @@ pub fn resolve_path(
 /// This does not consult the filesystem to follow symlinks, it only operates
 /// on the path components themselves.
 pub fn normalize_path(path: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
-    let path = path.as_ref();
-    normalize_path_impl(path.components()).with_context(|| format!("Normalizing: {}", path))
+    fn inner(path: &Utf8Path) -> Result<Utf8PathBuf> {
+        normalize_path_impl(path.components()).with_context(|| format!("Normalizing: {}", path))
+    }
+    inner(path.as_ref())
 }
 
 fn normalize_path_impl<'a>(
