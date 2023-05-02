@@ -1832,7 +1832,7 @@ static bool vmo_eviction_test() {
       page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr));
   EXPECT_EQ(0u, vmo2->AttributedPages().uncompressed);
   pmm_free_page(page2);
-  EXPECT_GT(vmo2->EvictionEventCount(), 0u);
+  EXPECT_GT(vmo2->ReclamationEventCount(), 0u);
 
   // Pinned pages should not be evictable.
   status = vmo->CommitRangePinned(0, PAGE_SIZE, false);
@@ -2467,17 +2467,21 @@ static bool vmo_attribution_compression_test() {
   EXPECT_EQ(true,
             verify_object_page_attribution(vmo.get(), expected_gen_count, AttributionCounts{}));
 
-  // Committing pages should increment the generation count.
+  uint64_t reclamation_count = vmo->ReclamationEventCount();
+
+  // Committing pages should increment the generation count, but not reclamation count.
   status = vmo->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{2u, 0u}));
+  EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Writing to one of the pages to make it have non-zero contents, should not impact the
   // generation.
   status = vmo->Write(&expected_gen_count, 0, sizeof(expected_gen_count));
   EXPECT_OK(status);
+  EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Compress the first page, and ensure the gen count changed.
   vm_page_t* page = nullptr;
@@ -2490,6 +2494,11 @@ static bool vmo_attribution_compression_test() {
   expected_gen_count += 2;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{1u, 1u}));
+  {
+    const uint64_t new_reclamation_count = vmo->ReclamationEventCount();
+    EXPECT_GT(new_reclamation_count, reclamation_count);
+    reclamation_count = new_reclamation_count;
+  }
   // Compress the second page, and ensure the gen count changed.
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
@@ -2500,6 +2509,11 @@ static bool vmo_attribution_compression_test() {
   expected_gen_count += 2;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{0u, 1u}));
+  {
+    const uint64_t new_reclamation_count = vmo->ReclamationEventCount();
+    EXPECT_GT(new_reclamation_count, reclamation_count);
+    reclamation_count = new_reclamation_count;
+  }
 
   // Attempting to read the first page will require a decompress, which should change the gen count.
   status = vmo->GetPageBlocking(0, VMM_PF_FLAG_HW_FAULT, nullptr, &page, nullptr);
@@ -2507,12 +2521,14 @@ static bool vmo_attribution_compression_test() {
   expected_gen_count += 1;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{1u, 0u}));
+  EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Reading the second page should not change the gen count, as we will just get the zero page.
   status = vmo->GetPageBlocking(PAGE_SIZE, VMM_PF_FLAG_HW_FAULT, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{1u, 0u}));
+  EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   END_TEST;
 }

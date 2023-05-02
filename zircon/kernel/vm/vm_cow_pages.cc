@@ -487,7 +487,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
     FreePageLocked(released_page, /*freeing_owned_page=*/true);
 
-    eviction_event_count_++;
+    reclamation_event_count_++;
     IncrementHierarchyGenerationCountLocked();
     VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -643,7 +643,7 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
   child->children_list_ = ktl::move(children_list_);
   child->children_list_len_ = children_list_len_;
   children_list_len_ = 0;
-  child->eviction_event_count_ = eviction_event_count_;
+  child->reclamation_event_count_ = reclamation_event_count_;
   child->page_attribution_user_id_ = page_attribution_user_id_;
   child->high_priority_count_ = high_priority_count_;
   high_priority_count_ = 0;
@@ -6260,7 +6260,7 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
   DEBUG_ASSERT(p == page);
   PQRemoveLocked(page);
 
-  eviction_event_count_++;
+  reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -6331,6 +6331,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
             ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
       // Compression succeeded, put the new reference in.
       old_ref = VmPageOrMarkerRef(slot).ChangeReferenceValue(*ref);
+      reclamation_event_count_++;
     } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
       // Compression failed, but the page back in.
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
@@ -6349,6 +6350,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
       // TODO(fxb/60238): determine if we can decommit the slot instead of placing a marker.
       old_ref = slot->ReleaseReference();
       *slot = VmPageOrMarker::Marker();
+      reclamation_event_count_++;
     }
     // Temporary reference has been replaced, can return it to the compressor.
     compressor->ReturnTempReference(old_ref);

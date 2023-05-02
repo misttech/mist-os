@@ -226,7 +226,7 @@ class VmCowPages final : public VmHierarchyBase,
     return page_list_.HeapAllocationBytes();
   }
 
-  uint64_t EvictionEventCountLocked() const TA_REQ(lock()) { return eviction_event_count_; }
+  uint64_t ReclamationEventCountLocked() const TA_REQ(lock()) { return reclamation_event_count_; }
 
   void DetachSourceLocked() TA_REQ(lock());
 
@@ -1192,8 +1192,8 @@ class VmCowPages final : public VmHierarchyBase,
   // The page source, if any.
   const fbl::RefPtr<PageSource> page_source_;
 
-  // Count eviction events so that we can report them to the user.
-  uint64_t eviction_event_count_ TA_GUARDED(lock()) = 0;
+  // Count reclamation events so that we can report them to the user.
+  uint64_t reclamation_event_count_ TA_GUARDED(lock()) = 0;
 
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
   // Cached count of number of pages in the page_list_, used to efficiently

@@ -117,10 +117,10 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->HeapAllocationBytesLocked();
   }
 
-  uint64_t EvictionEventCount() const override {
+  uint64_t ReclamationEventCount() const override {
     Guard<CriticalMutex> guard{lock()};
 
-    return cow_pages_locked()->EvictionEventCountLocked();
+    return cow_pages_locked()->ReclamationEventCountLocked();
   }
 
   AttributionCounts AttributedPagesInRange(uint64_t offset, uint64_t len) const override {

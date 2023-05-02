@@ -572,7 +572,7 @@ class VmObject : public VmHierarchyBase,
   // Number of times pages have been evicted over the lifetime of this VMO. Evicted counts for any
   // decommit style event such as user pager eviction or zero page merging. One eviction event
   // could count for multiple pages being evicted, if those pages were evicted as a group.
-  virtual uint64_t EvictionEventCount() const { return 0; }
+  virtual uint64_t ReclamationEventCount() const { return 0; }
 
   // Get a pointer to the page structure and/or physical address at the specified offset.
   // valid flags are VMM_PF_FLAG_*.
