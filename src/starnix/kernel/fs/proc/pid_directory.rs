@@ -58,6 +58,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     });
     dir.entry(b"ns", NsDirectory { task: task.clone() }, mode!(IFDIR, 0o777));
     dir.entry(b"mountinfo", ProcMountinfoFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"mounts", ProcMountsFile::new_node(task), mode!(IFREG, 0o444));
     dir.dir_creds(task.as_fscred());
     dir
 }

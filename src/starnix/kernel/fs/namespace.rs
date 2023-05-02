@@ -516,14 +516,17 @@ pub fn create_filesystem(
     Ok(WhatToMount::Fs(fs))
 }
 
-#[derive(Default)]
 pub struct ProcMountsFile {
+    task: Arc<Task>,
     seq: Mutex<SeqFileState<()>>,
 }
 
 impl ProcMountsFile {
-    pub fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(|| Ok(ProcMountsFile::default()))
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        let task = task.clone();
+        SimpleFileNode::new(move || {
+            Ok(Self { task: task.clone(), seq: Mutex::new(SeqFileState::default()) })
+        })
     }
 }
 
@@ -541,7 +544,7 @@ impl FileOps for ProcMountsFile {
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let ns = current_task.fs().namespace();
+        let ns = self.task.fs().namespace();
         let iter = move |_cursor, sink: &mut SeqFileBuf| {
             for_each_mount(&ns.root_mount, &mut |mount| {
                 let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());

@@ -588,7 +588,6 @@
                 "ProcSysVmMmapMinAddr.HasNumericValue",
                 "ProcSysVmOvercommitMemory.HasNumericValue",
                 "ProcFilesystems.Bug65172365",
-                "ProcMounts.IsSymlink",
                 "ProcSelfMountinfo.RequiredFieldsArePresent",
                 "ProcSelfMountinfo.ContainsProcfsEntry",
                 "ProcSelfMounts.RequiredFieldsArePresent",

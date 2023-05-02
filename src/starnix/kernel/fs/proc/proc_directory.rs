@@ -53,8 +53,7 @@ impl ProcDirectory {
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
                 fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile)), mode!(IFREG, 0o100), FsCred::root()),
-            &b"mounts"[..] =>
-                fs.create_node(ProcMountsFile::new_node(), mode!(IFREG, 0o777), FsCred::root()),
+            &b"mounts"[..] => MountsSymlink::new_node(fs),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(BytesFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
@@ -234,6 +233,27 @@ impl FsNodeOps for ThreadSelfSymlink {
         Ok(SymlinkTarget::Path(
             format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into_bytes(),
         ))
+    }
+}
+
+/// A node that represents a link to `self/mounts`.
+struct MountsSymlink;
+
+impl MountsSymlink {
+    fn new_node(fs: &FileSystemHandle) -> FsNodeHandle {
+        fs.create_node(Self, mode!(IFLNK, 0o777), FsCred::root())
+    }
+}
+
+impl FsNodeOps for MountsSymlink {
+    fs_node_impl_symlink!();
+
+    fn readlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
+        Ok(SymlinkTarget::Path(b"self/mounts".to_vec()))
     }
 }
 
