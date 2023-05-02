@@ -2454,6 +2454,16 @@ From //.gn:83
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
+### dir_pw_third_party_fuzztest
+
+If compiling tests with FuzzTest, this variable is set to the path to the
+FuzzTest installation. When set, a pw_source_set for the FuzzTest library is
+created at "$dir_pw_third_party/fuzztest".
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/third_party/fuzztest/fuzztest.gni:22
+
 ### dir_pw_third_party_googletest
 
 If compiling tests with googletest, this variable is set to the path to the
@@ -2493,6 +2503,16 @@ protobuf library is created at "$dir_pw_third_party/protobuf".
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/third_party/protobuf/protobuf.gni:19
+
+### dir_pw_third_party_re2
+
+If compiling tests with RE2, this variable is set to the path to the RE2
+installation. When set, a pw_source_set for the RE2 library is created at
+"$dir_pw_third_party/re2".
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/third_party/re2/re2.gni:22
 
 ### dir_pw_thread
 
@@ -3713,7 +3733,7 @@ Use Fxfs's blob implementation
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:45
+From //src/storage/fshost/generated_fshost_config.gni:47
 
 ### fxfs_partition
 
@@ -7464,7 +7484,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"0wVoM0do2oLU9PL1FBohoCqnqBg-fqtVrMhubzEm0oYC"`
+**Current value (from the default):** `"KxKPHN87fIwGAgE-QwFLATh_GYmcfPRe8BI1QQmNonYC"`
 
 From //build/rust/config.gni:32
 
@@ -8307,7 +8327,7 @@ format to the specified format. (The "toggle" option will migrate back and forth
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:42
+From //src/storage/fshost/generated_fshost_config.gni:44
 
 ### use_driver_framework_v2_default
 
