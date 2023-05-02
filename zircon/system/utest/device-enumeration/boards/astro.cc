@@ -25,7 +25,6 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
       "sys/platform/00:00:1e/dw-dsi",
-      "sys/platform/00:00:1e/dw-dsi/dw-dsi-base",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:03:e/aml-video",

@@ -11,7 +11,6 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/pt/vim3",
       "sys/platform/00:00:1b/sysmem",
       "sys/platform/00:00:1e/dw-dsi",
-      "sys/platform/00:00:1e/dw-dsi/dw-dsi-base",
 
       "sys/platform/05:06:1/aml-gpio",
       "sys/platform/05:06:14/clocks",

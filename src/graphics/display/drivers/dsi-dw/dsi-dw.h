@@ -39,34 +39,11 @@
 
 namespace dsi_dw {
 
-class DsiDwBase;
 class DsiDw;
 
 namespace fidl_dsi = fuchsia_hardware_dsi;
 
-using DeviceTypeBase =
-    ddk::Device<DsiDwBase, ddk::Messageable<fuchsia_hardware_dsi::DsiBase>::Mixin>;
-class DsiDwBase : public DeviceTypeBase, public ddk::EmptyProtocol<ZX_PROTOCOL_DSI_BASE> {
- public:
-  DsiDwBase(zx_device_t* parent, DsiDw* dsidw);
-
-  DsiDwBase(const DsiDwBase&) = delete;
-  DsiDwBase(DsiDwBase&&) = delete;
-  DsiDwBase& operator=(const DsiDwBase&) = delete;
-  DsiDwBase& operator=(DsiDwBase&&) = delete;
-
-  ~DsiDwBase() override;
-
-  // FIDL
-  void SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& _completer) override;
-
-  void DdkRelease();
-
- private:
-  DsiDw* dsidw_;
-};
-
-using DeviceType = ddk::Device<DsiDw>;
+using DeviceType = ddk::Device<DsiDw, ddk::Messageable<fidl_dsi::DsiBase>::Mixin>;
 
 class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_protocol> {
  public:
@@ -99,6 +76,9 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   zx_status_t DsiImplWriteReg(uint32_t reg, uint32_t val);
   zx_status_t DsiImplReadReg(uint32_t reg, uint32_t* val);
   zx_status_t DsiImplEnableBist(uint32_t pattern);
+
+  // fuchsia_hardware_dsi::DsiBase
+  void SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& completer) override;
 
   // ddk::Device implementation:
   void DdkRelease();
@@ -143,8 +123,6 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
 
   // This lock is used to synchronize SendCmd issued from FIDL server and Banjo interface
   fbl::Mutex command_lock_;
-
-  friend DsiDwBase;
 };
 
 }  // namespace dsi_dw

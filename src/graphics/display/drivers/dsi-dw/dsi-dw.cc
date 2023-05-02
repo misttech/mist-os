@@ -57,25 +57,6 @@ constexpr uint32_t kBitCmdEmpty = 0;
 
 }  // namespace
 
-DsiDwBase::DsiDwBase(zx_device_t* parent, DsiDw* dsidw) : DeviceTypeBase(parent), dsidw_(dsidw) {}
-
-DsiDwBase::~DsiDwBase() = default;
-
-void DsiDwBase::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& _completer) {
-  // TODO(payamm): We don't support READ at the moment. READ is complicated because it consumes
-  // additional cycles required to get info from the LCD. This may cause issues if the command is
-  // issued during the last line of a frame. If we want to support READ, we would want to properly
-  // stop VIDEO, switch to COMMAND mode and perform the read. For now, we will not support it.
-  fidl::VectorView<uint8_t> rsp_data(nullptr, 0);
-  zx_status_t status = dsidw_->SendCommand(request->cmd, request->txdata, rsp_data);
-  if (status != ZX_OK) {
-    _completer.ReplyError(status);
-  }
-  _completer.ReplySuccess(std::move(rsp_data));
-}
-
-void DsiDwBase::DdkRelease() { delete this; }
-
 DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
     : DeviceType(parent), dsi_mmio_(std::move(mmio)) {
   last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value();
@@ -881,6 +862,20 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
   return status;
 }
 
+void DsiDw::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& completer) {
+  // TODO(fxbug.dev/126565): We don't support READ at the moment. READ is complicated because it
+  // consumes additional cycles required to get info from the LCD. This may cause issues if the
+  // command is issued during the last line of a frame. If we want to support READ, we would want to
+  // properly stop VIDEO, switch to COMMAND mode and perform the read. For now, we will not support
+  // it.
+  fidl::VectorView<uint8_t> rsp_data(nullptr, 0);
+  zx_status_t status = SendCommand(request->cmd, request->txdata, rsp_data);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess(rsp_data);
+}
+
 void DsiDw::DdkRelease() { delete this; }
 
 // static
@@ -908,27 +903,14 @@ zx_status_t DsiDw::Create(zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx_status_t status = dsi_dw->DdkAdd("dw-dsi");
+  zx_status_t status =
+      dsi_dw->DdkAdd(ddk::DeviceAddArgs("dw-dsi").set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add dw-dsi device: %s", zx_status_get_string(status));
     return status;
   }
   // devmgr now owns the memory for `dsi_dw`
-  DsiDw* const dsi_dw_ptr = dsi_dw.release();
-
-  auto dsi_dw_base =
-      fbl::make_unique_checked<DsiDwBase>(&alloc_checker, dsi_dw_ptr->zxdev(), dsi_dw_ptr);
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  status = dsi_dw_base->DdkAdd("dw-dsi-base", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add dw-dsi-base device: %s", zx_status_get_string(status));
-    return status;
-  }
-  // devmgr now owns the memory for `dsi_dw_base`
-  [[maybe_unused]] DsiDwBase* dw_base_ptr = dsi_dw_base.release();
+  [[maybe_unused]] DsiDw* const dsi_dw_ptr = dsi_dw.release();
 
   return ZX_OK;
 }
