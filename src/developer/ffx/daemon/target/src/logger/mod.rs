@@ -49,6 +49,7 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
     streamer: Arc<T>,
     symbolizer_config: Option<&'a SymbolizerConfig<'a>>,
 ) -> Result<(ServerEnd<ArchiveIteratorMarker>, impl Future<Output = Result<()>> + 'a)> {
+    let mut end_of_stream = false;
     let (proxy, server) =
         create_proxy::<ArchiveIteratorMarker>().context("failed to create endpoints")?;
 
@@ -124,11 +125,13 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
 
             if get_next_results.is_empty() {
                 if let Some(err) = terminal_err {
-                    streamer
-                        .append_logs(vec![LogEntry::new(LogData::FfxEvent(
-                            EventType::TargetDisconnected,
-                        ))?])
-                        .await?;
+                    if !end_of_stream {
+                        streamer
+                            .append_logs(vec![LogEntry::new(LogData::FfxEvent(
+                                EventType::TargetDisconnected,
+                            ))?])
+                            .await?;
+                    }
                     return Err(anyhow!(err));
                 }
                 continue;
@@ -155,6 +158,9 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                                 truncated_chars: l.truncated_chars.unwrap_or(0),
                             }))
                         } else {
+                            if matches!(l.end_of_stream, Some(true)) {
+                                end_of_stream = true;
+                            }
                             None
                         }
                     }
@@ -279,11 +285,13 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
 
             streamer.append_logs(new_entries).await?;
             if let Some(err) = terminal_err {
-                streamer
-                    .append_logs(vec![LogEntry::new(LogData::FfxEvent(
-                        EventType::TargetDisconnected,
-                    ))?])
-                    .await?;
+                if !end_of_stream {
+                    streamer
+                        .append_logs(vec![LogEntry::new(LogData::FfxEvent(
+                            EventType::TargetDisconnected,
+                        ))?])
+                        .await?;
+                }
                 return Err(anyhow!(err));
             }
         }

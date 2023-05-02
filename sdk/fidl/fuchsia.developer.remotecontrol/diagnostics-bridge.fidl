@@ -33,6 +33,9 @@ type ArchiveIteratorEntry = resource table {
     @deprecated("The data is now sent using the diagnostics_data field")
     2: truncated_chars uint32;
     3: diagnostics_data DiagnosticsData;
+    // Indicates EOF for a request to snapshot data.
+    // If this is set by the daemon, the connection will not be retried.
+    4: end_of_stream bool;
 };
 
 type InlineData = struct {

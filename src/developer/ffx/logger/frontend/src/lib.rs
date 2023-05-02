@@ -132,6 +132,7 @@ struct ConnectionState {
     boot_timestamp: u64,
     running_daemon_channel: Option<Sender<(ServerEnd<ArchiveIteratorMarker>, AsyncSocket)>>,
     current_task: Option<fuchsia_async::Task<Result<(), LogError>>>,
+    mode: Option<StreamMode>,
 }
 
 pub struct RemoteDiagnosticsBridgeProxyWrapper {
@@ -319,6 +320,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 boot_timestamp: 0,
                 running_daemon_channel: None,
                 current_task: None,
+                mode: None,
             }),
         }
     }
@@ -365,6 +367,13 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             // after reboot on the old channel, followed by subsequent messages on the
             // new channel.
             pending_request = Some(frontend.await?);
+            {
+                let state = self.connection_state.lock().await;
+                if matches!(state.mode, Some(StreamMode::SnapshotAll)) {
+                    // End of stream, terminate connection.
+                    return Ok(());
+                }
+            }
             let (new_connection, new_device_proxy) =
                 new_connection_receiver.next().await.ok_or(LogError::EndOfStream)?;
             iterator = new_connection;
@@ -407,7 +416,20 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         while let Some(Ok(ArchiveIteratorRequest::GetNext { responder })) =
             daemon_server.next().await
         {
-            let out_vec = decoder.decode().await?;
+            let mode = self.connection_state.lock().await.mode.clone();
+            let out_vec = match (decoder.decode().await, mode) {
+                (Err(error), Some(StreamMode::SnapshotAll)) => {
+                    responder.send(&mut Ok(vec![ArchiveIteratorEntry {
+                        end_of_stream: Some(true),
+                        ..Default::default()
+                    }]))?;
+                    return Err(error);
+                }
+                (Err(error), _) => {
+                    return Err(error);
+                }
+                (Ok(value), _) => value,
+            };
             // Encode value into a new emulated socket
             let (local, remote) = fuchsia_async::emulated_handle::Socket::create_stream();
             let mut local = fuchsia_async::Socket::from_socket(local)?;
@@ -550,7 +572,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         let _ = connection.stream_diagnostics(
             StreamParameters {
                 data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
-                stream_mode: parameters.stream_mode.map(|mode| match mode {
+                stream_mode: parameters.stream_mode.as_ref().map(|mode| match mode {
                     StreamMode::SnapshotAll => fidl_fuchsia_diagnostics::StreamMode::Snapshot,
                     StreamMode::SnapshotRecentThenSubscribe => {
                         fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe
@@ -573,6 +595,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         let this = self.clone();
 
         let mut state = self.connection_state.lock().await;
+        state.mode = parameters.stream_mode;
         if let Some(daemon) = &state.running_daemon_channel {
             daemon.send((iterator, socket)).await?;
         } else {
