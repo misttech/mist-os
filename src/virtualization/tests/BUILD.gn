@@ -79,6 +79,14 @@ group("tests") {
   }
 }
 
+group("build_only") {
+  deps = [
+    # The zircon test utils binaries touch a lot of FIDL interfaces so we want
+    # to build them in CQ to test for build regressions.
+    "//src/virtualization/tests:virtualization_test_utils_pkg",
+  ]
+}
+
 group("test_images") {
   testonly = true
   deps = [

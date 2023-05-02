@@ -37,5 +37,11 @@ group("tests") {
   deps = [
     "bin:tests",
     "lib:tests",
+
+    # Build some of the components that are normally packaged into some of the
+    # larger test images. This allows us to get CQ coverage of building the
+    # executables without also pulling in the larger guest images that are only
+    # included on the virtualization builders.
+    "tests:build_only",
   ]
 }
