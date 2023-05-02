@@ -2,6 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// SimplePersistentLayer object format
+//
+// The layer is made up of 1 or more "blocks" whose size are some multiple of the block size used
+// by the underlying handle.
+//
+// The persistent layer has 3 types of blocks:
+//  - LayerInfo block
+//  - Data block
+//  - Seek block
+//
+// They are arranged with one LayerInfo block at the start, zero or more data blocks then zero or
+// more seek blocks. There should be an order of magnitude fewer seek blocks than data blocks. Items
+// within the layerfile are sorted with respect to their deserialized keys.
+//
+// |Layerinfo|Data|Data|Data|Data|Data|Data|Data|Data|Data|Data|Data|Data|Data|Seek|Seek|
+//
+// LayerInfo block just contains a single serialized LayerInfo struct.
+//
+// Data blocks contain a little endian encoded u16 item count at the start, then a series of
+// serialized items, and a list of little endian u16 offsets within the block for where
+// serialized items start, excluding the first item (since it is at a known offset). The list of
+// offsets ends at the end of the block and since the items are of variable length, there may be
+// space between the two sections if the next item and its offset cannot fit into the block.
+//
+// |item_count|item|item|item|item|item|item|dead space|offset|offset|offset|offset|offset|
+//
+// Seek blocks are at the end of the layer and contain a little endian u64 for every data block
+// except for the first one. The entries should be monotonically increasing, as they represent some
+// mapping for how the keys for the first item in each block would be predominantly sorted, and
+// there may be duplicate entries. There should be exactly as many seek blocks as are required to
+// house one entry fewer than the number of data blocks.
+
 use {
     crate::{
         drop_event::DropEvent,
@@ -12,9 +44,10 @@ use {
             BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
         },
         object_handle::{ReadObjectHandle, WriteBytes},
-        round::{round_down, round_up},
+        round::{how_many, round_down, round_up},
         serialized_types::{
-            Version, Versioned, VersionedLatest, LATEST_VERSION, PER_BLOCK_SEEK_VERSION,
+            Version, Versioned, VersionedLatest, INTERBLOCK_SEEK_VERSION, LATEST_VERSION,
+            PER_BLOCK_SEEK_VERSION,
         },
     },
     anyhow::{bail, ensure, Context, Error},
@@ -53,6 +86,7 @@ pub struct SimplePersistentLayer {
     object_handle: Arc<dyn ReadObjectHandle>,
     layer_info: LayerInfo,
     size: u64,
+    seek_table: Option<Vec<u64>>,
     close_event: Mutex<Option<Arc<DropEvent>>>,
 }
 
@@ -184,17 +218,88 @@ impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
     }
 }
 
+// Takes the total size of the layer and block size then returns the count that are data blocks
+// and the count that are blocks containing seek data. There are some impossible values due to
+// boundary conditions, which will result in an Inconsistent error.
+fn block_split(size: u64, block_size: u64) -> Result<(u64, u64), Error> {
+    // Don't count the layerinfo block.
+    let blocks = how_many(size, block_size) - 1;
+    // Entries are u64, so 8 bytes.
+    assert!(block_size % 8 == 0);
+    let entries_per_block = block_size / 8;
+    let seek_block_count = if blocks <= 1 {
+        0
+    } else {
+        // The first data block doesn't get an entry. Divide by `entries_per block + 1` since one
+        // seek block will be required for each `entries_per_block` data blocks.
+        how_many(blocks - 1, entries_per_block + 1)
+    };
+    let data_block_count = blocks - seek_block_count;
+    // When the number of blocks is such that all seek blocks are completely filled to support
+    // the associated number of data blocks, adding one block more would be impossible. So check
+    // that we don't have an extra seek block that would be empty.
+    ensure!(
+        seek_block_count == 0 || (seek_block_count - 1) * entries_per_block < data_block_count - 1,
+        FxfsError::Inconsistent
+    );
+    Ok((data_block_count, seek_block_count))
+}
+
+// Parse the seek table, if present at the end of the layer and return the offset where the
+// seek table begins. If not present, return None for the seek table and the end of layer
+// offset.
+async fn parse_seek_table(
+    object_handle: &(impl ReadObjectHandle + 'static),
+    layer_info: &LayerInfo,
+    mut buffer: Buffer<'_>,
+) -> Result<(Option<Vec<u64>>, u64), Error> {
+    let size = object_handle.get_size();
+    ensure!(size < u64::MAX - layer_info.block_size, FxfsError::Inconsistent);
+    if layer_info.key_value_version < INTERBLOCK_SEEK_VERSION {
+        return Ok((None, size));
+    }
+
+    let (data_block_count, seek_block_count) = block_split(size, layer_info.block_size)?;
+    let seek_table_offset =
+        round_up(size, layer_info.block_size).unwrap() - (layer_info.block_size * seek_block_count);
+    let mut seek_table = Vec::with_capacity(data_block_count as usize);
+    // No entry for the first data block, assume a lower bound 0.
+    seek_table.push(0);
+    let mut position = seek_table_offset;
+    let mut prev = 0;
+    let mut buffer_position = 0;
+    let mut bytes_read = 0;
+    while seek_table.len() < data_block_count as usize {
+        if buffer_position >= bytes_read {
+            // Check if we ran out before the seek table ended.
+            ensure!(position < size, FxfsError::Inconsistent);
+            // `read` demands that everything be block aligned, so it is expected to read at least
+            // a whole block, which must be divisible by 8.
+            bytes_read = object_handle.read(position, buffer.as_mut()).await?;
+            position += bytes_read as u64;
+            buffer_position = 0;
+        }
+        let next = LittleEndian::read_u64(&buffer.as_slice()[buffer_position..buffer_position + 8]);
+        buffer_position += 8;
+        // Should be in strict ascending order, otherwise something's broken, or we've gone off
+        // the end and we're reading zeroes.
+        ensure!(prev <= next, FxfsError::Inconsistent);
+        prev = next;
+        seek_table.push(next);
+    }
+    Ok((Some(seek_table), seek_table_offset))
+}
+
 impl SimplePersistentLayer {
     /// Opens an existing layer that is accessible via |object_handle| (which provides a read
     /// interface to the object).  The layer should have been written prior using
     /// SimplePersistentLayerWriter.
     pub async fn open(object_handle: impl ReadObjectHandle + 'static) -> Result<Arc<Self>, Error> {
-        let size = object_handle.get_size();
         let physical_block_size = object_handle.block_size();
 
         // The first block contains layer file information instead of key/value data.
+        let mut buffer = object_handle.allocate_buffer(physical_block_size as usize);
         let (layer_info, _version) = {
-            let mut buffer = object_handle.allocate_buffer(physical_block_size as usize);
             object_handle.read(0, buffer.as_mut()).await?;
             let mut cursor = std::io::Cursor::new(buffer.as_slice());
             LayerInfo::deserialize_with_version(&mut cursor)
@@ -205,13 +310,13 @@ impl SimplePersistentLayer {
         ensure!(layer_info.block_size % physical_block_size == 0, FxfsError::Inconsistent);
         ensure!(layer_info.block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
 
-        // Catch obviously bad sizes.
-        ensure!(size < u64::MAX - layer_info.block_size, FxfsError::Inconsistent);
+        let (seek_table, data_size) = parse_seek_table(&object_handle, &layer_info, buffer).await?;
 
         Ok(Arc::new(SimplePersistentLayer {
             object_handle: Arc::new(object_handle),
             layer_info,
-            size,
+            size: data_size,
+            seek_table,
             close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
         }))
     }
@@ -234,9 +339,33 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             Bound::Included(k) => (k, false),
             Bound::Excluded(k) => (k, true),
         };
-        // Skip the first block. We Store version info there for now.
-        let mut left_offset = self.layer_info.block_size;
-        let mut right_offset = round_up(self.size, self.layer_info.block_size).unwrap();
+
+        let (mut left_offset, mut right_offset) = match &self.seek_table {
+            Some(seek_table) => {
+                // We are searching for a range here, as multiple items can have the same value in
+                // this approximate search. Since the values used are the smallest in the associated
+                // block it means that if the value equals the target you should also search the
+                // one before it. The goal is for table[left] < target < table[right].
+                let target = key.get_leading_u64();
+                // Because the first entry in the table is always 0, right_index will never be 0.
+                let right_index = seek_table.as_slice().partition_point(|&x| x <= target) as u64;
+                // Since partition_point will find the index of the first place where the predicate
+                // is false, we subtract 1 to get the index where it was last true.
+                let left_index = seek_table.as_slice()[..right_index as usize]
+                    .partition_point(|&x| x < target)
+                    .saturating_sub(1) as u64;
+
+                // Skip the first block. We store version info there for now.
+                (
+                    (left_index + 1) * self.layer_info.block_size,
+                    (right_index + 1) * self.layer_info.block_size,
+                )
+            }
+            None => (
+                self.layer_info.block_size,
+                round_up(self.size, self.layer_info.block_size).unwrap(),
+            ),
+        };
         let mut left = Iterator::new(self, left_offset);
         left.advance().await?;
         match left.get() {
@@ -336,7 +465,11 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
                 right.buffer.pos = right.offset_for_index(right_index.into())? as usize;
                 right.item_index = u16::try_from(right_index).unwrap();
                 right.advance().await?;
-            };
+            } else if right.item.is_none() {
+                // This is cheap if we're actually off the end, but otherwise it catches when we
+                // need to look inside the next block.
+                right.advance().await?;
+            }
             return Ok(Box::new(right));
         } else {
             // At this point, we know that left_key < key and right_key >= key, so we have to
@@ -386,6 +519,7 @@ pub struct SimplePersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
     buf: Vec<u8>,
     item_count: u16,
     block_offsets: Vec<u16>,
+    block_keys: Vec<u64>,
     _key: PhantomData<K>,
     _value: PhantomData<V>,
 }
@@ -411,6 +545,7 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
             buf: vec![0; BLOCK_HEADER_SIZE],
             item_count: 0,
             block_offsets: Vec::new(),
+            block_keys: Vec::new(),
             _key: PhantomData,
             _value: PhantomData,
         })
@@ -448,6 +583,21 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
         self.block_offsets.clear();
         Ok(())
     }
+
+    async fn write_seek_table(&mut self) -> Result<(), Error> {
+        if self.block_keys.len() == 0 {
+            return Ok(());
+        }
+        self.buf.resize(self.block_keys.len() * 8, 0);
+        let mut len = 0;
+        for key in &self.block_keys {
+            LittleEndian::write_u64(&mut self.buf[len..len + 8], *key);
+            len += 8;
+        }
+        self.writer.write_bytes(&self.buf).await?;
+        self.writer.skip(self.block_size - (len as u64 % self.block_size)).await?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -478,6 +628,9 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
                 self.block_offsets.pop();
             }
             self.write_some(len).await?;
+
+            // Note that this will not insert an entry for the first data block.
+            self.block_keys.push(item.key.get_leading_u64());
         }
 
         self.item_count += 1;
@@ -486,6 +639,7 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
 
     async fn flush(&mut self) -> Result<(), Error> {
         self.write_some(self.buf.len()).await?;
+        self.write_seek_table().await?;
         self.writer.complete().await
     }
 }
@@ -502,18 +656,39 @@ impl<W: WriteBytes, K: Key, V: Value> Drop for SimplePersistentLayerWriter<W, K,
 mod tests {
 
     use {
-        super::{SimplePersistentLayer, SimplePersistentLayerWriter},
+        super::{block_split, SimplePersistentLayer, SimplePersistentLayerWriter},
         crate::{
             filesystem::MAX_BLOCK_SIZE,
-            lsm_tree::types::{DefaultOrdUpperBound, Item, ItemRef, Layer, LayerWriter},
+            lsm_tree::{
+                types::{
+                    DefaultOrdUpperBound, Item, ItemRef, Layer, LayerWriter, NextKey, SortByU64,
+                },
+                LayerIterator,
+            },
             object_handle::Writer,
             round::round_up,
+            serialized_types::{
+                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+            },
             testing::fake_object::{FakeObject, FakeObjectHandle},
         },
-        std::{fmt::Debug, ops::Bound, sync::Arc},
+        std::{
+            fmt::Debug,
+            ops::{Bound, Range},
+            sync::Arc,
+        },
+        type_hash::TypeHash,
     };
 
     impl DefaultOrdUpperBound for i32 {}
+    impl SortByU64 for i32 {
+        fn get_leading_u64(&self) -> u64 {
+            if self >= &0 {
+                return u64::try_from(*self).unwrap() + u64::try_from(i32::MAX).unwrap() + 1;
+            }
+            u64::try_from(self + i32::MAX + 1).unwrap()
+        }
+    }
 
     impl Debug for SimplePersistentLayerWriter<Writer<'_>, i32, i32> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -658,8 +833,8 @@ mod tests {
     async fn test_large_block_size() {
         // At the upper end of the supported size.
         const BLOCK_SIZE: u64 = MAX_BLOCK_SIZE;
-        // Items will be 16 bytes, so fill up a few pages.
-        const ITEM_COUNT: i32 = ((BLOCK_SIZE as i32) / 16) * 3;
+        // Items will be 18 bytes, so fill up a few pages.
+        const ITEM_COUNT: i32 = ((BLOCK_SIZE as i32) / 18) * 3;
 
         let handle =
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
@@ -670,7 +845,8 @@ mod tests {
             )
             .await
             .expect("writer new");
-            for i in 0..ITEM_COUNT {
+            // Use large values to force varint encoding to use consistent space.
+            for i in 2000000000..(2000000000 + ITEM_COUNT) {
                 writer.write(Item::new(i, i).as_item_ref()).await.expect("write failed");
             }
             writer.flush().await.expect("flush failed");
@@ -678,7 +854,7 @@ mod tests {
 
         let layer = SimplePersistentLayer::open(handle).await.expect("new failed");
         let mut iterator = layer.seek(Bound::Unbounded).await.expect("seek failed");
-        for i in 0..ITEM_COUNT {
+        for i in 2000000000..(2000000000 + ITEM_COUNT) {
             let ItemRef { key, value, .. } = iterator.get().expect("missing item");
             assert_eq!((key, value), (&i, &i));
             iterator.advance().await.expect("failed to advance");
@@ -737,6 +913,258 @@ mod tests {
                 }
             } else {
                 assert!(iterator.get().is_none());
+            }
+        }
+    }
+
+    #[derive(
+        Clone, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize, TypeHash, Versioned,
+    )]
+    struct TestKey(Range<u64>);
+    versioned_type! { 1.. => TestKey }
+    impl SortByU64 for TestKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
+    impl NextKey for TestKey {
+        fn next_key(&self) -> Option<Self> {
+            Some(TestKey(self.0.end..self.0.end + 1))
+        }
+    }
+    impl Ord for TestKey {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.0.start.cmp(&other.0.start).then(self.0.end.cmp(&other.0.end))
+        }
+    }
+    impl PartialOrd for TestKey {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    impl DefaultOrdUpperBound for TestKey {}
+
+    // Create a large spread of data across several blocks to ensure that no part of the range is
+    // lost by the partial search using the layer seek table.
+    #[fuchsia::test]
+    async fn test_block_seek_duplicate_keys() {
+        // At the upper end of the supported size.
+        const BLOCK_SIZE: u64 = 512;
+        // Items will be 37 bytes each. Max length varint u64 is 9 bytes, 3 of those plus one
+        // straight encoded sequence number for another 8 bytes. Then 2 more for each seek table
+        // entry.
+        const ITEMS_TO_FILL_BLOCK: u64 = BLOCK_SIZE / 37;
+
+        let mut to_find = Vec::new();
+
+        let handle =
+            FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
+        {
+            let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
+                Writer::new(&handle),
+                BLOCK_SIZE,
+            )
+            .await
+            .expect("writer new");
+
+            // Make all values take up maximum space for varint encoding.
+            let mut current_value = u32::MAX as u64 + 1;
+
+            // First fill the front with a duplicate leading u64 amount, then look at the start,
+            // middle and end of the range.
+            {
+                let items = ITEMS_TO_FILL_BLOCK * 3;
+                for i in 0..items {
+                    writer
+                        .write(
+                            Item::new(TestKey(current_value..current_value + i), current_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                }
+                to_find.push(TestKey(current_value..current_value));
+                to_find.push(TestKey(current_value..(current_value + (items / 2))));
+                to_find.push(TestKey(current_value..current_value + (items - 1)));
+                current_value += 1;
+            }
+
+            // Add some filler of all different leading u64.
+            {
+                let items = ITEMS_TO_FILL_BLOCK * 3;
+                for _ in 0..items {
+                    writer
+                        .write(
+                            Item::new(TestKey(current_value..current_value), current_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                    current_value += 1;
+                }
+            }
+
+            // Fill the middle with a duplicate leading u64 amount, then look at the start,
+            // middle and end of the range.
+            {
+                let items = ITEMS_TO_FILL_BLOCK * 3;
+                for i in 0..items {
+                    writer
+                        .write(
+                            Item::new(TestKey(current_value..current_value + i), current_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                }
+                to_find.push(TestKey(current_value..current_value));
+                to_find.push(TestKey(current_value..(current_value + (items / 2))));
+                to_find.push(TestKey(current_value..current_value + (items - 1)));
+                current_value += 1;
+            }
+
+            // Add some filler of all different leading u64.
+            {
+                let items = ITEMS_TO_FILL_BLOCK * 3;
+                for _ in 0..items {
+                    writer
+                        .write(
+                            Item::new(TestKey(current_value..current_value), current_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                    current_value += 1;
+                }
+            }
+
+            // Fill the end with a duplicate leading u64 amount, then look at the start,
+            // middle and end of the range.
+            {
+                let items = ITEMS_TO_FILL_BLOCK * 3;
+                for i in 0..items {
+                    writer
+                        .write(
+                            Item::new(TestKey(current_value..current_value + i), current_value)
+                                .as_item_ref(),
+                        )
+                        .await
+                        .expect("write failed");
+                }
+                to_find.push(TestKey(current_value..current_value));
+                to_find.push(TestKey(current_value..(current_value + (items / 2))));
+                to_find.push(TestKey(current_value..current_value + (items - 1)));
+            }
+
+            writer.flush().await.expect("flush failed");
+        }
+
+        let layer = SimplePersistentLayer::open(handle).await.expect("new failed");
+        for target in to_find {
+            let iterator: Box<dyn LayerIterator<TestKey, u64>> =
+                layer.seek(Bound::Included(&target)).await.expect("failed to seek");
+            let ItemRef { key, .. } = iterator.get().expect("missing item");
+            assert_eq!(&target, key);
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_two_seek_blocks() {
+        // At the upper end of the supported size.
+        const BLOCK_SIZE: u64 = 512;
+        // Items will be 37 bytes each. Max length varint u64 is 9 bytes, 3 of those plus one
+        // straight encoded sequence number for another 8 bytes. Then 2 more for each seek table
+        // entry.
+        const ITEMS_TO_FILL_BLOCK: u64 = BLOCK_SIZE / 37;
+        // Add enough items to create enough blocks that the seek table can't fit into a single
+        // block. Entries are 8 bytes. Remember to add one because the first block entry is omitted,
+        // then add one more to overflow into the next block.
+        const ITEM_COUNT: u64 = ITEMS_TO_FILL_BLOCK * ((BLOCK_SIZE / 8) + 2);
+
+        let mut to_find = Vec::new();
+
+        let handle =
+            FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
+        {
+            let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
+                Writer::new(&handle),
+                BLOCK_SIZE,
+            )
+            .await
+            .expect("writer new");
+
+            // Make all values take up maximum space for varint encoding.
+            let initial_value = u32::MAX as u64 + 1;
+            for i in 0..ITEM_COUNT {
+                writer
+                    .write(
+                        Item::new(TestKey(initial_value + i..initial_value + i), initial_value)
+                            .as_item_ref(),
+                    )
+                    .await
+                    .expect("write failed");
+            }
+            // Look at the start middle and end.
+            to_find.push(TestKey(initial_value..initial_value));
+            let middle = initial_value + ITEM_COUNT / 2;
+            to_find.push(TestKey(middle..middle));
+            let end = initial_value + ITEM_COUNT - 1;
+            to_find.push(TestKey(end..end));
+
+            writer.flush().await.expect("flush failed");
+        }
+
+        let layer = SimplePersistentLayer::open(handle).await.expect("new failed");
+        for target in to_find {
+            let iterator: Box<dyn LayerIterator<TestKey, u64>> =
+                layer.seek(Bound::Included(&target)).await.expect("failed to seek");
+            let ItemRef { key, .. } = iterator.get().expect("missing item");
+            assert_eq!(&target, key);
+        }
+    }
+
+    fn validate_values(block_size: u64, data_blocks: u64, seek_blocks: u64) -> bool {
+        if data_blocks <= 1 {
+            seek_blocks == 0
+        } else {
+            // No entry for the first data block, so don't count it. Look how much space would be
+            // generated in the seek blocks for those entries and then ensure that is the right
+            // amount of space reserved for the seek blocks.
+            round_up((data_blocks - 1) * 8, block_size).unwrap() / block_size == seek_blocks
+        }
+    }
+
+    // Verifies that the size of the generated seek blocks will be correctly calculated based on the
+    // size of the layer. Even though there are no interesting branches, testing the math from two
+    // ends was really helpful in development.
+    #[fuchsia::test]
+    async fn test_seek_block_count() {
+        const BLOCK_SIZE: u64 = 512;
+        const PER_BLOCK: u64 = BLOCK_SIZE / 8;
+        // Don't include zero, there must always be a layerinfo block.
+        for block_count in 1..(PER_BLOCK * (PER_BLOCK + 1)) {
+            let size = block_count * BLOCK_SIZE;
+            if let Ok((data_blocks, seek_blocks)) = block_split(size, BLOCK_SIZE) {
+                assert!(
+                    validate_values(BLOCK_SIZE, data_blocks, seek_blocks),
+                    "For {} blocks got {} data and {} seek",
+                    block_count,
+                    data_blocks,
+                    seek_blocks
+                );
+            } else {
+                // Whenever the split fails, the previous count would have perfectly saturated all
+                // seek blocks. The only available options with this count of blocks is an empty
+                // seek block or a data block entry that doesn't fit into any seek block.
+                let (data_blocks, _seek_blocks) =
+                    block_split(BLOCK_SIZE * (block_count - 1), BLOCK_SIZE)
+                        .expect("Previous count split");
+                assert_eq!(
+                    (data_blocks - 1) % PER_BLOCK,
+                    0,
+                    "Failed to split a valid value {}.",
+                    block_count
+                );
             }
         }
     }

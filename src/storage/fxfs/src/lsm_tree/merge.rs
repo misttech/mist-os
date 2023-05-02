@@ -688,7 +688,7 @@ mod tests {
                 skip_list_layer::SkipListLayer,
                 types::{
                     IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, MutableLayer, NextKey,
-                    OrdLowerBound, OrdUpperBound,
+                    OrdLowerBound, OrdUpperBound, SortByU64,
                 },
             },
             serialized_types::{
@@ -706,6 +706,12 @@ mod tests {
     struct TestKey(Range<u64>);
 
     versioned_type! { 1.. => TestKey }
+
+    impl SortByU64 for TestKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
 
     impl NextKey for TestKey {
         fn next_key(&self) -> Option<Self> {
@@ -1248,6 +1254,12 @@ mod tests {
     versioned_type! { 1.. => TestKeyWithDefaultNextKey }
 
     impl NextKey for TestKeyWithDefaultNextKey {}
+
+    impl SortByU64 for TestKeyWithDefaultNextKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
 
     impl OrdUpperBound for TestKeyWithDefaultNextKey {
         fn cmp_upper_bound(&self, other: &TestKeyWithDefaultNextKey) -> std::cmp::Ordering {

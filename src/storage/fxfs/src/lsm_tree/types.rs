@@ -17,6 +17,13 @@ use {
     type_hash::TypeHash,
 };
 
+// Force keys to be sorted first by a u64, so that they can be located approximately based on only
+// that integer without the whole key.
+pub trait SortByU64 {
+    // Return the u64 that is used as the first value when deciding on sort order of the key.
+    fn get_leading_u64(&self) -> u64;
+}
+
 /// Keys and values need to implement the following traits.  For merging, they need to implement
 /// MergeableKey.  TODO: Use trait_alias when available.
 pub trait Key:
@@ -24,6 +31,7 @@ pub trait Key:
     + Debug
     + OrdUpperBound
     + Send
+    + SortByU64
     + Sync
     + Versioned
     + VersionedLatest
@@ -42,6 +50,7 @@ impl<K> Key for K where
         + Debug
         + OrdUpperBound
         + Send
+        + SortByU64
         + Sync
         + Versioned
         + VersionedLatest

@@ -652,7 +652,7 @@ mod tests {
                 },
                 types::{
                     DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer,
-                    LayerIterator, LayerIteratorMut, MutableLayer,
+                    LayerIterator, LayerIteratorMut, MutableLayer, SortByU64,
                 },
             },
             serialized_types::{
@@ -681,9 +681,15 @@ mod tests {
         TypeHash,
         Versioned,
     )]
-    struct TestKey(i32);
+    struct TestKey(u64);
 
     versioned_type! { 1.. => TestKey }
+
+    impl SortByU64 for TestKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0
+        }
+    }
 
     impl DefaultOrdLowerBound for TestKey {}
     impl DefaultOrdUpperBound for TestKey {}

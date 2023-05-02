@@ -23,12 +23,14 @@ use crate::{
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 27, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 28, minor: 0 };
 
 /// The version where the journal block size changed.
 pub const JOURNAL_BLOCK_SIZE_CHANGE_VERSION: Version = Version { major: 26, minor: 0 };
 // The version at which per-block seek tables were added.
 pub const PER_BLOCK_SEEK_VERSION: Version = Version { major: 27, minor: 0 };
+// The version at which layerfile-wide seek tables allowed approximate searching of blocks.
+pub const INTERBLOCK_SEEK_VERSION: Version = Version { major: 28, minor: 0 };
 
 /// The earliest supported version of the on-disk filesystem format.
 ///

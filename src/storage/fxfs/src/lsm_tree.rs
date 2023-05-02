@@ -362,7 +362,7 @@ mod tests {
                 merge::{MergeLayerIterator, MergeResult},
                 types::{
                     Item, ItemRef, LayerIterator, LayerIteratorFilter, NextKey, OrdLowerBound,
-                    OrdUpperBound,
+                    OrdUpperBound, SortByU64,
                 },
             },
             serialized_types::{
@@ -381,6 +381,12 @@ mod tests {
     struct TestKey(std::ops::Range<u64>);
 
     versioned_type! { 1.. => TestKey }
+
+    impl SortByU64 for TestKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
 
     impl NextKey for TestKey {}
 
@@ -566,7 +572,7 @@ mod tests {
 mod fuzz {
     use {
         crate::{
-            lsm_tree::types::{Item, NextKey, OrdLowerBound, OrdUpperBound},
+            lsm_tree::types::{Item, NextKey, OrdLowerBound, OrdUpperBound, SortByU64},
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
@@ -595,6 +601,12 @@ mod fuzz {
     versioned_type! { 1.. => u64 }
 
     impl NextKey for TestKey {}
+
+    impl SortByU64 for TestKey {
+        fn get_leading_u64(&self) -> u64 {
+            self.0.start
+        }
+    }
 
     impl OrdUpperBound for TestKey {
         fn cmp_upper_bound(&self, other: &TestKey) -> std::cmp::Ordering {

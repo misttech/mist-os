@@ -16,7 +16,7 @@ use {
             skip_list_layer::SkipListLayer,
             types::{
                 BoxedLayerIterator, Item, ItemRef, Layer, LayerIterator, MutableLayer, NextKey,
-                OrdLowerBound, OrdUpperBound, RangeKey,
+                OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
             },
             LSMTree, LayerSet,
         },
@@ -313,6 +313,12 @@ pub type Hold<'a> = ReservationImpl<&'a Reservation, Reservation>;
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct AllocatorKey {
     pub device_range: Range<u64>,
+}
+
+impl SortByU64 for AllocatorKey {
+    fn get_leading_u64(&self) -> u64 {
+        self.device_range.start
+    }
 }
 
 impl AllocatorKey {

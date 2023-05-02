@@ -5,7 +5,9 @@
 // TODO(fxbug.dev/96139): need validation after deserialization.
 use {
     crate::{
-        lsm_tree::types::{Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey},
+        lsm_tree::types::{
+            Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+        },
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
         serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
@@ -95,6 +97,12 @@ pub struct ObjectKey {
 pub struct ObjectKeyV5 {
     pub object_id: u64,
     pub data: ObjectKeyDataV5,
+}
+
+impl SortByU64 for ObjectKey {
+    fn get_leading_u64(&self) -> u64 {
+        self.object_id
+    }
 }
 
 impl ObjectKey {
