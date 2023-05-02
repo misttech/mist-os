@@ -88,6 +88,29 @@ class DetailDiffTests(unittest.TestCase):
         self.assertTrue(
             command[0].endswith(str(remote_action._DETAIL_DIFF_SCRIPT)))
 
+    def test_filtered(self):
+
+        def _filter_for_compare(
+                file1: Path, filtered1: Path, file2: Path,
+                filtered2: Path) -> bool:
+            # Pretend we wrote filtered views to filtered1 and filtered2.
+            return True
+
+        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+            self.assertEqual(
+                remote_action._detail_diff_filtered(
+                    Path('file1.txt'),
+                    Path('file2.txt'),
+                    maybe_transform_pair=_filter_for_compare), 0)
+        mock_call.assert_called_once()
+        first_call = mock_call.call_args_list[0]
+        args, unused_kwargs = first_call
+        command = args[0]  # list
+        self.assertTrue(
+            command[0].endswith(str(remote_action._DETAIL_DIFF_SCRIPT)))
+        self.assertEqual(command[1], 'file1.txt.filtered')
+        self.assertEqual(command[2], 'file2.txt.filtered')
+
 
 class TextDiffTests(unittest.TestCase):
 
@@ -234,17 +257,32 @@ class ReclientCanonicalWorkingDirTests(unittest.TestCase):
 
 class RemoveWorkingDirAbspathsTests(unittest.TestCase):
 
-    def test_depfile(self):
+    def test_depfile_in_place(self):
         with tempfile.TemporaryDirectory() as td:
             depfile = Path(td) / 'dep.d'
 
             wd = Path('/home/base/out/inside/here')
             _write_file_contents(
                 depfile, f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n')
-            remote_action.remove_working_dir_abspaths_from_depfile_in_place(
-                depfile, wd)
+            remote_action.remove_working_dir_abspaths_from_depfile(
+                depfile, wd)  # write in-place
             self.assertEqual(
                 _read_file_contents(depfile),
+                'obj/foo.o: foo/bar.h baz/quux.h\n',
+            )
+
+    def test_depfile_new_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            depfile = Path(td) / 'dep.d'
+            output = depfile.with_suffix('.new')
+
+            wd = Path('/all/your/base')
+            _write_file_contents(
+                depfile, f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n')
+            remote_action.remove_working_dir_abspaths_from_depfile(
+                depfile, wd, output=output)  # write new file
+            self.assertEqual(
+                _read_file_contents(output),
                 'obj/foo.o: foo/bar.h baz/quux.h\n',
             )
 

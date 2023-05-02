@@ -99,6 +99,36 @@ def _detail_diff(
     return subprocess.call([str(x) for x in command])
 
 
+def _detail_diff_filtered(
+    file1: Path,
+    file2: Path,
+    maybe_transform_pair: Callable[[Path, Path, Path, Path], bool] = None,
+    project_root_rel: Path = None,
+) -> int:
+    """Show differences between filtered views of two files.
+
+    Args:
+      file1: usually a locally generated file
+      file2: usually a remotely generated file
+      maybe_transform_pair: function that returns True if it applies a transformation
+        to produce a filtered views.
+        Its path arguments are: original1, filtered1, original2, filtered2.
+        It should return false if it does not transform the original files
+        into filtered views.
+        This function should decide whether or not to transform based on the
+        original1 file name.
+      project_root_rel: path to project root
+    """
+    filtered1 = Path(str(file1) + '.filtered')
+    filtered2 = Path(str(file2) + '.filtered')
+    if maybe_transform_pair is not None and maybe_transform_pair(
+            file1, filtered1, file2, filtered2):
+        # Compare the filtered views of the files.
+        return _detail_diff(filtered1, filtered2, project_root_rel)
+
+    return _detail_diff(file1, file2, project_root_rel)
+
+
 def _text_diff(file1: Path, file2: Path) -> int:
     """Display textual differences to stdout."""
     return subprocess.call(['diff', '-u', str(file1), str(file2)])
@@ -239,17 +269,29 @@ def _transform_file_by_lines(
     _write_lines_to_file(dest, new_lines)
 
 
-def _rewrite_file_by_lines_in_place(
+def rewrite_file_by_lines_in_place(
         path: Path, line_transform: Callable[[str], str]):
     _transform_file_by_lines(path, path, line_transform)
 
 
-def remove_working_dir_abspaths_from_depfile_in_place(
-        depfile: Path, working_dir_abs: Path):
+def remove_working_dir_abspaths_from_depfile(
+    depfile: Path,
+    working_dir_abs: Path,
+    output: Path = None,
+):
+    """Remove working dir abspaths from a depfile.
+
+    Args:
+      depfile: depfile to transform
+      working_dir_abs: absolute path to erase
+      output: if given, write to this new file instead overwriting
+        the original depfile.
+    """
     # TODO(http://fxbug.dev/124714): This transformation would be more robust
     # if we properly lexed a depfile and operated on tokens instead of lines.
-    _rewrite_file_by_lines_in_place(
+    _transform_file_by_lines(
         depfile,
+        output or depfile,
         lambda line: line.replace(str(working_dir_abs) + os.path.sep, ''),
     )
 
@@ -1108,27 +1150,66 @@ class RemoteAction(object):
 
         return self.run()
 
-    def _rewrite_local_outputs_for_comparison_workaround(self):
-        # TODO: move this logic into post_(remote)_run_success_action hook.
-        for f in self.output_files_relative_to_working_dir:
-            if f.suffix == '.map':  # intended for linker map files
-                # Workaround https://fxbug.dev/89245: relative-ize absolute path of
-                # current working directory in linker map files.
-                _rewrite_file_by_lines_in_place(
-                    f,
-                    lambda line: line.replace(
-                        self.exec_root, self.exec_root_rel),
-                )
-            if f.suffix == '.d':  # intended for depfiles
-                # TEMPORARY WORKAROUND until upstream fix lands:
-                #   https://github.com/pest-parser/pest/pull/522
-                # Remove redundant occurrences of the current working dir absolute path.
-                # Paths should be relative to the root_build_dir.
-                _rewrite_file_by_lines_in_place(
-                    f,
-                    lambda line: line.replace(
-                        str(self.working_dir) + os.path.sep, ''),
-                )
+    def _filtered_outputs_for_comparison(
+        self,
+        local_file: Path,
+        local_file_filtered: Path,
+        remote_file: Path,
+        remote_file_filtered: Path,
+    ) -> bool:
+        """Tolerate some differences between files as acceptable.
+
+        Pass this function to _detail_diff_filtered() to compare
+        filtered views of some of the output files.
+        This does not modify any of the output files.
+
+        Args:
+          local_file: input file to compare, also determines whether or not
+            to apply a transform.
+          local_file_filtered: if transforming, write filtered view here.
+          remote_file: input file to compare.
+          remote_file_filtered: if transforming, write filtered view here.
+
+        Returns:
+          True if transformed filtered views were written.
+        """
+        # TODO: support passing in filters from application-specific code.
+        if local_file.suffix == '.map':  # intended for linker map files
+            # Workaround https://fxbug.dev/89245: relative-ize absolute path of
+            # current working directory in linker map files.
+            # These files are only used for local debugging.
+            _transform_file_by_lines(
+                local_file,
+                local_file_filtered,
+                lambda line: line.replace(self.exec_root, self.exec_root_rel),
+            )
+            _transform_file_by_lines(
+                remote_file,
+                remote_file_filtered,
+                lambda line: line.replace(
+                    _REMOTE_PROJECT_ROOT, self.exec_root_rel),
+            )
+            return True
+
+        if local_file.suffix == '.d':  # intended for depfiles
+            # TEMPORARY WORKAROUND until upstream fix lands:
+            #   https://github.com/pest-parser/pest/pull/522
+            # Remove redundant occurrences of the current working dir absolute path.
+            # Paths should be relative to the root_build_dir.
+            remove_working_dir_abspaths_from_depfile(
+                depfile=local_file,
+                working_dir_abs=str(self.working_dir),
+                output=local_file_filtered,
+            )
+            remove_working_dir_abspaths_from_depfile(
+                depfile=remote_file,
+                working_dir_abs=str(self.remote_working_dir),
+                output=remote_file_filtered,
+            )
+            return True
+
+        # No transform was done, tell the caller to compare the originals as-is.
+        return False
 
     def local_fsatrace_transform(self, line: str) -> str:
         return line.replace(str(self.exec_root) + os.path.sep, '').replace(
@@ -1216,7 +1297,7 @@ class RemoteAction(object):
             return local_exit_code
 
         # Apply workarounds to make comparisons more meaningful.
-        self._rewrite_local_outputs_for_comparison_workaround()
+        # self._rewrite_local_outputs_for_comparison_workaround()
 
         # Translate output directories into list of files.
         all_compare_files = direct_compare_output_files + list(
@@ -1238,9 +1319,10 @@ class RemoteAction(object):
             )
             for local_out, remote_out in output_diffs:
                 msg(f"  {local_out} vs. {remote_out}:")
-                _detail_diff(
+                _detail_diff_filtered(
                     local_out,
                     remote_out,
+                    maybe_transform_pair=self._filtered_outputs_for_comparison,
                     project_root_rel=self.exec_root_rel,
                 )  # ignore exit status
                 msg("------------------------------------")

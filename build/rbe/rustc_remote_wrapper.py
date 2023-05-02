@@ -747,8 +747,8 @@ class RustRemoteAction(object):
         We forgive this for depfiles, but other artifacts should be verified
         separately.
         """
-        remote_action.remove_working_dir_abspaths_from_depfile_in_place(
-            self.working_dir / self.depfile,
+        remote_action.remove_working_dir_abspaths_from_depfile(
+            self.working_dir / self.depfile,  # in-place
             self.remote_action.remote_working_dir,
         )
 
