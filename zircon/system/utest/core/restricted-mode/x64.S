@@ -1,0 +1,123 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+.globl vectab
+vectab:
+  // back from restricted mode
+  // rdi holds the context
+  // rsi holds the reason code
+  mov  %rdi,%rsp
+  pop  %rsp
+  pop  %r15
+  pop  %r14
+  pop  %r13
+  pop  %r12
+  pop  %rbp
+  pop  %rbx
+
+  // pop the reason code return slot
+  pop  %rdx
+
+  // return the reason code from this function
+  mov  %rsi,(%rdx)
+
+  // return back to whatever the address was on the stack
+  // make it appear as if the wrapper had returned ZX_OK
+  xor  %eax,%eax
+  ret
+
+.globl syscall_bounce
+syscall_bounce:
+  // do something to all the registers so we can read
+  // the state on the way out
+  inc  %rax
+  inc  %rbx
+  inc  %rcx
+  inc  %rdx
+  inc  %rsi
+  inc  %rdi
+  inc  %rbp
+  inc  %rsp
+  inc  %r8
+  inc  %r9
+  inc  %r10
+  inc  %r11
+  inc  %r12
+  inc  %r13
+  inc  %r14
+  inc  %r15
+
+  // write rcx and r11 to fs and gs base since they are both
+  // trashed by the syscall. also tests that fs and gs base are
+  // set properly.
+  mov   %rcx, %fs:0
+  mov   %r11, %gs:0
+
+0:
+  syscall
+.globl syscall_bounce_post_syscall
+syscall_bounce_post_syscall:
+  jmp 0b
+
+.globl exception_bounce
+exception_bounce:
+  // do something to all the registers so we can read
+  // the state on the way out
+  inc  %rax
+  inc  %rbx
+  inc  %rcx
+  inc  %rdx
+  inc  %rsi
+  inc  %rdi
+  inc  %rbp
+  inc  %rsp
+  inc  %r8
+  inc  %r9
+  inc  %r10
+  inc  %r11
+  inc  %r12
+  inc  %r13
+  inc  %r14
+  inc  %r15
+
+  // write rcx and r11 to fs and gs base since they are both
+  // trashed by the syscall. also tests that fs and gs base are
+  // set properly.
+  mov   %rcx, %fs:0
+  mov   %r11, %gs:0
+
+.globl exception_bounce_exception_address
+exception_bounce_exception_address:
+  ud2
+  jmp exception_bounce_exception_address
+.globl exception_bounce_exit
+exception_bounce_exit:
+  syscall
+
+.globl restricted_enter_wrapper
+restricted_enter_wrapper:
+  // args 0 - 1 are already in place in rdi, rsi
+
+  // save the return code pointer on the stack
+  push  %rdx
+
+  // save the callee saved regs since the return from restricted mode
+  // will zero out all of the registers except rdi and rsi
+  push  %rbx
+  push  %rbp
+  push  %r12
+  push  %r13
+  push  %r14
+  push  %r15
+  push  %rsp
+
+  // save the pointer the stack as the context pointer in the syscall
+  mov   %rsp,%rdx
+
+  // call the syscall
+  call  zx_restricted_enter
+
+  // if we got here it must have failed
+  add   $(8*8),%rsp // pop the previous state on the stack
+  ret

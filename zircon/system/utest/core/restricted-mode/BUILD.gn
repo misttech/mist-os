@@ -5,6 +5,11 @@
 source_set("restricted-mode") {
   testonly = true
   sources = [ "restricted-mode.cc" ]
+  if (current_cpu == "x64") {
+    sources += [ "x64.S" ]
+  } else if (current_cpu == "arm64") {
+    sources += [ "arm64.S" ]
+  }
   deps = [
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
