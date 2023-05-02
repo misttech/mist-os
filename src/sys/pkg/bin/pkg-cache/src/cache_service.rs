@@ -36,7 +36,7 @@ use {
             Arc,
         },
     },
-    tracing::{error, info, warn},
+    tracing::{error, warn},
     vfs::directory::entry::DirectoryEntry as _,
 };
 
@@ -233,7 +233,6 @@ async fn get(
                 (None, ps)
             }
             PackageStatus::Other => {
-                info!("get package {}", meta_far_blob.blob_id);
                 let (root_dir, name) = serve_needed_blobs(
                     needed_blobs,
                     meta_far_blob,
