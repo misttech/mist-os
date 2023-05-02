@@ -1536,18 +1536,29 @@ mod tests {
         assert!(!client.sta.eapol_required());
     }
 
-    // Auto-deauth is tied to singal report by AssociationStatusCheck timeout
-    fn advance_auto_deauth(
-        m: &mut MockObjects,
-        me: &mut ClientMlme<FakeDevice>,
+    /// Consumes `TimedEvent` values from the `TimeStream` held by `mock_objects` and handles
+    /// each `TimedEvent` value with `mlme`. This function makes the following assertions:
+    ///
+    ///   - The `TimeStream` held by `mock_objects` starts with one `StatusCheckTimeout` pending.
+    ///   - For the `beacon_count` specified, `mlme` will consume the current `StatusCheckTimeout`
+    ///     and schedule the next.
+    ///   - `mlme` produces a `fidl_mlme::SignalReportIndication` for each StatusCheckTimeout
+    ///     consumed.
+    fn handle_association_status_checks_and_signal_reports(
+        mock_objects: &mut MockObjects,
+        mlme: &mut ClientMlme<FakeDevice>,
         beacon_count: u32,
     ) {
         for _ in 0..beacon_count / super::state::ASSOCIATION_STATUS_TIMEOUT_BEACON_COUNT {
-            let (_, timed_event) =
-                m.time_stream.try_next().unwrap().expect("Should have scheduled a timed event");
-            me.handle_timed_event(timed_event.id, timed_event.event);
-            assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
-            m.fake_device_state
+            let (_, timed_event) = mock_objects
+                .time_stream
+                .try_next()
+                .unwrap()
+                .expect("Should have scheduled a timed event");
+            mlme.handle_timed_event(timed_event.id, timed_event.event);
+            assert_eq!(mock_objects.fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+            mock_objects
+                .fake_device_state
                 .lock()
                 .unwrap()
                 .next_mlme_msg::<fidl_internal::SignalReportIndication>()
@@ -1558,30 +1569,38 @@ mod tests {
     #[test]
     fn test_auto_deauth_uninterrupted_interval() {
         let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
-        let mut me = m.make_mlme();
-        me.make_client_station();
-        let mut client = me.get_bound_client().expect("client should be present");
+        let mut mock_objects = MockObjects::new(&exec);
+        let mut mlme = mock_objects.make_mlme();
+        mlme.make_client_station();
+        let mut client = mlme.get_bound_client().expect("client should be present");
 
         client.move_to_associated_state();
 
         // Verify timer is scheduled and move the time to immediately before auto deauth is triggered.
-        advance_auto_deauth(&mut m, &mut me, DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT);
+        handle_association_status_checks_and_signal_reports(
+            &mut mock_objects,
+            &mut mlme,
+            DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
+        );
 
         // One more timeout to trigger the auto deauth
-        let (_, timed_event) =
-            m.time_stream.try_next().unwrap().expect("Should have scheduled a timed event");
+        let (_, timed_event) = mock_objects
+            .time_stream
+            .try_next()
+            .unwrap()
+            .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at deadline causes deauth
-        me.handle_timed_event(timed_event.id, timed_event.event);
-        m.fake_device_state
+        mlme.handle_timed_event(timed_event.id, timed_event.event);
+        mock_objects
+            .fake_device_state
             .lock()
             .unwrap()
             .next_mlme_msg::<fidl_internal::SignalReportIndication>()
             .expect("error reading SignalReport.indication");
-        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(mock_objects.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&m.fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&mock_objects.fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header:
             0b1100_00_00, 0b00000000, // FC
             0, 0, // Duration
@@ -1591,7 +1610,7 @@ mod tests {
             0x10, 0, // Sequence Control
             3, 0, // reason code
         ][..]);
-        let deauth_ind = m
+        let deauth_ind = mock_objects
             .fake_device_state
             .lock()
             .unwrap()
@@ -1610,26 +1629,30 @@ mod tests {
     #[test]
     fn test_auto_deauth_received_beacon() {
         let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
-        let mut me = m.make_mlme();
-        me.make_client_station();
-        let mut client = me.get_bound_client().expect("client should be present");
+        let mut mock_objects = MockObjects::new(&exec);
+        let mut mlme = mock_objects.make_mlme();
+        mlme.make_client_station();
+        let mut client = mlme.get_bound_client().expect("client should be present");
 
         client.move_to_associated_state();
 
         // Move the countdown to just about to cause auto deauth.
-        advance_auto_deauth(&mut m, &mut me, DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT);
+        handle_association_status_checks_and_signal_reports(
+            &mut mock_objects,
+            &mut mlme,
+            DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
+        );
 
         // Receive beacon midway, so lost bss countdown is reset.
         // If this beacon is not received, the next timeout will trigger auto deauth.
-        me.on_mac_frame_rx(
+        mlme.on_mac_frame_rx(
             BEACON_FRAME,
             banjo_wlan_softmac::WlanRxInfo {
                 rx_flags: banjo_fuchsia_wlan_softmac::WlanRxInfoFlags(0),
                 valid_fields: banjo_fuchsia_wlan_softmac::WlanRxInfoValid(0),
                 phy: banjo_common::WlanPhyType::DSSS,
                 data_rate: 0,
-                channel: me.channel_state.get_main_channel().unwrap(),
+                channel: mlme.channel_state.get_main_channel().unwrap(),
                 mcs: 0,
                 rssi_dbm: 0,
                 snr_dbh: 0,
@@ -1637,22 +1660,30 @@ mod tests {
         );
 
         // Verify auto deauth is not triggered for the entire duration.
-        advance_auto_deauth(&mut m, &mut me, DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT);
+        handle_association_status_checks_and_signal_reports(
+            &mut mock_objects,
+            &mut mlme,
+            DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
+        );
 
         // Verify more timer is scheduled
-        let (_, timed_event2) =
-            m.time_stream.try_next().unwrap().expect("Should have scheduled a timed event");
+        let (_, timed_event2) = mock_objects
+            .time_stream
+            .try_next()
+            .unwrap()
+            .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at new deadline causes deauth
-        me.handle_timed_event(timed_event2.id, timed_event2.event);
-        m.fake_device_state
+        mlme.handle_timed_event(timed_event2.id, timed_event2.event);
+        mock_objects
+            .fake_device_state
             .lock()
             .unwrap()
             .next_mlme_msg::<fidl_internal::SignalReportIndication>()
             .expect("error reading SignalReport.indication");
-        assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(mock_objects.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&m.fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&mock_objects.fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
             // Mgmt header:
             0b1100_00_00, 0b00000000, // FC
             0, 0, // Duration
@@ -1662,7 +1693,7 @@ mod tests {
             0x10, 0, // Sequence Control
             3, 0, // reason code
         ][..]);
-        let deauth_ind = m
+        let deauth_ind = mock_objects
             .fake_device_state
             .lock()
             .unwrap()
