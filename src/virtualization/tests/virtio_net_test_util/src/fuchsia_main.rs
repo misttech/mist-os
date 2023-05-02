@@ -105,8 +105,7 @@ async fn network_device_send(
         buffer.set_frame_type(fidl_fuchsia_hardware_network::FrameType::Ethernet);
         buffer.set_port(port);
         let write_scratch = vec![config.send_byte; config.length];
-        let written = buffer.write_at(0, &write_scratch).expect("write message");
-        assert_eq!(written, config.length);
+        buffer.write_at(0, &write_scratch).expect("write message");
         session.send(buffer).expect("send");
 
         let recv_result = session
@@ -123,8 +122,7 @@ async fn network_device_send(
     };
 
     let mut scratch = vec![0; config.length];
-    let read = recv_buf.read_at(0, &mut scratch).expect("read from buffer");
-    assert_eq!(read, config.length, "expected length: {}, found: {}", config.length, read);
+    recv_buf.read_at(0, &mut scratch).expect("read from buffer");
     assert!(
         scratch.iter().all(|b| *b == config.receive_byte),
         "expected entire buffer to be {:x}, found {:x?}",
