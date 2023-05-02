@@ -89,6 +89,7 @@ func getGolibLicenseURL(b *builder, remainder, path string) (string, error) {
 		b.parent == "gvisor.dev",
 		b.dir == "go.opencensus.io",
 		b.parent == "cloud.google.com",
+		b.parent == "gopkg.in",
 		b.grandparent == "cloud.google.com",
 		b.grandparent == "honnef.co":
 		return fmt.Sprintf("https://pkg.go.dev/%s?tab=licenses", remainder), nil
@@ -100,6 +101,6 @@ func getGolibLicenseURL(b *builder, remainder, path string) (string, error) {
 
 	// Unknown
 	default:
-		return "", fmt.Errorf("Unknown golib URL for package %s", path)
+		return "", fmt.Errorf("Unknown golib URL for package %s", remainder)
 	}
 }

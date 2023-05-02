@@ -14,6 +14,7 @@
     "outputs": [
       "compliance.csv",
       "project_licenses.txt",
+      "all_project_licenses.txt",
       "license_texts_grouped_by_project.txt"
     ],
     "templates": [
@@ -115,7 +116,66 @@
           "prebuilt/virtualization/packages/termina_guest/kernel/x64": true,
           "src/connectivity/network/tools/nc/third_party/openbsd-netcat": true,
           "src/connectivity/wlan/tools/third_party/broadcom": true,
-          "tools/debug/covargs/api/third_party/codecoverage": true
+          "tools/debug/covargs/api/third_party/codecoverage": true,
+          "build/prebuilt": true,
+          "build/secondary/third_party": true,
+          "src/connectivity/bluetooth/hci/vendor": true,
+          "src/connectivity/openthread/third_party": true,
+          "src/virtualization/third_party": true,
+          "third_party": true,
+          "vendor": true,
+          "zircon/third_party": true,
+          "build/secondary/third_party/android/platform/system/core/demangle": true,
+          "build/secondary/third_party/dart-pkg": true,
+          "build/secondary/third_party/glm": true,
+          "build/secondary/third_party/golibs": true,
+          "build/secondary/third_party/grpc": true,
+          "src/connectivity/bluetooth/hci/vendor/atheros": true,
+          "src/connectivity/bluetooth/hci/vendor/broadcom": true,
+          "src/connectivity/bluetooth/hci/vendor/intel": true,
+          "src/connectivity/bluetooth/hci/vendor/marvell": true,
+          "third_party/android/platform/packages/modules/Bluetooth": true,
+          "third_party/android/platform/system": true,
+          "third_party/cobalt/build/secondary/third_party/eigen": true,
+          "third_party/cobalt/build/secondary/third_party/golibs": true,
+          "third_party/cobalt/third_party": true,
+          "third_party/crashpad/src/third_party/libfuzzer": true,
+          "third_party/github.com/ARM-software/HWCPipe/third_party": true,
+          "third_party/github.com/ARM-software/HWCPipe/vendor/arm/mali": true,
+          "third_party/github.com/ARM-software/HWCPipe/vendor/arm/pmu": true,
+          "third_party/golibs": true,
+          "third_party/grpc/third_party": true,
+          "third_party/libc-tests/third_party/nacl-tests": true,
+          "third_party/nlassert": true,
+          "third_party/openssl-ecjpake": true,
+          "third_party/openthread/third_party": true,
+          "third_party/openweave-core/src/lib/profiles/vendor/nestlabs/device-description": true,
+          "third_party/openweave-core/src/lib/profiles/vendor/nestlabs/dropcam-legacy-pairing": true,
+          "third_party/openweave-core/src/lib/profiles/vendor/nestlabs/thermostat": true,
+          "third_party/pciids": true,
+          "third_party/perfetto/infra/ci/frontend/static/third_party": true,
+          "third_party/perfetto/protos/third_party": true,
+          "third_party/pigweed/src/third_party": true,
+          "third_party/protobuf/conformance/third_party/jsoncpp": true,
+          "third_party/rust_crates": true,
+          "third_party/tink/third_party": true,
+          "zircon/third_party/uapp/mkfs-msdosfs": true,
+          "zircon/third_party/ulib/lz4": true
+        }
+      },
+      {
+        "name": "AllFilesAndFoldersMustBeIncludedInAProject",
+        "allowlist": {
+          "build/prebuilt": true,
+          "build/secondary/third_party": true,
+          "src/connectivity/bluetooth/hci/vendor": true,
+          "src/connectivity/openthread/third_party": true,
+          "src/virtualization/third_party": true,
+          "third_party": true,
+          "vendor": true,
+          "zircon/third_party": true,
+          "third_party/golibs/vendor": true,
+          "third_party/syzkaller": true
         }
       },
       {
@@ -128,7 +188,8 @@
           "prebuilt/test_data/media/third_party/chromium_media_test_data/COPYING": true,
           "prebuilt/third_party/edk2/License.txt": true,
           "third_party/rust_crates/vendor/regex-syntax-0.6.26/src/unicode_tables/LICENSE-UNICODE": true,
-          "tools/debug/covargs/api/third_party/codecoverage": true
+          "tools/debug/covargs/api/third_party/codecoverage": true,
+          "third_party/dart-pkg/pub/characters/third_party/Unicode_Consortium/UNICODE_LICENSE.txt": true
         }
       },
       {

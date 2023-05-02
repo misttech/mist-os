@@ -46,8 +46,9 @@ type Readme struct {
 }
 
 type Barrier struct {
-	Paths []string `json:"paths"`
-	Notes []string `json:"notes"`
+	Paths      []string `json:"paths"`
+	Exceptions []string `json:"exceptions"`
+	Notes      []string `json:"notes"`
 }
 
 // IsBarrier returns true if the given path is a part of the parent project.
@@ -57,14 +58,22 @@ type Barrier struct {
 // These "barrier" directories are set in the config file.
 func IsBarrier(path string) bool {
 	base := filepath.Base(path)
+	isBarrier := false
 	for _, barrier := range Config.Barriers {
-		for _, path := range barrier.Paths {
-			if base == path {
-				return true
+		for _, bPath := range barrier.Paths {
+			if base == bPath {
+				isBarrier = true
+				break
+			}
+		}
+		for _, ePath := range barrier.Exceptions {
+			if ePath == path {
+				isBarrier = false
+				break
 			}
 		}
 	}
-	return false
+	return isBarrier
 }
 
 func NewConfig() *ProjectConfig {
@@ -103,4 +112,24 @@ func (c *ProjectConfig) Merge(other *ProjectConfig) {
 	for k, v := range other.PruneTargets {
 		c.PruneTargets[k] = v
 	}
+
+	// Barrier objects need to be merged together,
+	// otherwise the exceptions paths may not work properly.
+	mergedBarrier := &Barrier{
+		Paths:      make([]string, 0),
+		Exceptions: make([]string, 0),
+		Notes:      make([]string, 0),
+	}
+	for _, b := range c.Barriers {
+		for _, p := range b.Paths {
+			mergedBarrier.Paths = append(mergedBarrier.Paths, p)
+		}
+		for _, e := range b.Exceptions {
+			mergedBarrier.Exceptions = append(mergedBarrier.Exceptions, e)
+		}
+		for _, n := range b.Notes {
+			mergedBarrier.Notes = append(mergedBarrier.Notes, n)
+		}
+	}
+	c.Barriers = []*Barrier{mergedBarrier}
 }

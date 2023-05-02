@@ -19,6 +19,34 @@ type SearchResult struct {
 	Pattern     *Pattern
 }
 
+type SearchResultOrder []*SearchResult
+
+func (a SearchResultOrder) Len() int      { return len(a) }
+func (a SearchResultOrder) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SearchResultOrder) Less(i, j int) bool {
+	iPath := a[i].LicenseData.File().RelPath()
+	jPath := a[j].LicenseData.File().RelPath()
+	if iPath != jPath {
+		return iPath < jPath
+	}
+
+	iLineNumber := a[i].LicenseData.LineNumber()
+	jLineNumber := a[j].LicenseData.LineNumber()
+	if iLineNumber != jLineNumber {
+		return iLineNumber < jLineNumber
+	}
+
+	iLibName := a[i].LicenseData.LibraryName()
+	jLibName := a[j].LicenseData.LibraryName()
+	if iLibName != jLibName {
+		return iLibName < jLibName
+	}
+
+	iDataLength := len(a[i].LicenseData.Data())
+	jDataLength := len(a[j].LicenseData.Data())
+	return iDataLength < jDataLength
+}
+
 // Search each data slice in the given file for license texts.
 // f (file) is assumed to be a single or multi license file, where all content
 // in the file is license information.

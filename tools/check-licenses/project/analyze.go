@@ -42,6 +42,7 @@ func AnalyzeLicenses() error {
 			// Set the license URLs in the license file objects.
 			l.UpdateURLs(p.Name, p.URL)
 		}
+		sort.Sort(license.SearchResultOrder(p.LicenseFileSearchResults))
 
 		// Currently, searching copyright header info for all source files
 		// in all projects is too much work. Runtimes on my local machine exceed 30mins.
@@ -64,6 +65,7 @@ func AnalyzeLicenses() error {
 				p.RegularFileSearchResults = append(p.RegularFileSearchResults, results...)
 			}
 		}
+		sort.Sort(license.SearchResultOrder(p.RegularFileSearchResults))
 	}
 
 	// Perform any cleanup steps in the license package.

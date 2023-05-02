@@ -24,7 +24,46 @@
                     "thirdparty",
                     "vendor"
                 ],
-                "notes": []
+                "exceptions": [
+                    "third_party/golibs/vendor/google.golang.org/api/internal/third_party",
+                    "third_party/bazel_rules_go/third_party",
+                    "third_party/cobalt/third_party",
+                    "third_party/openthread/third_party",
+                    "third_party/mini_chromium/base/third_party",
+                    "third_party/openweave-core/src/lib/profiles/vendor",
+                    "third_party/protobuf/third_party",
+                    "third_party/tink/third_party",
+                    "third_party/perfetto/protos/third_party",
+                    "third_party/pigweed/src/third_party",
+                    "third_party/perfetto/infra/ci/frontend/static/third_party",
+                    "third_party/crashpad/src/third_party",
+                    "third_party/cobalt/build/secondary/third_party",
+                    "prebuilt/third_party/go/linux-x64/src/cmd/vendor/github.com/google/pprof/third_party",
+                    "third_party/rust_crates/vendor/ring-0.16.12/third_party",
+                    "third_party/syzkaller/vendor/google.golang.org/api/internal/third_party",
+                    "third_party/grpc/third_party/upb/third_party",
+                    "third_party/rust_crates/vendor/ring-0.16.12/third_party",
+                    "third_party/go/src/cmd/vendor/github.com/google/pprof/third_party",
+                    "third_party/bazel_rules_python/third_party",
+                    "third_party/bazel_rules_go/third_party",
+                    "third_party/bazel_rules_cc/third_party",
+                    "third_party/bazel_rules_rust/crate_universe/private/vendor",
+                    "third_party/bazel_rules_go/tests/legacy/examples/vendor",
+                    "third_party/bazel_rules_rust/examples/third_party",
+                    "third_party/bazel_rules_rust/examples/third_party",
+                    "third_party/rust_crates/mirrors/serde_json5/third_party",
+                    "third_party/grpc/third_party",
+                    "third_party/grpc/third_party/upb/third_party",
+                    "third_party/dart-pkg/pub/csslib/third_party",
+                    "third_party/dart-pkg/pub/characters/third_party",
+                    "third_party/gperftools/src/third_party"
+                ],
+                "notes": [
+                    "The GN build system will likely not be able to accurately\n",
+                    "analyze dependencies in these lower level 3P directories.\n",
+                    "To simplify license collection, collect all license files under\n",
+                    "the closest parent project."
+                ]
             }
         ]
     }

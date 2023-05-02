@@ -89,13 +89,11 @@ func isCustomGolibProject(path string) bool {
 	case "third_party/golibs/vendor/cloud.google.com",
 		"third_party/golibs/vendor/golang.org",
 		"third_party/golibs/vendor/gonum.org",
-		"third_party/golibs/vendor/golang.opencensus.io",
-		"third_party/golibs/vendor/gopkg.in":
+		"third_party/golibs/vendor/golang.opencensus.io":
 		return true
 
 	case "third_party/syzkaller/vendor/github.com",
 		"third_party/syzkaller/vendor/golang.com",
-		"third_party/syzkaller/vendor/google.golang.com",
 		"third_party/syzkaller/vendor/honnef.co":
 		return true
 	}
@@ -104,15 +102,19 @@ func isCustomGolibProject(path string) bool {
 	case "third_party/golibs/vendor/google.golang.org",
 		"third_party/golibs/vendor/cloud.google.com",
 		"third_party/golibs/vendor/go.uber.org",
-		"third_party/golibs/vendor/gvisor.dev":
+		"third_party/golibs/vendor/gvisor.dev",
+		"third_party/golibs/vendor/gopkg.in":
 		return true
 
-	case "third_party/syzkaller/vendor/cloud.google.com":
+	case "third_party/syzkaller/vendor/cloud.google.com",
+		"third_party/syzkaller/vendor/golang.org/x",
+		"third_party/syzkaller/vendor/google.golang.org":
 		return true
 	}
 
 	switch path {
-	case "third_party/syzkaller/vendor/go.opencensus.io":
+	case "third_party/syzkaller/vendor/go.opencensus.io",
+		"third_party/golibs/vendor/go.opencensus.io":
 		return true
 	}
 

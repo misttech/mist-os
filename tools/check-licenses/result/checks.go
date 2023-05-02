@@ -263,9 +263,21 @@ func AllProjectsMustHaveALicense() error {
 }
 
 func AllFilesAndFoldersMustBeIncludedInAProject() error {
+	name := "AllFilesAndFoldersMustBeIncludedInAProject"
+
 	var b strings.Builder
 	var recurse func(*directory.Directory)
 	count := 0
+
+	// Retrieve allowlists from config files
+	allowlist := make(map[string]bool, 0)
+	for _, c := range Config.Checks {
+		if c.Name == name {
+			for k, v := range c.Allowlist {
+				allowlist[k] = v
+			}
+		}
+	}
 
 	b.WriteString("All files and folders must have proper license attribution.\n")
 	b.WriteString("This means a license file needs to accompany all first and third party projects,\n")
@@ -273,9 +285,11 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 	b.WriteString("The following directories are not included in a project:\n\n")
 	recurse = func(d *directory.Directory) {
 		if d.Project == project.UnknownProject && len(d.Files) > 0 {
-			b.WriteString(fmt.Sprintf("-> %s\n", d.Path))
-			count = count + 1
-			return
+			if _, ok := allowlist[d.Path]; !ok {
+				b.WriteString(fmt.Sprintf("-> %s\n", d.Path))
+				count = count + 1
+				return
+			}
 		}
 		for _, child := range d.Children {
 			recurse(child)
@@ -284,6 +298,9 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 	recurse(directory.RootDirectory)
 
 	b.WriteString("\nPlease add a LICENSE file to the above projects, and point to them in an associated README.fuchsia file.\n")
+	b.WriteString("If this is urgent and you cannot complete the above steps, add the above paths to the relevant allowlist\n")
+	b.WriteString("in tools/check-licenses/result/_config.json (last resort).\n")
+
 	if count > 0 {
 		return fmt.Errorf(b.String())
 	}
