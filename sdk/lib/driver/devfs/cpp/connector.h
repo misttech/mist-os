@@ -9,9 +9,14 @@
 
 namespace driver_devfs {
 
+// A helper class for implementing the Connector protocol.
+// This class provides type-safety over the protocol that is being connected to,
+// as the parent will get back a `fidl::ServerEnd<MyProtocol>`.
 template <typename Protocol>
 class Connector : public fidl::WireServer<fuchsia_device_fs::Connector> {
  public:
+  // Create the Connector. This callback will be called whenever a client attempts to
+  // connect.
   explicit Connector(fit::function<void(fidl::ServerEnd<Protocol>)> connect_callback)
       : callback_(std::move(connect_callback)) {}
 
