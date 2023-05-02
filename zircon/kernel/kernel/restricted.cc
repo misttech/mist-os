@@ -16,6 +16,7 @@
 #include <fbl/alloc_checker.h>
 #include <kernel/restricted_state.h>
 #include <kernel/thread.h>
+#include <object/exception_dispatcher.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
@@ -86,6 +87,9 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return ZX_ERR_BAD_STATE;
   }
   DEBUG_ASSERT(!rs->in_restricted());
+
+  rs->set_in_thread_exceptions_enabled(!(options & ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL));
+
   const zx_restricted_state_t* state_buffer = rs->state_ptr();
   if (!state_buffer) {
     return ZX_ERR_BAD_STATE;
@@ -143,4 +147,26 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
 
   // does not return
   __UNREACHABLE;
+}
+
+void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
+  DEBUG_ASSERT(rs->in_restricted());
+  zx_restricted_state_t* state = rs->state_ptr();
+  DEBUG_ASSERT(state);
+
+  // Save the exception register state into the restricted state.
+  RestrictedState::ArchSaveRestrictedExceptionState(*state);
+
+  // Redirect the exception so that we return to normal mode for handling.
+  //
+  // This will update the exception context so that when we return back to usermode
+  // we will be in normal mode instead of restricted mode.
+  RestrictedState::ArchRedirectRestrictedExceptionToNormal(rs->arch_normal_state(),
+                                                           rs->vector_ptr(), rs->context());
+
+  // Update state to be in normal mode.
+  rs->set_in_restricted(false);
+  arch_set_restricted_flag(false);
+  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
+  vmm_set_active_aspace(up->normal_aspace_ptr());
 }

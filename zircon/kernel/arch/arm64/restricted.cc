@@ -68,6 +68,15 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
   __UNREACHABLE;
 }
 
+void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
+    const ArchSavedNormalState& arch_state, uintptr_t vector_table, uintptr_t context) {
+  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on arm.
+}
+
+void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& state) {
+  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on arm.
+}
+
 void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
                                                      const syscall_regs_t& regs) {
   DEBUG_ASSERT(arch_ints_disabled());

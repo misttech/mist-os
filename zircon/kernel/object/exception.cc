@@ -15,6 +15,7 @@
 #include <zircon/types.h>
 
 #include <arch/exception.h>
+#include <kernel/restricted.h>
 #include <ktl/array.h>
 #include <ktl/move.h>
 #include <object/exception_dispatcher.h>
@@ -26,7 +27,8 @@
 
 #define LOCAL_TRACE 0
 
-static const char* excp_type_to_string(uint type) {
+namespace {
+const char* excp_type_to_string(uint type) {
   switch (type) {
     case ZX_EXCP_FATAL_PAGE_FAULT:
       return "fatal page fault";
@@ -52,6 +54,12 @@ static const char* excp_type_to_string(uint type) {
       return "unknown fault";
   }
 }
+
+bool HasRestrictedInThreadHandler() {
+  RestrictedState* rs = Thread::Current::restricted_state();
+  return rs != nullptr && rs->in_restricted() && rs->in_thread_exceptions_enabled();
+}
+}  // namespace
 
 // This isn't an "iterator" in the pure c++ sense. We don't need all that
 // complexity. I just couldn't think of a better term.
@@ -88,7 +96,11 @@ class ExceptionHandlerIterator final {
         case ExceptionDeliveryMethod::kFirstChanceDebugChannel:
           *result =
               thread_->HandleException(thread_->process()->debug_exceptionate(), exception_, &sent);
-          next_method_ = ExceptionDeliveryMethod::kThreadChannel;
+          if (HasRestrictedInThreadHandler()) {
+            next_method_ = ExceptionDeliveryMethod::kRestrictedModeVectoredException;
+          } else {
+            next_method_ = ExceptionDeliveryMethod::kThreadChannel;
+          }
           break;
         case ExceptionDeliveryMethod::kSecondChanceDebugChannel:
           *result =
@@ -96,6 +108,23 @@ class ExceptionHandlerIterator final {
           next_method_ = ExceptionDeliveryMethod::kJobChannel;
           next_job_ = thread_->process()->job();
           break;
+        case ExceptionDeliveryMethod::kRestrictedModeVectoredException: {
+          RestrictedState* rs = Thread::Current::restricted_state();
+          DEBUG_ASSERT(rs != nullptr);
+          RedirectRestrictedExceptionToNormalMode(rs);
+
+          // Write the exception report into the side-car.
+          auto* exception = rs->state_ptr_as<zx_restricted_exception_t>();
+          DEBUG_ASSERT(exception != nullptr);
+          exception_->FillReport(&exception->exception);
+
+          // Handle the exception on behalf of restricted mode.
+          //
+          // Note this implies that restricted exceptions can never propagate
+          // further and as such are ineligible for subsequent handlers.
+          *result = ZX_OK;
+          return true;
+        }
         case ExceptionDeliveryMethod::kThreadChannel:
           *result = thread_->HandleException(thread_->exceptionate(), exception_, &sent);
           next_method_ = ExceptionDeliveryMethod::kProcessChannel;
@@ -131,6 +160,7 @@ class ExceptionHandlerIterator final {
  private:
   enum class ExceptionDeliveryMethod {
     kFirstChanceDebugChannel,
+    kRestrictedModeVectoredException,
     kThreadChannel,
     kProcessChannel,
     kSecondChanceDebugChannel,
@@ -160,6 +190,8 @@ class ExceptionHandlerIterator final {
 static zx_status_t exception_handler_worker(uint exception_type,
                                             const arch_exception_context_t* context,
                                             ThreadDispatcher* thread, bool* out_processed) {
+  DEBUG_ASSERT(context != nullptr);
+
   *out_processed = false;
 
   zx_exception_report_t report = ExceptionDispatcher::BuildArchReport(exception_type, *context);

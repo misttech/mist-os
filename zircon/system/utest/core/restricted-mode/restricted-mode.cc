@@ -17,7 +17,21 @@
 
 #include <zxtest/zxtest.h>
 
-#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__x86_64__)
+#define ARCH_HAS_RESTRICTED_MODE 1
+#define ARCH_HAS_IN_THREAD_EXCEPTIONS 1
+#elif defined(__aarch64__)
+#define ARCH_HAS_RESTRICTED_MODE 1
+#define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
+#else
+#define ARCH_HAS_RESTRICTED_MODE 0
+#define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
+#endif
+
+constexpr uint32_t kRestrictedEnterOptions =
+    ARCH_HAS_IN_THREAD_EXCEPTIONS ? 0 : ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL;
+
+#if ARCH_HAS_RESTRICTED_MODE
 
 extern "C" void vectab();
 extern "C" void syscall_bounce();
@@ -546,12 +560,16 @@ TEST(RestrictedMode, EnterInvalidArgs) {
   // Invalid options.
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0xffffffff, 0, 0));
 
-  // In-thread exceptions are not yet implemented (no ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL).
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(0, 0, 0));
+  if constexpr (!ARCH_HAS_IN_THREAD_EXCEPTIONS) {
+    // In-thread exceptions are not yet implemented (no ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL).
+    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
+              zx_restricted_enter(kRestrictedEnterOptions & (~ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL),
+                                  0, 0));
+  }
 
   // Enter restricted mode with invalid args.
   // Vector table must be valid user pointer.
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, -1, 0));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(kRestrictedEnterOptions, -1, 0));
 }
 
 TEST(RestrictedMode, BindState) {
@@ -634,8 +652,7 @@ TEST(RestrictedMode, Basic) {
 
   // Enter restricted mode with reasonable args, expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(kRestrictedEnterOptions, (uintptr_t)vectab, &reason_code));
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
@@ -703,8 +720,8 @@ TEST(RestrictedMode, Bench) {
       zx_restricted_reason_t reason_code;
       auto t = zx::ticks::now();
       for (int i = 0; i < iter; i++) {
-        ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                           &reason_code));
+        ASSERT_OK(
+            restricted_enter_wrapper(kRestrictedEnterOptions, (uintptr_t)vectab, &reason_code));
       }
       t = zx::ticks::now() - t;
 
@@ -756,6 +773,22 @@ TEST(RestrictedMode, Bench) {
       printf("channel-based exceptions %ld ns per round trip (%ld raw ticks)\n",
              t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
     }
+
+    // In-thread exception handling
+    if constexpr (ARCH_HAS_IN_THREAD_EXCEPTIONS) {
+      constexpr int iter = 1000000;
+      zx_restricted_reason_t reason_code;
+      state.set_ip(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
+      ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+      auto t = zx::ticks::now();
+      for (int i = 0; i < iter; i++) {
+        ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+      }
+      t = zx::ticks::now() - t;
+
+      printf("in-thread exceptions %ld ns per round trip (%ld raw ticks)\n",
+             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
+    }
   }
 }
 
@@ -797,6 +830,41 @@ TEST(RestrictedMode, ExceptionChannel) {
   ASSERT_TRUE(exception_handled);
 }
 
+#if ARCH_HAS_IN_THREAD_EXCEPTIONS
+// Verify we can receive restricted exceptions using in-thread exception handlers.
+TEST(RestrictedMode, InThreadException) {
+  zx::vmo vmo;
+  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+  // Configure initial register state.
+  ArchRegisterState state;
+  state.InitializeRegisters();
+  state.set_ip(reinterpret_cast<uint64_t>(exception_bounce));
+
+  // Enter restricted mode. The restricted code will twiddle some registers
+  // and generate an exception.
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  zx_restricted_reason_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(vectab), &reason_code));
+
+  ASSERT_EQ(ZX_RESTRICTED_REASON_EXCEPTION, reason_code);
+
+  zx_restricted_exception_t exception_state = {};
+  ASSERT_OK(vmo.read(&exception_state, 0, sizeof(exception_state)));
+  EXPECT_EQ(sizeof(exception_state.exception), exception_state.exception.header.size);
+  EXPECT_EQ(ZX_EXCP_UNDEFINED_INSTRUCTION, exception_state.exception.header.type);
+  EXPECT_EQ(0u, exception_state.exception.context.synth_code);
+  EXPECT_EQ(0u, exception_state.exception.context.synth_data);
+#ifdef __x86_64__
+  EXPECT_EQ(0u, exception_state.exception.context.arch.u.x86_64.err_code);
+  EXPECT_EQ(0u, exception_state.exception.context.arch.u.x86_64.cr2);
+  // 0x6 corresponds to the invalid opcode vector.
+  EXPECT_EQ(0x6u, exception_state.exception.context.arch.u.x86_64.vector);
+#endif
+}
+#endif  // ARCH_HAS_IN_THREAD_EXCEPTIONS
+
 // Verify that restricted_enter fails on invalid zx_restricted_state_t values.
 TEST(RestrictedMode, EnterBadStateStruct) {
   zx::vmo vmo;
@@ -812,7 +880,7 @@ TEST(RestrictedMode, EnterBadStateStruct) {
 
     // This should fail with bad state.
     ASSERT_EQ(ZX_ERR_BAD_STATE,
-              zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
+              zx_restricted_enter(kRestrictedEnterOptions, (uintptr_t)&vectab, 0));
   };
 
   state.set_ip(-1);  // ip is outside of user space
@@ -843,10 +911,9 @@ TEST(RestrictedMode, EnterBadStateStruct) {
 #endif
 }
 
-#else  // defined(__x86_64__) || defined(__aarch64__)
+#else  // !ARCH_HAS_RESTRICTED_MODE
 
-// Restricted mode is only implemented on x86 and arm64.  See that the syscalls fail on other
-// arches.
+// Restricted mode is not implemented so the syscalls should fail appropriately.
 TEST(RestrictedMode, NotSupported) {
   zx::vmo vmo;
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_bind_state(0, vmo.reset_and_get_address()));
@@ -855,4 +922,4 @@ TEST(RestrictedMode, NotSupported) {
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, 0, 0));
 }
 
-#endif  // defined(__x86_64__) || defined(__aarch64__)
+#endif  // ARCH_HAS_RESTRICTED_MODE

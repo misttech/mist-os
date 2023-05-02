@@ -7,9 +7,11 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_RESTRICTED_STATE_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_RESTRICTED_STATE_H_
 
+#include <lib/user_copy/internal.h>
 #include <lib/zx/result.h>
 #include <zircon/syscalls-next.h>
 
+#include <arch/exception.h>
 #include <arch/regs.h>
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
@@ -38,17 +40,22 @@ class RestrictedState {
   bool in_restricted() const { return in_restricted_; }
   uintptr_t vector_ptr() const { return vector_ptr_; }
   uintptr_t context() const { return context_; }
+  bool in_thread_exceptions_enabled() const { return in_thread_exceptions_enabled_; }
   const ArchSavedNormalState& arch_normal_state() const { return arch_; }
   ArchSavedNormalState& arch_normal_state() { return arch_; }
-  zx_restricted_state_t* state_ptr() const {
-    return reinterpret_cast<zx_restricted_state_t*>(state_mapping_ptr_);
+  template <typename T>
+  T* state_ptr_as() const {
+    static_assert(internal::is_copy_allowed<T>::value);
+    return reinterpret_cast<T*>(state_mapping_ptr_);
   }
+  zx_restricted_state_t* state_ptr() const { return state_ptr_as<zx_restricted_state_t>(); }
 
   fbl::RefPtr<VmObjectPaged> vmo() const;
 
   void set_in_restricted(bool r) { in_restricted_ = r; }
   void set_vector_ptr(uintptr_t v) { vector_ptr_ = v; }
   void set_context(uintptr_t c) { context_ = c; }
+  void set_in_thread_exceptions_enabled(bool enable) { in_thread_exceptions_enabled_ = enable; }
 
   // Each arch must fill out the following routines prefixed with Arch:
   //
@@ -71,6 +78,15 @@ class RestrictedState {
   static void ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
                                              const syscall_regs_t& regs);
 
+  // Having exited from restricted mode via a synchronous exception, save the necessary
+  // restricted mode state.
+  static void ArchSaveRestrictedExceptionState(zx_restricted_state_t& state);
+
+  // Update the exception context so that we will return to normal mode to allow normal
+  // mode to handle a restricted exception.
+  static void ArchRedirectRestrictedExceptionToNormal(const ArchSavedNormalState& arch_state,
+                                                      uintptr_t vector_table, uintptr_t context);
+
   // Enter normal mode at the address pointed to by vector_table with arguments code and context
   // in an architecturally specific register in an architecturally specific way.
   [[noreturn]] static void ArchEnterFull(const ArchSavedNormalState& arch_state,
@@ -83,6 +99,7 @@ class RestrictedState {
   RestrictedState(fbl::RefPtr<VmObjectPaged> state_vmo, fbl::RefPtr<VmMapping> state_mapping);
 
   bool in_restricted_ = false;
+  bool in_thread_exceptions_enabled_ = false;
   uintptr_t vector_ptr_ = 0;
   uintptr_t context_ = 0;
 

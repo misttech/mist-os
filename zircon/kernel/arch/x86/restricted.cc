@@ -8,7 +8,10 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <trace.h>
+#include <zircon/syscalls-next.h>
+#include <zircon/syscalls/debug.h>
 
+#include <arch/debugger.h>
 #include <arch/regs.h>
 #include <arch/vm.h>
 #include <arch/x86.h>
@@ -150,6 +153,56 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
   arch_enter_uspace(&iframe);
 
   __UNREACHABLE;
+}
+
+void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
+    const ArchSavedNormalState& arch_state, uintptr_t vector_table, uintptr_t context) {
+  zx_thread_state_general_regs_t regs = {};
+  regs.rip = vector_table;
+  regs.rdi = context;
+  regs.rsi = ZX_RESTRICTED_REASON_EXCEPTION;
+  regs.rflags = X86_FLAGS_IF;
+  regs.fs_base = arch_state.normal_fs_base_;
+  regs.gs_base = arch_state.normal_gs_base_;
+
+  // This should only fail if we do not have any suspended registers, but this
+  // should always be the case at this point during exception handling.
+  [[maybe_unused]] zx_status_t status = arch_set_general_regs(Thread::Current().Get(), &regs);
+  DEBUG_ASSERT(status == ZX_OK);
+}
+
+void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& state) {
+  zx_thread_state_general_regs_t regs = {};
+  [[maybe_unused]] zx_status_t status = arch_get_general_regs(Thread::Current().Get(), &regs);
+  // This should only fail if we do not have any suspended registers, but this
+  // should always be the case at this point during exception handling.
+  DEBUG_ASSERT(status == ZX_OK);
+
+  state.rdi = regs.rdi;
+  state.rsi = regs.rsi;
+  state.rbp = regs.rbp;
+  state.rbx = regs.rbx;
+  state.rdx = regs.rdx;
+  state.rcx = regs.rcx;
+  state.rax = regs.rax;
+  state.rsp = regs.rsp;
+  state.r8 = regs.r8;
+  state.r9 = regs.r9;
+  state.r10 = regs.r10;
+  state.r11 = regs.r11;
+  state.r12 = regs.r12;
+  state.r13 = regs.r13;
+  state.r14 = regs.r14;
+  state.r15 = regs.r15;
+  state.ip = regs.rip;
+  state.flags = regs.rflags & X86_FLAGS_USER;
+
+  // read the fs/gs base out of the MSRs. This requires interrupts to be
+  // disabled.
+  DEBUG_ASSERT(!arch_ints_disabled());
+  arch_disable_ints();
+  get_fsgsbase(&state.fs_base, &state.gs_base);
+  arch_enable_ints();
 }
 
 void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,

@@ -36,10 +36,12 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
     return ZX_ERR_INVALID_ARGS;
   }
 
+#if !defined(__x86_64)
   // TODO(https://fxbug.dev/121512): Lift restriction once we have in-thread exceptions implemented.
   if (!(options & ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+#endif
 
   return RestrictedEnter(options, vector_table_ptr, context);
 }

@@ -272,6 +272,7 @@ class ProcessDispatcher final
   friend zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr,
                                      uintptr_t context);
   friend void syscall_from_restricted(const syscall_regs_t* regs);
+  friend void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs);
 
   // Returns the "normal" address space for a process.
   //
