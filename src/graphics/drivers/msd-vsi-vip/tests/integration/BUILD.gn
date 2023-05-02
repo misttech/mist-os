@@ -46,6 +46,9 @@ test("msd_vsi_vip_integration_tests") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/trace",
   ]
+
+  # TODO(fxbug.dev/126567): Temporarily disable lsan for this target. Reenable once all leaks are fixed.
+  deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 }
 
 fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
