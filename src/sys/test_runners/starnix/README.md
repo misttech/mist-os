@@ -52,7 +52,7 @@ appropriate container configuration values. For example,
         init: [],
         kernel_cmdline: "",
         mounts: [
-            "/:ext4:data/system.img",
+            "/:remote_bundle:data/system",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/data/tmp:tmpfs",

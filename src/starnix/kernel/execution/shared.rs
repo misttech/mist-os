@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
 #[cfg(feature = "syscall_stats")]
@@ -14,7 +14,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use crate::arch::execution::generate_interrupt_instructions;
-use crate::fs::ext4::ExtFilesystem;
 use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::fs::*;
 use crate::logging::log_trace;
@@ -318,12 +317,6 @@ pub fn create_filesystem_from_spec<'a>(
         "bind" => Bind(task.lookup_path_from_root(fs_src.as_bytes())?),
         "remote_bundle" => Fs(RemoteBundle::new_fs(task.kernel(), pkg, rights, fs_src)?),
         "remotefs" => Fs(create_remotefs_filesystem(task.kernel(), pkg, rights, fs_src)?),
-        "ext4" => {
-            let vmo =
-                syncio::directory_open_vmo(pkg, fs_src, fio::VmoFlags::READ, zx::Time::INFINITE)
-                    .context("failed to open EXT4 image file")?;
-            Fs(ExtFilesystem::new_fs(task.kernel(), vmo)?)
-        }
         _ => create_filesystem(task, fs_src.as_bytes(), fs_type.as_bytes(), b"")?,
     };
     Ok((mount_point.as_bytes(), fs))
