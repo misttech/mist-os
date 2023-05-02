@@ -34,9 +34,7 @@ TEST(HardwareUnitTests, DISABLED_All) {
 
   magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_INTEL);
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{
-      test_base.channel().channel()->borrow()};
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_base.magma_channel()};
 
   const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
 

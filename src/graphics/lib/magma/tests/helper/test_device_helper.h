@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_TEST_DEVICE_HELPER_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma/magma.h>
@@ -25,10 +26,17 @@ class TestDeviceBase {
   TestDeviceBase() = default;
 
   void InitializeFromFileName(const char* device_name) {
-    auto client = component::Connect<fuchsia_device::Controller>(device_name);
-    ASSERT_TRUE(client.is_ok());
-    device_controller_ = client->borrow();
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_import(client->TakeChannel().release(), &device_));
+    auto controller_client = component::Connect<fuchsia_device::Controller>(
+        std::string(device_name) + "/device_controller");
+    ASSERT_TRUE(controller_client.is_ok()) << controller_client.status_string();
+    device_controller_ = std::move(*controller_client);
+    auto magma_client = component::Connect<fuchsia_gpu_magma::TestDevice>(device_name);
+    ASSERT_TRUE(magma_client.is_ok()) << magma_client.status_string();
+
+    magma_channel_ = magma_client->borrow();
+
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_import(magma_client->TakeChannel().release(), &device_));
   }
 
   void InitializeFromVendorId(uint64_t id) {
@@ -64,7 +72,8 @@ class TestDeviceBase {
     // Remove everything after the final slash.
     *strrchr(path, '/') = 0;
 
-    auto parent = component::Connect<fuchsia_device::Controller>(path);
+    auto parent =
+        component::Connect<fuchsia_device::Controller>(std::string(path) + "/device_controller");
 
     EXPECT_EQ(ZX_OK, parent.status_value());
     return std::move(*parent);
@@ -88,7 +97,10 @@ class TestDeviceBase {
     ASSERT_TRUE(result->is_ok()) << zx_status_get_string(result->error_value());
   }
 
-  const fidl::UnownedClientEnd<fuchsia_device::Controller>& channel() { return device_controller_; }
+  const fidl::ClientEnd<fuchsia_device::Controller>& channel() { return device_controller_; }
+  const fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice>& magma_channel() {
+    return magma_channel_;
+  }
 
   magma_device_t device() const { return device_; }
 
@@ -127,7 +139,8 @@ class TestDeviceBase {
 
  private:
   magma_device_t device_ = 0;
-  fidl::UnownedClientEnd<fuchsia_device::Controller> device_controller_{ZX_HANDLE_INVALID};
+  fidl::ClientEnd<fuchsia_device::Controller> device_controller_;
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> magma_channel_{ZX_HANDLE_INVALID};
 };
 
 }  // namespace magma

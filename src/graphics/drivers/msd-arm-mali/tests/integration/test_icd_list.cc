@@ -23,9 +23,7 @@ namespace {
 TEST(Mali, IcdList) {
   magma::TestDeviceBase test_device(MAGMA_VENDOR_ID_MALI);
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  fidl::UnownedClientEnd<fuchsia_gpu_magma::IcdLoaderDevice> channel{
-      test_device.channel().channel()->borrow()};
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_device.magma_channel()};
   const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
   EXPECT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
