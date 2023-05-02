@@ -261,6 +261,10 @@
                 "OpenTest.Truncate",
                 "OpenTest.WriteOnly",
 
+                // proc_pid_smaps_test
+                // truncate() fails.
+                "ProcPidSmapsTest.SharedReadOnlyFile",
+
                 // read_test
                 "ReadTest.PartialReadSIGSEGV",
 

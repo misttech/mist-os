@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::mm::{MemoryAccessor, ProcMapsFile, ProcStatFile, ProcStatusFile};
+use crate::mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatusFile};
 use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, ThreadGroup};
 use crate::types::*;
@@ -44,6 +44,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777));
     dir.entry(b"limits", LimitsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));

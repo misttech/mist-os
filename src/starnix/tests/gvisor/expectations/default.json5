@@ -665,9 +665,6 @@
                 "ProcPidOomscoreAdjTest.BasicRead",
 
                 // proc_pid_smaps_test
-                "ProcPidSmapsTest.PrivateAnon",
-                "ProcPidSmapsTest.SharedAnon",
-                "ProcPidSmapsTest.SharedReadOnlyFile",
                 "ProcPidSmapsTest.GvisorFields",
 
                 // proc_pid_uid_gid_map_test

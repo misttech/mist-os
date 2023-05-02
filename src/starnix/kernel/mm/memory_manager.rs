@@ -8,6 +8,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryInto;
+use std::ops::Range;
 use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -1660,10 +1661,56 @@ impl DesiredAddress {
     }
 }
 
+fn write_map(
+    sink: &mut SeqFileBuf,
+    range: &Range<UserAddress>,
+    map: &Mapping,
+) -> Result<(), Errno> {
+    let line_length = write!(
+        sink,
+        "{:08x}-{:08x} {}{}{}{} {:08x} 00:00 {} ",
+        range.start.ptr(),
+        range.end.ptr(),
+        if map.permissions.contains(zx::VmarFlags::PERM_READ) { 'r' } else { '-' },
+        if map.permissions.contains(zx::VmarFlags::PERM_WRITE) { 'w' } else { '-' },
+        if map.permissions.contains(zx::VmarFlags::PERM_EXECUTE) { 'x' } else { '-' },
+        if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
+        map.vmo_offset,
+        if let MappingName::File(filename) = &map.name { filename.entry.node.inode_num } else { 0 }
+    )?;
+    if let MappingName::File(filename) = &map.name {
+        // The filename goes at >= the 74th column (73rd when zero indexed)
+        for _ in line_length..73 {
+            sink.write(b" ");
+        }
+        // File names can have newlines that need to be escaped before printing.
+        // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
+        // escaping applied to paths is replacing newlines with an octal sequence.
+        let path = filename.path();
+        sink.write_iter(
+            path.iter()
+                .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
+                .copied(),
+        );
+    }
+    if let MappingName::Vma(name) = &map.name {
+        // The filename goes at >= the 74th column (73rd when zero indexed)
+        for _ in line_length..73 {
+            sink.write(b" ");
+        }
+        sink.write(b"[anon:");
+        sink.write(name.as_bytes());
+        sink.write(b"]");
+    }
+    sink.write(b"\n");
+    Ok(())
+}
+
 pub struct ProcMapsFile {
     task: Arc<Task>,
     seq: Mutex<SeqFileState<UserAddress>>,
 }
+
 impl ProcMapsFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
@@ -1672,6 +1719,7 @@ impl ProcMapsFile {
         })
     }
 }
+
 impl FileOps for ProcMapsFile {
     fileops_impl_seekable!();
 
@@ -1686,55 +1734,100 @@ impl FileOps for ProcMapsFile {
             let state = self.task.mm.state.read();
             let mut iter = state.mappings.iter_starting_at(&cursor);
             if let Some((range, map)) = iter.next() {
-                let line_length = write!(
+                write_map(sink, range, map)?;
+                return Ok(Some(range.end));
+            }
+            Ok(None)
+        };
+        self.seq.lock().read_at(current_task, iter, offset, data)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOSYS)
+    }
+}
+
+pub struct ProcSmapsFile {
+    task: Arc<Task>,
+    seq: Mutex<SeqFileState<UserAddress>>,
+}
+
+impl ProcSmapsFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        let task = Arc::clone(task);
+        SimpleFileNode::new(move || {
+            Ok(ProcSmapsFile { task: Arc::clone(&task), seq: Default::default() })
+        })
+    }
+}
+
+impl FileOps for ProcSmapsFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let page_size_kb = *PAGE_SIZE / 1024;
+        let iter = move |cursor: UserAddress, sink: &mut SeqFileBuf| {
+            let state = self.task.mm.state.read();
+            let mut iter = state.mappings.iter_starting_at(&cursor);
+            if let Some((range, map)) = iter.next() {
+                write_map(sink, range, map)?;
+
+                let vmo_info = map.vmo.info().map_err(MemoryManager::get_errno_for_map_err)?;
+                let size_kb = vmo_info.size_bytes / 1024;
+                writeln!(sink, "Size:\t{size_kb} kB",)?;
+                writeln!(sink, "Rss:\t{size_kb} kB")?;
+                writeln!(
                     sink,
-                    "{:08x}-{:08x} {}{}{}{} {:08x} 00:00 {} ",
-                    range.start.ptr(),
-                    range.end.ptr(),
-                    if map.permissions.contains(zx::VmarFlags::PERM_READ) { 'r' } else { '-' },
-                    if map.permissions.contains(zx::VmarFlags::PERM_WRITE) { 'w' } else { '-' },
-                    if map.permissions.contains(zx::VmarFlags::PERM_EXECUTE) { 'x' } else { '-' },
-                    if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
-                    map.vmo_offset,
-                    if let MappingName::File(filename) = &map.name {
-                        filename.entry.node.inode_num
+                    "Pss:\t{} kB",
+                    if map.options.contains(MappingOptions::SHARED) {
+                        size_kb / vmo_info.share_count as u64
                     } else {
-                        0
+                        size_kb
                     }
                 )?;
-                if let MappingName::File(filename) = &map.name {
-                    // The filename goes at >= the 74th column (73rd when zero indexed)
-                    for _ in line_length..73 {
-                        sink.write(b" ");
-                    }
-                    // File names can have newlines that need to be escaped before printing.
-                    // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
-                    // escaping applied to paths is replacing newlines with an octal sequence.
-                    let path = filename.path();
-                    sink.write_iter(
-                        path.iter()
-                            .flat_map(
-                                |b| {
-                                    if *b == b'\n' {
-                                        b"\\012"
-                                    } else {
-                                        std::slice::from_ref(b)
-                                    }
-                                },
-                            )
-                            .copied(),
-                    );
+
+                let mut shared_clean_kb = 0;
+                let mut shared_dirty_kb = 0;
+                if vmo_info.share_count > 1 {
+                    shared_dirty_kb = vmo_info.committed_bytes / 1024;
+                    shared_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
                 }
-                if let MappingName::Vma(name) = &map.name {
-                    // The filename goes at >= the 74th column (73rd when zero indexed)
-                    for _ in line_length..73 {
-                        sink.write(b" ");
-                    }
-                    sink.write(b"[anon:");
-                    sink.write(name.as_bytes());
-                    sink.write(b"]");
+                writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
+                writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
+
+                let mut private_clean_kb = 0;
+                let mut private_dirty_kb = 0;
+                if vmo_info.share_count == 1 {
+                    private_dirty_kb = vmo_info.committed_bytes / 1024;
+                    private_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
                 }
-                sink.write(b"\n");
+                writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
+                writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
+
+                let anonymous_kb = if map.options.contains(MappingOptions::ANONYMOUS)
+                    && !map.options.contains(MappingOptions::SHARED)
+                {
+                    size_kb
+                } else {
+                    0
+                };
+                writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
+                writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
+                writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
+
+                // TODO(https://fxrev.dev/79328): Add optional fields.
                 return Ok(Some(range.end));
             }
             Ok(None)
