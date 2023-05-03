@@ -20,3 +20,17 @@ async fn offer_availability_invalid_routes() {
         .test_offer_availability_invalid_routes()
         .await
 }
+
+#[fuchsia::test]
+async fn expose_availability_successful_routes() {
+    CommonAvailabilityTest::<RoutingTestBuilder>::new()
+        .test_expose_availability_successful_routes()
+        .await
+}
+
+#[fuchsia::test]
+async fn expose_availability_invalid_routes() {
+    CommonAvailabilityTest::<RoutingTestBuilder>::new()
+        .test_expose_availability_invalid_routes()
+        .await
+}

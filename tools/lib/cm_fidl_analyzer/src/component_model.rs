@@ -675,7 +675,7 @@ impl ComponentModelForAnalyzer {
             // Ignore any route that failed due to a void offer to a target with an
             // optional dependency on the capability.
             Err(RoutingError::AvailabilityRoutingError(
-                AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
             )) => return vec![],
             Err(err) => results.push(VerifyRouteResult {
                 using_node: target.node_path(),
@@ -774,7 +774,7 @@ impl ComponentModelForAnalyzer {
                 // Ignore any route that failed due to a void offer to a target with an
                 // optional dependency on the capability.
                 if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                 )) = result
                 {
                     return vec![];
@@ -792,7 +792,7 @@ impl ComponentModelForAnalyzer {
                 // Ignore any route that failed due to a void offer to a target with an
                 // optional dependency on the capability.
                 if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                 )) = result
                 {
                     return vec![];
@@ -810,7 +810,7 @@ impl ComponentModelForAnalyzer {
                 // Ignore any route that failed due to a void offer to a target with an
                 // optional dependency on the capability.
                 if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                 )) = result
                 {
                     return vec![];
@@ -826,7 +826,7 @@ impl ComponentModelForAnalyzer {
                 // Ignore any route that failed due to a void offer to a target with an
                 // optional dependency on the capability.
                 if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                 )) = result
                 {
                     return vec![];

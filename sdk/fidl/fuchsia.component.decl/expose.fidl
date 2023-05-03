@@ -24,7 +24,9 @@ type Expose = flexible union {
 /// https://fuchsia.dev/fuchsia-src/glossary#service
 type ExposeService = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `self` or `child`.
+    /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
+    /// target must expose, offer, or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the service, by which it was presented to
@@ -51,7 +53,9 @@ type ExposeService = table {
 /// https://fuchsia.dev/fuchsia-src/glossary#protocol
 type ExposeProtocol = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `self` or `child`.
+    /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
+    /// target must expose, offer, or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the protocol, by which it was presented to
@@ -75,7 +79,9 @@ type ExposeProtocol = table {
 /// directory exposed by the component or one of its children at runtime.
 type ExposeDirectory = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `self` or `child`.
+    /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
+    /// target must expose, offer, or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the directory, by which it was presented to

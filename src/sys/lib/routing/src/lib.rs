@@ -654,8 +654,13 @@ impl DirectoryState {
     }
 
     fn advance_with_offer(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
-        self.availability_state.advance_with_offer(&offer.clone())?;
+        self.availability_state.advance_with_offer(offer)?;
         self.advance(offer.rights.clone(), offer.subdir.clone())
+    }
+
+    fn advance_with_expose(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
+        self.availability_state.advance_with_expose(expose)?;
+        self.advance(expose.rights.clone(), expose.subdir.clone())
     }
 
     fn advance(
@@ -698,7 +703,7 @@ impl ExposeVisitor for DirectoryState {
     fn visit(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
         match expose.source {
             ExposeSource::Framework => self.finalize(fio::RW_STAR_DIR, expose.subdir.clone()),
-            _ => self.advance(expose.rights.clone(), expose.subdir.clone()),
+            _ => self.advance_with_expose(expose),
         }
     }
 }

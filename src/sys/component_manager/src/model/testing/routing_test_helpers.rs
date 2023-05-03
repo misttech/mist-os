@@ -533,6 +533,7 @@ impl RoutingTest {
                 CapabilityDecl::Directory(DirectoryDecl { source_path, .. }) => {
                     source_path.as_ref()
                 }
+                CapabilityDecl::Service(ServiceDecl { source_path, .. }) => source_path.as_ref(),
                 _ => None,
             };
             if let Some(path) = path {
@@ -547,6 +548,11 @@ impl RoutingTest {
             match capability {
                 CapabilityDecl::Protocol(_) => {
                     Self::install_default_out_files(&mut out_dir);
+                }
+                CapabilityDecl::Service(_) => {
+                    out_dir.add_echo_protocol(
+                        CapabilityPath::try_from("/svc/foo.service/default/echo").unwrap(),
+                    );
                 }
                 CapabilityDecl::Directory(_) => out_dir.add_directory_proxy(test_dir_proxy),
                 CapabilityDecl::Storage(storage) => {
@@ -969,6 +975,8 @@ impl RoutingTestModel for RoutingTest {
 
 /// Contains functions to use capabilities in routing tests.
 pub mod capability_util {
+    use fuchsia_fs::node::OpenError;
+
     use {
         super::*,
         assert_matches::assert_matches,
@@ -1185,7 +1193,7 @@ pub mod capability_util {
         path: &CapabilityPath,
         instance: &str,
         member: &str,
-    ) -> T::Proxy {
+    ) -> Result<T::Proxy, fidl::Error> {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
@@ -1194,15 +1202,24 @@ pub mod capability_util {
             &path.basename,
             fio::OpenFlags::empty(),
         )
-        .await
-        .expect("failed to open service dir");
+        .await;
         add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
+        let service_dir = service_dir
+            // `open_directory` could fail if service capability routing fails.
+            .map_err(|e| match e {
+                OpenError::OnOpenDecode(e) => e,
+                _ => panic!("Unexpected open error {:?}", e),
+            })?;
+
         let instance_dir =
             fuchsia_fs::directory::open_directory(&service_dir, instance, fio::OpenFlags::empty())
                 .await
-                .expect("failed to open instance dir");
-        connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
-            .expect("failed to open service")
+                .map_err(|e| match e {
+                    OpenError::OnOpenDecode(e) => e,
+                    _ => panic!("Unexpected open error {:?}", e),
+                })?;
+        Ok(connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
+            .expect("failed to open member protocol"))
     }
 
     pub async fn read_service_in_namespace(
@@ -1249,39 +1266,63 @@ pub mod capability_util {
         member: String,
         expected_res: ExpectedResult,
     ) {
-        let echo_proxy = connect_to_instance_svc_in_namespace::<echo::EchoMarker>(
+        let connect_result = connect_to_instance_svc_in_namespace::<echo::EchoMarker>(
             namespace, &path, &instance, &member,
         )
         .await;
-        call_echo_and_validate_result(echo_proxy, expected_res).await;
+        let result = match connect_result {
+            Ok(p) => call_echo(p).await,
+            Err(e) => Err(Some(e)),
+        };
+        validate_echo_result(result, expected_res).await;
+    }
+
+    async fn call_echo(echo_proxy: echo::EchoProxy) -> Result<Option<String>, Option<fidl::Error>> {
+        match echo_proxy.echo_string(Some("hippos")).await {
+            Ok(value) => Ok(value),
+            Err(_) => {
+                let epitaph = echo_proxy.take_event_stream().next().await;
+                match epitaph {
+                    Some(Err(e)) => Err(Some(e)),
+                    Some(Ok(v)) => panic!("unexpected ok event: {:?}", v),
+                    None => Err(None),
+                }
+            }
+        }
+    }
+
+    async fn validate_echo_result(
+        res: Result<Option<String>, Option<fidl::Error>>,
+        expected_res: ExpectedResult,
+    ) {
+        match expected_res {
+            ExpectedResult::Ok => {
+                assert_eq!(res.expect("failed to use echo"), Some("hippos".to_string()))
+            }
+            ExpectedResult::Err(s) => {
+                let err = res
+                    .expect_err("used echo service successfully when it should fail")
+                    .expect("expected fidl error");
+                assert!(err.is_closed(), "expected closed error, got: {:?}", err);
+                assert_matches!(
+                    err,
+                    fidl::Error::ClientChannelClosed {
+                        status, ..
+                    } if status == s
+                );
+            }
+            ExpectedResult::ErrWithNoEpitaph => {
+                let err = res.expect_err("used echo successfully when it should fail");
+                assert_matches!(err, None);
+            }
+        }
     }
 
     pub async fn call_echo_and_validate_result(
         echo_proxy: echo::EchoProxy,
         expected_res: ExpectedResult,
     ) {
-        let res = echo_proxy.echo_string(Some("hippos")).await;
-        match expected_res {
-            ExpectedResult::Ok => {
-                assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()))
-            }
-            ExpectedResult::Err(s) => {
-                let err = res.expect_err("used echo service successfully when it should fail");
-                assert!(err.is_closed(), "expected file closed error, got: {:?}", err);
-                let epitaph = echo_proxy.take_event_stream().next().await.expect("no epitaph");
-                assert_matches!(
-                    epitaph,
-                    Err(fidl::Error::ClientChannelClosed {
-                        status, ..
-                    }) if status == s
-                );
-            }
-            ExpectedResult::ErrWithNoEpitaph => {
-                let err = res.expect_err("used echo service successfully when it should fail");
-                assert!(err.is_closed(), "expected file closed error, got: {:?}", err);
-                assert_matches!(echo_proxy.take_event_stream().next().await, None);
-            }
-        }
+        validate_echo_result(call_echo(echo_proxy).await, expected_res).await;
     }
 
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`.

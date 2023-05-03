@@ -21,4 +21,18 @@ mod tests {
             .test_offer_availability_invalid_routes()
             .await
     }
+
+    #[fuchsia::test]
+    async fn expose_availability_successful_routes() {
+        CommonAvailabilityTest::<RoutingTestBuilderForAnalyzer>::new()
+            .test_expose_availability_successful_routes()
+            .await
+    }
+
+    #[fuchsia::test]
+    async fn expose_availability_invalid_routes() {
+        CommonAvailabilityTest::<RoutingTestBuilderForAnalyzer>::new()
+            .test_expose_availability_invalid_routes()
+            .await
+    }
 }

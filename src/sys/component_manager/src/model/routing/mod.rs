@@ -229,7 +229,7 @@ pub async fn report_routing_failure(
                         RouteAndOpenCapabilityError::RoutingError {
                             err:
                                 RoutingError::AvailabilityRoutingError(
-                                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                                 ),
                         },
                 } => {

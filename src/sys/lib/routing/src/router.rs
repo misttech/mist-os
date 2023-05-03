@@ -1361,6 +1361,9 @@ where
                 offer: None,
             });
             match expose.source() {
+                ExposeSource::Void => {
+                    panic!("an error should have been emitted by the availability walker before we reach this point");
+                }
                 ExposeSource::Self_ => {
                     let target_capabilities = target.lock_resolved_state().await?.capabilities();
                     return Ok(ExposeResult::Source(CapabilitySource::<C>::Component {

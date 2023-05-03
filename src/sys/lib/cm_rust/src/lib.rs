@@ -1992,6 +1992,7 @@ pub enum ExposeSource {
     Collection(String),
     Framework,
     Capability(CapabilityName),
+    Void,
 }
 
 impl std::fmt::Display for ExposeSource {
@@ -2002,6 +2003,7 @@ impl std::fmt::Display for ExposeSource {
             Self::Collection(c) => write!(f, "collection `#{}`", c),
             Self::Self_ => write!(f, "self"),
             Self::Capability(c) => write!(f, "capability `{}`", c),
+            Self::Void => write!(f, "void"),
         }
     }
 }
@@ -2014,6 +2016,7 @@ impl FidlIntoNative<ExposeSource> for fdecl::Ref {
             fdecl::Ref::Collection(c) => ExposeSource::Collection(c.name),
             fdecl::Ref::Framework(_) => ExposeSource::Framework,
             fdecl::Ref::Capability(c) => ExposeSource::Capability(c.name.into()),
+            fdecl::Ref::VoidType(_) => ExposeSource::Void,
             _ => panic!("invalid ExposeSource variant"),
         }
     }
@@ -2031,6 +2034,7 @@ impl NativeIntoFidl<fdecl::Ref> for ExposeSource {
             ExposeSource::Capability(name) => {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
             }
+            ExposeSource::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         }
     }
 }

@@ -5,10 +5,11 @@
 use {
     crate::error::AvailabilityRoutingError,
     cm_rust::{
-        Availability, DirectoryDecl, EventStreamDecl, ExposeDirectoryDecl, ExposeEventStreamDecl,
-        ExposeProtocolDecl, ExposeServiceDecl, OfferDeclCommon, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        ProtocolDecl, ServiceDecl, StorageDecl, UseDeclCommon,
+        Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
+        ExposeEventStreamDecl, ExposeProtocolDecl, ExposeServiceDecl, ExposeSource,
+        OfferDeclCommon, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, ServiceDecl, StorageDecl,
+        UseDeclCommon,
     },
     std::convert::From,
 };
@@ -25,10 +26,10 @@ impl From<Availability> for AvailabilityState {
 }
 
 impl AvailabilityState {
-    pub fn advance_with_offer<O>(&mut self, offer: &O) -> Result<(), AvailabilityRoutingError>
-    where
-        O: OfferDeclCommon,
-    {
+    pub fn advance_with_offer(
+        &mut self,
+        offer: &dyn OfferDeclCommon,
+    ) -> Result<(), AvailabilityRoutingError> {
         let next_availability = offer
             .availability()
             .expect("tried to check availability on an offer that doesn't have that field");
@@ -37,7 +38,7 @@ impl AvailabilityState {
                 // Nb: Although an error is returned here, this specific error is ignored during validation
                 // because it's acceptable for routing to fail due to an optional capability ending in an offer
                 // from `void`.
-                Ok(()) => Err(AvailabilityRoutingError::OfferFromVoidToOptionalTarget),
+                Ok(()) => Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget),
                 Err(AvailabilityRoutingError::TargetHasStrongerAvailability) => {
                     Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget)
                 }
@@ -48,45 +49,61 @@ impl AvailabilityState {
         }
     }
 
-    pub fn advance(
+    pub fn advance_with_expose(
+        &mut self,
+        expose: &dyn ExposeDeclCommon,
+    ) -> Result<(), AvailabilityRoutingError> {
+        let next_availability = expose.availability();
+        if expose.source() == &ExposeSource::Void {
+            match self.advance(next_availability) {
+                // Nb: Although an error is returned here, this specific error is ignored during validation
+                // because it's acceptable for routing to fail due to an optional capability ending in an expose
+                // from `void`.
+                Ok(()) => Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget),
+                Err(AvailabilityRoutingError::TargetHasStrongerAvailability) => {
+                    Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget)
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            self.advance(next_availability)
+        }
+    }
+
+    fn advance(
         &mut self,
         next_availability: &Availability,
     ) -> Result<(), AvailabilityRoutingError> {
         match (&self.0, &next_availability) {
-            // Offer declarations can have availability of `SameAsTarget`. For availability walking,
-            // inherit the parent availability because the target's availability is unknown.
+            // `self` will be `SameAsTarget` when routing starts from an `Offer` or `Expose`. This
+            // is to verify as much as possible the correctness of routes involving `Offer` and
+            // `Expose` without full knowledge of the `use -> offer -> expose` chain.
+            //
+            // For the purpose of availability checking, we will skip any checks until we encounter
+            // a route declaration that has a known availability.
             (Availability::SameAsTarget, _) => self.0 = next_availability.clone(),
+
             // If our availability doesn't change, there's nothing to do.
             (Availability::Required, Availability::Required)
             | (Availability::Optional, Availability::Optional)
             | (Availability::Transitional, Availability::Transitional)
+
             // If the next availability is explicitly a pass-through, there's nothing to do.
             | (Availability::Required, Availability::SameAsTarget)
             | (Availability::Optional, Availability::SameAsTarget)
             | (Availability::Transitional, Availability::SameAsTarget) => (),
-            // If we are optional and our parent gives us a required offer, that's fine. We're
-            // required now.
-            (Availability::Optional, Availability::Required) =>
-                self.0 = next_availability.clone(),
-            // If we are transitional, inherit the availabity of the parent offer clause.
-            (Availability::Transitional, Availability::Required)
+
+            // Increasing the strength of availability as we travel toward the source is allowed.
+            (Availability::Optional, Availability::Required)
+            | (Availability::Transitional, Availability::Required)
             | (Availability::Transitional, Availability::Optional) =>
                 self.0 = next_availability.clone(),
 
-            // If we are optional and parent is transitional, that's a problem because
-            // as parent being optional.
-            (Availability::Optional, Availability::Transitional) =>
-                return Err(AvailabilityRoutingError::TargetHasStrongerAvailability),
-
-            // If we are required and parent is transitional, which is essentially optional, emit
-            // an error like in the subsequent case.
-            (Availability::Required, Availability::Transitional) =>
-                return Err(AvailabilityRoutingError::TargetHasStrongerAvailability),
-
-            // If we are required and our parent gives us an optional offer, that's a problem
-            // because our parent cannot promise us that the capability we need will always be
-            // present.
-            (Availability::Required, Availability::Optional) =>
+            // Decreasing the strength of availability is not allowed, as that could lead to
+            // unsanctioned broken routes.
+            (Availability::Optional, Availability::Transitional)
+            | (Availability::Required, Availability::Transitional)
+            | (Availability::Required, Availability::Optional) =>
                 return Err(AvailabilityRoutingError::TargetHasStrongerAvailability),
         }
         Ok(())
@@ -130,8 +147,8 @@ macro_rules! make_availability_visitor {
             impl $crate::router::ExposeVisitor for $name {
                 type ExposeDecl = $expose_decl;
 
-                fn visit(&mut self, _decl: &Self::ExposeDecl) -> Result<(), $crate::error::RoutingError> {
-                    Ok(())
+                fn visit(&mut self, expose: &Self::ExposeDecl) -> Result<(), $crate::error::RoutingError> {
+                    self.0.advance_with_expose(expose).map_err(Into::into)
                 }
             }
         )*
@@ -184,7 +201,7 @@ make_availability_visitor!(AvailabilityEventStreamVisitor, {
 mod tests {
     use {
         super::*,
-        cm_rust::{DependencyType, OfferDecl, OfferTarget},
+        cm_rust::{DependencyType, ExposeDecl, ExposeTarget, OfferDecl, OfferTarget},
         std::convert::TryInto,
         test_case::test_case,
     };
@@ -222,7 +239,7 @@ mod tests {
     #[test_case(
         Availability::Optional,
         new_void_offer(),
-        Err(AvailabilityRoutingError::OfferFromVoidToOptionalTarget)
+        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
     )]
     #[test_case(
         Availability::Required,
@@ -248,15 +265,84 @@ mod tests {
     #[test_case(
         Availability::Transitional,
         new_void_offer(),
-        Err(AvailabilityRoutingError::OfferFromVoidToOptionalTarget)
+        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
     )]
-    fn required_offer_to_transitional(
+    fn offer_tests(
         availability: Availability,
         offer: OfferDecl,
         expected: Result<(), AvailabilityRoutingError>,
     ) {
         let mut current_state: AvailabilityState = availability.into();
         let actual = current_state.advance_with_offer(&offer);
+        assert_eq!(actual, expected);
+    }
+
+    fn new_expose(availability: Availability) -> ExposeDecl {
+        ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Self_,
+            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target: ExposeTarget::Parent,
+            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            availability,
+        })
+    }
+
+    fn new_void_expose() -> ExposeDecl {
+        ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Void,
+            source_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            target: ExposeTarget::Parent,
+            target_name: "fuchsia.examples.Echo".try_into().unwrap(),
+            availability: Availability::Optional,
+        })
+    }
+
+    #[test_case(Availability::Optional, new_expose(Availability::Optional), Ok(()))]
+    #[test_case(Availability::Optional, new_expose(Availability::Required), Ok(()))]
+    #[test_case(Availability::Optional, new_expose(Availability::SameAsTarget), Ok(()))]
+    #[test_case(
+        Availability::Optional,
+        new_expose(Availability::Transitional),
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+    )]
+    #[test_case(
+        Availability::Optional,
+        new_void_expose(),
+        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
+    )]
+    #[test_case(
+        Availability::Required,
+        new_expose(Availability::Optional),
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+    )]
+    #[test_case(Availability::Required, new_expose(Availability::Required), Ok(()))]
+    #[test_case(Availability::Required, new_expose(Availability::SameAsTarget), Ok(()))]
+    #[test_case(
+        Availability::Required,
+        new_expose(Availability::Transitional),
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+    )]
+    #[test_case(
+        Availability::Required,
+        new_void_expose(),
+        Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget)
+    )]
+    #[test_case(Availability::Transitional, new_expose(Availability::Optional), Ok(()))]
+    #[test_case(Availability::Transitional, new_expose(Availability::Required), Ok(()))]
+    #[test_case(Availability::Transitional, new_expose(Availability::SameAsTarget), Ok(()))]
+    #[test_case(Availability::Transitional, new_expose(Availability::Transitional), Ok(()))]
+    #[test_case(
+        Availability::Transitional,
+        new_void_expose(),
+        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
+    )]
+    fn expose_tests(
+        availability: Availability,
+        expose: ExposeDecl,
+        expected: Result<(), AvailabilityRoutingError>,
+    ) {
+        let mut current_state: AvailabilityState = availability.into();
+        let actual = current_state.advance_with_expose(&expose);
         assert_eq!(actual, expected);
     }
 }

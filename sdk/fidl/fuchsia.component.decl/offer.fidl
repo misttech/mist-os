@@ -65,13 +65,13 @@ type Availability = strict enum {
     /// not have a required dependency on the capability.
     OPTIONAL = 2;
 
-    /// If the target of the corresponding offer declaration requires the
-    /// capability, then the behavior is equivalent to required. If the target
-    /// has an optional dependency on the capability, then the behavior is
-    /// equivalent to optional. This is useful for container components that
+    /// If the target of the corresponding offer or expose declaration requires
+    /// the capability, then the behavior is equivalent to required. If the
+    /// target has an optional dependency on the capability, then the behavior
+    /// is equivalent to optional. This is useful for container components that
     /// would like to change their routing availability based on ones inside.
     ///
-    /// This value is not allowed inside a use or expose declaration.
+    /// This value is not allowed inside a use declaration.
     SAME_AS_TARGET = 3;
 
     /// The source may omit the route completely without even having to route
@@ -92,8 +92,8 @@ type Availability = strict enum {
 type OfferService = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `self`, `child`, or `void`. If set to `void`,
-    /// then the target must offer or use the capability with `optional`
-    /// availability.
+    /// then the target must offer or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the service being offered.
@@ -133,7 +133,7 @@ type OfferProtocol = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `self`, `child`, `framework`, or `void`. If
     /// set to `void`, then the target must offer or use the capability with
-    /// `optional` availability.
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the protocol being offered.
@@ -166,7 +166,7 @@ type OfferDirectory = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `self`, `child`, `framework`, or `void`. If
     /// set to `void`, then the target must offer or use the capability with
-    /// `optional` availability.
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the directory being offered.
@@ -210,8 +210,8 @@ type OfferStorage = table {
 
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `storage`, or `void`. If set to `void`, then
-    /// the target must offer or use the capability with `optional`
-    /// availability.
+    /// the target must offer or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
     2: source Ref;
 
     /// (Required) Reference to the target of the capability. Must be `child` or
@@ -303,8 +303,8 @@ type OfferEvent = table {
 type OfferEventStream = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `framework`, `child`, or `void`. If set to
-    /// `void`, then the target must offer or use the capability with `optional`
-    /// availability.
+    /// `void`, then the target must offer or use the capability with `OPTIONAL`
+    /// or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name of the event being offered.
