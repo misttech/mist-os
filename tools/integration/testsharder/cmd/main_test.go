@@ -77,8 +77,6 @@ func TestExecute(t *testing.T) {
 		{
 			// Two tests whose dimensions differ only by some random dimension
 			// ("other_dimension") should still be sharded separately.
-			// TODO(http://b/276316631): This is not the case currently and
-			// should be fixed.
 			name: "arbitrary dimensions",
 			testSpecs: []build.TestSpec{
 				{

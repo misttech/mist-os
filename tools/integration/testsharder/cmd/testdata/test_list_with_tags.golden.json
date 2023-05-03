@@ -1,12 +1,12 @@
 [
     {
-        "name": "hermetic:AEMU",
+        "name": "AEMU",
         "tests": [
             {
-                "name": "fuchsia-pkg://fuchsia.com/hermetic-test#meta/hermetic-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/hermetic-test#meta/hermetic-test.cm",
+                "name": "fuchsia-pkg://fuchsia.com/nonhermetic-test#meta/nonhermetic-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic-test#meta/nonhermetic-test.cm",
                 "path": "",
-                "label": "//src/something:hermetic-test(//build/toolchain/fuchsia:x64)",
+                "label": "//src/something:nonhermetic-test(//build/toolchain/fuchsia:x64)",
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
@@ -14,7 +14,7 @@
                 "tags": [
                     {
                         "key": "hermetic",
-                        "value": "true"
+                        "value": "false"
                     },
                     {
                         "key": "expected_duration_milliseconds",
@@ -35,13 +35,13 @@
         "image_overrides": {}
     },
     {
-        "name": "AEMU",
+        "name": "hermetic:AEMU",
         "tests": [
             {
-                "name": "fuchsia-pkg://fuchsia.com/nonhermetic-test#meta/nonhermetic-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/nonhermetic-test#meta/nonhermetic-test.cm",
+                "name": "fuchsia-pkg://fuchsia.com/hermetic-test#meta/hermetic-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/hermetic-test#meta/hermetic-test.cm",
                 "path": "",
-                "label": "//src/something:nonhermetic-test(//build/toolchain/fuchsia:x64)",
+                "label": "//src/something:hermetic-test(//build/toolchain/fuchsia:x64)",
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
@@ -49,7 +49,7 @@
                 "tags": [
                     {
                         "key": "hermetic",
-                        "value": "false"
+                        "value": "true"
                     },
                     {
                         "key": "expected_duration_milliseconds",

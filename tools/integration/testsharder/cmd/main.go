@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -317,11 +319,36 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		defer f.Close()
 	}
 
+	slices.SortFunc(shards, func(a, b *testsharder.Shard) bool {
+		return a.Name < b.Name
+	})
+
 	encoder := json.NewEncoder(f)
 	// Use 4-space indents so golden files are compatible with `fx format-code`.
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(&shards); err != nil {
 		return fmt.Errorf("failed to encode shards: %v", err)
 	}
+
+	// All shard names must be unique. Validate this *after* emitting the shards
+	// so that it's easy to look at the output to see why dupes may have
+	// occurred.
+	if dupes := duplicatedShardNames(shards); len(dupes) > 0 {
+		return fmt.Errorf("some shard names are repeated: %s", strings.Join(dupes, ", "))
+	}
 	return nil
+}
+
+func duplicatedShardNames(shards []*testsharder.Shard) []string {
+	nameCounts := make(map[string]int)
+	for _, s := range shards {
+		nameCounts[s.Name]++
+	}
+	var dupes []string
+	for name, count := range nameCounts {
+		if count > 1 {
+			dupes = append(dupes, name)
+		}
+	}
+	return dupes
 }

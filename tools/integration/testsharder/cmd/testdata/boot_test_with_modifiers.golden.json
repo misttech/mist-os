@@ -1,12 +1,12 @@
 [
     {
-        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
+        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm",
         "tests": [
             {
-                "name": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
+                "name": "fuchsia-pkg://fuchsia.com/another-boot-test#meta/another-boot-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/another-boot-test#meta/another-boot-test.cm",
                 "path": "",
-                "label": "//src/something:boot-test(//build/toolchain/fuchsia:x64)",
+                "label": "//src/something:another-boot-test(//build/toolchain/fuchsia:x64)",
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
@@ -39,13 +39,13 @@
         }
     },
     {
-        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm",
+        "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
         "tests": [
             {
-                "name": "fuchsia-pkg://fuchsia.com/another-boot-test#meta/another-boot-test.cm",
-                "package_url": "fuchsia-pkg://fuchsia.com/another-boot-test#meta/another-boot-test.cm",
+                "name": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/boot-test#meta/boot-test.cm",
                 "path": "",
-                "label": "//src/something:another-boot-test(//build/toolchain/fuchsia:x64)",
+                "label": "//src/something:boot-test(//build/toolchain/fuchsia:x64)",
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
