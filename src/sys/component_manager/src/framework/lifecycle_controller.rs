@@ -7,7 +7,7 @@ use {
     crate::model::{
         actions::{ActionSet, StopAction},
         component::StartReason,
-        error::ModelError,
+        error::{CapabilityProviderError, ModelError},
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         model::Model,
     },
@@ -287,11 +287,11 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let forbidden = flags - PERMITTED_FLAGS;
         if !forbidden.is_empty() {
             warn!(?forbidden, "LifecycleController capability");
-            return Ok(());
+            return Err(CapabilityProviderError::BadFlags);
         }
 
         if relative_path.components().count() != 0 {
@@ -299,14 +299,14 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
                 path=%relative_path.display(),
                 "LifecycleController capability got open request with non-empty",
             );
-            return Ok(());
+            return Err(CapabilityProviderError::BadPath);
         }
 
         let server_end = channel::take_channel(server_end);
 
         let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
         let stream: fsys::LifecycleControllerRequestStream =
-            server_end.into_stream().map_err(ModelError::stream_creation_error)?;
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
                 self.control.serve(self.scope_moniker, stream).await;

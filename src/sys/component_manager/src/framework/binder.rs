@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{StartReason, WeakComponentInstance},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::report_routing_failure,
@@ -60,7 +60,7 @@ impl CapabilityProvider for BinderCapabilityProvider {
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let target = self.target.clone();
         let source = self.source.clone();
         let server_end = channel::take_channel(server_end);

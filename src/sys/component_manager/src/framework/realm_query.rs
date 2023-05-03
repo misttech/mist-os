@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
         model::{
             component::{ComponentInstance, InstanceState},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             namespace::populate_and_get_logsink_decl,
@@ -216,11 +216,11 @@ impl CapabilityProvider for RealmQueryCapabilityProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let forbidden = flags - PERMITTED_FLAGS;
         if !forbidden.is_empty() {
             warn!(?forbidden, "RealmQuery capability");
-            return Ok(());
+            return Err(CapabilityProviderError::BadFlags);
         }
 
         if relative_path.components().count() != 0 {
@@ -228,14 +228,14 @@ impl CapabilityProvider for RealmQueryCapabilityProvider {
                 path=%relative_path.display(),
                 "RealmQuery capability got open request with non-empty",
             );
-            return Ok(());
+            return Err(CapabilityProviderError::BadPath);
         }
 
         let server_end = channel::take_channel(server_end);
 
         let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
         let stream: fsys::RealmQueryRequestStream =
-            server_end.into_stream().map_err(ModelError::stream_creation_error)?;
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
                 self.query.serve(self.scope_moniker, stream).await;

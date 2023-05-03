@@ -20,7 +20,8 @@ use {
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
             error::{
-                ModelError, ResolveActionError, RouteAndOpenCapabilityError, StartActionError,
+                CapabilityProviderError, ModelError, ResolveActionError,
+                RouteAndOpenCapabilityError, StartActionError,
             },
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::{Route, RouteRequest, RouteSource, RoutingError},
@@ -89,7 +90,7 @@ async fn use_framework_service() {
             _flags: fio::OpenFlags,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,
-        ) -> Result<(), ModelError> {
+        ) -> Result<(), CapabilityProviderError> {
             let server_end = channel::take_channel(server_end);
             let stream = ServerEnd::<fcomponent::RealmMarker>::new(server_end)
                 .into_stream()
@@ -1815,7 +1816,7 @@ async fn use_runner_from_environment_failed() {
             _flags: fio::OpenFlags,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,
-        ) -> Result<(), ModelError> {
+        ) -> Result<(), CapabilityProviderError> {
             channel::take_channel(server_end);
             Ok(())
         }

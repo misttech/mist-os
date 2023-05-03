@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
         model::{
             component::{ComponentInstance, InstanceState, ResolvedInstanceState},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::{self, service::CollectionServiceRoute, Route, RouteRequest, RoutingError},
@@ -400,11 +400,11 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let forbidden = flags - PERMITTED_FLAGS;
         if !forbidden.is_empty() {
             warn!(?forbidden, "RouteValidator capability");
-            return Ok(());
+            return Err(CapabilityProviderError::BadFlags);
         }
 
         if relative_path.components().count() != 0 {
@@ -412,14 +412,14 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
                 path=%relative_path.display(),
                 "RouteValidator capability got open request with non-empty",
             );
-            return Ok(());
+            return Err(CapabilityProviderError::BadPath);
         }
 
         let server_end = channel::take_channel(server_end);
 
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
         let stream: fsys::RouteValidatorRequestStream =
-            server_end.into_stream().map_err(ModelError::stream_creation_error)?;
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
                 self.query.serve(self.scope_moniker, stream).await;

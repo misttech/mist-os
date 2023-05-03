@@ -7,7 +7,7 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilitySource, OpenOptions, OpenRequest, RouteSource, RoutingError},
@@ -287,15 +287,13 @@ impl CapabilityProvider for FilteredServiceProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
-        let relative_path_utf8 = relative_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(relative_path.clone()))?;
+    ) -> Result<(), CapabilityProviderError> {
+        let relative_path_utf8 = relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?;
         let relative_path_vfs = if relative_path_utf8.is_empty() {
             vfs::path::Path::dot()
         } else {
             vfs::path::Path::validate_and_split(relative_path_utf8)
-                .map_err(|_| ModelError::path_invalid(relative_path_utf8))?
+                .map_err(|_| CapabilityProviderError::BadPath)?
         };
 
         // Create a remote directory referring to the unfiltered source service directory.
@@ -395,15 +393,13 @@ impl CapabilityProvider for AggregateServiceDirectoryProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
-        let relative_path_utf8 = relative_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(relative_path.clone()))?;
+    ) -> Result<(), CapabilityProviderError> {
+        let relative_path_utf8 = relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?;
         let relative_path = if relative_path_utf8.is_empty() {
             vfs::path::Path::dot()
         } else {
             vfs::path::Path::validate_and_split(relative_path_utf8)
-                .map_err(|_| ModelError::path_invalid(relative_path_utf8))?
+                .map_err(|_| CapabilityProviderError::BadPath)?
         };
         self.dir.open(
             self.execution_scope.clone(),

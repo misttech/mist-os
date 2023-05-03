@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::routing_test_helpers::*,
         },
@@ -79,7 +79,7 @@ impl CapabilityProvider for MockFrameworkDirectoryProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let relative_path = relative_path.to_str().unwrap();
         let server_end = channel::take_channel(server_end);
         let server_end = ServerEnd::<fio::NodeMarker>::new(server_end);

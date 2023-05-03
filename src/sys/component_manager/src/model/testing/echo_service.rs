@@ -5,7 +5,7 @@
 use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
-        model::error::ModelError,
+        model::error::{CapabilityProviderError, ModelError},
         model::hooks::*,
     },
     async_trait::async_trait,
@@ -46,7 +46,7 @@ impl CapabilityProvider for EchoCapabilityProvider {
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let server_end = channel::take_channel(server_end);
         let server_end = ServerEnd::<EchoMarker>::new(server_end);
         let mut stream: EchoRequestStream = server_end.into_stream().unwrap();

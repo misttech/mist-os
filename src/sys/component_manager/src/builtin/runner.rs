@@ -5,7 +5,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
     },
@@ -107,12 +107,12 @@ impl CapabilityProvider for RunnerCapabilityProvider {
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let runner = Arc::clone(&self.runner);
         let server_end = channel::take_channel(server_end);
         let mut stream = ServerEnd::<fcrunner::ComponentRunnerMarker>::new(server_end)
             .into_stream()
-            .expect("could not convert channel into stream");
+            .map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
                 // Keep handling requests until the stream closes.

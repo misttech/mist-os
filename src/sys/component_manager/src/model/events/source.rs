@@ -7,7 +7,7 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ExtendedInstance, WeakExtendedInstance},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             events::{
                 error::EventsError,
                 registry::{EventRegistry, EventSubscription},
@@ -149,11 +149,15 @@ impl CapabilityProvider for EventSource {
         _flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         // Spawn the task in the component's task scope so that when the component is destroyed,
         // the task is cancelled and does not leak (similar to how framework capabilities are
         // scoped).
-        let task_scope = match self.subscriber.upgrade()? {
+        let task_scope = match self
+            .subscriber
+            .upgrade()
+            .map_err(|err| CapabilityProviderError::EventSourceError { err })?
+        {
             ExtendedInstance::Component(target) => target.nonblocking_task_scope(),
             ExtendedInstance::AboveRoot(target) => target.task_scope(),
         };

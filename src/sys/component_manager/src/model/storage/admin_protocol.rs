@@ -15,7 +15,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::{Route, RouteSource},
@@ -172,11 +172,11 @@ impl CapabilityProvider for StorageAdminProtocolProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let forbidden = flags - PERMITTED_FLAGS;
         if !forbidden.is_empty() {
             warn!(?forbidden, "StorageAdmin protocol");
-            return Ok(());
+            return Err(CapabilityProviderError::BadFlags);
         }
 
         if relative_path.components().count() != 0 {
@@ -184,7 +184,7 @@ impl CapabilityProvider for StorageAdminProtocolProvider {
                 path=%relative_path.display(),
                 "StorageAdmin protocol got open request with non-empty",
             );
-            return Ok(());
+            return Err(CapabilityProviderError::BadPath);
         }
 
         let server_end = channel::take_channel(server_end);

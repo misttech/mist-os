@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
     },
@@ -94,11 +94,11 @@ impl CapabilityProvider for ProcessLauncherCapabilityProvider {
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let server_end = channel::take_channel(server_end);
         let server_end = ServerEnd::<fproc::LauncherMarker>::new(server_end);
         let stream: fproc::LauncherRequestStream =
-            server_end.into_stream().map_err(ModelError::stream_creation_error)?;
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
                 let result = ProcessLauncher::serve(stream).await;

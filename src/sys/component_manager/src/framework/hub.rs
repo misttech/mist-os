@@ -8,7 +8,7 @@ use {
         model::{
             component::WeakComponentInstance,
             dir_tree::DirTree,
-            error::ModelError,
+            error::{CapabilityProviderError, HubError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration, RuntimeInfo},
             mutable_directory::MutableDirectory,
             routing_fns::{route_expose_fn, route_use_fn},
@@ -58,15 +58,13 @@ impl CapabilityProvider for HubCapabilityProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         info!(path=%relative_path.display(), "Opening the /hub capability provider");
-        let mut relative_path = relative_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(relative_path.clone()))?
-            .to_string();
+        let mut relative_path =
+            relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?.to_string();
         relative_path.push('/');
         let dir_path = pfsPath::validate_and_split(relative_path.clone())
-            .map_err(|_| ModelError::open_directory_error(self.moniker.clone(), relative_path))?;
+            .map_err(|_| CapabilityProviderError::BadPath)?;
         self.hub.open(&self.moniker, flags, dir_path, server_end).await?;
         Ok(())
     }
@@ -106,7 +104,7 @@ impl Hub {
         &self,
         flags: fio::OpenFlags,
         mut server_end: zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), HubError> {
         let root_moniker = AbsoluteMoniker::root();
         self.open(
             &root_moniker,
@@ -140,12 +138,9 @@ impl Hub {
         flags: fio::OpenFlags,
         relative_path: pfsPath,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), HubError> {
         let instance_map = self.instances.lock().await;
-        let instance = instance_map.get(moniker).ok_or(ModelError::open_directory_error(
-            moniker.clone(),
-            relative_path.clone().into_string(),
-        ))?;
+        let instance = instance_map.get(moniker).ok_or(HubError::InstanceNotFound)?;
         let server_end = channel::take_channel(server_end);
         instance.directory.clone().open(
             self.scope.clone(),

@@ -20,7 +20,7 @@ async fn component_manager_namespace() {
     let nonhanging_failed_opens = non_hanging_nodes.iter().map(|node_path| async move {
         assert_matches!(
             validate_open_with_node_reference_and_describe(node_path).await,
-            Err(OpenError::OnOpenEventStreamClosed),
+            Err(OpenError::OnOpenDecode(fidl::Error::ClientChannelClosed { .. })),
             "Opening capability: {} with DESCRIBE|NODE_REFERENCE did not produce closed stream.",
             node_path
         );

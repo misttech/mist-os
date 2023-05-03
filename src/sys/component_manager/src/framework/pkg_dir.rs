@@ -10,7 +10,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::Package,
-            error::ModelError,
+            error::{CapabilityProviderError, ModelError, PkgDirError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
     },
@@ -29,13 +29,13 @@ use {
 };
 
 struct PkgDirectoryProvider {
-    abs_moniker: AbsoluteMoniker,
+    _abs_moniker: AbsoluteMoniker,
     package: Option<Package>,
 }
 
 impl PkgDirectoryProvider {
     pub fn new(abs_moniker: AbsoluteMoniker, package: Option<Package>) -> Self {
-        PkgDirectoryProvider { abs_moniker, package }
+        PkgDirectoryProvider { _abs_moniker: abs_moniker, package }
     }
 }
 
@@ -47,24 +47,17 @@ impl CapabilityProvider for PkgDirectoryProvider {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
-        let relative_path = relative_path
-            .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(relative_path.clone()))?
-            .to_string();
+    ) -> Result<(), CapabilityProviderError> {
+        let relative_path =
+            relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?.to_string();
         let server_end = ServerEnd::new(channel::take_channel(server_end));
         if let Some(package) = &self.package {
             package
                 .package_dir
                 .open(flags, fio::ModeType::empty(), &relative_path, server_end)
-                .map_err(|_| {
-                    ModelError::open_directory_error(
-                        self.abs_moniker.clone(),
-                        relative_path.clone(),
-                    )
-                })?;
+                .map_err(|err| PkgDirError::OpenFailed { err })?;
         } else {
-            return Err(ModelError::PackageDirectoryMissing);
+            return Err(CapabilityProviderError::PkgDirError { err: PkgDirError::NoPkgDir });
         }
         Ok(())
     }

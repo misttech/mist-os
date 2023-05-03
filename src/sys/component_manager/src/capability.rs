@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{component::ComponentInstance, error::ModelError},
+    crate::model::{component::ComponentInstance, error::CapabilityProviderError},
     async_trait::async_trait,
     cm_task_scope::TaskScope,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -33,7 +33,7 @@ pub trait CapabilityProvider: Send + Sync {
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError>;
+    ) -> Result<(), CapabilityProviderError>;
 }
 
 /// The only flags that are accepted by `CapabilityProvider` implementations.

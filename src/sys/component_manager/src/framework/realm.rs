@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{ComponentInstance, StartReason, WeakComponentInstance},
-            error::{ModelError, OpenExposedDirError},
+            error::{CapabilityProviderError, ModelError, OpenExposedDirError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
         },
@@ -61,26 +61,26 @@ impl CapabilityProvider for RealmCapabilityProvider {
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), CapabilityProviderError> {
         let server_end = channel::take_channel(server_end);
         let host = self.host.clone();
-        // We only need to look up the component matching this scope.
-        // These operations should all work, even if the component is not running.
-        let model = host.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
-        let component = WeakComponentInstance::from(&model.look_up(&self.scope_moniker).await?);
+        let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
+        let stream: fcomponent::RealmRequestStream =
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
         task_scope
             .add_task(async move {
-                let serve_result = host
-                    .serve(
-                        component,
-                        ServerEnd::<fcomponent::RealmMarker>::new(server_end)
-                            .into_stream()
-                            .expect("could not convert channel into stream"),
-                    )
-                    .await;
-                if let Err(error) = serve_result {
-                    // TODO: Set an epitaph to indicate this was an unexpected error.
-                    warn!(%error, "serve failed");
+                // We only need to look up the component matching this scope.
+                // These operations should all work, even if the component is not running.
+                if let Some(model) = host.model.upgrade() {
+                    if let Ok(component) = model.look_up(&self.scope_moniker).await {
+                        let weak = WeakComponentInstance::new(&component);
+                        drop(component);
+                        let serve_result = host.serve(weak, stream).await;
+                        if let Err(error) = serve_result {
+                            // TODO: Set an epitaph to indicate this was an unexpected error.
+                            warn!(%error, "serve failed");
+                        }
+                    }
                 }
             })
             .await;

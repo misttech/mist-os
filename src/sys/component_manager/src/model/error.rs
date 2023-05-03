@@ -139,6 +139,11 @@ pub enum ModelError {
         #[from]
         err: RouteAndOpenCapabilityError,
     },
+    #[error("error with capability provider: {err}")]
+    CapabilityProviderError {
+        #[from]
+        err: CapabilityProviderError,
+    },
 }
 
 impl ModelError {
@@ -193,6 +198,7 @@ impl ModelError {
             ModelError::Timeout { .. } => zx::Status::TIMED_OUT,
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
             ModelError::RouteAndOpenCapabilityError { err } => err.as_zx_status(),
+            ModelError::CapabilityProviderError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
         }
@@ -501,6 +507,117 @@ impl Into<fsys::StartError> for ResolveActionError {
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::StartError::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum PkgDirError {
+    #[error("no pkg dir found for component")]
+    NoPkgDir,
+    #[error("error opening pkg dir: {err}")]
+    OpenFailed {
+        #[from]
+        err: fidl::Error,
+    },
+}
+
+impl PkgDirError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::NoPkgDir => zx::Status::NOT_FOUND,
+            Self::OpenFailed { .. } => zx::Status::IO,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum HubError {
+    #[error("instance not found in hub data structure")]
+    InstanceNotFound,
+}
+
+impl HubError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::InstanceNotFound => zx::Status::NOT_FOUND,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum ComponentProviderError {
+    #[error("source instance not found")]
+    SourceInstanceNotFound,
+    #[error("target instance not found")]
+    TargetInstanceNotFound,
+    #[error("failed to start source instance: {err}")]
+    SourceStartError {
+        #[from]
+        err: StartActionError,
+    },
+    #[error("failed to open source instance outgoing dir: {err}")]
+    OpenOutgoingDirError {
+        #[from]
+        err: OpenOutgoingDirError,
+    },
+}
+
+impl ComponentProviderError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::SourceInstanceNotFound | Self::TargetInstanceNotFound => zx::Status::NOT_FOUND,
+            Self::SourceStartError { err } => err.as_zx_status(),
+            Self::OpenOutgoingDirError { err } => err.as_zx_status(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum CapabilityProviderError {
+    #[error("failed to create stream from channel")]
+    StreamCreationError,
+    #[error("bad path")]
+    BadPath,
+    #[error("bad flags")]
+    BadFlags,
+    #[error("error in hub capability provider: {err}")]
+    HubError {
+        #[from]
+        err: HubError,
+    },
+    #[error("error in pkg dir capability provider: {err}")]
+    PkgDirError {
+        #[from]
+        err: PkgDirError,
+    },
+    #[error("error in event source capability provider: {err}")]
+    EventSourceError {
+        #[source]
+        err: ComponentInstanceError,
+    },
+    #[error("error in component capability provider: {err}")]
+    ComponentProviderError {
+        #[from]
+        err: ComponentProviderError,
+    },
+    #[error("error in component manager namespace capability provider: {err}")]
+    CmNamespaceError {
+        #[from]
+        err: ClonableError,
+    },
+}
+
+impl CapabilityProviderError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::StreamCreationError => zx::Status::BAD_HANDLE,
+            Self::BadFlags | Self::BadPath => zx::Status::INVALID_ARGS,
+            Self::HubError { err } => err.as_zx_status(),
+            Self::PkgDirError { err } => err.as_zx_status(),
+            Self::EventSourceError { err } => err.as_zx_status(),
+            Self::ComponentProviderError { err } => err.as_zx_status(),
+            Self::CmNamespaceError { .. } => zx::Status::INTERNAL,
         }
     }
 }
