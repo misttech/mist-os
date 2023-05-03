@@ -37,6 +37,11 @@ class MagmaExecuteMsdVsi : public testing::Test {
   }
 
   void TearDown() override {
+    for (auto& buffer : buffers_) {
+      buffer->Release(magma_vsi_.GetConnection());
+    }
+    buffers_.clear();
+
     magma_vsi_.ContextRelease();
     magma_vsi_.ConnectionRelease();
     magma_vsi_.DeviceClose();
@@ -50,6 +55,11 @@ class MagmaExecuteMsdVsi : public testing::Test {
     ~EtnaBuffer() { magma::UnmapCpuHelper(cpu_address_, size_); }
 
     uint32_t* GetCpuAddress() const { return reinterpret_cast<uint32_t*>(cpu_address_); }
+
+    void Release(magma_connection_t connection) {
+      magma_connection_release_buffer(connection, magma_buffer_);
+      magma_buffer_ = 0;
+    }
 
    private:
     magma_buffer_t magma_buffer_;
@@ -94,6 +104,8 @@ class MagmaExecuteMsdVsi : public testing::Test {
     etna_buffer->resource_.buffer_id = buffer_id;
     etna_buffer->resource_.offset = 0;
     etna_buffer->resource_.length = etna_buffer->size_;
+
+    buffers_.push_back(etna_buffer);
 
     return etna_buffer;
   }
@@ -275,6 +287,8 @@ class MagmaExecuteMsdVsi : public testing::Test {
   MagmaVsi magma_vsi_;
 
   uint32_t next_gpu_addr_ = 0x10000;
+  // Since the etnaviv test does not release buffers, we track them here to avoid leaks.
+  std::vector<std::shared_ptr<EtnaBuffer>> buffers_;
 };
 
 }  // namespace
