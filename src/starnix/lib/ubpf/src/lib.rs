@@ -5,10 +5,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-pub(crate) mod converter;
+pub mod converter;
 pub mod program;
 pub mod ubpf;
 
-// pub(crate) use converter::*;
+pub use converter::*;
 pub use program::*;
 pub use ubpf::*;

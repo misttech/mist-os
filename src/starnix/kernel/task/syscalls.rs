@@ -655,7 +655,8 @@ pub fn sys_prctl(
         }
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {
-                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
+                // arg3 should always be null, but that's checked in sys_seccomp.
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, arg3.into());
             } else if arg2 == SECCOMP_MODE_FILTER as u64 {
                 return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
             }
@@ -967,7 +968,7 @@ pub fn sys_seccomp(
 ) -> Result<SyscallResult, Errno> {
     match operation {
         SECCOMP_SET_MODE_STRICT => {
-            if flags != 0 {
+            if flags != 0 || args != UserAddress::NULL {
                 return error!(EINVAL);
             }
             current_task.set_seccomp_state(SeccompFilterState::Strict)?;
@@ -979,11 +980,15 @@ pub fn sys_seccomp(
             | SECCOMP_FILTER_FLAG_NEW_LISTENER
             | SECCOMP_FILTER_FLAG_SPEC_ALLOW
             | SECCOMP_FILTER_FLAG_TSYNC => {
-                // TODO(fxbug.dev/121283): Reenable correct return values
-                // when seccomp filters work fully.  Returning a failure
-                // causes libminijail to crash when enabled.
-                let _ = current_task.add_seccomp_filter(args);
-                Ok(().into())
+                if !current_task.read().no_new_privs()
+                    && !current_task.creds().has_capability(CAP_SYS_ADMIN)
+                {
+                    return error!(EACCES);
+                }
+                if args.is_null() {
+                    return error!(EFAULT);
+                }
+                current_task.add_seccomp_filter(args)
             }
             _ => error!(EINVAL),
         },

@@ -16,7 +16,7 @@ use crate::UbpfError::*;
 // BPF, like the one at https://docs.kernel.org/bpf/instruction-set.html
 
 /// The bpf_class is the instruction type.(e.g., load/store/jump/ALU).
-fn bpf_class(filter: &sock_filter) -> u32 {
+pub fn bpf_class(filter: &sock_filter) -> u32 {
     (filter.code & 0x07).into()
 }
 
@@ -30,7 +30,7 @@ fn bpf_size(filter: &sock_filter) -> u32 {
 /// The addressing mode is the most significant three bits of load and
 /// store instructions.  They indicate whether the instrution accesses a
 /// constant, accesses from memory, or accesses from memory atomically.
-fn bpf_addressing_mode(filter: &sock_filter) -> u32 {
+pub fn bpf_addressing_mode(filter: &sock_filter) -> u32 {
     (filter.code & 0xe0).into()
 }
 

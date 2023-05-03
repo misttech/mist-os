@@ -10,6 +10,7 @@ use std::ffi::CString;
 use std::fmt;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
+use ubpf::converter::{bpf_addressing_mode, bpf_class};
 use ubpf::program::EbpfProgram;
 
 use crate::arch::{registers::RegisterState, task::decode_page_fault_exception_report};
@@ -241,6 +242,12 @@ pub struct TaskMutableState {
 
     /// List of currently installed seccomp_filters; most recently added is last.
     pub seccomp_filters: Vec<EbpfProgram>,
+
+    // The total length of the provided seccomp filters, which cannot
+    // exceed 32768 - 4 * the number of filters.  This is stored
+    // instead of computed because we store seccomp filters in an
+    // expanded form, and it is impossible to get the original length.
+    pub seccomp_provided_instructions: u16,
 }
 
 impl TaskMutableState {
@@ -366,6 +373,7 @@ impl Task {
         no_new_privs: bool,
         has_seccomp_filters: AtomicU8,
         seccomp_filters: Vec<EbpfProgram>,
+        seccomp_provided_instructions: u16,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -399,6 +407,7 @@ impl Task {
                 restricted_state_addr_and_size: None,
                 no_new_privs,
                 seccomp_filters,
+                seccomp_provided_instructions,
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
             has_seccomp_filters,
@@ -507,6 +516,7 @@ impl Task {
             false,
             std::sync::atomic::AtomicU8::new(0),
             vec![],
+            0,
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -605,11 +615,13 @@ impl Task {
         let uts_ns;
         let no_new_privs;
         let seccomp_filters;
+        let seccomp_provided_instructions;
         {
             let state = self.read();
 
             no_new_privs = state.no_new_privs;
             seccomp_filters = state.seccomp_filters.clone();
+            seccomp_provided_instructions = state.seccomp_provided_instructions;
         }
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -680,6 +692,7 @@ impl Task {
             no_new_privs,
             AtomicU8::new(self.has_seccomp_filters.load(Ordering::Acquire)),
             seccomp_filters,
+            seccomp_provided_instructions,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child
@@ -1388,17 +1401,35 @@ impl CurrentTask {
     }
 
     pub fn add_seccomp_filter(&mut self, bpf_filter: UserAddress) -> Result<SyscallResult, Errno> {
-        // TODO: Check the length of the filter <= 4096.
-
         let fprog: sock_fprog = self.mm.read_object(UserRef::new(bpf_filter))?;
+
+        if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+            return Err(errno!(EINVAL));
+        }
 
         let mut code: Vec<sock_filter> = vec![Default::default(); fprog.len as usize];
         self.read_objects(UserRef::new(UserAddress::from_ptr(fprog.filter)), code.as_mut_slice())?;
+
+        // If an instruction loads from / stores to an absolute address, that address has to be
+        // 32-bit aligned and inside the struct seccomp_data passed in.
+        for insn in &code {
+            if (bpf_class(insn) == BPF_LD || bpf_class(insn) == BPF_ST)
+                && (bpf_addressing_mode(insn) == BPF_ABS)
+                && (insn.k & 0x3 != 0 || std::mem::size_of::<seccomp_data>() < insn.k as usize)
+            {
+                return Err(errno!(EINVAL));
+            }
+        }
 
         match EbpfProgram::from_cbpf(&code) {
             Ok(program) => {
                 {
                     let mut state = self.mutable_state.write();
+                    let maybe_new_length = state.seccomp_provided_instructions + fprog.len + 4;
+                    if maybe_new_length > 32768 {
+                        return Err(errno!(ENOMEM));
+                    }
+                    state.seccomp_provided_instructions = maybe_new_length;
                     state.seccomp_filters.push(program);
                 }
 
