@@ -48,7 +48,7 @@ pub fn init_logging_for_component_with_threads<'a, R>(
     interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl FnOnce() -> R + 'a {
     move || {
-        let _guard = init_logging_with_threads(logging_tags.to_vec(), interest);
+        let _guard = init_logging_with_threads(logging_tags, interest);
         func()
     }
 }
@@ -84,7 +84,7 @@ pub fn init_logging_for_test_with_threads<'a, R>(
     move |n| {
         let mut tags = vec![name];
         tags.extend_from_slice(logging_tags);
-        let _guard = init_logging_with_threads(tags.to_vec(), interest.clone());
+        let _guard = init_logging_with_threads(&tags, interest.clone());
         func(n)
     }
 }
@@ -92,50 +92,23 @@ pub fn init_logging_for_test_with_threads<'a, R>(
 /// Initializes logging on a background thread, returning a guard which cancels interest listening
 /// when dropped.
 #[cfg(target_os = "fuchsia")]
-fn init_logging_with_threads(
-    tags: Vec<&'static str>,
+fn init_logging_with_threads<'a>(
+    tags: &'a [&'static str],
     interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl Drop {
-    struct AbortAndJoinOnDrop(
-        Option<futures::future::AbortHandle>,
-        Option<std::thread::JoinHandle<()>>,
-    );
-    impl Drop for AbortAndJoinOnDrop {
-        fn drop(&mut self) {
-            if let Some(handle) = &mut self.0 {
-                handle.abort();
-            }
-            self.1.take().unwrap().join().unwrap();
-        }
+    let mut options = diagnostics_log::PublishOptions::default().tags(tags);
+    if let Some(severity) = interest.min_severity {
+        options = options.minimum_severity(severity);
     }
-
-    let (send, recv) = std::sync::mpsc::channel();
-    let bg_thread = std::thread::spawn(move || {
-        let mut exec = fuchsia_async::LocalExecutor::new();
-        let mut options = diagnostics_log::PublishOptions::default().tags(&tags);
-        if let Some(severity) = interest.min_severity {
-            options = options.minimum_severity(severity);
-        }
-        let interest_listening_task = diagnostics_log::initialize_returning_listening_task(options)
-            .expect("initialize logging");
-        if let Some(on_interest_changes) = interest_listening_task {
-            let (on_interest_changes, cancel_interest) =
-                futures::future::abortable(on_interest_changes);
-            send.send(cancel_interest).unwrap();
-            drop(send);
-            exec.run_singlethreaded(on_interest_changes).ok();
-        }
-    });
-
-    AbortAndJoinOnDrop(recv.recv().map_or(None, |value| Some(value)), Some(bg_thread))
+    diagnostics_log::initialize_sync(options)
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-fn init_logging_with_threads(
-    tags: Vec<&'static str>,
+fn init_logging_with_threads<'a>(
+    tags: &'a [&'static str],
     interest: fidl_fuchsia_diagnostics::Interest,
 ) {
-    let mut options = diagnostics_log::PublishOptions::default().tags(&tags);
+    let mut options = diagnostics_log::PublishOptions::default().tags(tags);
     if let Some(severity) = interest.min_severity {
         options = options.minimum_severity(severity);
     }

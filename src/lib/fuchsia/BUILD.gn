@@ -19,9 +19,6 @@ rustc_library("fuchsia") {
     "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/lib.rs" ]
-  if (is_fuchsia) {
-    deps += [ "//third_party/rust_crates:futures" ]
-  }
 }
 
 rustc_test("fuchsia_test") {

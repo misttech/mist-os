@@ -140,20 +140,88 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     Ok(())
 }
 
-/// Initializes logging with the given options, returning the async task that
-/// listens for changes in log interest.
+struct AbortAndJoinOnDrop(
+    Option<futures::future::AbortHandle>,
+    Option<std::thread::JoinHandle<()>>,
+);
+impl Drop for AbortAndJoinOnDrop {
+    fn drop(&mut self) {
+        if let Some(handle) = &mut self.0 {
+            handle.abort();
+        }
+        self.1.take().unwrap().join().unwrap();
+    }
+}
+
+/// Initializes logging with the given options.
+///
+/// This must be used when working in an environment where a [`fuchsia_async::Executor`] can't be
+/// used.
 ///
 /// IMPORTANT: this should be called at most once in a program, and must be
 /// called only after an async executor has been set for the current thread,
 /// otherwise it'll return errors or panic. Therefore it's recommended to never
 /// call this from libraries and only do it from binaries.
-pub fn initialize_returning_listening_task(
-    opts: PublishOptions<'_>,
-) -> Result<Option<fasync::Task<()>>, PublishError> {
-    let mut publisher = initialize_publishing(opts)?;
-    let interest_listening_task = publisher.take_interest_listening_task();
-    tracing::subscriber::set_global_default(publisher)?;
-    Ok(interest_listening_task)
+pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
+    let (send, recv) = std::sync::mpsc::channel();
+    let (ready_send, ready_recv) = {
+        let (snd, rcv) = std::sync::mpsc::channel();
+        if opts.publisher.wait_for_initial_interest {
+            (Some(snd), Some(rcv))
+        } else {
+            (None, None)
+        }
+    };
+    let PublishOptions {
+        publisher:
+            PublisherOptions {
+                interest,
+                metatags,
+                tags,
+                listen_for_interest_updates,
+                log_sink_proxy,
+                wait_for_initial_interest,
+            },
+        ingest_log_events,
+        install_panic_hook,
+    } = opts;
+    let tags = tags.into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+    let bg_thread = std::thread::spawn(move || {
+        let options = PublishOptions {
+            publisher: PublisherOptions {
+                interest,
+                metatags,
+                tags: &tags.iter().map(String::as_ref).collect::<Vec<_>>(),
+                listen_for_interest_updates,
+                log_sink_proxy,
+                wait_for_initial_interest,
+            },
+            ingest_log_events,
+            install_panic_hook,
+        };
+        let mut exec = fuchsia_async::LocalExecutor::new();
+        let mut publisher = initialize_publishing(options).expect("initialize logging");
+        if let Some(ready_send) = ready_send {
+            ready_send.send(()).unwrap();
+        }
+
+        let interest_listening_task = publisher.take_interest_listening_task();
+        tracing::subscriber::set_global_default(publisher).expect("set global tracing subscriber");
+
+        if let Some(on_interest_changes) = interest_listening_task {
+            let (on_interest_changes, cancel_interest) =
+                futures::future::abortable(on_interest_changes);
+            send.send(cancel_interest).unwrap();
+            drop(send);
+            exec.run_singlethreaded(on_interest_changes).ok();
+        }
+    });
+    if let Some(ready_recv) = ready_recv {
+        let _ = ready_recv.recv();
+    }
+
+    AbortAndJoinOnDrop(recv.recv().map_or(None, |value| Some(value)), Some(bg_thread))
 }
 
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
