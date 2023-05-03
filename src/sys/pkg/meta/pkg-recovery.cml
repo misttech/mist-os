@@ -85,7 +85,6 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
             ],

@@ -310,7 +310,6 @@ pub fn clone_directory_proxy(
 pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image: BlobfsAndSystemImageFut,
     mounts: MountsFn,
-    tuf_repo_config_boot_arg: Option<String>,
     local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
     fetch_delivery_blob: Option<bool>,
     delivery_blob_fallback: Option<bool>,
@@ -319,7 +318,6 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blob_network_header_timeout_seconds: Option<u32>,
     blob_network_body_timeout_seconds: Option<u32>,
     blob_download_resumption_attempts_limit: Option<u32>,
-    create_ota_channel_rewrite_rule: Option<bool>,
 }
 
 impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, fn() -> Mounts> {
@@ -347,7 +345,6 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
                     })
                     .build()
             },
-            tuf_repo_config_boot_arg: None,
             local_mirror_repo: None,
             fetch_delivery_blob: None,
             delivery_blob_fallback: None,
@@ -356,7 +353,6 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             blob_network_header_timeout_seconds: None,
             blob_network_body_timeout_seconds: None,
             blob_download_resumption_attempts_limit: None,
-            create_ota_channel_rewrite_rule: None,
         }
     }
 }
@@ -379,7 +375,6 @@ where
         TestEnvBuilder::<_, MountsFn> {
             blobfs_and_system_image: future::ready((blobfs, system_image)),
             mounts: self.mounts,
-            tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
@@ -388,7 +383,6 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
-            create_ota_channel_rewrite_rule: self.create_ota_channel_rewrite_rule,
         }
     }
 
@@ -412,7 +406,6 @@ where
                 Some(*system_image.meta_far_merkle_root()),
             )),
             mounts: self.mounts,
-            tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
@@ -421,7 +414,6 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
-            create_ota_channel_rewrite_rule: self.create_ota_channel_rewrite_rule,
         }
     }
 
@@ -432,7 +424,6 @@ where
         TestEnvBuilder::<_, _> {
             blobfs_and_system_image: self.blobfs_and_system_image,
             mounts: || mounts,
-            tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
@@ -441,13 +432,7 @@ where
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
-            create_ota_channel_rewrite_rule: self.create_ota_channel_rewrite_rule,
         }
-    }
-    pub fn tuf_repo_config_boot_arg(mut self, repo: String) -> Self {
-        assert_eq!(self.tuf_repo_config_boot_arg, None);
-        self.tuf_repo_config_boot_arg = Some(repo);
-        self
     }
 
     pub fn local_mirror_repo(mut self, repo: &Arc<Repository>, hostname: RepositoryUrl) -> Self {
@@ -497,24 +482,13 @@ where
         self
     }
 
-    pub fn create_ota_channel_rewrite_rule(
-        mut self,
-        create_ota_channel_rewrite_rule: bool,
-    ) -> Self {
-        assert_eq!(self.create_ota_channel_rewrite_rule, None);
-        self.create_ota_channel_rewrite_rule = Some(create_ota_channel_rewrite_rule);
-        self
-    }
-
     pub async fn build(self) -> TestEnv<ConcreteBlobfs> {
         let (blobfs, system_image) = self.blobfs_and_system_image.await;
         let mounts = (self.mounts)();
 
         let local_child_svc_dir = vfs::pseudo_directory! {};
 
-        let mut args = HashMap::new();
-        args.insert("tuf_repo_config".to_string(), self.tuf_repo_config_boot_arg);
-        let mut boot_arguments_service = MockBootArgumentsService::new(args);
+        let mut boot_arguments_service = MockBootArgumentsService::new(HashMap::new());
         if let Some(hash) = system_image {
             boot_arguments_service.insert_pkgfs_boot_arg(hash)
         }
@@ -639,7 +613,6 @@ where
             || self.blob_network_header_timeout_seconds.is_some()
             || self.blob_network_body_timeout_seconds.is_some()
             || self.blob_download_resumption_attempts_limit.is_some()
-            || self.create_ota_channel_rewrite_rule.is_some()
         {
             builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
             if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
@@ -713,16 +686,6 @@ where
                     .await
                     .unwrap();
             }
-            if let Some(create_ota_channel_rewrite_rule) = self.create_ota_channel_rewrite_rule {
-                builder
-                    .set_config_value_bool(
-                        &pkg_resolver,
-                        "create_ota_channel_rewrite_rule",
-                        create_ota_channel_rewrite_rule,
-                    )
-                    .await
-                    .unwrap();
-            }
         }
 
         builder
@@ -754,7 +717,6 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
                     .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
                     .capability(
                         Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
@@ -816,6 +778,7 @@ where
                             .path("/blob")
                             .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
                     )
+                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
                     .from(&service_reflector)
                     .to(&pkg_cache),
             )

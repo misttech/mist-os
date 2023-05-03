@@ -38,10 +38,6 @@ async fn initial_inspect_state() {
                 static_rules: {},
                 generation: 0u64,
             },
-            omaha_channel: {
-                tuf_config_name: OptionDebugStringProperty::<String>::None,
-                source: OptionDebugStringProperty::<String>::None,
-            },
             repository_manager: {
                 dynamic_configs_path: format!("{:?}", Some(std::path::Path::new("repositories.json"))),
                 dynamic_configs: {},
@@ -304,49 +300,6 @@ async fn package_and_blob_queues() {
             blob_fetcher: contains {
                 queue: {}
             }
-        }
-    );
-
-    env.stop().await;
-}
-
-#[fuchsia::test]
-async fn channel_in_vbmeta_appears_in_inspect_state() {
-    let repo =
-        Arc::new(RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH).build().await.unwrap());
-    let served_repository = repo.server().start().unwrap();
-    let repo_url = "fuchsia-pkg://test-repo".parse().unwrap();
-    let config = served_repository.make_repo_config(repo_url);
-    let env = TestEnvBuilder::new()
-        .tuf_repo_config_boot_arg("test-repo".to_string())
-        .create_ota_channel_rewrite_rule(true)
-        .mounts(lib::MountsBuilder::new().static_repository(config.clone()).build())
-        .build()
-        .await;
-    env.wait_for_pkg_resolver_to_start().await;
-
-    let hierarchy = env.pkg_resolver_inspect_hierarchy().await;
-
-    assert_data_tree!(
-        hierarchy,
-        root: contains {
-            rewrite_manager: {
-                dynamic_rules: {
-                   "0": {
-                        path_prefix_replacement: "/",
-                        host_match: "fuchsia.com",
-                        path_prefix_match: "/",
-                        host_replacement: "test-repo",
-                    }
-                },
-                dynamic_rules_path: "None",
-                static_rules: {},
-                generation: 0u64,
-            },
-            omaha_channel: {
-                tuf_config_name: "test-repo",
-                source: "Some(VbMeta)"
-            },
         }
     );
 

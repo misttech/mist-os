@@ -10,7 +10,6 @@ use {
     async_trait::async_trait,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_boot::{ArgumentsRequest, ArgumentsRequestStream},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_paver::{Asset, Configuration},
     fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs},
@@ -65,33 +64,6 @@ struct IsolatedOtaTestExecutor {}
 impl IsolatedOtaTestExecutor {
     pub fn new() -> Box<Self> {
         Box::new(Self {})
-    }
-
-    async fn serve_boot_arguments(mut stream: ArgumentsRequestStream, channel: Option<String>) {
-        while let Some(req) = stream.try_next().await.unwrap() {
-            match req {
-                ArgumentsRequest::GetString { key, responder } => {
-                    if key == "tuf_repo_config" {
-                        responder.send(channel.as_deref()).unwrap();
-                    } else {
-                        eprintln!("Unexpected arguments GetString: {key}, closing channel.");
-                    }
-                }
-                _ => eprintln!("Unexpected arguments request, closing channel."),
-            }
-        }
-    }
-
-    async fn run_boot_arguments(
-        handles: fuchsia_component_test::LocalComponentHandles,
-        channel: Option<String>,
-    ) -> Result<(), Error> {
-        let mut fs = fuchsia_component::server::ServiceFs::new();
-        fs.dir("svc")
-            .add_fidl_service(move |stream| Self::serve_boot_arguments(stream, channel.clone()));
-        fs.serve_connection(handles.outgoing_dir)?;
-        fs.for_each_concurrent(None, |req| req).await;
-        Ok(())
     }
 }
 
@@ -315,26 +287,6 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             .unwrap();
 
         let channel_clone = params.channel.clone();
-        let boot_args_mock = realm_builder
-            .add_local_child(
-                "boot_arguments",
-                move |handles| {
-                    Box::pin(Self::run_boot_arguments(handles, Some(params.channel.clone())))
-                },
-                ChildOptions::new(),
-            )
-            .await
-            .unwrap();
-
-        realm_builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.boot.Arguments"))
-                    .from(&boot_args_mock)
-                    .to(&pkg_component),
-            )
-            .await
-            .unwrap();
 
         let realm_instance = realm_builder.build().await.unwrap();
 

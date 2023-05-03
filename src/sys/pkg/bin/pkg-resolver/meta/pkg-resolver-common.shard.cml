@@ -24,7 +24,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.pkg.PackageCache",
             ],
@@ -96,8 +95,5 @@
 
         // The maximum number of times to try resuming a blob download using HTTP range requests.
         blob_download_resumption_attempts_limit: { type: "uint32" },
-
-        // Whether to create a rewrite rule for the optional ota channel in the boot arguments.
-        create_ota_channel_rewrite_rule: { type: "bool" },
     },
 }

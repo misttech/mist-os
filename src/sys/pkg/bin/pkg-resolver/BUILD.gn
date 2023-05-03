@@ -18,7 +18,6 @@ rustc_library("lib") {
 
   deps = [
     ":config_lib",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
@@ -94,7 +93,6 @@ rustc_library("lib") {
     "src/inspect_util.rs",
     "src/main.rs",
     "src/metrics_util.rs",
-    "src/ota_channel.rs",
     "src/repository.rs",
     "src/repository/filesystem_repository.rs",
     "src/repository/local_provider.rs",
@@ -204,7 +202,6 @@ structured_config_values = {
   fetch_delivery_blob = false
   delivery_blob_fallback = false
   allow_local_mirror = false
-  create_ota_channel_rewrite_rule = false
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
   # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

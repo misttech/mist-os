@@ -279,10 +279,7 @@
             to: "#full-resolver",
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.pkg.PackageCache",
-            ],
+            protocol: [ "fuchsia.pkg.PackageCache" ],
             from: "parent",
             to: "#pkg-resolver",
         },

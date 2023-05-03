@@ -358,16 +358,6 @@ impl<N> RewriteManagerBuilder<N> {
         self.static_rules.extend(iter);
         self
     }
-
-    /// Replace the dynamic rules with the given [Rule]s.
-    pub fn replace_dynamic_rules<T>(mut self, iter: T) -> Self
-    where
-        T: IntoIterator<Item = Rule>,
-    {
-        self.dynamic_rules.clear();
-        self.dynamic_rules.extend(iter);
-        self
-    }
 }
 
 #[cfg(test)]
@@ -636,30 +626,6 @@ pub(crate) mod tests {
 
         let url = "fuchsia-pkg://fuchsia.com/package".parse().unwrap();
         assert_eq!(manager.rewrite(&url), "fuchsia-pkg://fuchsia.com/remapped".parse().unwrap());
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_rewrite_replace_dynamic_configs() {
-        let static_rules = vec![rule!("fuchsia.com" => "foo.com", "/" => "/")];
-        let dynamic_rules = vec![rule!("fuchsia.com" => "bar.com", "/" => "/")];
-        let new_dynamic_rules = vec![rule!("fuchsia.com" => "baz.com", "/" => "/")];
-
-        let static_path = make_rule_config(static_rules);
-        let (static_config_dir, static_config_file) = temp_path_into_proxy_and_path(&static_path);
-        let path = make_rule_config(dynamic_rules);
-        let (dynamic_config_dir, dynamic_config_file) = temp_path_into_proxy_and_path(&path);
-
-        let manager = RewriteManagerBuilder::new(dynamic_config_dir, dynamic_config_file)
-            .await
-            .unwrap()
-            .static_rules_path(static_config_dir, &static_config_file.unwrap())
-            .await
-            .unwrap()
-            .replace_dynamic_rules(new_dynamic_rules.clone())
-            .build();
-
-        let url = "fuchsia-pkg://fuchsia.com/package".parse().unwrap();
-        assert_eq!(manager.rewrite(&url), "fuchsia-pkg://baz.com/package".parse().unwrap());
     }
 
     #[fasync::run_singlethreaded(test)]

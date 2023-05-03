@@ -30,7 +30,6 @@ rustc_library("isolated-swd") {
   ]
 
   test_deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

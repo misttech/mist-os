@@ -54,11 +54,6 @@ impl RepositoryUrl {
     pub fn into_host(self) -> String {
         self.host.into()
     }
-
-    /// Returns the channel name of the repository, if it exists.
-    pub fn channel(&self) -> Option<&str> {
-        self.host.as_ref().strip_suffix(".fuchsia.com")?.split('.').nth(1)
-    }
 }
 
 impl std::str::FromStr for RepositoryUrl {
@@ -174,35 +169,5 @@ mod tests {
                 url
             );
         }
-    }
-
-    #[test]
-    fn channel_err() {
-        for s in vec![
-            "devhost",
-            "fuchsia.com",
-            "example.com",
-            "test.fuchsia.com",
-            "test.example.com",
-            "a.b-c.d.example.com",
-            "ignore.channel.fuchsia.comx",
-            "ignore.channel.fuchsia.com.evil.com",
-        ] {
-            assert_eq!(RepositoryUrl::parse_host(s.to_string()).unwrap().channel(), None);
-        }
-    }
-
-    #[test]
-    fn channel_ok() {
-        assert_eq!(
-            RepositoryUrl::parse_host("a.b-c.d.fuchsia.com".to_string()).unwrap().channel(),
-            Some("b-c")
-        );
-        assert_eq!(
-            RepositoryUrl::parse_host("test.fuchsia.com.fuchsia.com".to_string())
-                .unwrap()
-                .channel(),
-            Some("fuchsia")
-        );
     }
 }

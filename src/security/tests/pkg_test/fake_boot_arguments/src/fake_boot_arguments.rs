@@ -9,7 +9,6 @@ use {
     tracing::{error, info},
 };
 
-static TUF_REPO_CONFIG_ARG_KEY: &'static str = "tuf_repo_config";
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";
 
@@ -61,8 +60,6 @@ async fn serve(
             fidl_fuchsia_boot::ArgumentsRequest::GetString { key, responder } => {
                 let value = if key == PKGFS_BOOT_ARG_KEY {
                     Some(pkgfs_boot_arg_value)
-                } else if key == TUF_REPO_CONFIG_ARG_KEY {
-                    None
                 } else {
                     anyhow::bail!("unsupported boot argument key {}", key);
                 };

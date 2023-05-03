@@ -142,7 +142,6 @@ pub(crate) mod for_tests {
         vfs::directory::entry::DirectoryEntry,
     };
 
-    const TEST_CHANNEL: &str = "test";
     pub const TEST_REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
     pub struct UpdaterBuilder {
         paver_builder: MockPaverServiceBuilder,
@@ -248,7 +247,6 @@ pub(crate) mod for_tests {
                 &realm_builder,
                 Arc::clone(&served_repo),
                 self.repo_url.clone(),
-                Some(TEST_CHANNEL.to_owned()),
                 &blobfs,
             )
             .await
