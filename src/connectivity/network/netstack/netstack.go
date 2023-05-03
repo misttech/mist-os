@@ -102,7 +102,13 @@ type stats struct {
 	}
 }
 
-// endpointsMap is a map from a monotonically increasing uint64 value to tcpip.Endpoint.
+type endpointAndStats struct {
+	ep           tcpip.Endpoint
+	sockOptStats socketOptionStats
+}
+
+// endpointsMap is a map from a monotonically increasing uint64 value to
+// endpointAndStats.
 //
 // It is a typesafe wrapper around sync.Map.
 type endpointsMap struct {
@@ -110,39 +116,43 @@ type endpointsMap struct {
 	inner   sync.Map
 }
 
-func (m *endpointsMap) Load(key uint64) (tcpip.Endpoint, bool) {
-	if value, ok := m.inner.Load(key); ok {
-		return value.(tcpip.Endpoint), true
-	}
-	return nil, false
+func (m *endpointsMap) CompareAndSwap(key uint64, old, new endpointAndStats) bool {
+	return m.inner.CompareAndSwap(key, old, new)
 }
 
-func (m *endpointsMap) Store(key uint64, value tcpip.Endpoint) {
+func (m *endpointsMap) Load(key uint64) (endpointAndStats, bool) {
+	if value, ok := m.inner.Load(key); ok {
+		return value.(endpointAndStats), true
+	}
+	return endpointAndStats{}, false
+}
+
+func (m *endpointsMap) Store(key uint64, value endpointAndStats) {
 	m.inner.Store(key, value)
 }
 
-func (m *endpointsMap) LoadOrStore(key uint64, value tcpip.Endpoint) (tcpip.Endpoint, bool) {
+func (m *endpointsMap) LoadOrStore(key uint64, value endpointAndStats) (endpointAndStats, bool) {
 	// Create a scope to allow `value` to be shadowed below.
 	{
 		value, ok := m.inner.LoadOrStore(key, value)
-		return value.(tcpip.Endpoint), ok
+		return value.(endpointAndStats), ok
 	}
 }
 
-func (m *endpointsMap) LoadAndDelete(key uint64) (tcpip.Endpoint, bool) {
+func (m *endpointsMap) LoadAndDelete(key uint64) (endpointAndStats, bool) {
 	if value, ok := m.inner.LoadAndDelete(key); ok {
-		return value.(tcpip.Endpoint), ok
+		return value.(endpointAndStats), ok
 	}
-	return nil, false
+	return endpointAndStats{}, false
 }
 
 func (m *endpointsMap) Delete(key uint64) {
 	m.inner.Delete(key)
 }
 
-func (m *endpointsMap) Range(f func(key uint64, value tcpip.Endpoint) bool) {
+func (m *endpointsMap) Range(f func(key uint64, value endpointAndStats) bool) {
 	m.inner.Range(func(key, value interface{}) bool {
-		return f(key.(uint64), value.(tcpip.Endpoint))
+		return f(key.(uint64), value.(endpointAndStats))
 	})
 }
 

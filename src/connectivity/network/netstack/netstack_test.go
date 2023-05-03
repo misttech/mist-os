@@ -289,7 +289,7 @@ func TestEndpoint_Close(t *testing.T) {
 
 	if _, ok := eps.ns.endpoints.Load(eps.endpoint.key); !ok {
 		var keys []uint64
-		eps.ns.endpoints.Range(func(key uint64, _ tcpip.Endpoint) bool {
+		eps.ns.endpoints.Range(func(key uint64, _ endpointAndStats) bool {
 			keys = append(keys, key)
 			return true
 		})
@@ -359,7 +359,7 @@ func TestEndpoint_Close(t *testing.T) {
 
 	if _, ok := eps.ns.endpoints.Load(eps.endpoint.key); !ok {
 		var keys []uint64
-		eps.ns.endpoints.Range(func(key uint64, _ tcpip.Endpoint) bool {
+		eps.ns.endpoints.Range(func(key uint64, _ endpointAndStats) bool {
 			keys = append(keys, key)
 			return true
 		})
@@ -393,7 +393,7 @@ func TestEndpoint_Close(t *testing.T) {
 			select {
 			case <-timeout:
 				var keys []uint64
-				eps.ns.endpoints.Range(func(key uint64, _ tcpip.Endpoint) bool {
+				eps.ns.endpoints.Range(func(key uint64, _ endpointAndStats) bool {
 					keys = append(keys, key)
 					return true
 				})
@@ -745,7 +745,7 @@ func TestEndpointsMapKey(t *testing.T) {
 
 	// Key value 0 is not expected to be removed from the map.
 	_, ep := tcpipEP()
-	ns.endpoints.Store(0, ep)
+	ns.endpoints.Store(0, endpointAndStats{ep: ep})
 	if ns.onRemoveEndpoint(0) {
 		t.Errorf("got ns.onRemoveEndpoint(0) = true, want false")
 	}

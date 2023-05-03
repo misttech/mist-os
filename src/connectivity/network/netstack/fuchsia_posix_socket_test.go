@@ -214,10 +214,10 @@ func newNetstackAndEndpoint(t *testing.T, transProto tcpip.TransportProtocolNumb
 	return ns, clock, wq, ep
 }
 
-func addEndpoint(t *testing.T, ns *Netstack, ep *endpoint) {
+func addEndpoint(t *testing.T, ns *Netstack, ep *endpoint, stats socketOptionStats) {
 	t.Helper()
 
-	ns.onAddEndpoint(ep)
+	ns.onAddEndpoint(ep, stats)
 	ep.incRef()
 }
 
@@ -239,7 +239,7 @@ func TestCloseDatagramSocketClosesHandles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newDatagramSocketImpl(_, %d, _, _): %s", ipv4.ProtocolNumber, err)
 	}
-	addEndpoint(t, ns, &s.endpoint)
+	addEndpoint(t, ns, &s.endpoint, &s.endpointWithSocket.endpoint.sockOptStats)
 	// Provide a cancel callback so the endpoint can be closed below.
 	s.cancel = func() {}
 
@@ -270,7 +270,7 @@ func TestCloseSynchronousDatagramSocketClosesHandles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("makeSynchronousDatagramSocket(_, %d, %d, _, _): %s", ipv4.ProtocolNumber, header.UDPProtocolNumber, err)
 	}
-	addEndpoint(t, ns, &s.endpoint)
+	addEndpoint(t, ns, &s.endpoint, &s.endpointWithEvent.endpoint.sockOptStats)
 	// Provide a cancel callback so the endpoint can be closed below.
 	s.cancel = func() {}
 
@@ -294,7 +294,8 @@ func newNetstackAndSreamSocket(t *testing.T) (*faketime.ManualClock, *streamSock
 		t.Fatalf("newEndpointWithSocket(_, _, %d, %d, _, _): %s", header.TCPProtocolNumber, ipv4.ProtocolNumber, err)
 	}
 	s := makeStreamSocketImpl(socketEp)
-	addEndpoint(t, ns, &s.endpoint)
+	s.endpoint.incRef()
+
 	// Provide a cancel callback so the endpoint can be closed below.
 	s.cancel = func() {}
 

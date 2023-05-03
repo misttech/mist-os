@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"sync/atomic"
 	"syscall/zx"
 	"syscall/zx/fidl"
 	"time"
@@ -45,6 +46,7 @@ type inspectInner interface {
 
 const (
 	statsLabel                  = "Stats"
+	socketOptionStatsLabel      = "Socket Option Stats"
 	networkEndpointStatsLabel   = "Network Endpoint Stats"
 	socketInfo                  = "Socket Info"
 	dhcpInfo                    = "DHCP Info"
@@ -198,6 +200,16 @@ type statCounter interface {
 var _ statCounter = (*tcpip.StatCounter)(nil)
 var statCounterType = reflect.TypeOf((*statCounter)(nil)).Elem()
 
+type atomicUint32Stat struct {
+	atomic.Uint32
+}
+
+var _ statCounter = (*atomicUint32Stat)(nil)
+
+func (s *atomicUint32Stat) Value() uint64 {
+	return uint64(s.Load())
+}
+
 // Recursive reflection-based implementation for structs containing other
 // structs, stat counters, or maps of stat counters.
 
@@ -231,8 +243,8 @@ func (impl *statCounterInspectImpl) asMetrics() []inspect.Metric {
 					Key:   field.Name,
 					Value: inspect.MetricValueWithUintValue(counter.Value()),
 				})
-			} else if field.Anonymous && v.Kind() == reflect.Struct {
-				metrics = append(metrics, (&statCounterInspectImpl{value: v}).asMetrics()...)
+			} else if field.Anonymous {
+				metrics = append(metrics, (&statCounterInspectImpl{value: reflect.Indirect(v)}).asMetrics()...)
 			}
 		}
 	}
@@ -898,7 +910,7 @@ func (*socketInfoMapInspectImpl) ReadData() inspect.Object {
 
 func (impl *socketInfoMapInspectImpl) ListChildren() []string {
 	var children []string
-	impl.value.Range(func(key uint64, _ tcpip.Endpoint) bool {
+	impl.value.Range(func(key uint64, _ endpointAndStats) bool {
 		children = append(children, strconv.FormatUint(uint64(key), 10))
 		return true
 	})
@@ -911,12 +923,13 @@ func (impl *socketInfoMapInspectImpl) GetChild(childName string) inspectInner {
 		_ = syslog.VLogTf(syslog.DebugVerbosity, inspect.InspectName, "GetChild(): %s", err)
 		return nil
 	}
-	if ep, ok := impl.value.Load(uint64(id)); ok {
+	if stats, ok := impl.value.Load(uint64(id)); ok {
 		return &socketInfoInspectImpl{
-			name:  childName,
-			info:  ep.Info(),
-			state: ep.State(),
-			stats: ep.Stats(),
+			name:         childName,
+			info:         stats.ep.Info(),
+			state:        stats.ep.State(),
+			stats:        stats.ep.Stats(),
+			sockOptStats: stats.sockOptStats,
 		}
 	}
 	return nil
@@ -925,10 +938,11 @@ func (impl *socketInfoMapInspectImpl) GetChild(childName string) inspectInner {
 var _ inspectInner = (*socketInfoInspectImpl)(nil)
 
 type socketInfoInspectImpl struct {
-	name  string
-	info  tcpip.EndpointInfo
-	state uint32
-	stats tcpip.EndpointStats
+	name         string
+	info         tcpip.EndpointInfo
+	state        uint32
+	stats        tcpip.EndpointStats
+	sockOptStats socketOptionStats
 }
 
 func (impl *socketInfoInspectImpl) ReadData() inspect.Object {
@@ -1002,14 +1016,14 @@ func (impl *socketInfoInspectImpl) ReadData() inspect.Object {
 
 func (*socketInfoInspectImpl) ListChildren() []string {
 	return []string{
-		statsLabel,
+		statsLabel, socketOptionStatsLabel,
 	}
 }
 
 func (impl *socketInfoInspectImpl) GetChild(childName string) inspectInner {
+	var value reflect.Value
 	switch childName {
 	case statsLabel:
-		var value reflect.Value
 		switch t := impl.stats.(type) {
 		case *tcp.Stats:
 			value = reflect.ValueOf(t).Elem()
@@ -1018,12 +1032,15 @@ func (impl *socketInfoInspectImpl) GetChild(childName string) inspectInner {
 		default:
 			return nil
 		}
-		return &statCounterInspectImpl{
-			name:  childName,
-			value: value,
-		}
+	case socketOptionStatsLabel:
+		value = reflect.ValueOf(impl.sockOptStats).Elem()
+	default:
+		return nil
 	}
-	return nil
+	return &statCounterInspectImpl{
+		name:  childName,
+		value: value,
+	}
 }
 
 var _ inspectInner = (*routingTableInspectImpl)(nil)

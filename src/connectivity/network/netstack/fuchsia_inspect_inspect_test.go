@@ -357,14 +357,6 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 	// Create a new netstack and add TCP and UDP endpoints.
 	ns, _ := newNetstack(t, netstackTestOptions{})
 	wq := new(waiter.Queue)
-	tcpEP, err := ns.stack.NewEndpoint(tcp.ProtocolNumber, ipv4.ProtocolNumber, wq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	udpEP, err := ns.stack.NewEndpoint(udp.ProtocolNumber, ipv6.ProtocolNumber, wq)
-	if err != nil {
-		t.Fatal(err)
-	}
 	v := socketInfoMapInspectImpl{
 		value: &ns.endpoints,
 	}
@@ -373,16 +365,34 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 		t.Errorf("ListChildren() mismatch (-want +got):\n%s", diff)
 	}
 
-	// Add the 2 endpoints to endpoints with key being the transport protocol
-	// number.
-	const key1 = 1
-	const key2 = 2
-	ns.endpoints.Store(key1, tcpEP)
-	ns.endpoints.Store(key2, udpEP)
+	// Add a TCP socket. Since it's the first to be added, it will have key = 1.
+	const tcpKey = 1
+	tcpEP, tcpipErr := ns.stack.NewEndpoint(tcp.ProtocolNumber, ipv4.ProtocolNumber, wq)
+	if tcpipErr != nil {
+		t.Fatal(tcpipErr)
+	}
+	tcpEPS, err := newEndpointWithSocket(tcpEP, wq, tcp.ProtocolNumber, ipv4.ProtocolNumber, ns, zx.SocketStream)
+	if err != nil {
+		t.Fatalf("failed to create TCP endpointWithSocket: %s", err)
+	}
+	// The following call is necessary in order for the TCP-specific socket option
+	// stats to be registered.
+	_ = makeStreamSocketImpl(tcpEPS)
+
+	// Add a UDP socket.
+	const udpKey = 2
+	udpEP, tcpipErr := ns.stack.NewEndpoint(udp.ProtocolNumber, ipv6.ProtocolNumber, wq)
+	if tcpipErr != nil {
+		t.Fatal(tcpipErr)
+	}
+	// The following call is necessary for socket option stats to be registered.
+	if _, err := newEndpointWithSocket(udpEP, wq, udp.ProtocolNumber, ipv6.ProtocolNumber, ns, zx.SocketDatagram); err != nil {
+		t.Fatalf("failed to create UDP endpointWithSocket: %s", err)
+	}
 
 	children = v.ListChildren()
 	sort.Strings(children)
-	if diff := cmp.Diff([]string{strconv.Itoa(key1), strconv.Itoa(key2)}, children); diff != "" {
+	if diff := cmp.Diff([]string{strconv.Itoa(tcpKey), strconv.Itoa(udpKey)}, children); diff != "" {
 		t.Errorf("ListChildren() mismatch (-want +got):\n%s", diff)
 	}
 
@@ -406,42 +416,47 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 		var (
 			networkProtoName, transportProtoName string
 			unspecifiedAddress                   string
-			expectInspectObj                     inspect.Object
+			expectStatsObject                    inspect.Object
+			expectSockOptStatsType               reflect.Type
 		)
 		switch val {
-		case key1:
+		case tcpKey:
 			networkProtoName = "IPv4"
 			transportProtoName = "TCP"
 			unspecifiedAddress = "0.0.0.0"
-			expectInspectObj = inspect.Object{
-				Name: "Stats",
+			expectStatsObject = inspect.Object{
+				Name: statsLabel,
 				Metrics: []inspect.Metric{
 					{Key: "SegmentsReceived", Value: inspect.MetricValueWithUintValue(0)},
 					{Key: "SegmentsSent", Value: inspect.MetricValueWithUintValue(0)},
 					{Key: "FailedConnectionAttempts", Value: inspect.MetricValueWithUintValue(0)},
 				},
 			}
-		case key2:
+			expectSockOptStatsType = reflect.TypeOf((*streamSocketOptionStats)(nil)).Elem()
+		case udpKey:
 			networkProtoName = "IPv6"
 			transportProtoName = "UDP"
 			unspecifiedAddress = "[::]"
-			expectInspectObj = inspect.Object{
-				Name: "Stats",
+			expectStatsObject = inspect.Object{
+				Name: statsLabel,
 				Metrics: []inspect.Metric{
 					{Key: "PacketsReceived", Value: inspect.MetricValueWithUintValue(0)},
 					{Key: "PacketsSent", Value: inspect.MetricValueWithUintValue(0)},
 				},
 			}
+			expectSockOptStatsType = reflect.TypeOf((*NetworkSocketOptionStats)(nil)).Elem()
 		}
 
+		ignoreUnexportedInspect := cmpopts.IgnoreUnexported(inspect.Object{}, inspect.Metric{}, inspect.Property{})
 		epChildren := child.ListChildren()
 		if diff := cmp.Diff([]string{
-			"Stats",
+			statsLabel, socketOptionStatsLabel,
 		}, epChildren); diff != "" {
 			t.Errorf("ListChildren() mismatch (-want +got):\n%s", diff)
 		}
 		for _, c := range epChildren {
-			if c == "Stats" {
+			switch c {
+			case statsLabel:
 				statsChild := child.GetChild(c)
 				if diff := cmp.Diff([]string{
 					"ReceiveErrors",
@@ -453,9 +468,29 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 				}
 
 				// Compare against the expected inspect objects.
-				if diff := cmp.Diff(expectInspectObj, statsChild.ReadData(), cmpopts.IgnoreUnexported(inspect.Object{}, inspect.Metric{}, inspect.Property{})); diff != "" {
+				if diff := cmp.Diff(expectStatsObject, statsChild.ReadData(), ignoreUnexportedInspect); diff != "" {
 					t.Errorf("ReadData() mismatch (-want +got):\n%s", diff)
 				}
+			case socketOptionStatsLabel:
+				sockOptStats := child.GetChild(c)
+				var want []inspect.Metric
+				for _, field := range reflect.VisibleFields(expectSockOptStatsType) {
+					// Must exclude the anonymous fields that contain stat counters since
+					// they're not stat counters themselves.
+					if field.Anonymous {
+						continue
+					}
+					want = append(want, inspect.Metric{Key: field.Name, Value: inspect.MetricValueWithUintValue(0)})
+				}
+
+				sortMetricByName := func(a, b inspect.Metric) bool {
+					return a.Key < b.Key
+				}
+				if diff := cmp.Diff(want, sockOptStats.ReadData().Metrics, ignoreUnexportedInspect, cmpopts.SortSlices(sortMetricByName)); diff != "" {
+					t.Errorf("SocketOptionStats ReadData() mismatch (-want +got):\n%s", diff)
+				}
+			default:
+				t.Errorf("unexpected child: %s", c)
 			}
 		}
 
@@ -471,13 +506,13 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 				{Key: "BindNICID", Value: inspect.PropertyValueWithStr("0")},
 				{Key: "RegisterNICID", Value: inspect.PropertyValueWithStr("0")},
 			},
-		}, child.ReadData(), cmpopts.IgnoreUnexported(inspect.Object{}, inspect.Metric{}, inspect.Property{})); diff != "" {
+		}, child.ReadData(), ignoreUnexportedInspect); diff != "" {
 			t.Errorf("ReadData() mismatch (-want +got):\n%s", diff)
 		}
 	}
 
 	// Empty the endpoints.
-	ns.endpoints.Range(func(key uint64, _ tcpip.Endpoint) bool {
+	ns.endpoints.Range(func(key uint64, _ endpointAndStats) bool {
 		ns.endpoints.Delete(key)
 		return true
 	})
