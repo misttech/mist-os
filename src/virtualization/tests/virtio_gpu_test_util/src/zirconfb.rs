@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     fidl::endpoints,
     fidl_fuchsia_hardware_display::{
-        ControllerEvent, ControllerMarker, ControllerSynchronousProxy, Info,
+        CoordinatorEvent, CoordinatorMarker, CoordinatorSynchronousProxy, Info,
         ProviderSynchronousProxy,
     },
     fuchsia_zircon as zx,
@@ -25,22 +25,22 @@ fn convert_info(info: &Info) -> DisplayInfo {
 }
 
 fn read_info() -> Result<DetectResult, Error> {
-    // Connect to the display controller.
+    // Connect to the display coordinator.
     let provider = {
         let (client_end, server_end) = zx::Channel::create();
         fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, DEVICE_PATH)?;
         ProviderSynchronousProxy::new(client_end)
     };
-    let controller = {
-        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>();
-        provider.open_controller(dc_server, zx::Time::INFINITE)?;
-        ControllerSynchronousProxy::new(dc_client.into_channel())
+    let coordinator = {
+        let (dc_client, dc_server) = endpoints::create_endpoints::<CoordinatorMarker>();
+        provider.open_coordinator_for_primary(dc_server, zx::Time::INFINITE)?;
+        CoordinatorSynchronousProxy::new(dc_client.into_channel())
     };
 
     // Wait for the 'OnDisplaysChanged' event.
     let displays = loop {
-        match controller.wait_for_event(zx::Time::INFINITE)? {
-            ControllerEvent::OnDisplaysChanged { added, .. } => break added,
+        match coordinator.wait_for_event(zx::Time::INFINITE)? {
+            CoordinatorEvent::OnDisplaysChanged { added, .. } => break added,
             _ => {}
         }
     };
@@ -51,7 +51,7 @@ fn read_info() -> Result<DetectResult, Error> {
     })
 }
 
-fn read_info_from_display_controller() -> DetectResult {
+fn read_info_from_display_coordinator() -> DetectResult {
     read_info().unwrap_or_else(DetectResult::from_error)
 }
 
@@ -59,6 +59,6 @@ pub struct ZirconFramebuffer;
 
 impl Framebuffer for ZirconFramebuffer {
     fn detect_displays(&self) -> DetectResult {
-        read_info_from_display_controller()
+        read_info_from_display_coordinator()
     }
 }

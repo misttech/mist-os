@@ -57,7 +57,7 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride,
       bg_color_(bg_color),
       modifier_(modifier) {}
 
-Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t width,
+Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t width,
                      uint32_t height, fuchsia_images2::wire::PixelFormat format, Pattern pattern,
                      uint32_t fg_color, uint32_t bg_color, uint64_t modifier) {
   zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
@@ -458,7 +458,7 @@ void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
   }
 }
 
-bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc, uint64_t image_id,
+bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint64_t image_id,
                    image_import_t* info_out) const {
   for (int i = 0; i < 2; i++) {
     static int event_id = fhd::wire::kInvalidDispId + 1;

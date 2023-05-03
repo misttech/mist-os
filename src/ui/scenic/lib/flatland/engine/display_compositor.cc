@@ -32,9 +32,9 @@ const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
 
 // Returns an image type that describes the tiling format used for buffer with
 // this pixel format. The values are display driver specific and not documented
-// in display-controller.fidl.
+// in the display coordinator FIDL API.
 // TODO(fxbug.dev/33334): Remove this when image type is removed from the display
-// controller API.
+// coordinator API.
 uint32_t BufferCollectionPixelFormatToImageType(const fuchsia::sysmem::PixelFormat& pixel_format) {
   if (pixel_format.has_format_modifier) {
     switch (pixel_format.format_modifier.value) {
@@ -203,10 +203,10 @@ std::optional<fuchsia::sysmem::PixelFormat> DetermineDisplaySupportFor(
 
 DisplayCompositor::DisplayCompositor(
     async_dispatcher_t* main_dispatcher,
-    std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
+    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
     const bool enable_display_composition)
-    : display_controller_(std::move(display_controller)),
+    : display_coordinator_(std::move(display_coordinator)),
       renderer_(renderer),
       release_fence_manager_(main_dispatcher),
       sysmem_allocator_(std::move(sysmem_allocator)),
@@ -223,11 +223,11 @@ DisplayCompositor::~DisplayCompositor() {
   DiscardConfig();
   for (const auto& [_, data] : display_engine_data_map_) {
     for (const auto& layer : data.layers) {
-      (*display_controller_)->DestroyLayer(layer);
+      (*display_coordinator_)->DestroyLayer(layer);
     }
     for (const auto& event_data : data.frame_event_datas) {
-      (*display_controller_)->ReleaseEvent(event_data.wait_id);
-      (*display_controller_)->ReleaseEvent(event_data.signal_id);
+      (*display_coordinator_)->ReleaseEvent(event_data.wait_id);
+      (*display_coordinator_)->ReleaseEvent(event_data.signal_id);
     }
   }
 
@@ -284,7 +284,7 @@ bool DisplayCompositor::ImportBufferCollection(
 
   if (!enable_display_composition_) {
     // Forced fallback to using the renderer; don't attempt direct-to-display.
-    // Close |display_token| without importing it to the display controller.
+    // Close |display_token| without importing it to the display coordinator.
     if (const auto status = display_token->Close(); status != ZX_OK) {
       FX_LOGS(ERROR) << "Could not close token: " << zx_status_get_string(status);
     }
@@ -306,8 +306,8 @@ bool DisplayCompositor::ImportBufferCollection(
     FX_DCHECK(success);
   }
 
-  // Import the buffer collection into the display controller, setting display constraints.
-  return ImportBufferCollectionToDisplayController(
+  // Import the buffer collection into the display coordinator, setting display constraints.
+  return ImportBufferCollectionToDisplayCoordinator(
       collection_id, std::move(display_token),
       // Indicate that no specific size, format, or type is required.
       fuchsia::hardware::display::ImageConfig{.type = 0});
@@ -322,8 +322,8 @@ void DisplayCompositor::ReleaseBufferCollection(
   renderer_->ReleaseBufferCollection(collection_id, usage);
 
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_controller_);
-  (*display_controller_)->ReleaseBufferCollection(collection_id);
+  FX_DCHECK(display_coordinator_);
+  (*display_coordinator_)->ReleaseBufferCollection(collection_id);
   display_buffer_collection_ptrs_.erase(collection_id);
   buffer_collection_supports_display_.erase(collection_id);
 }
@@ -362,7 +362,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_controller_);
+  FX_DCHECK(display_coordinator_);
 
   const allocation::GlobalBufferCollectionId collection_id = metadata.collection_id;
   const bool display_support_already_set =
@@ -395,14 +395,14 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(metadata);
   zx_status_t import_image_status = ZX_OK;
   {
-    const auto status = (*display_controller_)
+    const auto status = (*display_coordinator_)
                             ->ImportImage(image_config, collection_id, metadata.identifier,
                                           metadata.vmo_index, &import_image_status);
     FX_DCHECK(status == ZX_OK);
   }
 
   if (import_image_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Display controller could not import the image.";
+    FX_LOGS(ERROR) << "Display coordinator could not import the image.";
     return false;
   }
 
@@ -416,8 +416,8 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
   renderer_->ReleaseBufferImage(image_id);
 
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_controller_);
-  (*display_controller_)->ReleaseImage(image_id);
+  FX_DCHECK(display_coordinator_);
+  (*display_coordinator_)->ReleaseImage(image_id);
   image_event_map_.erase(image_id);
 }
 
@@ -426,7 +426,7 @@ uint64_t DisplayCompositor::CreateDisplayLayer() {
   uint64_t layer_id;
   zx_status_t create_layer_status;
   const zx_status_t transport_status =
-      (*display_controller_)->CreateLayer(&create_layer_status, &layer_id);
+      (*display_coordinator_)->CreateLayer(&create_layer_status, &layer_id);
   if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
     return 0;
@@ -439,7 +439,7 @@ void DisplayCompositor::SetDisplayLayers(const uint64_t display_id,
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
-  const auto status = (*display_controller_)->SetDisplayLayers(display_id, layers);
+  const auto status = (*display_coordinator_)->SetDisplayLayers(display_id, layers);
   FX_DCHECK(status == ZX_OK);
 }
 
@@ -514,7 +514,8 @@ void DisplayCompositor::ApplyLayerColor(const uint64_t layer_id, const ImageRect
                               static_cast<uint8_t>(255 * image.multiply_color[2]),
                               static_cast<uint8_t>(255 * image.multiply_color[3])};
 
-  (*display_controller_)->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::BGRA32, col);
+  (*display_coordinator_)
+      ->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::BGRA32, col);
 
 // TODO(fxbug.dev/104887): Currently, not all display hardware supports the ability to
 // set either the position or the alpha on a color layer, as color layers are not primary
@@ -533,9 +534,9 @@ void DisplayCompositor::ApplyLayerColor(const uint64_t layer_id, const ImageRect
   const fhd_Transform transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
 
-  (*display_controller_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
+  (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
   auto alpha_mode = GetAlphaMode(image.blend_mode);
-  (*display_controller_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
+  (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
 #endif
 }
 
@@ -557,11 +558,11 @@ void DisplayCompositor::ApplyLayerImage(const uint64_t layer_id, const ImageRect
   // stalled: see fxr/716543.
   const auto pixel_format = buffer_collection_pixel_format_.at(image.collection_id);
   const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(image);
-  (*display_controller_)->SetLayerPrimaryConfig(layer_id, image_config);
-  (*display_controller_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
-  (*display_controller_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
+  (*display_coordinator_)->SetLayerPrimaryConfig(layer_id, image_config);
+  (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
+  (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
-  (*display_controller_)->SetLayerImage(layer_id, image.identifier, wait_id, signal_id);
+  (*display_coordinator_)->SetLayerImage(layer_id, image.identifier, wait_id, signal_id);
 }
 
 bool DisplayCompositor::CheckConfig() {
@@ -569,7 +570,7 @@ bool DisplayCompositor::CheckConfig() {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::CheckConfig");
   fuchsia::hardware::display::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  (*display_controller_)->CheckConfig(/*discard*/ false, &result, &ops);
+  (*display_coordinator_)->CheckConfig(/*discard*/ false, &result, &ops);
   return result == fuchsia::hardware::display::ConfigResult::OK;
 }
 
@@ -579,19 +580,19 @@ void DisplayCompositor::DiscardConfig() {
   pending_images_in_config_.clear();
   fuchsia::hardware::display::ConfigResult result;
   std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  (*display_controller_)->CheckConfig(/*discard*/ true, &result, &ops);
+  (*display_coordinator_)->CheckConfig(/*discard*/ true, &result, &ops);
 }
 
 fuchsia::hardware::display::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   {
-    const auto status = (*display_controller_)->ApplyConfig();
+    const auto status = (*display_coordinator_)->ApplyConfig();
     FX_DCHECK(status == ZX_OK);
   }
   fuchsia::hardware::display::ConfigStamp pending_config_stamp;
   {
-    const auto status = (*display_controller_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
+    const auto status = (*display_coordinator_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
     FX_DCHECK(status == ZX_OK);
   }
   return pending_config_stamp;
@@ -624,7 +625,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     if (cc_state_machine_.GpuRequiresDisplayClearing()) {
       TRACE_DURATION("gfx", "flatland::DisplayCompositor::PerformGpuComposition[cc]");
       const zx_status_t status =
-          (*display_controller_)
+          (*display_coordinator_)
               ->SetDisplayColorConversion(render_data.display_id, kDefaultColorConversionOffsets,
                                           kDefaultColorConversionCoefficients,
                                           kDefaultColorConversionOffsets);
@@ -726,7 +727,7 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
   std::scoped_lock lock(lock_);
 
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
-  // don't need to, because this requires a round-trip to the display controller.
+  // don't need to, because this requires a round-trip to the display coordinator.
   // Note: SetRenderDatasOnDisplay() failing indicates hardware failure to do display composition.
   const bool fallback_to_gpu_composition =
       !enable_display_composition_ || !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
@@ -782,7 +783,7 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
     if (const auto cc_data = cc_state_machine_.GetDataToApply()) {
       // Apply direct-to-display color conversion here.
       const zx_status_t status =
-          (*display_controller_)
+          (*display_coordinator_)
               ->SetDisplayColorConversion(data.display_id, (*cc_data).preoffsets,
                                           (*cc_data).coefficients, (*cc_data).postoffsets);
       FX_CHECK(status == ZX_OK) << "Could not apply hardware color conversion: " << status;
@@ -842,10 +843,10 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  result.wait_id = scenic_impl::ImportEvent(*display_controller_, result.wait_event);
+  result.wait_id = scenic_impl::ImportEvent(*display_coordinator_, result.wait_event);
   FX_DCHECK(result.wait_id != fuchsia::hardware::display::INVALID_DISP_ID);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
-  result.signal_id = scenic_impl::ImportEvent(*display_controller_, result.signal_event);
+  result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
   FX_DCHECK(result.signal_id != fuchsia::hardware::display::INVALID_DISP_ID);
   return result;
 }
@@ -864,7 +865,7 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  result.signal_id = scenic_impl::ImportEvent(*display_controller_, result.signal_event);
+  result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
   FX_DCHECK(result.signal_id != fuchsia::hardware::display::INVALID_DISP_ID);
 
   return result;
@@ -892,7 +893,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   {
     std::scoped_lock lock(lock_);
     // When we add in a new display, we create a couple of layers for that display upfront to be
-    // used when we directly composite render data in hardware via the display controller.
+    // used when we directly composite render data in hardware via the display coordinator.
     // TODO(fxbug.dev/77873): per-display layer lists are probably a bad idea; this approach doesn't
     // reflect the constraints of the underlying display hardware.
     for (uint32_t i = 0; i < 2; i++) {
@@ -952,8 +953,8 @@ void DisplayCompositor::SetColorConversionValues(const std::array<float, 9>& coe
 bool DisplayCompositor::SetMinimumRgb(const uint8_t minimum_rgb) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   std::scoped_lock lock(lock_);
-  fuchsia::hardware::display::Controller_SetMinimumRgb_Result cmd_result;
-  const auto status = (*display_controller_)->SetMinimumRgb(minimum_rgb, &cmd_result);
+  fuchsia::hardware::display::Coordinator_SetMinimumRgb_Result cmd_result;
+  const auto status = (*display_coordinator_)->SetMinimumRgb(minimum_rgb, &cmd_result);
   if (status != ZX_OK || cmd_result.is_err()) {
     FX_LOGS(WARNING) << "FlatlandDisplayCompositor SetMinimumRGB failed";
     return false;
@@ -997,7 +998,7 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
 
   {  // Set display constraints.
     std::scoped_lock lock(lock_);
-    const auto result = ImportBufferCollectionToDisplayController(
+    const auto result = ImportBufferCollectionToDisplayCoordinator(
         collection_id, std::move(display_token), fuchsia::hardware::display::ImageConfig{});
     FX_DCHECK(result);
   }
@@ -1081,12 +1082,12 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
   return render_targets;
 }
 
-bool DisplayCompositor::ImportBufferCollectionToDisplayController(
+bool DisplayCompositor::ImportBufferCollectionToDisplayCoordinator(
     allocation::GlobalBufferCollectionId identifier,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
     const fuchsia::hardware::display::ImageConfig& image_config) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  return scenic_impl::ImportBufferCollection(identifier, *display_controller_, std::move(token),
+  return scenic_impl::ImportBufferCollection(identifier, *display_coordinator_, std::move(token),
                                              image_config);
 }
 

@@ -19,11 +19,11 @@ struct fake_context : fpromise::context {
   fpromise::suspended_task suspend_task() override { return fpromise::suspended_task(); }
 };
 
-class GetHardwareDisplayControllerInjectServicesTest : public gtest::RealLoopFixture {};
+class GetHardwareDisplayCoordinatorInjectServicesTest : public gtest::RealLoopFixture {};
 
 // Tests the code path when the service is injected through .cmx file.
-TEST_F(GetHardwareDisplayControllerInjectServicesTest, WithInjectedService) {
-  auto promise = GetHardwareDisplayController();
+TEST_F(GetHardwareDisplayCoordinatorInjectServicesTest, WithInjectedService) {
+  auto promise = GetHardwareDisplayCoordinator();
   fake_context context;
   EXPECT_FALSE(promise(context).is_error());
 }

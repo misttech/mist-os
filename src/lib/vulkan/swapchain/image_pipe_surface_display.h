@@ -59,7 +59,7 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   uint32_t height_ = 0;
   uint64_t display_id_ = 0;
   uint64_t layer_id_ = 0;
-  fuchsia::hardware::display::ControllerPtr display_controller_;
+  fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;
 };

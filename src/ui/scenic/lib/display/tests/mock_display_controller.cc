@@ -8,22 +8,24 @@ namespace scenic_impl {
 namespace display {
 namespace test {
 
-DisplayControllerObjects CreateMockDisplayController() {
-  DisplayControllerObjects controller_objs;
+DisplayCoordinatorObjects CreateMockDisplayCoordinator() {
+  DisplayCoordinatorObjects coordinator_objs;
 
-  zx::channel controller_channel_server;
-  zx::channel controller_channel_client;
-  FX_CHECK(ZX_OK == zx::channel::create(0, &controller_channel_server, &controller_channel_client));
+  zx::channel coordinator_channel_server;
+  zx::channel coordinator_channel_client;
+  FX_CHECK(ZX_OK ==
+           zx::channel::create(0, &coordinator_channel_server, &coordinator_channel_client));
 
-  controller_objs.mock = std::make_unique<MockDisplayController>();
-  controller_objs.mock->Bind(std::move(controller_channel_server));
+  coordinator_objs.mock = std::make_unique<MockDisplayCoordinator>();
+  coordinator_objs.mock->Bind(std::move(coordinator_channel_server));
 
-  controller_objs.interface_ptr = std::make_shared<fuchsia::hardware::display::ControllerSyncPtr>();
-  controller_objs.interface_ptr->Bind(std::move(controller_channel_client));
-  controller_objs.listener =
-      std::make_unique<DisplayControllerListener>(controller_objs.interface_ptr);
+  coordinator_objs.interface_ptr =
+      std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
+  coordinator_objs.interface_ptr->Bind(std::move(coordinator_channel_client));
+  coordinator_objs.listener =
+      std::make_unique<DisplayCoordinatorListener>(coordinator_objs.interface_ptr);
 
-  return controller_objs;
+  return coordinator_objs;
 }
 
 }  // namespace test

@@ -25,22 +25,22 @@ DisplayManager::DisplayManager(std::optional<uint64_t> i_can_haz_display_id,
       i_can_haz_display_mode_(i_can_haz_display_mode),
       display_available_cb_(std::move(display_available_cb)) {}
 
-void DisplayManager::BindDefaultDisplayController(
-    fidl::InterfaceHandle<fuchsia::hardware::display::Controller> controller) {
-  FX_DCHECK(!default_display_controller_);
-  FX_DCHECK(controller);
-  default_display_controller_ = std::make_shared<fuchsia::hardware::display::ControllerSyncPtr>();
-  default_display_controller_->Bind(std::move(controller));
-  default_display_controller_listener_ =
-      std::make_shared<display::DisplayControllerListener>(default_display_controller_);
-  default_display_controller_listener_->InitializeCallbacks(
+void DisplayManager::BindDefaultDisplayCoordinator(
+    fidl::InterfaceHandle<fuchsia::hardware::display::Coordinator> coordinator) {
+  FX_DCHECK(!default_display_coordinator_);
+  FX_DCHECK(coordinator);
+  default_display_coordinator_ = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
+  default_display_coordinator_->Bind(std::move(coordinator));
+  default_display_coordinator_listener_ =
+      std::make_shared<display::DisplayCoordinatorListener>(default_display_coordinator_);
+  default_display_coordinator_listener_->InitializeCallbacks(
       /*on_invalid_cb=*/nullptr, fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
 
-  // Set up callback to handle Vsync notifications, and ask controller to send these notifications.
-  default_display_controller_listener_->SetOnVsyncCallback(
+  // Set up callback to handle Vsync notifications, and ask coordinator to send these notifications.
+  default_display_coordinator_listener_->SetOnVsyncCallback(
       fit::bind_member<&DisplayManager::OnVsync>(this));
-  zx_status_t vsync_status = (*default_display_controller_)->EnableVsync(true);
+  zx_status_t vsync_status = (*default_display_coordinator_)->EnableVsync(true);
   if (vsync_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to enable vsync, status: " << vsync_status;
   }
@@ -63,8 +63,8 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
       if (i_can_haz_display_mode_.has_value()) {
         if (*i_can_haz_display_mode_ < display.modes.size()) {
           mode_idx = *i_can_haz_display_mode_;
-          (*default_display_controller_)->SetDisplayMode(display.id, display.modes[mode_idx]);
-          (*default_display_controller_)->ApplyConfig();
+          (*default_display_coordinator_)->SetDisplayMode(display.id, display.modes[mode_idx]);
+          (*default_display_coordinator_)->ApplyConfig();
         } else {
           FX_LOGS(ERROR) << "Requested display mode=" << *i_can_haz_display_mode_
                          << " doesn't exist for display with id=" << display.id;
@@ -77,7 +77,7 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
       default_display_ = std::make_unique<Display>(
           display.id, mode.horizontal_resolution, mode.vertical_resolution,
           display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats));
-      OnClientOwnershipChange(owns_display_controller_);
+      OnClientOwnershipChange(owns_display_coordinator_);
 
       if (display_available_cb_) {
         display_available_cb_();
@@ -96,7 +96,7 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
 }
 
 void DisplayManager::OnClientOwnershipChange(bool has_ownership) {
-  owns_display_controller_ = has_ownership;
+  owns_display_coordinator_ = has_ownership;
   if (default_display_) {
     if (has_ownership) {
       default_display_->ownership_event().signal(fuchsia::ui::scenic::displayNotOwnedSignal,
@@ -119,7 +119,7 @@ void DisplayManager::OnVsync(uint64_t display_id, uint64_t timestamp,
                              fuchsia::hardware::display::ConfigStamp applied_config_stamp,
                              uint64_t cookie) {
   if (cookie) {
-    (*default_display_controller_)->AcknowledgeVsync(cookie);
+    (*default_display_coordinator_)->AcknowledgeVsync(cookie);
   }
 
   if (vsync_callback_) {

@@ -8,18 +8,18 @@
 
 use {
     fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_hardware_display::{self as display, ControllerMarker, ControllerRequestStream},
+    fidl_fuchsia_hardware_display::{self as display, CoordinatorMarker, CoordinatorRequestStream},
     fuchsia_zircon as zx,
     itertools::Itertools,
     std::collections::HashMap,
     thiserror::Error,
 };
 
-/// Errors that can be returned by `MockController`.
+/// Errors that can be returned by `MockCoordinator`.
 #[derive(Error, Debug)]
-pub enum MockControllerError {
+pub enum MockCoordinatorError {
     /// Duplicate IDs were given to a function that expects objects with unique IDs. For example,
-    /// MockController has been assigned multiple displays with clashing IDs.
+    /// MockCoordinator has been assigned multiple displays with clashing IDs.
     #[error("duplicate IDs provided")]
     DuplicateIds,
 
@@ -28,16 +28,16 @@ pub enum MockControllerError {
     FidlError(#[from] fidl::Error),
 }
 
-/// MockControllerError Result type alias.
-pub type Result<T> = std::result::Result<T, MockControllerError>;
+/// MockCoordinatorError Result type alias.
+pub type Result<T> = std::result::Result<T, MockCoordinatorError>;
 
-/// `MockController` implements the server-end of the `fuchsia.hardware.display.Controller`
-/// protocol. It minimally reproduces the display controller driver state machine to respond to
+/// `MockCoordinator` implements the server-end of the `fuchsia.hardware.display.Coordinator`
+/// protocol. It minimally reproduces the display coordinator driver state machine to respond to
 /// FIDL messages in a predictable and configurable manner.
-pub struct MockController {
+pub struct MockCoordinator {
     #[allow(unused)]
-    stream: ControllerRequestStream,
-    control_handle: <ControllerRequestStream as RequestStream>::ControlHandle,
+    stream: CoordinatorRequestStream,
+    control_handle: <CoordinatorRequestStream as RequestStream>::ControlHandle,
 
     displays: HashMap<DisplayId, display::Info>,
 }
@@ -45,15 +45,15 @@ pub struct MockController {
 #[derive(Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct DisplayId(u64);
 
-impl MockController {
-    /// Bind a new `MockController` to the server end of a FIDL channel.
-    pub fn new(server_end: ServerEnd<ControllerMarker>) -> Result<MockController> {
+impl MockCoordinator {
+    /// Bind a new `MockCoordinator` to the server end of a FIDL channel.
+    pub fn new(server_end: ServerEnd<CoordinatorMarker>) -> Result<MockCoordinator> {
         let (stream, control_handle) = server_end.into_stream_and_control_handle()?;
-        Ok(MockController { stream, control_handle, displays: HashMap::new() })
+        Ok(MockCoordinator { stream, control_handle, displays: HashMap::new() })
     }
 
     /// Replace the list of available display devices with the given collection and send a
-    /// `fuchsia.hardware.display.Controller.OnDisplaysChanged` event reflecting the changes.
+    /// `fuchsia.hardware.display.Coordinator.OnDisplaysChanged` event reflecting the changes.
     ///
     /// All the new displays will be reported as added while previously present displays will
     /// be reported as removed, regardless of their content.
@@ -62,7 +62,7 @@ impl MockController {
     pub fn assign_displays(&mut self, displays: Vec<display::Info>) -> Result<()> {
         let mut added = HashMap::new();
         if !displays.into_iter().all(|info| added.insert(DisplayId(info.id), info).is_none()) {
-            return Err(MockControllerError::DuplicateIds);
+            return Err(MockCoordinatorError::DuplicateIds);
         }
 
         let removed: Vec<u64> = self.displays.iter().map(|(_, info)| info.id).collect();
@@ -80,18 +80,18 @@ impl MockController {
     pub fn emit_vsync_event(&self, display_id: u64, mut stamp: display::ConfigStamp) -> Result<()> {
         self.control_handle
             .send_on_vsync(display_id, zx::Time::get_monotonic().into_nanos() as u64, &mut stamp, 0)
-            .map_err(MockControllerError::from)
+            .map_err(MockCoordinatorError::from)
     }
 }
 
 /// Create a Zircon channel and return both endpoints with the server end bound to a
-/// `MockController`.
+/// `MockCoordinator`.
 ///
 /// NOTE: This function instantiates FIDL bindings and thus requires a fuchsia-async executor to
 /// have been created beforehand.
-pub fn create_proxy_and_mock() -> Result<(display::ControllerProxy, MockController)> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<ControllerMarker>()?;
-    Ok((proxy, MockController::new(server)?))
+pub fn create_proxy_and_mock() -> Result<(display::CoordinatorProxy, MockCoordinator)> {
+    let (proxy, server) = fidl::endpoints::create_proxy::<CoordinatorMarker>()?;
+    Ok((proxy, MockCoordinator::new(server)?))
 }
 
 #[cfg(test)]
@@ -104,15 +104,15 @@ mod tests {
     };
 
     async fn wait_for_displays_changed_event(
-        events: &mut display::ControllerEventStream,
+        events: &mut display::CoordinatorEventStream,
     ) -> Result<(Vec<display::Info>, Vec<u64>)> {
         let mut stream = events.try_filter_map(|event| match event {
-            display::ControllerEvent::OnDisplaysChanged { added, removed } => {
+            display::CoordinatorEvent::OnDisplaysChanged { added, removed } => {
                 future::ok(Some((added, removed)))
             }
             _ => future::ok(None),
         });
-        stream.try_next().await?.context("failed to listen to controller events")
+        stream.try_next().await?.context("failed to listen to coordinator events")
     }
 
     #[fuchsia::test]
@@ -144,7 +144,7 @@ mod tests {
             },
         ];
 
-        let (_proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockController");
+        let (_proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
         let result = mock.assign_displays(displays);
         assert!(result.is_err());
     }
@@ -178,7 +178,7 @@ mod tests {
             },
         ];
 
-        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockController");
+        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
         mock.assign_displays(displays.clone())?;
 
         let mut events = proxy.take_event_stream();
@@ -204,7 +204,7 @@ mod tests {
             using_fallback_size: false,
         }];
 
-        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockController");
+        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
         mock.assign_displays(displays)?;
 
         let mut events = proxy.take_event_stream();

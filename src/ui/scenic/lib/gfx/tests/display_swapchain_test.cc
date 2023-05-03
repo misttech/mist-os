@@ -46,8 +46,8 @@ class DisplaySwapchainTest : public Fixture {
  public:
   std::unique_ptr<DisplaySwapchain> CreateSwapchain(display::Display* display) {
     return std::make_unique<DisplaySwapchain>(
-        sysmem(), display_manager()->default_display_controller(),
-        display_manager()->default_display_controller_listener(), 2, display, escher());
+        sysmem(), display_manager()->default_display_coordinator(),
+        display_manager()->default_display_coordinator_listener(), 2, display, escher());
   }
 
   // |testing::Test|
@@ -62,10 +62,10 @@ class DisplaySwapchainTest : public Fixture {
     sysmem_ = std::make_unique<Sysmem>();
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
-    auto hdc_promise = ui_display::GetHardwareDisplayController();
+    auto hdc_promise = ui_display::GetHardwareDisplayCoordinator();
     executor_->schedule_task(
-        hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
-          display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
+        hdc_promise.then([this](fpromise::result<ui_display::DisplayCoordinatorHandles>& handles) {
+          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value().coordinator));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });

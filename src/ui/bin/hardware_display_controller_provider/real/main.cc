@@ -20,11 +20,11 @@ int main(int argc, const char** argv) {
 
   FX_LOGS(INFO) << "Starting standalone fuchsia.hardware.display.Provider service.";
 
-  ui_display::HardwareDisplayControllerProviderImpl hdcp_service_impl(app_context.get());
+  ui_display::HardwareDisplayCoordinatorProviderImpl hdcp_service_impl(app_context.get());
 
   loop.Run();
 
-  FX_LOGS(INFO) << "Quit HardwareDisplayControllerProvider main loop.";
+  FX_LOGS(INFO) << "Quit HardwareDisplayCoordinatorProvider main loop.";
 
   return 0;
 }

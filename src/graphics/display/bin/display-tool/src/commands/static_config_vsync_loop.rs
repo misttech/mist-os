@@ -7,7 +7,7 @@
 use {
     anyhow::{format_err, Context, Result},
     display_utils::{
-        Controller, DisplayConfig, DisplayInfo, Image, ImageId, Layer, LayerConfig, PixelFormat,
+        Coordinator, DisplayConfig, DisplayInfo, Image, ImageId, Layer, LayerConfig, PixelFormat,
         VsyncEvent,
     },
     futures::StreamExt,
@@ -36,7 +36,7 @@ pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result
     }
 }
 
-pub async fn run<'a>(controller: &Controller, args: Args<'a>) -> Result<()> {
+pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
     // The display driver does not send vsync events to a client unless it successfully applies a
     // display configuration. Build a single full screen layer with a solid color to generate
     // hardware vsync events.
@@ -58,14 +58,15 @@ pub async fn run<'a>(controller: &Controller, args: Args<'a>) -> Result<()> {
         color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
         name: Some("display-tool vsync layer".to_string()),
     };
-    let image = MappedImage::create(Image::create(controller.clone(), ImageId(1), &params).await?)?;
+    let image =
+        MappedImage::create(Image::create(coordinator.clone(), ImageId(1), &params).await?)?;
     let bytes_to_fill = get_bytes_for_rgb_color(color, pixel_format)?;
     image.fill(&bytes_to_fill).context("failed to draw fill color")?;
 
     // Ensure that vsync events are enabled before we issue the first call to ApplyConfig.
-    let mut vsync = controller.add_vsync_listener(Some(display.id()))?;
+    let mut vsync = coordinator.add_vsync_listener(Some(display.id()))?;
 
-    let layer = controller.create_layer().await?;
+    let layer = coordinator.create_layer().await?;
     let configs = vec![DisplayConfig {
         id: display.id(),
         layers: vec![Layer {
@@ -78,7 +79,7 @@ pub async fn run<'a>(controller: &Controller, args: Args<'a>) -> Result<()> {
             },
         }],
     }];
-    controller.apply_config(&configs).await?;
+    coordinator.apply_config(&configs).await?;
 
     // Start sampling vsync frequency.
     let mut counter = Counter::new();

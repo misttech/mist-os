@@ -17,17 +17,17 @@ namespace scenic_impl {
 namespace display {
 namespace test {
 
-class MockDisplayController;
+class MockDisplayCoordinator;
 
-struct DisplayControllerObjects {
-  std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> interface_ptr;
-  std::unique_ptr<MockDisplayController> mock;
-  std::unique_ptr<DisplayControllerListener> listener;
+struct DisplayCoordinatorObjects {
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> interface_ptr;
+  std::unique_ptr<MockDisplayCoordinator> mock;
+  std::unique_ptr<DisplayCoordinatorListener> listener;
 };
 
-DisplayControllerObjects CreateMockDisplayController();
+DisplayCoordinatorObjects CreateMockDisplayCoordinator();
 
-class MockDisplayController : public fuchsia::hardware::display::testing::Controller_TestBase {
+class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
  public:
   using CheckConfigFn =
       std::function<void(bool, fuchsia::hardware::display::ConfigResult*,
@@ -42,15 +42,15 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
       std::function<void(uint64_t, fuchsia::hardware::display::Transform,
                          fuchsia::hardware::display::Frame, fuchsia::hardware::display::Frame)>;
 
-  MockDisplayController() : binding_(this) {}
+  MockDisplayCoordinator() : binding_(this) {}
 
   void NotImplemented_(const std::string& name) final {}
 
   void WaitForMessage() { binding_.WaitForMessage(); }
 
-  void Bind(zx::channel controller_channel, async_dispatcher_t* dispatcher = nullptr) {
-    binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Controller>(
-                      std::move(controller_channel)),
+  void Bind(zx::channel coordinator_channel, async_dispatcher_t* dispatcher = nullptr) {
+    binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator>(
+                      std::move(coordinator_channel)),
                   dispatcher);
   }
 
@@ -85,8 +85,8 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
   }
 
   void SetMinimumRgb(uint8_t minimum, SetMinimumRgbCallback callback) override {
-    auto result = fuchsia::hardware::display::Controller_SetMinimumRgb_Result::WithResponse(
-        fuchsia::hardware::display::Controller_SetMinimumRgb_Response());
+    auto result = fuchsia::hardware::display::Coordinator_SetMinimumRgb_Result::WithResponse(
+        fuchsia::hardware::display::Coordinator_SetMinimumRgb_Response());
     ++set_minimum_rgb_count_;
     if (set_minimum_rgb_fn_) {
       set_minimum_rgb_fn_(minimum);
@@ -151,7 +151,7 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
 
   void SetDisplayPower(uint64_t display_id, bool power_on,
                        SetDisplayPowerCallback callback) override {
-    using SetDisplayPowerResult = fuchsia::hardware::display::Controller_SetDisplayPower_Result;
+    using SetDisplayPowerResult = fuchsia::hardware::display::Coordinator_SetDisplayPower_Result;
     auto result = set_display_power_result_;
     if (result == ZX_OK) {
       display_power_on_ = power_on;
@@ -163,9 +163,9 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
 
   EventSender_& events() { return binding_.events(); }
 
-  void ResetControllerBinding() { binding_.Close(ZX_ERR_INTERNAL); }
+  void ResetCoordinatorBinding() { binding_.Close(ZX_ERR_INTERNAL); }
 
-  fidl::Binding<fuchsia::hardware::display::Controller>& binding() { return binding_; }
+  fidl::Binding<fuchsia::hardware::display::Coordinator>& binding() { return binding_; }
 
   // Number of times each function has been called.
   uint32_t check_config_count() const { return check_config_count_; }
@@ -197,7 +197,7 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
   zx_status_t set_display_power_result_ = ZX_OK;
   bool display_power_on_ = true;
 
-  fidl::Binding<fuchsia::hardware::display::Controller> binding_;
+  fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
 };
 
 }  // namespace test

@@ -71,7 +71,7 @@ class CoreDisplayTest : public zxtest::Test {
 
   fdio_cpp::FdioCaller caller_;
 
-  fidl::WireSyncClient<fhd::Controller> dc_client_;
+  fidl::WireSyncClient<fhd::Coordinator> dc_client_;
   fidl::WireSyncClient<sysinfo::SysInfo> sysinfo_;
   fidl::WireSyncClient<sysmem::Allocator> sysmem_allocator_;
   zx::event client_event_;
@@ -84,7 +84,7 @@ class CoreDisplayTest : public zxtest::Test {
 };
 
 void CoreDisplayTest::SetUp() {
-  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Controller>();
+  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
   ASSERT_TRUE(dc_endpoints.is_ok(), "%s", dc_endpoints.status_string());
 
   fbl::unique_fd fd;
@@ -93,31 +93,31 @@ void CoreDisplayTest::SetUp() {
   caller_.reset(std::move(fd));
 
   const fidl::WireResult result = fidl::WireCall(caller_.borrow_as<fhd::Provider>())
-                                      ->OpenController(std::move(dc_endpoints->server));
+                                      ->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
   ASSERT_TRUE(result.ok(), "%s", result.status_string());
   const fidl::WireResponse response = result.value();
   ASSERT_OK(response.s);
 
   dc_client_ = fidl::WireSyncClient(std::move(dc_endpoints->client));
 
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Controller> {
+  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
    public:
     EventHandler() = default;
 
     bool has_display() const { return has_display_; }
     const fbl::Vector<fhd::wire::Info>& displays_tmp() const { return displays_tmp_; }
 
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
+    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
       for (unsigned i = 0; i < event->added.count(); i++) {
         displays_tmp_.push_back(std::move(event->added[i]));
       }
       has_display_ = true;
     }
 
-    void OnVsync(fidl::WireEvent<fhd::Controller::OnVsync>* event) override {}
+    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {}
 
     void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Controller::OnClientOwnershipChange>* event) override {}
+        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {}
 
    private:
     bool has_display_ = false;
@@ -169,7 +169,7 @@ void CoreDisplayTest::CreateToken() {
 }
 
 void CoreDisplayTest::DuplicateAndImportToken() {
-  // Duplicate the token, to be passed to the display controller
+  // Duplicate the token, to be passed to the display coordinator
   zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(endpoints.is_ok(), "%s", endpoints.status_string());
 
@@ -199,7 +199,7 @@ void CoreDisplayTest::SetBufferConstraints() {
 }
 
 void CoreDisplayTest::FinalizeClientConstraints() {
-  // now that we have provided all that's needed to the display controllers, we can
+  // now that we have provided all that's needed to the display coordinators, we can
   // return our token, set our own constraints and for allocation
   // Before that, we need to create a channel to communicate with the buffer collection
   zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
@@ -313,11 +313,11 @@ void CoreDisplayTest::CaptureSetup() {
 }
 
 TEST_F(CoreDisplayTest, CoreDisplayAlreadyBoundTest) {
-  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Controller>();
+  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
   ASSERT_TRUE(dc_endpoints.is_ok(), "%s", dc_endpoints.status_string());
 
   const fidl::WireResult result = fidl::WireCall(caller_.borrow_as<fhd::Provider>())
-                                      ->OpenController(std::move(dc_endpoints->server));
+                                      ->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
   ASSERT_TRUE(result.ok(), "%s", result.status_string());
   const fidl::WireResponse response = result.value();
   ASSERT_STATUS(response.s, ZX_ERR_ALREADY_BOUND);

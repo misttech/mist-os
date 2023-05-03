@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     argh::FromArgs,
-    display_utils::{Controller, PixelFormat},
+    display_utils::{Coordinator, PixelFormat},
     fuchsia_async as fasync, fuchsia_trace_provider,
     futures::{
         future::{FutureExt, TryFutureExt},
@@ -98,19 +98,21 @@ async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let args: Args = argh::from_env();
-    let controller = Controller::init().await?;
+    let coordinator = Coordinator::init().await?;
 
-    let fidl_events_future = controller.handle_events().err_into();
+    let fidl_events_future = coordinator.handle_events().err_into();
     let cmd_future = async {
         match args.cmd {
-            SubCommands::Info(args) => commands::show_display_info(&controller, args.id, args.fidl),
+            SubCommands::Info(args) => {
+                commands::show_display_info(&coordinator, args.id, args.fidl)
+            }
             SubCommands::Vsync(args) => {
-                commands::vsync(&controller, args.id, args.color, args.pixel_format).await
+                commands::vsync(&coordinator, args.id, args.color, args.pixel_format).await
             }
             SubCommands::Color(args) => {
-                commands::color(&controller, args.id, args.color, args.pixel_format).await
+                commands::color(&coordinator, args.id, args.color, args.pixel_format).await
             }
-            SubCommands::Squares(args) => commands::squares(&controller, args.id).await,
+            SubCommands::Squares(args) => commands::squares(&coordinator, args.id).await,
         }
     };
 

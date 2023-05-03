@@ -1390,12 +1390,12 @@ void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
   zxlogf(TRACE, "Cookie %ld Acked\n", request->cookie);
 }
 
-fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Controller>, zx_status_t>
-Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end) {
+fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t>
+Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
   running_ = true;
 
   fidl::OnUnboundFn<Client> cb = [](Client* client, fidl::UnbindInfo info,
-                                    fidl::ServerEnd<fuchsia_hardware_display::Controller> ch) {
+                                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
     sync_completion_signal(client->fidl_unbound());
     // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
     client->TearDown();
@@ -1446,7 +1446,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t 
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {}
 
 Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t client_id,
-               fidl::ServerEnd<fhd::Controller> server_end)
+               fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
       proxy_(proxy),
       is_vc_(is_vc),
@@ -1705,7 +1705,7 @@ void ClientProxy::CloseOnControllerLoop() {
 }
 
 zx_status_t ClientProxy::Init(inspect::Node* parent_node,
-                              fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end) {
+                              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
   node_ = parent_node->CreateChild(fbl::StringPrintf("client-%d", handler_.id()).c_str());
   node_.CreateBool("primary", !is_vc_, &static_properties_);
   is_owner_property_ = node_.CreateBool("is_owner", false);
@@ -1730,7 +1730,7 @@ ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
 }
 
 ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
-                         fidl::ServerEnd<fhd::Controller> server_end)
+                         fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
       is_vc_(is_vc),
       handler_(controller_, this, is_vc_, client_id, std::move(server_end)) {

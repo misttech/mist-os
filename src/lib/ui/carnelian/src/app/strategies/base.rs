@@ -6,7 +6,7 @@ use crate::{
     app::{
         strategies::{
             framebuffer::{
-                first_display_device_path, DisplayController, DisplayDirectAppStrategy, DisplayId,
+                first_display_device_path, DisplayCoordinator, DisplayDirectAppStrategy, DisplayId,
             },
             scenic::ScenicAppStrategy,
         },
@@ -77,10 +77,10 @@ pub(crate) trait AppStrategy {
         _device_descriptor: &hid_input_report::DeviceDescriptor,
     ) {
     }
-    async fn handle_new_display_controller(&mut self, _display_path: PathBuf) {}
-    async fn handle_display_controller_event(
+    async fn handle_new_display_coordinator(&mut self, _display_path: PathBuf) {}
+    async fn handle_display_coordinator_event(
         &mut self,
-        _event: fidl_fuchsia_hardware_display::ControllerEvent,
+        _event: fidl_fuchsia_hardware_display::CoordinatorEvent,
     ) {
     }
     fn set_virtcon_mode(&mut self, _virtcon_mode: VirtconMode) {}
@@ -110,12 +110,12 @@ fn make_scenic_app_strategy() -> Result<AppStrategyPtr, Error> {
 }
 
 fn make_direct_app_strategy(
-    display_controller: Option<DisplayController>,
+    display_coordinator: Option<DisplayCoordinator>,
     app_config: &Config,
     internal_sender: InternalSender,
 ) -> Result<AppStrategyPtr, Error> {
     let strat = DisplayDirectAppStrategy::new(
-        display_controller,
+        display_coordinator,
         select_keymap(&app_config.keymap_name),
         internal_sender,
         &app_config,
@@ -130,9 +130,9 @@ pub(crate) async fn create_app_strategy(
     let app_config = Config::get();
     match app_config.view_mode {
         ViewMode::Auto => {
-            // Tries to open the display controller. If that fails, assume we want to run as hosted.
-            let display_controller = if let Some(path) = first_display_device_path() {
-                DisplayController::open(
+            // Tries to open the display coordinator. If that fails, assume we want to run as hosted.
+            let display_coordinator = if let Some(path) = first_display_device_path() {
+                DisplayCoordinator::open(
                     path.to_str().unwrap(),
                     &app_config.virtcon_mode,
                     &internal_sender,
@@ -142,14 +142,14 @@ pub(crate) async fn create_app_strategy(
             } else {
                 None
             };
-            if display_controller.is_none() {
+            if display_coordinator.is_none() {
                 make_scenic_app_strategy()
             } else {
-                make_direct_app_strategy(display_controller, app_config, internal_sender.clone())
+                make_direct_app_strategy(display_coordinator, app_config, internal_sender.clone())
             }
         }
         ViewMode::Direct => {
-            DisplayController::watch_displays(internal_sender.clone()).await;
+            DisplayCoordinator::watch_displays(internal_sender.clone()).await;
             make_direct_app_strategy(None, app_config, internal_sender.clone())
         }
         ViewMode::Hosted => make_scenic_app_strategy(),
