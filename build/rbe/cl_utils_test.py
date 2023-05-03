@@ -551,7 +551,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             src = Path(td) / 'src.link'
             # note: dest does not actually exist
             with open(src, 'w') as f:
-              f.write('\t\n')
+                f.write('\t\n')
             cl_utils.symlink_relative(dest, src)  # overwrite file
             self.assertTrue(src.is_symlink())
             self.assertEqual(_readlink(src), 'dest.txt')  # relative
@@ -569,6 +569,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertEqual(_readlink(src), 'dest.txt')  # relative
             # Need dest.resolve() on Mac OS where tempdirs can be symlinks
             self.assertEqual(src.resolve(), dest.resolve())
+
 
 class ExecRelaunchTests(unittest.TestCase):
 

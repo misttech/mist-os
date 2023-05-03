@@ -35,7 +35,7 @@ _COMMENT_RE = re.compile(r'#[^\n]*')
 
 
 def _lex_line(line: str) -> Iterable[Token]:
-    prev : Token = None
+    prev: Token = None
     while line:  # is not empty
         next_char = line[0]
 
@@ -96,6 +96,7 @@ def _lex_line(line: str) -> Iterable[Token]:
 
     if prev:
         yield prev
+
 
 def lex(lines: Iterable[str]) -> Iterable[Token]:
     """Divides depfile text into tokens."""
