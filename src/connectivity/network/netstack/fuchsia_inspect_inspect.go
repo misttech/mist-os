@@ -192,7 +192,7 @@ func (_ *configDataInspectImpl) GetChild(_ string) inspectInner {
 // statCounter enables *tcpip.StatCounters and other types in this
 // package to be accessed via the same interface.
 type statCounter interface {
-	Value(...string) uint64
+	Value() uint64
 }
 
 var _ statCounter = (*tcpip.StatCounter)(nil)
