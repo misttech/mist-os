@@ -35,8 +35,9 @@ String validRepoName(String originalName) {
   return originalName.replaceAll(RegExp(r'(?![a-z0-9-]).'), '-');
 }
 
-Future<String> formattedHostAddress(sl4f.Sl4f sl4fDriver) async {
+Future<String> formattedHostAddress(sl4f.Sl4f sl4fDriver, Logger log) async {
   final output = await sl4fDriver.ssh.run('echo \$SSH_CONNECTION');
+  log.info('\$SSH_CONNECTION response: ${output.stdout.toString()}');
   final hostAddress =
       output.stdout.toString().split(' ')[0].replaceAll('%', '%25');
   return '[$hostAddress]';
@@ -57,7 +58,7 @@ void main() {
       ..onRecord.listen((rec) => print('[${rec.level}]: ${rec.message}'));
     sl4fDriver = sl4f.Sl4f.fromEnvironment();
 
-    hostAddress = await formattedHostAddress(sl4fDriver);
+    hostAddress = await formattedHostAddress(sl4fDriver, log);
 
     // Extract the `package.tar`.
     final packageTarPath =
