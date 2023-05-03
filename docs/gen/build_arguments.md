@@ -424,6 +424,15 @@ From //boards/x64.gni:17
 
 From //build/images/filesystem_limits.gni:15
 
+### blobfs_enable_streaming_writes
+
+TODO(bcastell): Streaming writes is now enabled by default. Remove this argument when out of
+tree users don't set this anymore.
+
+**Current value (from the default):** `true`
+
+From //src/storage/blobfs/BUILD.gn:11
+
 ### blobfs_maximum_runtime_bytes
 
 blobfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
