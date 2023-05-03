@@ -4,12 +4,9 @@
 
 """Python toolchain definition for our prebuilt Python3 executable."""
 
-load("@//:fuchsia_build_config.bzl", "build_config")
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
 
 package(default_visibility = ["//visibility:public"])
-
-_python3_interpreter_path = "external/{repository_dir}/{python_launcher}"
 
 filegroup(
     name = "runtime_files",
@@ -36,9 +33,29 @@ py_runtime(
 # NOTE: `exec` is necessary here because when used as a launcher script, we want
 # the script to stop at this line, instead of continuing the rest of the
 # launcher script, which are in Python, not bash.
+#
+# For a py_binary() target in //src:foo, Bazel generates several things under
+# the $BAZEL_BIN directory:
+#
+#   - $BAZEL_BIN/foo, a "middle-man" python script that will setup the environment
+#     before calling the actual Python interpreter with the real script path
+#     as argument.
+#
+#   - $BAZEL_BIN/foo.runfiles/, a directory containing symlinks to all files that
+#     are needed to run the script.
+#
+#   - $BAZEL_BIN/foo.runfiles/<python_repository_name>/, a directory that contains
+#     symlinks to the compact runtime files.
+#
+#   - $BAZEL_BIN/src/foo, a symlink to $BAZEL_BIN/foo, which is the actual path
+#     that Bazel will invoke when running this script in certain cases, but not
+#     all of them (why is still a mystery).
+#
+# The use of readlink below is necessary to always get the path of the middle-man
+# script, which in turns allows finding the right runfiles directory.
 
-"exec" "$0.runfiles/main/%s" "$0" "$@"
-""" % _python3_interpreter_path,
+"exec" "$(readlink $0 || echo $0).runfiles/{repository_dir}/{python_launcher}" "$0" "$@"
+""",
 )
 
 py_runtime_pair(
@@ -49,12 +66,12 @@ py_runtime_pair(
 toolchain(
     name = "py_toolchain",
     exec_compatible_with = [
-        build_config.host_platform_os_constraint,
-        build_config.host_platform_cpu_constraint,
+        "{host_platform_os_constraint}",
+        "{host_platform_cpu_constraint}",
     ],
     target_compatible_with = [
-        build_config.host_platform_os_constraint,
-        build_config.host_platform_cpu_constraint,
+        "{host_platform_os_constraint}",
+        "{host_platform_cpu_constraint}",
     ],
     toolchain = ":runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",

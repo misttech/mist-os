@@ -10,22 +10,56 @@ to drastically limit the number of files exposed in Bazel sandboxes. From 4940 t
 To do so requires the following:
 
 1) A zip archive that contains all files from <python_prefix>/lib/python<version>/,
-   named "lib_python.zip" in this repository.
+   named "lib_python<version>.zip" in this repository.
 
 2) A symlink to the real python interpreter, named "python3-real" in the repository.
 
-3) A wrapper script that sets PYTHONPATH to point to lib_python.zip directly,
+3) A wrapper script that sets PYTHONPATH to point to lib_python<version>.zip directly,
    and invokes python3-real with the -S flag (to avoid reading site-specific
    module installs).
 
-None of the definitions here are Fuchsia specific.
+Example usage:
+
+  # WORKSPACE.bazel
+
+  workspace(name = "my_project")
+
+  ...
+
+  # Load the repository rule. Ntoe that this requires @rules_python to already be loaded.
+  load("//path/to:this/repository_rule.bzl", "compact_python_runtime_repository")
+
+  # Create the repository for the compact python runtime.
+  compact_python_runtime_repository(
+    name = "compact_python"
+  )
+
+  # Register the python runtime, it is always named `py_toolchain`.
+  register_toolchains("@compact_python//:py_toolchain")
+
 """
+
+def _make_path_from_str(repo_ctx, path_str):
+    if not path_str.startswith("/"):
+        path_str = "%s/%s" % (repo_ctx.workspace_root, path_str)
+    return repo_ctx.path(path_str)
 
 def _compact_python_runtime_impl(repo_ctx):
     repo_ctx.file("WORKSPACE.bzl", "")
 
-    project_root = str(repo_ctx.workspace_root) + "/"
-    python_binpath = repo_ctx.path(project_root + repo_ctx.attr.interpreter_path).dirname
+    # Find the python/bin/ path.
+    python_interpreter_path = repo_ctx.attr.interpreter_path
+    if not python_interpreter_path:
+        python_interpreter = repo_ctx.which("python3")
+        if not python_interpreter:
+            fail("There is no python3 interpreter in your PATH! Set python_interpreter_path " +
+                 "when calling this repository rule to point to an existing one.")
+    else:
+        python_interpreter = _make_path_from_str(repo_ctx, python_interpreter_path)
+        if not python_interpreter.exists:
+            fail("Python3 interpreter does not exist: %s" % python_interpreter)
+
+    python_binpath = python_interpreter.dirname
 
     # Detect which Python version is supported by this installation.
     python_version = None
@@ -43,12 +77,12 @@ def _compact_python_runtime_impl(repo_ctx):
     if not python_version:
         fail("Could not find Python version from: %s" % python_binpath)
 
-    # Ensure this repository rule is re-run everytime the python<version>
-    # file changes. This should be enough to avoid incremental issues when
-    # switching between the regular and compact toolchain in the Fuchsia
-    # Jiri manifest.
-    python_binpath_rel = str(python_binpath)[len(project_root):]
-    repo_ctx.path(Label("//:%s/python%s" % (python_binpath_rel, python_version)))
+    if repo_ctx.attr.interpreter_path and not repo_ctx.attr.interpreter_path.startswith("/"):
+        # Ensure this repository rule is re-run everytime the python<version>
+        # file changes. This should be enough to avoid incremental issues when
+        # switching between the regular and compact toolchain in the Fuchsia
+        # Jiri manifest.
+        repo_ctx.path(Label("@//:%s" % (repo_ctx.attr.interpreter_path)))
 
     # Create symlink to include directory.
     repo_ctx.symlink(python_binpath.dirname.get_child("include"), "include")
@@ -78,33 +112,41 @@ def _compact_python_runtime_impl(repo_ctx):
     else:
         # Create a symlink to the real interpreter.
         python3_real = "python%s-real" % python_version
-        repo_ctx.symlink(project_root + repo_ctx.attr.interpreter_path, python3_real)
+        repo_ctx.symlink(python_interpreter, python3_real)
+
+        lib_python_zip = "lib_python%s.zip" % python_version
 
         # Either symlink or create a zip archive that contains the content of
         # <python_install_dir>/lib/python<version>/
-        lib_python_zip = "lib_python%s.zip" % python_version
         if repo_ctx.attr.lib_python_zip:
             if repo_ctx.attr.lib_python_path:
                 fail("Only one of lib_python_zip or lib_python_path can be defined!")
-            repo_ctx.symlink(project_root + repo_ctx.attr.lib_python_zip, lib_python_zip)
-        elif repo_ctx.attr.lib_python_path:
+            lib_python_zip_path = _make_path_from_str(repo_ctx, repo_ctx.attr.lib_python_zip)
+            repo_ctx.symlink(lib_python_zip_path, lib_python_zip)
+        else:
+            if repo_ctx.attr.lib_python_path:
+                lib_python_path = _make_path_from_str(repo_ctx, repo_ctx.attr.lib_python_path)
+            else:
+                lib_python_path = python_binpath.dirname.get_child("lib").get_child("python%s" % python_version)
+            if not lib_python_path.exists:
+                fail("Missing python library path: %s" % lib_python_path)
+
             # Create the zip archive using a custom Python script, since this is
             # more portable than relying on a host `zip` tool being available.
             # On Linux, this is slightly slower than using the host zip command
             # (i.e. 0.77s vs 0.483s).
-            zip_directory_script = repo_ctx.path(project_root + "build/bazel/scripts/zip-directory.py")
+            zip_directory_script = repo_ctx.path(Label("//:build/bazel/scripts/zip-directory.py"))
             ret = repo_ctx.execute(
                 [
+                    str(python_interpreter),
                     str(zip_directory_script),
-                    str(repo_ctx.path(lib_python_zip)),
-                    project_root + repo_ctx.attr.lib_python_path,
+                    str(lib_python_zip),
+                    str(lib_python_path),
                 ],
                 quiet = False,  # False for debugging!
             )
             if ret.return_code != 0:
                 fail("Could not create python library zip archive!: %s" % ret.stderr)
-        else:
-            fail("One of lib_python_zip or lib_python_path must be defined.")
 
         # Create a launcher shell script named 'python3' that invokes 'python3-real'
         #
@@ -127,44 +169,70 @@ def _compact_python_runtime_impl(repo_ctx):
         python3_launcher = "python" + python_version
         repo_ctx.file(
             python3_launcher,
-            content = '''#!/bin/bash
-    # AUTO-GENERATED - DO NOT EDIT
-    readonly _SCRIPT_DIR="$(dirname "${{BASH_SOURCE[0]}}")"
-    PYTHONHOME="${{_SCRIPT_DIR}}" \\
-    PYTHONPATH="${{_SCRIPT_DIR}}/{lib_python_zip}:${{PYTHONPATH}}" \\
-    exec "${{_SCRIPT_DIR}}/{python3_real}" -S -s "$@"
-    '''.format(python3_real = python3_real, lib_python_zip = lib_python_zip),
+            content = '''\
+#!/bin/bash
+# AUTO-GENERATED - DO NOT EDIT
+readonly _SCRIPT_DIR="$(dirname "${{BASH_SOURCE[0]}}")"
+PYTHONHOME="${{_SCRIPT_DIR}}" \\
+PYTHONPATH="${{_SCRIPT_DIR}}/{lib_python_zip}:${{PYTHONPATH}}" \\
+exec "${{_SCRIPT_DIR}}/{python3_real}" -S -s "$@"
+'''.format(python3_real = python3_real, lib_python_zip = lib_python_zip),
             executable = True,
         )
 
         python_runtime_files = [python3_launcher, python3_real, lib_python_zip]
 
-    # Create targets to be used in a py_runtime() declaration.
+    _CPU_MAP = {
+        "amd64": "x86_64",
+    }
+    host_os = repo_ctx.os.name
+    host_cpu = repo_ctx.os.arch
+    host_cpu = _CPU_MAP.get(host_cpu, host_cpu)
+
     repo_ctx.template(
         "BUILD.bazel",
-        project_root + "build/bazel/toolchains/python/template.BUILD.bazel",
+        str(repo_ctx.path(Label("//:build/bazel/toolchains/python/template.BUILD.bazel"))),
         substitutions = {
             "{python_launcher}": python3_launcher,
             "{python_runtime_files}": str(python_runtime_files),
             "{repository_dir}": repo_ctx.attr.name,
+            "{host_platform_os_constraint}": "@platforms//os:" + host_os,
+            "{host_platform_cpu_constraint}": "@platforms//cpu:" + host_cpu,
         },
     )
 
 compact_python_runtime_repository = repository_rule(
     implementation = _compact_python_runtime_impl,
+    doc = """\
+Generate a repository directory that contains a very compact Python
+toolchain installation. This considerably speeds up invocation of
+any py_binary() script.
+
+A regular toolchain requires adding 5000+ files to each sandbox every
+time a py_binary() is invoked. The compact toolchain avoids that by
+creating a zip archive containing all standard modules and ensuring
+the interpreter uses it at runtime. This reduces the number of files
+to add to the sandbox to only 3.""",
     attrs = {
         "interpreter_path": attr.string(
-            doc = "Path to the Python interpreter, relative to project root.",
-            mandatory = True,
-        ),
-        "lib_python_path": attr.string(
-            doc = "Path to the lib/python<version> directory, relative to project root." +
-                  "Incompatible with lib_python_zip. Either one is required.",
+            doc = """\
+Path to the Python interpreter program, either absolute, or relative
+to the project root. If not provided, the python3 in PATH will be
+used instead.""",
         ),
         "lib_python_zip": attr.string(
-            doc = "Path to prebuilt lib_python.zip archive, relative to project root." +
-                  "Incompatible with lib_python_path. Either one is required. For best " +
-                  "build performance, do not use compression.",
+            doc = """\
+Path to an existing python library zip archive, absolute or relative
+to the project root directory. If not provided, a zip archive is
+created automatically containing all individual standard library
+modules. Setting this is incompatible with lib_python_path.""",
+        ),
+        "lib_python_path": attr.string(
+            doc = """\
+Path to an existing python library directory, absolute or relative
+to the project root directory. If not provided, this is auto-detected
+from the interpreter path location. Setting this is incompatible
+with lib_python_zip.""",
         ),
     },
 )
