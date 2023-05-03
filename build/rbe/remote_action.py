@@ -582,6 +582,10 @@ _RBE_DOWNLOAD_STUB_IDENTIFIER = '# RBE download stub'
 
 _RBE_DOWNLOAD_STUB_SUFFIX = '.dl-stub'
 
+# Filesystem extended attribute for digests.
+# This should match the 'xattr_hash' value in build/rbe/fuchsia-reproxy.cfg.
+_RBE_XATTR_NAME = 'user.fuchsia.rbe.digest.sha256'
+
 
 class DownloadStubFormatError(Exception):
 
@@ -605,6 +609,10 @@ class DownloadStubInfo(object):
         self._blob_digest = blob_digest
         self._action_digest = action_digest
         self._build_id = build_id
+
+    @property
+    def blob_digest(self) -> str:
+        return self._blob_digest
 
     def __eq__(self, other) -> bool:
         return self._path == other._path and \
@@ -723,6 +731,12 @@ def _write_download_stub(
     """
     stub_info = log_record.make_download_stub_info(path, build_id)
     stub_info.create(working_dir_abs)
+    # Signal to the next reproxy invocation that the object already
+    # exists in the CAS and does not need to be uploaded.
+    # TODO(http://fxbug.dev/123178): use xattr package for portability
+    if hasattr(os, 'setxattr'):  # not available on all platforms
+        os.setxattr(
+            path, _RBE_XATTR_NAME, stub_info.blob_digest, follow_symlinks=False)
 
 
 def get_download_stub_file(path: Path) -> Optional[Path]:

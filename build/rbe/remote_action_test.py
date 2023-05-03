@@ -21,6 +21,8 @@ import output_leak_scanner
 
 from typing import Any, Sequence
 
+_HAVE_XATTR = hasattr(os, 'setxattr')
+
 
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
@@ -1635,12 +1637,15 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'xyzzy'
-            remote_action.make_download_stubs(
-                files=[p],
-                dirs=[],
-                working_dir_abs=tdp,
-                rrpl=rrpl,
-                build_id=build_id)
+            mock_setxattr = mock.patch.object(
+                os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext()
+            with mock_setxattr:
+                remote_action.make_download_stubs(
+                    files=[p],
+                    dirs=[],
+                    working_dir_abs=tdp,
+                    rrpl=rrpl,
+                    build_id=build_id)
 
             link = tdp / p
             self.assertTrue(link.is_symlink())
@@ -1684,12 +1689,15 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'yzzyx'
-            remote_action.make_download_stubs(
-                files=[],
-                dirs=[p],
-                working_dir_abs=tdp,
-                rrpl=rrpl,
-                build_id=build_id)
+            mock_setxattr = mock.patch.object(
+                os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext()
+            with mock_setxattr:
+                remote_action.make_download_stubs(
+                    files=[],
+                    dirs=[p],
+                    working_dir_abs=tdp,
+                    rrpl=rrpl,
+                    build_id=build_id)
 
             link = tdp / p
             self.assertTrue(link.is_symlink())
