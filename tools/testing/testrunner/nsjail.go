@@ -99,9 +99,7 @@ func (n *NsJailCmdBuilder) ForwardEnv(overrides map[string]string) {
 		n.Env = make(map[string]string)
 	}
 	for _, pair := range os.Environ() {
-		elems := strings.Split(pair, "=")
-		key := elems[0]
-		val := elems[1]
+		key, val, _ := strings.Cut(pair, "=")
 		n.Env[key] = val
 	}
 	for key, val := range overrides {

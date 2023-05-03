@@ -121,6 +121,7 @@ func TestBuild(t *testing.T) {
 			cmdBuilder: &NsJailCmdBuilder{
 				Bin: "/path/to/nsjail",
 				Env: map[string]string{
+					"FOO":  "bar=baz",
 					"TEST": "test",
 				},
 			},
@@ -128,7 +129,7 @@ func TestBuild(t *testing.T) {
 			want: append(
 				cmdStart,
 				"--disable_clone_newnet",
-				"--env", "TEST=test",
+				"--env", "FOO=bar=baz", "--env", "TEST=test",
 				"--",
 				"/foo/bar",
 			),
