@@ -77,10 +77,12 @@ class FileMatchTests(unittest.TestCase):
 class DetailDiffTests(unittest.TestCase):
 
     def test_called(self):
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(0)) as mock_call:
             self.assertEqual(
                 remote_action._detail_diff(
-                    Path('file1.txt'), Path('file2.txt')), 0)
+                    Path('file1.txt'), Path('file2.txt')).returncode, 0)
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
         args, unused_kwargs = first_call
@@ -96,12 +98,14 @@ class DetailDiffTests(unittest.TestCase):
             # Pretend we wrote filtered views to filtered1 and filtered2.
             return True
 
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(0)) as mock_call:
             self.assertEqual(
                 remote_action._detail_diff_filtered(
                     Path('file1.txt'),
                     Path('file2.txt'),
-                    maybe_transform_pair=_filter_for_compare), 0)
+                    maybe_transform_pair=_filter_for_compare).returncode, 0)
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
         args, unused_kwargs = first_call
@@ -115,9 +119,11 @@ class DetailDiffTests(unittest.TestCase):
 class TextDiffTests(unittest.TestCase):
 
     def test_called(self):
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        result = cl_utils.SubprocessResult(0)
+        with mock.patch.object(cl_utils, 'subprocess_call',
+                               return_value=result) as mock_call:
             self.assertEqual(
-                remote_action._text_diff('file1.txt', 'file2.txt'), 0)
+                remote_action._text_diff('file1.txt', 'file2.txt'), result)
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
         args, unused_kwargs = first_call
@@ -132,7 +138,9 @@ class TextDiffTests(unittest.TestCase):
             contents = 'The quick brown fox\njumped over the lazy\ndogs.\n'
             _write_file_contents(f1, contents)
             _write_file_contents(f2, contents)
-            self.assertEqual(remote_action._text_diff(f1, f2), 0)
+            result = remote_action._text_diff(f1, f2)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, [])
 
     def test_not_matches(self):  # no mocking
         with tempfile.TemporaryDirectory() as td:
@@ -141,7 +149,9 @@ class TextDiffTests(unittest.TestCase):
             contents = 'The quick brown fox\njumped over the lazy\ndogs.\n'
             _write_file_contents(f1, contents)
             _write_file_contents(f2, contents.replace('m', 'M'))
-            self.assertEqual(remote_action._text_diff(f1, f2), 1)
+            result = remote_action._text_diff(f1, f2)
+            self.assertEqual(result.returncode, 1)
+            self.assertNotEqual(result.stdout, [])
 
 
 class FilesUnderDirTests(unittest.TestCase):
@@ -800,11 +810,11 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             _write_file_contents(remote_trace, remote_trace_contents)
             diff_text = io.StringIO()
             with contextlib.redirect_stdout(diff_text):
-                exit_code = action._compare_fsatraces_select_logs(
+                status = action._compare_fsatraces_select_logs(
                     local_trace=local_trace,
                     remote_trace=remote_trace,
                 )
-        self.assertEqual(exit_code, 0)  # contents are equivalent
+        self.assertEqual(status.returncode, 0)  # contents are equivalent
 
     def test_compare_fsatraces_with_difference(self):
         exec_root = Path('/home/project')
@@ -835,11 +845,11 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             _write_file_contents(remote_trace, remote_trace_contents)
             diff_text = io.StringIO()
             with contextlib.redirect_stdout(diff_text):
-                exit_code = action._compare_fsatraces_select_logs(
+                result = action._compare_fsatraces_select_logs(
                     local_trace=local_trace,
                     remote_trace=remote_trace,
                 )
-        self.assertEqual(exit_code, 1)  # traces differ
+        self.assertEqual(result.returncode, 1)  # traces differ
 
     def test_local_remote_compare_no_diffs_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
@@ -988,8 +998,10 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
                                        '_run_maybe_remotely',
                                        return_value=cl_utils.SubprocessResult(
                                            0)) as mock_remote_launch:
-                    with mock.patch.object(remote_action, '_text_diff',
-                                           return_value=0) as mock_trace_diff:
+                    with mock.patch.object(
+                            remote_action, '_text_diff',
+                            return_value=cl_utils.SubprocessResult(
+                                0)) as mock_trace_diff:
                         exit_code = action.run_with_main_args(main_args)
 
         remote_command = action.launch_command

@@ -90,14 +90,16 @@ def _files_match(file1: Path, file2: Path) -> bool:
 
 
 def _detail_diff(
-        file1: Path, file2: Path, project_root_rel: Path = None) -> int:
+        file1: Path,
+        file2: Path,
+        project_root_rel: Path = None) -> cl_utils.SubprocessResult:
     command = [
         _path_or_default(project_root_rel, PROJECT_ROOT_REL) /
         _DETAIL_DIFF_SCRIPT,
         file1,
         file2,
     ]
-    return subprocess.call([str(x) for x in command])
+    return cl_utils.subprocess_call([str(x) for x in command], quiet=True)
 
 
 def _detail_diff_filtered(
@@ -105,7 +107,7 @@ def _detail_diff_filtered(
     file2: Path,
     maybe_transform_pair: Callable[[Path, Path, Path, Path], bool] = None,
     project_root_rel: Path = None,
-) -> int:
+) -> cl_utils.SubprocessResult:
     """Show differences between filtered views of two files.
 
     Args:
@@ -130,9 +132,10 @@ def _detail_diff_filtered(
     return _detail_diff(file1, file2, project_root_rel)
 
 
-def _text_diff(file1: Path, file2: Path) -> int:
-    """Display textual differences to stdout."""
-    return subprocess.call(['diff', '-u', str(file1), str(file2)])
+def _text_diff(file1: Path, file2: Path) -> cl_utils.SubprocessResult:
+    """Capture textual differences to the result."""
+    return cl_utils.subprocess_call(
+        ['diff', '-u', str(file1), str(file2)], quiet=True)
 
 
 def _files_under_dir(path: Path) -> Iterable[Path]:
@@ -565,6 +568,7 @@ class RemoteAction(object):
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
         disable: bool = False,
+        verbose: bool = False,
         save_temps: bool = False,
         remote_log: str = "",
         fsatrace_path: Optional[Path] = None,
@@ -594,6 +598,7 @@ class RemoteAction(object):
           output_dirs: directories to be fetched after remote execution, relative to the
             current working dir.
           disable: if true, execute locally.
+          verbose: if true, print more information about what is happening.
           compare_with_local: if true, also run locally and compare outputs.
           check_determinism: if true, compare outputs of two local executions.
           save_temps: if true, keep around temporarily generated files after execution.
@@ -629,6 +634,7 @@ class RemoteAction(object):
         # Parse and strip out --remote-* flags from command.
         self._remote_only_command = command
         self._remote_disable = disable
+        self._verbose = verbose
         self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
         self._options = (options or [])
@@ -669,6 +675,14 @@ class RemoteAction(object):
             self._output_files.append(self._fsatrace_remote_trace)
 
         self._cleanup_files = []
+
+    @property
+    def verbose(self) -> bool:
+        return self._verbose
+
+    def vmsg(self, text: str):
+        if self.verbose:
+            msg(text)
 
     @property
     def exec_root(self) -> Optional[str]:
@@ -741,7 +755,7 @@ class RemoteAction(object):
         return cl_utils.auto_env_prefix_command(self._remote_only_command)
 
     def show_local_remote_command_differences(self):
-        if self._local_only_command != self._remote_only_command:
+        if self._local_only_command == self._remote_only_command:
             return  # no differences to show
 
         print('local vs. remote command differences:')
@@ -1000,6 +1014,7 @@ class RemoteAction(object):
         return self.remote_launch_command
 
     def _make_download_stubs(self):
+        self.vmsg("Creating download stubs for remote outputs.")
         make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
@@ -1008,6 +1023,7 @@ class RemoteAction(object):
         )
 
     def _cleanup(self):
+        self.vmsg("Cleaning up temporary files.")
         for f in self._cleanup_files:
             if f.exists():
                 f.unlink()  # does os.remove for files, rmdir for dirs
@@ -1022,8 +1038,82 @@ class RemoteAction(object):
             list(self._generate_remote_debug_command()), cwd=self.working_dir)
 
     def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
-        return cl_utils.subprocess_call(
-            self.launch_command, cwd=self.working_dir)
+        command = self.launch_command
+        quoted = cl_utils.command_quoted_str(command)
+        self.vmsg(f"Launching: {quoted}")
+        return cl_utils.subprocess_call(command, cwd=self.working_dir)
+
+    def _on_success(self) -> int:
+        """Work to do after success (local or remote)."""
+        # TODO: output_leak_scanner.postflight_checks() here,
+        #   but only when requested, because inspecting output
+        #   contents takes time.
+
+        if self.remote_disable:  # ran only locally
+            # Nothing do compare.
+            return 0
+
+        # ran remotely
+        if self.download_outputs:
+            # Possibly transform some of the remote outputs.
+            # It is important that transformations are applied before
+            # local vs. remote comparison.
+            if self._post_remote_run_success_action:
+                self.vmsg("Running post-remote-success actions")
+                post_run_status = self._post_remote_run_success_action()
+                if post_run_status != 0:
+                    return post_run_status
+
+            if self.compare_with_local:
+                # Also run locally, and compare outputs.
+                return self._compare_against_local()
+        else:
+            self._make_download_stubs()
+            # TODO: in compare-mode, force-download outputs,
+            # overriding and taking precedence over
+            # --download_outputs=false, because comparison is intended
+            # to be done locally with downloaded artifacts.
+            # For now, just advise the user.
+            if self.compare_with_local and not self.remote_disable:
+                msg(
+                    "Cannot compare remote outputs as requested because --download_outputs=false.  Re-run with downloads enabled to compare outputs."
+                )
+        return 0
+
+    def _on_failure(self, result: cl_utils.SubprocessResult) -> int:
+        """Work to do after execution fails."""
+        exec_strategy = self.exec_strategy or "remote"  # rewrapper default
+        # rewrapper assumes that the command it was given is suitable for
+        # both local and remote execution, but this isn't always the case,
+        # e.g. remote cross-compiling may require invoking different
+        # binaries.  We know however, whether the local/remote commands
+        # match and can take the appropriate local fallback action,
+        # like running a different command than the remote one.
+        if exec_strategy in {"local", "remote_local_fallback"}:
+            if self._local_only_command != self._remote_only_command:
+                # We intended to run a different local command,
+                # so ignore the result from rewrapper.
+                local_exit_code = self._run_locally()
+                if local_exit_code == 0:
+                    # local succeeded where remote failed
+                    self.show_local_remote_command_differences()
+
+                return local_exit_code
+
+            # Not an RBE issue if local execution failed.
+            return result.returncode
+
+        if not self.diagnose_nonzero:
+            return result.returncode
+
+        # Otherwise, there was some remote execution failure.
+        # Continue to analyze log files.
+        analyze_rbe_logs(
+            rewrapper_pid=result.pid,
+            action_log=self._action_log,
+        )
+
+        return result.returncode
 
     def run(self) -> int:
         """Remotely execute the command.
@@ -1063,60 +1153,10 @@ class RemoteAction(object):
                 result = self._run_maybe_remotely()
 
             if result.returncode == 0:  # success, nothing to see
-                # TODO: output_leak_scanner.postflight_checks() here,
-                #   but only when requested, because inspecting output
-                #   contents takes time.
-                if self.download_outputs:
-                    # TODO: in compare-mode, force-download outputs,
-                    # overriding and taking precedence over
-                    # --download_outputs=false, because comparison is intended
-                    # to be done locally with downloaded artifacts.
-                    if self.compare_with_local and not self.remote_disable:
-                        # Also run locally, and compare outputs.
-                        # If running only --local, there is nothing to compare.
-                        return self._compare_against_local()
-                else:
-                    self._make_download_stubs()
-
-                if not self.remote_disable and self._post_remote_run_success_action:
-                    post_run_status = self._post_remote_run_success_action()
-                    if post_run_status != 0:
-                        return post_run_status
-
-                return result.returncode
+                return self._on_success()
 
             # From here onward, remote return code was != 0
-
-            exec_strategy = self.exec_strategy or "remote"  # rewrapper default
-            # rewrapper assumes that the command it was given is suitable for
-            # both local and remote execution, but this isn't always the case,
-            # e.g. remote cross-compiling may require invoking different
-            # binaries.  We know however, whether the local/remote commands
-            # match and can take the appropriate local fallback action,
-            # like running a different command than the remote one.
-            if exec_strategy in {"local", "remote_local_fallback"}:
-                if self._local_only_command != self._remote_only_command:
-                    local_exit_code = self._run_locally()
-                    if local_exit_code == 0:
-                        # local succeeded where remote failed
-                        self.show_local_remote_command_differences()
-
-                    return local_exit_code
-
-                # Not an RBE issue if local execution failed.
-                return result.returncode
-
-            if not self.diagnose_nonzero:
-                return result.returncode
-
-            # Otherwise, there was some remote execution failure.
-            # Continue to analyze log files.
-            analyze_rbe_logs(
-                rewrapper_pid=result.pid,
-                action_log=self._action_log,
-            )
-
-            return result.returncode
+            return self._on_failure(result)
 
         finally:
             if not self._save_temps:
@@ -1187,13 +1227,13 @@ class RemoteAction(object):
             _transform_file_by_lines(
                 local_file,
                 local_file_filtered,
-                lambda line: line.replace(self.exec_root, self.exec_root_rel),
+                lambda line: line.replace(str(self.exec_root), str(self.exec_root_rel)),
             )
             _transform_file_by_lines(
                 remote_file,
                 remote_file_filtered,
                 lambda line: line.replace(
-                    _REMOTE_PROJECT_ROOT, self.exec_root_rel),
+                    str(_REMOTE_PROJECT_ROOT), str(self.exec_root_rel)),
             )
             return True
 
@@ -1231,7 +1271,7 @@ class RemoteAction(object):
         self,
         local_trace: Path,
         remote_trace: Path,
-    ) -> int:
+    ) -> cl_utils.SubprocessResult:
         msg("Comparing local (-) vs. remote (+) file access traces.")
         # Normalize absolute paths.
         local_norm = Path(str(local_trace) + '.norm')
@@ -1248,7 +1288,7 @@ class RemoteAction(object):
         )
         return _text_diff(local_norm, remote_norm)
 
-    def _compare_fsatraces(self) -> int:
+    def _compare_fsatraces(self) -> cl_utils.SubprocessResult:
         return self._compare_fsatraces_select_logs(
             local_trace=self._fsatrace_local_trace,
             remote_trace=self._fsatrace_remote_trace,
@@ -1258,10 +1298,11 @@ class RemoteAction(object):
         # Run the job locally.
         # Local command may include an fsatrace prefix.
         local_command = self.local_launch_command
+        local_command_str = cl_utils.command_quoted_str(local_command)
+        self.vmsg(f"Executing command locally: {local_command_str}")
         exit_code = subprocess.call(local_command)
         if exit_code != 0:
             # Presumably, we want to only compare against local successes.
-            local_command_str = cl_utils.command_quoted_str(local_command)
             msg(
                 f"Local command failed for comparison (exit={exit_code}): {local_command_str}"
             )
@@ -1273,6 +1314,7 @@ class RemoteAction(object):
         Returns:
           exit code 0 for success (all outputs match) else non-zero.
         """
+        self.vmsg("Comparing outputs between remote and local execution.")
         # Backup outputs from remote execution first to '.remote'.
 
         # The fsatrace files will be handled separately because they are
@@ -1309,33 +1351,49 @@ class RemoteAction(object):
         all_compare_files = direct_compare_output_files + list(
             _expand_common_files_between_dirs(compare_output_dirs))
 
-        output_diffs = []
+        output_diff_candidates = []
         # Quick file comparison first.
         for f, remote_out in all_compare_files:
             if _files_match(f, remote_out):
                 # reclaim space when remote output matches, keep only diffs
                 os.remove(remote_out)
             else:
-                output_diffs.append((f, remote_out))
+                output_diff_candidates.append((f, remote_out))
 
-        # Report detailed differences.
-        if output_diffs:
-            msg(
-                "*** Differences between local (-) and remote (+) build outputs found. ***"
-            )
-            for local_out, remote_out in output_diffs:
-                msg(f"  {local_out} vs. {remote_out}:")
+        # Take the difference candidates and re-compare filtered views
+        # of them, to remove unimportant or acceptable differences.
+        comparisons = (
+            (
+                local_out, remote_out,
                 _detail_diff_filtered(
                     local_out,
                     remote_out,
                     maybe_transform_pair=self._filtered_outputs_for_comparison,
                     project_root_rel=self.exec_root_rel,
-                )  # ignore exit status
+                )) for local_out, remote_out in output_diff_candidates)
+
+        differences = [
+            (local_out, remote_out, result)
+            for local_out, remote_out, result in comparisons
+            if result.returncode != 0
+        ]
+
+        # Report detailed differences.
+        if differences:
+            msg(
+                "*** Differences between local (-) and remote (+) build outputs found. ***"
+            )
+            for local_out, remote_out, result in differences:
+                msg(f"  {local_out} vs. {remote_out}:")
+                for line in result.stdout:
+                    print(line)
                 msg("------------------------------------")
 
             # Also compare file access traces, if available.
             if self._fsatrace_path:
-                self._compare_fsatraces()
+                diff_status = self._compare_fsatraces()
+                for line in diff_status.stdout:
+                    print(line)
 
             self.show_local_remote_command_differences()
 
@@ -1581,6 +1639,7 @@ def remote_action_from_args(
         output_files=output_files,
         output_dirs=output_dirs,
         disable=main_args.local,
+        verbose=main_args.verbose,
         compare_with_local=main_args.compare,
         check_determinism=main_args.check_determinism,
         save_temps=main_args.save_temps,
