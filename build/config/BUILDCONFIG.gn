@@ -1327,6 +1327,7 @@ _hwasan_variant = {
     "hwasan",
     "instrumentation-runtime",
     "instrumented",
+    "lsan",
     "needs-compiler-abi",
     "needs-writable-globals",
     "kernel-excluded",
@@ -1338,10 +1339,6 @@ _hwasan_variant = {
     # we don't ship that yet in the toolchain. Once we do, we should be able
     # to remove this.
     "fuchsia-only",
-
-    # TODO(fxbug.dev/120208): Note the lsan tag is omitted here because
-    # hwasan+lsan is not yet supported. Once that work is complete, we can
-    # add it here.
   ]
 }
 
