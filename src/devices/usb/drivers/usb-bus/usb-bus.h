@@ -68,6 +68,8 @@ class UsbBus : public UsbBusType,
   // This will be used to signal USB device remove completion.
   // The USBDevice* is used just as a key and will not be dereferenced.
   std::map<UsbDevice*, libsync::Completion> remove_completion_;
+
+  async_dispatcher_t* dispatcher_;
 };
 
 }  // namespace usb_bus

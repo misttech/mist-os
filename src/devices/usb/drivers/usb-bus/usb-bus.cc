@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/usb-bus/usb-bus.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/sync/completion.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,8 @@ zx_status_t UsbBus::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t UsbBus::Init() {
+  dispatcher_ = fdf::Dispatcher().GetCurrent()->async_dispatcher();
+
   // Parent must support HCI protocol.
   if (!hci_.is_valid()) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -65,10 +68,22 @@ zx_status_t UsbBus::UsbBusInterfaceAddDevice(uint32_t device_id, uint32_t hub_id
     return ZX_ERR_BAD_STATE;
   }
 
+  auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb_hci::UsbHciService::Device>();
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+
   // devices_[device_id] must be set before usb_device_add() creates the interface devices
   // so we pass pointer to it here rather than setting it after usb_device_add() returns.
-  zx_status_t status =
-      UsbDevice::Create(zxdev(), hci_, device_id, hub_id, speed, &devices_[device_id]);
+  sync_completion_t wait;
+  zx_status_t status = ZX_OK;
+  async::PostTask(dispatcher_, [&]() {
+    status = UsbDevice::Create(zxdev(), hci_, std::move(*client), device_id, hub_id, speed,
+                               dispatcher_, &devices_[device_id]);
+    sync_completion_signal(&wait);
+  });
+  sync_completion_wait(&wait, ZX_TIME_INFINITE);
   if (status == ZX_OK) {
     // Add an entry into the remove completion list for the new UsbDevice.
     remove_completion_[devices_[device_id].get()] = {};
@@ -82,14 +97,24 @@ zx_status_t UsbBus::UsbBusInterfaceRemoveDevice(uint32_t device_id) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto device = devices_[device_id];
+  auto device = std::move(devices_[device_id]);
   if (device == nullptr) {
     return ZX_ERR_BAD_STATE;
   }
-  device->DdkAsyncRemove();
+  sync_completion_t wait;
+  async::PostTask(dispatcher_, [&]() {
+    device->DdkAsyncRemove();
+    sync_completion_signal(&wait);
+  });
+  sync_completion_wait(&wait, ZX_TIME_INFINITE);
   remove_completion_[device.get()].Wait();
   remove_completion_.erase(device.get());
-  devices_[device_id].reset();
+  sync_completion_reset(&wait);
+  async::PostTask(dispatcher_, [&]() {
+    device.reset();
+    sync_completion_signal(&wait);
+  });
+  sync_completion_wait(&wait, ZX_TIME_INFINITE);
   return ZX_OK;
 }
 

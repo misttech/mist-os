@@ -36,7 +36,8 @@ static constexpr uint8_t IN_EP_START = 17;
 
 zx_status_t UsbVirtualBus::Create(zx_device_t* parent) {
   fbl::AllocChecker ac;
-  auto bus = fbl::make_unique_checked<UsbVirtualBus>(&ac, parent);
+  auto bus = fbl::make_unique_checked<UsbVirtualBus>(
+      &ac, parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -69,12 +70,27 @@ zx_status_t UsbVirtualBus::CreateDevice() {
 
 zx_status_t UsbVirtualBus::CreateHost() {
   fbl::AllocChecker ac;
-  host_ = fbl::make_unique_checked<UsbVirtualHost>(&ac, zxdev(), this);
+  host_ = fbl::make_unique_checked<UsbVirtualHost>(&ac, zxdev(), this, dispatcher_);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto status = host_->DdkAdd("usb-virtual-host");
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  auto status = host_->AddService(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    host_ = nullptr;
+    return status;
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb_hci::UsbHciService::Name,
+  };
+  status = host_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-host")
+                             .set_fidl_service_offers(offers)
+                             .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     host_ = nullptr;
     return status;

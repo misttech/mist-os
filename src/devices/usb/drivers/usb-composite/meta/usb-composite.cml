@@ -15,5 +15,16 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "true",
     },
-    use: [],
+    capabilities: [
+        { service: "fuchsia.hardware.usb.UsbService" },
+    ],
+    use: [
+        { service: "fuchsia.hardware.usb.UsbService" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.usb.UsbService",
+            from: "self",
+        },
+    ],
 }

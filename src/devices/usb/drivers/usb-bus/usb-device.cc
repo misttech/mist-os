@@ -796,11 +796,13 @@ zx_status_t UsbDevice::HubResetPort(uint32_t port) {
 }
 
 zx_status_t UsbDevice::Create(zx_device_t* parent, const ddk::UsbHciProtocolClient& hci,
+                              fidl::ClientEnd<fuchsia_hardware_usb_hci::UsbHci> hci_new,
                               uint32_t device_id, uint32_t hub_id, usb_speed_t speed,
-                              fbl::RefPtr<UsbDevice>* out_device) {
+                              async_dispatcher_t* dispatcher, fbl::RefPtr<UsbDevice>* out_device) {
   fbl::AllocChecker ac;
-  auto device = fbl::MakeRefCountedChecked<UsbDevice>(&ac, parent, hci, device_id, hub_id, speed,
-                                                      fbl::MakeRefCounted<UsbWaiterImpl>());
+  auto device = fbl::MakeRefCountedChecked<UsbDevice>(
+      &ac, parent, hci, std::move(hci_new), device_id, hub_id, speed,
+      fbl::MakeRefCounted<UsbWaiterImpl>(), dispatcher);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -808,14 +810,14 @@ zx_status_t UsbDevice::Create(zx_device_t* parent, const ddk::UsbHciProtocolClie
   // devices_[device_id] must be set before calling DdkAdd().
   *out_device = device;
 
-  auto status = device->Init();
+  auto status = device->Init(dispatcher);
   if (status != ZX_OK) {
     out_device->reset();
   }
   return status;
 }
 
-zx_status_t UsbDevice::Init() {
+zx_status_t UsbDevice::Init(async_dispatcher_t* dispatcher) {
   // We implement ZX_PROTOCOL_USB, but drivers bind to us as ZX_PROTOCOL_USB_DEVICE.
   // We also need this for the device to appear in /dev/class/usb-device/.
   ddk_proto_id_ = ZX_PROTOCOL_USB_DEVICE;
@@ -934,6 +936,28 @@ zx_status_t UsbDevice::Init() {
   // bind other drivers to us before it returns.
   StartCallbackThread();
 
+  zx::result result = outgoing_.AddService<fuchsia_hardware_usb::UsbService>(
+      fuchsia_hardware_usb::UsbService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service");
+    return result.status_value();
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb::UsbService::Name,
+  };
+
   char name[16];
   snprintf(name, sizeof(name), "%03d", device_id_);
 
@@ -944,7 +968,11 @@ zx_status_t UsbDevice::Init() {
       {BIND_USB_SUBCLASS, 0, device_desc_.b_device_sub_class},
       {BIND_USB_PROTOCOL, 0, device_desc_.b_device_protocol},
   };
-  status = DdkAdd(ddk::DeviceAddArgs(name).set_props(props).set_proto_id(ZX_PROTOCOL_USB_DEVICE));
+  status = DdkAdd(ddk::DeviceAddArgs(name)
+                      .set_props(props)
+                      .set_proto_id(ZX_PROTOCOL_USB_DEVICE)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     return status;
   }

@@ -6,10 +6,13 @@
 #define SRC_DEVICES_USB_DRIVERS_USB_BUS_USB_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.usb.device/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb/cpp/fidl.h>
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hub/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 
@@ -41,25 +44,43 @@ using UsbDeviceType = ddk::Device<UsbDevice, ddk::GetProtocolable,
 
 class UsbDevice : public UsbDeviceType,
                   public ddk::UsbProtocol<UsbDevice, ddk::base_protocol>,
-                  public fbl::RefCounted<UsbDevice> {
+                  public fbl::RefCounted<UsbDevice>,
+                  public fidl::Server<fuchsia_hardware_usb::Usb> {
  public:
-  UsbDevice(zx_device_t* parent, const ddk::UsbHciProtocolClient& hci, uint32_t device_id,
-            uint32_t hub_id, usb_speed_t speed, fbl::RefPtr<UsbWaiterInterface> waiter)
+  UsbDevice(zx_device_t* parent, const ddk::UsbHciProtocolClient& hci,
+            fidl::ClientEnd<fuchsia_hardware_usb_hci::UsbHci> hci_new, uint32_t device_id,
+            uint32_t hub_id, usb_speed_t speed, fbl::RefPtr<UsbWaiterInterface> waiter,
+            async_dispatcher_t* dispatcher)
       : UsbDeviceType(parent),
         device_id_(device_id),
         hub_id_(hub_id),
         speed_(speed),
         hci_(hci),
+        hci_new_(std::move(hci_new)),
         bus_(parent),
-        waiter_(waiter) {}
+        waiter_(waiter),
+        outgoing_(dispatcher) {}
 
   static zx_status_t Create(zx_device_t* parent, const ddk::UsbHciProtocolClient& hci,
+                            fidl::ClientEnd<fuchsia_hardware_usb_hci::UsbHci> hci_new,
                             uint32_t device_id, uint32_t hub_id, usb_speed_t speed,
-                            fbl::RefPtr<UsbDevice>* out_device);
+                            async_dispatcher_t* dispatcher, fbl::RefPtr<UsbDevice>* out_device);
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
+
+  // fuchsia_hardware_usb_new.Usb protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override {
+    auto result =
+        hci_new_->ConnectToEndpoint(device_id_, request.ep_addr(), std::move(request.ep()));
+    if (result->is_error()) {
+      completer.Reply(fit::as_error(result->error_value()));
+      return;
+    }
+    completer.Reply(fit::ok());
+  }
 
   // USB protocol implementation.
   zx_status_t UsbControlOut(uint8_t request_type, uint8_t request, uint16_t value, uint16_t index,
@@ -120,7 +141,7 @@ class UsbDevice : public UsbDeviceType,
 
   inline uint32_t GetHubId() const { return hub_id_; }
   inline usb_speed_t GetSpeed() const { return speed_; }
-  zx_status_t Init();
+  zx_status_t Init(async_dispatcher_t* dispatcher);
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbDevice);
@@ -171,6 +192,7 @@ class UsbDevice : public UsbDeviceType,
 
   // Parent's HCI protocol.
   ddk::UsbHciProtocolClient hci_;
+  fidl::WireSyncClient<fuchsia_hardware_usb_hci::UsbHci> hci_new_;
 
   // Protocol of parent (USB BUS).
   ddk::UsbBusProtocolClient bus_;
@@ -208,6 +230,9 @@ class UsbDevice : public UsbDeviceType,
   size_t parent_req_size_;
 
   fbl::RefPtr<UsbWaiterInterface> waiter_;
+
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb::Usb> bindings_;
 };
 
 }  // namespace usb_bus

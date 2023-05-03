@@ -17,14 +17,16 @@
 
 namespace usb_composite {
 
-zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
-                                 const ddk::UsbProtocolClient& usb,
-                                 const usb_interface_descriptor_t* interface_desc,
-                                 size_t desc_length, std::unique_ptr<UsbInterface>* out_interface) {
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> UsbInterface::Create(
+    zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb,
+    fidl::ClientEnd<fuchsia_hardware_usb::Usb> usb_new,
+    const usb_interface_descriptor_t* interface_desc, size_t desc_length,
+    async_dispatcher_t* dispatcher, std::unique_ptr<UsbInterface>* out_interface) {
   fbl::AllocChecker ac;
-  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb);
+  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb,
+                                                  std::move(usb_new), dispatcher);
   if (!interface) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   auto* device_desc = composite->device_descriptor();
@@ -44,26 +46,31 @@ zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
   auto status = interface->Init(interface_desc, desc_length, interface_desc->b_interface_number,
                                 usb_class, usb_subclass, usb_protocol);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   status = interface->ConfigureEndpoints(interface_desc->b_interface_number, 0);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
-  *out_interface = std::move(interface);
-  return ZX_OK;
+  auto result = interface->ServeOutgoing(dispatcher);
+  if (result.is_ok()) {
+    *out_interface = std::move(interface);
+  }
+  return result;
 }
 
-zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
-                                 const ddk::UsbProtocolClient& usb,
-                                 const usb_interface_assoc_descriptor_t* assoc_desc,
-                                 size_t desc_length, std::unique_ptr<UsbInterface>* out_interface) {
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> UsbInterface::Create(
+    zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb,
+    fidl::ClientEnd<fuchsia_hardware_usb::Usb> usb_new,
+    const usb_interface_assoc_descriptor_t* assoc_desc, size_t desc_length,
+    async_dispatcher_t* dispatcher, std::unique_ptr<UsbInterface>* out_interface) {
   fbl::AllocChecker ac;
-  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb);
+  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb,
+                                                  std::move(usb_new), dispatcher);
   if (!interface) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   auto* device_desc = composite->device_descriptor();
@@ -85,7 +92,7 @@ zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
   auto status = interface->Init(assoc_desc, desc_length, static_cast<uint8_t>(last_interface_id),
                                 usb_class, usb_subclass, usb_protocol);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   usb::UnownedInterfaceList assoc_list(const_cast<usb_interface_assoc_descriptor_t*>(assoc_desc),
@@ -96,16 +103,19 @@ zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
     }
     if (!intf.descriptor()) {
       zxlogf(ERROR, "Malformed USB descriptor detected!");
-      return false;
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
     zx_status_t status = interface->ConfigureEndpoints(intf.descriptor()->b_interface_number, 0);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
   }
 
-  *out_interface = std::move(interface);
-  return ZX_OK;
+  auto result = interface->ServeOutgoing(dispatcher);
+  if (result.is_ok()) {
+    *out_interface = std::move(interface);
+  }
+  return result;
 }
 
 zx_status_t UsbInterface::Init(const void* descriptors, size_t desc_length,

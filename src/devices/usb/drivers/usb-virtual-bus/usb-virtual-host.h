@@ -5,7 +5,9 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_HOST_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_HOST_H_
 
+#include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 
 #include <ddktl/device.h>
@@ -19,10 +21,13 @@ using UsbVirtualHostType = ddk::Device<UsbVirtualHost>;
 
 // This class implements the virtual USB host controller protocol.
 class UsbVirtualHost : public UsbVirtualHostType,
-                       public ddk::UsbHciProtocol<UsbVirtualHost, ddk::base_protocol> {
+                       public ddk::UsbHciProtocol<UsbVirtualHost, ddk::base_protocol>,
+                       public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
  public:
-  explicit UsbVirtualHost(zx_device_t* parent, UsbVirtualBus* bus)
-      : UsbVirtualHostType(parent), bus_(bus) {}
+  explicit UsbVirtualHost(zx_device_t* parent, UsbVirtualBus* bus, async_dispatcher_t* dispatcher)
+      : UsbVirtualHostType(parent), bus_(bus), dispatcher_(dispatcher), outgoing_(dispatcher) {}
+
+  zx_status_t AddService(fidl::ServerEnd<fuchsia_io::Directory> server);
 
   // Device protocol implementation.
   void DdkRelease();
@@ -46,10 +51,17 @@ class UsbVirtualHost : public UsbVirtualHostType,
   zx_status_t UsbHciCancelAll(uint32_t device_id, uint8_t ep_address);
   size_t UsbHciGetRequestSize();
 
+  // fuchsia_hardware_usb_new.UsbHciNew protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override;
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualHost);
 
   UsbVirtualBus* bus_;
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_hci::UsbHci> bindings_;
 };
 
 }  // namespace usb_virtual_bus

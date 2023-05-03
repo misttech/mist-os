@@ -49,10 +49,18 @@ bool UsbComposite::RemoveInterfaceById(uint8_t interface_id) {
 
 zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interface_desc,
                                        size_t length) {
+  auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb::UsbService::Device>();
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+
   std::unique_ptr<UsbInterface> interface;
-  auto status = UsbInterface::Create(zxdev(), this, usb_, interface_desc, length, &interface);
-  if (status != ZX_OK) {
-    return status;
+  auto client_end =
+      UsbInterface::Create(zxdev(), this, usb_, std::move(*client), interface_desc, length,
+                           fdf::Dispatcher::GetCurrent()->async_dispatcher(), &interface);
+  if (client_end.is_error()) {
+    return client_end.error_value();
   }
 
   {
@@ -74,7 +82,13 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
       {BIND_USB_INTERFACE_NUMBER, 0, interface_desc->b_interface_number},
   };
 
-  status = interface->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
+  std::array offers = {
+      fuchsia_hardware_usb::UsbService::Name,
+  };
+
+  auto status = interface->DdkAdd(
+      ddk::DeviceAddArgs(name).set_props(props).set_fidl_service_offers(offers).set_outgoing_dir(
+          client_end->TakeChannel()));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
     interface.release();
@@ -88,10 +102,18 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
 
 zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor_t* assoc_desc,
                                             size_t length) {
+  auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb::UsbService::Device>();
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+
   std::unique_ptr<UsbInterface> interface;
-  auto status = UsbInterface::Create(zxdev(), this, usb_, assoc_desc, length, &interface);
-  if (status != ZX_OK) {
-    return status;
+  auto client_end =
+      UsbInterface::Create(zxdev(), this, usb_, std::move(*client), assoc_desc, length,
+                           fdf::Dispatcher::GetCurrent()->async_dispatcher(), &interface);
+  if (client_end.is_error()) {
+    return client_end.error_value();
   }
 
   {
@@ -113,7 +135,13 @@ zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor
       {BIND_USB_INTERFACE_NUMBER, 0, assoc_desc->b_first_interface},
   };
 
-  status = interface->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
+  std::array offers = {
+      fuchsia_hardware_usb::UsbService::Name,
+  };
+
+  auto status = interface->DdkAdd(
+      ddk::DeviceAddArgs(name).set_props(props).set_fidl_service_offers(offers).set_outgoing_dir(
+          client_end->TakeChannel()));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
     interface.release();

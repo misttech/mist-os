@@ -36,7 +36,8 @@ using UsbVirtualBusType =
 // This is the main class for the USB virtual bus.
 class UsbVirtualBus : public UsbVirtualBusType {
  public:
-  explicit UsbVirtualBus(zx_device_t* parent) : UsbVirtualBusType(parent) {}
+  explicit UsbVirtualBus(zx_device_t* parent, async_dispatcher_t* dispatcher)
+      : UsbVirtualBusType(parent), dispatcher_(dispatcher) {}
 
   static zx_status_t Create(zx_device_t* parent);
 
@@ -105,6 +106,8 @@ class UsbVirtualBus : public UsbVirtualBusType {
   int DeviceThread();
   void HandleControl(Request req);
   zx_status_t SetStall(uint8_t ep_address, bool stall);
+
+  async_dispatcher_t* dispatcher_;
 
   // Reference to class that implements the virtual device controller protocol.
   std::unique_ptr<UsbVirtualDevice> device_;

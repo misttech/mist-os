@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.usb.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <thread>
@@ -14,7 +15,6 @@
 #include <usb/request-cpp.h>
 #include <zxtest/zxtest.h>
 
-#include "lib/ddk/driver.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/utf_conversion/utf_conversion.h"
 
@@ -254,22 +254,31 @@ class DeviceTest : public zxtest::Test {
   auto& get_device() { return *device_; }
 
   void SetUp() override {
-    auto device =
-        fbl::MakeRefCounted<UsbDevice>(root_.get(), ddk::UsbHciProtocolClient(hci_.proto()),
-                                       kDeviceId, kHubId, kDeviceSpeed, timer_);
-    ASSERT_OK(device->Init());
-    device_ = device.get();
-    loop_.StartThread();
+    EXPECT_TRUE(dispatcher_.Start({}, "usb-device-test-dispatcher").is_ok());
+    EXPECT_OK(fidl_loop_.StartThread("usb-device-test-fidl-loop"));
+
+    auto hci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
+    ASSERT_OK(hci_endpoints);
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+      auto device = fbl::MakeRefCounted<UsbDevice>(
+          root_.get(), ddk::UsbHciProtocolClient(hci_.proto()), std::move(hci_endpoints->client),
+          kDeviceId, kHubId, kDeviceSpeed, timer_, dispatcher_.dispatcher());
+      ASSERT_OK(device->Init(dispatcher_.dispatcher()));
+      device_ = device.get();
+    });
+    EXPECT_TRUE(result.is_ok());
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_device::Device>();
     ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints->server), device_);
     fidl_.Bind(std::move(endpoints->client));
   }
 
   void TearDown() override {
-    loop_.Shutdown();
-    device_->DdkAsyncRemove();
-    mock_ddk::ReleaseFlaggedDevices(root_.get());
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+      device_->DdkAsyncRemove();
+      mock_ddk::ReleaseFlaggedDevices(root_.get());
+    });
+    EXPECT_TRUE(result.is_ok());
   }
 
   void CancelAll() { ASSERT_OK(device_->UsbCancelAll(1)); }
@@ -319,10 +328,11 @@ class DeviceTest : public zxtest::Test {
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
 
  private:
+  async::Loop fidl_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  fdf::TestSynchronizedDispatcher dispatcher_;
   fbl::RefPtr<FakeTimer> timer_;
   fidl::WireSyncClient<fuchsia_hardware_usb_device::Device> fidl_;
   FakeHci hci_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   // UsbDevice context pointer owned by us through MockDdk
   UsbDevice* device_;
 };
@@ -859,10 +869,14 @@ TEST(EvilFakeHciDeviceTest, GetConfigurationDescriptorTooShortRejected) {
     return sync_completion_wait(completion, duration);
   });
 
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
+  ASSERT_OK(endpoints);
   auto device = fbl::MakeRefCounted<UsbDevice>(root.get(), ddk::UsbHciProtocolClient(hci.proto()),
-                                               kDeviceId, kHubId, kDeviceSpeed, timer);
-  auto result = device->Init();
+                                               std::move(endpoints->client), kDeviceId, kHubId,
+                                               kDeviceSpeed, timer, loop.dispatcher());
+  auto result = device->Init(loop.dispatcher());
   ASSERT_EQ(result, ZX_ERR_IO);
 }
 
@@ -876,10 +890,14 @@ TEST(EvilFakeHciDeviceTest, GetConfigurationDescriptorDifferentSizesAreRejected)
     return sync_completion_wait(completion, duration);
   });
 
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
+  ASSERT_OK(endpoints);
   auto device = fbl::MakeRefCounted<UsbDevice>(root.get(), ddk::UsbHciProtocolClient(hci.proto()),
-                                               kDeviceId, kHubId, kDeviceSpeed, timer);
-  auto result = device->Init();
+                                               std::move(endpoints->client), kDeviceId, kHubId,
+                                               kDeviceSpeed, timer, loop.dispatcher());
+  auto result = device->Init(loop.dispatcher());
   ASSERT_EQ(result, ZX_ERR_IO);
 }
 

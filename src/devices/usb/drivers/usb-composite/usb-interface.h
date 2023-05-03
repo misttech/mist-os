@@ -5,8 +5,10 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_COMPOSITE_USB_INTERFACE_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_COMPOSITE_USB_INTERFACE_H_
 
+#include <fidl/fuchsia.hardware.usb/cpp/fidl.h>
 #include <fuchsia/hardware/usb/composite/cpp/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
@@ -24,23 +26,42 @@ using UsbInterfaceType = ddk::Device<UsbInterface, ddk::GetProtocolable>;
 // This class represents a USB interface in a composite device.
 class UsbInterface : public UsbInterfaceType,
                      public ddk::UsbProtocol<UsbInterface, ddk::base_protocol>,
-                     public ddk::UsbCompositeProtocol<UsbInterface> {
+                     public ddk::UsbCompositeProtocol<UsbInterface>,
+                     public fidl::Server<fuchsia_hardware_usb::Usb> {
  public:
-  UsbInterface(zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb)
-      : UsbInterfaceType(parent), composite_(composite), usb_(usb) {}
+  UsbInterface(zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb,
+               fidl::ClientEnd<fuchsia_hardware_usb::Usb> usb_new, async_dispatcher_t* dispatcher)
+      : UsbInterfaceType(parent),
+        composite_(composite),
+        usb_(usb),
+        usb_new_(std::move(usb_new)),
+        outgoing_(dispatcher) {}
 
-  static zx_status_t Create(zx_device_t* parent, UsbComposite* composite,
-                            const ddk::UsbProtocolClient& usb,
-                            const usb_interface_descriptor_t* interface_desc, size_t desc_length,
-                            std::unique_ptr<UsbInterface>* out_interface);
-  static zx_status_t Create(zx_device_t* parent, UsbComposite* composite,
-                            const ddk::UsbProtocolClient& usb,
-                            const usb_interface_assoc_descriptor_t* assoc_desc, size_t desc_length,
-                            std::unique_ptr<UsbInterface>* out_interface);
+  static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Create(
+      zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb,
+      fidl::ClientEnd<fuchsia_hardware_usb::Usb> usb_new,
+      const usb_interface_descriptor_t* interface_desc, size_t desc_length,
+      async_dispatcher_t* dispatcher, std::unique_ptr<UsbInterface>* out_interface);
+  static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Create(
+      zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb,
+      fidl::ClientEnd<fuchsia_hardware_usb::Usb> usb_new,
+      const usb_interface_assoc_descriptor_t* assoc_desc, size_t desc_length,
+      async_dispatcher_t* dispatcher, std::unique_ptr<UsbInterface>* out_interface);
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
+
+  // fuchsia_hardware_usb_new::Usb protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override {
+    auto result = usb_new_->ConnectToEndpoint(request.ep_addr(), std::move(request.ep()));
+    if (result->is_error()) {
+      completer.Reply(fit::as_error(result->error_value()));
+      return;
+    }
+    completer.Reply(fit::ok());
+  }
 
   // USB protocol implementation.
   zx_status_t UsbControlOut(uint8_t request_type, uint8_t request, uint16_t value, uint16_t index,
@@ -94,8 +115,27 @@ class UsbInterface : public UsbInterfaceType,
                    uint8_t usb_class, uint8_t usb_subclass, uint8_t usb_protocol);
   zx_status_t ConfigureEndpoints(uint8_t interface_id, uint8_t alt_setting);
 
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ServeOutgoing(async_dispatcher_t* dispatcher) {
+    zx::result result = outgoing_.AddService<fuchsia_hardware_usb::UsbService>(
+        fuchsia_hardware_usb::UsbService::InstanceHandler({
+            .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+        }));
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return zx::error(endpoints.status_value());
+    }
+    result = outgoing_.Serve(std::move(endpoints->server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to service the outgoing directory");
+      return zx::error(result.status_value());
+    }
+
+    return zx::ok(std::move(endpoints->client));
+  }
+
   UsbComposite* composite_;
   const ddk::UsbProtocolClient usb_;
+  fidl::WireSyncClient<fuchsia_hardware_usb::Usb> usb_new_;
 
   uint8_t usb_class_;
   uint8_t usb_subclass_;
@@ -109,6 +149,9 @@ class UsbInterface : public UsbInterfaceType,
   // Descriptors for currently active endpoints.
   // These point into descriptor_'s storage.
   const usb_endpoint_descriptor_t* active_endpoints_[USB_MAX_EPS] = {};
+
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb::Usb> bindings_;
 };
 
 }  // namespace usb_composite

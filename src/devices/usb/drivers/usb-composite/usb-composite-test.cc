@@ -4,12 +4,15 @@
 
 #include "src/devices/usb/drivers/usb-composite/usb-composite.h"
 
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+
 #include <queue>
 
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-composite/test-helper.h"
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"
@@ -23,7 +26,14 @@ template <auto* descriptors>
 class UsbCompositeTest : public zxtest::Test {
  public:
   void SetUp() override {
+    EXPECT_TRUE(dispatcher_.Start({}, "usb-composite-test-dispatcher").is_ok());
+
     fake_parent_->AddProtocol(ZX_PROTOCOL_USB, usb_.GetProto()->ops, usb_.GetProto()->ctx);
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_usb::UsbService::Name,
+                                 std::move(endpoints->client));
 
     usb_.ExpectGetDeviceDescriptor(usb_device_descriptor_t{
         .b_length = sizeof(usb_device_descriptor_t),
@@ -53,24 +63,20 @@ class UsbCompositeTest : public zxtest::Test {
     composite_ = fake_parent_->GetLatestChild();
     dut_ = composite_->GetDeviceContext<usb_composite::UsbComposite>();
 
-    composite_->InitOp();
-    EXPECT_OK(composite_->WaitUntilInitReplyCalled());
-    EXPECT_TRUE(composite_->InitReplyCalled());
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+      composite_->InitOp();
+      EXPECT_OK(composite_->WaitUntilInitReplyCalled());
+      EXPECT_TRUE(composite_->InitReplyCalled());
+    });
+    EXPECT_TRUE(result.is_ok());
   }
 
   void TearDown() override {
-    // auto children = composite_->children();
-
-    // composite_->UnbindOp();
-    // EXPECT_OK(composite_->WaitUntilUnbindReplyCalled());
-    // EXPECT_TRUE(composite_->UnbindReplyCalled());
-
-    // for (const auto& child : children) {
-    //   EXPECT_TRUE(child->AsyncRemoveCalled());
-    // }
-
-    device_async_remove(composite_);
-    mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+      device_async_remove(composite_);
+      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    });
+    EXPECT_TRUE(result.is_ok());
   }
 
   struct init_test_expected_values_t {
@@ -109,6 +115,7 @@ class UsbCompositeTest : public zxtest::Test {
  private:
   void ExpectConfigureEndpoints();
 
+  fdf::TestSynchronizedDispatcher dispatcher_;
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
 };
 

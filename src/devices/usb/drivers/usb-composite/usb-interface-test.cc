@@ -4,6 +4,8 @@
 
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"
 
+#include <lib/async-loop/cpp/loop.h>
+
 #include <queue>
 
 #include <zxtest/zxtest.h>
@@ -101,10 +103,12 @@ class UsbInterfaceTest : public zxtest::Test {
  private:
   template <typename T>
   void SetUpInterface(const T* descriptor, size_t desc_length) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb::Usb>();
+    ASSERT_OK(endpoints);
     std::unique_ptr<UsbInterface> ifc;
-    EXPECT_OK(UsbInterface::Create(fake_parent_.get(), composite_,
-                                   ddk::UsbProtocolClient(fake_parent_.get()), descriptor,
-                                   desc_length, &ifc));
+    EXPECT_OK(UsbInterface::Create(
+        composite_dev_, composite_, ddk::UsbProtocolClient(fake_parent_.get()),
+        std::move(endpoints->client), descriptor, desc_length, loop_.dispatcher(), &ifc));
     ASSERT_NOT_NULL(ifc);
 
     EXPECT_OK(ifc->DdkAdd("test-interface", DEVICE_ADD_NON_BINDABLE));
@@ -121,6 +125,7 @@ class UsbInterfaceTest : public zxtest::Test {
     ASSERT_TRUE(composite_client_.is_valid());
   }
 
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   MockDevice* composite_dev_;
 };

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 
 #include <thread>
 
@@ -14,9 +16,10 @@
 namespace usb_virtual_bus {
 
 TEST(VirtualBusUnitTest, DdkLifecycle) {
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   auto fake_parent = MockDevice::FakeRootParent();
 
-  auto bus = new UsbVirtualBus(fake_parent.get());
+  auto bus = new UsbVirtualBus(fake_parent.get(), loop.dispatcher());
   ASSERT_NOT_NULL(bus);
 
   ASSERT_OK(bus->DdkAdd("usb-virtual-bus"));
@@ -67,9 +70,10 @@ class FakeDci : public ddk::UsbDciInterfaceProtocol<FakeDci> {
 
 // Tests unbinding the usb virtual bus while a control request is in progress.
 TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   auto fake_parent = MockDevice::FakeRootParent();
 
-  auto bus = new UsbVirtualBus(fake_parent.get());
+  auto bus = new UsbVirtualBus(fake_parent.get(), loop.dispatcher());
   ASSERT_NOT_NULL(bus);
 
   ASSERT_OK(bus->DdkAdd("usb-virtual-bus"));
