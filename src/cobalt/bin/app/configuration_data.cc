@@ -109,7 +109,7 @@ Status JSONHelper::EnsureKey(const std::string& key) const {
                   fxl::Concatenate({"Key ", key, " not present in the config."}));
   }
 
-  return Status::OK;
+  return Status::OkStatus();
 }
 
 namespace {

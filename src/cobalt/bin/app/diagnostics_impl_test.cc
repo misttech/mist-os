@@ -42,7 +42,7 @@ class DiagnosticsTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(DiagnosticsTest, SentObservationResultSuccess) {
-  listener_->SentObservationResult(Status::OK);
+  listener_->SentObservationResult(Status::OkStatus());
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(AllOf(
