@@ -29,6 +29,15 @@
   related_guides: [""]
   area: ["System", "Zircon"]
 
+- term: "Action key"
+  short_description: "Keys that have a distinct special action."
+  full_description: "Keys corresponding to specific actions, such as \"display
+  brightness increment\", \"display brightness decrement\" etc, which are
+  specifically named in the USB HID usage tables."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "Assembly Config"
   short_description: ""
   full_description: "<p>The JSON file that the product owner writes in order to specify (1)
@@ -269,6 +278,17 @@
              "<a href=\"/docs/contribute/governance/policy/update_channel_usage_policy.md)\">Update channel usage policy</a>"]
   related_guides: [""]
   area: ["FIDL", "Zircon"]
+
+- term: "Character key"
+  short_description: "A key that sends characters to the computer."
+  full_description: "A key that sends characters to the computer.
+
+  This definition does not specifically account for the effect of key
+  composition and dead keys, which are present on certain keyboard layouts,
+  but is operational enough for effective use."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
 
 - term: "Child component instance"
   short_description: "A child component instance is a component instance that is owned by another instance,
@@ -1006,6 +1026,13 @@
   related_guides: [""]
   area: ["General", "Storage"]
 
+- term: "Function key"
+  short_description: "The common name for the keys F1, F2, F3, ..."
+  full_description: "The common name for the keys F1, F2, F3, ..."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "GN"
   short_description: "GN is a meta-build system that generates build files."
   full_description: "GN is a meta-build system that generates build files so that Fuchsia can be
@@ -1096,6 +1123,34 @@
   related_guides: ['<a href="/docs/get-started/get_fuchsia_source.md">Get Fuchsia source code</a>',
                    '<a href="/docs/get-started/build_fuchsia.md">Build Fuchsia</a>']
   area: ["Developer"]
+
+- term: "Input Method Editor"
+  short_description: "Software for sophisticated text input."
+  full_description: "From
+  <a href=\"https://docs.microsoft.com/en-us/windows/apps/design/input/input-method-editors\">MSDN</a>:
+   \"A software component that enables a user to input text in a language that
+   can not be represented easily on a standard keyboard.\""
+  see_also: ["Input Method Editor API"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Input Method Editor API"
+  short_description: "API to implement IMEs"
+  full_description: "A FIDL API offered by the keyboard subsystem for
+  integrating with built-in or custom made input method editors."
+  see_also: ["Input Method Editor"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Input Pipeline"
+  short_description: "Fuchsia system component for handling input-related events."
+  full_description: "A library and component for processing of input-related
+  events on Fuchsia in a sequential manner. The input pipeline mediates between
+  driver-level input and \"UI Framework\" facing services. One of the input
+  pipeline's tasks is to apply a keymap by attaching a key meaning to a key event."
+  see_also: ["key event", "key meaning", "keymap", "RFC-0096"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
 
 - term: "InputDeviceBinding"
   short_description: "A Rust trait in the input pipeline client library."
@@ -1213,6 +1268,191 @@
   related_guides: [""]
   area: ["Zircon"]
 
+- term: "Key"
+  short_description: "A switch that can be pressed or released."
+  full_description: "A switch that can be pressed or released. Usually,
+  <a href=\"https://shop.daskeyboard.com/collections/all-mechanical-keyboards/products/das-keyboard-4-ultimate?variant=594321629\">but not always</a>,
+  it has a keycap with one or more symbols written on it.
+
+  It is traditionally a mechanical, or electromechanical device, but modern
+  input modes have seen purely software key implementations, as a
+  user-interface element coupled with a touch-screen, or a computer mouse for
+  actuation. ISO/IEC 9995-1:2009 does not explicitly define the term
+  <emph>key</emph>, but notes that a keyboard has keys that can be actuated.
+  We will use the term physical key to emphasize a key on a physical keyboard
+  where otherwise confusion would arise."
+  see_also: ["keyboard", "keycap", "physical key"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key actuation"
+  short_description: "Physical action to cause a key effect."
+  full_description: "Doing something to a key to cause a key effect. For
+  example, pressing a key. Actuation is probably a better term to use in
+  general, since while each press is an actuation, not every key actuation
+  has to be a key press. Some keys may be actuated by a tap, or a throw switch,
+  or a twist etc.
+
+  It's OK to use \"key press\" when talking about pressable keys in the narrow
+  sense - such as on a standard PC keyboard. Prefer \"key actuation\" in formal
+  contexts, or where precision is important."
+  see_also: ["Physical key", "Key effect"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key binding"
+  short_description: "A key chord and its key effect, together."
+  full_description: "A pair of a key chord and a key effect. For example
+  pressing \"Ctrl+O\" causes the \"Open File\" dialog box to be shown."
+  see_also: ["Key actuation", "Key chord", "Key effect"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key event"
+  short_description: "A message that reports a state change for a key."
+  full_description: "A message reporting a state change associated with a
+  single key. \"Key 'A' has just been pressed\" is a representation of a key
+  event.
+
+  On Fuchsia, a key event can only ever be delivered to a View that is in
+  focus. This feature ensures that potentially sensitive keyboard input is
+  always delivered only to the View that is permitted to receive it."
+  see_also: ["Keyboard", "Physical key", "View"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key chord"
+  short_description: "One or more simultaneous key actuations."
+  full_description: "One or more key actuations that happen at the same time.
+
+  It may be impossible to actuate a specific key chord without actuating other
+  key chords first. For example, on mechanical keyboards, \"Ctrl+Alt+Del\" can
+  not be actuated until at least one of \"Ctrl\", or \"Alt\" or \"Del\" is
+  actuated first, as it is physically impossible to press all the three keys
+  at the same time.
+
+  This is not a universal definition, so expect variations across time periods,
+  operating systems, and schools of thought. For example, KDE uses the term
+  \"chord\" to mean \"key sequence\". But this usage seems unusual and not
+  intuitive, as it deviates from the use of \"chord\" in music, so we don't
+  follow this precedent and recommend against following it."
+  see_also: ["Physical key"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key consumer"
+  short_description: "The final destination for the events generated by the keyboard subsystem."
+  full_description: "A client that is the final destination for the events
+  generated by the keyboard subsystem. Prefer the term <emph>consumer</emph> to
+  <emph>client</emph>, since the keyboard subsystem has multiple collaborators,
+  each of which can be a client in the context of a particular 1:1
+  collaboration."
+  see_also: ["key event", "keyboard subsystem"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key effect"
+  short_description: "Effect that results when a key is actuated."
+  full_description: "\"Effect that results when a key is actuated, depending on
+  the active level, and possibly by the concurrent operation of a qualifier key
+  or keys.\" (ISO/IEC 9995-1:2009, section 4)
+
+  Example: the letter \"a\" appearing on a screen is a key effect, caused by
+  an actuation of the key with the keycap \"a\" on the keyboard."
+  see_also: ["key", "keycap", "keyboard"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key event API"
+  short_description: "An API that provides discrete key events."
+  full_description: "E.g. fuchsia.ui.input3. API that gives access to discrete
+  key events, possibly annotated with information about the currently
+  applicable keyboard layout. At this stage, events corresponding to button
+  presses have not yet been interpreted as language. May be used for limited
+  use-cases such as controlling a game, but most clients should prefer the
+  text edit API."
+  see_also: ["Text Edit API"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key meaning"
+  short_description: "An encoding corresponding to the meaning a key event
+  has to the key consumer, with all layout and other mappings that apply."
+  full_description: "An encoding corresponding to the meaning a key event
+  has to the key consumer, with all layout and other mappings that apply."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Key sequence"
+  short_description: "A sequence of key chords."
+  full_description: "A sequence of key chords.
+
+  Example: in Emacs, pressing C-x followed by C-s saves the current buffer.
+
+  Since a single key actuation is a key chord (see definition above), every
+  sequence of single key presses such as \"hello world\" is also a key sequence."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Keyboard"
+  short_description: "A means for input of information by a human being."
+  full_description: "An \"[...] intermediate element between a user and an
+  information processing system. The keyboard is specifically intended as
+  a means for input of information by a human being.\"
+  (<a href=\"https://www.iso.org/obp/ui/#iso:std:iso-iec:9995:-1:ed-3:v1:en\">ISO/IEC 9995-1:2009</a>,
+  section 5). This
+  <a href=\"https://en.wikipedia.org/wiki/Computer_keyboard\">link</a>
+  has some examples of computer keyboards."
+  see_also: ["physical keyboard", "virtual keyboard"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Keyboard subsystem"
+  short_description: "The set of Fuchsia system services that process keyboard and text related input."
+  full_description: "The set of Fuchsia system services that process keyboard and text related input."
+  see_also: ["Keyboard", "key event"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Keyboard map"
+  short_description: "A map that transforms a sequence of physical keys into a key meaning."
+  full_description: "A map that transforms a sequence of physical keys into a key meaning.
+  Also known as <emph>keymap</emph>, or <emph>keyboard layout</emph>."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Keyboard shortcut"
+  short_description: "A special kind of key binding."
+  full_description: "A key chord that appears in some key binding.
+
+  All keyboard shortcuts are chords, but only chords that have a key effect
+  associated with them are shortcuts.
+
+  On Fuchsia, a distinctive feature of shortcuts is that they can be routed
+  to Views that are not in focus.
+
+  This allows top-level Views such as the graphical shell, or Accessibility,
+  to install system-wide shortcuts and intercept them instead of yielding them
+  over to child views. Contrast to the behavior of key events, which are only
+  ever delivered to focused views."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Keycap symbol"
+  short_description: "The symbol displayed on top of a key."
+  full_description: "The symbol that is displayed on a key of the physical
+  keyboard, or on the UI item representing a virtual keyboard button that acts
+  as a key. The user's expectation is that actuating a key with a specific
+  symbol on the keycap would, by default, cause that symbol to be communicated
+  to the computer."
+  see_also: ["Physical key", "Keyboard", "Key meaning"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "KOID"
   short_description: "A Kernel Object Identifier."
   full_description: ""
@@ -1248,6 +1488,17 @@
   related_guides: [""]
   area: ["UI"]
 
+- term: "Lock state"
+  short_description: "Caps lock, num lock, fn lock, scroll lock"
+  full_description: "A \"state set by actuating a lock key, singly or in
+  combination with a [modifier] key\". (ISO/IEC 9995-1:2009, section 4.5)
+
+  Example lock state keys on PC keyboards are: CapsLock, NumLock, FnLock,
+  ScrollLock."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "LK"
   short_description: "Little Kernel (LK) is the embedded kernel that formed the core of the Zircon
   Kernel."
@@ -1256,6 +1507,33 @@
   see_also: ["<a href=\"https://github.com/littlekernel/lk\">LK on Github</a>"]
   related_guides: [""]
   area: ["Zircon"]
+
+- term: "Mnemonic"
+  short_description: "Underlined character in a menu option."
+  full_description: "The underlined character in a menu
+  (<a href=\"https://en.wikipedia.org/wiki/Mnemonics_(keyboard)\">Wikipedia</a>).
+  For example, the \"F\" in \"File\" which is accessed by pressing \"Alt+F\".
+
+  Mnemonics are localized. For example, the \"File\" menu in an English version
+  of a program has \"F\" as the mnemonic, so \"Alt+F\" would be used to access.
+  The Dutch version of the same program would have \"Bestanden\" as the title
+  of that very same menu, so \"Alt+B\" would be used for access.
+
+  Mnemonics differ from shortcuts: in an application an \"Open\" command could
+  have \"O\" as mnemonic, but Ctrl+F12 as a shortcut."
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Modifier key"
+  short_description: "A key that modifies the effect of other keys."
+  full_description: "A \"key whose operation has no immediate effect, but
+  which, for as long as it is actuated, modifies the effects of other keys.
+  A modifier key can be, for example, [...] a control key.\"
+  (ISO/IEC 9995-1:2009, section 4.17)"
+  see_also:
+  related_guides: [""]
+  area: ["UI", "HCI"]
 
 - term: "Module"
   short_description: "A role a <a href=\"/docs/glossary#component\">component</a>
@@ -1448,6 +1726,34 @@
   related_guides: ["<a href=\"/docs/development/hardware/paving.md\">Guide for installing Fuchsia with paver</a>"]
   area: ["System", "Devices"]
 
+- term: "Physical keyboard"
+  short_description: "A physical device for text entry."
+  full_description: "A physical device for text entry, which relies on an arrangement of keys."
+  see_also: ["physical key", "keycap", "key effect"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Physical keyboard layout"
+  short_description: "A positioning of keycaps on a physical keyboard."
+  full_description: "A positioning of keycaps on a physical keyboard."
+  see_also: ["keycap", "physical keyboard"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
+- term: "Physical keycode"
+  short_description: "The numeric code associated with a key, as assigned by Fuchsia."
+  full_description: "The numeric code associated with a key, as assigned by
+  the operating system.
+
+  In Fuchsia, the physical key codes are unsigned 32-bit integers, derived from
+  the USB HID usage tables. The USB HID usage page number is encoded in the
+  upper 16 bits, and the usage ID within a page is encoded in the lower 16 bits.
+
+  An encoding of a physical key code used in Fuchsia: see input.Key."
+  see_also: ["Physical key", "Scan code"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "Physical pixels"
   short_description: "Display's physical pixel count."
   full_description: "Display's physical pixel count. i.e. if there are 4K and FHD variants of the
@@ -1606,6 +1912,18 @@
              "<a href=\"/docs/concepts/components/v2/capabilities/runners.md\">Component runner</a>"]
   related_guides: [""]
   area: ["Component Framework", "System"]
+
+- term: "Scan code"
+  short_description: "A sequence of numeric values associated with a key."
+  full_description: "A sequence of numeric values associated with a key, as
+  assigned by the hardware controller of the physical keyboard.
+
+  While standardized scan codes exist, keyboards are varied enough that
+  operating systems usually have to map all scan code sequences into a single
+  space of physical key codes."
+  see_also: ["key", "physical keyboard"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
 
 - term: "Scenic"
   short_description: "Scenic is Fuchsia's system compositor, which composes graphical
@@ -1796,6 +2114,18 @@
   related_guides: [""]
   area: ["Languages and Libraries"]
 
+- term: "Text Edit API"
+  short_description: "An API that allows editing a UI text field."
+  full_description: "E.g. fuchsia.ui.text. This API allows the platform to
+  access and edit the contents of a text field implemented by a UI Framework.
+  This type of editing is a requirement for most text manipulation, in
+  particular when the text is interpreted as human language rather than
+  discrete button events. This API is required for accented characters
+  (anything using a dead key) and most CJK languages."
+  see_also: ["Key Event API"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
+
 - term: "Thread"
   short_description: "A <a href=\"/docs/glossary#kernel-object\">kernel object</a> that
   represents a time-shared CPU execution context. Each thread is contained in
@@ -1959,6 +2289,18 @@
   see_also: [""]
   related_guides: [""]
   area: ["Zircon", "System"]
+
+- term: "Virtual Keyboard"
+  short_description: "A keyboard represented with software."
+  full_description: "While traditionally a keyboard is a
+  <a href=\"https://en.wikipedia.org/wiki/Typewriter\">mechanical</a> or
+  <a href=\"https://en.wikipedia.org/wiki/Computer_keyboard\">electromechanical</a>
+  device, modern keyboards can be visual elements on a screen, or can use voice
+  dictation for example. Also called <emph>on-screen keyboard (OSK)</emph>.
+  [<a href=\"https://en.wikipedia.org/wiki/Computer_keyboard\">wikipedia</a>]"
+  see_also: ["keyboard", "physical keyboard"]
+  related_guides: [""]
+  area: ["UI", "HCI"]
 
 - term: "Virtual Memory Address Range"
   short_description: "A Virtual Memory Address Range (VMAR) is a Zircon
