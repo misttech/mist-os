@@ -320,6 +320,12 @@ variant("user-executable") {
     # PT_INTERP.
     ldflags += [ "-fuse-ld=bfd" ]
   }
+
+  # crt1 and libc will come via explicit link dependencies if at all.
+  ldflags += [
+    "-nostartfiles",
+    "-nolibc",
+  ]
 }
 
 config("integer-paranoia") {

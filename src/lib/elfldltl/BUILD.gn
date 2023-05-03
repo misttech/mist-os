@@ -2,13 +2,39 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 is_elf = current_os != "mac" && current_os != "win"
 
-zx_library("elfldltl") {
-  sdk = "source"
-  sdk_headers = [
+has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
+                       [ "standalone" ] == toolchain_variant.tags
+
+library_headers("headers") {
+  public_deps = [ "//sdk/lib/stdcompat" ]
+  if (has_fd) {
+    public_deps += [
+      # <lib/elfldltl/mapped-fd-file.h> has #include <lib/fit/result.h>.
+      "//sdk/lib/fit",
+
+      # <lib/elfldltl/fd.h> has #include <fbl/unique_fd.h>.
+      "//zircon/system/ulib/fbl",
+    ]
+  }
+  if (is_fuchsia && !is_kernel) {
+    public_deps += [
+      # <lib/elfldltl/vmo.h> has #include <lib/zx/vmo.h>.
+      "//zircon/system/ulib/zx",
+    ]
+  }
+  if (is_kernel) {
+    public_deps += [
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+  }
+
+  headers = [
     "lib/elfldltl/compat-hash.h",
     "lib/elfldltl/constants.h",
     "lib/elfldltl/container.h",
@@ -49,57 +75,57 @@ zx_library("elfldltl") {
     "lib/elfldltl/vmo.h",
     "lib/elfldltl/zircon.h",
   ]
+}
+
+static_library("elfldltl") {
+  public_deps = [ ":headers" ]
+  complete_static_lib = true
 
   sources = []
+  deps = []
   if (is_elf) {
-    sources += [ "self.cc" ]
-    configs += [ "//build/config/sanitizers:no_sanitizers" ]
-    libs = [ "./self-base.ld" ]
-  }
-
-  public_deps = [ "//sdk/lib/stdcompat" ]
-  if (!is_kernel) {
-    public_deps += [
-      # <lib/elfldltl/mapped-fd-file.h> has #include <lib/fit/result.h>.
-      "//sdk/lib/fit:headers",
-
-      # <lib/elfldltl/fd.h> has #include <fbl/unique_fd.h>.
-      "//zircon/system/ulib/fbl:headers",
-    ]
-    if (is_fuchsia) {
-      public_deps += [
-        # <lib/elfldltl/mapped-vmo-file.h> has #include <lib/zx/status.h>.
-        "//zircon/system/ulib/zx:headers",
-
-        # <lib/elfldltl/vmo.h> has #include <lib/zx/vmo.h>.
-        "//zircon/system/ulib/zx:headers",
-      ]
+    if (toolchain_base_environment == "user") {
+      deps += [ ":self.basic" ]
+    } else {
+      deps += [ ":self" ]
     }
   }
-
-  deps = []
-  if (is_kernel) {
-    deps += [
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-  } else {
+  if (has_fd) {
     sources += [ "mapped-fd-file.cc" ]
     deps += [
       "//sdk/lib/fit",
       "//zircon/system/ulib/fbl",
     ]
-    if (is_fuchsia) {
-      sources += [
-        "mapped-vmo-file.cc",
-        "vmar-loader.cc",
-      ]
-      deps += [ "//zircon/system/ulib/zx" ]
+  }
+  if (is_fuchsia && !is_kernel) {
+    sources += [
+      "mapped-vmo-file.cc",
+      "vmar-loader.cc",
+    ]
+    deps += [ "//zircon/system/ulib/zx" ]
+  }
+
+  if (is_linux) {
+    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  }
+}
+
+if (is_elf) {
+  # When the elfldltl::Self<...> code is not fully inlined, it's still used in
+  # places where only the basic machine ABI is available.
+
+  if (toolchain_base_environment == "user") {
+    user_basic_redirect("self.basic") {
+      visibility = [ ":*" ]
+      public_deps = [ ":self" ]
     }
   }
 
-  if (current_os == "linux") {
-    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  source_set("self") {
+    visibility = [ ":*" ]
+    deps = [ ":headers" ]
+    sources = [ "self.cc" ]
+    libs = [ "./self-base.ld" ]
   }
 }
 

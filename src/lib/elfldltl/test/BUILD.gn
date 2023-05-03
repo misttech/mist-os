@@ -8,6 +8,7 @@ import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/testing/zbi_test.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 is_elf = current_os != "mac" && current_os != "win"
 
@@ -148,49 +149,66 @@ if (current_os == "linux") {
 if (is_fuchsia) {
   static_library("static-pie") {
     sources = [ "fuchsia-static-pie.cc" ]
-    configs += [ "//build/config/fuchsia:static-pie-config" ]
-    deps = [ ".." ]
+    deps = [
+      "..",
+      "//src/zircon/lib/zircon",
+    ]
 
     # Avoid libc references from assert() in libc++ header code.
     defines = [ "NDEBUG=1" ]
   }
 
-  test("fuchsia-static-pie-test") {
-    sources = [ "fuchsia-static-pie-test.cc" ]
+  # The test doesn't get normal C library setup before its code runs, so it
+  # needs to use the basic machine ABI.
+  user_basic_redirect("fuchsia-static-pie-test.basic") {
+    testonly = true
+    public_deps = [ ":fuchsia-static-pie-test" ]
+  }
 
-    # Avoid libc references from assert() in libc++ header code.
-    defines = [ "NDEBUG=1" ]
+  if (toolchain_environment == "user.basic") {
+    # This is only actually used in the user.basic environment through the
+    # redirect above. Usually it's harmless enough for targets to be defined in
+    # additional toolchains where they aren't used. However, this target used
+    # to be built in $default_toolchain and Ninja quirks mean that later
+    # rebuilds in existing build directories that survive across the change
+    # where it should no longer be built in $default_toolchain will wind up
+    # trying to rebuild the $default_toolchain instantiation of this target
+    # (even though nothing will use that binary); but that doesn't link
+    # correctly any more since this target is now only intended to be used in
+    # the user.basic toolchain.
+    test("fuchsia-static-pie-test") {
+      visibility = [ ":*" ]
 
-    configs += [ "//build/config/fuchsia:static-pie-config" ]
-    if (zircon_toolchain == false) {
-      configs -= [ "//build/config/fuchsia:fdio_config" ]
+      sources = [ "fuchsia-static-pie-test.cc" ]
+
+      # Avoid libc references from assert() in libc++ header code.
+      defines = [ "NDEBUG=1" ]
+
+      ldflags = [
+        # A standalone binary should indicate its stack requirements.
+        # They should be minimal for this test.
+        "-Wl,-z,stack-size=0x1000",
+      ]
+
+      deps = [
+        ":static-pie",
+        "//src/zircon/lib/zircon",
+        "//zircon/system/ulib/c/string:mem",
+        "//zircon/third_party/ulib/musl/src/exit:abort",
+      ]
+
+      exclude_toolchain_tags = [ "instrumented" ]
+
+      # TODO(fxbug.dev/126542): __ehdr_start bug in ld.bfd aarch64-elf
+      if (current_cpu == "arm64") {
+        exclude_toolchain_tags += [ "gcc" ]
+      }
     }
-    disable_syslog_backend = true
-
-    ldflags = [
-      # The build system makes it impossible to avoid the libc dep.  But this
-      # can avoid it creating a spurious DT_NEEDED, though that's harmless
-      # enough since nothing looks at those without a dynamic linker.
-      "-Wl,--as-needed",
-
-      # A standalone binary should indicate its stack requirements.
-      # They should be minimal for this test.
-      "-Wl,-z,stack-size=0x1000",
-    ]
-
-    deps = [
-      ":static-pie",
-      "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/c/string:mem",
-      "//zircon/third_party/ulib/musl/src/exit:abort",
-    ]
-
-    exclude_toolchain_tags = [ "instrumented" ]
   }
 
   fuchsia_unittest_package("elfldltl-static-pie-test") {
     deps = [
-      ":fuchsia-static-pie-test",
+      ":fuchsia-static-pie-test.basic",
       "//src/sys/testing/elftest",
     ]
   }
@@ -349,7 +367,7 @@ zbi_test("zbi-static-pie-test") {
   ]
 
   deps = [
-    ":fuchsia-static-pie-test",
+    ":fuchsia-static-pie-test.basic",
     "//zircon/kernel",
   ]
   assert_no_deps = [

@@ -391,7 +391,7 @@ struct Elf : private Layout<Class, Data> {
   // even if this pattern is unlikely to be used on these types.
 
   struct Rel {
-    constexpr uint32_t symndx() const { return info() >> kSymndxShift; }
+    constexpr uint32_t symndx() const { return static_cast<uint32_t>(info() >> kSymndxShift); }
     constexpr uint32_t type() const { return info() & kTypeMask; }
 
     static constexpr auto kSymndxShift = Layout<Class, Data>::kRelTypeBits;
@@ -406,7 +406,7 @@ struct Elf : private Layout<Class, Data> {
   };
 
   struct Rela {
-    constexpr uint32_t symndx() const { return info() >> kSymndxShift; }
+    constexpr uint32_t symndx() const { return static_cast<uint32_t>(info() >> kSymndxShift); }
     constexpr uint32_t type() const { return info() & kTypeMask; }
 
     static constexpr auto kSymndxShift = Layout<Class, Data>::kRelTypeBits;
