@@ -602,6 +602,10 @@ class RustRemoteAction(object):
         remote_output_files = list(self._remote_output_files())
         remote_output_dirs = list(self._remote_output_dirs())
 
+        downloads = []
+        if self.depfile:  # always download the depfile
+            downloads.append(self.depfile)
+
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
             remote_options=self.remote_options,
@@ -612,6 +616,7 @@ class RustRemoteAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
             post_remote_run_success_action=self._post_remote_success_action,
+            downloads=downloads,
         )
         self._prepare_status = 0  # exit code success
         return self._prepare_status

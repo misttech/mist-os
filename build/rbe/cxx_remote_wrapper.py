@@ -268,6 +268,10 @@ class CxxRemoteAction(object):
             msg(f'remote output dirs: {remote_output_dirs}')
             msg(f'rewrapper options: {remote_options}')
 
+        downloads = []
+        if self.depfile:  # always fetch the depfile
+            downloads.append(self.depfile)
+
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
             remote_options=remote_options,
@@ -278,6 +282,7 @@ class CxxRemoteAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
             post_remote_run_success_action=self._post_remote_success_action,
+            downloads=downloads,
         )
 
         self._prepare_status = 0

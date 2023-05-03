@@ -736,7 +736,10 @@ def _write_download_stub(
     # TODO(http://fxbug.dev/123178): use xattr package for portability
     if hasattr(os, 'setxattr'):  # not available on all platforms
         os.setxattr(
-            path, _RBE_XATTR_NAME, stub_info.blob_digest, follow_symlinks=False)
+            path,
+            _RBE_XATTR_NAME,
+            stub_info.blob_digest.encode(),
+            follow_symlinks=False)
 
 
 def get_download_stub_file(path: Path) -> Optional[Path]:
@@ -814,7 +817,7 @@ def make_download_stubs(
     working_dir_abs: Path,
     rrpl: Path,
     build_id: str,
-):
+) -> ReproxyLogEntry:
     """Establish placeholders from which real artifacts can be retrieved later.
 
     Args:
@@ -825,6 +828,9 @@ def make_download_stubs(
       rrpl: single-action reproxy log (reproxy.LogRecord), which contains
           file digests.
       build_id: any string that corresponds to a unique build.
+
+    Returns:
+      the ReproxyLogEntry that was parsed.
     """
     log_record = ReproxyLogEntry.parse_action_log(rrpl)
     # TODO: the following could be parallelized
@@ -842,6 +848,7 @@ def make_download_stubs(
             build_id=build_id,
             working_dir_abs=working_dir_abs,
         )
+    return log_record
 
 
 class RemoteAction(object):
@@ -870,6 +877,7 @@ class RemoteAction(object):
         check_determinism: bool = False,
         post_remote_run_success_action: Callable[[], int] = None,
         remote_debug_command: Sequence[str] = None,
+        always_download: Sequence[Path] = None,
     ):
         """RemoteAction constructor.
 
@@ -916,6 +924,8 @@ class RemoteAction(object):
             a cause of error.
           remote_debug_command: if True, run different command remotely instead of
             the original command, for debugging the remote inputs setup.
+          always_download: files/dirs to download, relative to the working dir,
+            even if --download_outputs=false.
         """
         self._rewrapper = rewrapper
         self._config = cfg  # can be None
@@ -933,6 +943,7 @@ class RemoteAction(object):
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
         self._remote_debug_command = remote_debug_command or []
+        self._always_download = always_download or []
 
         # By default, the local and remote commands match, but there are
         # circumstances that require them to be different.  It is the caller's
@@ -988,6 +999,10 @@ class RemoteAction(object):
     @property
     def config(self) -> str:
         return self._config
+
+    @property
+    def always_download(self) -> Sequence[str]:
+        return self._always_download
 
     @property
     def _default_auxiliary_file_basename(self) -> str:
@@ -1306,15 +1321,25 @@ class RemoteAction(object):
             return self.local_launch_command
         return self.remote_launch_command
 
-    def _make_download_stubs(self):
+    def _process_download_stubs(self):
         self.vmsg("Creating download stubs for remote outputs.")
-        make_download_stubs(
+        build_id = _reproxy_log_dir()  # unique per build
+        log_record = make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
             working_dir_abs=self.working_dir,
             rrpl=self._action_log,
-            build_id=_reproxy_log_dir(),  # unique per build
+            build_id=build_id,
         )
+        # Download outputs that were explicitly requested.
+        # With 'log_record', we can just go directly to stub info without
+        # having to read the stub file we just wrote.
+        for path in self.always_download:
+            stub_info = log_record.make_download_stub_info(path, build_id)
+            status = stub_info.download(
+                exec_root=self.exec_root, working_dir=self.working_dir)
+            if status != 0:  # alert, but do not fail
+                msg(f"Unable to download {path}.")
 
     def _cleanup(self):
         self.vmsg("Cleaning up temporary files.")
@@ -1362,8 +1387,9 @@ class RemoteAction(object):
                 # Also run locally, and compare outputs.
                 return self._compare_against_local()
         else:
-            self._make_download_stubs()
-            # TODO: in compare-mode, force-download outputs,
+            self._process_download_stubs()
+
+            # TODO: in compare-mode, force-download all output files and dirs,
             # overriding and taking precedence over
             # --download_outputs=false, because comparison is intended
             # to be done locally with downloaded artifacts.
@@ -1885,6 +1911,13 @@ Otherwise, BASE will default to the first output file named.""",
         help=
         f"""Alternate command to execute remotely, while doing the setup for the original command.  e.g. --remote-debug-command="ls -l -R {PROJECT_ROOT_REL}" ."""
     )
+    main_group.add_argument(
+        "--download",
+        action="append",
+        default=[],
+        help=
+        "Always download these outputs, even when --download_outputs=false.  Arguments are files or directories relative to the working dir, comma-separated, repeatable and cumulative.",
+    )
     # Positional args are the command and arguments to run.
     parser.add_argument(
         "command", nargs="*", help="The command to run remotely")
@@ -1911,6 +1944,7 @@ def remote_action_from_args(
         inputs: Sequence[Path] = None,
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
+        downloads: Sequence[Path] = None,
         **kwargs,  # other RemoteAction __init__ params
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
@@ -1923,6 +1957,9 @@ def remote_action_from_args(
     output_dirs = (output_dirs or []) + [
         Path(p)
         for p in cl_utils.flatten_comma_list(main_args.output_directories)
+    ]
+    always_download = (downloads or []) + [
+        Path(p) for p in cl_utils.flatten_comma_list(main_args.download)
     ]
     return RemoteAction(
         rewrapper=main_args.bindir / "rewrapper",
@@ -1942,6 +1979,7 @@ def remote_action_from_args(
         fsatrace_path=main_args.fsatrace_path,
         diagnose_nonzero=main_args.diagnose_nonzero,
         remote_debug_command=main_args.remote_debug_command,
+        always_download=always_download,
         **kwargs,
     )
 

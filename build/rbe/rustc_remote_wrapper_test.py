@@ -228,6 +228,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(
             remote_inputs, set([compiler, shlib_rel, source] + deps))
         self.assertEqual(remote_output_files, {rlib, depfile_path})
+        self.assertEqual(set(a.always_download), set([depfile_path]))
 
     def test_prepare_depfile_failure(self):
         exec_root = Path('/home/project')
