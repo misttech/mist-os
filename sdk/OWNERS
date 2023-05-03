@@ -18,3 +18,4 @@ hjfreyer@google.com
 # Add/Change how the SDK is built:
 #   That's "how" the SDK is made, ask
 dschuyler@google.com
+per-file *.gn,*.gni,version_history.json = file: /build/OWNERS
