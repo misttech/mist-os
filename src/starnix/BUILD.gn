@@ -8,6 +8,7 @@ group("starnix") {
     "examples",
     "kernel",
     "runner",
+    "tools",
   ]
 }
 
