@@ -107,8 +107,13 @@ void ServiceInstanceResolver::ReceiveResource(const DnsResource& resource,
       break;
     case DnsType::kAaaa:
       if (resource.name_.dotted_string_ == target_full_name_) {
+        // Add scope_id only to link local addresses.
+        uint32_t scope_id = 0;
+        if (resource.aaaa_.address_.address_.is_link_local()) {
+          scope_id = sender_address.interface_id();
+        }
         auto address = MdnsFidlUtil::CreateSocketAddressV6(
-            inet::SocketAddress(resource.aaaa_.address_.address_, port_));
+            inet::SocketAddress(resource.aaaa_.address_.address_, port_, scope_id));
         instance_.set_ipv6_endpoint(address);
         if (!instance_.has_addresses()) {
           instance_.set_addresses(std::vector<fuchsia::net::SocketAddress>());
