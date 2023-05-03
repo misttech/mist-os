@@ -15,7 +15,7 @@
     children: [
         {
             name: "mock-a2dp-controller",
-            url: "fuchsia-pkg://fuchsia.com/bt-hfp-audio-gateway-tests#meta/mock-a2dp-controller.cm",
+            url: "#meta/mock-a2dp-controller.cm",
         },
     ],
     use: [
