@@ -339,19 +339,7 @@ func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 			PATH= echo "%s" > "%s"
         )`, bootID, rebootCheckPath)
 
-	initialBootCount := *c.bootCounter
-
-	err = c.Run(ctx, strings.Fields(cmd), os.Stdout, os.Stderr)
-
-	afterBootCount := *c.bootCounter
-
-	logger.Infof(ctx, "device appears to have rebooted %d times", afterBootCount-initialBootCount)
-
-	if initialBootCount != afterBootCount {
-		return fmt.Errorf("boot counters do not match!")
-	}
-
-	if err != nil {
+	if err := c.Run(ctx, strings.Fields(cmd), os.Stdout, os.Stderr); err != nil {
 		return fmt.Errorf("failed to write reboot check file: %w", err)
 	}
 
@@ -366,6 +354,9 @@ func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 	if actual != bootID {
 		return fmt.Errorf("reboot check file has wrong value: expected %q, got %q", bootID, actual)
 	}
+
+	// Look up the boot count before we reboot the device.
+	initialBootCount := *c.bootCounter
 
 	ch := c.DisconnectionListener()
 
@@ -384,6 +375,17 @@ func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 
 	if err := c.Reconnect(ctx); err != nil {
 		return fmt.Errorf("failed to reconnect: %w", err)
+	}
+
+	// We've reconnected to the device, so count how many times we've rebooted.
+	afterBootCount := *c.bootCounter
+
+	// If we have boot counting enabled (signified by the initial boot
+	// count not being zero), then check how many times we rebooted. It
+	// should be 1 more than our initial count. If not, error out.
+	logger.Infof(ctx, "device appears to have rebooted %d times", afterBootCount-initialBootCount)
+	if initialBootCount != 0 && initialBootCount+1 != afterBootCount {
+		return fmt.Errorf("device appears to have rebooted more than once! %d != %d", initialBootCount, afterBootCount)
 	}
 
 	// We reconnected to the device. Check that the reboot check file doesn't exist.
@@ -413,8 +415,6 @@ func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 			actual,
 		)
 	}
-
-	logger.Infof(ctx, "device rebooted")
 
 	return nil
 }
