@@ -181,7 +181,7 @@ ACPI_STATUS AcpiIoPortSetup() {
   return AE_OK;
 }
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
 
 ACPI_STATUS AcpiIoPortSetup() { return AE_OK; }
 ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32* Value, UINT32 Width) {
@@ -190,5 +190,9 @@ ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32* Value, UINT32 Width)
 ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Width) {
   return AE_NOT_IMPLEMENTED;
 }
+
+#else
+
+#error handle this new architecture
 
 #endif
