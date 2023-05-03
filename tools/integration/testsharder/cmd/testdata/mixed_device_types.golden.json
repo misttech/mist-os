@@ -51,6 +51,7 @@
         ],
         "environment": {
             "dimensions": {
+                "cpu": "x64",
                 "os": "Linux"
             }
         },
