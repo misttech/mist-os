@@ -56,7 +56,8 @@ class AutoJoinThread {
 // Run a test with LSAN disabled.
 template <typename Callable>
 void RunWithLsanDisabled(Callable&& callable) {
-#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
   // Disable LSAN for this thread while in scope. It is expected to leak by way
   // of a crash.
   __lsan::ScopedDisabler _;

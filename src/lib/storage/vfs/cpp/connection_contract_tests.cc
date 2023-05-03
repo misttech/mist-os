@@ -87,7 +87,8 @@ TEST(ConnectionDeathTest, StartDispatchingRequiresVfsManagingConnection_Negative
   if (ZX_DEBUG_ASSERT_IMPLEMENTED) {
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_DEATH([&] {
-#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
       // Disable LSAN, this thread is expected to leak by way of a crash.
       __lsan::ScopedDisabler _;
 #endif

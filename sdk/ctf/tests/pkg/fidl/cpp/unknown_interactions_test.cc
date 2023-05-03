@@ -1771,7 +1771,8 @@ TEST_F(UnknownInteractions, FlexibleTwoWayResponseManualUnknownResponse) {
   ASSERT_EQ(ZX_OK, client.write(0, &client_request, client_request.size(), nullptr, 0));
 
   ASSERT_DEATH([this]() {
-#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
     // Disable LSAN for this thread while in scope. It is expected to leak by way
     // of a crash.
     __lsan::ScopedDisabler _;
@@ -1874,7 +1875,8 @@ TEST_F(UnknownInteractions, FlexibleTwoWayErrResponseManualUnknownResponse) {
   ASSERT_EQ(ZX_OK, client.write(0, &client_request, client_request.size(), nullptr, 0));
 
   ASSERT_DEATH([this]() {
-#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
+    __has_feature(hwaddress_sanitizer)
     // Disable LSAN for this thread while in scope. It is expected to leak by way
     // of a crash.
     __lsan::ScopedDisabler _;
