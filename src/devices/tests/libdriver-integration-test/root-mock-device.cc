@@ -131,8 +131,9 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
 
   fidl::WireSharedClient<fuchsia_device::Controller> controller_client;
   {
+    std::string controller_path = path + "/device_controller";
     zx::result channel =
-        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), path.c_str());
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), controller_path.c_str());
     if (channel.is_error()) {
       return channel.error_value();
     }

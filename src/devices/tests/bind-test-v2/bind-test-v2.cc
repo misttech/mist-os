@@ -67,12 +67,13 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
 
     // Connect to the child device and bind a test driver to it.
     {
+      std::string controller_path = device_path_ + "/device_controller";
       zx::result channel =
-          device_watcher::RecursiveWaitForFile(root_fd.get(), device_path_.c_str());
+          device_watcher::RecursiveWaitForFile(root_fd.get(), controller_path.c_str());
       ASSERT_EQ(channel.status_value(), ZX_OK);
 
-      fidl::ClientEnd<fuchsia_device::Controller> client_end(std::move(channel.value()));
-      fidl::WireSyncClient child{std::move(client_end)};
+      fidl::WireSyncClient child{
+          fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
 
       auto response = child->Bind(::fidl::StringView::FromExternal(kDriverLibname));
       status = response.status();

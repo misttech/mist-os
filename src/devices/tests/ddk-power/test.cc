@@ -17,7 +17,6 @@
 #include <zxtest/zxtest.h>
 
 using driver_integration_test::IsolatedDevmgr;
-using fuchsia_device::Controller;
 using fuchsia_device::wire::DevicePerformanceStateInfo;
 using fuchsia_device::wire::DevicePowerState;
 using fuchsia_device::wire::DevicePowerStateInfo;
@@ -29,6 +28,10 @@ using fuchsia_device_manager::wire::SystemPowerState;
 using fuchsia_device_power_test::TestDevice;
 namespace device_manager_fidl = fuchsia_device_manager;
 namespace lifecycle_fidl = fuchsia_process_lifecycle;
+
+constexpr char kPowerTestPath[] = "sys/platform/11:0b:0/power-test";
+constexpr char kPowerTestChild1Path[] = "sys/platform/11:0b:0/power-test/power-test-child";
+constexpr char kPowerTestChild2Path[] = "sys/platform/11:0b:0/power-test/power-test-child-2";
 
 class PowerTestCase : public zxtest::Test {
  public:
@@ -45,15 +48,29 @@ class PowerTestCase : public zxtest::Test {
     zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr);
     ASSERT_OK(status);
 
-    zx::result parent_channel = device_watcher::RecursiveWaitForFile(
-        devmgr.devfs_root().get(), "sys/platform/11:0b:0/power-test");
+    zx::result parent_channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), kPowerTestPath);
     ASSERT_OK(parent_channel);
     parent_device_client.Bind(fidl::ClientEnd<TestDevice>{std::move(parent_channel.value())});
 
-    zx::result child_channel = device_watcher::RecursiveWaitForFile(
-        devmgr.devfs_root().get(), "sys/platform/11:0b:0/power-test/power-test-child");
+    std::string parent_controller_path = std::string(kPowerTestPath) + "/device_controller";
+    parent_channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
+                                                          parent_controller_path.c_str());
+    ASSERT_OK(parent_channel);
+    parent_device_controller.Bind(
+        fidl::ClientEnd<fuchsia_device::Controller>{std::move(parent_channel.value())});
+
+    zx::result child_channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), kPowerTestChild1Path);
     ASSERT_OK(child_channel);
     child1_device_client.Bind(fidl::ClientEnd<TestDevice>{std::move(child_channel.value())});
+
+    std::string child_controller_path = std::string(kPowerTestChild1Path) + "/device_controller";
+    child_channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
+                                                         child_controller_path.c_str());
+    ASSERT_OK(child_channel);
+    child1_device_controller.Bind(
+        fidl::ClientEnd<fuchsia_device::Controller>{std::move(child_channel.value())});
   }
 
   void AddChildWithPowerArgs(DevicePowerStateInfo *states, uint8_t sleep_state_count,
@@ -72,10 +89,17 @@ class PowerTestCase : public zxtest::Test {
     }
     ASSERT_OK(call_status);
 
-    zx::result channel = device_watcher::RecursiveWaitForFile(
-        devmgr.devfs_root().get(), "sys/platform/11:0b:0/power-test/power-test-child-2");
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), kPowerTestChild2Path);
     ASSERT_OK(channel);
     child2_device_client.Bind(fidl::ClientEnd<TestDevice>{std::move(channel.value())});
+
+    std::string child_controller_path = std::string(kPowerTestChild2Path) + "/device_controller";
+    channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
+                                                   child_controller_path.c_str());
+    ASSERT_OK(channel);
+    child2_device_controller.Bind(
+        fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())});
   }
 
   void WaitForDeviceSuspendCompletion(const fidl::WireSyncClient<TestDevice> &client) {
@@ -88,8 +112,13 @@ class PowerTestCase : public zxtest::Test {
   }
 
   fidl::WireSyncClient<TestDevice> parent_device_client;
+  fidl::WireSyncClient<fuchsia_device::Controller> parent_device_controller;
+
   fidl::WireSyncClient<TestDevice> child1_device_client;
+  fidl::WireSyncClient<fuchsia_device::Controller> child1_device_controller;
+
   fidl::WireSyncClient<TestDevice> child2_device_client;
+  fidl::WireSyncClient<fuchsia_device::Controller> child2_device_controller;
   IsolatedDevmgr devmgr;
 };
 
@@ -354,20 +383,13 @@ TEST_F(PowerTestCase, SetPerformanceState_Success) {
 
   AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto perf_change_result =
-      fidl::WireCall(
-          fidl::UnownedClientEnd<Controller>(child2_device_client.client_end().borrow().channel()))
-          ->SetPerformanceState(1);
+  auto perf_change_result = child2_device_controller->SetPerformanceState(1);
   ASSERT_OK(perf_change_result.status());
   const auto &perf_change_response = perf_change_result.value();
   ASSERT_OK(perf_change_response.status);
   ASSERT_EQ(perf_change_response.out_state, 1);
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto response2 = fidl::WireCall(fidl::UnownedClientEnd<Controller>(
-                                      child2_device_client.client_end().borrow().channel()))
-                       ->GetCurrentPerformanceState();
+  auto response2 = child2_device_controller->GetCurrentPerformanceState();
   ASSERT_OK(response2.status());
   ASSERT_EQ(response2.value().out_state, 1);
 }
@@ -375,11 +397,7 @@ TEST_F(PowerTestCase, SetPerformanceState_Success) {
 TEST_F(PowerTestCase, SetPerformanceStateFail_HookNotPresent) {
   // Parent does not support SetPerformanceState hook.
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto perf_change_result =
-      fidl::WireCall(
-          fidl::UnownedClientEnd<Controller>(parent_device_client.client_end().borrow().channel()))
-          ->SetPerformanceState(0);
+  auto perf_change_result = parent_device_controller->SetPerformanceState(0);
   ASSERT_OK(perf_change_result.status());
   const auto &perf_change_response = perf_change_result.value();
   ASSERT_EQ(perf_change_response.status, ZX_ERR_NOT_SUPPORTED);
@@ -403,11 +421,7 @@ TEST_F(PowerTestCase, SetPerformanceStateFail_UnsupportedState) {
 
   AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto perf_change_result =
-      fidl::WireCall(
-          fidl::UnownedClientEnd<Controller>(child2_device_client.client_end().borrow().channel()))
-          ->SetPerformanceState(2);
+  auto perf_change_result = child2_device_controller->SetPerformanceState(2);
   ASSERT_OK(perf_change_result.status());
   const auto &perf_change_response = perf_change_result.value();
   ASSERT_EQ(perf_change_response.status, ZX_ERR_INVALID_ARGS);
@@ -547,20 +561,13 @@ TEST_F(PowerTestCase, SelectiveResume_AfterSetPerformanceState) {
 
   AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto perf_change_result =
-      fidl::WireCall(
-          fidl::UnownedClientEnd<Controller>(child2_device_client.client_end().borrow().channel()))
-          ->SetPerformanceState(1);
+  auto perf_change_result = child2_device_controller->SetPerformanceState(1);
   ASSERT_OK(perf_change_result.status());
   const auto &perf_change_response = perf_change_result.value();
   ASSERT_OK(perf_change_response.status);
   ASSERT_EQ(perf_change_response.out_state, 1);
 
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  auto response2 = fidl::WireCall(fidl::UnownedClientEnd<Controller>(
-                                      child2_device_client.client_end().borrow().channel()))
-                       ->GetCurrentPerformanceState();
+  auto response2 = child2_device_controller->GetCurrentPerformanceState();
   ASSERT_OK(response2.status());
   ASSERT_EQ(response2.value().out_state, 1);
 }

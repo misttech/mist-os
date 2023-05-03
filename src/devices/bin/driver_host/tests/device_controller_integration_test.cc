@@ -26,7 +26,8 @@ constexpr const char kPassDriverName[] = "unit-test-pass.cm";
 constexpr const char kFailDriverName[] = "unit-test-fail.cm";
 
 void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
-                      fidl::ClientEnd<fuchsia_device::Controller>* dev_channel) {
+                      fidl::ClientEnd<fuchsia_device::Controller>* controller_channel,
+                      fidl::ClientEnd<fuchsia_device_test::Device>* dev_channel) {
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), fuchsia_device_test::wire::kControlDevice);
   ASSERT_OK(channel.status_value());
@@ -43,16 +44,24 @@ void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
               zx_status_get_string(result->error_value()));
 
   // Connect to the child that we created.
+  std::string device_path;
+  device_path.append(fuchsia_device_test::wire::kControlDevice);
+  device_path.append("/");
+  device_path.append(driver_name);
   {
-    std::string device_path;
-    device_path.append(fuchsia_device_test::wire::kControlDevice);
-    device_path.append("/");
-    device_path.append(driver_name);
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), device_path.c_str());
+    ASSERT_OK(channel.status_value());
+    *dev_channel = fidl::ClientEnd<fuchsia_device_test::Device>{std::move(channel.value())};
+  }
+  // Connect to it's device controller.
+  {
+    device_path.append("/device_controller");
 
     zx::result channel =
         device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), device_path.c_str());
     ASSERT_OK(channel.status_value());
-    *dev_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+    *controller_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
   }
 }
 
@@ -74,27 +83,28 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindSameDriver) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kPassDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kPassDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
   call_status = ZX_OK;
-  auto resp2 = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
+  auto resp2 =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
   ASSERT_OK(resp2.status());
   if (resp2.value().is_error()) {
     call_status = resp2.value().error_value();
   }
   ASSERT_OK(resp2.status());
   ASSERT_STATUS(ZX_ERR_ALREADY_BOUND, call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 TEST_F(DeviceControllerIntegrationTest, TestRebindNoChildrenManualBind) {
@@ -104,19 +114,19 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindNoChildrenManualBind) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kPassDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kPassDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Rebind(fidl::StringView::FromExternal(kPassDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Rebind(fidl::StringView::FromExternal(kPassDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenAutoBind) {
@@ -254,11 +264,13 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindDifferentDriver) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kPassDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kPassDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -266,16 +278,15 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindDifferentDriver) {
   ASSERT_OK(call_status);
 
   call_status = ZX_OK;
-  auto resp2 = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
+  auto resp2 =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp2.status());
   if (resp2.value().is_error()) {
     call_status = resp2.value().error_value();
   }
   ASSERT_OK(resp2.status());
   ASSERT_STATUS(ZX_ERR_ALREADY_BOUND, call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBind) {
@@ -287,19 +298,19 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBind) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kPassDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kPassDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kPassDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBindFail) {
@@ -311,19 +322,19 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBindFail) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kFailDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kFailDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_STATUS(ZX_ERR_BAD_STATE, call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 // Test the flag using bind failure as a proxy for "the unit test did run".
@@ -336,19 +347,19 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestEnabledBindFail) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kFailDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kFailDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_STATUS(ZX_ERR_BAD_STATE, call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 // Test the flag using bind success as a proxy for "the unit test didn't run".
@@ -359,19 +370,19 @@ TEST_F(DeviceControllerIntegrationTest, DefaultTestsDisabledBind) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kFailDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kFailDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 // Test the flag using bind success as a proxy for "the unit test didn't run".
@@ -385,19 +396,19 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestDisabledBind) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
-  CreateTestDevice(devmgr.value(), kFailDriverName, &dev_channel);
+  fidl::ClientEnd<fuchsia_device::Controller> controller_channel;
+  fidl::ClientEnd<fuchsia_device_test::Device> dev_channel;
+  CreateTestDevice(devmgr.value(), kFailDriverName, &controller_channel, &dev_channel);
 
   zx_status_t call_status = ZX_OK;
-  auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
+  auto resp =
+      fidl::WireCall(controller_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
-  ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
-                ->Destroy());
+  ASSERT_OK(fidl::WireCall(dev_channel)->Destroy());
 }
 
 TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Success) {
