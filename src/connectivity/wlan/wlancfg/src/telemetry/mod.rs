@@ -4,10 +4,15 @@
 
 mod convert;
 pub mod experiment;
+mod inspect_time_series;
 mod windowed_stats;
 
 use {
-    crate::{client, telemetry::windowed_stats::WindowedStats, util::pseudo_energy::PseudoDecibel},
+    crate::{
+        client,
+        telemetry::{inspect_time_series::TimeSeriesStats, windowed_stats::WindowedStats},
+        util::pseudo_energy::PseudoDecibel,
+    },
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -382,6 +387,12 @@ pub fn serve_telemetry(
                     // rather than 23 hours.
                     if interval_tick % INTERVAL_TICKS_PER_HR == 0 {
                         telemetry.signal_hr_passed().await;
+                    }
+
+                    if interval_tick % INTERVAL_TICKS_PER_MINUTE == 0 {
+                        // Slide the window of all time series stats only after
+                        // `handle_periodic_telemetry` is called.
+                        telemetry.stats_logger.time_series_stats.lock().slide_minute();
                     }
                 }
             }
@@ -1298,6 +1309,13 @@ fn float_to_ten_thousandth(value: f64) -> i64 {
     (value * 10000f64) as i64
 }
 
+fn round_to_nearest_second(duration: zx::Duration) -> i64 {
+    const MILLIS_PER_SEC: i64 = 1000;
+    let millis = duration.into_millis();
+    let rounded_portion = if millis % MILLIS_PER_SEC >= 500 { 1 } else { 0 };
+    millis / MILLIS_PER_SEC + rounded_portion
+}
+
 pub async fn connect_to_metrics_logger_factory(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy, Error> {
     let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
@@ -1374,6 +1392,15 @@ async fn diff_and_log_counters(
     let tx_drop_rate = if tx_total > 0 { tx_drop as f64 / tx_total as f64 } else { 0f64 };
     let rx_drop_rate = if rx_total > 0 { rx_drop as f64 / rx_total as f64 } else { 0f64 };
 
+    stats_logger
+        .log_stat(StatOp::AddRxTxPacketCounters {
+            rx_unicast_total: rx_total,
+            rx_unicast_drop: rx_drop,
+            tx_total,
+            tx_drop,
+        })
+        .await;
+
     if tx_drop_rate > HIGH_PACKET_DROP_RATE_THRESHOLD {
         stats_logger.log_stat(StatOp::AddTxHighPacketDropDuration(duration)).await;
     }
@@ -1393,6 +1420,7 @@ async fn diff_and_log_counters(
 
 struct StatsLogger {
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    time_series_stats: Arc<Mutex<TimeSeriesStats>>,
     last_1d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
     last_7d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
     /// Stats aggregated for each day and then logged into Cobalt.
@@ -1407,6 +1435,7 @@ struct StatsLogger {
     rssi_hist: HashMap<u32, fidl_fuchsia_metrics::HistogramBucket>,
 
     // Inspect nodes
+    _time_series_inspect_node: LazyNode,
     _1d_counters_inspect_node: LazyNode,
     _7d_counters_inspect_node: LazyNode,
 }
@@ -1416,8 +1445,14 @@ impl StatsLogger {
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
     ) -> Self {
+        let time_series_stats = Arc::new(Mutex::new(TimeSeriesStats::new()));
         let last_1d_stats = Arc::new(Mutex::new(WindowedStats::new(24)));
         let last_7d_stats = Arc::new(Mutex::new(WindowedStats::new(7)));
+        let _time_series_inspect_node = inspect_time_series::inspect_create_stats(
+            inspect_node,
+            "time_series",
+            Arc::clone(&time_series_stats),
+        );
         let _1d_counters_inspect_node =
             inspect_create_counters(inspect_node, "1d_counters", Arc::clone(&last_1d_stats));
         let _7d_counters_inspect_node =
@@ -1425,6 +1460,7 @@ impl StatsLogger {
 
         Self {
             cobalt_1dot1_proxy,
+            time_series_stats,
             last_1d_stats,
             last_7d_stats,
             last_1d_detailed_stats: DailyDetailedStats::new(),
@@ -1434,6 +1470,7 @@ impl StatsLogger {
             rssi_hist: HashMap::new(),
             _1d_counters_inspect_node,
             _7d_counters_inspect_node,
+            _time_series_inspect_node,
         }
     }
 
@@ -1447,6 +1484,66 @@ impl StatsLogger {
     }
 
     async fn log_stat(&mut self, stat_op: StatOp) {
+        self.log_time_series(&stat_op);
+        self.log_stat_counters(stat_op);
+    }
+
+    fn log_time_series(&mut self, stat_op: &StatOp) {
+        match stat_op {
+            StatOp::AddTotalDuration(duration) => {
+                self.time_series_stats
+                    .lock()
+                    .total_duration_sec
+                    .add_value(&(round_to_nearest_second(*duration) as i32));
+            }
+            StatOp::AddConnectedDuration(duration) => {
+                self.time_series_stats
+                    .lock()
+                    .connected_duration_sec
+                    .add_value(&(round_to_nearest_second(*duration) as i32));
+            }
+            StatOp::AddConnectAttemptsCount => {
+                self.time_series_stats.lock().connect_attempt_count.add_value(&1u32);
+            }
+            StatOp::AddConnectSuccessfulCount => {
+                self.time_series_stats.lock().connect_successful_count.add_value(&1u32);
+            }
+            StatOp::AddDisconnectCount(..) => {
+                self.time_series_stats.lock().disconnect_count.add_value(&1u32);
+            }
+            StatOp::AddRxTxPacketCounters {
+                rx_unicast_total,
+                rx_unicast_drop,
+                tx_total,
+                tx_drop,
+            } => {
+                self.time_series_stats
+                    .lock()
+                    .rx_unicast_total_count
+                    .add_value(&(*rx_unicast_total as u32));
+                self.time_series_stats
+                    .lock()
+                    .rx_unicast_drop_count
+                    .add_value(&(*rx_unicast_drop as u32));
+                self.time_series_stats.lock().tx_total_count.add_value(&(*tx_total as u32));
+                self.time_series_stats.lock().tx_drop_count.add_value(&(*tx_drop as u32));
+            }
+            StatOp::AddNoRxDuration(duration) => {
+                self.time_series_stats
+                    .lock()
+                    .no_rx_duration_sec
+                    .add_value(&(round_to_nearest_second(*duration) as i32));
+            }
+            StatOp::AddDowntimeDuration(..)
+            | StatOp::AddDowntimeNoSavedNeighborDuration(..)
+            | StatOp::AddTxHighPacketDropDuration(..)
+            | StatOp::AddRxHighPacketDropDuration(..)
+            | StatOp::AddTxVeryHighPacketDropDuration(..)
+            | StatOp::AddRxVeryHighPacketDropDuration(..) => (),
+        }
+    }
+
+    fn log_stat_counters(&mut self, stat_op: StatOp) {
         let zero = StatCounters::default();
         let addition = match stat_op {
             StatOp::AddTotalDuration(duration) => StatCounters { total_duration: duration, ..zero },
@@ -1488,9 +1585,13 @@ impl StatsLogger {
                 StatCounters { rx_very_high_packet_drop_duration: duration, ..zero }
             }
             StatOp::AddNoRxDuration(duration) => StatCounters { no_rx_duration: duration, ..zero },
+            StatOp::AddRxTxPacketCounters { .. } => StatCounters { ..zero },
         };
-        self.last_1d_stats.lock().saturating_add(&addition);
-        self.last_7d_stats.lock().saturating_add(&addition);
+
+        if addition != zero {
+            self.last_1d_stats.lock().saturating_add(&addition);
+            self.last_7d_stats.lock().saturating_add(&addition);
+        }
     }
 
     // Queue stat operation to be logged later. This allows the caller to control the timing of
@@ -2824,9 +2925,15 @@ enum StatOp {
     AddTxVeryHighPacketDropDuration(zx::Duration),
     AddRxVeryHighPacketDropDuration(zx::Duration),
     AddNoRxDuration(zx::Duration),
+    AddRxTxPacketCounters {
+        rx_unicast_total: u64,
+        rx_unicast_drop: u64,
+        tx_total: u64,
+        tx_drop: u64,
+    },
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 struct StatCounters {
     total_duration: zx::Duration,
     connected_duration: zx::Duration,
@@ -3300,6 +3407,38 @@ mod tests {
         });
     }
 
+    #[fuchsia::test]
+    fn test_total_duration_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        test_helper.advance_by(25.seconds(), test_fut.as_mut());
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    total_duration_sec: {
+                        "@time": 25_000_000_000i64,
+                        "1m": vec![15i64],
+                        "15m": vec![15i64],
+                        "1h": vec![15i64],
+                    }
+                },
+            }
+        });
+
+        test_helper.advance_to_next_telemetry_checkpoint(test_fut.as_mut());
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    total_duration_sec: contains {
+                        "1m": vec![30i64],
+                        "15m": vec![30i64],
+                        "1h": vec![30i64],
+                    }
+                },
+            }
+        });
+    }
+
     /// This test is to verify that after a `TelemetryEvent::UpdateExperiment`,
     /// the `1d_counters` and `7d_counters` in Inspect LazyNode are still valid,
     /// ensuring that the regression from fxbug.dev/120678 is not introduced
@@ -3675,6 +3814,52 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_log_connect_attempt_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send 10 failed connect results, then 1 successful.
+        for i in 0..10 {
+            let event = TelemetryEvent::ConnectResult {
+                iface_id: IFACE_ID,
+                policy_connect_reason: Some(
+                    client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+                ),
+                result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
+                multiple_bss_candidates: true,
+                ap_state: random_bss_description!(Wpa1).into(),
+            };
+            test_helper.telemetry_sender.send(event);
+
+            // Verify that the connection failure has been logged.
+            test_helper.drain_cobalt_events(&mut test_fut);
+            let logged_metrics =
+                test_helper.get_logged_metrics(metrics::CONNECTION_FAILURES_METRIC_ID);
+            assert_eq!(logged_metrics.len(), i + 1);
+        }
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    connect_attempt_count: {
+                        "@time": 0i64,
+                        "1m": vec![11u64],
+                        "15m": vec![11u64],
+                        "1h": vec![11u64],
+                    },
+                    connect_successful_count: {
+                        "@time": 0i64,
+                        "1m": vec![1u64],
+                        "15m": vec![1u64],
+                        "1h": vec![1u64],
+                    }
+                },
+            }
+        });
+    }
+
+    #[fuchsia::test]
     fn test_disconnect_count_counter() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.send_connected_event(random_bss_description!(Wpa2));
@@ -3770,6 +3955,71 @@ mod tests {
                     disconnect_count: 3u64,
                     roaming_disconnect_count: 1u64,
                     non_roaming_non_user_disconnect_count: 1u64,
+                },
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_count_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    disconnect_count: {
+                        "@time": 0i64,
+                        "1m": vec![0u64],
+                        "15m": vec![0u64],
+                        "1h": vec![0u64],
+                    }
+                },
+            }
+        });
+
+        let info = DisconnectInfo {
+            disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                reason_code: fidl_ieee80211::ReasonCode::StaLeaving,
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::DisassociateIndication,
+            }),
+            ..fake_disconnect_info()
+        };
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    disconnect_count: contains {
+                        "1m": vec![1u64],
+                        "15m": vec![1u64],
+                        "1h": vec![1u64],
+                    }
+                },
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_connected_duration_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        test_helper.advance_by(90.seconds(), test_fut.as_mut());
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    connected_duration_sec: {
+                        "@time": 90_000_000_000i64,
+                        "1m": vec![60i64, 30i64],
+                        "15m": vec![90i64],
+                        "1h": vec![90i64],
+                    }
                 },
             }
         });
@@ -3925,6 +4175,58 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_rx_tx_packet_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.set_counter_stats_resp(Box::new(|| {
+            let seed = (fasync::Time::now() - fasync::Time::from_nanos(0i64)).into_seconds() as u64;
+            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
+                rx_unicast_total: 100 * seed,
+                rx_unicast_drop: 3 * seed,
+                tx_total: 10 * seed,
+                tx_drop: 2 * seed,
+                ..fake_iface_counter_stats(seed)
+            })
+        }));
+
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        test_helper.advance_by(2.minutes(), test_fut.as_mut());
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    rx_unicast_drop_count: {
+                        "@time": 120_000_000_000i64,
+                        // Note: Packets from the first 15 seconds are not accounted because we
+                        //       we did not take packet measurement at 0th second mark.
+                        "1m": vec![135u64, 180u64, 0u64],
+                        "15m": vec![315u64],
+                        "1h": vec![315u64],
+                    },
+                    rx_unicast_total_count: {
+                        "@time": 120_000_000_000i64,
+                        "1m": vec![4500u64, 6000u64, 0u64],
+                        "15m": vec![10500u64],
+                        "1h": vec![10500u64],
+                    },
+                    tx_drop_count: {
+                        "@time": 120_000_000_000i64,
+                        "1m": vec![90u64, 120u64, 0u64],
+                        "15m": vec![210u64],
+                        "1h": vec![210u64],
+                    },
+                    tx_total_count: {
+                        "@time": 120_000_000_000i64,
+                        "1m": vec![450u64, 600u64, 0u64],
+                        "15m": vec![1050u64],
+                        "1h": vec![1050u64],
+                    },
+                },
+            }
+        });
+    }
+
+    #[fuchsia::test]
     fn test_no_rx_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
@@ -3957,6 +4259,37 @@ mod tests {
                     tx_high_packet_drop_duration: 0i64,
                     rx_very_high_packet_drop_duration: 0i64,
                     tx_very_high_packet_drop_duration: 0i64,
+                },
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_no_rx_duration_time_series() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.set_counter_stats_resp(Box::new(|| {
+            let seed = fasync::Time::now().into_nanos() as u64;
+            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
+                rx_unicast_total: 10,
+                ..fake_iface_counter_stats(seed)
+            })
+        }));
+
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        test_helper.advance_by(150.seconds(), test_fut.as_mut());
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                time_series: contains {
+                    no_rx_duration_sec: {
+                        "@time": 150_000_000_000i64,
+                        // Note: Packets from the first 15 seconds are not accounted because we
+                        //       we did not take packet measurement at 0th second mark.
+                        "1m": vec![45i64, 60i64, 30i64],
+                        "15m": vec![135i64],
+                        "1h": vec![135i64],
+                    },
                 },
             }
         });
