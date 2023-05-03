@@ -13,6 +13,7 @@ from shutil import rmtree
 
 from fuchsia_task_lib import *
 
+
 def run(*command):
     try:
         return subprocess.check_output(
@@ -22,6 +23,7 @@ def run(*command):
     except subprocess.CalledProcessError as e:
         print(e.stdout)
         raise TaskExecutionException(f'Command {command} failed.')
+
 
 class FuchsiaTaskPublish(FuchsiaTask):
 
@@ -65,8 +67,7 @@ class FuchsiaTaskPublish(FuchsiaTask):
             '--make_repo_default',
             action='store_true',
             help=argparse.SUPPRESS,
-            required=False
-        )
+            required=False)
         # The effective repo path to publish to.
         parser.add_argument(
             '--repo_path',
@@ -76,8 +77,10 @@ class FuchsiaTaskPublish(FuchsiaTask):
         return parser.parse_args()
 
     def enable_ffx_repository(self, args):
-        if run(args.ffx, 'config', 'get', 'repository.server.enabled') != 'true':
-            print('The ffx repository server is not enabled, starting it now...')
+        if run(args.ffx, 'config', 'get',
+               'repository.server.enabled') != 'true':
+            print(
+                'The ffx repository server is not enabled, starting it now...')
             run(args.ffx, 'repository', 'server', 'start')
 
     def ensure_target_device(self, args):
@@ -94,41 +97,49 @@ class FuchsiaTaskPublish(FuchsiaTask):
                 # We shouldn't ask to delete a user specified --repo_name.
                 self.prompt_repo_cleanup = False
             return args.repo_name
+
         # 2. ffx default repository.
         def ffx_default_repo():
-            default = run(args.ffx, '-c', 'ffx_repository=true', 'repository', 'default', 'get')
+            default = run(
+                args.ffx, '-c', 'ffx_repository=true', 'repository', 'default',
+                'get')
             if default:
                 print(f'Using ffx default repository: {default}')
                 # We shouldn't ask to delete the ffx default repo.
                 self.prompt_repo_cleanup = False
             return default
+
         # 3. A user prompt.
         def prompt_repo():
-            print('--repo_name was not specified and there is no default ffx repository set.')
+            print(
+                '--repo_name was not specified and there is no default ffx repository set.'
+            )
             repo_name = input('Please specify a repo name to publish to: ')
             if args.make_repo_default is None:
-                args.make_repo_default = input('Would you make this repo your default ffx repo? (y/n): ').lower() == 'y'
+                args.make_repo_default = input(
+                    'Would you make this repo your default ffx repo? (y/n): '
+                ).lower() == 'y'
             # We shouldn't ask to delete a repo that we're going to make default.
             self.prompt_repo_cleanup = not args.make_repo_default
             return repo_name
-        args.repo_name = user_specified_repo_name() or ffx_default_repo() or prompt_repo()
+
+        args.repo_name = user_specified_repo_name() or ffx_default_repo(
+        ) or prompt_repo()
 
         # Determine the pm repo path (use the existing one from ffx, or create a new one).
-        existing_repos = json.loads(run(
-            args.ffx,
-            '--machine',
-            'json',
-            'repository',
-            'list',
-        ))
-        existing_repo = ([
-            repo
-            for repo in existing_repos
-            if repo['name'] == args.repo_name
-        ] or [None])[0]
+        existing_repos = json.loads(
+            run(
+                args.ffx,
+                '--machine',
+                'json',
+                'repository',
+                'list',
+            ))
+        existing_repo = (
+            [repo for repo in existing_repos if repo['name'] == args.repo_name]
+            or [None])[0]
         existing_repo_path = existing_repo and Path(
-            existing_repo['spec']['path']
-        )
+            existing_repo['spec']['metadata_repo_path']).parent
         args.repo_path = existing_repo_path or Path(tempfile.mkdtemp())
 
     def ensure_repo(self, args):
@@ -166,7 +177,9 @@ class FuchsiaTaskPublish(FuchsiaTask):
         # Optionally make the ffx repository default.
         if args.make_repo_default:
             old_default = run(args.ffx, 'repository', 'default', 'get')
-            print(f'Setting default ffx repository "{old_default}" => "{args.repo_name}"')
+            print(
+                f'Setting default ffx repository "{old_default}" => "{args.repo_name}"'
+            )
             run(
                 args.ffx,
                 'repository',
@@ -216,10 +229,12 @@ class FuchsiaTaskPublish(FuchsiaTask):
         self.ensure_repo(args)
         self.publish_packages(args)
 
-        self.workflow_state['environment_variables']['FUCHSIA_REPO_NAME'] = args.repo_name
+        self.workflow_state['environment_variables'][
+            'FUCHSIA_REPO_NAME'] = args.repo_name
 
         # Optionally cleanup the repo.
         self.teardown(args)
+
 
 if __name__ == '__main__':
     FuchsiaTaskPublish.main()
