@@ -152,10 +152,7 @@ fuchsia_structured_config_rust_lib("config") {
 
 fuchsia_package("pkg") {
   package_name = "fonts"
-  deps = [
-    ":config_values",
-    ":font_provider_cm",
-  ]
+  deps = [ ":font_provider_cm" ]
 }
 
 build_type_config_data("build_type") {

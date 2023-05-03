@@ -21,6 +21,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/diagnostics.rs",
     "src/subsystems/driver_framework.rs",
     "src/subsystems/example.rs",
+    "src/subsystems/fonts.rs",
     "src/subsystems/graphics.rs",
     "src/subsystems/identity.rs",
     "src/subsystems/input.rs",

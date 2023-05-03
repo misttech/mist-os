@@ -9,6 +9,7 @@ pub mod development_support_config;
 pub mod diagnostics_config;
 pub mod driver_framework_config;
 pub mod example_config;
+pub mod fonts_config;
 pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
@@ -103,6 +104,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for ICU library choice.
     #[serde(default)]
     pub icu: icu_config::ICUConfig,
+
+    /// Platform configuration options for fonts.
+    #[serde(default)]
+    pub fonts: fonts_config::FontsConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///

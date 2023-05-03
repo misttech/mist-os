@@ -28,6 +28,7 @@ mod development;
 mod diagnostics;
 mod driver_framework;
 mod example;
+mod fonts;
 mod graphics;
 mod identity;
 mod input;
@@ -235,6 +236,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'virtualization' subsystem")?;
+
+    fonts::FontsSubsystem::define_configuration(context, &config.platform.fonts, builder)
+        .context("Configuring the 'fonts' subsystem")?;
 
     Ok(())
 }
