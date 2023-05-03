@@ -13,6 +13,7 @@ group("tests") {
     ":cxx_remote_wrapper_test($host_toolchain)",
     ":cxx_test($host_toolchain)",
     ":depfile_test($host_toolchain)",
+    ":dlwrap_test($host_toolchain)",
     ":fuchsia_test($host_toolchain)",
     ":output_leak_scanner_test($host_toolchain)",
     ":relativize_args_test($host_toolchain)",
@@ -36,6 +37,7 @@ if (is_host) {
   _remote_action_sources =
       [ "remote_action.py" ] + _fuchsia_sources + _cl_utils_sources +
       [ "output_leak_scanner.py" ] + _depfile_sources
+  _dlwrap_sources = [ "dlwrap.py" ] + _remote_action_sources
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
       [ "cxx_remote_wrapper.py" ] + _cxx_sources + _fuchsia_sources +
@@ -75,6 +77,14 @@ if (is_host) {
   python_host_test("depfile_test") {
     main_source = "depfile_test.py"
     sources = _depfile_sources
+  }
+
+  python_library("dlwrap") {
+    sources = _dlwrap_sources
+  }
+  python_host_test("dlwrap_test") {
+    main_source = "dlwrap_test.py"
+    sources = _dlwrap_sources
   }
 
   python_library("fuchsia") {

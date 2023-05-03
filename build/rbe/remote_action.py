@@ -611,13 +611,21 @@ class DownloadStubInfo(object):
         self._build_id = build_id
 
     @property
+    def path(self) -> Path:
+        return self._path
+
+    @property
+    def type(self) -> str:
+        return self._type
+
+    @property
     def blob_digest(self) -> str:
         return self._blob_digest
 
     def __eq__(self, other) -> bool:
-        return self._path == other._path and \
-            self._type == other._type and \
-            self._blob_digest == other._blob_digest and \
+        return self.path == other.path and \
+            self.type == other.type and \
+            self.blob_digest == other.blob_digest and \
             self._build_id == other._build_id
 
     def _write(self, output_abspath: Path):
@@ -628,9 +636,9 @@ class DownloadStubInfo(object):
         assert output_abspath.is_absolute(), f'got: {output_abspath}'
         lines = [
             _RBE_DOWNLOAD_STUB_IDENTIFIER,
-            f'path={self._path}',
-            f'type={self._type}',
-            f'blob_digest={self._blob_digest}',  # hash/size
+            f'path={self.path}',
+            f'type={self.type}',
+            f'blob_digest={self.blob_digest}',  # hash/size
             f'action_digest={self._action_digest}',
             f'build_id={self._build_id}',
         ]
@@ -639,7 +647,7 @@ class DownloadStubInfo(object):
     def create(self, working_dir_abs: Path):
         """Create a stub file along with a symlink.
 
-        The stub file is written to a location next to self._path,
+        The stub file is written to a location next to self.path,
         and a symlink at the destination points to the stub file.
 
         The stub file will be preserved when this is 'downloaded',
@@ -651,7 +659,7 @@ class DownloadStubInfo(object):
             this operation does not depend on os.curdir.
         """
         assert working_dir_abs.is_absolute()
-        path = working_dir_abs / self._path
+        path = working_dir_abs / self.path
         path.parent.mkdir(parents=True, exist_ok=True)
         stub_dest = Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
         self._write(stub_dest)
@@ -697,18 +705,18 @@ class DownloadStubInfo(object):
         # TODO: use filelock.FileLock when downloading from outside
         # of this remote action, e.g. when lazily fetching local inputs.
         # This would gracefully handle concurrent requests for the same file.
-        dest = working_dir_abs / self._path  # this is a symlink
+        dest = working_dir_abs / self.path  # this is a symlink
         temp_dl = Path(str(dest) + '.download-tmp')
         status = _download_blob(
             output=temp_dl,
-            is_dir=(self._type == "dir"),
+            is_dir=(self.type == "dir"),
             digest=self._blob_digest,
             exec_root=exec_root,
             working_dir_abs=working_dir_abs,
         )
 
         if status == 0:  # download complete, success
-            self._path.unlink()  # break symlink
+            self.path.unlink()  # break symlink
             temp_dl.rename(dest)
 
         return status
