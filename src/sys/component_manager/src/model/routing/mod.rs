@@ -20,7 +20,7 @@ use {
     ::routing::{
         self, capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
-        mapper::NoopRouteMapper,
+        mapper::NoopRouteMapper, router::RouteBundle,
     },
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
@@ -172,7 +172,9 @@ pub fn request_for_namespace_capability_expose(expose_decl: ExposeDecl) -> Optio
     match expose_decl {
         ExposeDecl::Directory(decl) => Some(RouteRequest::ExposeDirectory(decl)),
         ExposeDecl::Protocol(decl) => Some(RouteRequest::ExposeProtocol(decl)),
-        ExposeDecl::Service(decl) => Some(RouteRequest::ExposeService(decl)),
+        ExposeDecl::Service(decl) => {
+            Some(RouteRequest::ExposeService(RouteBundle::from_expose(decl)))
+        }
         _ => None,
     }
 }

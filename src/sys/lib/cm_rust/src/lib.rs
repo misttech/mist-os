@@ -1628,7 +1628,7 @@ pub trait RegistrationDeclCommon: SourceName + Send + Sync {
 }
 
 /// The common properties of an [Offer](fdecl::Offer) declaration.
-pub trait OfferDeclCommon: SourceName + Send + Sync {
+pub trait OfferDeclCommon: SourceName + fmt::Debug + Send + Sync {
     fn target_name(&self) -> &CapabilityName;
     fn target(&self) -> &OfferTarget;
     fn source(&self) -> &OfferSource;
@@ -1636,7 +1636,7 @@ pub trait OfferDeclCommon: SourceName + Send + Sync {
 }
 
 /// The common properties of an [Expose](fdecl::Expose) declaration.
-pub trait ExposeDeclCommon: SourceName + Send + Sync {
+pub trait ExposeDeclCommon: SourceName + fmt::Debug + Send + Sync {
     fn target_name(&self) -> &CapabilityName;
     fn target(&self) -> &ExposeTarget;
     fn source(&self) -> &ExposeSource;

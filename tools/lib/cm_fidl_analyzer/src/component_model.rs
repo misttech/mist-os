@@ -37,7 +37,9 @@ use {
         error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
         mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
-        route_capability, route_event_stream, RouteInfo, RouteRequest, RouteSource,
+        route_capability, route_event_stream,
+        router::RouteBundle,
+        RouteInfo, RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{
@@ -632,7 +634,7 @@ impl ComponentModelForAnalyzer {
             }
             OfferDecl::Service(offer_decl) => {
                 let capability = offer_decl.source_name.clone();
-                let route_request = RouteRequest::OfferService(offer_decl);
+                let route_request = RouteRequest::OfferService(RouteBundle::from_offer(offer_decl));
                 (capability, route_request)
             }
             OfferDecl::EventStream(offer_decl) => {
@@ -1083,9 +1085,9 @@ impl ComponentModelForAnalyzer {
             ExposeDecl::Protocol(expose_protocol_decl) => {
                 Some(RouteRequest::ExposeProtocol(expose_protocol_decl.clone()))
             }
-            ExposeDecl::Service(expose_service_decl) => {
-                Some(RouteRequest::ExposeService(expose_service_decl.clone()))
-            }
+            ExposeDecl::Service(expose_service_decl) => Some(RouteRequest::ExposeService(
+                RouteBundle::from_expose(expose_service_decl.clone()),
+            )),
             _ => None,
         }
     }

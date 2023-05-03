@@ -37,7 +37,7 @@ use {
         rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, Sources,
+            ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, RouteBundle, Sources,
         },
         walk_state::WalkState,
     },
@@ -61,12 +61,12 @@ use {
 use serde::{Deserialize, Serialize};
 
 /// A request to route a capability, together with the data needed to do so.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RouteRequest {
     // Route a capability from an ExposeDecl.
     ExposeDirectory(ExposeDirectoryDecl),
     ExposeProtocol(ExposeProtocolDecl),
-    ExposeService(ExposeServiceDecl),
+    ExposeService(RouteBundle<ExposeServiceDecl>),
 
     // Route a capability from a realm's environment.
     Resolver(ResolverRegistration),
@@ -86,7 +86,7 @@ pub enum RouteRequest {
     OfferDirectory(OfferDirectoryDecl),
     OfferEventStream(OfferEventStreamDecl),
     OfferProtocol(OfferProtocolDecl),
-    OfferService(OfferServiceDecl),
+    OfferService(RouteBundle<OfferServiceDecl>),
     OfferStorage(OfferStorageDecl),
     OfferRunner(OfferRunnerDecl),
     OfferResolver(OfferResolverDecl),
@@ -119,10 +119,11 @@ impl RouteRequest {
             OfferDirectory(OfferDirectoryDecl { availability, .. })
             | OfferEventStream(OfferEventStreamDecl { availability, .. })
             | OfferProtocol(OfferProtocolDecl { availability, .. })
-            | OfferService(OfferServiceDecl { availability, .. })
             | OfferStorage(OfferStorageDecl { availability, .. }) => {
                 *availability == Availability::Optional
             }
+
+            OfferService(bundle) => bundle.iter().all(|o| o.availability == Availability::Optional),
         }
     }
 }
@@ -168,8 +169,8 @@ where
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
             route_protocol_from_expose(expose_protocol_decl, target, mapper).await
         }
-        RouteRequest::ExposeService(expose_service_decl) => {
-            route_service_from_expose(expose_service_decl, target, mapper).await
+        RouteRequest::ExposeService(expose_bundle) => {
+            route_service_from_expose(expose_bundle, target, mapper).await
         }
 
         // Route a resolver or runner from an environment
@@ -257,7 +258,7 @@ where
         .component()
         .capability();
     let source = router::route_from_offer(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -290,7 +291,7 @@ where
         .namespace()
         .component();
     let source = router::route_from_offer(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut state,
@@ -302,7 +303,7 @@ where
 }
 
 async fn route_service_from_offer<C, M>(
-    offer_decl: OfferServiceDecl,
+    offer_bundle: RouteBundle<OfferServiceDecl>,
     target: &Arc<C>,
     mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
@@ -310,10 +311,14 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor = AvailabilityServiceVisitor::new_from_offer(&offer_decl);
+    // TODO(fxbug.dev/4776): Figure out how to set the availability when `offer_bundle` contains
+    // multiple routes with different availabilities. It's possible that manifest validation should
+    // disallow this. For now, just pick the first.
+    let mut availability_visitor =
+        AvailabilityServiceVisitor::new_from_offer(offer_bundle.iter().next().unwrap());
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
     let source = router::route_from_offer(
-        offer_decl,
+        offer_bundle,
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -338,7 +343,7 @@ where
 
     let mut availability_visitor = AvailabilityEventStreamVisitor::new_from_offer(&offer_decl);
     let source = router::route_from_offer(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -360,9 +365,8 @@ where
 {
     let mut availability_visitor = AvailabilityStorageVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component();
-
     let source = router::route_from_offer_without_expose(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -383,9 +387,8 @@ where
     M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
-
     let source = router::route_from_offer(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut RunnerVisitor,
@@ -406,9 +409,8 @@ where
     M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
-
     let source = router::route_from_offer(
-        offer_decl,
+        RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
         &mut ResolverVisitor,
@@ -552,7 +554,7 @@ where
         .component()
         .capability();
     let source = router::route_from_expose(
-        expose_decl,
+        RouteBundle::from_expose(expose_decl),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -608,7 +610,7 @@ where
 }
 
 async fn route_service_from_expose<C, M>(
-    expose_decl: ExposeServiceDecl,
+    expose_bundle: RouteBundle<ExposeServiceDecl>,
     target: &Arc<C>,
     mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
@@ -619,7 +621,7 @@ where
     let mut availability_visitor = AvailabilityServiceVisitor::required();
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
     let source = router::route_from_expose(
-        expose_decl,
+        expose_bundle,
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -793,7 +795,7 @@ where
         .namespace()
         .component();
     let source = router::route_from_expose(
-        expose_decl,
+        RouteBundle::from_expose(expose_decl),
         target.clone(),
         allowed_sources,
         &mut state,
@@ -854,6 +856,7 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
+        &mut vec![],
     )
     .await?;
     Ok(source)

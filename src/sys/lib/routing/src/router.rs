@@ -20,11 +20,10 @@
 
 use {
     crate::{
-        availability::AvailabilityServiceVisitor,
         capability_source::{
             AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
         },
-        collection::{AggregateServiceProvider, CollectionCapabilityProvider},
+        collection::{CollectionAggregateServiceProvider, OfferAggregateServiceProvider},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             TopInstanceInterface,
@@ -34,15 +33,16 @@ use {
         RegistrationDecl, RouteInfo,
     },
     cm_rust::{
-        name_mappings_to_map, Availability, CapabilityDecl, CapabilityDeclCommon, CapabilityName,
-        ExposeDecl, ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon,
-        OfferServiceDecl, OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource,
-        ServiceDecl, UseDecl, UseDeclCommon, UseSource,
+        name_mappings_to_map, CapabilityDecl, CapabilityDeclCommon, CapabilityName, ExposeDecl,
+        ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl,
+        OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl,
+        UseDeclCommon, UseSource,
     },
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::{AbsoluteMoniker, ChildMoniker, ChildMonikerBase},
     std::collections::{HashMap, HashSet},
+    std::{fmt, slice},
     std::{marker::PhantomData, sync::Arc},
 };
 
@@ -88,29 +88,14 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let availability = use_decl.availability().clone();
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
-        UseResult::FromParent(offers, component) => {
-            if offers.len() == 1 {
-                let offer_opt: Option<&O> = offers.first();
-                route_from_offer(
-                    offer_opt.unwrap().clone(),
-                    component,
-                    sources,
-                    visitor,
-                    mapper,
-                    route,
-                )
-                .await
-            } else {
-                create_aggregate_source(availability, offers, component, mapper.clone())
-            }
+        UseResult::OfferFromParent(offer, component) => {
+            route_from_offer(offer, component, sources, visitor, mapper, route).await
         }
-        UseResult::FromChild(use_decl, child_component) => {
+        UseResult::ExposeFromChild(use_decl, child_component) => {
             let child_exposes = child_component.lock_resolved_state().await?.exposes();
-            let expose_decl = find_matching_expose(use_decl.source_name(), &child_exposes)
-                .cloned()
+            let child_exposes = find_matching_exposes(use_decl.source_name(), &child_exposes)
                 .ok_or_else(|| {
                     let child_moniker =
                         child_component.child_moniker().expect("ChildMoniker should exist");
@@ -120,7 +105,7 @@ where
                         use_decl.source_name().clone(),
                     )
                 })?;
-            route_from_expose(expose_decl, child_component, sources, visitor, mapper, route).await
+            route_from_expose(child_exposes, child_component, sources, visitor, mapper, route).await
         }
     }
 }
@@ -171,22 +156,8 @@ where
         .await?
     {
         RegistrationResult::Source(source) => return Ok(source),
-        RegistrationResult::FromParent(offers, component) => {
-            if offers.len() == 1 {
-                let offer_opt: Option<&O> = offers.first();
-                route_from_offer(
-                    offer_opt.unwrap().clone(),
-                    component,
-                    sources,
-                    visitor,
-                    mapper,
-                    route,
-                )
-                .await
-            } else {
-                // capabilities used in a registgration are always required.
-                create_aggregate_source(Availability::Required, offers, component, mapper.clone())
-            }
+        RegistrationResult::FromParent(offer, component) => {
+            route_from_offer(offer, component, sources, visitor, mapper, route).await
         }
         RegistrationResult::FromChild(expose, component) => {
             route_from_expose(expose, component, sources, visitor, mapper, route).await
@@ -201,7 +172,7 @@ where
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
 pub async fn route_from_offer<O, E, C, S, V, M>(
-    offer_decl: O,
+    offer: RouteBundle<O>,
     offer_target: Arc<C>,
     sources: S,
     visitor: &mut V,
@@ -230,15 +201,15 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    match Offer::route(offer_decl, offer_target, &sources, visitor, mapper, route).await? {
+    match Offer::route(offer, offer_target, &sources, visitor, mapper, route).await? {
         OfferResult::Source(source) => return Ok(source),
         OfferResult::OfferFromChild(offer, component) => {
             let offer_decl: OfferDecl = offer.clone().into();
 
-            let (expose, component) = change_directions(offer, component).await?;
+            let (exposes, component) = change_directions::<C, O, E>(offer, component).await?;
 
             let capability_source =
-                route_from_expose(expose, component, sources, visitor, mapper, route).await?;
+                route_from_expose(exposes, component, sources, visitor, mapper, route).await?;
             if let OfferDecl::Service(offer_service_decl) = offer_decl {
                 if offer_service_decl.source_instance_filter.is_some()
                     || offer_service_decl.renamed_instances.is_some()
@@ -247,8 +218,8 @@ where
                     if let CapabilitySource::Component { capability, component } = capability_source
                     {
                         return Ok(CapabilitySource::<C>::FilteredService {
-                            capability: capability,
-                            component: component,
+                            capability,
+                            component,
                             source_instance_filter: offer_service_decl
                                 .source_instance_filter
                                 .unwrap_or(vec![]),
@@ -261,15 +232,26 @@ where
             }
             Ok(capability_source)
         }
-        OfferResult::OfferFromCollection(offer_decl, collection_component, collection_name) => {
+        OfferResult::OfferFromCollectionAggregate(offers, aggregation_component) => {
+            if offers.len() > 1 {
+                // TODO(fxbug.dev/4776): Support aggregating over multiple collections
+                return Err(RoutingError::UnsupportedRouteSource {
+                    source_type: "multiple collections".into(),
+                });
+            }
+            let first_offer = offers.iter().next().unwrap();
+            let collection_name = match first_offer.source() {
+                OfferSource::Collection(n) => n.clone(),
+                _ => unreachable!("this was checked before"),
+            };
             Ok(CapabilitySource::<C>::Collection {
-                capability: AggregateCapability::Service(offer_decl.source_name().clone()),
-                component: collection_component.as_weak(),
-                aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
+                capability: AggregateCapability::Service(first_offer.source_name().clone()),
+                component: aggregation_component.as_weak(),
+                aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
                     collection_name: collection_name.clone(),
-                    collection_component: collection_component.as_weak(),
+                    collection_component: aggregation_component.as_weak(),
                     phantom_expose: std::marker::PhantomData::<E> {},
-                    capability_name: offer_decl.source_name().clone(),
+                    capability_name: first_offer.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                     mapper: mapper.clone(),
@@ -277,14 +259,58 @@ where
                 collection_name,
             })
         }
-        OfferResult::OfferFromAggregate(offer_decls, aggregation_component) => {
-            // TODO(102532): get optional to work with aggregate services
-            create_aggregate_source(
-                Availability::Required,
-                offer_decls,
-                aggregation_component,
-                mapper.clone(),
-            )
+        OfferResult::OfferFromChildAggregate(offers, aggregation_component) => {
+            // Check that all of the service offers contain non-conflicting filter instances.
+            let mut seen_instances: HashSet<String> = HashSet::new();
+            for o in offers.iter() {
+                if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
+                    match offer_service_decl.source_instance_filter {
+                        None => {
+                            return Err(RoutingError::unsupported_route_source(
+                                "Aggregate offers must be of service capabilities \
+                            with source_instance_filter set",
+                            ));
+                        }
+                        Some(allowed_instances) => {
+                            for instance in allowed_instances.iter() {
+                                if !seen_instances.insert(instance.clone()) {
+                                    return Err(RoutingError::unsupported_route_source(format!(
+                                        "Instance {} found in multiple offers \
+                                                of the same service.",
+                                        instance
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return Err(RoutingError::unsupported_route_source(
+                        "Aggregate source must consist of only service capabilities",
+                    ));
+                }
+            }
+            let (source_name, offer_service_decls) = offers.iter().fold(
+                ("".into(), Vec::<OfferServiceDecl>::new()),
+                |(_, mut decls), o| {
+                    if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
+                        decls.push(offer_service_decl);
+                    }
+                    (o.source_name().clone(), decls)
+                },
+            );
+            // TODO(fxbug.dev/71881) Make the Collection CapabilitySource type generic
+            // for other types of aggregations.
+            Ok(CapabilitySource::<C>::Aggregate {
+                capability: AggregateCapability::Service(source_name),
+                component: aggregation_component.as_weak(),
+                capability_provider: Box::new(OfferAggregateServiceProvider::new(
+                    offer_service_decls,
+                    aggregation_component.as_weak(),
+                    sources.clone(),
+                    visitor.clone(),
+                    mapper.clone(),
+                )),
+            })
         }
     }
 }
@@ -296,7 +322,7 @@ where
 /// `visitor` is invoked for each `Expose` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
 pub async fn route_from_expose<E, C, S, V, M, O>(
-    expose_decl: E,
+    expose: RouteBundle<E>,
     expose_target: Arc<C>,
     sources: S,
     visitor: &mut V,
@@ -317,22 +343,33 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    match Expose::route(expose_decl, expose_target, &sources, visitor, mapper, route).await? {
+    match Expose::route(expose, expose_target, &sources, visitor, mapper, route).await? {
         ExposeResult::Source(source) => Ok(source),
-        ExposeResult::ExposeFromCollection(expose_decl, collection_component, collection_name) => {
+        ExposeResult::ExposeFromAggregate(exposes, aggregation_component) => {
+            if exposes.len() > 1 {
+                // TODO(fxbug.dev/4776): Support aggregating over multiple collections
+                return Err(RoutingError::UnsupportedRouteSource {
+                    source_type: "multiple collections".into(),
+                });
+            }
+            let first_expose = exposes.iter().next().expect("empty bundle");
+            let collection_name = match first_expose.source() {
+                ExposeSource::Collection(n) => n.clone(),
+                _ => unreachable!("this was checked before"),
+            };
             Ok(CapabilitySource::<C>::Collection {
-                capability: AggregateCapability::Service(expose_decl.source_name().clone()),
-                component: collection_component.as_weak(),
-                aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
+                capability: AggregateCapability::Service(first_expose.source_name().clone()),
+                component: aggregation_component.as_weak(),
+                aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
                     collection_name: collection_name.clone(),
-                    collection_component: collection_component.as_weak(),
+                    collection_component: aggregation_component.as_weak(),
                     phantom_expose: std::marker::PhantomData::<E> {},
-                    capability_name: expose_decl.source_name().clone(),
+                    capability_name: first_expose.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                     mapper: mapper.clone(),
                 }),
-                collection_name: collection_name.clone(),
+                collection_name,
             })
         }
     }
@@ -386,6 +423,7 @@ pub async fn route_from_use_without_expose<U, O, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
+    route: &mut Vec<RouteInfo<C, O, ()>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
@@ -396,27 +434,12 @@ where
     V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     M: DebugRouteMapper + 'static,
 {
-    let mut route: Vec<RouteInfo<C, O, ()>> = vec![];
-    let availability = use_decl.availability().clone();
     match Use::route(use_decl, use_target, &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
-        UseResult::FromParent(offers, component) => {
-            if offers.len() == 1 {
-                let offer_opt: Option<&O> = offers.first();
-                route_from_offer_without_expose(
-                    offer_opt.unwrap().clone(),
-                    component,
-                    sources,
-                    visitor,
-                    mapper,
-                    &mut route,
-                )
-                .await
-            } else {
-                create_aggregate_source(availability, offers, component, mapper.clone())
-            }
+        UseResult::OfferFromParent(offer, component) => {
+            route_from_offer_without_expose(offer, component, sources, visitor, mapper, route).await
         }
-        UseResult::FromChild(_use_decl, _component) => {
+        UseResult::ExposeFromChild(_, _) => {
             unreachable!("found use from child but capability cannot be exposed")
         }
     }
@@ -431,7 +454,7 @@ where
 /// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
 pub async fn route_from_offer_without_expose<O, C, S, V, M>(
-    offer_decl: O,
+    offer: RouteBundle<O>,
     offer_target: Arc<C>,
     sources: S,
     visitor: &mut V,
@@ -446,88 +469,24 @@ where
     V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     M: DebugRouteMapper,
 {
-    match Offer::route(offer_decl, offer_target, &sources, visitor, mapper, route).await? {
+    match Offer::route(offer, offer_target, &sources, visitor, mapper, route).await? {
         OfferResult::Source(source) => Ok(source),
         OfferResult::OfferFromChild(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
             // that this kind of declaration cannot exist.
             unreachable!("found offer from child but capability cannot be exposed")
         }
-        OfferResult::OfferFromCollection(_, _, _) => {
+        OfferResult::OfferFromCollectionAggregate(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
             // that this kind of declaration cannot exist.
-            unreachable!("found offer from collection but capability cannot be exposed")
+            unreachable!("found offer from collections but capability cannot be exposed")
         }
-        OfferResult::OfferFromAggregate(_, _) => {
+        OfferResult::OfferFromChildAggregate(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
             // that this kind of declaration cannot exist.
             unreachable!("found offer from aggregate but capability cannot be exposed")
         }
     }
-}
-
-fn create_aggregate_source<C, O, M>(
-    starting_availability: Availability,
-    offer_decls: Vec<O>,
-    aggregation_component: Arc<C>,
-    mapper: M,
-) -> Result<CapabilitySource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    O: OfferDeclCommon + FromEnum<OfferDecl> + Into<OfferDecl> + Clone,
-    M: DebugRouteMapper + 'static,
-{
-    // Check that all of the service offers contain non-conflicting filter instances.
-    {
-        let mut seen_instances: HashSet<String> = HashSet::new();
-        for o in offer_decls.iter() {
-            if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
-                match offer_service_decl.source_instance_filter {
-                    None => {
-                        return Err(RoutingError::unsupported_route_source(
-                            "Aggregate offers must be of service capabilities with source_instance_filter set",
-                        ));
-                    }
-                    Some(allowed_instances) => {
-                        for instance in allowed_instances.iter() {
-                            if !seen_instances.insert(instance.clone()) {
-                                return Err(RoutingError::unsupported_route_source(format!(
-                                    "Instance {} found in multiple offers of the same service.",
-                                    instance
-                                )));
-                            }
-                        }
-                    }
-                }
-            } else {
-                return Err(RoutingError::unsupported_route_source(
-                    "Aggregate source must consist of only service capabilities",
-                ));
-            }
-        }
-    }
-    let (source_name, offer_service_decls) = offer_decls.iter().fold(
-        ("".into(), Vec::<OfferServiceDecl>::new()),
-        |(_, mut decls), o| {
-            if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
-                decls.push(offer_service_decl);
-            }
-            (o.source_name().clone(), decls)
-        },
-    );
-    // TODO(fxbug.dev/71881) Make the Collection CapabilitySourceInterface type generic
-    // for other types of aggregations.
-    Ok(CapabilitySource::<C>::Aggregate {
-        capability: AggregateCapability::Service(source_name),
-        component: aggregation_component.as_weak(),
-        capability_provider: Box::new(AggregateServiceProvider::new(
-            offer_service_decls,
-            aggregation_component.as_weak(),
-            AllowedSourcesBuilder::<ServiceDecl>::new().component().collection(),
-            AvailabilityServiceVisitor(starting_availability.into()),
-            mapper,
-        )),
-    })
 }
 
 /// A trait for extracting the source of a capability.
@@ -821,16 +780,16 @@ where
 pub struct Use<U>(PhantomData<U>);
 
 /// The result of routing a Use declaration to the next phase.
-enum UseResult<C: ComponentInstanceInterface, O, U> {
+enum UseResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug, U> {
     /// The source of the Use was found (Framework, AboveRoot, etc.)
     Source(CapabilitySource<C>),
     /// The Use led to a parent Offer declaration.
-    FromParent(Vec<O>, Arc<C>),
+    OfferFromParent(RouteBundle<O>, Arc<C>),
     /// The Use led to a child Expose declaration.
     /// Note: Instead of FromChild carrying an ExposeDecl of the matching child, it carries a
     /// UseDecl. This is because some RoutingStrategy<> don't support Expose, but are still
     /// required to enumerate over UseResult<>.
-    FromChild(U, Arc<C>),
+    ExposeFromChild(U, Arc<C>),
 }
 
 impl<U> Use<U>
@@ -897,27 +856,17 @@ where
                     ))
                 }
                 ExtendedInstanceInterface::<C>::Component(parent_component) => {
-                    let parent_offers: Vec<O> = {
-                        let parent_offers = parent_component.lock_resolved_state().await?.offers();
-                        let child_moniker =
-                            target.child_moniker().expect("ChildMoniker should exist");
-                        let found_offers = find_matching_offers(
-                            use_.source_name(),
-                            &child_moniker,
-                            &parent_offers,
-                        );
-                        if found_offers.is_empty() {
-                            return Err(
+                    let parent_offers = parent_component.lock_resolved_state().await?.offers();
+                    let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                    let parent_offers =
+                        find_matching_offers(use_.source_name(), &child_moniker, &parent_offers)
+                            .ok_or_else(|| {
                                 <U as ErrorNotFoundFromParent>::error_not_found_from_parent(
                                     target.abs_moniker().clone(),
                                     use_.source_name().clone(),
-                                ),
-                            );
-                        } else {
-                            found_offers
-                        }
-                    };
-                    Ok(UseResult::FromParent(parent_offers, parent_component))
+                                )
+                            })?;
+                    Ok(UseResult::OfferFromParent(parent_offers, parent_component))
                 }
             },
             UseSource::Child(name) => {
@@ -934,8 +883,7 @@ where
                         },
                     )?
                 };
-
-                Ok(UseResult::FromChild(use_, child_component))
+                Ok(UseResult::ExposeFromChild(use_, child_component))
             }
             UseSource::Debug => {
                 // This is not supported today. It might be worthwhile to support this if
@@ -953,13 +901,14 @@ where
 pub struct Registration<R>(PhantomData<R>);
 
 /// The result of routing a Registration declaration to the next phase.
-enum RegistrationResult<C: ComponentInstanceInterface, O, E> {
+enum RegistrationResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug, E: Clone + fmt::Debug>
+{
     /// The source of the Registration was found (Framework, AboveRoot, etc.).
     Source(CapabilitySource<C>),
     /// The Registration led to a parent Offer declaration.
-    FromParent(Vec<O>, Arc<C>),
+    FromParent(RouteBundle<O>, Arc<C>),
     /// The Registration led to a child Expose declaration.
-    FromChild(E, Arc<C>),
+    FromChild(RouteBundle<E>, Arc<C>),
 }
 
 impl<R> Registration<R>
@@ -1036,26 +985,19 @@ where
                     ))
                 }
                 ExtendedInstanceInterface::<C>::Component(parent_component) => {
-                    let parent_offers: Vec<O> = {
-                        let parent_offers = parent_component.lock_resolved_state().await?.offers();
-                        let child_moniker =
-                            target.child_moniker().expect("ChildMoniker should exist");
-                        let found_offers = find_matching_offers(
-                            registration.source_name(),
-                            &child_moniker,
-                            &parent_offers,
-                        );
-                        if found_offers.is_empty() {
-                            return Err(
-                                <R as ErrorNotFoundFromParent>::error_not_found_from_parent(
-                                    target.abs_moniker().clone(),
-                                    registration.source_name().clone(),
-                                ),
-                            );
-                        } else {
-                            found_offers
-                        }
-                    };
+                    let parent_offers = parent_component.lock_resolved_state().await?.offers();
+                    let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                    let parent_offers = find_matching_offers(
+                        registration.source_name(),
+                        &child_moniker,
+                        &parent_offers,
+                    )
+                    .ok_or_else(|| {
+                        <R as ErrorNotFoundFromParent>::error_not_found_from_parent(
+                            target.abs_moniker().clone(),
+                            registration.source_name().clone(),
+                        )
+                    })?;
                     Ok(RegistrationResult::FromParent(parent_offers, parent_component))
                 }
             },
@@ -1072,11 +1014,10 @@ where
                     )?
                 };
 
-                let child_expose: E = {
-                    let child_exposes = child_component.lock_resolved_state().await?.exposes();
-                    find_matching_expose(registration.source_name(), &child_exposes)
-                        .cloned()
-                        .ok_or_else(|| {
+                let child_exposes = child_component.lock_resolved_state().await?.exposes();
+                let child_exposes =
+                    find_matching_exposes(registration.source_name(), &child_exposes).ok_or_else(
+                        || {
                             let child_moniker =
                                 child_component.child_moniker().expect("ChildMoniker should exist");
                             <R as ErrorNotFoundInChild>::error_not_found_in_child(
@@ -1084,9 +1025,9 @@ where
                                 child_moniker.clone(),
                                 registration.source_name().clone(),
                             )
-                        })?
-                };
-                Ok(RegistrationResult::FromChild(child_expose, child_component.clone()))
+                        },
+                    )?;
+                Ok(RegistrationResult::FromChild(child_exposes, child_component.clone()))
             }
         }
     }
@@ -1096,16 +1037,21 @@ where
 pub struct Offer<O>(PhantomData<O>);
 
 /// The result of routing an Offer declaration to the next phase.
-enum OfferResult<C: ComponentInstanceInterface, O> {
+enum OfferResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
     /// The source of the Offer was found (Framework, AboveRoot, Component, etc.).
     Source(CapabilitySource<C>),
     /// The Offer led to an Offer-from-child declaration.
     /// Not all capabilities can be exposed, so let the caller decide how to handle this.
     OfferFromChild(O, Arc<C>),
-    /// Offer from collection.
-    OfferFromCollection(O, Arc<C>, String),
-    /// Offer from multiple sources.
-    OfferFromAggregate(Vec<O>, Arc<C>),
+    /// Offer from multiple static children.
+    OfferFromChildAggregate(RouteBundle<O>, Arc<C>),
+    /// Offer from a collection.
+    OfferFromCollectionAggregate(RouteBundle<O>, Arc<C>),
+}
+
+enum OfferSegment<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
+    Done(OfferResult<C, O>),
+    Next(RouteBundle<O>, Arc<C>),
 }
 
 impl<O> Offer<O>
@@ -1115,7 +1061,7 @@ where
     /// Routes the capability starting from the `offer` declaration at `target` to either a valid
     /// source (as defined by `sources`) or the declaration that ends this phase of routing.
     async fn route<C, S, V, M, E>(
-        mut offer: O,
+        mut offer_bundle: RouteBundle<O>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
@@ -1130,150 +1076,182 @@ where
         M: DebugRouteMapper,
     {
         loop {
-            mapper.add_offer(target.abs_moniker().clone(), offer.clone().into());
-            OfferVisitor::visit(visitor, &offer)?;
-            route.push(RouteInfo {
-                component: target.clone(),
-                offer: Some(offer.clone()),
-                expose: None,
-            });
-            match offer.source() {
-                OfferSource::Void => {
-                    panic!("an error should have been emitted by the availability walker before we reach this point");
-                }
-                OfferSource::Self_ => {
-                    let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                    let component_capability = sources.find_component_source(
-                        offer.source_name(),
-                        target.abs_moniker(),
-                        &target_capabilities,
-                        visitor,
-                        mapper,
-                    )?;
-                    // if offerdecl is for a filtered service return the associated filterd source.
-                    return match offer.into() {
-                        OfferDecl::Service(offer_service_decl) => {
-                            if offer_service_decl.source_instance_filter.is_some()
-                                || offer_service_decl.renamed_instances.is_some()
-                            {
-                                Ok(OfferResult::Source(CapabilitySource::<C>::FilteredService {
-                                    capability: component_capability,
-                                    component: target.as_weak(),
-                                    source_instance_filter: offer_service_decl
-                                        .source_instance_filter
-                                        .unwrap_or(vec![]),
-                                    instance_name_source_to_target: offer_service_decl
-                                        .renamed_instances
-                                        .map_or(HashMap::new(), name_mappings_to_map),
-                                }))
-                            } else {
-                                Ok(OfferResult::Source(CapabilitySource::<C>::Component {
-                                    capability: component_capability,
-                                    component: target.as_weak(),
-                                }))
-                            }
-                        }
-                        _ => Ok(OfferResult::Source(CapabilitySource::<C>::Component {
-                            capability: component_capability,
-                            component: target.as_weak(),
-                        })),
-                    };
-                }
-                OfferSource::Framework => {
-                    return Ok(OfferResult::Source(CapabilitySource::<C>::Framework {
-                        capability: sources
-                            .framework_source(offer.source_name().clone(), mapper)?,
-                        component: target.as_weak(),
-                    }))
-                }
-                OfferSource::Capability(_) => {
-                    sources.capability_source()?;
-                    return Ok(OfferResult::Source(CapabilitySource::<C>::Capability {
-                        source_capability: ComponentCapability::Offer(offer.into()),
-                        component: target.as_weak(),
-                    }));
-                }
-                OfferSource::Parent => {
-                    let parent_component = match target.try_get_parent()? {
-                        ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
-                            if sources.is_namespace_supported() {
-                                if let Some(capability) = sources.find_namespace_source(
-                                    offer.source_name(),
-                                    top_instance.namespace_capabilities(),
-                                    visitor,
-                                    mapper,
-                                )? {
-                                    return Ok(OfferResult::Source(
-                                        CapabilitySource::<C>::Namespace {
-                                            capability,
-                                            top_instance: Arc::downgrade(&top_instance),
-                                        },
-                                    ));
-                                }
-                            }
-                            if let Some(capability) = sources.find_builtin_source(
-                                offer.source_name(),
-                                top_instance.builtin_capabilities(),
-                                visitor,
-                                mapper,
-                            )? {
-                                return Ok(OfferResult::Source(CapabilitySource::<C>::Builtin {
-                                    capability,
-                                    top_instance: Arc::downgrade(&top_instance),
-                                }));
-                            }
-                            return Err(RoutingError::offer_from_component_manager_not_found(
-                                offer.source_name().to_string(),
-                            ));
-                        }
-                        ExtendedInstanceInterface::<C>::Component(component) => component,
-                    };
-                    let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
-                    let parent_offers: Vec<O> = {
-                        let parent_offers = parent_component.lock_resolved_state().await?.offers();
-                        let found_offers = find_matching_offers(
-                            offer.source_name(),
-                            &child_moniker,
-                            &parent_offers,
-                        );
-                        if found_offers.is_empty() {
-                            return Err(
-                                <O as ErrorNotFoundFromParent>::error_not_found_from_parent(
-                                    target.abs_moniker().clone(),
-                                    offer.source_name().clone(),
-                                ),
-                            );
-                        } else {
-                            found_offers
-                        }
-                    };
-                    if parent_offers.len() == 1 {
-                        offer = parent_offers.first().unwrap().clone();
-                        target = parent_component;
+            let visit_offer = match &offer_bundle {
+                RouteBundle::Single(offer) => Some(offer),
+                RouteBundle::Aggregate(offers) => {
+                    // TODO(fxbug.dev/4776): Visit routes in all aggregates.
+                    if offers.len() == 1 {
+                        Some(&offers[0])
                     } else {
-                        return Ok(OfferResult::OfferFromAggregate(parent_offers, target));
+                        None
                     }
                 }
-                OfferSource::Child(_) => {
-                    return Ok(OfferResult::OfferFromChild(offer, target));
+            };
+            if let Some(visit_offer) = visit_offer {
+                mapper.add_offer(target.abs_moniker().clone(), visit_offer.clone().into());
+                OfferVisitor::visit(visitor, &visit_offer)?;
+                route.push(RouteInfo {
+                    component: target.clone(),
+                    offer: Some(visit_offer.clone()),
+                    expose: None,
+                });
+            }
+
+            match offer_bundle {
+                RouteBundle::Single(offer) => {
+                    match Self::route_segment(offer, target, sources, visitor, mapper).await? {
+                        OfferSegment::Done(r) => return Ok(r),
+                        OfferSegment::Next(o, t) => {
+                            offer_bundle = o;
+                            target = t;
+                        }
+                    }
                 }
-                OfferSource::Collection(name) => {
-                    sources.collection_source()?;
+                RouteBundle::Aggregate(_) => {
+                    if offer_bundle.iter().all(|e| matches!(e.source(), OfferSource::Collection(_)))
                     {
-                        let target_collections = target.lock_resolved_state().await?.collections();
-                        target_collections.iter().find(|c| &c.name == name).ok_or_else(|| {
-                            RoutingError::OfferFromCollectionNotFound {
-                                collection: name.clone(),
-                                moniker: target.abs_moniker().clone(),
-                                capability: offer.source_name().clone(),
-                            }
-                        })?;
+                        return Ok(OfferResult::OfferFromCollectionAggregate(offer_bundle, target));
+                    } else if offer_bundle
+                        .iter()
+                        .all(|e| !matches!(e.source(), OfferSource::Collection(_)))
+                    {
+                        return Ok(OfferResult::OfferFromChildAggregate(offer_bundle, target));
+                    } else {
+                        // TODO(fxbug.dev/4776): Support aggregation over collections and children.
+                        return Err(RoutingError::UnsupportedRouteSource {
+                            source_type: "mix of collections and child routes".into(),
+                        });
                     }
-                    let name = name.clone();
-                    return Ok(OfferResult::OfferFromCollection(offer, target, name));
                 }
             }
         }
+    }
+
+    async fn route_segment<C, S, V, M>(
+        offer: O,
+        target: Arc<C>,
+        sources: &S,
+        visitor: &mut V,
+        mapper: &mut M,
+    ) -> Result<OfferSegment<C, O>, RoutingError>
+    where
+        C: ComponentInstanceInterface,
+        S: Sources,
+        V: OfferVisitor<OfferDecl = O>,
+        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        M: DebugRouteMapper,
+    {
+        let res = match offer.source() {
+            OfferSource::Void => {
+                panic!("an error should have been emitted by the availability walker before we reach this point");
+            }
+            OfferSource::Self_ => {
+                let target_capabilities = target.lock_resolved_state().await?.capabilities();
+                let component_capability = sources.find_component_source(
+                    offer.source_name(),
+                    target.abs_moniker(),
+                    &target_capabilities,
+                    visitor,
+                    mapper,
+                )?;
+                // if offerdecl is for a filtered service return the associated filterd source.
+                let res = match offer.into() {
+                    OfferDecl::Service(offer_service_decl) => {
+                        if offer_service_decl.source_instance_filter.is_some()
+                            || offer_service_decl.renamed_instances.is_some()
+                        {
+                            OfferResult::Source(CapabilitySource::<C>::FilteredService {
+                                capability: component_capability,
+                                component: target.as_weak(),
+                                source_instance_filter: offer_service_decl
+                                    .source_instance_filter
+                                    .unwrap_or(vec![]),
+                                instance_name_source_to_target: offer_service_decl
+                                    .renamed_instances
+                                    .map_or(HashMap::new(), name_mappings_to_map),
+                            })
+                        } else {
+                            OfferResult::Source(CapabilitySource::<C>::Component {
+                                capability: component_capability,
+                                component: target.as_weak(),
+                            })
+                        }
+                    }
+                    _ => OfferResult::Source(CapabilitySource::<C>::Component {
+                        capability: component_capability,
+                        component: target.as_weak(),
+                    }),
+                };
+                OfferSegment::Done(res)
+            }
+            OfferSource::Framework => {
+                OfferSegment::Done(OfferResult::Source(CapabilitySource::<C>::Framework {
+                    capability: sources.framework_source(offer.source_name().clone(), mapper)?,
+                    component: target.as_weak(),
+                }))
+            }
+            OfferSource::Capability(_) => {
+                sources.capability_source()?;
+                OfferSegment::Done(OfferResult::Source(CapabilitySource::<C>::Capability {
+                    source_capability: ComponentCapability::Offer(offer.into()),
+                    component: target.as_weak(),
+                }))
+            }
+            OfferSource::Parent => {
+                let parent_component = match target.try_get_parent()? {
+                    ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
+                        if sources.is_namespace_supported() {
+                            if let Some(capability) = sources.find_namespace_source(
+                                offer.source_name(),
+                                top_instance.namespace_capabilities(),
+                                visitor,
+                                mapper,
+                            )? {
+                                return Ok(OfferSegment::Done(OfferResult::Source(
+                                    CapabilitySource::<C>::Namespace {
+                                        capability,
+                                        top_instance: Arc::downgrade(&top_instance),
+                                    },
+                                )));
+                            }
+                        }
+                        if let Some(capability) = sources.find_builtin_source(
+                            offer.source_name(),
+                            top_instance.builtin_capabilities(),
+                            visitor,
+                            mapper,
+                        )? {
+                            return Ok(OfferSegment::Done(OfferResult::Source(
+                                CapabilitySource::<C>::Builtin {
+                                    capability,
+                                    top_instance: Arc::downgrade(&top_instance),
+                                },
+                            )));
+                        }
+                        return Err(RoutingError::offer_from_component_manager_not_found(
+                            offer.source_name().to_string(),
+                        ));
+                    }
+                    ExtendedInstanceInterface::<C>::Component(component) => component,
+                };
+                let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                let parent_offers = parent_component.lock_resolved_state().await?.offers();
+                let parent_offers =
+                    find_matching_offers(offer.source_name(), &child_moniker, &parent_offers)
+                        .ok_or_else(|| {
+                            <O as ErrorNotFoundFromParent>::error_not_found_from_parent(
+                                target.abs_moniker().clone(),
+                                offer.source_name().clone(),
+                            )
+                        })?;
+                OfferSegment::Next(parent_offers, parent_component)
+            }
+            OfferSource::Child(_) => OfferSegment::Done(OfferResult::OfferFromChild(offer, target)),
+            OfferSource::Collection(_) => OfferSegment::Done(
+                OfferResult::OfferFromCollectionAggregate(RouteBundle::from_offer(offer), target),
+            ),
+        };
+        Ok(res)
     }
 }
 
@@ -1282,7 +1260,7 @@ where
 async fn change_directions<C, O, E>(
     offer: O,
     component: Arc<C>,
-) -> Result<(E, Arc<C>), RoutingError>
+) -> Result<(RouteBundle<E>, Arc<C>), RoutingError>
 where
     C: ComponentInstanceInterface,
     O: OfferDeclCommon + ErrorNotFoundInChild,
@@ -1300,35 +1278,169 @@ where
                     },
                 )?
             };
-            let expose = {
-                let child_exposes = child_component.lock_resolved_state().await?.exposes();
-                find_matching_expose(offer.source_name(), &child_exposes).cloned().ok_or_else(
-                    || {
-                        let child_moniker =
-                            child_component.child_moniker().expect("ChildMoniker should exist");
-                        <O as ErrorNotFoundInChild>::error_not_found_in_child(
-                            component.abs_moniker().clone(),
-                            child_moniker.clone(),
-                            offer.source_name().clone(),
-                        )
-                    },
-                )?
-            };
-            Ok((expose, child_component.clone()))
+            let child_exposes = child_component.lock_resolved_state().await?.exposes();
+            let child_exposes = find_matching_exposes(offer.source_name(), &child_exposes)
+                .ok_or_else(|| {
+                    let child_moniker =
+                        child_component.child_moniker().expect("ChildMoniker should exist");
+                    <O as ErrorNotFoundInChild>::error_not_found_in_child(
+                        component.abs_moniker().clone(),
+                        child_moniker.clone(),
+                        offer.source_name().clone(),
+                    )
+                })?;
+            Ok((child_exposes, child_component.clone()))
         }
         _ => panic!("change_direction called with offer that does not change direction"),
     }
 }
 
 /// The `Expose` phase of routing.
+#[derive(Debug)]
 pub struct Expose<E>(PhantomData<E>);
 
 /// The result of routing an Expose declaration to the next phase.
-enum ExposeResult<C: ComponentInstanceInterface, E> {
+enum ExposeResult<C: ComponentInstanceInterface, E: Clone + fmt::Debug> {
     /// The source of the Expose was found (Framework, Component, etc.).
     Source(CapabilitySource<C>),
-    /// The source of the Expose comes from a collection.
-    ExposeFromCollection(E, Arc<C>, String),
+    /// The source of the Expose comes from an aggregation of collections
+    ExposeFromAggregate(RouteBundle<E>, Arc<C>),
+}
+
+/// A bundle of one or more routing declarations to route together, that share the same target_name
+#[derive(Clone, Debug)]
+pub enum RouteBundle<T>
+where
+    T: Clone + fmt::Debug,
+{
+    /// A single route from a unique source.
+    Single(T),
+    /// A bundle of routes representing an aggregated capability. This can be a vector of one,
+    /// e.g. exposing a service from a collection.
+    Aggregate(Vec<T>),
+}
+
+impl<T> RouteBundle<T>
+where
+    T: Clone + fmt::Debug,
+{
+    /// Returns an iterator over the values of `OneOrMany<T>`.
+    pub fn iter(&self) -> RouteBundleIter<'_, T> {
+        match self {
+            Self::Single(item) => {
+                RouteBundleIter { inner_single: Some(item), inner_aggregate: None }
+            }
+            Self::Aggregate(items) => {
+                RouteBundleIter { inner_single: None, inner_aggregate: Some(items.iter()) }
+            }
+        }
+    }
+
+    /// Returns the number of routes in this bundle.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Aggregate(v) => v.len(),
+        }
+    }
+
+    /// Creates a `RouteBundle` from of a single offer routing declaration.
+    pub fn from_offer(input: T) -> Self
+    where
+        T: OfferDeclCommon + Clone,
+    {
+        Self::from_offers(vec![input])
+    }
+
+    /// Creates a `RouteBundle` from of a list of offer routing declarations.
+    ///
+    /// REQUIRES: `input` is nonempty.
+    /// REQUIRES: All elements of `input` share the same `target_name`.
+    pub fn from_offers(mut input: Vec<T>) -> Self
+    where
+        T: OfferDeclCommon + Clone,
+    {
+        match input.len() {
+            1 => {
+                let input = input.remove(0);
+                match input.source() {
+                    OfferSource::Collection(_) => Self::Aggregate(vec![input]),
+                    _ => Self::Single(input),
+                }
+            }
+            0 => panic!("empty bundles are not allowed"),
+            _ => Self::Aggregate(input),
+        }
+    }
+
+    /// Creates a `RouteBundle` from of a single expose routing declaration.
+    pub fn from_expose(input: T) -> Self
+    where
+        T: ExposeDeclCommon + Clone,
+    {
+        Self::from_exposes(vec![input])
+    }
+
+    /// Creates a `RouteBundle` from of a list of expose routing declarations.
+    ///
+    /// REQUIRES: `input` is nonempty.
+    /// REQUIRES: All elements of `input` share the same `target_name`.
+    pub fn from_exposes(mut input: Vec<T>) -> Self
+    where
+        T: ExposeDeclCommon + Clone,
+    {
+        match input.len() {
+            1 => {
+                let input = input.remove(0);
+                match input.source() {
+                    ExposeSource::Collection(_) => Self::Aggregate(vec![input]),
+                    _ => Self::Single(input),
+                }
+            }
+            0 => panic!("empty bundles are not allowed"),
+            _ => Self::Aggregate(input),
+        }
+    }
+}
+
+/// Immutable iterator over a `RouteBundle`.
+/// This `struct` is created by [`RouteBundle::iter`].
+///
+/// [`RouteBundle::iter`]: struct.RouteBundle.html#method.iter
+pub struct RouteBundleIter<'a, T> {
+    inner_single: Option<&'a T>,
+    inner_aggregate: Option<slice::Iter<'a, T>>,
+}
+
+impl<'a, T> Iterator for RouteBundleIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(item) = self.inner_single.take() {
+            Some(item)
+        } else if let Some(ref mut iter) = &mut self.inner_aggregate {
+            iter.next()
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if let Some(_) = self.inner_single {
+            (1, Some(1))
+        } else if let Some(iter) = &self.inner_aggregate {
+            iter.size_hint()
+        } else {
+            (0, Some(0))
+        }
+    }
+}
+
+impl<'a, T> ExactSizeIterator for RouteBundleIter<'a, T> {}
+
+enum ExposeSegment<C: ComponentInstanceInterface, E: Clone + fmt::Debug> {
+    Done(ExposeResult<C, E>),
+    Next(RouteBundle<E>, Arc<C>),
 }
 
 impl<E> Expose<E>
@@ -1338,7 +1450,7 @@ where
     /// Routes the capability starting from the `expose` declaration at `target` to a valid source
     /// (as defined by `sources`).
     async fn route<C, S, V, M, O>(
-        mut expose: E,
+        mut expose_bundle: RouteBundle<E>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
@@ -1353,90 +1465,127 @@ where
         M: DebugRouteMapper,
     {
         loop {
-            mapper.add_expose(target.abs_moniker().clone(), expose.clone().into());
-            ExposeVisitor::visit(visitor, &expose)?;
-            route.push(RouteInfo {
-                component: target.clone(),
-                expose: Some(expose.clone()),
-                offer: None,
-            });
-            match expose.source() {
-                ExposeSource::Void => {
-                    panic!("an error should have been emitted by the availability walker before we reach this point");
-                }
-                ExposeSource::Self_ => {
-                    let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Component {
-                        capability: sources.find_component_source(
-                            expose.source_name(),
-                            target.abs_moniker(),
-                            &target_capabilities,
-                            visitor,
-                            mapper,
-                        )?,
-                        component: target.as_weak(),
-                    }));
-                }
-                ExposeSource::Framework => {
-                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Framework {
-                        capability: sources
-                            .framework_source(expose.source_name().clone(), mapper)?,
-                        component: target.as_weak(),
-                    }))
-                }
-                ExposeSource::Capability(_) => {
-                    sources.capability_source()?;
-                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Capability {
-                        source_capability: ComponentCapability::Expose(expose.into()),
-                        component: target.as_weak(),
-                    }));
-                }
-                ExposeSource::Child(child) => {
-                    let child_component = {
-                        let child_moniker = ChildMoniker::try_new(child, None)?;
-                        target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
-                            || RoutingError::ExposeFromChildInstanceNotFound {
-                                child_moniker,
-                                moniker: target.abs_moniker().clone(),
-                                capability_id: expose.source_name().clone().into(),
-                            },
-                        )?
-                    };
-                    let child_expose = {
-                        let child_exposes = child_component.lock_resolved_state().await?.exposes();
-                        find_matching_expose(expose.source_name(), &child_exposes)
-                            .cloned()
-                            .ok_or_else(|| {
-                                let child_moniker = child_component
-                                    .child_moniker()
-                                    .expect("ChildMoniker should exist");
-                                <E as ErrorNotFoundInChild>::error_not_found_in_child(
-                                    target.abs_moniker().clone(),
-                                    child_moniker.clone(),
-                                    expose.source_name().clone(),
-                                )
-                            })?
-                    };
-                    expose = child_expose;
-                    target = child_component.clone();
-                }
-                ExposeSource::Collection(name) => {
-                    sources.collection_source()?;
-                    {
-                        let target_collections = target.lock_resolved_state().await?.collections();
-                        target_collections.iter().find(|c| &c.name == name).ok_or_else(|| {
-                            RoutingError::ExposeFromCollectionNotFound {
-                                collection: name.clone(),
-                                moniker: target.abs_moniker().clone(),
-                                capability: expose.source_name().clone(),
-                            }
-                        })?;
+            let visit_expose = match &expose_bundle {
+                RouteBundle::Single(expose) => Some(expose),
+                RouteBundle::Aggregate(exposes) => {
+                    // TODO(fxbug.dev/4776): Visit routes in all aggregates.
+                    if exposes.len() == 1 {
+                        Some(&exposes[0])
+                    } else {
+                        None
                     }
-                    let name = name.clone();
-                    return Ok(ExposeResult::ExposeFromCollection(expose, target, name));
+                }
+            };
+            if let Some(visit_expose) = visit_expose {
+                mapper.add_expose(target.abs_moniker().clone(), visit_expose.clone().into());
+                ExposeVisitor::visit(visitor, &visit_expose)?;
+                route.push(RouteInfo {
+                    component: target.clone(),
+                    expose: Some(visit_expose.clone()),
+                    offer: None,
+                });
+            }
+
+            match expose_bundle {
+                RouteBundle::Single(expose) => {
+                    match Self::route_segment(expose, target, sources, visitor, mapper).await? {
+                        ExposeSegment::Done(r) => return Ok(r),
+                        ExposeSegment::Next(e, t) => {
+                            expose_bundle = e;
+                            target = t;
+                        }
+                    }
+                }
+                RouteBundle::Aggregate(_) => {
+                    if expose_bundle
+                        .iter()
+                        .any(|e| !matches!(e.source(), ExposeSource::Collection(_)))
+                    {
+                        // TODO(fxbug.dev/4776): Support aggregation over collections and children.
+                        return Err(RoutingError::UnsupportedRouteSource {
+                            source_type: "mix of collections and child routes".into(),
+                        });
+                    }
+                    return Ok(ExposeResult::ExposeFromAggregate(expose_bundle, target));
                 }
             }
         }
+    }
+
+    async fn route_segment<C, S, V, M>(
+        expose: E,
+        target: Arc<C>,
+        sources: &S,
+        visitor: &mut V,
+        mapper: &mut M,
+    ) -> Result<ExposeSegment<C, E>, RoutingError>
+    where
+        C: ComponentInstanceInterface,
+        S: Sources,
+        V: ExposeVisitor<ExposeDecl = E>,
+        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        M: DebugRouteMapper,
+    {
+        let res = match expose.source() {
+            ExposeSource::Void => {
+                panic!("an error should have been emitted by the availability walker before we reach this point");
+            }
+            ExposeSource::Self_ => {
+                let target_capabilities = target.lock_resolved_state().await?.capabilities();
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Component {
+                    capability: sources.find_component_source(
+                        expose.source_name(),
+                        target.abs_moniker(),
+                        &target_capabilities,
+                        visitor,
+                        mapper,
+                    )?,
+                    component: target.as_weak(),
+                }))
+            }
+            ExposeSource::Framework => {
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Framework {
+                    capability: sources.framework_source(expose.source_name().clone(), mapper)?,
+                    component: target.as_weak(),
+                }))
+            }
+            ExposeSource::Capability(_) => {
+                sources.capability_source()?;
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Capability {
+                    source_capability: ComponentCapability::Expose(expose.into()),
+                    component: target.as_weak(),
+                }))
+            }
+            ExposeSource::Child(child) => {
+                let child_component = {
+                    let child_moniker = ChildMoniker::try_new(child, None)?;
+                    target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
+                        || RoutingError::ExposeFromChildInstanceNotFound {
+                            child_moniker,
+                            moniker: target.abs_moniker().clone(),
+                            capability_id: expose.source_name().clone().into(),
+                        },
+                    )?
+                };
+                let child_exposes = child_component.lock_resolved_state().await?.exposes();
+                let child_exposes = find_matching_exposes(expose.source_name(), &child_exposes)
+                    .ok_or_else(|| {
+                        let child_moniker =
+                            child_component.child_moniker().expect("ChildMoniker should exist");
+                        <E as ErrorNotFoundInChild>::error_not_found_in_child(
+                            target.abs_moniker().clone(),
+                            child_moniker.clone(),
+                            expose.source_name().clone(),
+                        )
+                    })?;
+                ExposeSegment::Next(child_exposes, child_component)
+            }
+            ExposeSource::Collection(_) => ExposeSegment::Done(ExposeResult::ExposeFromAggregate(
+                RouteBundle::from_expose(expose),
+                target,
+            )),
+        };
+        Ok(res)
     }
 }
 
@@ -1486,29 +1635,15 @@ pub trait CapabilityVisitor {
     }
 }
 
-pub fn find_matching_offer<'a, O>(
-    source_name: &CapabilityName,
-    child_moniker: &ChildMoniker,
-    offers: &'a Vec<OfferDecl>,
-) -> Option<&'a O>
-where
-    O: OfferDeclCommon + FromEnum<OfferDecl>,
-{
-    offers.iter().flat_map(FromEnum::<OfferDecl>::from_enum).find(|offer: &&O| {
-        *offer.target_name() == *source_name
-            && target_matches_moniker(offer.target(), &child_moniker)
-    })
-}
-
 pub fn find_matching_offers<'a, O>(
     source_name: &CapabilityName,
     child_moniker: &ChildMoniker,
     offers: &'a Vec<OfferDecl>,
-) -> Vec<O>
+) -> Option<RouteBundle<O>>
 where
     O: OfferDeclCommon + FromEnum<OfferDecl> + Clone,
 {
-    offers
+    let offers: Vec<_> = offers
         .iter()
         .flat_map(FromEnum::<OfferDecl>::from_enum)
         .filter(|offer: &&O| {
@@ -1516,19 +1651,32 @@ where
                 && target_matches_moniker(offer.target(), &child_moniker)
         })
         .cloned()
-        .collect()
+        .collect();
+    if offers.is_empty() {
+        return None;
+    }
+    Some(RouteBundle::from_offers(offers))
 }
 
-pub fn find_matching_expose<'a, E>(
+pub fn find_matching_exposes<'a, E>(
     source_name: &CapabilityName,
     exposes: &'a Vec<ExposeDecl>,
-) -> Option<&'a E>
+) -> Option<RouteBundle<E>>
 where
-    E: ExposeDeclCommon + FromEnum<ExposeDecl>,
+    E: ExposeDeclCommon + FromEnum<ExposeDecl> + Clone,
 {
-    exposes.iter().flat_map(FromEnum::<ExposeDecl>::from_enum).find(|expose: &&E| {
-        *expose.target_name() == *source_name && *expose.target() == ExposeTarget::Parent
-    })
+    let exposes: Vec<_> = exposes
+        .iter()
+        .flat_map(FromEnum::<ExposeDecl>::from_enum)
+        .filter(|expose: &&E| {
+            *expose.target_name() == *source_name && *expose.target() == ExposeTarget::Parent
+        })
+        .cloned()
+        .collect();
+    if exposes.is_empty() {
+        return None;
+    }
+    Some(RouteBundle::from_exposes(exposes))
 }
 
 /// Implemented by declaration types to emit a proper error when a matching offer is not found in the parent.
@@ -1592,4 +1740,109 @@ macro_rules! make_noop_visitor {
             }
         )*
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        assert_matches::assert_matches,
+        cm_rust::{Availability, ChildRef, ExposeServiceDecl},
+    };
+
+    #[test]
+    fn route_bundle_iter_single() {
+        let v = RouteBundle::Single(34);
+        let mut iter = v.iter();
+        assert_matches!(iter.next(), Some(&34));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn route_bundle_iter_many() {
+        let v = RouteBundle::Aggregate(vec![1, 2, 3]);
+        let mut iter = v.iter();
+        assert_matches!(iter.next(), Some(&1));
+        assert_matches!(iter.next(), Some(&2));
+        assert_matches!(iter.next(), Some(&3));
+        assert_matches!(iter.next(), None);
+    }
+
+    #[test]
+    fn route_bundle_from_offers() {
+        let parent_offers: Vec<_> = [1, 2, 3]
+            .into_iter()
+            .map(|i| OfferServiceDecl {
+                source: OfferSource::Parent,
+                source_name: format!("foo_source_{}", i).into(),
+                target: OfferTarget::Collection("coll".into()),
+                target_name: "foo_target".into(),
+                source_instance_filter: None,
+                renamed_instances: None,
+                availability: Availability::Required,
+            })
+            .collect();
+        let collection_offer = OfferServiceDecl {
+            source: OfferSource::Collection("coll".into()),
+            source_name: "foo_source".into(),
+            target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
+            target_name: "foo_target".into(),
+            source_instance_filter: None,
+            renamed_instances: None,
+            availability: Availability::Required,
+        };
+        assert_matches!(
+            RouteBundle::from_offer(parent_offers[0].clone()),
+            RouteBundle::Single(o) if o == parent_offers[0]
+        );
+        assert_matches!(
+            RouteBundle::from_offers(vec![parent_offers[0].clone()]),
+            RouteBundle::Single(o) if o == parent_offers[0]
+        );
+        assert_matches!(
+            RouteBundle::from_offers(parent_offers.clone()),
+            RouteBundle::Aggregate(v) if v == parent_offers
+        );
+        assert_matches!(
+            RouteBundle::from_offer(collection_offer.clone()),
+            RouteBundle::Aggregate(v) if v == vec![collection_offer.clone()]
+        );
+    }
+
+    #[test]
+    fn route_bundle_from_exposes() {
+        let child_exposes: Vec<_> = [1, 2, 3]
+            .into_iter()
+            .map(|i| ExposeServiceDecl {
+                source: ExposeSource::Child("source".into()),
+                source_name: format!("foo_source_{}", i).into(),
+                target: ExposeTarget::Parent,
+                target_name: "foo_target".into(),
+                availability: Availability::Required,
+            })
+            .collect();
+        let collection_expose = ExposeServiceDecl {
+            source: ExposeSource::Collection("coll".into()),
+            source_name: "foo_source".into(),
+            target: ExposeTarget::Parent,
+            target_name: "foo_target".into(),
+            availability: Availability::Required,
+        };
+        assert_matches!(
+            RouteBundle::from_expose(child_exposes[0].clone()),
+            RouteBundle::Single(o) if o == child_exposes[0]
+        );
+        assert_matches!(
+            RouteBundle::from_exposes(vec![child_exposes[0].clone()]),
+            RouteBundle::Single(o) if o == child_exposes[0]
+        );
+        assert_matches!(
+            RouteBundle::from_exposes(child_exposes.clone()),
+            RouteBundle::Aggregate(v) if v == child_exposes
+        );
+        assert_matches!(
+            RouteBundle::from_expose(collection_expose.clone()),
+            RouteBundle::Aggregate(v) if v == vec![collection_expose.clone()]
+        );
+    }
 }

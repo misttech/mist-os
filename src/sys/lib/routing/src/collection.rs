@@ -10,14 +10,15 @@ use {
         },
         error::RoutingError,
         mapper::DebugRouteMapper,
-        router,
-        router::{CapabilityVisitor, ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, Sources},
+        router::{
+            self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
+            OfferVisitor, RouteBundle, Sources,
+        },
         Never, RouteInfo,
     },
     async_trait::async_trait,
     cm_rust::{
-        CapabilityName, ExposeDecl, ExposeDeclCommon, ExposeServiceDecl, OfferServiceDecl,
-        ServiceDecl,
+        CapabilityName, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, OfferServiceDecl,
     },
     derivative::Derivative,
     from_enum::FromEnum,
@@ -35,7 +36,7 @@ use {
 /// all children within the collection.
 #[derive(Derivative)]
 #[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone, M: Clone"))]
-pub(super) struct CollectionCapabilityProvider<C: ComponentInstanceInterface, E, S, V, M> {
+pub(super) struct CollectionAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V, M> {
     /// Component that contains the collection.
     pub collection_component: WeakComponentInstanceInterface<C>,
 
@@ -53,7 +54,8 @@ pub(super) struct CollectionCapabilityProvider<C: ComponentInstanceInterface, E,
 }
 
 #[async_trait]
-impl<C, E, S, V, M> AggregateCapabilityProvider<C> for CollectionCapabilityProvider<C, E, S, V, M>
+impl<C, E, S, V, M> AggregateCapabilityProvider<C>
+    for CollectionAggregateServiceProvider<C, E, S, V, M>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -84,7 +86,7 @@ where
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
             match child_exposes {
                 Ok(child_exposes) => {
-                    if router::find_matching_expose::<E>(&self.capability_name, &child_exposes)
+                    if router::find_matching_exposes::<E>(&self.capability_name, &child_exposes)
                         .is_some()
                     {
                         instances.push(moniker.name().to_string())
@@ -97,7 +99,7 @@ where
         Ok(instances)
     }
 
-    /// Returns a `CapabilitySourceInterface` to a capability exposed by a child.
+    /// Returns a `CapabilitySource` to a capability exposed by a child.
     ///
     /// `instance` is the name of the child that exposes the capability, as returned by
     /// `list_instances`.
@@ -118,20 +120,17 @@ where
                 })?
         };
 
-        let expose_decl: E = {
-            let child_exposes = child_component.lock_resolved_state().await?.exposes();
-            router::find_matching_expose(&self.capability_name, &child_exposes)
-                .cloned()
-                .ok_or_else(|| {
-                    E::error_not_found_in_child(
-                        collection_component.abs_moniker().clone(),
-                        child_moniker,
-                        self.capability_name.clone(),
-                    )
-                })?
-        };
+        let child_exposes = child_component.lock_resolved_state().await?.exposes();
+        let expose_bundle = router::find_matching_exposes(&self.capability_name, &child_exposes)
+            .ok_or_else(|| {
+                E::error_not_found_in_child(
+                    collection_component.abs_moniker().clone(),
+                    child_moniker,
+                    self.capability_name.clone(),
+                )
+            })?;
         router::route_from_expose(
-            expose_decl,
+            expose_bundle,
             child_component,
             self.sources.clone(),
             &mut self.visitor.clone(),
@@ -148,9 +147,12 @@ where
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "S: Clone, M: Clone, V: Clone"))]
-pub(super) struct AggregateServiceProvider<C: ComponentInstanceInterface, S, M, V> {
+pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O, E, S, M, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
+
+    phantom_offer: std::marker::PhantomData<O>,
+    phantom_expose: std::marker::PhantomData<E>,
 
     /// List of offer decl to follow for routing each service provider used in the overall aggregation
     offer_decls: Vec<OfferServiceDecl>,
@@ -160,13 +162,26 @@ pub(super) struct AggregateServiceProvider<C: ComponentInstanceInterface, S, M, 
     mapper: M,
 }
 
-impl<C, S, M, V> AggregateServiceProvider<C, S, M, V>
+impl<C, O, E, S, M, V> OfferAggregateServiceProvider<C, O, E, S, M, V>
 where
     C: ComponentInstanceInterface + 'static,
-    S: Sources<CapabilityDecl = ServiceDecl> + 'static,
-    V: OfferVisitor<OfferDecl = OfferServiceDecl>
-        + ExposeVisitor<ExposeDecl = ExposeServiceDecl>
-        + CapabilityVisitor<CapabilityDecl = ServiceDecl>,
+    E: ExposeDeclCommon
+        + ErrorNotFoundInChild
+        + FromEnum<ExposeDecl>
+        + Into<ExposeDecl>
+        + Clone
+        + 'static,
+    O: OfferDeclCommon
+        + ErrorNotFoundFromParent
+        + ErrorNotFoundInChild
+        + FromEnum<OfferDecl>
+        + Into<OfferDecl>
+        + Clone
+        + 'static,
+    S: Sources + 'static,
+    V: OfferVisitor<OfferDecl = O>
+        + ExposeVisitor<ExposeDecl = E>
+        + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
     M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
@@ -190,18 +205,40 @@ where
             })
             .flatten()
             .collect();
-        Self { offer_decls: single_instance_decls, sources, visitor, component, mapper }
+        Self {
+            offer_decls: single_instance_decls,
+            phantom_expose: std::marker::PhantomData::<E> {},
+            phantom_offer: std::marker::PhantomData::<O> {},
+            sources,
+            visitor,
+            component,
+            mapper,
+        }
     }
 }
 
 #[async_trait]
-impl<C, S, M, V> AggregateCapabilityProvider<C> for AggregateServiceProvider<C, S, M, V>
+impl<C, O, E, S, M, V> AggregateCapabilityProvider<C>
+    for OfferAggregateServiceProvider<C, O, E, S, M, V>
 where
     C: ComponentInstanceInterface + 'static,
-    S: Sources<CapabilityDecl = ServiceDecl> + 'static,
-    V: OfferVisitor<OfferDecl = OfferServiceDecl>
-        + ExposeVisitor<ExposeDecl = ExposeServiceDecl>
-        + CapabilityVisitor<CapabilityDecl = ServiceDecl>,
+    E: ExposeDeclCommon
+        + ErrorNotFoundInChild
+        + FromEnum<ExposeDecl>
+        + Into<ExposeDecl>
+        + Clone
+        + 'static,
+    O: OfferDeclCommon
+        + ErrorNotFoundFromParent
+        + ErrorNotFoundInChild
+        + FromEnum<OfferDecl>
+        + Into<OfferDecl>
+        + Clone
+        + 'static,
+    S: Sources + 'static,
+    V: OfferVisitor<OfferDecl = O>
+        + ExposeVisitor<ExposeDecl = E>
+        + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
     M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
@@ -222,8 +259,13 @@ where
                 .map(|allowed_instances| allowed_instances.contains(&instance.to_string()))
                 .unwrap_or(false)
             {
+                // The visitor which we inherited from the router is parameterized on the generic
+                // type `O`. This construction with from_enum is a roundabout way of
+                // converting from the concrete variant type to the generic.
+                let offer_decl = OfferDecl::Service(offer_decl.clone());
+                let offer_decl = O::from_enum(&offer_decl).unwrap().clone();
                 return router::route_from_offer(
-                    offer_decl.clone(),
+                    RouteBundle::from_offer(offer_decl),
                     self.component.upgrade().map_err(|e| {
                         RoutingError::unsupported_route_source(format!(
                             "error upgrading aggregation point component {}",
