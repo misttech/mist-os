@@ -9,10 +9,14 @@ use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
 use std::{
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Once,
+    },
     time::Duration,
 };
-use tracing::{info, span, Event, Metadata, Subscriber};
+use tracing::{span, Event, Metadata, Subscriber};
+use tracing_log::LogTracer;
 
 async fn setup_publisher() -> (zx::Socket, Publisher) {
     let (proxy, mut requests) =
@@ -66,19 +70,19 @@ fn write_log_benchmark<F, S>(
 // to log. They set up different cases: just a string, a string with arguments, the same string
 // but with the arguments formatted, etc. It'll measure the time it takes for the log to go
 // through the tracing mechanisms, our encoder and finally writing to the socket.
-fn setup_write_log_benchmarks<F, S>(
+fn setup_tracing_write_benchmarks<F, S>(
     name: &str,
-    mut make_subscriber: F,
+    make_subscriber: F,
     benchmark: Option<criterion::Benchmark>,
 ) -> criterion::Benchmark
 where
-    F: FnMut() -> (Option<zx::Socket>, S) + 'static + Copy,
+    F: Fn() -> (Option<zx::Socket>, S) + 'static + Copy,
     S: Subscriber + Send + Sync,
 {
     let all_args_bench = move |b: &mut criterion::Bencher| {
         let (socket, subscriber) = make_subscriber();
         write_log_benchmark(b, socket, subscriber, || {
-            info!(
+            tracing::info!(
                 tag = "logbench",
                 boolean = true,
                 float = 1234.5678,
@@ -98,13 +102,13 @@ where
         .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
-                info!("this is a log emitted from the benchmark");
+                tracing::info!("this is a log emitted from the benchmark");
             });
         })
         .with_function(&format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
-                info!(
+                tracing::info!(
                     boolean = true,
                     int = -123456,
                     string = "foobarbaz",
@@ -115,9 +119,11 @@ where
         .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
-                info!(
+                tracing::info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
-                    true, -123456, "foobarbaz",
+                    true,
+                    -123456,
+                    "foobarbaz",
                 );
             });
         })
@@ -156,6 +162,49 @@ impl Subscriber for NoOpSubscriber {
     fn exit(&self, _span: &span::Id) {}
 }
 
+fn setup_log_write_benchmarks<F, S>(
+    name: &str,
+    bench: criterion::Benchmark,
+    make_subscriber: F,
+) -> criterion::Benchmark
+where
+    F: Fn() -> (Option<zx::Socket>, S) + 'static + Copy,
+    S: Subscriber + Send + Sync,
+{
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        LogTracer::init().unwrap();
+    });
+    bench
+        .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
+            let (socket, subscriber) = make_subscriber();
+            write_log_benchmark(b, socket, subscriber, || {
+                log::info!("this is a log emitted from the benchmark");
+            });
+        })
+        .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
+            let (socket, subscriber) = make_subscriber();
+            write_log_benchmark(b, socket, subscriber, || {
+                log::info!(
+                    "this is a log emitted from the benchmark boolean={} int={} string={}",
+                    true,
+                    -123456,
+                    "foobarbaz",
+                );
+            });
+        })
+}
+
+fn create_real_tracing_subscriber() -> (Option<zx::Socket>, Publisher) {
+    let mut executor = fasync::LocalExecutor::new();
+    let (socket, publisher) = executor.run_singlethreaded(setup_publisher());
+    (Some(socket), publisher)
+}
+
+fn create_noop_subscriber() -> (Option<zx::Socket>, NoOpSubscriber) {
+    (None, NoOpSubscriber::default())
+}
+
 fn main() {
     let mut c = FuchsiaCriterion::default();
     let internal_c: &mut criterion::Criterion = &mut c;
@@ -167,20 +216,12 @@ fn main() {
         // and run for much longer.
         .sample_size(10);
 
-    let mut bench = setup_write_log_benchmarks(
-        "Tracing",
-        move || {
-            let mut executor = fasync::LocalExecutor::new();
-            let (socket, publisher) = executor.run_singlethreaded(setup_publisher());
-            (Some(socket), publisher)
-        },
-        None,
-    );
-    bench = setup_write_log_benchmarks(
-        "TracingNoOp",
-        move || (None, NoOpSubscriber::default()),
-        Some(bench),
-    );
+    let mut bench =
+        setup_tracing_write_benchmarks("Tracing", &create_real_tracing_subscriber, None);
+    bench = setup_tracing_write_benchmarks("TracingNoOp", &create_noop_subscriber, Some(bench));
+
+    bench = setup_log_write_benchmarks("Log", bench, &create_real_tracing_subscriber);
+    bench = setup_log_write_benchmarks("LogNoOp", bench, &create_noop_subscriber);
 
     c.bench("fuchsia.diagnostics_log_rust.core", bench);
 }

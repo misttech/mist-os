@@ -1,3 +1,7 @@
+fuchsia.diagnostics_log_rust.core: Publisher/Log/MessageAsString
+fuchsia.diagnostics_log_rust.core: Publisher/Log/NoArguments
+fuchsia.diagnostics_log_rust.core: Publisher/LogNoOp/MessageAsString
+fuchsia.diagnostics_log_rust.core: Publisher/LogNoOp/NoArguments
 fuchsia.diagnostics_log_rust.core: Publisher/Tracing/AllArguments
 fuchsia.diagnostics_log_rust.core: Publisher/Tracing/NoArguments
 fuchsia.diagnostics_log_rust.core: Publisher/Tracing/MessageWithSomeArguments
