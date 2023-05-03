@@ -7,7 +7,7 @@
 namespace radar {
 
 RadarReaderProxy::~RadarReaderProxy() {
-  // Close out any outstanding requests before destruction to avoid triggerig an assert.
+  // Close out any outstanding requests before destruction to avoid triggering an assert.
   for (auto& [server, completer] : connect_requests_) {
     completer.Close(ZX_ERR_PEER_CLOSED);
   }
@@ -18,7 +18,8 @@ void RadarReaderProxy::Connect(ConnectRequest& request, ConnectCompleter::Sync& 
     // Our driver client is bound, so we must have already set these fields.
     ZX_DEBUG_ASSERT(burst_properties_);
 
-    instances_.emplace_back(std::make_unique<ReaderInstance>(this, std::move(request.server())));
+    instances_.emplace_back(
+        std::make_unique<ReaderInstance>(dispatcher_, std::move(request.server()), this));
     completer.Reply(fit::ok());
   } else {
     connect_requests_.emplace_back(std::move(request.server()), completer.ToAsync());
@@ -31,6 +32,105 @@ void RadarReaderProxy::DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory>
     connector_->ConnectToRadarDevice(
         dir, filename, [&](auto client_end) { return ValidateDevice(std::move(client_end)); });
   }
+}
+
+void RadarReaderProxy::ResizeVmoPool(const size_t count) {
+  ZX_DEBUG_ASSERT(burst_properties_);
+
+  if (count <= vmo_pool_.size()) {
+    return;
+  }
+
+  const size_t vmos_to_register = count - vmo_pool_.size();
+
+  std::vector<zx::vmo> vmos(vmos_to_register);
+  std::vector<uint32_t> vmo_ids(vmos_to_register);
+
+  for (size_t i = 0; i < vmos.size(); i++) {
+    vmo_ids[i] = static_cast<uint32_t>(vmo_pool_.size());
+
+    MappedVmo vmo;
+
+    // The radar driver writes to these VMOs, so we only need read access.
+    zx_status_t status =
+        vmo.mapped_vmo.CreateAndMap(burst_properties_->size(), ZX_VM_PERM_READ, nullptr, &vmo.vmo);
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to create and map VMO";
+      HandleFatalError(status);
+      return;
+    }
+
+    if ((status = vmo.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmos[i])) != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to duplicate VMO";
+      HandleFatalError(status);
+      return;
+    }
+
+    vmo_pool_.push_back(std::move(vmo));
+  }
+
+  if (!radar_client_) {
+    return;
+  }
+
+  radar_client_->RegisterVmos({std::move(vmo_ids), std::move(vmos)}).Then([&](const auto& result) {
+    if (result.is_error()) {
+      zx_status_t status = ZX_ERR_BAD_STATE;
+      if (result.error_value().is_framework_error()) {
+        status = result.error_value().is_framework_error();
+        FX_PLOGS(ERROR, status) << "Failed to send register VMOs request";
+      } else {
+        FX_LOGS(ERROR) << "Failed to register VMOs";
+      }
+      HandleFatalError(status);
+    }
+  });
+}
+
+void RadarReaderProxy::StartBursts() {
+  if (radar_client_) {
+    if (auto result = radar_client_->StartBursts(); result.is_error()) {
+      FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send start bursts request";
+      HandleFatalError(result.error_value().status());
+    }
+  }
+}
+
+void RadarReaderProxy::RequestStopBursts() {
+  if (!radar_client_) {
+    return;
+  }
+
+  for (const auto& instance : instances_) {
+    // Don't stop bursts if any client still wants to receive them.
+    if (instance->bursts_started()) {
+      return;
+    }
+  }
+
+  radar_client_->StopBursts().Then([&](const auto& result) {
+    if (result.is_error()) {
+      FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send stop bursts request";
+      HandleFatalError(result.error_value().status());
+    }
+  });
+}
+
+void RadarReaderProxy::OnInstanceUnbound(ReaderInstance* const instance) {
+  // The instance was unbound, remove it from our list and let it be deleted.
+  for (auto it = instances_.begin(); it != instances_.end(); it++) {
+    if (it->get() == instance) {
+      instances_.erase(it);
+      RequestStopBursts();
+      return;
+    }
+  }
+}
+
+fuchsia_hardware_radar::RadarBurstReaderGetBurstPropertiesResponse
+RadarReaderProxy::burst_properties() const {
+  ZX_DEBUG_ASSERT(burst_properties_);
+  return *burst_properties_;
 }
 
 void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
@@ -109,11 +209,15 @@ bool RadarReaderProxy::ValidateDevice(
   // If this is our first connection, save the burst size. If this is not our first connection, make
   // sure that the burst size reported by this device matches what we have saved.
   const auto burst_properties = reader->GetBurstProperties();
-  if (burst_properties.is_error() ||
-      (burst_properties_ && burst_properties_->size() != burst_properties->size())) {
+  if (burst_properties.is_error()) {
     return false;
   }
-  if (!burst_properties_) {
+  if (burst_properties_) {
+    if (burst_properties_->size() != burst_properties->size() ||
+        burst_properties_->period() != burst_properties->period()) {
+      return false;
+    }
+  } else {
     burst_properties_ = *burst_properties;
   }
 
@@ -147,7 +251,7 @@ bool RadarReaderProxy::ValidateDevice(
 
   // Now that we are connected to a device, complete any connect requests that are outstanding.
   for (auto& [server, completer] : connect_requests_) {
-    instances_.emplace_back(std::make_unique<ReaderInstance>(this, std::move(server)));
+    instances_.emplace_back(std::make_unique<ReaderInstance>(dispatcher_, std::move(server), this));
     completer.Reply(fit::ok());
   }
   connect_requests_.clear();
@@ -169,183 +273,6 @@ void RadarReaderProxy::HandleFatalError(const zx_status_t status) {
   // not, the DeviceWatcher will signal to connect when a new device becomes available.
   connector_->ConnectToFirstRadarDevice(
       [&](auto client_end) { return ValidateDevice(std::move(client_end)); });
-}
-
-void RadarReaderProxy::UpdateVmoCount(const size_t count) {
-  ZX_DEBUG_ASSERT(burst_properties_);
-
-  if (count <= vmo_pool_.size()) {
-    return;
-  }
-
-  const size_t vmos_to_register = count - vmo_pool_.size();
-
-  std::vector<zx::vmo> vmos(vmos_to_register);
-  std::vector<uint32_t> vmo_ids(vmos_to_register);
-
-  for (size_t i = 0; i < vmos.size(); i++) {
-    vmo_ids[i] = static_cast<uint32_t>(vmo_pool_.size());
-
-    MappedVmo vmo;
-
-    // The radar driver writes to these VMOs, so we only need read access.
-    zx_status_t status =
-        vmo.mapped_vmo.CreateAndMap(burst_properties_->size(), ZX_VM_PERM_READ, nullptr, &vmo.vmo);
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to create and map VMO";
-      HandleFatalError(status);
-      return;
-    }
-
-    if ((status = vmo.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmos[i])) != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to duplicate VMO";
-      HandleFatalError(status);
-      return;
-    }
-
-    vmo_pool_.push_back(std::move(vmo));
-  }
-
-  radar_client_->RegisterVmos({std::move(vmo_ids), std::move(vmos)}).Then([&](const auto& result) {
-    if (result.is_error()) {
-      zx_status_t status = ZX_ERR_BAD_STATE;
-      if (result.error_value().is_framework_error()) {
-        status = result.error_value().is_framework_error();
-        FX_PLOGS(ERROR, status) << "Failed to send register VMOs request";
-      } else {
-        FX_LOGS(ERROR) << "Failed to register VMOs";
-      }
-      HandleFatalError(status);
-    }
-  });
-}
-
-void RadarReaderProxy::StartBursts() {
-  if (auto result = radar_client_->StartBursts(); result.is_error()) {
-    FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send start bursts request";
-    HandleFatalError(result.error_value().status());
-  }
-}
-
-void RadarReaderProxy::StopBursts() {
-  for (const auto& instance : instances_) {
-    // Don't stop bursts if any client still wants to receive them.
-    if (instance->bursts_started()) {
-      return;
-    }
-  }
-
-  radar_client_->StopBursts().Then([&](const auto& result) {
-    if (result.is_error()) {
-      FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send stop bursts request";
-      HandleFatalError(result.error_value().status());
-    }
-  });
-}
-
-void RadarReaderProxy::InstanceUnbound(ReaderInstance* const instance) {
-  // The instance was unbound, remove it from our list and let it be deleted.
-  for (auto it = instances_.begin(); it != instances_.end(); it++) {
-    if (it->get() == instance) {
-      instances_.erase(it);
-
-      // Stop bursts if this was the last client that wanted to receive them. We may be handling a
-      // fatal error in which case the client has already been unbound.
-      if (radar_client_) {
-        StopBursts();
-      }
-      return;
-    }
-  }
-}
-
-RadarReaderProxy::ReaderInstance::ReaderInstance(
-    RadarReaderProxy* const parent,
-    fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReader> server_end)
-    : parent_(parent),
-      server_(fidl::BindServer(parent->dispatcher_, std::move(server_end), this,
-                               [](ReaderInstance* instance, auto, auto) {
-                                 instance->parent_->InstanceUnbound(instance);
-                               })),
-      manager_(parent->burst_properties_ ? parent->burst_properties_->size() : 0) {}
-
-// TODO(fxbug.dev/100020): Remove this after all clients have switched to GetBurstProperties.
-void RadarReaderProxy::ReaderInstance::GetBurstSize(GetBurstSizeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(parent_->burst_properties_);
-  completer.Reply(parent_->burst_properties_->size());
-}
-
-void RadarReaderProxy::ReaderInstance::GetBurstProperties(
-    GetBurstPropertiesCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(parent_->burst_properties_);
-  completer.Reply(*parent_->burst_properties_);
-}
-
-void RadarReaderProxy::ReaderInstance::RegisterVmos(RegisterVmosRequest& request,
-                                                    RegisterVmosCompleter::Sync& completer) {
-  const fit::result result = manager_.RegisterVmos(request.vmo_ids(), std::move(request.vmos()));
-  completer.Reply(result);
-  if (result.is_ok()) {
-    parent_->UpdateVmoCount(vmo_count_ += request.vmo_ids().size());
-  }
-}
-
-void RadarReaderProxy::ReaderInstance::UnregisterVmos(UnregisterVmosRequest& request,
-                                                      UnregisterVmosCompleter::Sync& completer) {
-  completer.Reply(manager_.UnregisterVmos(request.vmo_ids()));
-}
-
-void RadarReaderProxy::ReaderInstance::StartBursts(StartBurstsCompleter::Sync& completer) {
-  bursts_started_ = true;
-  sent_error_ = false;
-  parent_->StartBursts();
-}
-
-void RadarReaderProxy::ReaderInstance::StopBursts(StopBurstsCompleter::Sync& completer) {
-  bursts_started_ = false;
-  // We know that no more bursts will be sent on the channel after setting this flag, so it is safe
-  // to immediately reply.
-  completer.Reply();
-  parent_->StopBursts();
-}
-
-void RadarReaderProxy::ReaderInstance::UnlockVmo(UnlockVmoRequest& request,
-                                                 UnlockVmoCompleter::Sync& completer) {
-  manager_.UnlockVmo(request.vmo_id());
-}
-
-void RadarReaderProxy::ReaderInstance::SendBurst(const cpp20::span<const uint8_t> burst,
-                                                 const zx::time timestamp) {
-  if (!bursts_started_) {
-    return;
-  }
-
-  fit::result vmo_id = manager_.WriteUnlockedVmoAndGetId(burst);
-  if (vmo_id.is_error()) {
-    SendError(vmo_id.error_value());
-    return;
-  }
-
-  sent_error_ = false;
-
-  const auto result = fuchsia_hardware_radar::RadarBurstReaderOnBurstResult::WithResponse(
-      {{*vmo_id, timestamp.get()}});
-  if (auto event_result = fidl::SendEvent(server_)->OnBurst(result); event_result.is_error()) {
-    FX_PLOGS(ERROR, event_result.error_value().status()) << "Failed to send burst";
-  }
-}
-
-void RadarReaderProxy::ReaderInstance::SendError(const fuchsia_hardware_radar::StatusCode error) {
-  if (!bursts_started_ || sent_error_) {
-    return;
-  }
-
-  sent_error_ = true;
-
-  const auto result = fuchsia_hardware_radar::RadarBurstReaderOnBurstResult::WithErr(error);
-  if (auto event_result = fidl::SendEvent(server_)->OnBurst(result); event_result.is_error()) {
-    FX_PLOGS(ERROR, event_result.error_value().status()) << "Failed to send burst error";
-  }
 }
 
 }  // namespace radar

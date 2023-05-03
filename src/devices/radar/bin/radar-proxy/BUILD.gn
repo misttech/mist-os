@@ -31,6 +31,7 @@ executable("radar-proxy-bin") {
     "main.cc",
     "radar-provider-proxy.cc",
     "radar-reader-proxy.cc",
+    "reader-instance.cc",
   ]
   deps = _common_deps
 }
@@ -77,6 +78,7 @@ test("radar-proxy-test-bin") {
     "radar-provider-proxy.cc",
     "radar-proxy-test.cc",
     "radar-reader-proxy.cc",
+    "reader-instance.cc",
   ]
   deps = [
            "//sdk/lib/driver/runtime/testing/runtime",
