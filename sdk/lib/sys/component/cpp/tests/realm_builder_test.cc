@@ -36,7 +36,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <src/lib/fostr/fidl/fuchsia/component/decl/formatting.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <test/placeholders/cpp/fidl.h>
 
@@ -1235,8 +1234,7 @@ TEST_P(RealmBuilderRoutingParameterizedFixture, RoutedCapabilitiesYieldExpectedO
   const fdecl::Offer& actual = root_decl.offers().at(0);
   const fdecl::Offer& expected = *param.second;
 
-  EXPECT_TRUE(fidl::Equals(actual, expected)) << "Actual: " << actual << std::endl
-                                              << "Expected: " << expected << std::endl;
+  EXPECT_TRUE(fidl::Equals(actual, expected));
 }
 
 INSTANTIATE_TEST_SUITE_P(

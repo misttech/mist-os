@@ -83,3 +83,72 @@ type LayoutConstraint = flexible union {
     // For vectors, this is the maximum number of elements allowed.
     1: max_size uint32;
 };
+
+/// A configuration value which can be provided to a component.
+///
+/// Used both for storing configuration at-rest and in runtime configuration APIs.
+@available(added=12)
+type ConfigValue = flexible union {
+    1: single ConfigSingleValue;
+    2: vector ConfigVectorValue;
+};
+
+/// A single configuration value.
+@available(added=12)
+type ConfigSingleValue = flexible union {
+    1: bool bool;
+    2: uint8 uint8;
+    3: uint16 uint16;
+    4: uint32 uint32;
+    5: uint64 uint64;
+    6: int8 int8;
+    7: int16 int16;
+    8: int32 int32;
+    9: int64 int64;
+   10: string string:MAX;
+};
+
+/// A vector configuration value.
+@available(added=12)
+type ConfigVectorValue = flexible union {
+    1: bool_vector vector<bool>:MAX;
+    2: uint8_vector vector<uint8>:MAX;
+    3: uint16_vector vector<uint16>:MAX;
+    4: uint32_vector vector<uint32>:MAX;
+    5: uint64_vector vector<uint64>:MAX;
+    6: int8_vector vector<int8>:MAX;
+    7: int16_vector vector<int16>:MAX;
+    8: int32_vector vector<int32>:MAX;
+    9: int64_vector vector<int64>:MAX;
+   10: string_vector vector<string:MAX>:MAX;
+};
+
+/// Contents of the configuration value file. Defines the base values for a component's config.
+@available(added=12)
+type ConfigValuesData = table {
+    /// The concrete values for the component's configuration.
+    1: values vector<ConfigValueSpec>:MAX;
+    /// A SHA-256 checksum of the configuration schema. Must match the checksum in the component
+    /// manifest and config parser library used to resolve the final configuration.
+    2: checksum ConfigChecksum;
+};
+
+/// An individual configuration value. It is matched against a specific configuration field based
+/// on its offset within `ValuesData.values`.
+@available(added=12)
+type ConfigValueSpec = table {
+    1: value ConfigValue;
+};
+
+/// A configuration that has been completely resolved by component manager.
+@available(added=12)
+type ResolvedConfig = struct {
+    fields vector<ResolvedConfigField>:MAX;
+    checksum ConfigChecksum;
+};
+
+@available(added=12)
+type ResolvedConfigField = struct {
+    key string:MAX;
+    value ConfigValue;
+};
