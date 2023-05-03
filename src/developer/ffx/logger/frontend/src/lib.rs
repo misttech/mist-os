@@ -128,11 +128,21 @@ impl StreamDiagnostics for DiagnosticsProxy {
 }
 
 struct ConnectionState {
+    // Connection to the Overnet daemon, used
+    // for connecting to devices.
     target_collection_proxy: TargetCollectionProxy,
+    // Current boot timestamp
     boot_timestamp: u64,
+    // Channel to send reconnects over (when the target connection is lost)
     running_daemon_channel: Option<Sender<(ServerEnd<ArchiveIteratorMarker>, AsyncSocket)>>,
+    // Current connection handler
     current_task: Option<fuchsia_async::Task<Result<(), LogError>>>,
+    // Streaming mode
     mode: Option<StreamMode>,
+    // True if timestamp filtering should be disabled
+    disable_timestamps: bool,
+    // Previous boot timestamp, or 0 if not yet connected.
+    last_boot_timestamp: u64,
 }
 
 pub struct RemoteDiagnosticsBridgeProxyWrapper {
@@ -321,6 +331,8 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 running_daemon_channel: None,
                 current_task: None,
                 mode: None,
+                disable_timestamps: false,
+                last_boot_timestamp: 0,
             }),
         }
     }
@@ -455,15 +467,19 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             let Some(value) = receiver.next().await else {
                 return Ok(Some(responder));
             };
-
+            let disable_timestamps = self.connection_state.lock().await.disable_timestamps;
             // Skip if timestamp is not within specified range
-            match (&parameters.daemon_parameters.min_timestamp_nanos, &value.data) {
-                (Some(TimeBound::Absolute(utc)), LogData::TargetLog(target))
+            match (
+                &parameters.daemon_parameters.min_timestamp_nanos,
+                &value.data,
+                disable_timestamps,
+            ) {
+                (Some(TimeBound::Absolute(utc)), LogData::TargetLog(target), false)
                     if (target.metadata.timestamp + parameters.boot_ts) <= (*utc) as i64 =>
                 {
                     continue;
                 }
-                (Some(TimeBound::Monotonic(device_ts)), LogData::TargetLog(target))
+                (Some(TimeBound::Monotonic(device_ts)), LogData::TargetLog(target), false)
                     if target.metadata.timestamp <= (*device_ts) as i64 =>
                 {
                     continue;
@@ -562,13 +578,24 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
     async fn stream_diagnostics(
         &mut self,
         _target: Option<&str>,
-        parameters: DaemonDiagnosticsStreamParameters,
+        mut parameters: DaemonDiagnosticsStreamParameters,
         iterator: fidl::endpoints::ServerEnd<
             fidl_fuchsia_developer_remotecontrol::ArchiveIteratorMarker,
         >,
     ) -> Result<fidl_fuchsia_developer_ffx::DiagnosticsStreamDiagnosticsResult, anyhow::Error> {
         let (socket, server) = fuchsia_async::emulated_handle::Socket::create_stream();
         let connection = self.connect().await?;
+        {
+            let mut state = self.connection_state.lock().await;
+            if state.last_boot_timestamp == 0 {
+                state.last_boot_timestamp = state.boot_timestamp;
+            } else {
+                if state.last_boot_timestamp != state.boot_timestamp {
+                    parameters.stream_mode = Some(StreamMode::SnapshotAllThenSubscribe);
+                    state.disable_timestamps = true;
+                }
+            }
+        }
         let _ = connection.stream_diagnostics(
             StreamParameters {
                 data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
@@ -968,14 +995,19 @@ mod test {
         proxy
     }
 
-    fn setup_fake_diagnostics_server_direct(
-        _expected_parameters: DaemonDiagnosticsStreamParameters,
+    struct FakeDiagnosticsServerArgs {
         expected_responses: Arc<Vec<FakeArchiveIteratorResponse>>,
         use_socket: bool,
+        advance_timestamps_on_reboot: bool,
+    }
+
+    fn setup_fake_diagnostics_server_direct(
+        args: FakeDiagnosticsServerArgs,
     ) -> Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         let (target_collection_proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<TargetCollectionMarker>().unwrap();
         fuchsia_async::Task::local(async move {
+            let mut time_offset = 0;
             while let Some(Ok(TargetCollectionRequest::OpenTarget {
                 query,
                 target_handle,
@@ -986,12 +1018,16 @@ mod test {
                     query,
                     responder,
                     target_handle,
-                    &expected_responses,
-                    use_socket,
+                    &args.expected_responses,
+                    args.use_socket,
+                    time_offset,
                 )
                 .await
                 {
                     return;
+                }
+                if args.advance_timestamps_on_reboot {
+                    time_offset += 1;
                 }
             }
         })
@@ -1009,6 +1045,7 @@ mod test {
         target_handle: ServerEnd<fidl_fuchsia_developer_ffx::TargetMarker>,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
         use_socket: bool,
+        time_offset: u64,
     ) -> ControlFlow<()> {
         assert_matches!(query.string_matcher, Some(value) if value == TARGET_NAME);
         responder.send(&mut Ok(())).unwrap();
@@ -1021,6 +1058,7 @@ mod test {
                 remote_control,
                 expected_responses,
                 use_socket,
+                time_offset,
             )
             .await
             {
@@ -1035,6 +1073,7 @@ mod test {
         remote_control: ServerEnd<fidl_fuchsia_developer_remotecontrol::RemoteControlMarker>,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
         use_socket: bool,
+        time_offset: u64,
     ) -> Option<ControlFlow<()>> {
         responder.send(&mut Ok(())).unwrap();
         let mut remote_control_stream = remote_control.into_stream().unwrap();
@@ -1044,7 +1083,7 @@ mod test {
             responder
                 .send(&mut Ok(IdentifyHostResponse {
                     nodename: Some(TARGET_NAME.to_string()),
-                    boot_timestamp_nanos: Some(BOOT_TS),
+                    boot_timestamp_nanos: Some(BOOT_TS + time_offset),
                     ..Default::default()
                 }))
                 .unwrap();
@@ -1300,11 +1339,11 @@ mod test {
                 let mut writer = Vec::new();
                 exec_log_cmd(
                     LogCommandParameters::from(params.clone()),
-                    setup_fake_diagnostics_server_direct(
-                        params,
-                        Arc::new(expected_responses),
-                        false,
-                    ),
+                    setup_fake_diagnostics_server_direct(FakeDiagnosticsServerArgs {
+                        expected_responses: Arc::new(expected_responses),
+                        use_socket: false,
+                        advance_timestamps_on_reboot: false,
+                    }),
                     &mut formatter,
                     &mut writer,
                 )
@@ -1359,7 +1398,11 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
+                setup_fake_diagnostics_server_direct(FakeDiagnosticsServerArgs {
+                    expected_responses: Arc::new(expected_responses),
+                    use_socket: false,
+                    advance_timestamps_on_reboot: false,
+                }),
                 &mut formatter,
                 &mut writer,
             )
@@ -1418,7 +1461,11 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
+                setup_fake_diagnostics_server_direct(FakeDiagnosticsServerArgs {
+                    expected_responses: Arc::new(expected_responses),
+                    use_socket: false,
+                    advance_timestamps_on_reboot: false,
+                }),
                 &mut formatter,
                 &mut writer,
             )
@@ -1430,6 +1477,89 @@ mod test {
         assert_matches!(
             receiver.next().await.unwrap().unwrap().data,
             LogData::FfxEvent(EventType::LoggingStarted)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::TargetLog(value)
+            if value == log_1
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_dump_logs_with_now_timestamp_filter() {
+        let env = test_init().await.unwrap();
+        env.load().await;
+        let (sender, mut receiver) = unbounded();
+        let params = DaemonDiagnosticsStreamParameters {
+            stream_mode: Some(StreamMode::Subscribe),
+            min_timestamp_nanos: Some(TimeBound::Absolute(BOOT_TS)),
+            ..Default::default()
+        };
+
+        let log_0 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from(0),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Discarded message")
+        .build();
+
+        let log_1 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from(1),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Received message")
+        .build();
+
+        let expected_responses = vec![FakeArchiveIteratorResponse::new_with_values(vec![
+            serde_json::to_string(&log_0).unwrap(),
+            serde_json::to_string(&log_1).unwrap(),
+        ])];
+
+        let mut formatter = FakeLogFormatter::new_with_stream(sender);
+        let _logger_task = fuchsia_async::Task::local(async move {
+            let mut writer = Vec::new();
+            exec_log_cmd(
+                LogCommandParameters::from(params.clone()),
+                setup_fake_diagnostics_server_direct(FakeDiagnosticsServerArgs {
+                    expected_responses: Arc::new(expected_responses),
+                    use_socket: false,
+                    advance_timestamps_on_reboot: true,
+                }),
+                &mut formatter,
+                &mut writer,
+            )
+            .await
+            .unwrap();
+        });
+
+        // First message should be skipped
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::FfxEvent(EventType::LoggingStarted)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::TargetLog(value)
+            if value == log_1
+        );
+
+        // Second time through we should get both messages
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::FfxEvent(EventType::TargetDisconnected)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::FfxEvent(EventType::LoggingStarted)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::TargetLog(value)
+            if value == log_0
         );
         assert_matches!(
             receiver.next().await.unwrap().unwrap().data,
@@ -1467,7 +1597,11 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
+                setup_fake_diagnostics_server_direct(FakeDiagnosticsServerArgs {
+                    expected_responses: Arc::new(expected_responses),
+                    use_socket: false,
+                    advance_timestamps_on_reboot: false,
+                }),
                 &mut formatter,
                 &mut writer,
             )
