@@ -54,6 +54,13 @@ type Int64Limits = strict enum : int64 {
     MAX = 0x7fffffffffffffff;
 };
 
+const FOUR uint16 = 0b100;
+
+type EnumWithExpressions = flexible enum : uint16 {
+    OR_WITH_LITERAL = 0b01 | 0b10;
+    OR_WITH_CONSTANT = 0b001 | FOUR;
+};
+
 /// Enum with a one-line comment.
 type EnumWithOneLineComment = strict enum : uint8 {
     /// Enum member with one-line comment.

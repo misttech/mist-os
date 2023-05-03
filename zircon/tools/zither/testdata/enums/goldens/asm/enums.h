@@ -41,6 +41,11 @@
 #define ZITHER_ENUMS_INT64_LIMITS_MIN (-0x8000000000000000)
 #define ZITHER_ENUMS_INT64_LIMITS_MAX (0x7fffffffffffffff)
 
+#define ZITHER_ENUMS_FOUR (0b100)
+
+#define ZITHER_ENUMS_ENUM_WITH_EXPRESSIONS_OR_WITH_LITERAL (3)   // 0b01 | 0b10
+#define ZITHER_ENUMS_ENUM_WITH_EXPRESSIONS_OR_WITH_CONSTANT (5)  // 0b001 | FOUR
+
 // Enum with a one-line comment.
 
 // Enum member with one-line comment.

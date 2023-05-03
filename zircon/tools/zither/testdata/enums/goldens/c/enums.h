@@ -65,6 +65,15 @@ typedef int64_t zither_enums_int64_limits_t;
 #define ZITHER_ENUMS_INT64_LIMITS_MIN ((zither_enums_int64_limits_t)(-0x8000000000000000u))
 #define ZITHER_ENUMS_INT64_LIMITS_MAX ((zither_enums_int64_limits_t)(0x7fffffffffffffffu))
 
+#define ZITHER_ENUMS_FOUR ((uint16_t)(0b100u))
+
+typedef uint16_t zither_enums_enum_with_expressions_t;
+
+#define ZITHER_ENUMS_ENUM_WITH_EXPRESSIONS_OR_WITH_LITERAL \
+  ((zither_enums_enum_with_expressions_t)(3u))  // 0b01 | 0b10
+#define ZITHER_ENUMS_ENUM_WITH_EXPRESSIONS_OR_WITH_CONSTANT \
+  ((zither_enums_enum_with_expressions_t)(5u))  // 0b001 | FOUR
+
 // Enum with a one-line comment.
 typedef uint8_t zither_enums_enum_with_one_line_comment_t;
 

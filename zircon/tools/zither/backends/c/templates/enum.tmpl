@@ -17,7 +17,7 @@ typedef {{ PrimitiveTypeName .Subtype }} {{ TypeName . }};
 //{{ . }}
 {{- end }}
 {{- end }}
-#define {{ ConstMemberName $enum . }} {{ EnumMemberValue $enum . }}
+#define {{ ConstMemberName $enum . }} {{ EnumMemberValue $enum . }} {{- if .Expression }}  // {{ .Expression }} {{ end }}
 {{- end }}
 
 {{ end }}

@@ -18,7 +18,7 @@ pub enum {{ UpperCamelCase . }} {
     ///{{ . }}
 {{- end }}
 {{ end -}}
-    {{ UpperCamelCase . }} = {{ .Value }},
+    {{ UpperCamelCase . }} = {{ .Value }}, {{- if .Expression }}  // {{ .Expression }} {{ end }}
 {{ end }}
 }
 

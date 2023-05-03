@@ -423,6 +423,7 @@ type Uint8Enum = enum : uint8 {
 /// int64 enum.
 type Int64Enum = enum : int64 {
   MINUS_HEX_ABCD = -0xabcd;
+  ORED_VALUE = 0x10 | 0x01;
   HEX_DEADBEEF = 0xdeadbeef;
 };
 `)
@@ -481,6 +482,11 @@ type Int64Enum = enum : int64 {
 				{
 					member: member{Name: "MINUS_HEX_ABCD"},
 					Value:  "-0xabcd",
+				},
+				{
+					member:     member{Name: "ORED_VALUE"},
+					Value:      "17",
+					Expression: "0x10 | 0x01",
 				},
 			},
 		},

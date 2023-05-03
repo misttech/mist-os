@@ -532,19 +532,16 @@ func newConst(c fidlgen.Const, decls declMap, members memberMap) (*Const, error)
 		return nil, fmt.Errorf("%v has unsupported constant type: %s", c.Name, c.Type.Kind)
 	}
 
-	value := c.Value.Value
+	val := getConstantValue(c.Value, kind)
 	expr := c.Value.Expression
 	var elVal *ConstElementValue
 	switch c.Value.Kind {
 	case fidlgen.LiteralConstant:
-		// In the integer case, the original expression conveys more
-		// information than the equivalent decimal value: if the author
-		// intended for the number to be understood in binary or hex, then the
-		// generated code should preserve that.
-		if kind == TypeKindInteger || kind == TypeKindSize {
-			value = expr
+		// If the value matches the expression, there is no value in passing
+		// the latter along.
+		if expr == val || (kind == TypeKindString && expr == fmt.Sprintf("%q", val)) {
+			expr = ""
 		}
-		expr = ""
 	case fidlgen.IdentifierConstant:
 		valName, err := fidlgen.ReadName(string(c.Value.Identifier))
 		if err != nil {
@@ -557,6 +554,7 @@ func newConst(c fidlgen.Const, decls declMap, members memberMap) (*Const, error)
 		if memberName != "" {
 			elVal.Member = members[valName.String()]
 		}
+		// The original expression doesn't matter if it gave another identifier.
 		expr = ""
 	case fidlgen.BinaryOperator:
 		decl, ok := decls[typ]
@@ -570,10 +568,22 @@ func newConst(c fidlgen.Const, decls declMap, members memberMap) (*Const, error)
 		decl:       newDecl(c),
 		Kind:       kind,
 		Type:       typ,
-		Value:      value,
+		Value:      val,
 		Element:    elVal,
 		Expression: expr,
 	}, nil
+}
+
+// Gives the desired expression of a constant.
+func getConstantValue(c fidlgen.Constant, kind TypeKind) string {
+	// In the integer case, the original expression conveys more
+	// information than the equivalent decimal value: if the author
+	// intended for the number to be understood in binary or hex, then the
+	// generated code should preserve that.
+	if c.Kind == fidlgen.LiteralConstant && (kind == TypeKindInteger || kind == TypeKindSize) {
+		return c.Expression
+	}
+	return c.Value
 }
 
 // ConstElementValue represents a constant value given by another FIDL element.
@@ -604,6 +614,10 @@ type EnumMember struct {
 
 	// Value is the member's value.
 	Value string
+
+	// Expression is the original FIDL expression given for the value,
+	// included only when it meaningfully differs from the value.
+	Expression string
 }
 
 func newEnum(enum fidlgen.Enum) (*Enum, error) {
@@ -612,9 +626,17 @@ func newEnum(enum fidlgen.Enum) (*Enum, error) {
 		Subtype: enum.Type,
 	}
 	for _, member := range enum.Members {
+		val := getConstantValue(member.Value, TypeKindInteger)
+		// If the value matches the expression, there is no value in passing
+		// the latter along.
+		expr := member.Value.Expression
+		if expr == val {
+			expr = ""
+		}
 		e.Members = append(e.Members, EnumMember{
-			member: newMember(member),
-			Value:  member.Value.Expression,
+			member:     newMember(member),
+			Value:      val,
+			Expression: expr,
 		})
 	}
 	return e, nil

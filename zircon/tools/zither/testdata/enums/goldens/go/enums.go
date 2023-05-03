@@ -76,6 +76,15 @@ const (
 	Int64LimitsMax Int64Limits = 0x7fffffffffffffff
 )
 
+const Four uint16 = 0b100
+
+type EnumWithExpressions uint16
+
+const (
+	EnumWithExpressionsOrWithLiteral  EnumWithExpressions = 3 // 0b01 | 0b10
+	EnumWithExpressionsOrWithConstant EnumWithExpressions = 5 // 0b001 | FOUR
+)
+
 // Enum with a one-line comment.
 type EnumWithOneLineComment uint8
 

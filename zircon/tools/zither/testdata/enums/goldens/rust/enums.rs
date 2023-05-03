@@ -77,6 +77,15 @@ pub enum Int64Limits {
     Max = 0x7fffffffffffffff,
 }
 
+pub const FOUR: u16 = 0b100;
+
+#[repr(u16)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnumWithExpressions {
+    OrWithLiteral = 3,  // 0b01 | 0b10
+    OrWithConstant = 5, // 0b001 | FOUR
+}
+
 /// Enum with a one-line comment.
 #[repr(u8)]
 #[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
