@@ -193,6 +193,24 @@ test("xhci-transfer-ring-unittest-bin") {
   deps = [ ":test-libs" ]
 }
 
+test("xhci-endpoint-unittest-bin") {
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  output_name = "xhci-endpoint-unittest"
+  sources = [
+    "xhci-endpoint-test.cc",
+    "xhci-endpoint.cc",
+  ]
+  deps = [
+    ":test-libs",
+    "//src/devices/testing/fake-bti",
+  ]
+}
+
 fuchsia_unittest_package("xhci-unittest") {
   deps = [ ":xhci-unittest-bin" ]
   test_specs = {
@@ -227,11 +245,22 @@ fuchsia_unittest_package("xhci-transfer-ring-unittest") {
   }
 }
 
+fuchsia_unittest_package("xhci-endpoint-unittest") {
+  deps = [ ":xhci-endpoint-unittest-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
 group("tests") {
   testonly = true
   deps = [
     ":usb_xhci_bind_test",
     ":xhci-core-unittest",
+    ":xhci-endpoint-unittest",
     ":xhci-event-ring-unittest",
     ":xhci-transfer-ring-unittest",
     ":xhci-unittest",
