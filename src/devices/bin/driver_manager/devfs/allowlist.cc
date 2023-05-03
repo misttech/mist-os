@@ -19,7 +19,6 @@ bool AllowMultiplexingController(std::string_view class_name) {
       "nand",
       "skip-block",
       "rtc",
-      "sysmem",
       "tdh",
       "cpu-ctrl",
       "network",
@@ -35,7 +34,6 @@ bool AllowMultiplexingNode(std::string_view class_name) {
       "block",
       "goldfish-pipe",
       "skip-block",
-      "sysmem",
       "ot-radio",
   });
   return classes_that_include_node.find(class_name) != classes_that_include_node.end();
