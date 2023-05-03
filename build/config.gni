@@ -30,7 +30,6 @@ template("config_data") {
     forward_variables_from(invoker,
                            [
                              "data_deps",
-                             "deps",
                              "for_pkg",
                              "outputs",
                              "public_deps",
@@ -79,6 +78,13 @@ template("config_data") {
         }
       }
     }
+
+    deps = []
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    deps += [ "//build:config_data_template_allowlist" ]
   }
 }
 
