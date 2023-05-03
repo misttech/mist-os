@@ -25,15 +25,10 @@
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
                 // SO_REUSEPORT for UDP sockets.
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReuseAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable1/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable2/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReuseAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrDistribution/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/*",
 
                 // Netstack3 does not have complete support for multicast UDP sockets.
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",

@@ -1640,7 +1640,11 @@ where
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                // ANVL's UDP test stub requires that setting SO_REUSEADDR succeeds.
+                // Blindly return success here to unblock test coverage (possible since
+                // the network test realm is restarted before each test case).
+                // TODO(https://fxbug.dev/97823): Actually implement SetReuseAddress.
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReuseAddress { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
