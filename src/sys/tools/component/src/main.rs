@@ -103,6 +103,12 @@ pub async fn exec() -> Result<()> {
                 .await
             }
         },
+        ComponentSubcommand::Collection(args) => match args.subcommand {
+            CollectionSubcommand::List(_) => collection_list_cmd(realm_query, writer).await,
+            CollectionSubcommand::Show(show_args) => {
+                collection_show_cmd(show_args.query, realm_query, writer).await
+            }
+        },
     }
 }
 

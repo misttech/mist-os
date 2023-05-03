@@ -59,7 +59,7 @@ pub async fn show_cmd_print<W: std::io::Write>(
 
     if instances.is_empty() {
         // TODO(fxbug.dev/104031): Clarify the exit code policy of this plugin.
-        bail!("No matching components found");
+        bail!("No matching components found.\nTo find a collection, use the `ffx component collection show` plugin instead.");
     }
 
     for instance in instances {

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod capability;
+pub mod collection;
 pub mod create;
 pub mod destroy;
 pub mod doctor;
@@ -22,6 +23,7 @@ mod format;
 
 pub use {
     capability::capability_cmd,
+    collection::{collection_list_cmd, collection_show_cmd},
     create::create_cmd,
     destroy::destroy_cmd,
     doctor::{doctor_cmd_print, doctor_cmd_serialized},

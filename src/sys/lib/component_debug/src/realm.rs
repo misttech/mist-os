@@ -303,6 +303,31 @@ pub enum Runtime {
     Unknown,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, PartialEq)]
+pub enum Durability {
+    Transient,
+    SingleRun,
+}
+
+impl std::fmt::Display for Durability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Transient => write!(f, "Transient"),
+            Self::SingleRun => write!(f, "Single-run"),
+        }
+    }
+}
+
+impl From<fcdecl::Durability> for Durability {
+    fn from(value: fcdecl::Durability) -> Self {
+        match value {
+            fcdecl::Durability::SingleRun => Durability::SingleRun,
+            fcdecl::Durability::Transient => Durability::Transient,
+        }
+    }
+}
+
 pub async fn get_all_instances(
     query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<Instance>, GetAllInstancesError> {

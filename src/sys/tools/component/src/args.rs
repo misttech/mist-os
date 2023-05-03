@@ -32,6 +32,7 @@ pub enum ComponentSubcommand {
     Doctor(DoctorArgs),
     Copy(CopyArgs),
     Storage(StorageArgs),
+    Collection(CollectionArgs),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -221,4 +222,32 @@ pub struct StorageCopyArgs {
 pub struct StorageDeleteArgs {
     #[argh(positional)]
     pub path: String,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "collection", description = "Same as `ffx component collection`")]
+pub struct CollectionArgs {
+    #[argh(subcommand)]
+    pub subcommand: CollectionSubcommand,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum CollectionSubcommand {
+    List(CollectionListArgs),
+    Show(CollectionShowArgs),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "list", description = "Same as `ffx component collection list`")]
+pub struct CollectionListArgs {
+    #[argh(positional)]
+    pub path: String,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "show", description = "Same as `ffx component collection show`")]
+pub struct CollectionShowArgs {
+    #[argh(positional)]
+    pub query: String,
 }
