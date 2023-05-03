@@ -412,7 +412,7 @@ this component and the capability's source.
 - `as`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
     components defined in the scope.
-- `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require especifying a filter
+- `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require specifying a filter
     referring to the protocol to which the events in the event stream apply. The content of the
     filter will be an object mapping from "name" to the "protocol name".
 - `dependency`: (_optional `string`_) `dependency` _(optional)_: The type of dependency between the source and
@@ -433,6 +433,8 @@ this component and the capability's source.
     - `optional`: an optional dependency, the component will be able to function without this
         capability (although if the capability is unavailable some functionality may be
         disabled).
+    - `transitional`: the source may omit the route completely without even having to route
+        from `void`. Used for soft transitions that introduce new capabilities.
 
 Example:
 
@@ -554,8 +556,8 @@ instance or a [child collection][doc-collections].
     - `#<child-name>`: A [reference](#references) to a child component
         instance. This source can only be used when offering protocol,
         directory, or runner capabilities.
-    - `void`: The source is intentionally omitted. Only valid when `availability` is not
-        `required`.
+    - `void`: The source is intentionally omitted. Only valid when `availability` is
+        `optional` or `transitional`.
 - `to`: (_`string or array of strings`_) A capability target or array of targets, each of which is a [reference](#references) to the
     child or collection to which the capability is being offered, of the form `#<target-name>`.
 - `as`: (_optional `string`_) An explicit [name](#name) for the capability as it will be known by the target. If omitted,
@@ -587,11 +589,13 @@ instance or a [child collection][doc-collections].
     - `optional`: an optional dependency. Use this when the target of this will function
         properly if it does or does not not receive this capability. If the target consumes
         this capability, the target must do so as `optional`. The source of this capability
-        may be void, and therefore not provide it.
+        may be `void`, and therefore not provide it.
     - `same_as_target`: the availability expectations of this capability will match the
         target's. If the target requires the capability, then this field is set to `required`.
         If the target has an optional dependency on the capability, then the field is set to
         `optional`.
+    - `transitional`: the source may omit the route completely without even having to route
+        from `void`. Used for soft transitions that introduce new capabilities.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. If set to `unknown`, the source of this
     offer will be rewritten to `void` if the source does not exist (i.e. is not defined in this
     manifest). Defaults to `required`.

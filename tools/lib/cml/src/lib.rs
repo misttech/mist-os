@@ -1997,7 +1997,7 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
 
-    /// (`event_stream` only) Capability requested event streams require especifying a filter
+    /// (`event_stream` only) Capability requested event streams require specifying a filter
     /// referring to the protocol to which the events in the event stream apply. The content of the
     /// filter will be an object mapping from "name" to the "protocol name".
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2024,6 +2024,8 @@ pub struct Use {
     /// - `optional`: an optional dependency, the component will be able to function without this
     ///     capability (although if the capability is unavailable some functionality may be
     ///     disabled).
+    /// - `transitional`: the source may omit the route completely without even having to route
+    ///     from `void`. Used for soft transitions that introduce new capabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 }
@@ -2211,8 +2213,8 @@ pub struct Offer {
     /// - `#<child-name>`: A [reference](#references) to a child component
     ///     instance. This source can only be used when offering protocol,
     ///     directory, or runner capabilities.
-    /// - `void`: The source is intentionally omitted. Only valid when `availability` is not
-    ///     `required`.
+    /// - `void`: The source is intentionally omitted. Only valid when `availability` is
+    ///     `optional` or `transitional`.
     pub from: OneOrMany<OfferFromRef>,
 
     /// A capability target or array of targets, each of which is a [reference](#references) to the
@@ -2270,11 +2272,13 @@ pub struct Offer {
     /// - `optional`: an optional dependency. Use this when the target of this will function
     ///     properly if it does or does not not receive this capability. If the target consumes
     ///     this capability, the target must do so as `optional`. The source of this capability
-    ///     may be void, and therefore not provide it.
+    ///     may be `void`, and therefore not provide it.
     /// - `same_as_target`: the availability expectations of this capability will match the
     ///     target's. If the target requires the capability, then this field is set to `required`.
     ///     If the target has an optional dependency on the capability, then the field is set to
     ///     `optional`.
+    /// - `transitional`: the source may omit the route completely without even having to route
+    ///     from `void`. Used for soft transitions that introduce new capabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
