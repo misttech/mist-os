@@ -19,6 +19,7 @@ import sys
 
 import cxx
 import cl_utils
+import depfile
 import fuchsia
 import remote_action
 
@@ -191,14 +192,14 @@ class CxxRemoteAction(object):
         # Remotely generated gcc depfiles may contain absolute paths
         # that are not suitable for local use.  Rewrite them.
         if self.compiler_type == cxx.Compiler.GCC and self._depfile_exists():
-            self._rewrite_depfile()
+            self._rewrite_remote_depfile()
         # TODO: if downloads were skipped, need to force-download depfile
         return 0
 
-    def _rewrite_depfile(self):
-        remote_action.remove_working_dir_abspaths_from_depfile(
-            self.working_dir / self.depfile,  # in-place
-            self.remote_action.remote_working_dir,
+    def _rewrite_remote_depfile(self):
+        remote_action.rewrite_depfile(
+            dep_file=self.working_dir / self.depfile,  # in-place
+            transform=self.remote_action._relativize_remote_deps,
         )
 
     def prepare(self) -> int:

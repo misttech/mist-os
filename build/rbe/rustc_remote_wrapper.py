@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 import cl_utils
+import depfile
 import fuchsia
 import rustc
 import remote_action
@@ -725,11 +726,11 @@ class RustRemoteAction(object):
 
     def _post_remote_success_action(self) -> int:
         if self._depfile_exists():
-            self._rewrite_depfile()
+            self._rewrite_remote_depfile()
         # TODO: if downloads were skipped, need to force-download depfile
         return 0
 
-    def _rewrite_depfile(self):
+    def _rewrite_remote_depfile(self):
         """Rewrite depfile without working dir absolute paths.
 
         TEMPORARY WORKAROUND until upstream fix lands:
@@ -747,9 +748,9 @@ class RustRemoteAction(object):
         We forgive this for depfiles, but other artifacts should be verified
         separately.
         """
-        remote_action.remove_working_dir_abspaths_from_depfile(
-            self.working_dir / self.depfile,  # in-place
-            self.remote_action.remote_working_dir,
+        remote_action.rewrite_depfile(
+            dep_file=self.working_dir / self.depfile,  # in-place
+            transform=self.remote_action._relativize_remote_deps,
         )
 
     def run_remote(self) -> int:

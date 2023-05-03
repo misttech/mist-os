@@ -24,6 +24,7 @@ import sys
 
 import fuchsia
 import cl_utils
+import depfile
 import output_leak_scanner
 
 from pathlib import Path
@@ -274,26 +275,21 @@ def rewrite_file_by_lines_in_place(
     _transform_file_by_lines(path, path, line_transform)
 
 
-def remove_working_dir_abspaths_from_depfile(
-    depfile: Path,
-    working_dir_abs: Path,
-    output: Path = None,
-):
-    """Remove working dir abspaths from a depfile.
+def rewrite_depfile(
+        dep_file: Path, transform: Callable[[str], str], output: Path = None):
+    """Relativize absolute paths in a depfile.
 
     Args:
-      depfile: depfile to transform
-      working_dir_abs: absolute path to erase
+      dep_file: depfile to transform
+      transform: f(str) -> str. change to apply to each path.
       output: if given, write to this new file instead overwriting
         the original depfile.
     """
-    # TODO(http://fxbug.dev/124714): This transformation would be more robust
-    # if we properly lexed a depfile and operated on tokens instead of lines.
-    _transform_file_by_lines(
-        depfile,
-        output or depfile,
-        lambda line: line.replace(str(working_dir_abs) + os.path.sep, ''),
-    )
+    output = output or dep_file
+    with open(dep_file) as f:
+        new_deps = depfile.transform_paths(f.read(), transform)
+    with open(output, 'w') as f:
+        f.write(new_deps)
 
 
 def _matches_file_not_found(line: str) -> bool:
@@ -1150,6 +1146,16 @@ class RemoteAction(object):
 
         return self.run()
 
+    def _relativize_local_deps(self, path: str) -> str:
+        p = Path(path)
+        return str(cl_utils.relpath(
+            p, start=self.working_dir)) if p.is_absolute() else path
+
+    def _relativize_remote_deps(self, path: str) -> str:
+        p = Path(path)
+        return str(cl_utils.relpath(
+            p, start=self.remote_working_dir)) if p.is_absolute() else path
+
     def _filtered_outputs_for_comparison(
         self,
         local_file: Path,
@@ -1196,14 +1202,14 @@ class RemoteAction(object):
             #   https://github.com/pest-parser/pest/pull/522
             # Remove redundant occurrences of the current working dir absolute path.
             # Paths should be relative to the root_build_dir.
-            remove_working_dir_abspaths_from_depfile(
-                depfile=local_file,
-                working_dir_abs=str(self.working_dir),
+            rewrite_depfile(
+                dep_file=local_file,
+                transform=self._relativize_local_deps,
                 output=local_file_filtered,
             )
-            remove_working_dir_abspaths_from_depfile(
-                depfile=remote_file,
-                working_dir_abs=str(self.remote_working_dir),
+            rewrite_depfile(
+                dep_file=remote_file,
+                transform=self._relativize_remote_deps,
                 output=remote_file_filtered,
             )
             return True

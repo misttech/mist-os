@@ -12,6 +12,7 @@ group("tests") {
     ":cl_utils_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
     ":cxx_test($host_toolchain)",
+    ":depfile_test($host_toolchain)",
     ":fuchsia_test($host_toolchain)",
     ":output_leak_scanner_test($host_toolchain)",
     ":relativize_args_test($host_toolchain)",
@@ -28,11 +29,13 @@ if (is_host) {
   # dependency tree of libraries.  :(
   _fuchsia_sources = [ "fuchsia.py" ]
   _cl_utils_sources = [ "cl_utils.py" ]
+  _depfile_sources = [ "depfile.py" ]
   _output_leak_scanner_sources =
       [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
 
-  _remote_action_sources = [ "remote_action.py" ] + _fuchsia_sources +
-                           _cl_utils_sources + [ "output_leak_scanner.py" ]
+  _remote_action_sources =
+      [ "remote_action.py" ] + _fuchsia_sources + _cl_utils_sources +
+      [ "output_leak_scanner.py" ] + _depfile_sources
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
       [ "cxx_remote_wrapper.py" ] + _cxx_sources + _fuchsia_sources +
@@ -64,6 +67,14 @@ if (is_host) {
   python_host_test("cxx_remote_wrapper_test") {
     main_source = "cxx_remote_wrapper_test.py"
     sources = _cxx_remote_wrapper_sources
+  }
+
+  python_library("depfile") {
+    sources = _depfile_sources
+  }
+  python_host_test("depfile_test") {
+    main_source = "depfile_test.py"
+    sources = _depfile_sources
   }
 
   python_library("fuchsia") {

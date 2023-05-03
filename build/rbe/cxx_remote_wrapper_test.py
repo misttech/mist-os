@@ -312,7 +312,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             [fake_builddir / output])
 
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
-                               '_rewrite_depfile') as mock_rewrite:
+                               '_rewrite_remote_depfile') as mock_rewrite:
             with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
                                    '_depfile_exists',
                                    return_value=True) as mock_exists:
@@ -326,7 +326,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         mock_rewrite.assert_called_with()
         mock_exists.assert_called_with()
 
-    def test_rewrite_depfile(self):
+    def test_rewrite_remote_depfile(self):
         compiler = Path('g++')
         source = Path('hello.cc')
         output = Path('hello.o')
@@ -359,7 +359,7 @@ class CxxRemoteActionTests(unittest.TestCase):
 
             mock_check.asert_called_once()
             self.assertEqual(c._remote_action.remote_working_dir, remote_cwd)
-            c._rewrite_depfile()
+            c._rewrite_remote_depfile()
             new_depfile = _read_file_contents(fake_cwd / depfile)
             self.assertEqual(new_depfile, 'lib/bar.a: obj/foo.o\n')
 

@@ -741,11 +741,11 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             for m in run_mocks:
                 stack.enter_context(m)
             with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
-                                   '_rewrite_depfile') as mock_rewrite:
+                                   '_rewrite_remote_depfile') as mock_rewrite:
                 run_status = r.run()
             mock_rewrite.assert_called_with()
 
-    def test_rewrite_depfile(self):
+    def test_rewrite_remote_depfile(self):
         compiler = Path('../tools/bin/rustc')
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
@@ -783,7 +783,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             _write_file_contents(
                 depfile_abspath,
                 f'{remote_cwd}/obj/foo.rlib: {remote_cwd}/src/lib.rs\n')
-            r._rewrite_depfile()
+            r._rewrite_remote_depfile()
             new_deps = _read_file_contents(depfile_abspath)
             self.assertEqual(new_deps, 'obj/foo.rlib: src/lib.rs\n')
 

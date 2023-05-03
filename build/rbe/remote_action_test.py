@@ -255,7 +255,7 @@ class ReclientCanonicalWorkingDirTests(unittest.TestCase):
                 Path('build/inside/there')), Path('set_by_reclient/a/a'))
 
 
-class RemoveWorkingDirAbspathsTests(unittest.TestCase):
+class RewriteDepfileTests(unittest.TestCase):
 
     def test_depfile_in_place(self):
         with tempfile.TemporaryDirectory() as td:
@@ -264,8 +264,10 @@ class RemoveWorkingDirAbspathsTests(unittest.TestCase):
             wd = Path('/home/base/out/inside/here')
             _write_file_contents(
                 depfile, f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n')
-            remote_action.remove_working_dir_abspaths_from_depfile(
-                depfile, wd)  # write in-place
+            remote_action.rewrite_depfile(
+                depfile,
+                transform=lambda x: remote_action._remove_prefix(x, f'{wd}/')
+            )  # write in-place
             self.assertEqual(
                 _read_file_contents(depfile),
                 'obj/foo.o: foo/bar.h baz/quux.h\n',
@@ -279,8 +281,10 @@ class RemoveWorkingDirAbspathsTests(unittest.TestCase):
             wd = Path('/all/your/base')
             _write_file_contents(
                 depfile, f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n')
-            remote_action.remove_working_dir_abspaths_from_depfile(
-                depfile, wd, output=output)  # write new file
+            remote_action.rewrite_depfile(
+                depfile,
+                transform=lambda x: remote_action._remove_prefix(x, f'{wd}/'),
+                output=output)  # write new file
             self.assertEqual(
                 _read_file_contents(output),
                 'obj/foo.o: foo/bar.h baz/quux.h\n',
