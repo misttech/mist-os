@@ -193,7 +193,7 @@ mod tests {
         .unwrap();
         let device_proxy = device_watcher::recursive_wait_and_open::<ControllerMarker>(
             &out_dir,
-            "sys/test/virtual-logsink",
+            "sys/test/virtual-logsink/device_controller",
         )
         .await
         .unwrap();

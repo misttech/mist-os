@@ -22,7 +22,6 @@ bool AllowMultiplexingController(std::string_view class_name) {
       "tdh",
       "cpu-ctrl",
       "network",
-      "virtual-bus-test",
       "temperature",
   });
   return classes_that_include_controller.find(class_name) != classes_that_include_controller.end();
