@@ -28,10 +28,10 @@
 #define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
 #endif
 
+#if ARCH_HAS_RESTRICTED_MODE
+
 constexpr uint32_t kRestrictedEnterOptions =
     ARCH_HAS_IN_THREAD_EXCEPTIONS ? 0 : ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL;
-
-#if ARCH_HAS_RESTRICTED_MODE
 
 extern "C" void vectab();
 extern "C" void syscall_bounce();

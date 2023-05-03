@@ -78,6 +78,7 @@ if (toolchain_base_environment == "kernel") {
       "fpu_asm.S",
       "mmu.cc",
       "mp.cc",
+      "restricted.cc",
       "spinlock.cc",
       "start.S",
       "thread.cc",
