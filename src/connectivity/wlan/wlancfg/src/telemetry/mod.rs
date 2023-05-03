@@ -59,7 +59,8 @@ const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 // through the policy API, it is likely that a user intended to restart WLAN connections.
 const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 pub struct TelemetrySender {
     sender: Arc<Mutex<mpsc::Sender<TelemetryEvent>>>,
     sender_is_blocked: Arc<AtomicBool>,
@@ -160,7 +161,7 @@ impl DisconnectSourceExt for fidl_sme::DisconnectSource {
     }
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub enum TelemetryEvent {
     /// Request telemetry for the latest status
     QueryStatus {
