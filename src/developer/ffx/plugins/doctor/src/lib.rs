@@ -15,6 +15,7 @@ use ffx_config::{
 use ffx_core::ffx_plugin;
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
+use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
@@ -26,6 +27,7 @@ use futures::TryStreamExt;
 use serde_json::json;
 use std::{
     collections::HashSet,
+    fs,
     io::{stdout, BufWriter, ErrorKind, Write},
     path::PathBuf,
     process::Command,
@@ -294,6 +296,51 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
             }
         }
     };
+
+    if cmd.repair_keys {
+        let keys = SshKeyFiles::load().await?;
+
+        // Be gentle in repairing, we should not remove keys unnecessarily.
+        // Do we need to repair anything?
+        let mut del_priv_key = false;
+        let mut recreate_keys = false;
+        let message = match keys.check_keys() {
+            Ok(_) => format!("SSH Public/Private keys match"),
+            Err(e) => match e.kind {
+                SshKeyErrorKind::BadKeyType => {
+                    format!("SSH keys type not supported: {}", e.message)
+                }
+                SshKeyErrorKind::BadKeyFormat => {
+                    del_priv_key = true;
+                    recreate_keys = true;
+                    format!("{}.", e.message)
+                }
+                _ => {
+                    recreate_keys = true;
+                    format!("{}.", e.message)
+                }
+            },
+        };
+        writeln!(&mut writer, "{message}")?;
+        if recreate_keys {
+            match keys.create_keys_if_needed() {
+                Ok(_) => writeln!(&mut writer, "SSH Keys repaired.")?,
+                Err(e) => {
+                    // If there was an error, print it, delete the keys,
+                    // and recreate.
+                    writeln!(&mut writer, "Error repairing SSH keys {e:?}. Existing keys will be deleted and new keys generated.")?;
+                    if del_priv_key && keys.private_key.exists() {
+                        fs::remove_file(&keys.private_key)?;
+                    }
+
+                    if keys.authorized_keys.exists() {
+                        fs::remove_file(&keys.authorized_keys)?;
+                    }
+                    keys.create_keys_if_needed()?;
+                }
+            }
+        }
+    }
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
     let mut handler = DefaultDoctorStepHandler::new(recorder.clone(), Box::new(writer));
@@ -867,6 +914,33 @@ async fn doctor_summary<W: Write>(
 
     ledger.close(lock_node)?;
 
+    // Check SSH Keys
+    let ssh_node: usize;
+    match SshKeyFiles::load().await {
+        Ok(ssh_files) => {
+            let ( description, outcome) = match ssh_files.check_keys() {
+                Ok(_) => (format!("SSH Public/Private keys match"), LedgerOutcome::Success),
+                Err(e)  => {
+                    match e.kind {
+                        SshKeyErrorKind::BadKeyType => (format!("SSH keys type not supported: {}", e.message), LedgerOutcome::Warning),
+                        SshKeyErrorKind::BadConfiguration => (format!("SSH keys configuration problem: {e}"), LedgerOutcome::Failure),
+                        SshKeyErrorKind::IOError | SshKeyErrorKind::FileNotFound => (format!("{}. Check configuration or run `ffx doctor --repair-keys`", e.message), LedgerOutcome::Failure),
+                        SshKeyErrorKind::KeyMismatch => (format!("{}. Check configuration or run `ffx doctor --repair-keys`", e.message), LedgerOutcome::Failure),
+                        _ => (format!("SSH keys problem: {e}. Check configuration or run `ffx doctor --repair-keys`"), LedgerOutcome::Failure)
+                    }
+                }
+            };
+            ssh_node = ledger.add_node(&description, LedgerMode::Automatic)?;
+            ledger.set_outcome(ssh_node, outcome)?;
+        }
+        Err(e) => {
+            ssh_node = ledger
+                .add_node(&format!("Could not get SSH key paths {e}"), LedgerMode::Automatic)?;
+            ledger.set_outcome(ssh_node, LedgerOutcome::Failure)?;
+        }
+    };
+    ledger.close(ssh_node)?;
+
     ledger.close(main_node)?;
 
     main_node = ledger.add_node("Checking daemon", LedgerMode::Automatic)?;
@@ -1230,7 +1304,7 @@ mod test {
     use super::*;
     use async_lock::Mutex;
     use async_trait::async_trait;
-    use ffx_config::TestEnv;
+    use ffx_config::{query, ConfigLevel, TestEnv};
     use ffx_doctor_test_utils::MockWriter;
     use fidl::{
         endpoints::{
@@ -1971,9 +2045,31 @@ mod test {
         )
     }
 
+    async fn setup_ssh_keys(test_env: &TestEnv) -> Result<()> {
+        let pub_key = test_env.isolate_root.path().join("test_authorized_keys");
+        let priv_key = test_env.isolate_root.path().join("test_ed25519_key");
+        // Set the paths to use for the SSH keys
+        test_env
+            .context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([&pub_key]))
+            .await?;
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([&priv_key]))
+            .await?;
+        let keys = SshKeyFiles::load().await?;
+        keys.create_keys_if_needed()?;
+        Ok(())
+    }
+
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_no_daemon_running_no_targets_with_default_target() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![false],
@@ -2023,6 +2119,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
                    \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\n",
                 ffx_path=ffx_path(),
@@ -2036,6 +2133,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_daemon_running_no_targets() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -2084,6 +2182,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -2105,6 +2204,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_daemon_running_connection_error() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -2153,6 +2253,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✗] Error connecting to daemon: Some error message. Run `ffx doctor --restart-daemon`\n",
@@ -2167,6 +2268,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_daemon_running_no_targets_default_target_empty() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -2215,6 +2317,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -2236,6 +2339,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_two_tries_daemon_running_list_fails() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true, false],
@@ -2284,6 +2388,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2303,7 +2408,6 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
-
     async fn test_two_tries_no_daemon_running_echo_timeout() {
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -2454,6 +2558,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_connects_to_rcs_with_ssh_error_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let ledger = test_finds_target_connects_to_rcs_setup(
             &test_env,
@@ -2476,6 +2581,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2535,6 +2641,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_connects_to_rcs_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let ledger =
             test_finds_target_connects_to_rcs_setup(&test_env, RcsTestArgs::default().verbose())
@@ -2555,6 +2662,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2586,6 +2694,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_connects_to_rcs_normal() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let ledger =
             test_finds_target_connects_to_rcs_setup(&test_env, RcsTestArgs::default()).await;
@@ -2598,6 +2707,7 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
@@ -2617,6 +2727,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_with_filter() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -2668,6 +2779,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2695,6 +2807,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_invalid_filter_finds_no_targets() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -2747,6 +2860,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2845,6 +2959,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_daemon_running_no_targets_record_enabled() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -2898,7 +3013,8 @@ mod test {
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
                     \n        [✓] {env_file} locked by {env_file}.lock\
-                    \n        [✓] {user_file} locked by {user_file}.lock\n\
+                    \n        [✓] {user_file} locked by {user_file}.lock\
+                    \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
                     \n    [✓] Connecting to daemon\
@@ -2927,6 +3043,7 @@ mod test {
         params: DoctorRecorderParameters,
     ) {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -2977,7 +3094,8 @@ mod test {
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
                     \n        [✓] {env_file} locked by {env_file}.lock\
-                    \n        [✓] {user_file} locked by {user_file}.lock\n\
+                    \n        [✓] {user_file} locked by {user_file}.lock\
+                    \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
                     \n    [✓] Connecting to daemon\
@@ -3058,6 +3176,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_with_missing_nodename_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let ledger =
             test_finds_target_with_missing_nodename_setup(&test_env, LedgerViewMode::Verbose).await;
@@ -3077,6 +3196,7 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
@@ -3108,6 +3228,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_finds_target_with_missing_nodename_normal() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let ledger =
             test_finds_target_with_missing_nodename_setup(&test_env, LedgerViewMode::Normal).await;
@@ -3120,6 +3241,7 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
+                \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
@@ -3140,6 +3262,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_fastboot_target() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -3188,6 +3311,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -3212,6 +3336,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_single_try_daemon_running_different_api_level() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
 
         let fake = FakeDaemonManager::new(
             vec![true],
@@ -3260,6 +3385,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
+                   \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -3275,6 +3401,87 @@ mod test {
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
+            )
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_missing_ssh_keys() {
+        let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+        let pub_key = test_env.isolate_root.path().join("test_authorized_keys");
+        let priv_key = test_env.isolate_root.path().join("test_ed25519_key");
+        // Set the paths to use for the SSH keys
+        query("ssh.pub").level(Some(ConfigLevel::User)).set(json!([&pub_key])).await.unwrap();
+        query("ssh.priv").level(Some(ConfigLevel::User)).set(json!([&priv_key])).await.unwrap();
+
+        // Do not generate the keys - so they are missing.
+
+        let fake = FakeDaemonManager::new(
+            vec![true],
+            vec![],
+            vec![],
+            vec![Ok(setup_responsive_daemon_server_with_fastboot_target())],
+            vec![Ok(vec![1])],
+        );
+        let mut handler = FakeStepHandler::new();
+        let ledger_view = Box::new(FakeLedgerView::new());
+        let mut ledger = DoctorLedger::<MockWriter>::new(
+            MockWriter::new(),
+            ledger_view,
+            LedgerViewMode::Verbose,
+        );
+
+        doctor(
+            &mut handler,
+            &mut ledger,
+            &fake,
+            "",
+            1,
+            DEFAULT_RETRY_DELAY,
+            false,
+            frontend_version_info(true),
+            Ok(None),
+            &test_env.context,
+            record_params_no_record(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            ledger.writer.get_data(),
+            format!(
+                "\
+            \n[✓] FFX doctor\
+            \n    [✓] Frontend version: {FRONTEND_VERSION}\
+            \n    [✓] abi-revision: {ABI_REVISION_STR}\
+            \n    [✓] api-level: {FAKE_API_LEVEL}\
+            \n    [i] Path to ffx: {ffx_path}\
+            \n[✗] FFX Environment Context\
+            \n    [✓] Kind of Environment: Isolated environment with an isolated root of {isolated_root}\
+            \n    [✓] Environment File Location: {env_file}\
+            \n    [✓] No build directory discovered in the environment.\
+            \n    [✓] Config Lock Files\
+            \n        [✓] {env_file} locked by {env_file}.lock\
+            \n        [✓] {user_file} locked by {user_file}.lock\
+            \n    [✗] Private key {priv_key} does not exist. Check configuration or run `ffx doctor --repair-keys`\
+            \n[✓] Checking daemon\
+            \n    [✓] Daemon found: [1]\
+            \n    [✓] Connecting to daemon\
+            \n    [✓] Daemon version: {DAEMON_VERSION}\
+            \n    [✓] path: {ffx_path}\
+            \n    [✓] abi-revision: {ABI_REVISION_STR}\
+            \n    [✓] api-level: {FAKE_API_LEVEL}\
+            \n    [✓] Default target: (none)\
+            \n[✓] Searching for targets\
+            \n    [✓] 1 targets found\
+            \n[✓] Verifying Targets\
+            \n    [✓] Target found in fastboot mode: {SERIAL_NUMBER}\
+            \n[✓] No issues found\n",
+                ffx_path=ffx_path(),
+                isolated_root=test_env.isolate_root.path().display(),
+                env_file=test_env.env_file.path().display(),
+                user_file=test_env.user_file.path().display(),
+                priv_key = priv_key.display()
             )
         );
     }

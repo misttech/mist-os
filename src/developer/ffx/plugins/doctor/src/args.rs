@@ -60,4 +60,10 @@ pub struct DoctorCommand {
 
     #[argh(option, description = "override the default output directory for doctor records")]
     pub output_dir: Option<String>,
+
+    #[argh(
+        switch,
+        description = "checks SSH key consistency and repairs them if needed. This may cause any devices to be reflashed."
+    )]
+    pub repair_keys: bool,
 }

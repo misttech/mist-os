@@ -5,4 +5,4 @@
 pub mod ssh;
 mod ssh_key;
 
-pub use ssh_key::SshKeyFiles;
+pub use ssh_key::{SshKeyError, SshKeyErrorKind, SshKeyFiles};
