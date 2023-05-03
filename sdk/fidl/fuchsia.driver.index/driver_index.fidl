@@ -119,16 +119,6 @@ protocol DriverIndex {
     /// This function will block until base drivers are loaded.
     WaitForBaseDrivers() -> ();
 
-    // TODO(fxbug.dev/81175): Remove V1 APIs
-    /// This function returns a vector of drivers that match a device.
-    /// This should only be used by DFv1 and should be removed.
-    /// If more than MAX drivers match, only MAX drivers will be returned.
-    MatchDriversV1(struct {
-        args MatchDriverArgs;
-    }) -> (struct {
-        drivers vector<MatchedDriver>:MAX;
-    }) error zx.Status;
-
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are
     /// included in the driver matching process.

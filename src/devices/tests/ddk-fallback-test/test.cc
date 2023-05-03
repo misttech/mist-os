@@ -61,14 +61,6 @@ TEST_F(FallbackTest, TestFallbackBoundWhenAloneDfv1) {
   ASSERT_NO_FATAL_FAILURE(CheckDriverBound(true));
 }
 
-TEST_F(FallbackTest, TestFallbackBoundWhenEagerDfv1) {
-  IsolatedDevmgr::Args args;
-  args.use_driver_framework_v2 = false;
-  args.driver_bind_eager.push_back("fuchsia-boot:///#meta/ddk-fallback-test.cm");
-  ASSERT_NO_FATAL_FAILURE(LaunchDevmgr(std::move(args)));
-  ASSERT_NO_FATAL_FAILURE(CheckDriverBound(true));
-}
-
 TEST_F(FallbackTest, TestNotFallbackTakesPriorityDfv2) {
   IsolatedDevmgr::Args args;
   args.use_driver_framework_v2 = true;

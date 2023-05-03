@@ -50,20 +50,6 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     completer.Reply();
   }
 
-  void MatchDriversV1(MatchDriversV1RequestView request,
-                      MatchDriversV1Completer::Sync& completer) override {
-    auto match = match_callback_(request->args);
-    if (match.status_value() != ZX_OK) {
-      completer.ReplyError(match.status_value());
-      return;
-    }
-
-    fidl::Arena arena;
-    auto driver = GetMatchedDriver(arena, match.value());
-    completer.ReplySuccess(
-        fidl::VectorView<fuchsia_driver_index::wire::MatchedDriver>::FromExternal(&driver, 1));
-  }
-
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                             AddCompositeNodeSpecCompleter::Sync& completer) override {
     auto name = std::string(request->name().get());
