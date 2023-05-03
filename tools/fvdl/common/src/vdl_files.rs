@@ -798,7 +798,7 @@ mod tests {
         let tmp_dir = Builder::new().prefix("fvdl_test_cipd_label_").tempdir()?;
         env::set_var("FEMU_DOWNLOAD_DIR", tmp_dir.path());
 
-        let mut start_command = &mut create_start_command();
+        let start_command = &mut create_start_command();
         start_command.vdl_path = None;
         start_command.vdl_version = Some("g3-revision:vdl_fuchsia_20210113_RC00".to_string());
 
@@ -821,7 +821,7 @@ mod tests {
         let tmp_dir = Builder::new().prefix("fvdl_test_default_").tempdir()?;
         env::set_var("FEMU_DOWNLOAD_DIR", tmp_dir.path());
 
-        let mut start_command = &mut create_start_command();
+        let start_command = &mut create_start_command();
         start_command.aemu_path = None;
         start_command.aemu_version = None;
         start_command.vdl_path = None;
@@ -844,7 +844,7 @@ mod tests {
     fn test_resolve_portmap() -> Result<()> {
         setup();
 
-        let mut start_command = &mut create_start_command();
+        let start_command = &mut create_start_command();
         start_command.port_map = None;
         let (port_map, ssh) = VDLFiles::new(true, false)?.resolve_portmap(start_command);
         assert!(ssh > 0);

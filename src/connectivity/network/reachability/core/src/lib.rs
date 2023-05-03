@@ -638,7 +638,7 @@ impl Monitor {
         id: Id,
         name: &str,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
-        let mut ctx = self.interface_context.get_mut(&id).ok_or(anyhow!(
+        let ctx = self.interface_context.get_mut(&id).ok_or(anyhow!(
             "attempting to update state with context but context for id {} does not exist",
             id
         ))?;
@@ -734,7 +734,7 @@ impl Monitor {
         };
         info!("handle ping: success: {}; interface id: {}; ping address: {}", success, id, addr);
 
-        let mut ctx = self
+        let ctx = self
             .interface_context
             .get_mut(&id)
             .ok_or(anyhow!("handle ping: interface id {} should already exist in map", id))?;
@@ -859,7 +859,7 @@ impl NetworkChecker for Monitor {
         // short period of time, for example changing between online and offline multiple times
         // over the span of a few seconds. It is safe that this happens, as the system is
         // eventually consistent.
-        let mut ctx = self.interface_context.entry(id).or_insert(Default::default());
+        let ctx = self.interface_context.entry(id).or_insert(Default::default());
 
         match ctx.checker_state {
             NetworkCheckState::Begin => {}

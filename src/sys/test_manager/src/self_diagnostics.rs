@@ -111,7 +111,7 @@ impl DiagnosticNode {
         let cow_val = value.into();
         match prop_lock.entry(key) {
             Entry::Occupied(mut entry) => {
-                let mut val = entry.get_mut();
+                let val = entry.get_mut();
                 val.1.set(cow_val.deref());
                 val.0 = cow_val;
             }

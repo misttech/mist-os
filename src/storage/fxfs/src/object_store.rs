@@ -636,7 +636,7 @@ impl ObjectStore {
             let root_directory = Directory::create(transaction, &self).await?;
 
             let mut store_info = self.store_info.lock().unwrap();
-            let mut store_info = store_info.info_mut().unwrap();
+            let store_info = store_info.info_mut().unwrap();
 
             store_info.graveyard_directory_object_id = graveyard_directory_object_id;
             store_info.root_directory_object_id = root_directory.object_id();
@@ -1662,7 +1662,7 @@ impl ObjectStore {
         // Update StoreInfo.
         let buf = {
             let mut store_info = self.store_info.lock().unwrap();
-            let mut store_info = store_info.info_mut().unwrap();
+            let store_info = store_info.info_mut().unwrap();
             store_info.object_id_key = Some(object_id_wrapped);
             let mut serialized_info = Vec::new();
             store_info.serialize_with_version(&mut serialized_info)?;

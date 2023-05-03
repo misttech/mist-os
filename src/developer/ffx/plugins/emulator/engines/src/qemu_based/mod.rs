@@ -347,7 +347,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     }
 
     async fn stage(&mut self) -> Result<()> {
-        let mut emu_config = self.emu_config_mut();
+        let emu_config = self.emu_config_mut();
         let name = emu_config.runtime.name.clone();
         let reuse = emu_config.runtime.reuse;
 

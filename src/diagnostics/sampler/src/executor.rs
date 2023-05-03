@@ -616,7 +616,7 @@ impl ProjectSampler {
 
     fn rebuild_selector_data_structures(&mut self) {
         let mut all_selectors = vec![];
-        for mut metric in &mut self.metrics {
+        for metric in &mut self.metrics {
             // TODO(fxbug.dev/87709): Using Box<ParsedSelector> could reduce copying.
             let active_selectors = metric
                 .selectors

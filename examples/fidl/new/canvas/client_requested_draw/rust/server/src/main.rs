@@ -34,7 +34,7 @@ struct CanvasState {
 /// Handler for the `AddLines` method.
 fn add_lines(state: &mut CanvasState, lines: Vec<[Point; 2]>) {
     // Update the bounding box to account for the new lines we've just "added" to the canvas.
-    let mut bounds = &mut state.bounding_box;
+    let bounds = &mut state.bounding_box;
     for line in lines {
         println!("AddLines printing line: {:?}", line);
         // [END diff_2]

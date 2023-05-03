@@ -114,7 +114,7 @@ pub fn sys_sigaltstack(
     user_old_ss: UserRef<sigaltstack_t>,
 ) -> Result<(), Errno> {
     let mut state = current_task.write();
-    let mut signal_state = &mut state.signals;
+    let signal_state = &mut state.signals;
     let on_signal_stack = signal_state
         .alt_stack
         .map(|signal_stack| {

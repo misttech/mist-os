@@ -142,7 +142,7 @@ impl<W: Write> Write for AnsiFilterWriter<W> {
                         None => {
                             printable_range = Some((idx + 1 - character_len, idx + 1));
                         }
-                        Some(mut range) if range.1 == idx + 1 - character_len => {
+                        Some(range) if range.1 == idx + 1 - character_len => {
                             range.1 = idx + 1;
                         }
                         // We've passed over a section of non-printable characters and found a new

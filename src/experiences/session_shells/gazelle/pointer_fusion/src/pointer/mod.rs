@@ -216,7 +216,7 @@ impl PointerFusionState {
                 }
                 Phase::Move => {
                     // Makes sure we have an existing pointer in down state
-                    let mut state =
+                    let state =
                         self.pointer_states.get_mut(&event.device_id).expect("State should exist");
                     assert!(state.is_down);
                     event.id = state.id;

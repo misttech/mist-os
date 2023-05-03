@@ -87,7 +87,7 @@ impl ProxyFacadeInternal {
 
     async fn open_proxy(&mut self, target_port: u16, proxy_port: u16) -> Result<u16, Error> {
         match self.open_proxies.get_mut(&target_port) {
-            Some(mut proxy) => {
+            Some(proxy) => {
                 proxy.num_users += 1;
                 Ok(proxy.open_port)
             }

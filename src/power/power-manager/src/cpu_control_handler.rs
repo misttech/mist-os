@@ -511,7 +511,7 @@ impl Node for CpuControlHandler {
 
         {
             let mut mutable_inner = self.mutable_inner.borrow_mut();
-            let mut cpu_control_params = &mut mutable_inner.cpu_control_params;
+            let cpu_control_params = &mut mutable_inner.cpu_control_params;
             cpu_control_params.p_states = p_states;
             cpu_control_params.validate().context("Invalid CPU control params")?;
             self.inspect.set_cpu_control_params(&cpu_control_params);

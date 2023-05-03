@@ -580,7 +580,7 @@ impl MetricsTracker {
         ))
         .await;
 
-        let mut per_sensor_metrics = {
+        let per_sensor_metrics = {
             if let Some(m) = self.per_sensor_metrics.get_mut(sensor_path) {
                 m
             } else {

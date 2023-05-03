@@ -30,7 +30,7 @@ impl CanvasState {
     /// Handler for the `AddLine` method.
     fn add_line(&mut self, line: [Point; 2]) {
         // Update the bounding box to account for the new lines we've just "added" to the canvas.
-        let mut bounds = &mut self.bounding_box;
+        let bounds = &mut self.bounding_box;
         for point in line {
             if point.x < bounds.top_left.x {
                 bounds.top_left.x = point.x;

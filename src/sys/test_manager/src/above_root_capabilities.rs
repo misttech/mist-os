@@ -177,7 +177,7 @@ impl AboveRootCapabilitiesForTest {
                         && matches!(source, fdecl::Ref::Parent(_))
                         && scope.map(|s| s.contains(&coll_ref)).unwrap_or(false)
                     {
-                        let mut entry = collection_data.get_mut(name.as_str()).unwrap();
+                        let entry = collection_data.get_mut(name.as_str()).unwrap();
                         entry.required_event_streams.directory_ready =
                             entry.required_event_streams.directory_ready
                                 || target_name == "directory_ready";

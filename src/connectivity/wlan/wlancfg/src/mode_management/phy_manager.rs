@@ -450,7 +450,7 @@ impl PhyManagerApi for PhyManager {
         let mut failing_phys = Vec::new();
 
         for client_phy in client_capable_phys.iter() {
-            let mut phy_container =
+            let phy_container =
                 self.phys.get_mut(client_phy).ok_or(PhyManagerError::PhyQueryFailure)?;
 
             // Continue tracking interface IDs for which deletion fails.
@@ -597,7 +597,7 @@ impl PhyManagerApi for PhyManager {
         let mut failing_phys = Vec::new();
 
         for ap_phy in ap_capable_phys.iter() {
-            let mut phy_container =
+            let phy_container =
                 self.phys.get_mut(ap_phy).ok_or(PhyManagerError::PhyQueryFailure)?;
 
             // Continue tracking interface IDs for which deletion fails.

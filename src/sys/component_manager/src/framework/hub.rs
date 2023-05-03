@@ -358,7 +358,7 @@ impl Hub {
 
     async fn on_stopped_async(&self, target_moniker: &AbsoluteMoniker) -> Result<(), ModelError> {
         let mut instance_map = self.instances.lock().await;
-        let mut instance = instance_map
+        let instance = instance_map
             .get_mut(target_moniker)
             .ok_or(ModelError::instance_not_found(target_moniker.clone()))?;
 

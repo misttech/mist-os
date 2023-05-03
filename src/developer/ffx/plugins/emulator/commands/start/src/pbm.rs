@@ -242,7 +242,7 @@ fn parse_host_port_maps(
                     name
                 );
             }
-            let mut mapping = mapping.unwrap();
+            let mapping = mapping.unwrap();
             if mapping.host.is_some() {
                 tracing::warn!(
                     "Command line attempts to set the '{}' port more than once. This may \

@@ -288,8 +288,7 @@ impl WatchServer {
                 );
                 Some(view_ref_koid)
             } else {
-                let mut view_ref_state =
-                    inner.view_ref_koid_to_state.get_mut(&view_ref_koid).unwrap();
+                let view_ref_state = inner.view_ref_koid_to_state.get_mut(&view_ref_koid).unwrap();
                 if let WatchingState::Watching(old_responder) = &view_ref_state.watching {
                     warn!(
                         ?view_ref_koid,

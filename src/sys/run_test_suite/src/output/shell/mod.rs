@@ -138,7 +138,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
     fn entity_started(&self, entity: &EntityId, _: Timestamp) -> Result<(), Error> {
         let mut writer = self.new_writer_handle(None);
         let mut entity_map_lock = self.entity_state_map.lock();
-        let mut entity_entry = entity_map_lock.get_mut(entity).unwrap();
+        let entity_entry = entity_map_lock.get_mut(entity).unwrap();
         entity_entry.run_state = EntityRunningState::Started;
         let name = entity_entry.name().to_string();
         match entity {
@@ -325,7 +325,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         artifact_type: &ArtifactType,
     ) -> Result<Box<DynArtifact>, Error> {
         let mut lock = self.entity_state_map.lock();
-        let mut entity = lock.get_mut(entity).unwrap();
+        let entity = lock.get_mut(entity).unwrap();
         let name = entity.name();
 
         Ok(match artifact_type {

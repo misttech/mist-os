@@ -427,10 +427,10 @@ impl BlobfsContents {
     /// Relativize all manifest locations in the BlobFsContents to the output file's location
     pub fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
         // Modify in-place so we can add fields to the struct without updating this code
-        for mut package in self.packages.base.0.iter_mut() {
+        for package in self.packages.base.0.iter_mut() {
             package.manifest = path_relative_from(&package.manifest, &base_path)?
         }
-        for mut package in self.packages.cache.0.iter_mut() {
+        for package in self.packages.cache.0.iter_mut() {
             package.manifest = path_relative_from(&package.manifest, &base_path)?
         }
         Ok(self)
@@ -439,10 +439,10 @@ impl BlobfsContents {
     /// Join all manifest paths in the BlobFsContents to the location of the file it is serialized in
     fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
         // Modify in-place so we can add fields without updating this code
-        for mut package in self.packages.base.0.iter_mut() {
+        for package in self.packages.base.0.iter_mut() {
             package.manifest = manifest_dir.as_ref().join(&package.manifest)
         }
-        for mut package in self.packages.cache.0.iter_mut() {
+        for package in self.packages.cache.0.iter_mut() {
             package.manifest = manifest_dir.as_ref().join(&package.manifest)
         }
         Ok(self)

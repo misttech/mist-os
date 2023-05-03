@@ -926,7 +926,7 @@ impl Allocator for SimpleAllocator {
             // We must take care not to use up space that might be reserved.
             let limit = std::cmp::min(owner_bytes_left, self.device_size - device_used);
             len = round_down(std::cmp::min(len, limit), self.block_size);
-            let mut owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
+            let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             owner_entry.reserved_bytes += len;
             Right(ReservationImpl::<_, Self>::new(self, Some(owner_object_id), len))
         };
@@ -1027,7 +1027,7 @@ impl Allocator for SimpleAllocator {
 
         {
             let mut inner = self.inner.lock().unwrap();
-            let mut owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
+            let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             owner_entry.uncommitted_allocated_bytes += len;
             // If the reservation has an owner, ensure they are the same.
             assert_eq!(owner_object_id, reservation_owner.unwrap_or(owner_object_id));
@@ -1059,7 +1059,7 @@ impl Allocator for SimpleAllocator {
             let mut inner = self.inner.lock().unwrap();
             let device_used = inner.used_bytes();
             let owner_id_bytes_left = inner.owner_id_bytes_left(owner_object_id);
-            let mut owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
+            let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             ensure!(
                 device_range.end <= self.device_size
                     && self.device_size - device_used >= len
@@ -1391,7 +1391,7 @@ impl JournalingObject for SimpleAllocator {
                 {
                     let mut inner = self.inner.lock().unwrap();
                     {
-                        let mut entry = inner.owner_bytes.entry(owner_object_id).or_default();
+                        let entry = inner.owner_bytes.entry(owner_object_id).or_default();
                         entry.allocated_bytes = entry.allocated_bytes.saturating_sub(len as i64);
                         if context.mode.is_live() {
                             entry.committed_deallocated_bytes += len;
@@ -1451,7 +1451,7 @@ impl JournalingObject for SimpleAllocator {
                     let allocated_bytes: Vec<(u64, i64)> =
                         inner.info.allocated_bytes.iter().map(|(k, v)| (*k, *v as i64)).collect();
                     for (k, v) in allocated_bytes {
-                        let mut entry = inner.owner_bytes.entry(k).or_default();
+                        let entry = inner.owner_bytes.entry(k).or_default();
                         entry.allocated_bytes -= v as i64;
                     }
                 }

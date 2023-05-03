@@ -155,7 +155,7 @@ impl VolumeActor {
         // Update state
         self.insert_seeds(&append_range, seeds);
 
-        let mut range = self.vslice_ranges.get_mut(index);
+        let range = self.vslice_ranges.get_mut(index);
         range.end = append_range.end;
 
         Ok(())
@@ -201,7 +201,7 @@ impl VolumeActor {
             Err(s) => return Err(s),
         }
 
-        let mut range = self.vslice_ranges.get_mut(index);
+        let range = self.vslice_ranges.get_mut(index);
 
         // Update state
         if subrange == *range {

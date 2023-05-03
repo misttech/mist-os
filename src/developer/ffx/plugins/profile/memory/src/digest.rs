@@ -396,7 +396,7 @@ pub mod processed {
         };
 
         // Compute per-process, aggregated sizes.
-        for mut process in processes.iter_mut() {
+        for process in processes.iter_mut() {
             if let Some(vmo_koids) = process_to_charged_vmos.get(&process.koid) {
                 for vmo_koid in vmo_koids.iter() {
                     if let Some(processed::Vmo { name, committed_bytes, .. }) =
@@ -407,7 +407,7 @@ pub mod processed {
                             None => unreachable!(),
                         };
                         let name = rename(name).to_string();
-                        let mut name_sizes = process.name_to_vmo_memory.entry(name).or_default();
+                        let name_sizes = process.name_to_vmo_memory.entry(name).or_default();
                         name_sizes.vmos.push(*vmo_koid);
                         name_sizes.total += committed_bytes;
                         process.memory.total += committed_bytes;

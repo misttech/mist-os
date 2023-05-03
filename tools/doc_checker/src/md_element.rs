@@ -184,7 +184,7 @@ impl<'a> Element<'a> {
      * Add the delta to the line number of this element and all nested elements.
      */
     fn add_line_offset(&mut self, delta: i32) {
-        let mut doc_line = self.doc_line_mut();
+        let doc_line = self.doc_line_mut();
         let n: i32 = doc_line.line_num.try_into().unwrap();
         doc_line.line_num = (n + delta).try_into().unwrap();
 

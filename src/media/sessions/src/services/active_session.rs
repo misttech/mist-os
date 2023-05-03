@@ -205,7 +205,7 @@ impl ActiveSession {
                 ClientRequest((client_id, responder)) => {
                     let update = (|| {
                         let current_active_session = self.active_sessions.active_session();
-                        let mut client = self.clients.entry(client_id).or_insert(Client::default());
+                        let client = self.clients.entry(client_id).or_insert(Client::default());
 
                         if client.hanging_get.is_some() {
                             return false;
