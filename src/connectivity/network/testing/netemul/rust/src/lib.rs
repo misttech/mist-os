@@ -33,7 +33,7 @@ use net_types::{ip::Ipv4Addr, SpecifiedAddr};
 
 use anyhow::{anyhow, Context as _};
 use futures::{
-    future::{FutureExt as _, TryFutureExt as _},
+    future::{ready, FutureExt as _, TryFutureExt as _},
     SinkExt as _, StreamExt as _, TryStreamExt as _,
 };
 use net_declare::fidl_subnet;
@@ -1161,6 +1161,25 @@ impl<'a> TestInterface<'a> {
             client: client.clone(),
             task: fasync::Task::spawn(async move {
                 let mut final_routers = fnet_dhcp_ext::configuration_stream(client)
+                    .scan((), |(), item| {
+                        ready(match item {
+                            Err(e) => match e {
+                                // Observing `PEER_CLOSED` is expected after the
+                                // client is shut down, so rather than returning an
+                                // error, simply end the stream.
+                                fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
+                                    status: zx::Status::PEER_CLOSED,
+                                    protocol_name: _,
+                                }) => None,
+                                fnet_dhcp_ext::Error::Fidl(_)
+                                | fnet_dhcp_ext::Error::ApiViolation(_)
+                                | fnet_dhcp_ext::Error::ForwardingEntry(_)
+                                | fnet_dhcp_ext::Error::WrongExitReason(_)
+                                | fnet_dhcp_ext::Error::MissingExitReason => Some(Err(e)),
+                            },
+                            Ok(_) => Some(item),
+                        })
+                    })
                     .try_fold(
                         HashSet::<SpecifiedAddr<Ipv4Addr>>::new(),
                         |mut routers,

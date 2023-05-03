@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Duration};
 
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
@@ -19,10 +19,10 @@ use futures::{
 use net_declare::{fidl_ip_v4, fidl_mac};
 use netemul::DhcpClient;
 use netstack_testing_common::{
-    dhcpv4 as dhcpv4_helper, interfaces,
+    annotate, dhcpv4 as dhcpv4_helper, interfaces,
     realms::{
         constants, DhcpClientVersion, KnownServiceProvider, Netstack, NetstackAndDhcpClient,
-        TestSandboxExt as _,
+        NetstackVersion, TestSandboxExt as _,
     },
     Result,
 };
@@ -78,7 +78,10 @@ struct TestServerConfig<'a> {
 struct TestNetstackRealmConfig<'a> {
     clients: &'a [DhcpTestEndpointConfig<'a>],
     servers: &'a mut [TestServerConfig<'a>],
+    netstack_version: NetstackVersion,
 }
+
+const DEBUG_PRINT_INTERVAL: Duration = Duration::from_secs(10);
 
 async fn assert_client_acquires_addr<D: DhcpClient>(
     client_realm: &netemul::TestRealm<'_>,
@@ -111,12 +114,16 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
 
         let () = client_interface.start_dhcp::<D>().await.expect("failed to start DHCP");
 
-        let valid_until = assert_interface_assigned_addr(
-            client_realm,
-            expected_acquired,
-            |_| true,
-            event_stream.by_ref(),
-            &mut properties,
+        let valid_until = annotate(
+            assert_interface_assigned_addr(
+                client_realm,
+                expected_acquired,
+                |_| true,
+                event_stream.by_ref(),
+                &mut properties,
+            ),
+            DEBUG_PRINT_INTERVAL,
+            "initial assert_interface_assigned_addr",
         )
         .await;
 
@@ -125,40 +132,49 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
         // lease. It will take lease_length/2 duration for the client to renew its address
         // and trigger the subsequent interface changed event.
         if client_renews {
-            let _: zx_time_t = assert_interface_assigned_addr(
-                client_realm,
-                expected_acquired,
-                |new_valid_until| new_valid_until > valid_until,
-                event_stream.by_ref(),
-                &mut properties,
+            let _: zx_time_t = annotate(
+                assert_interface_assigned_addr(
+                    client_realm,
+                    expected_acquired,
+                    |new_valid_until| new_valid_until > valid_until,
+                    event_stream.by_ref(),
+                    &mut properties,
+                ),
+                DEBUG_PRINT_INTERVAL,
+                "renewal assert_interface_assigned_addr",
             )
             .await;
         }
         // Set interface online signal to down and wait for address to be removed.
         let () = client_interface.set_link_up(false).await.expect("failed to bring link down");
+        let () = client_interface.stop_dhcp::<D>().await.expect("failed to stop DHCP");
 
-        let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            event_stream.by_ref(),
-            &mut properties,
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 id: _,
-                 addresses,
-                 online: _,
-                 device_class: _,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-                 name: _,
-             }| {
-                if addresses.iter().any(
-                    |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                        addr == expected_acquired
-                    },
-                ) {
-                    None
-                } else {
-                    Some(())
-                }
-            },
+        let () = annotate(
+            fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+                event_stream.by_ref(),
+                &mut properties,
+                |fidl_fuchsia_net_interfaces_ext::Properties {
+                     id: _,
+                     addresses,
+                     online: _,
+                     device_class: _,
+                     has_default_ipv4_route: _,
+                     has_default_ipv6_route: _,
+                     name: _,
+                 }| {
+                    if addresses.iter().any(
+                        |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                            addr == expected_acquired
+                        },
+                    ) {
+                        None
+                    } else {
+                        Some(())
+                    }
+                },
+            ),
+            DEBUG_PRINT_INTERVAL,
+            "address removal",
         )
         .await
         .expect("failed to wait for address removal");
@@ -235,11 +251,13 @@ struct Settings<'a> {
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(name: &str) {
+async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDhcpClient>(
+    name: &str,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    test_dhcp::<N>(
+    test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -251,6 +269,7 @@ async fn acquire_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(name: &str) {
                     network: &network,
                 }],
                 servers: &mut [],
+                netstack_version: CLIENT::Netstack::VERSION,
             },
             TestNetstackRealmConfig {
                 clients: &[],
@@ -268,6 +287,7 @@ async fn acquire_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(name: &str) {
                         options: &mut [],
                     },
                 }],
+                netstack_version: SERVER::VERSION,
             },
         ],
         1,
@@ -277,7 +297,12 @@ async fn acquire_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(name: &str) {
 }
 
 #[netstack_test]
-async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(name: &str) {
+async fn acquire_then_renew_with_dhcpd_bound_device<
+    SERVER: Netstack,
+    CLIENT: NetstackAndDhcpClient,
+>(
+    name: &str,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -293,7 +318,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(na
         ..Default::default()
     }));
 
-    test_dhcp::<N>(
+    test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -305,6 +330,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(na
                     network: &network,
                 }],
                 servers: &mut [],
+                netstack_version: CLIENT::Netstack::VERSION,
             },
             TestNetstackRealmConfig {
                 clients: &[],
@@ -324,6 +350,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(na
                         )],
                     },
                 }],
+                netstack_version: SERVER::VERSION,
             },
         ],
         1,
@@ -333,7 +360,12 @@ async fn acquire_then_renew_with_dhcpd_bound_device<N: NetstackAndDhcpClient>(na
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device_dup_addr<N: NetstackAndDhcpClient>(name: &str) {
+async fn acquire_with_dhcpd_bound_device_dup_addr<
+    SERVER: Netstack,
+    CLIENT: NetstackAndDhcpClient,
+>(
+    name: &str,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -358,7 +390,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<N: NetstackAndDhcpClient>(name
         }
     };
 
-    test_dhcp::<N>(
+    test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -368,6 +400,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<N: NetstackAndDhcpClient>(name
                     network: &network,
                 }],
                 servers: &mut [],
+                netstack_version: CLIENT::Netstack::VERSION,
             },
             TestNetstackRealmConfig {
                 clients: &[],
@@ -393,6 +426,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<N: NetstackAndDhcpClient>(name
                         options: &mut [],
                     },
                 }],
+                netstack_version: SERVER::VERSION,
             },
         ],
         1,
@@ -410,7 +444,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<N: NetstackAndDhcpClient>(name
 ///        -- Start DHCP servers on each server endpoint
 ///        -- Start DHCP clients on each client endpoint and verify that they acquire the expected
 ///           addresses
-fn test_dhcp<'a, N: NetstackAndDhcpClient>(
+fn test_dhcp<'a, D: DhcpClient>(
     test_name: &'a str,
     sandbox: &'a netemul::TestSandbox,
     netstack_configs: &'a mut [TestNetstackRealmConfig<'a>],
@@ -421,15 +455,15 @@ fn test_dhcp<'a, N: NetstackAndDhcpClient>(
         let dhcp_objects = stream::iter(netstack_configs.into_iter())
             .enumerate()
             .then(|(id, netstack)| async move {
-                let TestNetstackRealmConfig { servers, clients } = netstack;
-                let netstack_realm = sandbox
-                    .create_netstack_realm_with::<N::Netstack, _, _>(
+                let TestNetstackRealmConfig { servers, clients, netstack_version } = netstack;
+                let netstack_realm = sandbox.create_realm(
                         format!("netstack_realm_{}_{}", test_name, id),
                         &[
+                            KnownServiceProvider::Netstack(*netstack_version),
                             KnownServiceProvider::DhcpServer { persistent: false },
                             KnownServiceProvider::FakeClock,
                             KnownServiceProvider::SecureStash,
-                        ].into_iter().chain(match N::DhcpClient::DHCP_CLIENT_VERSION {
+                        ].into_iter().chain(match D::DHCP_CLIENT_VERSION {
                             DhcpClientVersion::InStack => None,
                             DhcpClientVersion::OutOfStack => Some(KnownServiceProvider::DhcpClient),
                         }).collect::<Vec<_>>(),
@@ -560,7 +594,7 @@ fn test_dhcp<'a, N: NetstackAndDhcpClient>(
 
         for (netstack_realm, servers, clients) in dhcp_objects {
             for (client, expected_acquired) in clients {
-                assert_client_acquires_addr::<N::DhcpClient>(
+                assert_client_acquires_addr::<D>(
                     &netstack_realm,
                     &client,
                     *expected_acquired,
@@ -692,9 +726,14 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
 // clear_leases() function is triggered, which will cause a panic if the server is in an
 // inconsistent state.
 #[netstack_test]
-async fn acquire_persistent_dhcp_server_after_restart<N: NetstackAndDhcpClient>(name: &str) {
+async fn acquire_persistent_dhcp_server_after_restart<
+    SERVER: Netstack,
+    CLIENT: NetstackAndDhcpClient,
+>(
+    name: &str,
+) {
     let mode = PersistenceMode::Persistent;
-    acquire_dhcp_server_after_restart::<N>(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart::<SERVER, CLIENT>(&format!("{}_{}", name, mode), mode).await
 }
 
 // An ephemeral dhcp server cannot become inconsistent with its persistent state because it has
@@ -702,19 +741,24 @@ async fn acquire_persistent_dhcp_server_after_restart<N: NetstackAndDhcpClient>(
 // configuration.  This test verifies that an ephemeral dhcp server will return an error if run
 // after restarting.
 #[netstack_test]
-async fn acquire_ephemeral_dhcp_server_after_restart<N: NetstackAndDhcpClient>(name: &str) {
+async fn acquire_ephemeral_dhcp_server_after_restart<
+    SERVER: Netstack,
+    CLIENT: NetstackAndDhcpClient,
+>(
+    name: &str,
+) {
     let mode = PersistenceMode::Ephemeral;
-    acquire_dhcp_server_after_restart::<N>(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart::<SERVER, CLIENT>(&format!("{}_{}", name, mode), mode).await
 }
 
-async fn acquire_dhcp_server_after_restart<N: NetstackAndDhcpClient>(
+async fn acquire_dhcp_server_after_restart<SERVER: Netstack, CLIENT: NetstackAndDhcpClient>(
     name: &str,
     mode: PersistenceMode,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let server_realm = sandbox
-        .create_netstack_realm_with::<N::Netstack, _, _>(
+        .create_netstack_realm_with::<SERVER, _, _>(
             format!("{}_server", name),
             &[
                 match mode {
@@ -732,9 +776,9 @@ async fn acquire_dhcp_server_after_restart<N: NetstackAndDhcpClient>(
         .expect("failed to create server realm");
 
     let client_realm = sandbox
-        .create_netstack_realm_with::<N::Netstack, _, _>(
+        .create_netstack_realm_with::<CLIENT::Netstack, _, _>(
             format!("{}_client", name),
-            match N::DhcpClient::DHCP_CLIENT_VERSION {
+            match CLIENT::DhcpClient::DHCP_CLIENT_VERSION {
                 DhcpClientVersion::InStack => None,
                 DhcpClientVersion::OutOfStack => Some(&KnownServiceProvider::DhcpClient),
             },
@@ -786,7 +830,7 @@ async fn acquire_dhcp_server_after_restart<N: NetstackAndDhcpClient>(
             .expect("failed to call dhcp/Server.StartServing")
             .map_err(zx::Status::from_raw)
             .expect("dhcp/Server.StartServing returned error");
-        let () = assert_client_acquires_addr::<N::DhcpClient>(
+        let () = assert_client_acquires_addr::<CLIENT::DhcpClient>(
             &client_realm,
             &client_ep,
             dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),

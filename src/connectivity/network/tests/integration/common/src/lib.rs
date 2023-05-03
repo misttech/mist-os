@@ -16,13 +16,17 @@ pub mod ping;
 #[macro_use]
 pub mod realms;
 
+use anyhow::Context as _;
 use component_events::events::EventStream;
 use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_zircon as zx;
-
-use anyhow::Context as _;
-use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
+use futures::{
+    future::FutureExt as _,
+    pin_mut, select,
+    stream::{Stream, StreamExt as _, TryStreamExt as _},
+    Future,
+};
 
 use crate::realms::TestSandboxExt as _;
 
@@ -261,4 +265,33 @@ pub async fn pause_fake_clock(realm: &netemul::TestRealm<'_>) -> Result<()> {
         .context("failed to connect to FakeClockControl")?;
     let () = fake_clock_control.pause().await.context("failed to pause time")?;
     Ok(())
+}
+
+/// Wraps `fut` so that it prints `event_name` and the caller's location to
+/// stderr every `interval` until `fut` completes.
+#[track_caller]
+pub fn annotate<'a, 'b: 'a, T>(
+    fut: impl Future<Output = T> + 'a,
+    interval: std::time::Duration,
+    event_name: &'b str,
+) -> impl Future<Output = T> + 'a {
+    let caller = std::panic::Location::caller();
+
+    async move {
+        let fut = fut.fuse();
+        let event_name = event_name.to_string();
+        let print_fut = futures::stream::repeat(())
+            .for_each(|()| async {
+                fasync::Timer::new(interval).await;
+                eprintln!("waiting for {} at {}", event_name, caller);
+            })
+            .fuse();
+        pin_mut!(fut, print_fut);
+        let result = select! {
+            result = fut => result,
+            () = print_fut => unreachable!("should repeat printing forever"),
+        };
+        eprintln!("completed {} at {}", event_name, caller);
+        result
+    }
 }
