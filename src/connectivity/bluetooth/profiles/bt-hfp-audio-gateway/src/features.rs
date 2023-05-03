@@ -106,24 +106,22 @@ impl Into<i64> for CodecId {
     }
 }
 
-impl PartialEq<i64> for CodecId {
-    fn eq(&self, other: &i64) -> bool {
-        self.0 as i64 == *other
-    }
-}
+impl TryFrom<CodecId> for media::EncoderSettings {
+    type Error = AudioError;
 
-impl std::fmt::Display for CodecId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            0x01 => write!(f, "{}", "CVSD"),
-            0x02 => write!(f, "{}", "MSBC"),
-            unknown => write!(f, "Unknown({:#x})", unknown),
+    fn try_from(value: CodecId) -> Result<Self, Self::Error> {
+        match value {
+            CodecId::MSBC => Ok(media::EncoderSettings::Msbc(Default::default())),
+            _ => Err(AudioError::UnsupportedParameters {
+                source: format_err!("Unsupported CodecID {value}"),
+            }),
         }
     }
 }
 
 impl TryFrom<CodecId> for media::PcmFormat {
     type Error = AudioError;
+
     fn try_from(value: CodecId) -> Result<Self, Self::Error> {
         let frames_per_second = match value {
             CodecId::CVSD => 64000,
@@ -140,6 +138,16 @@ impl TryFrom<CodecId> for media::PcmFormat {
             frames_per_second,
             channel_map: vec![media::AudioChannelId::Lf],
         })
+    }
+}
+
+impl TryFrom<CodecId> for media::DomainFormat {
+    type Error = AudioError;
+
+    fn try_from(value: CodecId) -> Result<Self, Self::Error> {
+        Ok(media::DomainFormat::Audio(media::AudioFormat::Uncompressed(
+            media::AudioUncompressedFormat::Pcm(media::PcmFormat::try_from(value)?),
+        )))
     }
 }
 
@@ -166,6 +174,22 @@ impl TryFrom<CodecId> for fidl_fuchsia_hardware_audio::Format {
             }),
             ..Default::default()
         })
+    }
+}
+
+impl PartialEq<i64> for CodecId {
+    fn eq(&self, other: &i64) -> bool {
+        self.0 as i64 == *other
+    }
+}
+
+impl std::fmt::Display for CodecId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            0x01 => write!(f, "{}", "CVSD"),
+            0x02 => write!(f, "{}", "MSBC"),
+            unknown => write!(f, "Unknown({:#x})", unknown),
+        }
     }
 }
 
@@ -200,11 +224,11 @@ impl CodecId {
         }
     }
 
-    pub fn mime_type(&self) -> &str {
+    pub fn mime_type(&self) -> Result<&str, AudioError> {
         match self {
-            &CodecId::MSBC => "audio/msbc",
-            &CodecId::CVSD => "audio/cvsd",
-            _ => unimplemented!(),
+            &CodecId::MSBC => Ok("audio/msbc"),
+            &CodecId::CVSD => Ok("audio/cvsd"),
+            _ => Err(AudioError::UnsupportedParameters { source: format_err!("codec {self}") }),
         }
     }
 }
