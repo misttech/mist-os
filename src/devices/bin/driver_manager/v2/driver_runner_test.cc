@@ -29,6 +29,7 @@ namespace fdh = fuchsia::driver::host;
 namespace fio = fuchsia::io;
 namespace fprocess = fuchsia_process;
 namespace frunner = fuchsia_component_runner;
+namespace fdi = fuchsia_driver_index;
 namespace fcomponent = fuchsia::component;
 namespace fdecl = fuchsia::component::decl;
 namespace fcd = fuchsia_component_decl;
@@ -2207,4 +2208,81 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
   // Check that a non-default filter stayed the same.
   EXPECT_EQ(std::string("instance-2"),
             std::string(new_offer->service().source_instance_filter()[2].get()));
+}
+
+TEST(NodeTest, ToCollection) {
+  InspectManager inspect(nullptr);
+  constexpr uint32_t kProtocolId = 0;
+
+  constexpr char kParentName[] = "parent";
+  Node parent(kParentName, std::vector<Node*>{}, nullptr, nullptr,
+              inspect.CreateDevice(kParentName, zx::vmo{}, kProtocolId), nullptr);
+
+  constexpr char kChild1Name[] = "child1";
+  Node child1(kChild1Name, std::vector<Node*>{&parent}, nullptr, nullptr,
+              inspect.CreateDevice(kChild1Name, zx::vmo{}, kProtocolId), nullptr);
+
+  constexpr char kChild2Name[] = "child2";
+  Node child2(kChild2Name, std::vector<Node*>{&parent, &child1}, nullptr, nullptr,
+              inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), nullptr);
+
+  // Test parentless
+  EXPECT_EQ(ToCollection(parent, fdi::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(parent, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(parent, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(parent, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  // Test single parent
+  parent.set_collection(Collection::kNone);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kBoot);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBoot), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBoot), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kBase), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  // Test multi parent
+  parent.set_collection(Collection::kNone);
+  child1.set_collection(Collection::kNone);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kBoot);
+  child1.set_collection(Collection::kNone);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kNone);
+  child1.set_collection(Collection::kPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBoot), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+
+  parent.set_collection(Collection::kFullPackage);
+  child1.set_collection(Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBoot), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kBase), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
 }

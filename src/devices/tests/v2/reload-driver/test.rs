@@ -102,7 +102,7 @@ async fn test_reload_target() -> Result<()> {
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
-        root_driver: Some("#meta/root.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
         offers: Some(offers),
         ..Default::default()
@@ -116,6 +116,7 @@ async fn test_reload_target() -> Result<()> {
     // yet (if composite parent we start with `Some` for this since we don't receive acks
     // from them). The inner option is the driver host koid.
     let mut nodes = HashMap::from([
+        ("dev".to_string(), None),
         ("B".to_string(), None),
         ("C".to_string(), None),
         ("D".to_string(), Some(None)), // composite parent

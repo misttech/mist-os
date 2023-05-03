@@ -192,6 +192,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes_;
 };
 
+Collection ToCollection(const Node& node, fuchsia_driver_index::DriverPackageType package_type);
+
 }  // namespace dfv2
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V2_DRIVER_RUNNER_H_

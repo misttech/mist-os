@@ -72,8 +72,6 @@ const char* CollectionName(Collection collection) {
   switch (collection) {
     case Collection::kNone:
       return "";
-    case Collection::kHost:
-      return "driver-hosts";
     case Collection::kBoot:
       return "boot-drivers";
     case Collection::kPackage:
@@ -567,7 +565,6 @@ void Node::FinishRestart() {
   fuchsia_driver_index::DriverPackageType pkg_type;
   switch (collection_) {
     case Collection::kNone:
-    case Collection::kHost:
       pkg_type = fuchsia_driver_index::DriverPackageType::Unknown();
       break;
     case Collection::kBoot:

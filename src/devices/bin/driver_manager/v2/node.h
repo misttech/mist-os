@@ -86,10 +86,8 @@ class NodeManager {
   virtual void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) = 0;
 };
 
-enum class Collection {
+enum class Collection : uint8_t {
   kNone,
-  // Collection for driver hosts.
-  kHost,
   // Collection for boot drivers.
   kBoot,
   // Collection for package drivers.

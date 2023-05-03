@@ -135,8 +135,6 @@ fidl::StringView CollectionName(Collection collection) {
   switch (collection) {
     case Collection::kNone:
       return {};
-    case Collection::kHost:
-      return "driver-hosts";
     case Collection::kBoot:
       return "boot-drivers";
     case Collection::kPackage:
@@ -189,6 +187,16 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
 }
 
 }  // namespace
+
+Collection ToCollection(const Node& node, fdi::DriverPackageType package_type) {
+  Collection collection = ToCollection(package_type);
+  for (const auto& parent : node.parents()) {
+    if (parent->collection() > collection) {
+      collection = parent->collection();
+    }
+  }
+  return collection;
+}
 
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
                            fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
@@ -364,8 +372,7 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
                                        fdi::DriverPackageType package_type) {
-  Collection collection = ToCollection(package_type);
-  node.set_collection(collection);
+  node.set_collection(ToCollection(node, package_type));
 
   std::weak_ptr node_weak = node.shared_from_this();
   runner_.StartDriverComponent(
