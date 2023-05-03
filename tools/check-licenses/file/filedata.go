@@ -86,6 +86,20 @@ func LoadFileData(f *File, content []byte) ([]*FileData, error) {
 	// File.LicenseFormat == MultiLicense*
 	// NOTICE files that contain text for multiple licenses.
 	// See the files in the /notice subdirectory for more info.
+	case MultiLicense:
+		ndata, err := notice.ParseOneDelimiter(f.absPath, content)
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range ndata {
+			data = append(data, &FileData{
+				file:        f,
+				lineNumber:  d.LineNumber,
+				libraryName: d.LibraryName,
+				data:        bytes.TrimSpace(d.LicenseText),
+			})
+		}
+
 	case MultiLicenseChromium:
 		ndata, err := notice.ParseChromium(f.absPath, content)
 		if err != nil {
