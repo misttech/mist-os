@@ -7,6 +7,7 @@ package golang
 import (
 	"embed"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strconv"
 	"text/template"
@@ -44,8 +45,9 @@ func (gen Generator) DeclOrder() zither.DeclOrder {
 func (gen Generator) DeclCallback(zither.Decl) {}
 
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
-	pkgPath := filepath.Join(summaries[0].Library.Parts()...)
-	outputDir = filepath.Join(outputDir, pkgPath)
+	pkgParts := append([]string{"fidl", "data"}, summaries[0].Library.Parts()...)
+	pkgPath := path.Join(pkgParts...) // path.Join() over filepath.Join(), as package names always use '/'
+	outputDir = filepath.Join(outputDir, filepath.Join(pkgParts...))
 
 	var outputs []string
 	// Generate a file containing the package's name

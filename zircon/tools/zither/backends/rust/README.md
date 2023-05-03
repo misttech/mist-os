@@ -4,10 +4,9 @@ The Zither Rust backend is gives Rust data layout bindings.
 
 ## Output layout
 
-iven a FIDL
-library by the name of `id1.id2.....idn`, one crate with name `id1-id2-...-idn`
-is generated: it contains a `${filename}.rs` for each original FIDL source file
-and a crate root `lib.rs`.
+Given a FIDL library by the name of `id1.id2.....idn`, one crate with name
+`fidl-data-id1-id2-...-idn` is generated: it contains a `${filename}.rs` for
+each original FIDL source file and a crate root `lib.rs`.
 
 ## GN integration
 

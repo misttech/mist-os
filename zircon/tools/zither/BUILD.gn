@@ -236,6 +236,7 @@ template("zither_golden_test") {
       output_namespace_info = {
         prefix_parts = []
         suffix_parts = []
+        part_separator = "/"
         forward_variables_from(backend_info.output_namespace, "*")
         parts = prefix_parts
         if (defined(library_name_separator)) {
@@ -243,7 +244,7 @@ template("zither_golden_test") {
               [ string_replace(library_target, ".", library_name_separator) ]
         }
         parts += suffix_parts
-        path = string_join("/", parts)
+        path = string_join(part_separator, parts)
       }
       if (output_namespace_info.path != "") {
         output_namespace = output_namespace_info.path

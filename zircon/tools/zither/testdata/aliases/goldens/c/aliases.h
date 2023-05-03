@@ -6,8 +6,8 @@
 //   zither.aliases (//zircon/tools/zither/testdata/aliases/aliases.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_ALIASES_C_ALIASES_H_
-#define LIB_ZITHER_ALIASES_C_ALIASES_H_
+#ifndef FIDL_ZITHER_ALIASES_DATA_C_ALIASES_H_
+#define FIDL_ZITHER_ALIASES_DATA_C_ALIASES_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -76,4 +76,4 @@ typedef uint8_t zither_aliases_alias_with_many_line_comment_t;
 }
 #endif
 
-#endif  // LIB_ZITHER_ALIASES_C_ALIASES_H_
+#endif  // FIDL_ZITHER_ALIASES_DATA_C_ALIASES_H_

@@ -6,8 +6,8 @@
 //   zither.enums (//zircon/tools/zither/testdata/enums/enums.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_ENUMS_ASM_ENUMS_H_
-#define LIB_ZITHER_ENUMS_ASM_ENUMS_H_
+#ifndef FIDL_ZITHER_ENUMS_DATA_ASM_ENUMS_H_
+#define FIDL_ZITHER_ENUMS_DATA_ASM_ENUMS_H_
 
 #define ZITHER_ENUMS_COLOR_RED (0)
 #define ZITHER_ENUMS_COLOR_ORANGE (1)
@@ -94,4 +94,4 @@
 
 #define ZITHER_ENUMS_INT64_MAX ZITHER_ENUMS_INT64_LIMITS_MAX
 
-#endif  // LIB_ZITHER_ENUMS_ASM_ENUMS_H_
+#endif  // FIDL_ZITHER_ENUMS_DATA_ASM_ENUMS_H_

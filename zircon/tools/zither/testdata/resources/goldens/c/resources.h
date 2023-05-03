@@ -6,8 +6,8 @@
 //   zither.resources (//zircon/tools/zither/testdata/resources/resources.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_RESOURCES_C_RESOURCES_H_
-#define LIB_ZITHER_RESOURCES_C_RESOURCES_H_
+#ifndef FIDL_ZITHER_RESOURCES_DATA_C_RESOURCES_H_
+#define FIDL_ZITHER_RESOURCES_DATA_C_RESOURCES_H_
 
 #include <stdint.h>
 
@@ -33,4 +33,4 @@ typedef struct {
 }
 #endif
 
-#endif  // LIB_ZITHER_RESOURCES_C_RESOURCES_H_
+#endif  // FIDL_ZITHER_RESOURCES_DATA_C_RESOURCES_H_

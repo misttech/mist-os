@@ -7,7 +7,7 @@ The Zither Go backend is gives Go data layout bindings.
 One file `${filename}.go` is generated per original FIDL source file,
 containing the bindings for the declarations defined there. Given a FIDL
 library by the name of `id1.id2.....idn`, these files comprise a package of
-name `${id1}/.../${idn}`.
+name `fidl/data/${id1}/.../${idn}`.
 
 Additionally, a `pkg_name.txt` is generated with the package name for its
 contents.

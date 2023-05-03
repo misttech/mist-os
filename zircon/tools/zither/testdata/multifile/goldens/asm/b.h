@@ -6,8 +6,8 @@
 //   zither.multifile (//zircon/tools/zither/testdata/multifile/b.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_MULTIFILE_ASM_B_H_
-#define LIB_ZITHER_MULTIFILE_ASM_B_H_
+#ifndef FIDL_ZITHER_MULTIFILE_DATA_ASM_B_H_
+#define FIDL_ZITHER_MULTIFILE_DATA_ASM_B_H_
 
 #include "a.h"
 
@@ -17,4 +17,4 @@
 
 #define ZITHER_MULTIFILE_B2_A (0)
 
-#endif  // LIB_ZITHER_MULTIFILE_ASM_B_H_
+#endif  // FIDL_ZITHER_MULTIFILE_DATA_ASM_B_H_

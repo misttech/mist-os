@@ -133,7 +133,8 @@ func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *tr
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	lib := summaries[0].Library
 	rootData := crateRootData{Library: lib}
-	outputDir = filepath.Join(outputDir, strings.Join(lib.Parts(), "-"), "src")
+	crateParts := append([]string{"fidl", "data"}, lib.Parts()...)
+	outputDir = filepath.Join(outputDir, strings.Join(crateParts, "-"), "src")
 
 	var outputs []string
 	for _, summary := range summaries {

@@ -47,6 +47,14 @@ _gofmt = {
   extensions = [ "go" ]
 }
 
+if (support_rust) {
+  _rustfmt = {
+    script = "$rustc_prefix/bin/rustfmt"
+    inputs = [ "//rustfmt.toml" ]
+    args = [ "--config-path=" + rebase_path(inputs[0], root_build_dir) ]
+  }
+}
+
 # Information on supported backends, accessible via
 # `supported_zither_backend_info[ "$backend" ]`.
 #
@@ -63,13 +71,14 @@ _gofmt = {
 #      output_namespace_info = {
 #        prefix_parts = []
 #        suffix_parts = []
+#        part_separator = "/"
 #        forward_variables_from(backend_info.output_namespace, "*")
 #        parts = prefix_parts
 #        if (defined(library_name_separator)) {
 #         parts += [ string_replace(library_name, ".", library_name_separator) ]
 #        }
 #        path += suffix_parts
-#        path = string_join("/", parts)
+#        path = string_join(part_separator, parts)
 #      }
 #      output_namespace = output_namespace_info.path
 #      ```
@@ -93,6 +102,11 @@ _gofmt = {
 #        - Type: list(string)
 #        - Default: []
 #
+#      * part_separator
+#        - Optional: The path part separator.
+#        - Type: string
+#        - Default: "/"
+#
 #  * formatter
 #    - Optional: A formatting specification for Zither outputs. The shape and
 #      semantics of this parameter are identical to the `formatter` parameter
@@ -105,9 +119,12 @@ _gofmt = {
 supported_zither_backend_info = {
   c = {
     output_namespace = {
-      prefix_parts = [ "lib" ]
+      prefix_parts = [ "fidl" ]
       library_name_separator = "."
-      suffix_parts = [ "c" ]
+      suffix_parts = [
+        "data",
+        "c",
+      ]
       supports_override = true
     }
     formatter = _clang_format
@@ -116,9 +133,12 @@ supported_zither_backend_info = {
   }
   asm = {
     output_namespace = {
-      prefix_parts = [ "lib" ]
+      prefix_parts = [ "fidl" ]
       library_name_separator = "."
-      suffix_parts = [ "asm" ]
+      suffix_parts = [
+        "data",
+        "asm",
+      ]
       supports_override = true
     }
     formatter = _clang_format
@@ -127,6 +147,10 @@ supported_zither_backend_info = {
   }
   go = {
     output_namespace = {
+      prefix_parts = [
+        "fidl",
+        "data",
+      ]
       library_name_separator = "/"
     }
     formatter = _gofmt
@@ -136,13 +160,14 @@ supported_zither_backend_info = {
   if (support_rust) {
     rust = {
       output_namespace = {
+        prefix_parts = [
+          "fidl",
+          "data",
+        ]
         library_name_separator = "-"
+        part_separator = "-"
       }
-      formatter = {
-        script = "$rustc_prefix/bin/rustfmt"
-        inputs = [ "//rustfmt.toml" ]
-        args = [ "--config-path=" + rebase_path(inputs[0], root_build_dir) ]
-      }
+      formatter = _rustfmt
       _library_template = "_zither_rust_library"
     }
   }
@@ -177,7 +202,13 @@ supported_zither_backend_info = {
   }
 
   if (support_rust) {
-    rust_syscall = rust
+    rust_syscall = {
+      output_namespace = {
+        library_name_separator = "-"
+      }
+      formatter = _rustfmt
+      _library_template = "_zither_rust_library"
+    }
   }
 
   go_runtime = {
@@ -880,6 +911,7 @@ template("zither_library") {
         output_namespace_info = {
           prefix_parts = []
           suffix_parts = []
+          part_separator = "/"
           forward_variables_from(backend_info.output_namespace, "*")
           parts = prefix_parts
           if (defined(library_name_separator)) {
@@ -888,7 +920,7 @@ template("zither_library") {
                                       library_name_separator) ]
           }
           parts += suffix_parts
-          path = string_join("/", parts)
+          path = string_join(part_separator, parts)
         }
         if (output_namespace_info.path != "") {
           output_namespace = output_namespace_info.path

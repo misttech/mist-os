@@ -1,1 +1,1 @@
-zither/structs
+fidl/data/zither/structs

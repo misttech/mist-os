@@ -6,8 +6,8 @@
 //   zither.structs (//zircon/tools/zither/testdata/structs/structs.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_STRUCTS_C_STRUCTS_H_
-#define LIB_ZITHER_STRUCTS_C_STRUCTS_H_
+#ifndef FIDL_ZITHER_STRUCTS_DATA_C_STRUCTS_H_
+#define FIDL_ZITHER_STRUCTS_DATA_C_STRUCTS_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -87,4 +87,4 @@ typedef struct {
 }
 #endif
 
-#endif  // LIB_ZITHER_STRUCTS_C_STRUCTS_H_
+#endif  // FIDL_ZITHER_STRUCTS_DATA_C_STRUCTS_H_

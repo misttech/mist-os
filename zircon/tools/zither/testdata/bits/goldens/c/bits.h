@@ -6,8 +6,8 @@
 //   zither.bits (//zircon/tools/zither/testdata/bits/bits.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_BITS_C_BITS_H_
-#define LIB_ZITHER_BITS_C_BITS_H_
+#ifndef FIDL_ZITHER_BITS_DATA_C_BITS_H_
+#define FIDL_ZITHER_BITS_DATA_C_BITS_H_
 
 #include <stdint.h>
 
@@ -94,4 +94,4 @@ typedef uint16_t zither_bits_bits_with_many_line_comment_t;
 }
 #endif
 
-#endif  // LIB_ZITHER_BITS_C_BITS_H_
+#endif  // FIDL_ZITHER_BITS_DATA_C_BITS_H_

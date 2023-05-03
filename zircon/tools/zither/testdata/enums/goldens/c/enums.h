@@ -6,8 +6,8 @@
 //   zither.enums (//zircon/tools/zither/testdata/enums/enums.test.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef LIB_ZITHER_ENUMS_C_ENUMS_H_
-#define LIB_ZITHER_ENUMS_C_ENUMS_H_
+#ifndef FIDL_ZITHER_ENUMS_DATA_C_ENUMS_H_
+#define FIDL_ZITHER_ENUMS_DATA_C_ENUMS_H_
 
 #include <stdint.h>
 
@@ -127,4 +127,4 @@ typedef uint16_t zither_enums_enum_with_many_line_comment_t;
 }
 #endif
 
-#endif  // LIB_ZITHER_ENUMS_C_ENUMS_H_
+#endif  // FIDL_ZITHER_ENUMS_DATA_C_ENUMS_H_
