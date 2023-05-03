@@ -281,6 +281,9 @@ impl Component {
         assert!(client.block_size() <= zx::system_get_page_size());
         assert!((zx::system_get_page_size() as u64) == MIN_BLOCK_SIZE);
 
+        // TODO(https://fxbug.dev/122125): fxblob delivery blob support.
+        assert!(!options.allow_delivery_blobs);
+
         let fs = FxFilesystem::open_with_options(
             DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?),
             OpenOptions {
@@ -533,6 +536,7 @@ mod tests {
                         write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                         write_compression_level: 0,
                         cache_eviction_policy_override: EvictionPolicyOverride::None,
+                        allow_delivery_blobs: false,
                     },
                 )
                 .await

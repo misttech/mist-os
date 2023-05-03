@@ -37,6 +37,9 @@ std::vector<std::string> MountOptions::as_argv(const char *binary) const {
   if (fsck_after_every_transaction) {
     argv.push_back("--fsck_after_every_transaction");
   }
+  if (allow_delivery_blobs) {
+    argv.push_back("--allow_delivery_blobs");
+  }
   return argv;
 }
 
@@ -79,6 +82,8 @@ zx::result<fuchsia_fs_startup::wire::StartOptions> MountOptions::as_start_option
     options.cache_eviction_policy_override =
         fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone;
   }
+
+  options.allow_delivery_blobs = allow_delivery_blobs;
 
   return zx::ok(options);
 }

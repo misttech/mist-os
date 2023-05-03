@@ -259,6 +259,7 @@ impl MemfsInstance {
             write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
             write_compression_level: 0,
             cache_eviction_policy_override: EvictionPolicyOverride::None,
+            allow_delivery_blobs: false,
         };
         // Memfs doesn't need a block device but FIDL prevents passing an invalid handle.
         let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>();

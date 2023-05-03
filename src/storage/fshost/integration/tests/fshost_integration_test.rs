@@ -21,6 +21,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
+    fuchsia_fs::node::OpenError,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::FutureExt,
 };
@@ -89,6 +90,34 @@ fn volumes_spec() -> VolumesSpec {
 
 fn data_fs_spec() -> DataSpec {
     DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
+}
+
+async fn check_delivery_blob_support(
+    blobfs: fio::DirectoryProxy,
+    should_allow_delivery_blobs: bool,
+) {
+    // We just use the null blob's hash as a test.
+    let hash = "15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b";
+    let delivery_path = format!("v1-{}", hash);
+    let blob = fuchsia_fs::directory::open_file(
+        &blobfs,
+        &delivery_path,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+    )
+    .await;
+    if should_allow_delivery_blobs {
+        assert!(blob.is_ok(), "Failed to open delivery blob for writing: {:?}", &blob);
+    } else {
+        // If delivery blob support is disabled, we should get NOT_SUPPORTED.
+        assert!(blob.is_err(), "Succeeded opening delivery blob when feature disabled.");
+        match blob.unwrap_err() {
+            OpenError::OpenError(status) => assert_eq!(status, zx::Status::NOT_SUPPORTED),
+            other => panic!(
+                "Unexpected error when opening delivery blob (expected NOT_SUPPORTED): {:?}",
+                other
+            ),
+        }
+    }
 }
 
 #[fuchsia::test]
@@ -819,4 +848,23 @@ async fn verify_blobs() {
         .expect("verify failure");
 
     fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/122125): fxblob delivery blob support.
+#[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
+async fn delivery_blob_config() {
+    for allow_delivery_blobs in [false, true] {
+        let mut builder = new_builder();
+        builder.fshost().set_config_value("blobfs_allow_delivery_blobs", allow_delivery_blobs);
+        builder.with_disk().format_volumes(volumes_spec());
+        let fixture = builder.build().await;
+        // Ensure we succeed/fail to create a delivery blob if the feature is enabled/disabled.
+        check_delivery_blob_support(
+            fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
+            allow_delivery_blobs,
+        )
+        .await;
+        fixture.tear_down().await;
+    }
 }

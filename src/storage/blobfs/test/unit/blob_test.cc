@@ -42,22 +42,10 @@ constexpr uint32_t kTestDeviceBlockSize = 512;
 constexpr uint32_t kTestDeviceNumBlocks = 400 * kBlobfsBlockSize / kTestDeviceBlockSize;
 namespace fio = fuchsia_io;
 
-struct BlobWriteOptions {
-  CompressionAlgorithm compression_algorithm;
-  bool streaming_writes = false;
-};
-
-constexpr BlobWriteOptions kAllValidWriteOptions[] = {
-    {.compression_algorithm = CompressionAlgorithm::kUncompressed},
-    {.compression_algorithm = CompressionAlgorithm::kChunked},
-    // Streaming writes are only supported when compression is disabled.
-    {.compression_algorithm = CompressionAlgorithm::kUncompressed, .streaming_writes = true},
-};
-
 }  // namespace
 
 class BlobTest : public BlobfsTestSetup,
-                 public testing::TestWithParam<std::tuple<BlobLayoutFormat, BlobWriteOptions>> {
+                 public testing::TestWithParam<std::tuple<BlobLayoutFormat, CompressionAlgorithm>> {
  public:
   // Tests that need to test migration from a specific revision can override this method to
   // specify an older minor revision. See also blobfs_revision_test.cc for general migration tests.
@@ -83,9 +71,8 @@ class BlobTest : public BlobfsTestSetup,
     MountOptions mount_options{
         .compression_settings =
             {
-                .compression_algorithm = std::get<1>(GetParam()).compression_algorithm,
+                .compression_algorithm = std::get<1>(GetParam()),
             },
-        .streaming_writes = std::get<1>(GetParam()).streaming_writes,
     };
     ASSERT_EQ(ZX_OK, Mount(std::move(device), mount_options));
   }
@@ -684,18 +671,18 @@ TEST_P(BlobTest, WriteBlobChunked) {
 }
 
 std::string GetTestParamName(
-    const ::testing::TestParamInfo<std::tuple<BlobLayoutFormat, BlobWriteOptions>>& param) {
-  const auto& [layout, write_options] = param.param;
+    const ::testing::TestParamInfo<std::tuple<BlobLayoutFormat, CompressionAlgorithm>>& param) {
+  const auto& [layout, compression_algorithm] = param.param;
   return GetBlobLayoutFormatNameForTests(layout) +
-         GetCompressionAlgorithmName(write_options.compression_algorithm) +
-         std::string(write_options.streaming_writes ? "Streaming" : "");
+         GetCompressionAlgorithmName(compression_algorithm);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     /*no prefix*/, BlobTest,
     testing::Combine(testing::Values(BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart,
                                      BlobLayoutFormat::kCompactMerkleTreeAtEnd),
-                     testing::ValuesIn(kAllValidWriteOptions)),
+                     testing::Values(CompressionAlgorithm::kUncompressed,
+                                     CompressionAlgorithm::kChunked)),
     GetTestParamName);
 
 }  // namespace

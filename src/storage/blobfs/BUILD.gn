@@ -4,14 +4,11 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/images/args.gni")
 
 declare_args() {
-  # Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
-  # by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
-  #
-  # Streaming writes are only supported when writing delivery blobs or when compression is disabled.
-  blobfs_enable_streaming_writes = false
+  # TODO(bcastell): Streaming writes is now enabled by default. Remove this argument when out of
+  # tree users don't set this anymore.
+  blobfs_enable_streaming_writes = true
 
   # Set this to true when configuring gn args to enable blobfs page-in metrics recording. This will
   # also increase the inspect VMO size for blobfs to 2 MiB, to accommodate the large number of
@@ -221,15 +218,6 @@ static_library("blobfs") {
       # The page-in metrics feature requires a large Inspect VMO (>512KB) for blobfs.
       "BLOBFS_ENABLE_LARGE_INSPECT_VMO",
     ]
-  }
-
-  if (blobfs_enable_streaming_writes) {
-    defines += [ "BLOBFS_STREAMING_WRITES_ENABLED_DEFAULT" ]
-  }
-
-  if (delivery_blob_type != false) {
-    # TODO: don't use compile time flag for this.
-    defines += [ "BLOBFS_DELIVERY_BLOBS_ENABLED_DEFAULT" ]
   }
 }
 
