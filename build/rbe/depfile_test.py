@@ -71,6 +71,11 @@ class LexLineTests(unittest.TestCase):
     def test_line_continue(self):
         self._test_tokens([depfile.Token('\\', depfile.TokenType.LINECONTINUE)])
 
+    def test_escape_slash(self):
+        with self.assertRaises(ValueError):  # not handled yet
+            self._test_tokens(
+                [depfile.Token('\\\\', depfile.TokenType.ESCAPED)])
+
     def test_path(self):
         for text in ('_', 'a', 'a.txt', 'f_e.g.h', 'READ-ME.md', '/x', '/x/y/z',
                      '/f/g-h.ij', '/usr/include/c++/v1'):

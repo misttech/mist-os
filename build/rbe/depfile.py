@@ -39,7 +39,7 @@ def _lex_line(line: str) -> Iterable[Token]:
     while line:  # is not empty
         next_char = line[0]
 
-        if prev and prev.Type == TokenType.LINECONTINUE:
+        if prev and prev.type == TokenType.LINECONTINUE:
             newline_match = _NEWLINE_RE.match(line)
             if newline_match:
                 newline = newline_match.group(0)
