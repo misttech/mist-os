@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::Arc;
 
-use crate::arch::vdso::load_vdso_from_file;
 use crate::device::framebuffer::Framebuffer;
 use crate::device::input::InputFile;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
@@ -24,6 +23,7 @@ use crate::mm::FutexTable;
 use crate::task::*;
 use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
+use crate::vdso::vdso_loader::load_vdso_from_file;
 
 pub struct Kernel {
     /// The Zircon job object that holds the processes running in this kernel.

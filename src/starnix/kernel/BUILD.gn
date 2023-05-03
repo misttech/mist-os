@@ -129,18 +129,17 @@ rustc_binary("starnix_kernel_bin") {
     "//zircon/system/ulib/backtrace-request/rust",
   ]
 
-  if (current_cpu == "x64") {
-    deps += [
-      ":vdso-data($target_linux_toolchain)",
-      "//src/lib/fuchsia-fs",
-    ]
-  }
+  deps += [
+    ":vdso-data($target_linux_toolchain)",
+    "//src/lib/fuchsia-fs",
+  ]
 
   if (is_debug) {
     deps += [ "//third_party/rust_crates:tracing-mutex" ]
   }
 
   test_deps = [
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4:test_img",
@@ -150,12 +149,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
   ]
-
-  # This is x64 only since we don't use it on other architectures yet (it's used for loading the
-  # vDSO which we only do on x64).
-  if (current_cpu == "x64") {
-    test_deps += [ "//src/lib/fuchsia-fs" ]
-  }
 
   non_rust_deps = [ ":restricted_trampoline" ]
 
@@ -307,6 +300,8 @@ rustc_binary("starnix_kernel_bin") {
     "types/union.rs",
     "types/user_address.rs",
     "types/user_buffer.rs",
+    "vdso/mod.rs",
+    "vdso/vdso_loader.rs",
     "vmex_resource.rs",
   ]
 
@@ -385,12 +380,17 @@ config("vdso_config") {
     "-nostdlib",
   ]
 
-  if (current_cpu == "x64") {
-    # Use a custom linker script to ensure only one PT_LOAD header.
-    vdso_linker_script = "vdso/vdso.ld"
-    ldflags += [ "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir) ]
+  # Use a custom linker script to ensure only one PT_LOAD header.
+  vdso_linker_script = "vdso/vdso.ld"
+  ldflags += [ "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir) ]
 
+  if (current_cpu == "x64") {
     vdso_version_script = "vdso/vdso-x64.map"
+    ldflags += [ "-Wl,--version-script," +
+                 rebase_path(vdso_version_script, root_build_dir) ]
+  }
+  if (current_cpu == "arm64") {
+    vdso_version_script = "vdso/vdso-aarch64.map"
     ldflags += [ "-Wl,--version-script," +
                  rebase_path(vdso_version_script, root_build_dir) ]
   }
@@ -404,6 +404,9 @@ loadable_module("vdso") {
       "vdso/vdso-x64.cc",
     ]
   }
+  if (current_cpu == "arm64") {
+    sources = [ "vdso/vdso-aarch64.cc" ]
+  }
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
   if (is_linux) {
@@ -416,7 +419,9 @@ loadable_module("vdso") {
 }
 
 resource("vdso-data") {
-  sources = [ "$root_out_dir/libvdso.so" ]
+  if (current_cpu == "x64" || current_cpu == "arm64") {
+    sources = [ "$root_out_dir/libvdso.so" ]
+  }
   outputs = [ "data/libvdso.so" ]
   deps = [ ":vdso" ]
 }
