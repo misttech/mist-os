@@ -7,8 +7,8 @@ using fuchsia.images2;
 using fuchsia.sysmem;
 using zx;
 
-// Invalid id for displays, images, and events.
-const INVALID_DISP_ID uint64 = 0;
+/// Invalid id for displays, images, and events.
+const INVALID_DISP_ID DisplayId = 0;
 
 /// Interface for accessing the display hardware.
 ///
@@ -139,7 +139,7 @@ protocol Coordinator {
     //
     // It is illegal to pass a display mode which was not part of the display's Info.
     SetDisplayMode(struct {
-        display_id uint64;
+        display_id DisplayId;
         mode Mode;
     });
 
@@ -170,7 +170,7 @@ protocol Coordinator {
     // successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     // the last successfully applied state is restored.
     SetDisplayColorConversion(struct {
-        display_id uint64;
+        display_id DisplayId;
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
@@ -182,7 +182,7 @@ protocol Coordinator {
     /// safe to release a gamma table after using it here, and will not modify
     /// display output.
     SetDisplayGammaTable(struct {
-        display_id uint64;
+        display_id DisplayId;
         gamma_table_id uint64;
     });
 
@@ -193,7 +193,7 @@ protocol Coordinator {
     // pending config before being added to the second display's pending config. It
     // is also illegal to pass an invalid layer id.
     SetDisplayLayers(struct {
-        display_id uint64;
+        display_id DisplayId;
         layer_ids vector<uint64>:MAX;
     });
 
@@ -453,7 +453,7 @@ protocol Coordinator {
     // OnVsync on all display clients.
     //
     -> OnVsync(resource struct {
-        display_id uint64;
+        display_id DisplayId;
         timestamp uint64;
         applied_config_stamp ConfigStamp;
         cookie uint64;
@@ -569,7 +569,7 @@ protocol Coordinator {
     /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
     /// turning on/off displays.
     SetDisplayPower(struct {
-        display_id uint64;
+        display_id DisplayId;
         power_on bool;
     }) -> () error zx.Status;
 };

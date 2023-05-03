@@ -5,50 +5,139 @@ library fuchsia.hardware.display;
 
 using fuchsia.images2;
 
-// A display mode configuration.
+/// Unique identifier for a display device attached to the system.
+///
+/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+///
+/// Values are unique within a [`fuchsia.hardware.display/Controller`]
+/// connection. An external display will be associated with different DisplayId
+/// values if it is disconnected and reconnected.
+///
+/// A display device may be identified by different values across boot cycles or
+/// across different Controller connections. Software that needs to identify
+/// displays (for example, to honor display-specific preferences) should use
+/// [`fuchsia.hardware.display/Info`] identifiers, not display IDs.
+///
+/// This type is not related to the VESA DisplayID standard.
+alias DisplayId = uint64;
+
+/// Describes an operational mode for a display device attached to the system.
+///
+/// The operational parameters that make up a mode description must be updated
+/// atomically, using a resource-intensive "mode setting" operation. Parameters
+/// that can be changed quickly, such as brightness and contrast, do not belong
+/// in a mode description.
 type Mode = struct {
-    // Resolution in pixels.
+    /// Number of pixels on a horizontal line of the displayed image.
+    ///
+    /// This describes the image data sent to the display, which is also called
+    /// the "active area" or "active pixels" in raster scan terminology. Despite
+    /// the name, some of the "active pixels" may not actually be shown to the
+    /// user, for example due to corners or notches.
     horizontal_resolution uint32;
+
+    /// Number of horizontal lines that make up a displayed image.
+    ///
+    /// This describes the image data sent to the display, which is also called
+    /// the "active area" or "active pixels" in raster scan terminology. Despite
+    /// the name, some of the "active pixels" may not actually be shown to the
+    /// user, for example due to corners or notches.
     vertical_resolution uint32;
-    // Vertical refresh rate in units of (Hz / 100).
+
+    /// Number of images transmitted to the display in 100 seconds.
+    ///
+    /// This is the display's vertical refresh rate, in centihertz (0.01 Hz).
     refresh_rate_e2 uint32;
 
-    // Bitfield of flags defined below which further specify the mode.
+    /// Bit field of mode attributes.
+    ///
+    /// This field is currently unused. It will be used for binary attributes,
+    /// such as whether a display mode is interlaced.
     flags uint32;
 };
 
-// Info contains the information about a particular attached display.
+/// Description for a display device attached to the system.
+///
+/// Display devices include external monitors and internal panels.
 type Info = struct {
-    id uint64;
+    /// Uniquely identifies the display in a Controller connection.
+    ///
+    /// See [`fuchsia.hardware.display/DisplayId`].
+    id DisplayId;
 
-    // Modes supported by the attached display. The first entry is the
-    // preferred mode.
+    /// Operational modes supported by the described display device.
+    ///
+    /// The first entry is the device's preferred mode.
     modes vector<Mode>:MAX;
 
-    // Pixel format type (fuchsia.images2.PixelFormat) supported by the
-    // attached display. The first entry is the preferred mode.
+    /// Pixel formats that can be directly displayed on the attached display.
+    ///
+    /// This field will be revised to better reflect the subtleties around
+    /// modern display hardware, such as multiple layer types, and around
+    /// pixel format modifiers, such as tiling and framebuffer compression
+    /// formats. See fxbug.dev/121328 and fxbug.dev/126156.
+    ///
+    /// The formats listed here reflect support from both the display engine
+    /// hardware and the display device. This means some of the formats may be
+    /// subject to conversion inside the display engine hardware.
+    ///
+    /// The first entry in the list is the display's preferred format. This
+    /// format is likely to be supported for transferring data between the
+    /// display engine and the display hardware, and not require any conversion
+    /// inside the display engine.
+    ///
+    /// Format conversion inside the display engine is likely to be
+    /// significantly more power-efficient than a GPU render stage or software
+    /// conversion. So, using any format in this list is better than using the
+    /// GPU to convert to the preferred format.
     pixel_format vector<fuchsia.images2.PixelFormat>:MAX;
 
-    // A list of cursor configurations most likely to be accepted by the
-    // driver. Maybe be empty if there is no hardware support for cursors.
-    //
-    // The driver may reject some of these configurations in some
-    // circumstances, and it may accept other configurations, but at least
-    // one of these configurations should be valid at most times.
+    /// Cursor layer configurations supported by the underlying display engine.
+    ///
+    /// The list is empty if the display engine driving the display device does
+    /// not support cursors.
+    ///
+    /// The list is not guaranteed to contain all configurations that are
+    /// accepted by cursor layers. Drivers can choose to return a subset of
+    /// acceptable configurations, if producing the full set would take too much
+    /// effort or would use up too much memory.
+    ///
+    /// A display config that uses a cursor layer configuration in this list may
+    /// still be rejected by the driver, due to limitations that can't be
+    /// covered by this API, such as total memory bandwidth constraints.
     cursor_configs vector<CursorInfo>:MAX;
 
+    /// Part of a display device identifier that persists across boot cycles.
+    ///
+    /// If the `manufacturer_name`, `monitor_name` and `monitor_serial` fields
+    /// are all non-empty, they  make up an identifier that is likely to be
+    /// unique to the attached device, and is highly unlikely to change across
+    /// boot cycles. Software that needs to identify displays (for example, to
+    /// honor display-specific preferences) should use this triplet.
     manufacturer_name string:IDENTIFIER_MAX_LEN;
+
+    /// Part of a display device identifier that persists across boot cycles.
+    ///
+    /// See `manufacturer_name` for details.
     monitor_name string:IDENTIFIER_MAX_LEN;
+
+    /// Part of a display device identifier that persists across boot cycles.
+    ///
+    /// See `manufacturer_name` for details.
     monitor_serial string:IDENTIFIER_MAX_LEN;
 
-    /// Physical horizontal size in millimeters.
-    /// If this value is not available, set to a best guess value and set the flag
+    /// Physical horizontal size of the displayed image area, in millimeters.
+    ///
+    /// If `using_fallback_size` is true, the value is a best guess from the
+    /// driver. Otherwise, the value here is reported by the display device.
     horizontal_size_mm uint32;
-    /// Physical vertical size in millimeters
-    /// If this value is not available, set to a best guess value and set the flag
+
+    /// Physical vertical size of the displayed image area, in millimeters.
+    ///
+    /// See `horizontal_size_mm` for more details.
     vertical_size_mm uint32;
-    /// This flag is set if fallback horizontal and vertical sizes were used as opposed
-    /// to actual values reported by the display.
+
+    /// True if the driver does not have the display's physical sizing info.
     using_fallback_size bool;
 };
 
