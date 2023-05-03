@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <asm.h>
+#include <lib/arch/asm.h>
 #include <lib/zbi-format/zbi.h>
 
 

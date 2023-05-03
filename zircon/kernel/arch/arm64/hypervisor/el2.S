@@ -6,8 +6,8 @@
 
 #include <arch/arm64/hypervisor/el2_state.h>
 #include <arch/arm64/mmu.h>
-#include <arch/asm_macros.h>
 #include <asm.h>
+#include <lib/arch/asm.h>
 #include <zircon/errors.h>
 
 #define CNTHCTL_EL2_EL1PCTEN            BIT_32(0)

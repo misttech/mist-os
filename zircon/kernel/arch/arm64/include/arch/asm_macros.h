@@ -10,19 +10,6 @@
 
 // clang-format off
 
-.macro movlit reg, literal
-mov \reg, #((\literal) & 0xffff)
-.ifne (((\literal) >> 16) & 0xffff)
-movk \reg, #(((\literal) >> 16) & 0xffff), lsl #16
-.endif
-.ifne (((\literal) >> 32) & 0xffff)
-movk \reg, #(((\literal) >> 32) & 0xffff), lsl #32
-.endif
-.ifne (((\literal) >> 48) & 0xffff)
-movk \reg, #(((\literal) >> 48) & 0xffff), lsl #48
-.endif
-.endm
-
 // GAS doesn't support xzr in .cfi directives.
 
 .macro push_regs ra, rb
@@ -55,15 +42,6 @@ sub sp, sp, #\value
 .macro add_to_sp value
 add sp, sp, #\value
 .cfi_adjust_cfa_offset -\value
-.endm
-
-.macro adr_global reg, symbol
-#if TINY
-adr \reg, \symbol
-#else
-adrp \reg, \symbol
-add \reg, \reg, #:lo12:\symbol
-#endif
 .endm
 
 .macro movabs reg, symbol

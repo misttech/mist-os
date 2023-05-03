@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <arch/arm64/asm.h>
-#include <arch/asm_macros.h>
+#include <lib/arch/asm.h>
 
 // These must match up with start.S register assignments.
 tmp .req x9

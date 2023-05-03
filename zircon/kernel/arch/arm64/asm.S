@@ -5,8 +5,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/asm.h>
 #include <arch/arm64/asm.h>
-#include <arch/asm_macros.h>
 
 #ifndef __has_feature
 #define __has_feature(x) 0

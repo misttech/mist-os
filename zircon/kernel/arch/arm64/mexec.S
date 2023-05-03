@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <arch/arm64/hypervisor/el2_state.h>
-#include <arch/asm_macros.h>
+#include <lib/arch/asm.h>
 #include <arch/defines.h>
 #include <asm.h>
 #include <lib/arch/cache.h>
