@@ -7,7 +7,7 @@ use ffx_core::ffx_plugin;
 use ffx_package_archive_list_args::ListCommand;
 use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader, FarListReader};
 use ffx_writer::Writer;
-use humansize::{file_size_opts, FileSize};
+use humansize::{file_size_opts, FileSize as _};
 use prettytable::{cell, format::TableFormat, row, Row, Table};
 
 #[ffx_plugin()]
@@ -69,8 +69,10 @@ fn print_list_table(
             row.add_cell(cell!(entry.path));
             row.add_cell(cell!(entry
                 .length
-                .file_size(file_size_opts::CONVENTIONAL)
-                .unwrap_or_else(|_| format!("{}b", entry.length))));
+                .map(|n| n
+                    .file_size(file_size_opts::CONVENTIONAL)
+                    .unwrap_or_else(|_| format!("{}b", n)))
+                .unwrap_or_else(|| "missing from archive".into())));
         }
 
         table.add_row(row);
@@ -112,17 +114,17 @@ mod test {
                 ArchiveEntry {
                     name: "meta/the_component.cm".to_string(),
                     path: "meta/the_component.cm".to_string(),
-                    length: 100,
+                    length: Some(100),
                 },
                 ArchiveEntry {
                     name: "meta/package".to_string(),
                     path: "meta/package".to_string(),
-                    length: 25,
+                    length: Some(25),
                 },
                 ArchiveEntry {
                     name: "meta/contents".to_string(),
                     path: "meta/contents".to_string(),
-                    length: 55,
+                    length: Some(55),
                 },
             ])
         });
@@ -161,6 +163,8 @@ mod test {
 +-----------------------+
 | NAME                  |
 +=======================+
+| data/missing_blob     |
++-----------------------+
 | data/some_file        |
 +-----------------------+
 | lib/run.so            |
@@ -189,25 +193,27 @@ mod test {
         let mut writer = Writer::new_test(None);
         list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
 
-        let expected = r#"
-+-----------------------+------------------------------------------------------------------+-----------+
-| NAME                  | PATH                                                             | LENGTH    |
-+=======================+==================================================================+===========+
-| data/some_file        | 4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c | 292.97 KB |
-+-----------------------+------------------------------------------------------------------+-----------+
-| lib/run.so            | 892d655f2c841030d1b5556f9f124a753b5e32948471be76e72d330c6b6ba1db | 4 KB      |
-+-----------------------+------------------------------------------------------------------+-----------+
-| meta.far              | meta.far                                                         | 16 KB     |
-+-----------------------+------------------------------------------------------------------+-----------+
-| meta/contents         | meta/contents                                                    | 55 B      |
-+-----------------------+------------------------------------------------------------------+-----------+
-| meta/package          | meta/package                                                     | 25 B      |
-+-----------------------+------------------------------------------------------------------+-----------+
-| meta/the_component.cm | meta/the_component.cm                                            | 100 B     |
-+-----------------------+------------------------------------------------------------------+-----------+
-| run_me                | 1f487b576253664f9de1a940ad3a350ca47316b5cdb65254fbf267367fd77c62 | 4 KB      |
-+-----------------------+------------------------------------------------------------------+-----------+
-"#[1..].to_string();
+        let expected = "\
++-----------------------+------------------------------------------------------------------+----------------------+
+| NAME                  | PATH                                                             | LENGTH               |
++=======================+==================================================================+======================+
+| data/missing_blob     | acfe18f46d86a6d0848ce02320acb455b17f2df9fe5806dc52465b3d74cf2fd9 | missing from archive |
++-----------------------+------------------------------------------------------------------+----------------------+
+| data/some_file        | 4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c | 292.97 KB            |
++-----------------------+------------------------------------------------------------------+----------------------+
+| lib/run.so            | 892d655f2c841030d1b5556f9f124a753b5e32948471be76e72d330c6b6ba1db | 4 KB                 |
++-----------------------+------------------------------------------------------------------+----------------------+
+| meta.far              | meta.far                                                         | 16 KB                |
++-----------------------+------------------------------------------------------------------+----------------------+
+| meta/contents         | meta/contents                                                    | 55 B                 |
++-----------------------+------------------------------------------------------------------+----------------------+
+| meta/package          | meta/package                                                     | 25 B                 |
++-----------------------+------------------------------------------------------------------+----------------------+
+| meta/the_component.cm | meta/the_component.cm                                            | 100 B                |
++-----------------------+------------------------------------------------------------------+----------------------+
+| run_me                | 1f487b576253664f9de1a940ad3a350ca47316b5cdb65254fbf267367fd77c62 | 4 KB                 |
++-----------------------+------------------------------------------------------------------+----------------------+
+".to_owned();
 
         assert_eq!(writer.test_output()?, expected);
         Ok(())
@@ -222,6 +228,11 @@ mod test {
 
         let expected = r#"
 [
+  {
+    "name": "data/missing_blob",
+    "path": "acfe18f46d86a6d0848ce02320acb455b17f2df9fe5806dc52465b3d74cf2fd9",
+    "length": null
+  },
   {
     "name": "data/some_file",
     "path": "4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c",

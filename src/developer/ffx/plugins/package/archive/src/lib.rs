@@ -20,7 +20,7 @@ use std::{
 pub struct ArchiveEntry {
     pub name: String,
     pub path: String,
-    pub length: u64,
+    pub length: Option<u64>,
 }
 
 impl From<Utf8Entry<'_>> for ArchiveEntry {
@@ -28,7 +28,7 @@ impl From<Utf8Entry<'_>> for ArchiveEntry {
         ArchiveEntry {
             name: entry.path().to_string(),
             path: entry.path().to_string(),
-            length: entry.length(),
+            length: Some(entry.length()),
         }
     }
 }
@@ -127,7 +127,7 @@ pub fn read_file_entries(reader: &mut dyn FarListReader) -> Result<Vec<ArchiveEn
             entries.push(ArchiveEntry {
                 name: name.to_string(),
                 path: hash.to_string(),
-                length: 0,
+                length: None,
             });
         }
     }
@@ -158,18 +158,33 @@ pub mod test_utils {
     pub static BLOB3: &str = "4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c";
     pub static DATA_SOME_FILE_BLOB: &str = BLOB3;
     pub static DATA_SOME_FILE_PATH: &str = "data/some_file";
+    pub static MISSING_BLOB: &str =
+        "acfe18f46d86a6d0848ce02320acb455b17f2df9fe5806dc52465b3d74cf2fd9";
+    pub static MISSING_BLOB_PATH: &str = "data/missing_blob";
 
     pub fn create_mockreader() -> MockFarListReader {
         let mut mockreader = MockFarListReader::new();
         mockreader.expect_list_contents().returning(|| {
             Ok(vec![
-                ArchiveEntry { name: BLOB1.to_string(), path: BLOB1.to_string(), length: 1024 * 4 },
-                ArchiveEntry { name: BLOB2.to_string(), path: BLOB2.to_string(), length: 1024 * 4 },
-                ArchiveEntry { name: BLOB3.to_string(), path: BLOB3.to_string(), length: 300000 },
+                ArchiveEntry {
+                    name: BLOB1.to_string(),
+                    path: BLOB1.to_string(),
+                    length: Some(1024 * 4),
+                },
+                ArchiveEntry {
+                    name: BLOB2.to_string(),
+                    path: BLOB2.to_string(),
+                    length: Some(1024 * 4),
+                },
+                ArchiveEntry {
+                    name: BLOB3.to_string(),
+                    path: BLOB3.to_string(),
+                    length: Some(300000),
+                },
                 ArchiveEntry {
                     name: "meta.far".to_string(),
                     path: "meta.far".to_string(),
-                    length: 1024 * 16,
+                    length: Some(1024 * 16),
                 },
             ])
         });
@@ -179,23 +194,24 @@ pub mod test_utils {
                     ArchiveEntry {
                         name: "meta/the_component.cm".to_string(),
                         path: "meta/the_component.cm".to_string(),
-                        length: 100,
+                        length: Some(100),
                     },
                     ArchiveEntry {
                         name: "meta/package".to_string(),
                         path: "meta/package".to_string(),
-                        length: 25,
+                        length: Some(25),
                     },
                     ArchiveEntry {
                         name: "meta/contents".to_string(),
                         path: "meta/contents".to_string(),
-                        length: 55,
+                        length: Some(55),
                     },
                 ],
                 HashMap::from([
-                    (RUN_ME_PATH.to_string(), Hash::from_str(RUN_ME_BLOB)?),
-                    (LIB_RUN_SO_PATH.to_string(), Hash::from_str(LIB_RUN_SO_BLOB)?),
-                    (DATA_SOME_FILE_PATH.to_string(), Hash::from_str(DATA_SOME_FILE_BLOB)?),
+                    (RUN_ME_PATH.into(), Hash::from_str(RUN_ME_BLOB)?),
+                    (LIB_RUN_SO_PATH.into(), Hash::from_str(LIB_RUN_SO_BLOB)?),
+                    (DATA_SOME_FILE_PATH.into(), Hash::from_str(DATA_SOME_FILE_BLOB)?),
+                    (MISSING_BLOB_PATH.into(), Hash::from_str(MISSING_BLOB)?),
                 ]),
             ))
         });
@@ -223,7 +239,7 @@ mod tests {
     fn read_file_entries_handles_duplicate_content_blobs() {
         let mut mockreader = MockFarListReader::new();
         mockreader.expect_list_contents().returning(|| {
-            Ok(vec![ArchiveEntry { name: BLOB1.into(), path: BLOB1.into(), length: 1 }])
+            Ok(vec![ArchiveEntry { name: BLOB1.into(), path: BLOB1.into(), length: Some(1) }])
         });
         mockreader.expect_list_meta_contents().returning(|| {
             Ok((
@@ -242,9 +258,25 @@ mod tests {
         assert_eq!(
             entries,
             vec![
-                ArchiveEntry { name: "first-copy".into(), path: BLOB1.into(), length: 1 },
-                ArchiveEntry { name: "second-copy".into(), path: BLOB1.into(), length: 1 }
+                ArchiveEntry { name: "first-copy".into(), path: BLOB1.into(), length: Some(1) },
+                ArchiveEntry { name: "second-copy".into(), path: BLOB1.into(), length: Some(1) }
             ]
+        );
+    }
+
+    #[test]
+    fn read_file_entries_missing_content_blob() {
+        let mut mockreader = MockFarListReader::new();
+        mockreader.expect_list_contents().returning(|| Ok(vec![]));
+        mockreader.expect_list_meta_contents().returning(|| {
+            Ok((vec![], HashMap::from([("missing-blob".into(), BLOB1.parse().unwrap())])))
+        });
+
+        let entries = read_file_entries(&mut mockreader).unwrap();
+
+        assert_eq!(
+            entries,
+            vec![ArchiveEntry { name: "missing-blob".into(), path: BLOB1.into(), length: None },]
         );
     }
 }
