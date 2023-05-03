@@ -65,6 +65,12 @@
             from: "parent",
             to: "#elements",
         },
+        {
+            protocol: [ "fuchsia.power.battery.BatteryManager" ],
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
 
         // Dependencies for element_manager
         {
