@@ -16,12 +16,15 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances import bluetooth_default
 from honeydew.affordances import component_default
+from honeydew.affordances import tracing_default
 from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
 from honeydew.interfaces.affordances import component as component_interface
+from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import bluetooth_capable_device
 from honeydew.interfaces.device_classes import component_capable_device
+from honeydew.interfaces.device_classes import tracing_capable_device
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
@@ -51,7 +54,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
                         component_capable_device.ComponentCapableDevice,
-                        bluetooth_capable_device.BluetoothCapableDevice):
+                        bluetooth_capable_device.BluetoothCapableDevice,
+                        tracing_capable_device.TracingCapableDevice):
     """Default implementation of Fuchsia device abstract base class.
 
     This class contains methods that are supported by every device running
@@ -188,6 +192,16 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             component.Component object
         """
         return component_default.ComponentDefault(
+            device_name=self.name, sl4f=self.sl4f)
+
+    @properties.Affordance
+    def tracing(self) -> tracing_interface.Tracing:
+        """Returns a tracing affordance object.
+
+        Returns:
+            tracing.Tracing object
+        """
+        return tracing_default.TracingDefault(
             device_name=self.name, sl4f=self.sl4f)
 
     # List all the public methods in alphabetical order

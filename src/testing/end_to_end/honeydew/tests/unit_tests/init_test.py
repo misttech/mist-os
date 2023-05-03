@@ -10,7 +10,6 @@ import unittest
 from unittest import mock
 
 import honeydew
-from honeydew import custom_types
 from honeydew.device_classes import generic_fuchsia_device
 from honeydew.device_classes import x64
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -101,7 +100,7 @@ class InitTests(unittest.TestCase):
     def test_get_all_affordances(self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances()."""
         device_name = "fuchsia-emulator"
-        expected_affordances: list[str] = ["bluetooth", "component"]
+        expected_affordances: list[str] = ["bluetooth", "component", "tracing"]
 
         self.assertEqual(
             honeydew.get_all_affordances(device_name), expected_affordances)

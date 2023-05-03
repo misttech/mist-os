@@ -8,6 +8,8 @@ fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests:blu
 
 fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests:component_default_test --host --output
 
+fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests:tracing_default_test --host --output
+
 fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_class_tests:fuchsia_device_base_test --host --output
 
 fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:ssh_test --host --output

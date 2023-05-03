@@ -8,6 +8,7 @@ if (is_host) {
     public_deps = [
       "test_bluetooth_default:bluetooth_default_test($host_toolchain)",
       "test_component_default:component_default_test($host_toolchain)",
+      "test_tracing_default:tracing_default_test($host_toolchain)",
     ]
   }
 }

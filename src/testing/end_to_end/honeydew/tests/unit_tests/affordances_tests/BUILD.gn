@@ -24,6 +24,16 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+
+  python_host_test("tracing_default_test") {
+    main_source = "tracing_default_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
 }
 
 group("tests") {
@@ -31,5 +41,6 @@ group("tests") {
   public_deps = [
     ":bluetooth_default_test($host_toolchain)",
     ":component_default_test($host_toolchain)",
+    ":tracing_default_test($host_toolchain)",
   ]
 }

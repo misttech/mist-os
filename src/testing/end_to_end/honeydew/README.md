@@ -108,6 +108,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ### Access the affordances
 * [Component affordance](markdowns/component.md)
 * [Bluetooth affordance](markdowns/bluetooth.md)
+* [Tracing affordance](markdowns/tracing.md)
 
 ### Device object destruction
 ```python

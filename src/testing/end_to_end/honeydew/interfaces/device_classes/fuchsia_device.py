@@ -5,11 +5,12 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import bluetooth
 from honeydew.interfaces.affordances import component
+from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import properties
@@ -95,6 +96,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             component.Component object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def tracing(self) -> tracing.Tracing:
+        """Returns a tracing affordance object.
+
+        Returns:
+            tracing.Tracing object
         """
 
     # List all the public methods in alphabetical order
