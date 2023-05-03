@@ -12,13 +12,12 @@ group("tests") {
   testonly = true
   deps = []
 
-  # Disabled until roller has rolled backwards-incompatible binaries.
-  # if (target_cpu == "x64" && !is_asan) {
-  # deps = [ ":starnix_gvisor_tests" ]
-  # if (data_filesystem_format == "fxfs") {
-  # deps += [ ":starnix_gvisor_tests_on_fxfs" ]
-  # }
-  # }
+  if (target_cpu == "x64" && !is_asan) {
+    deps = [ ":starnix_gvisor_tests" ]
+    if (data_filesystem_format == "fxfs") {
+      deps += [ ":starnix_gvisor_tests_on_fxfs" ]
+    }
+  }
 }
 
 gvisor_tests = [
@@ -276,11 +275,17 @@ expect_includes("gvisor_test_with_expectations") {
   ]
 }
 
+zip_resource("gvisor_runfiles") {
+  file = "${gvisor_prebuilt_directory}/gvisor_runfiles"
+  dest_prefix = "data/tests"
+}
+
 group("container_resources") {
   deps = [ "//src/starnix/containers:default_init" ]
 
   if (target_cpu == "x64") {
     deps += [
+      ":gvisor_runfiles",
       "//src/connectivity/network/netstack:component",
       "//src/starnix/containers:data_tmp_target",
       "//src/starnix/containers/bionic:system_image",

@@ -372,7 +372,6 @@
                 "MountTest.TmpfsEmptySizeAllocCheck",
                 "MountTest.TmpfsSizePartialWriteSinglePage",
                 "MountTest.TmpfsSizePartialWriteMultiplePages",
-                "MountTest.BindToSelf",
                 "MountTest.MaxMounts",
                 "MountTest.MakeShared",
                 "MountTest.MakeMultipleShared",
@@ -1221,6 +1220,7 @@
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
                 "UnameTest.Sanity",
+                "MountTest.BindToSelf",
 
                 // TODO: These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
