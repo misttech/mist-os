@@ -28,7 +28,7 @@ import depfile
 import output_leak_scanner
 
 from pathlib import Path
-from typing import AbstractSet, Callable, Iterable, Optional, Sequence, Tuple
+from typing import AbstractSet, Callable, Dict, Iterable, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -341,13 +341,6 @@ def _rewrapper_log_dir() -> Optional[str]:
     return os.environ.get("RBE_log_dir", None)
 
 
-@dataclasses.dataclass
-class ReproxyLogEntry(object):
-    execution_id: str
-    action_digest: str
-    # add more useful fields as needed
-
-
 def _remove_prefix(text: str, prefix: str) -> str:
     # Like string.removeprefix() in Python 3.9+
     return text[len(prefix):] if text.startswith(prefix) else text
@@ -362,34 +355,111 @@ def _extract_proto_field_value(line: str, field_name: str) -> str:
     return _remove_prefix(line, field_name + ':').strip(' "')
 
 
-def _parse_reproxy_log_record_lines(lines: Iterable[str]) -> ReproxyLogEntry:
-    """Extremely crude extraction of data from a .rrpl file.
+@dataclasses.dataclass
+class ReproxyLogEntry(object):
+    execution_id: str
+    action_digest: str
+    output_file_digests: Dict[Path, str]  # path, hash/size
+    output_directory_digests: Dict[Path, str]  # path, hash/size
 
-    Args:
-      lines: text from a rewrapper --action_log file
+    # add more useful fields as needed
 
-    TODO: properly parse reclient proxy.LogRecord textproto, which
-      requires protoc -> .pb2.py from .protos from various sources.
-      See build/rbe/proto/refresh.sh.
-    """
-    execution_id = None
-    action_digest = None
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("execution_id:"):
-            execution_id = _extract_proto_field_value(stripped, "execution_id")
-        if stripped.startswith("action_digest:"):
-            action_digest = _extract_proto_field_value(
-                stripped, "action_digest")
-    return ReproxyLogEntry(
-        execution_id=execution_id,
-        action_digest=action_digest,
-    )
+    def make_download_stub_info(
+            self, path: Path, build_id: str) -> 'DownloadStubInfo':
+        type = "file"
+        if path in self.output_file_digests:
+            digest = self.output_file_digests[path]
+        elif path in self.output_directory_digests:
+            digest = self.output_directory_digests[path]
+            type = "dir"
+        else:
+            raise KeyError(f'{path} not found as an output file or directory')
+        return DownloadStubInfo(
+            path=path,
+            type=type,
+            blob_digest=digest,
+            action_digest=self.action_digest,
+            build_id=build_id,
+        )
 
+    @staticmethod
+    def parse_action_log(log: Path) -> 'ReproxyLogEntry':
+        with open(log) as f:
+            return ReproxyLogEntry._parse_lines(f.readlines())
 
-def _parse_rewrapper_action_log(log: Path) -> ReproxyLogEntry:
-    with open(log) as f:
-        return _parse_reproxy_log_record_lines(f.readlines())
+    @staticmethod
+    def _parse_lines(lines: Iterable[str]) -> 'ReproxyLogEntry':
+        """Extremely crude extraction of data from a .rrpl (reproxy log) file.
+
+        Args:
+          lines: text from a rewrapper --action_log file
+
+        TODO: properly parse reclient proxy.LogRecord textproto, which
+          requires protoc -> .pb2.py from .protos from various sources.
+          See build/rbe/proto/refresh.sh.
+        """
+        execution_id = None
+        action_digest = None
+        output_file_digests: Dict[Path, str] = {}
+        output_directory_digests: Dict[Path, str] = {}
+
+        in_output_file_digests = False
+        in_output_directory_digests = False
+        key = None
+        for line in lines:
+            stripped = line.strip()
+            if in_output_file_digests:
+                if stripped.startswith("key:"):  # output file path
+                    key = _extract_proto_field_value(stripped, "key").strip('"')
+                elif stripped.startswith("value:"):  # digest: hash/size
+                    value = _extract_proto_field_value(stripped,
+                                                       "value").strip('"')
+                    output_file_digests[Path(key)] = value
+                    key = None
+                elif stripped == '}':
+                    in_output_file_digests = False
+                continue
+
+            if in_output_directory_digests:
+                if stripped.startswith("key:"):  # output directory path
+                    key = _extract_proto_field_value(stripped, "key").strip('"')
+                elif stripped.startswith("value:"):  # digest: hash/size
+                    value = _extract_proto_field_value(stripped,
+                                                       "value").strip('"')
+                    output_directory_digests[Path(key)] = value
+                    key = None
+                elif stripped == '}':
+                    in_output_directory_digests = False
+                continue
+
+            if stripped.startswith("execution_id:"):
+                execution_id = _extract_proto_field_value(
+                    stripped, "execution_id")
+                continue
+
+            if stripped.startswith("action_digest:"):
+                action_digest = _extract_proto_field_value(
+                    stripped, "action_digest")
+                continue
+
+            if stripped.startswith(
+                    "output_file_digests:"):  # starts a '{' section
+                in_output_file_digests = True
+                continue
+
+            if stripped.startswith(
+                    "output_directory_digests:"):  # starts a '{' section
+                in_output_directory_digests = True
+                continue
+
+            # else ignore line
+
+        return ReproxyLogEntry(
+            execution_id=execution_id,
+            action_digest=action_digest,
+            output_file_digests=output_file_digests,
+            output_directory_digests=output_directory_digests,
+        )
 
 
 def _diagnose_fail_to_dial(line: str):
@@ -490,7 +560,7 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
         return
 
     msg(f"Action log: {action_log}")
-    rewrapper_info = _parse_rewrapper_action_log(action_log)
+    rewrapper_info = ReproxyLogEntry.parse_action_log(action_log)
     execution_id = rewrapper_info.execution_id
     action_digest = rewrapper_info.action_digest
     print(f"  execution_id: {execution_id}")
@@ -510,23 +580,224 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
 
 _RBE_DOWNLOAD_STUB_IDENTIFIER = '# RBE download stub'
 
+_RBE_DOWNLOAD_STUB_SUFFIX = '.dl-stub'
+
+
+class DownloadStubFormatError(Exception):
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class DownloadStubInfo(object):
+    """Contains infomation about a remotely stored artifact."""
+
+    def __init__(
+            self, path: Path, type: str, blob_digest: str, action_digest: str,
+            build_id: str):
+        """Private raw constructor.
+
+        Use public methods like read_from_file().
+        """
+        self._path = path
+        assert type in {"file", "dir"}
+        self._type = type
+        self._blob_digest = blob_digest
+        self._action_digest = action_digest
+        self._build_id = build_id
+
+    def __eq__(self, other) -> bool:
+        return self._path == other._path and \
+            self._type == other._type and \
+            self._blob_digest == other._blob_digest and \
+            self._build_id == other._build_id
+
+    def _write(self, output_abspath: Path):
+        """Writes download stub contents to file.
+
+        This unconditionally overwrites any existing stub file.
+        """
+        assert output_abspath.is_absolute(), f'got: {output_abspath}'
+        lines = [
+            _RBE_DOWNLOAD_STUB_IDENTIFIER,
+            f'path={self._path}',
+            f'type={self._type}',
+            f'blob_digest={self._blob_digest}',  # hash/size
+            f'action_digest={self._action_digest}',
+            f'build_id={self._build_id}',
+        ]
+        _write_lines_to_file(output_abspath, lines)
+
+    def create(self, working_dir_abs: Path):
+        """Create a stub file along with a symlink.
+
+        The stub file is written to a location next to self._path,
+        and a symlink at the destination points to the stub file.
+
+        The stub file will be preserved when this is 'downloaded',
+        which replaces only the symlink with a real file.
+
+        Args:
+          working_dir_abs: absolute path to the working dir, to which
+            all referenced paths are relative.  This is passed so that
+            this operation does not depend on os.curdir.
+        """
+        assert working_dir_abs.is_absolute()
+        path = working_dir_abs / self._path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stub_dest = Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
+        self._write(stub_dest)
+        cl_utils.symlink_relative(stub_dest, path)
+
+    @staticmethod
+    def read_from_file(stub: Path) -> 'DownloadStubInfo':
+
+        with open(stub) as f:
+            first = f.readline()
+            if first.rstrip() != _RBE_DOWNLOAD_STUB_IDENTIFIER:
+                raise DownloadStubFormatError(
+                    f'File {stub} is not a download stub.')
+            lines = f.readlines()  # read the remainder
+
+        variables = {}
+        for line in lines:
+            key, sep, value = line.partition('=')
+            if sep != '=':
+                continue
+            variables[key] = value.rstrip()  # without trailing '\n'
+
+        return DownloadStubInfo(
+            path=Path(variables["path"]),
+            type=variables["type"],
+            blob_digest=variables["blob_digest"],
+            action_digest=variables["action_digest"],
+            build_id=variables["build_id"],
+        )
+
+    def download(self, exec_root: Path, working_dir_abs: Path) -> int:
+        """Retrieves the file referenced by the stub.
+
+        Reads the stub info from file though a symlink.
+        Downloads to a temporarily location, and then moves it
+        to replace the symlink upon completion.
+        The stub file is left untouched.
+
+        Args:
+          exec_root: project root (from which _REMOTETOOL_SCRIPT can be found).
+          working_dir_abs: working dir.
+        """
+        # TODO: use filelock.FileLock when downloading from outside
+        # of this remote action, e.g. when lazily fetching local inputs.
+        # This would gracefully handle concurrent requests for the same file.
+        dest = working_dir_abs / self._path  # this is a symlink
+        temp_dl = Path(str(dest) + '.download-tmp')
+        status = _download_blob(
+            output=temp_dl,
+            is_dir=(self._type == "dir"),
+            digest=self._blob_digest,
+            exec_root=exec_root,
+            working_dir_abs=working_dir_abs,
+        )
+
+        if status == 0:  # download complete, success
+            self._path.unlink()  # break symlink
+            temp_dl.rename(dest)
+
+        return status
+
 
 def _write_download_stub(
     path: Path,
-    rrpl: Path,
+    log_record: ReproxyLogEntry,
     build_id: str,
+    working_dir_abs: Path,
 ):
-    lines = [
-        _RBE_DOWNLOAD_STUB_IDENTIFIER,
-        str(rrpl),
-        build_id,
-    ]
-    _write_lines_to_file(path, lines)
+    """Write a single stub file that can be used to fetch a blob later.
+
+    Args:
+      path: the full path of the output file or dir, absolute.
+      log_record: data from a parsed .rrpl, containing files/digests.
+        path must correspond to a file or dir output in this record.
+      build_id: a unique identifier for a particular build (reproxy) session.
+      working_dir_abs: working dir.
+    """
+    stub_info = log_record.make_download_stub_info(path, build_id)
+    stub_info.create(working_dir_abs)
+
+
+def get_download_stub_file(path: Path) -> Optional[Path]:
+    if not path.is_symlink():
+        return None
+    dest = Path(os.readlink(path))  # No Path.readlink until Python 3.9
+    suffixes = dest.suffixes
+    if not suffixes:
+        return None
+    if suffixes[-1] == _RBE_DOWNLOAD_STUB_SUFFIX:
+        return Path(os.path.normpath(path.parent / dest))
+    return None
+
+
+def get_download_stub_info(path: Path) -> Optional[DownloadStubInfo]:
+    stub_file = get_download_stub_file(path)
+    if not stub_file:
+        return None
+    # path is a link to a stub
+    return DownloadStubInfo.read_from_file(stub_file)
+
+
+def download_from_stub(
+        stub: Path, exec_root: Path, working_dir_abs: Path) -> int:
+    """Possibly downloads a file over a stub link.
+    Args:
+      stub: is a path to a possible download stub.
+
+    Returns:
+      download exit status, or 0 if there is nothing to download.
+    """
+    stub_info = get_download_stub_info(stub)
+    if not stub_info:
+        return 0
+    return stub_info.download(
+        exec_root=exec_root,
+        working_dir_abs=working_dir_abs,
+    )
+
+
+def _download_blob(
+    output: Path,
+    is_dir: bool,
+    digest: str,
+    exec_root: Path,
+    working_dir_abs: Path,
+) -> int:
+    """Download a blob from the RBE CAS at a given path.
+
+    Args:
+      output: path at which to retrieve the blob, relative to working_dir_abs.
+      file_digest: hash/size of blob to download.
+      exec_root: location of project root that contains the download tools,
+        can be relative or absolute.
+      working_dir_abs: working dir
+    """
+    operation = 'download_dir' if is_dir else 'download_blob'
+    return subprocess.call(
+        [
+            str(exec_root / _REMOTETOOL_SCRIPT),  #
+            '--operation',
+            operation,  #
+            '--digest',
+            digest,  #
+            '--path',
+            output
+        ],
+        cwd=working_dir_abs,
+    )
 
 
 def make_download_stubs(
     files: Iterable[Path],
     dirs: Iterable[Path],
+    working_dir_abs: Path,
     rrpl: Path,
     build_id: str,
 ):
@@ -535,20 +806,28 @@ def make_download_stubs(
     Args:
       files: files to create download stubs for.
       dirs: directories to create download stubs for.
+      working_dir_abs: absolute path to current working dir, relative to which
+          files are created.
       rrpl: single-action reproxy log (reproxy.LogRecord), which contains
           file digests.
       build_id: any string that corresponds to a unique build.
     """
-    # TODO(http://fxbug.dev/123178): validate that we are creating stubs for
-    # paths that are covered in the .rrpl log.  This requires parsing
-    # more of the .rrpl log.
+    log_record = ReproxyLogEntry.parse_action_log(rrpl)
+    # TODO: the following could be parallelized
     for f in files:
-        _write_download_stub(path=f, rrpl=rrpl, build_id=build_id)
+        _write_download_stub(
+            path=f,
+            log_record=log_record,
+            build_id=build_id,
+            working_dir_abs=working_dir_abs,
+        )
     for d in dirs:
-        _write_download_stub(path=d / '.dlstub', rrpl=rrpl, build_id=build_id)
-
-
-# TODO(http://fxbug.dev/123178): download using stub links
+        _write_download_stub(
+            path=d,
+            log_record=log_record,
+            build_id=build_id,
+            working_dir_abs=working_dir_abs,
+        )
 
 
 class RemoteAction(object):
@@ -1018,6 +1297,7 @@ class RemoteAction(object):
         make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
+            working_dir_abs=self.working_dir,
             rrpl=self._action_log,
             build_id=_reproxy_log_dir(),  # unique per build
         )
@@ -1227,7 +1507,8 @@ class RemoteAction(object):
             _transform_file_by_lines(
                 local_file,
                 local_file_filtered,
-                lambda line: line.replace(str(self.exec_root), str(self.exec_root_rel)),
+                lambda line: line.replace(
+                    str(self.exec_root), str(self.exec_root_rel)),
             )
             _transform_file_by_lines(
                 remote_file,
@@ -1329,7 +1610,7 @@ class RemoteAction(object):
         # Use the results from the local execution, as they are more likely
         # to be what the user expected if something went wrong remotely.
         for f, bkp in direct_compare_output_files:
-            os.rename(f, bkp)
+            f.rename(bkp)
 
         compare_output_dirs = [
             (d, Path(str(d) + '.remote'))
@@ -1337,7 +1618,7 @@ class RemoteAction(object):
             if d.is_dir()
         ]
         for d, bkp in compare_output_dirs:
-            os.rename(d, bkp)
+            d.rename(bkp)
 
         # Run the job locally, for comparison.
         local_exit_code = self._run_locally()

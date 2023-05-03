@@ -533,6 +533,42 @@ class SymlinkRelativeTests(unittest.TestCase):
                 _readlink(src), '../../../trash/bin/garbage.txt')  # relative
             self.assertEqual(src.resolve(), dest.resolve())
 
+    def test_link_over_existing_link_dest_does_not_exist(self):
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / 'dest.txt'  # doesn't exist
+            src = Path(td) / 'src.link'
+            # note: dest does not actually exist
+            cl_utils.symlink_relative(dest, src)
+            cl_utils.symlink_relative(dest, src)  # yes, link twice
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(_readlink(src), 'dest.txt')  # relative
+            # Need dest.resolve() on Mac OS where tempdirs can be symlinks
+            self.assertEqual(src.resolve(), dest.resolve())
+
+    def test_link_replaces_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / 'dest.txt'  # doesn't exist
+            src = Path(td) / 'src.link'
+            # note: dest does not actually exist
+            with open(src, 'w') as f:
+              f.write('\t\n')
+            cl_utils.symlink_relative(dest, src)  # overwrite file
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(_readlink(src), 'dest.txt')  # relative
+            # Need dest.resolve() on Mac OS where tempdirs can be symlinks
+            self.assertEqual(src.resolve(), dest.resolve())
+
+    def test_link_replaces_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / 'dest.txt'  # doesn't exist
+            src = Path(td) / 'src.link'
+            # note: dest does not actually exist
+            src.mkdir(parents=True, exist_ok=True)
+            cl_utils.symlink_relative(dest, src)  # overwrite empty dir
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(_readlink(src), 'dest.txt')  # relative
+            # Need dest.resolve() on Mac OS where tempdirs can be symlinks
+            self.assertEqual(src.resolve(), dest.resolve())
 
 class ExecRelaunchTests(unittest.TestCase):
 

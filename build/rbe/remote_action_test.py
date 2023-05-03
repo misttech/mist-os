@@ -871,7 +871,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
 
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
-            mock.patch.object(os, 'rename'),
+            mock.patch.object(Path, 'rename'),
             mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds no differences
             mock.patch.object(remote_action, '_files_match', return_value=True),
@@ -921,7 +921,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
 
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
-            mock.patch.object(os, 'rename'),
+            mock.patch.object(Path, 'rename'),
             mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds differences
             mock.patch.object(
@@ -978,7 +978,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
 
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
-            mock.patch.object(os, 'rename'),
+            mock.patch.object(Path, 'rename'),
             mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds differences
             mock.patch.object(
@@ -1615,29 +1615,163 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
 class DownloadStubsTests(unittest.TestCase):
 
-    def test_file(self):
-        p = Path('dir/big-file.txt')
-        rrpl = Path('action_log.rrpl')
-        build_id = 'xyzzy'
-        with mock.patch.object(remote_action,
-                               '_write_lines_to_file') as mock_write:
+    def test_create_file_stub_and_download(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            p = Path('dir/big-file.txt')
+            (tdp / p.parent).mkdir(parents=True, exist_ok=True)
+            digest = "abc123abc123/343"
+            rrpl = tdp / 'action_log.rrpl'
+            rrpl_contents = f"""
+command: {{
+  action_digest: "feedfacefeedface/1337"
+}}
+remote_metadata: {{
+  output_file_digests: {{
+    key: "{p}"
+    value: "{digest}"
+  }}
+}}
+"""
+            _write_file_contents(rrpl, rrpl_contents)
+            build_id = 'xyzzy'
             remote_action.make_download_stubs(
-                files=[p], dirs=[], rrpl=rrpl, build_id=build_id)
-        mock_write.assert_called_once()
-        args, kwargs = mock_write.call_args_list[0]
-        self.assertEqual(args[0], p)
+                files=[p],
+                dirs=[],
+                working_dir_abs=tdp,
+                rrpl=rrpl,
+                build_id=build_id)
 
-    def test_dir(self):
-        p = Path('big/bad/dir')
-        rrpl = Path('action_log.rrpl')
-        build_id = 'yzzyx'
-        with mock.patch.object(remote_action,
-                               '_write_lines_to_file') as mock_write:
+            link = tdp / p
+            self.assertTrue(link.is_symlink())
+            actual_stub = link.resolve()
+            self.assertFalse(actual_stub.is_symlink())
+
+            exec_root = '/exec/root'
+            with mock.patch.object(remote_action, '_download_blob',
+                                   return_value=0) as mock_download:
+                with mock.patch.object(Path, 'unlink') as mock_unlink:
+                    with mock.patch.object(Path, 'rename') as mock_rename:
+                        remote_action.download_from_stub(
+                            link, exec_root=exec_root, working_dir_abs=tdp)
+            mock_download.assert_called_with(
+                output=Path(str(link) + '.download-tmp'),
+                is_dir=False,
+                digest=digest,
+                exec_root=exec_root,
+                working_dir_abs=tdp,
+            )
+            mock_unlink.assert_called_with()
+            mock_rename.assert_called_with(tdp / link)
+
+    def test_create_directory_stub_and_download(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            p = Path('bag/of/goodies')
+            (tdp / p.parent).mkdir(parents=True, exist_ok=True)
+            digest = "09ab9c86d8f001a/6540"
+            rrpl = tdp / 'action_log-2.rrpl'
+            rrpl_contents = f"""
+command: {{
+  action_digest: "cafef00dcafef00d/656"
+}}
+remote_metadata: {{
+  output_directory_digests: {{
+    key: "{p}"
+    value: "{digest}"
+  }}
+}}
+"""
+            _write_file_contents(rrpl, rrpl_contents)
+            build_id = 'yzzyx'
             remote_action.make_download_stubs(
-                files=[], dirs=[p], rrpl=rrpl, build_id=build_id)
-        mock_write.assert_called_once()
-        args, kwargs = mock_write.call_args_list[0]
-        self.assertEqual(args[0], p / '.dlstub')
+                files=[],
+                dirs=[p],
+                working_dir_abs=tdp,
+                rrpl=rrpl,
+                build_id=build_id)
+
+            link = tdp / p
+            self.assertTrue(link.is_symlink())
+            actual_stub = link.resolve()
+            self.assertFalse(actual_stub.is_symlink())
+
+            exec_root = '/exec/root'
+            with mock.patch.object(remote_action, '_download_blob',
+                                   return_value=0) as mock_download:
+                with mock.patch.object(Path, 'unlink') as mock_unlink:
+                    with mock.patch.object(Path, 'rename') as mock_rename:
+                        remote_action.download_from_stub(
+                            link, exec_root=exec_root, working_dir_abs=tdp)
+            mock_download.assert_called_with(
+                output=Path(str(link) + '.download-tmp'),
+                is_dir=True,
+                digest=digest,
+                exec_root=exec_root,
+                working_dir_abs=tdp,
+            )
+            mock_unlink.assert_called_with()
+            mock_rename.assert_called_with(tdp / link)
+
+    def test_read_fail(self):
+        with tempfile.TemporaryDirectory() as td:
+            stub_file = Path(td) / 'testing.stub'
+            _write_file_contents(stub_file, '#!/bin/sh\nnot a stub file\n')
+            with self.assertRaises(remote_action.DownloadStubFormatError):
+                remote_action.DownloadStubInfo.read_from_file(stub_file)
+
+    def test_stub_write_read_match(self):
+        stub = remote_action.DownloadStubInfo(
+            path=Path('foo/bar.baz'),
+            type="file",
+            blob_digest="abc00101ef/240",
+            action_digest="08871bc3d1/18",
+            build_id="random-id888",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            stub_file = Path(td) / 'identity.stub'
+            stub._write(stub_file)
+            new_stub = remote_action.DownloadStubInfo.read_from_file(stub_file)
+
+        self.assertEqual(stub, new_stub)
+
+    def test_create(self):
+        path = Path('foo/goes/deeper/bar.baz')
+        stub = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="abc00101ef/240",
+            action_digest="08871bc3d1/18",
+            build_id="random-id888",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            full_path = td / path
+            stub.create(working_dir_abs=Path(td))
+            self.assertTrue(full_path.is_symlink())
+            actual_stub = full_path.resolve()
+            read_back = remote_action.DownloadStubInfo.read_from_file(
+                actual_stub)
+            self.assertEqual(read_back, stub)
+
+    def test_download_fail(self):
+        stub = remote_action.DownloadStubInfo(
+            path=Path('foo/bar.baz'),
+            type="file",
+            blob_digest="abcef8712/24",
+            action_digest="0923d1/21",
+            build_id="random-id999",
+        )
+        with mock.patch.object(remote_action, '_download_blob',
+                               return_value=1) as mock_download:
+            with mock.patch.object(Path, 'unlink') as mock_unlink:
+                with mock.patch.object(Path, 'rename') as mock_rename:
+                    status = stub.download(
+                        exec_root=Path('/root'),
+                        working_dir_abs=Path('/root/work'))
+        self.assertEqual(status, 1)
+        mock_download.assert_called_once()
+        mock_unlink.assert_not_called()
+        mock_rename.assert_not_called()
 
     def test_made_download_stubs(self):
         exec_root = Path('/home/project')
@@ -1674,6 +1808,7 @@ class DownloadStubsTests(unittest.TestCase):
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
+            working_dir_abs=working_dir,
             rrpl=Path(output + '.rrpl'),
             build_id=logdir,
         )
@@ -1788,8 +1923,8 @@ class RbeDiagnosticsTests(unittest.TestCase):
                     Path, 'glob',
                     return_value=fake_rewrapper_logs) as mock_glob:
                 with mock.patch.object(
-                        remote_action,
-                        '_parse_rewrapper_action_log') as mock_parse_action_log:
+                        remote_action.ReproxyLogEntry,
+                        'parse_action_log') as mock_parse_action_log:
                     with mock.patch.object(remote_action,
                                            '_file_lines_matching',
                                            return_value=['this is interesting'
@@ -1808,7 +1943,9 @@ class RbeDiagnosticsTests(unittest.TestCase):
 
     def test_parse_reproxy_log_record_lines(self):
         exec_id = "xx-yy-zzzz"
-        digest = "2afd98ae7274456b2bfc208e10f4cbe75fca88c2c41e352e57cb6b9ad840bf64/144"
+        action_digest = "2afd98ae7274456b2bfc208e10f4cbe75fca88c2c41e352e57cb6b9ad840bf64/144"
+        output_path = Path("obj/sub/lib/foo.o")
+        output_digest = "345324aefg983bc0/531"
         log_lines = f"""
 command:  {{
         identifiers:  {{
@@ -1820,12 +1957,18 @@ command:  {{
 }}
 remote_metadata:  {{
         command_digest:  "e9d024e5dc99438b08f4592a09379e65146149821480e2057c7afc285d30f090/181"
-        action_digest:  "{digest}"
+        action_digest:  "{action_digest}"
+        output_file_digests: {{
+                key: "{output_path}"
+                value: "{output_digest}"
+        }}
 }}
         """.splitlines()
-        log_entry = remote_action._parse_reproxy_log_record_lines(log_lines)
+        log_entry = remote_action.ReproxyLogEntry._parse_lines(log_lines)
         self.assertEqual(log_entry.execution_id, exec_id)
-        self.assertEqual(log_entry.action_digest, digest)
+        self.assertEqual(log_entry.action_digest, action_digest)
+        self.assertEqual(
+            log_entry.output_file_digests[output_path], output_digest)
 
     def test_diagnose_uninteresting_log_line(self):
         line = "This diagnostic does not appear interesting."

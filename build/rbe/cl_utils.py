@@ -331,10 +331,16 @@ def symlink_relative(dest: Path, src: Path):
     Like os.symlink(), but using relative path.
     Any intermediate directories to src are automatically created.
 
+    This is done without any os.chdir(), and can be done in parallel.
+
     Args:
       dest: target to link-to (not required to exist)
       src: new symlink path pointing to dest
     """
+    if src.is_dir():
+        src.rmdir()
+    elif src.is_symlink() or src.is_file():
+        src.unlink()
     src.parent.mkdir(parents=True, exist_ok=True)
     src.symlink_to(relpath(dest, start=src.parent))
 
