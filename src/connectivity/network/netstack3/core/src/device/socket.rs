@@ -193,9 +193,7 @@ trait SyncContextTypes {
 }
 
 /// Synchronzied context for accessing socket state.
-trait SyncContext<C: NonSyncContext<Self::DeviceId>>:
-    SyncContextTypes + DeviceIdContext<AnyDevice>
-{
+trait SyncContext<C: NonSyncContext<Self::DeviceId>>: DeviceSocketAccessor<C> {
     /// The synchronized context available in callbacks to methods on this
     /// context.
     type SocketTablesSyncCtx<'a>: DeviceSocketAccessor<
@@ -235,17 +233,6 @@ trait SyncContext<C: NonSyncContext<Self::DeviceId>>:
         &mut self,
         cb: F,
     ) -> R;
-
-    /// Executes the provided callback without accessing socket state.
-    ///
-    /// Ideally this would not exist and [`DeviceSocketAccessor`] would be a
-    /// supertrait of [`SyncContext`]. That makes writing the test
-    /// implementations of the traits difficult since it requires `O(N^2)` total
-    /// trait-type impls.
-    // TODO(https://fxbug.dev/125732): Determine whether generic test impls of
-    // this and the other traits can be used to allow stacking.
-    fn without_sockets<R>(&mut self, cb: impl FnOnce(&mut Self::SocketTablesSyncCtx<'_>) -> R)
-        -> R;
 }
 
 /// Synchronized context for accessing the state of an individual socket.
@@ -289,9 +276,7 @@ trait SocketStateAccessor<C: NonSyncContext<Self::DeviceId>>:
 }
 
 /// Synchronized context for accessing the socket state for a device.
-trait DeviceSocketAccessor<C: NonSyncContext<Self::DeviceId>>:
-    SyncContextTypes + DeviceIdContext<AnyDevice>
-{
+trait DeviceSocketAccessor<C: NonSyncContext<Self::DeviceId>>: SocketStateAccessor<C> {
     /// Synchronized context available in callbacks to methods on this context.
     type DeviceSocketSyncCtx<'a>: SocketStateAccessor<
         C,
@@ -320,14 +305,6 @@ trait DeviceSocketAccessor<C: NonSyncContext<Self::DeviceId>>:
         &mut self,
         device: &Self::DeviceId,
         cb: F,
-    ) -> R;
-
-    /// Executes the provided callback without accessing device socket state.
-    ///
-    /// See [`SyncContext::without_sockets`] for why this method exists.
-    fn without_device_sockets<R>(
-        &mut self,
-        cb: impl FnOnce(&mut Self::DeviceSocketSyncCtx<'_>) -> R,
     ) -> R;
 }
 
@@ -433,33 +410,29 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId
         // atomic from the perspective of frame delivery. Otherwise there
         // would be a brief period during which arriving frames wouldn't be
         // delivered to the socket from either device.
-        let old_device = sync_ctx.without_device_sockets(|sync_ctx| {
-            sync_ctx.with_socket_state_mut(
-                socket,
-                |_: &C::SocketState, Target { protocol, device }, sync_ctx| {
-                    match protocol_update {
-                        MaybeUpdate::NewValue(p) => *protocol = Some(p),
-                        MaybeUpdate::NoChange => (),
-                    };
-                    let old_device = match &device {
-                        TargetDevice::SpecificDevice(device) => {
-                            sync_ctx.upgrade_weak_device_id(device)
-                        }
-                        TargetDevice::AnyDevice => {
-                            assert!(any_device_sockets.remove(socket));
-                            None
-                        }
-                    };
-                    *device = match &new_device {
-                        TargetDevice::AnyDevice => TargetDevice::AnyDevice,
-                        TargetDevice::SpecificDevice(d) => {
-                            TargetDevice::SpecificDevice(sync_ctx.downgrade_device_id(d))
-                        }
-                    };
-                    old_device
-                },
-            )
-        });
+        let old_device = sync_ctx.with_socket_state_mut(
+            socket,
+            |_: &C::SocketState, Target { protocol, device }, sync_ctx| {
+                match protocol_update {
+                    MaybeUpdate::NewValue(p) => *protocol = Some(p),
+                    MaybeUpdate::NoChange => (),
+                };
+                let old_device = match &device {
+                    TargetDevice::SpecificDevice(device) => sync_ctx.upgrade_weak_device_id(device),
+                    TargetDevice::AnyDevice => {
+                        assert!(any_device_sockets.remove(socket));
+                        None
+                    }
+                };
+                *device = match &new_device {
+                    TargetDevice::AnyDevice => TargetDevice::AnyDevice,
+                    TargetDevice::SpecificDevice(d) => {
+                        TargetDevice::SpecificDevice(sync_ctx.downgrade_device_id(d))
+                    }
+                };
+                old_device
+            },
+        );
 
         // This modification occurs without holding the socket's individual
         // lock. That's safe because all modifications to the socket's
@@ -521,22 +494,14 @@ impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for S
     }
 
     fn get_info(&mut self, id: &Self::SocketId) -> SocketInfo<Self::WeakDeviceId> {
-        self.without_sockets(|sync_ctx| {
-            sync_ctx.without_device_sockets(|sync_ctx| {
-                sync_ctx.with_socket_state(
-                    id,
-                    |_external_state, Target { device, protocol }, _sync_ctx| SocketInfo {
-                        device: device.clone(),
-                        protocol: *protocol,
-                    },
-                )
-            })
+        self.with_socket_state(id, |_external_state, Target { device, protocol }, _sync_ctx| {
+            SocketInfo { device: device.clone(), protocol: *protocol }
         })
     }
 
     fn remove(&mut self, id: Self::SocketId) {
         self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), sync_ctx| {
-            let old_device = sync_ctx.without_device_sockets(|sync_ctx| {
+            let old_device =
                 sync_ctx.with_socket_state_mut(&id, |_: &C::SocketState, target, sync_ctx| {
                     let Target { device, protocol: _ } = target;
                     match &device {
@@ -548,8 +513,7 @@ impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for S
                             None
                         }
                     }
-                })
-            });
+                });
             if let Some(device) = old_device {
                 sync_ctx.with_device_sockets_mut(
                     &device,
@@ -589,12 +553,8 @@ impl<
         params: SendFrameParams<SC::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)> {
-        let metadata = match self.without_sockets(|sync_ctx| {
-            sync_ctx.without_device_sockets(|sync_ctx| {
-                sync_ctx.with_socket_state(id, |_: &C::SocketState, target, sync_ctx| {
-                    make_send_metadata(sync_ctx, target, params, None)
-                })
-            })
+        let metadata = match self.with_socket_state(id, |_: &C::SocketState, target, sync_ctx| {
+            make_send_metadata(sync_ctx, target, params, None)
         }) {
             Ok(metadata) => metadata,
             Err(e) => return Err((body, e)),
@@ -609,37 +569,29 @@ impl<
         params: SendDatagramParams<Self::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendDatagramError)> {
-        let metadata = match self.without_sockets(|sync_ctx| {
-            sync_ctx.without_device_sockets(|sync_ctx| {
-                sync_ctx.with_socket_state(
-                    id,
-                    |_: &C::SocketState, target @ Target { device: _, protocol }, sync_ctx| {
-                        let SendDatagramParams { frame, protocol: target_protocol, dest_addr } =
-                            params;
-                        let protocol = match target_protocol.or_else(|| {
-                            protocol.and_then(|p| match p {
-                                Protocol::Specific(p) => Some(p),
-                                Protocol::All => None,
-                            })
-                        }) {
-                            None => return Err(SendDatagramError::NoProtocol),
-                            Some(p) => p,
-                        };
+        let metadata = match self.with_socket_state(
+            id,
+            |_: &C::SocketState, target @ Target { device: _, protocol }, sync_ctx| {
+                let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
+                let protocol = match target_protocol.or_else(|| {
+                    protocol.and_then(|p| match p {
+                        Protocol::Specific(p) => Some(p),
+                        Protocol::All => None,
+                    })
+                }) {
+                    None => return Err(SendDatagramError::NoProtocol),
+                    Some(p) => p,
+                };
 
-                        make_send_metadata(
-                            sync_ctx,
-                            target,
-                            frame,
-                            Some(DatagramHeader {
-                                dest_addr,
-                                protocol: EtherType::from(protocol.get()),
-                            }),
-                        )
-                        .map_err(SendDatagramError::Frame)
-                    },
+                make_send_metadata(
+                    sync_ctx,
+                    target,
+                    frame,
+                    Some(DatagramHeader { dest_addr, protocol: EtherType::from(protocol.get()) }),
                 )
-            })
-        }) {
+                .map_err(SendDatagramError::Frame)
+            },
+        ) {
             Ok(metadata) => metadata,
             Err(e) => return Err((body, e)),
         };
@@ -962,13 +914,6 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSock
             self.write_lock_and::<crate::lock_ordering::AnyDeviceSockets>();
         cb(&mut *sockets, &mut locked)
     }
-
-    fn without_sockets<R>(
-        &mut self,
-        cb: impl FnOnce(&mut Self::SocketTablesSyncCtx<'_>) -> R,
-    ) -> R {
-        cb(&mut self.cast_locked::<crate::lock_ordering::AnyDeviceSockets>())
-    }
 }
 
 impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
@@ -1064,12 +1009,6 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
                 })
             }
         }
-    }
-    fn without_device_sockets<R>(
-        &mut self,
-        cb: impl FnOnce(&mut Self::DeviceSocketSyncCtx<'_>) -> R,
-    ) -> R {
-        cb(&mut self.cast_locked())
     }
 }
 
@@ -1213,11 +1152,64 @@ mod tests {
         all_sockets: FakeAllSockets<D>,
     }
 
+    /// Tuple of references
+    struct FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices>(
+        &'m mut AnyDevice,
+        &'m mut AllSockets,
+        &'m mut Devices,
+    );
+
+    /// Helper trait to allow treating a `&mut self` as a
+    /// [`FakeSocketsMutRefs`].
+    trait AsFakeSocketsMutRefs {
+        type AnyDevice: 'static;
+        type AllSockets: 'static;
+        type Devices: 'static;
+        fn as_sockets_ref(
+            &mut self,
+        ) -> FakeSocketsMutRefs<'_, Self::AnyDevice, Self::AllSockets, Self::Devices>;
+    }
+
+    impl<D: FakeStrongDeviceId + 'static> AsFakeSocketsMutRefs for FakeSyncCtx<FakeSockets<D>, (), D> {
+        type AnyDevice = AnyDeviceSockets<FakeStrongId>;
+        type AllSockets = FakeAllSockets<D>;
+        type Devices = HashMap<D, DeviceSockets<FakeStrongId>>;
+
+        fn as_sockets_ref(
+            &mut self,
+        ) -> FakeSocketsMutRefs<
+            '_,
+            AnyDeviceSockets<FakeStrongId>,
+            FakeAllSockets<D>,
+            HashMap<D, DeviceSockets<FakeStrongId>>,
+        > {
+            let FakeSockets { any_device_sockets, device_sockets, all_sockets } = self.get_mut();
+            FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets)
+        }
+    }
+
+    impl<'m, AnyDevice: 'static, AllSockets: 'static, Devices: 'static> AsFakeSocketsMutRefs
+        for FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices>
+    {
+        type AnyDevice = AnyDevice;
+        type AllSockets = AllSockets;
+        type Devices = Devices;
+
+        fn as_sockets_ref(&mut self) -> FakeSocketsMutRefs<'_, AnyDevice, AllSockets, Devices> {
+            let Self(any_device, all_sockets, devices) = self;
+            FakeSocketsMutRefs(any_device, all_sockets, devices)
+        }
+    }
+
+    impl<As: AsFakeSocketsMutRefs> SyncContextTypes for As {
+        type SocketId = FakeStrongId;
+    }
+
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    struct FakeStrongId(usize);
+    pub(crate) struct FakeStrongId(usize);
 
     #[derive(Debug)]
-    struct FakePrimaryId(usize);
+    pub(crate) struct FakePrimaryId(usize);
 
     impl StrongSocketId for FakeStrongId {
         type Primary = FakePrimaryId;
@@ -1259,18 +1251,15 @@ mod tests {
 
     impl<SC: FakeDeviceIdContext> DeviceIdContext<AnyDevice> for SC {
         type DeviceId = SC::DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<Self::DeviceId>;
+        type WeakDeviceId = FakeWeakDeviceId<SC::DeviceId>;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             FakeWeakDeviceId(device_id.clone())
         }
         fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
             self.contains_id(device_id)
         }
-        fn upgrade_weak_device_id(
-            &self,
-            FakeWeakDeviceId(device_id): &Self::WeakDeviceId,
-        ) -> Option<Self::DeviceId> {
-            self.contains_id(device_id).then_some(device_id.clone())
+        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
+            self.contains_id(&device_id.0).then_some(device_id.0.clone())
         }
     }
 
@@ -1280,13 +1269,170 @@ mod tests {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            self.get_ref().downgrade_device_id(device_id)
+            self.get_ref().device_sockets.downgrade_device_id(device_id)
         }
         fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.get_ref().is_device_installed(device_id)
+            self.get_ref().device_sockets.is_device_installed(device_id)
         }
         fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
-            self.get_ref().upgrade_weak_device_id(device_id)
+            self.get_ref().device_sockets.upgrade_weak_device_id(device_id)
+        }
+    }
+
+    impl<
+            'm,
+            DeviceId: FakeStrongDeviceId + 'static,
+            As: AsFakeSocketsMutRefs<AllSockets = FakeAllSockets<DeviceId>>
+                + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
+                + SyncContextTypes<SocketId = FakeStrongId>,
+        > SocketStateAccessor<FakeNonSyncCtx<DeviceId>> for As
+    where
+        As::Devices: FakeDeviceIdContext<DeviceId = DeviceId>,
+    {
+        type SocketStateSyncCtx<'a> = FakeSocketsMutRefs<'a, As::AnyDevice, (), As::Devices>;
+
+        fn with_socket_state<
+            F: FnOnce(
+                &ExternalSocketState<Self::DeviceId>,
+                &Target<Self::WeakDeviceId>,
+                &mut Self::SocketStateSyncCtx<'_>,
+            ) -> R,
+            R,
+        >(
+            &mut self,
+            socket: &Self::SocketId,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device, all_sockets, devices) = self.as_sockets_ref();
+            let (state, target) = all_sockets.get(socket.0).unwrap();
+            cb(state, target, &mut FakeSocketsMutRefs(any_device, &mut (), devices))
+        }
+
+        fn with_socket_state_mut<
+            F: FnOnce(
+                &ExternalSocketState<Self::DeviceId>,
+                &mut Target<Self::WeakDeviceId>,
+                &mut Self::SocketStateSyncCtx<'_>,
+            ) -> R,
+            R,
+        >(
+            &mut self,
+            socket: &Self::SocketId,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device, all_sockets, devices) = self.as_sockets_ref();
+            let (state, target) = all_sockets.get_mut(socket.0).unwrap();
+            cb(state, target, &mut FakeSocketsMutRefs(any_device, &mut (), devices))
+        }
+    }
+
+    impl<
+            'm,
+            DeviceId: FakeStrongDeviceId + 'static,
+            As: AsFakeSocketsMutRefs<
+                    AllSockets = FakeAllSockets<DeviceId>,
+                    Devices = HashMap<DeviceId, DeviceSockets<FakeStrongId>>,
+                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
+                + SyncContextTypes<SocketId = FakeStrongId>,
+        > DeviceSocketAccessor<FakeNonSyncCtx<DeviceId>> for As
+    {
+        type DeviceSocketSyncCtx<'a> =
+            FakeSocketsMutRefs<'a, As::AnyDevice, FakeAllSockets<DeviceId>, HashSet<DeviceId>>;
+        fn with_device_sockets<
+            F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketSyncCtx<'_>) -> R,
+            R,
+        >(
+            &mut self,
+            device: &Self::DeviceId,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets) = self.as_sockets_ref();
+            let mut devices = device_sockets.keys().cloned().collect();
+            let device = device_sockets.get(device).unwrap();
+            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices))
+        }
+        fn with_device_sockets_mut<
+            F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketSyncCtx<'_>) -> R,
+            R,
+        >(
+            &mut self,
+            device: &Self::DeviceId,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets) = self.as_sockets_ref();
+            let mut devices = device_sockets.keys().cloned().collect();
+            let device = device_sockets.get_mut(device).unwrap();
+            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices))
+        }
+    }
+
+    impl<
+            'm,
+            DeviceId: FakeStrongDeviceId + 'static,
+            As: AsFakeSocketsMutRefs<
+                    AnyDevice = AnyDeviceSockets<FakeStrongId>,
+                    AllSockets = FakeAllSockets<DeviceId>,
+                    Devices = HashMap<DeviceId, DeviceSockets<FakeStrongId>>,
+                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
+                + SyncContextTypes<SocketId = FakeStrongId>,
+        > SyncContext<FakeNonSyncCtx<DeviceId>> for As
+    {
+        type SocketTablesSyncCtx<'a> = FakeSocketsMutRefs<
+            'a,
+            (),
+            FakeAllSockets<DeviceId>,
+            HashMap<DeviceId, DeviceSockets<FakeStrongId>>,
+        >;
+        fn create_socket(&mut self, state: ExternalSocketState<DeviceId>) -> Self::SocketId {
+            let FakeSocketsMutRefs(_any_device, all_sockets, _devices) = self.as_sockets_ref();
+            FakeStrongId(all_sockets.push((state, Target::default())))
+        }
+        fn remove_socket(&mut self, id: Self::SocketId) {
+            let FakeSocketsMutRefs(
+                AnyDeviceSockets(any_device_sockets),
+                all_sockets,
+                device_sockets,
+            ) = self.as_sockets_ref();
+            // Ensure there aren't any additional references to the socket's
+            // state.
+            assert!(!any_device_sockets.contains(&id));
+            assert!(!device_sockets
+                .iter()
+                .any(|(_device, DeviceSockets(sockets))| sockets.contains(&id)));
+
+            let FakeStrongId(index) = id;
+            let _: (_, _) = all_sockets.remove(index).unwrap();
+        }
+        fn with_any_device_sockets<
+            F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesSyncCtx<'_>) -> R,
+            R,
+        >(
+            &mut self,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets) =
+                self.as_sockets_ref();
+            cb(any_device_sockets, &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets))
+        }
+        fn with_any_device_sockets_mut<
+            F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesSyncCtx<'_>) -> R,
+            R,
+        >(
+            &mut self,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets) =
+                self.as_sockets_ref();
+            cb(any_device_sockets, &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets))
+        }
+    }
+
+    impl<'m, X: 'static, Y: 'static, Z: FakeDeviceIdContext + 'static> FakeDeviceIdContext
+        for FakeSocketsMutRefs<'m, X, Y, Z>
+    {
+        type DeviceId = Z::DeviceId;
+        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
+            self.2.contains_id(device_id)
         }
     }
 
@@ -1301,183 +1447,6 @@ mod tests {
         type DeviceId = D;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
             self.contains_key(device_id)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId + 'static> FakeDeviceIdContext for FakeSockets<D> {
-        type DeviceId = D;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.device_sockets.contains_key(device_id)
-        }
-    }
-
-    impl<B: FakeDeviceIdContext> FakeDeviceIdContext for &B {
-        type DeviceId = B::DeviceId;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            (*self).contains_id(device_id)
-        }
-    }
-
-    impl<A, B: FakeDeviceIdContext> FakeDeviceIdContext for (A, &B) {
-        type DeviceId = B::DeviceId;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.1.contains_id(device_id)
-        }
-    }
-
-    impl<A, B: FakeDeviceIdContext> FakeDeviceIdContext for (A, &mut B) {
-        type DeviceId = B::DeviceId;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.1.contains_id(device_id)
-        }
-    }
-
-    impl<B: FakeDeviceIdContext> SyncContextTypes for (&mut FakeAllSockets<B::DeviceId>, &B) {
-        type SocketId = FakeStrongId;
-    }
-
-    impl<B: FakeDeviceIdContext> SyncContextTypes for (&mut FakeAllSockets<B::DeviceId>, &mut B) {
-        type SocketId = FakeStrongId;
-    }
-
-    impl<D: FakeStrongDeviceId> SyncContextTypes for FakeSyncCtx<FakeSockets<D>, (), D> {
-        type SocketId = FakeStrongId;
-    }
-
-    impl<
-            'b,
-            C: NonSyncContext<B::DeviceId, SocketState = ExternalSocketState<B::DeviceId>>,
-            B: FakeDeviceIdContext,
-        > SocketStateAccessor<C> for (&'b mut FakeAllSockets<B::DeviceId>, &'b B)
-    {
-        type SocketStateSyncCtx<'a> = &'b B;
-
-        fn with_socket_state<
-            F: FnOnce(
-                &C::SocketState,
-                &Target<Self::WeakDeviceId>,
-                &mut Self::SocketStateSyncCtx<'_>,
-            ) -> R,
-            R,
-        >(
-            &mut self,
-            socket: &Self::SocketId,
-            cb: F,
-        ) -> R {
-            let (sockets, sync_ctx) = self;
-            let (state, target) = sockets.get(socket.0).unwrap();
-            cb(state, target, sync_ctx)
-        }
-
-        fn with_socket_state_mut<
-            F: FnOnce(
-                &C::SocketState,
-                &mut Target<Self::WeakDeviceId>,
-                &mut Self::SocketStateSyncCtx<'_>,
-            ) -> R,
-            R,
-        >(
-            &mut self,
-            socket: &Self::SocketId,
-            cb: F,
-        ) -> R {
-            let (sockets, sync_ctx) = self;
-            let (state, target) = sockets.get_mut(socket.0).unwrap();
-            cb(state, target, sync_ctx)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId + 'static> DeviceSocketAccessor<FakeNonSyncCtx<D>>
-        for (&mut FakeAllSockets<D>, &mut HashMap<D, DeviceSockets<FakeStrongId>>)
-    {
-        type DeviceSocketSyncCtx<'a> = (&'a mut FakeAllSockets<D>, &'a HashSet<D>);
-        fn with_device_sockets<
-            F: FnOnce(&DeviceSockets<FakeStrongId>, &mut Self::DeviceSocketSyncCtx<'_>) -> R,
-            R,
-        >(
-            &mut self,
-            device: &Self::DeviceId,
-            cb: F,
-        ) -> R {
-            let (sync_ctx, device_sockets) = self;
-            let devices = device_sockets.keys().cloned().collect();
-            cb(device_sockets.get(device).unwrap(), &mut (sync_ctx, &devices))
-        }
-        fn with_device_sockets_mut<
-            F: FnOnce(&mut DeviceSockets<FakeStrongId>, &mut Self::DeviceSocketSyncCtx<'_>) -> R,
-            R,
-        >(
-            &mut self,
-            device: &Self::DeviceId,
-            cb: F,
-        ) -> R {
-            let (sync_ctx, device_sockets) = self;
-            let devices = device_sockets.keys().cloned().collect();
-            cb(device_sockets.get_mut(device).unwrap(), &mut (sync_ctx, &devices))
-        }
-        fn without_device_sockets<R>(
-            &mut self,
-            cb: impl FnOnce(&mut Self::DeviceSocketSyncCtx<'_>) -> R,
-        ) -> R {
-            let (sync_ctx, device_sockets) = self;
-            let devices = device_sockets.keys().cloned().collect();
-            cb(&mut (sync_ctx, &devices))
-        }
-    }
-
-    impl<D: FakeStrongDeviceId + 'static> SyncContext<FakeNonSyncCtx<D>>
-        for FakeSyncCtx<FakeSockets<D>, (), D>
-    {
-        type SocketTablesSyncCtx<'a> =
-            (&'a mut FakeAllSockets<D>, &'a mut HashMap<D, DeviceSockets<FakeStrongId>>);
-
-        fn create_socket(&mut self, state: ExternalSocketState<D>) -> Self::SocketId {
-            FakeStrongId(self.get_mut().all_sockets.push((state, Target::default())))
-        }
-
-        fn remove_socket(&mut self, id: Self::SocketId) {
-            let FakeSockets {
-                any_device_sockets: AnyDeviceSockets(any_device_sockets),
-                device_sockets,
-                all_sockets,
-            } = self.get_mut();
-            // Ensure there aren't any additional references to the socket's
-            // state.
-            assert!(!any_device_sockets.contains(&id));
-            assert!(!device_sockets
-                .iter()
-                .any(|(_device, DeviceSockets(sockets))| sockets.contains(&id)));
-
-            let FakeStrongId(index) = id;
-            let _: (_, _) = all_sockets.remove(index).unwrap();
-        }
-
-        fn with_any_device_sockets<
-            F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesSyncCtx<'_>) -> R,
-            R,
-        >(
-            &mut self,
-            cb: F,
-        ) -> R {
-            let FakeSockets { all_sockets, any_device_sockets, device_sockets } = self.get_mut();
-            cb(any_device_sockets, &mut (all_sockets, device_sockets))
-        }
-        fn with_any_device_sockets_mut<
-            F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesSyncCtx<'_>) -> R,
-            R,
-        >(
-            &mut self,
-            cb: F,
-        ) -> R {
-            let FakeSockets { all_sockets, any_device_sockets, device_sockets } = self.get_mut();
-            cb(any_device_sockets, &mut (all_sockets, device_sockets))
-        }
-        fn without_sockets<R>(
-            &mut self,
-            cb: impl FnOnce(&mut Self::SocketTablesSyncCtx<'_>) -> R,
-        ) -> R {
-            let FakeSockets { all_sockets, any_device_sockets: _, device_sockets } = self.get_mut();
-            cb(&mut (all_sockets, device_sockets))
         }
     }
 
