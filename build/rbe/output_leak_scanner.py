@@ -95,15 +95,21 @@ class PathPattern(object):
     def __init__(self, path: Path):
         self._text = str(path)
         # match whole-word only
-        self._re = re.compile(_whole_word_pattern(self._text))
+        pattern = _whole_word_pattern(self._text)
+        self._re_text = re.compile(pattern)
+        self._re_bin = re.compile(pattern.encode())
 
     @property
     def text(self) -> str:
         return self._text
 
     @property
-    def re(self) -> re.Pattern:
-        return self._re
+    def re_text(self) -> re.Pattern:
+        return self._re_text
+
+    @property
+    def re_bin(self) -> re.Pattern:
+        return self._re_bin
 
     def __eq__(self, other) -> bool:
         # equivalence of compiled re is implied
@@ -143,7 +149,7 @@ def file_contains_subpath(
     try:  # Try text first.
         with _open_read_text(f) as lines:
             for line in lines:  # read one line at a time
-                if subpath.re.search(line):
+                if subpath.re_text.search(line):
                     return True  # stop at first match
     except UnicodeDecodeError:
         # Open as binary.
@@ -153,7 +159,7 @@ def file_contains_subpath(
             s = mmap.mmap(binary_file.fileno(), 0, access=mmap.ACCESS_READ)
             # Note: This matches partial words, which risks flagging
             # false positives.
-            if s.find(subpath.text.encode()) != -1:
+            if subpath.re_bin.search(s):
                 return True
 
     return False
@@ -199,7 +205,7 @@ def preflight_checks(
 ) -> int:
     """Checks output paths and command for build dir leaks."""
     exit_code = 0
-    output_path_leaks = list(paths_with_build_dir_leaks(paths, pattern.re))
+    output_path_leaks = list(paths_with_build_dir_leaks(paths, pattern.re_text))
     if output_path_leaks:
         for f in output_path_leaks:
             error_msg(
@@ -210,7 +216,8 @@ If this command requires an absolute path, mark this action in GN with
                 label=label)
             exit_code = 1
 
-    token_path_leaks = list(tokens_with_build_dir_leaks(command, pattern.re))
+    token_path_leaks = list(
+        tokens_with_build_dir_leaks(command, pattern.re_text))
     for tok in token_path_leaks:
         error_msg(
             f"""Command token '{tok}' contains '{pattern.text}'.

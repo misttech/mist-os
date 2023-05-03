@@ -44,7 +44,7 @@ class PathPatternTests(unittest.TestCase):
         path = Path('over/the/rainbow')
         p = output_leak_scanner.PathPattern(path)
         self.assertEqual(p.text, str(path))
-        self.assertTrue(p.re.search('somewhere/over/the/rainbow'))
+        self.assertTrue(p.re_text.search('somewhere/over/the/rainbow'))
 
     def test_equal(self):
         # different, but equivalent objects
@@ -175,11 +175,11 @@ class FileContainsSubpathTests(unittest.TestCase):
                 output_leak_scanner.file_contains_subpath(
                     tf, output_leak_scanner.PathPattern(Path('abc'))))
 
-    def test_binary_match_partial(self):
+    def test_binary_no_match_partial(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_binary_file_contents(tf, b'\xcc\n\xdd\xee\n\xff\n+abc+\n')
-            self.assertTrue(
+            self.assertFalse(
                 output_leak_scanner.file_contains_subpath(
                     tf, output_leak_scanner.PathPattern(Path('b'))))
 
@@ -195,7 +195,8 @@ class PathsWithBuildDirLeaksTests(unittest.TestCase):
             ])
         pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern.re))
+            output_leak_scanner.paths_with_build_dir_leaks(
+                cases, pattern.re_text))
         self.assertEqual(actual, [])
 
     def test_positives(self):
@@ -207,7 +208,8 @@ class PathsWithBuildDirLeaksTests(unittest.TestCase):
             ])
         pattern = output_leak_scanner.PathPattern(build_dir)
         actual = set(
-            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern.re))
+            output_leak_scanner.paths_with_build_dir_leaks(
+                cases, pattern.re_text))
         self.assertEqual(actual, set(cases))
 
 
@@ -221,7 +223,8 @@ class TokensWithBuildDirLeaks(unittest.TestCase):
         ]
         pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
+            output_leak_scanner.tokens_with_build_dir_leaks(
+                cases, pattern.re_text))
         self.assertEqual(actual, [])
 
     def test_positives(self):
@@ -229,7 +232,8 @@ class TokensWithBuildDirLeaks(unittest.TestCase):
         cases = ['/work/out/build/here', 'build/here', 'build/here/out.txt']
         pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
+            output_leak_scanner.tokens_with_build_dir_leaks(
+                cases, pattern.re_text))
         self.assertEqual(actual, cases)
 
     def test_exceptions(self):
@@ -242,7 +246,8 @@ class TokensWithBuildDirLeaks(unittest.TestCase):
         ]
         pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
+            output_leak_scanner.tokens_with_build_dir_leaks(
+                cases, pattern.re_text))
         self.assertEqual(actual, [])
 
 
