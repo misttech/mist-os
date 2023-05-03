@@ -612,6 +612,11 @@ pub const ZX_MIN_PAGE_SHIFT: u32 = 12;
 #[cfg(target_arch = "aarch64")]
 pub const ZX_MAX_PAGE_SHIFT: u32 = 16;
 
+#[cfg(target_arch = "riscv64")]
+pub const ZX_MIN_PAGE_SHIFT: u32 = 12;
+#[cfg(target_arch = "riscv64")]
+pub const ZX_MAX_PAGE_SHIFT: u32 = 21;
+
 // Task response codes if a process is externally killed
 pub const ZX_TASK_RETCODE_SYSCALL_KILL: i64 = -1024;
 pub const ZX_TASK_RETCODE_OOM_KILL: i64 = -1025;
@@ -988,10 +993,19 @@ pub struct zx_arm64_exc_data_t {
 }
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_riscv64_exc_data_t {
+    pub cause: u64,
+    pub tval: u64,
+    pub padding2: [PadByte; 8],
+}
+
+#[repr(C)]
 #[derive(Copy, Clone)]
 pub union zx_exception_header_arch_t {
     pub x86_64: zx_x86_64_exc_data_t,
     pub arm_64: zx_arm64_exc_data_t,
+    pub riscv_64: zx_riscv64_exc_data_t,
 }
 
 #[repr(C)]
@@ -1167,6 +1181,44 @@ impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
     }
 }
 
+#[cfg(target_arch = "riscv64")]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_thread_state_general_regs_t {
+    pub pc: u64,
+    pub ra: u64,  // x1
+    pub sp: u64,  // x2
+    pub gp: u64,  // x3
+    pub tp: u64,  // x4
+    pub t0: u64,  // x5
+    pub t1: u64,  // x6
+    pub t2: u64,  // x7
+    pub s0: u64,  // x8
+    pub s1: u64,  // x9
+    pub a0: u64,  // x10
+    pub a1: u64,  // x11
+    pub a2: u64,  // x12
+    pub a3: u64,  // x13
+    pub a4: u64,  // x14
+    pub a5: u64,  // x15
+    pub a6: u64,  // x16
+    pub a7: u64,  // x17
+    pub s2: u64,  // x18
+    pub s3: u64,  // x19
+    pub s4: u64,  // x20
+    pub s5: u64,  // x21
+    pub s6: u64,  // x22
+    pub s7: u64,  // x23
+    pub s8: u64,  // x24
+    pub s9: u64,  // x25
+    pub s10: u64, // x26
+    pub s11: u64, // x27
+    pub t3: u64,  // x28
+    pub t4: u64,  // x29
+    pub t5: u64,  // x30
+    pub t6: u64,  // x31
+}
+
 multiconst!(u32, [
     ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL = 1;
 ]);
@@ -1289,16 +1341,23 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
     }
 }
 
+#[cfg(target_arch = "riscv64")]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+pub struct zx_restricted_state_t {
+    reserved: u64,
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "riscv64"))]
 pub struct zx_restricted_syscall_t {
     pub state: zx_restricted_state_t,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "riscv64"))]
 pub struct zx_restricted_exception {
     pub state: zx_restricted_state_t,
     pub exception: zx_exception_report_t,
@@ -1339,6 +1398,13 @@ pub struct zx_vcpu_state_t {
     pub _padding1: [PadByte; 4],
 }
 
+#[cfg(target_arch = "riscv64")]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_vcpu_state_t {
+    pub empty: u32,
+}
+
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_vcpu_io_t {
@@ -1357,6 +1423,14 @@ pub struct zx_packet_guest_mem_t {
     pub xt: u8,
     pub read: bool,
     pub data: u64,
+}
+
+#[cfg(target_arch = "riscv64")]
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_packet_guest_mem_t {
+    pub addr: zx_gpaddr_t,
+    pub reserved: [u64; 3],
 }
 
 pub const X86_MAX_INST_LEN: usize = 15;
