@@ -267,6 +267,7 @@ def copy_file_if_changed(src_path: str, dst_path: str):
             os.chmod(p, file_mode | stat.S_IWUSR)
 
     def copy_writable(src, dst):
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(src, dst)
         make_writable(dst)
 
