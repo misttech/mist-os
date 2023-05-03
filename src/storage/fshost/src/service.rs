@@ -8,6 +8,7 @@ use {
         debug_log,
         device::{constants, BlockDevice, Device},
         environment::{FilesystemLauncher, ServeFilesystemStatus},
+        fxblob,
         service::constants::ZXCRYPT_DRIVER_PATH,
         watcher,
     },
@@ -85,7 +86,9 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
         ..Default::default()
     };
 
-    find_partition(data_matcher, FIND_PARTITION_DURATION).await
+    find_partition(data_matcher, FIND_PARTITION_DURATION)
+        .await
+        .context("Failed to find data partition")
 }
 
 #[link(name = "fvm")]
@@ -201,7 +204,6 @@ async fn wipe_storage(
     Ok(())
 }
 
-// TODO(https://fxbug.dev/122943) Add support for fxblob.
 async fn write_data_file(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
@@ -227,80 +229,88 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let partition_controller = find_data_partition(ramdisk_prefix).await?;
-
-    let format = match config.data_filesystem_format.as_ref() {
-        "fxfs" => DiskFormat::Fxfs,
-        "f2fs" => DiskFormat::F2fs,
-        "minfs" => DiskFormat::Minfs,
-        _ => panic!("unsupported data filesystem format type"),
-    };
-
-    let partition_path = partition_controller
-        .get_topological_path()
-        .await
-        .context("get_topo_path transport error")?
-        .map_err(zx::Status::from_raw)
-        .context("get_topo_path returned error")?;
-    tracing::info!(%partition_path, "Found data partition");
-    let mut device = Box::new(
-        BlockDevice::from_proxy(partition_controller, &partition_path)
+    let (mut filesystem, mut data) = if config.fxfs_blob {
+        fxblob::mount_or_format_data(ramdisk_prefix, launcher)
             .await
-            .context("failed to make new device")?,
-    );
-    let mut device: &mut dyn Device = device.as_mut();
-    let mut zxcrypt_device;
-    if format != DiskFormat::Fxfs && !config.no_zxcrypt {
-        launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-        tracing::info!("Ensuring device is formatted with zxcrypt");
-        zxcrypt_device = Box::new(
-            match ZxcryptDevice::unseal(device).await.context("Failed to unseal zxcrypt")? {
-                UnsealOutcome::Unsealed(device) => device,
-                UnsealOutcome::FormatRequired => ZxcryptDevice::format(device).await?,
-            },
+            .map(|(fs, data)| ((Some(fs), data)))?
+    } else {
+        let partition_controller = find_data_partition(ramdisk_prefix).await?;
+
+        let format = match config.data_filesystem_format.as_ref() {
+            "fxfs" => DiskFormat::Fxfs,
+            "f2fs" => DiskFormat::F2fs,
+            "minfs" => DiskFormat::Minfs,
+            _ => panic!("unsupported data filesystem format type"),
+        };
+
+        let partition_path = partition_controller
+            .get_topological_path()
+            .await
+            .context("get_topo_path transport error")?
+            .map_err(zx::Status::from_raw)
+            .context("get_topo_path returned error")?;
+        tracing::info!(%partition_path, "Found data partition");
+        let mut device = Box::new(
+            BlockDevice::from_proxy(partition_controller, &partition_path)
+                .await
+                .context("failed to make new device")?,
         );
-        device = zxcrypt_device.as_mut();
-    }
-
-    let filesystem = match format {
-        DiskFormat::Fxfs => {
-            launcher.serve_data(device, Fxfs::dynamic_child()).await.context("serving fxfs")?
-        }
-        DiskFormat::F2fs => {
-            launcher.serve_data(device, F2fs::dynamic_child()).await.context("serving f2fs")?
-        }
-        DiskFormat::Minfs => {
-            launcher.serve_data(device, Minfs::dynamic_child()).await.context("serving minfs")?
-        }
-        _ => unreachable!(),
-    };
-    let mut filesystem = match filesystem {
-        ServeFilesystemStatus::Serving(fs) => fs,
-        ServeFilesystemStatus::FormatRequired => {
-            tracing::info!(
-                "Format required {:?} for device {:?}",
-                format,
-                device.topological_path()
+        let mut device: &mut dyn Device = device.as_mut();
+        let mut zxcrypt_device;
+        if format != DiskFormat::Fxfs && !config.no_zxcrypt {
+            launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
+            tracing::info!("Ensuring device is formatted with zxcrypt");
+            zxcrypt_device = Box::new(
+                match ZxcryptDevice::unseal(device).await.context("Failed to unseal zxcrypt")? {
+                    UnsealOutcome::Unsealed(device) => device,
+                    UnsealOutcome::FormatRequired => ZxcryptDevice::format(device).await?,
+                },
             );
-            match format {
-                DiskFormat::Fxfs => launcher
-                    .format_data(device, Fxfs::dynamic_child())
-                    .await
-                    .context("serving fxfs")?,
-                DiskFormat::F2fs => launcher
-                    .format_data(device, F2fs::dynamic_child())
-                    .await
-                    .context("serving f2fs")?,
-                DiskFormat::Minfs => launcher
-                    .format_data(device, Minfs::dynamic_child())
-                    .await
-                    .context("serving minfs")?,
-                _ => unreachable!(),
-            }
+            device = zxcrypt_device.as_mut();
         }
-    };
 
-    let data_root = filesystem.root(None).context("Failed to get data root")?;
+        let filesystem = match format {
+            DiskFormat::Fxfs => {
+                launcher.serve_data(device, Fxfs::dynamic_child()).await.context("serving fxfs")?
+            }
+            DiskFormat::F2fs => {
+                launcher.serve_data(device, F2fs::dynamic_child()).await.context("serving f2fs")?
+            }
+            DiskFormat::Minfs => launcher
+                .serve_data(device, Minfs::dynamic_child())
+                .await
+                .context("serving minfs")?,
+            _ => unreachable!(),
+        };
+        let filesystem = match filesystem {
+            ServeFilesystemStatus::Serving(fs) => fs,
+            ServeFilesystemStatus::FormatRequired => {
+                tracing::info!(
+                    "Format required {:?} for device {:?}",
+                    format,
+                    device.topological_path()
+                );
+                match format {
+                    DiskFormat::Fxfs => launcher
+                        .format_data(device, Fxfs::dynamic_child())
+                        .await
+                        .context("serving fxfs")?,
+                    DiskFormat::F2fs => launcher
+                        .format_data(device, F2fs::dynamic_child())
+                        .await
+                        .context("serving f2fs")?,
+                    DiskFormat::Minfs => launcher
+                        .format_data(device, Minfs::dynamic_child())
+                        .await
+                        .context("serving minfs")?,
+                    _ => unreachable!(),
+                }
+            }
+        };
+
+        (None, filesystem)
+    };
+    let data_root = data.root(filesystem.as_mut()).context("Failed to get data root")?;
     let (directory_proxy, file_path) = match filename.rsplit_once("/") {
         Some((directory_path, relative_file_path)) => {
             let directory_proxy = create_directory_recursive(
@@ -323,11 +333,14 @@ async fn write_data_file(
     .await
     .context("Failed to open file")?;
 
-    let mut data = vec![0; content_size];
-    payload.read(&mut data, 0).context("reading payload vmo")?;
-    write(&file_proxy, &data).await.context("writing file contents")?;
+    let mut contents = vec![0; content_size];
+    payload.read(&mut contents, 0).context("reading payload vmo")?;
+    write(&file_proxy, &contents).await.context("writing file contents")?;
 
-    filesystem.shutdown(None).await.context("shutting down data filesystem")?;
+    data.shutdown(filesystem.as_mut()).await.context("shutting down data")?;
+    if let Some(fs) = filesystem {
+        fs.shutdown().await.context("shutting down filesystem")?;
+    }
     return Ok(());
 }
 

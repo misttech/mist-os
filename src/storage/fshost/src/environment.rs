@@ -424,11 +424,7 @@ impl Environment for FshostEnvironment {
             expected_format = "fxfs",
             "Mounting fxblob"
         );
-        let mut fs = fs_management::filesystem::Filesystem::new(
-            device.reopen_controller()?,
-            Fxfs { component_type: ComponentType::StaticChild, ..Default::default() },
-        );
-        let serving_fs = fs.serve_multi_volume().await?;
+        let serving_fs = self.launcher.serve_fxblob(device).await?;
         self.fxblob = Some(serving_fs);
         Ok(())
     }
@@ -460,7 +456,7 @@ impl Environment for FshostEnvironment {
 
         let multi_vol_fs =
             self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
-        let mut filesystem = self.launcher.serve_fxblob(multi_vol_fs).await?;
+        let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
 
         // TODO(fxbug.dev/122966): shred_volume relies on the unencrypted volume being bound in the
         // namespace. This should be reevaluated when keybag takes a proxy, but for now this is the
@@ -861,7 +857,20 @@ impl FilesystemLauncher {
         Ok(Box::new(BlockDevice::from_proxy(data_partition_controller, device_path).await?))
     }
 
+    /// Starts serving Fxblob without opening any volumes.
     pub async fn serve_fxblob(
+        &self,
+        device: &mut dyn Device,
+    ) -> Result<ServingMultiVolumeFilesystem, Error> {
+        let mut fs = fs_management::filesystem::Filesystem::new(
+            device.reopen_controller()?,
+            Fxfs { component_type: ComponentType::StaticChild, ..Default::default() },
+        );
+        fs.serve_multi_volume().await
+    }
+
+    /// Serves the data volume from Fxblob, formatting any non-blob volumes as needed.
+    pub async fn serve_data_fxblob(
         &self,
         serving_multi_vol_fs: &mut ServingMultiVolumeFilesystem,
     ) -> Result<Filesystem, Error> {
@@ -870,12 +879,16 @@ impl FilesystemLauncher {
 
         // We expect the startup protocol to work with fxblob. There are no options for
         // reformatting the entire fxfs partition now that blobfs is one of the volumes.
-        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe(
+        let volumes_dir = fuchsia_fs::directory::open_directory(
             serving_multi_vol_fs.exposed_dir(),
             "volumes",
             fuchsia_fs::OpenFlags::empty(),
-        )?;
-        let volumes = fuchsia_fs::directory::readdir(&volumes_dir).await?;
+        )
+        .await
+        .context("opening volumes directory")?;
+        let volumes = fuchsia_fs::directory::readdir(&volumes_dir)
+            .await
+            .context("reading volumes directory")?;
         let needed =
             HashSet::from(["blob".to_string(), "data".to_string(), "unencrypted".to_string()]);
         let mut found = HashSet::new();

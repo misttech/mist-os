@@ -284,9 +284,6 @@ async fn ramdisk_blob_and_data_mounted() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/124455): Figure out ramdisk_image semantics for fxblob and fake out the
-// fshost ramdisk accordingly in this test.
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
     // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust

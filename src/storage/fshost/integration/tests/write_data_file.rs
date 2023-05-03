@@ -26,9 +26,7 @@ async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
         .expect("write_data_file failed: transport error")
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -46,6 +44,11 @@ async fn unformatted() {
     fixture.tear_down().await;
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
+
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
@@ -60,9 +63,7 @@ async fn unformatted() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
@@ -76,6 +77,11 @@ async fn unformatted_netboot() {
     fixture.tear_down().await;
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
+
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
@@ -90,9 +96,7 @@ async fn unformatted_netboot() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -120,6 +124,10 @@ async fn unformatted_small_disk() {
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
 
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
+
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
@@ -134,9 +142,7 @@ async fn unformatted_small_disk() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -155,6 +161,10 @@ async fn formatted() {
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
 
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
+
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // Make sure the original contents in the data partition still exist.
@@ -172,9 +182,7 @@ async fn formatted() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted_file_in_root() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -202,6 +210,10 @@ async fn formatted_file_in_root() {
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
 
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
+
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // Make sure the original contents in the data partition still exist.
@@ -219,9 +231,7 @@ async fn formatted_file_in_root() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
@@ -235,6 +245,10 @@ async fn formatted_netboot() {
     fixture.tear_down().await;
 
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    // Ensure the blob volume is present and unmodified.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_test_blob().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
 

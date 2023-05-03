@@ -69,18 +69,16 @@ impl Matchers {
         if config.nand {
             matchers.push(Box::new(NandMatcher::new()));
         }
-        if config.fxfs_blob {
-            // TODO(https://fxbug.dev/124455): Figure out netboot semantics for fxblob.
-            if !config.netboot {
-                matchers.push(Box::new(FxblobMatcher::new(
-                    DiskFormat::Fxfs,
-                    if config.ramdisk_image { ramdisk_path } else { None },
-                )));
-            }
-        } else {
-            // If ramdisk_image is true but we don't actually have a ramdisk launching, we skip
-            // making the fvm+blobfs+data matcher entirely.
-            if !config.ramdisk_image || ramdisk_path.is_some() {
+        // If ramdisk_image is true but we don't actually have a ramdisk launching, we skip
+        // making the fvm+blobfs+data or Fxblob matcher entirely.
+        if !config.ramdisk_image || ramdisk_path.is_some() {
+            if !config.netboot && config.fxfs_blob {
+                matchers.push(Box::new(FxblobMatcher::new(if config.ramdisk_image {
+                    ramdisk_path
+                } else {
+                    None
+                })));
+            } else {
                 let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
                     DiskFormat::Fvm,
                     false,
@@ -100,18 +98,16 @@ impl Matchers {
                     matchers.push(fvm_matcher);
                 }
             }
-
-            if config.fvm && config.ramdisk_image {
-                // Add another matcher for the non-ramdisk version of fvm.
-                let non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
-                    DiskFormat::Fvm,
-                    false,
-                    FVM_DRIVER_PATH,
-                    "/fvm",
-                    None,
-                ));
-                matchers.push(non_ramdisk_fvm_matcher);
-            }
+        }
+        if config.fvm && config.ramdisk_image {
+            // Add another matcher for the non-ramdisk version of fvm.
+            matchers.push(Box::new(PartitionMapMatcher::new(
+                DiskFormat::Fvm,
+                false,
+                FVM_DRIVER_PATH,
+                "/fvm",
+                None,
+            )));
         }
 
         let gpt_matcher =
@@ -227,16 +223,14 @@ impl Matcher for NandMatcher {
 
 // Matches against a data partition that exists independent of FVM using the DiskFormat.
 struct FxblobMatcher {
-    // The content format expected.
-    content_format: DiskFormat,
     // If this partition is required to exist on a ramdisk, then this contains the prefix it should
     // have.
     ramdisk_required: Option<String>,
 }
 
 impl FxblobMatcher {
-    fn new(content_format: DiskFormat, ramdisk_required: Option<String>) -> Self {
-        Self { content_format, ramdisk_required }
+    fn new(ramdisk_required: Option<String>) -> Self {
+        Self { ramdisk_required }
     }
 }
 
@@ -248,7 +242,7 @@ impl Matcher for FxblobMatcher {
                 return false;
             }
         }
-        device.content_format().await.ok() == Some(self.content_format)
+        device.content_format().await.ok() == Some(DiskFormat::Fxfs)
     }
 
     async fn process_device(
