@@ -120,12 +120,11 @@ other operating systems, which may have APIs to obtain global or default locale
 settings, following Fuchsia's design principle of
 [no ambient authority](/docs/concepts/principles/secure.md)
 
-In runtimes where the standard library offers access to some default locale (for
-example, `Platform.localeName` in Dart and Flutter), it is the responsibility of
-the [runner](/docs/concepts/components/v2/capabilities/runners.md) to retrieve
-the needed values from the realm of the component being run. In most cases, the
-runner should call `fuchsia.intl.PropertyProvider.GetProfile`. See
-[Runner integrations](#runner-integrations) below.
+In runtimes where the standard library offers access to some default locale, it
+is the responsibility of the
+[runner](/docs/concepts/components/v2/capabilities/runners.md) to retrieve the
+needed values from the realm of the component being run. In most cases, the
+runner should call `fuchsia.intl.PropertyProvider.GetProfile`.
 
 #### Multiple i18n `Profile`s {#multiple-i18n-profiles}
 
@@ -151,29 +150,7 @@ The
 product configuration includes [`intl_services`](/src/intl/intl_services), a
 component that wraps this implementation.
 
-### Runner integrations {#runner-integrations}
-
-#### dart_runner
-
-In the future, accessing the field `Platform.localeName` in Dart will return the
-_first_ `LocaleId` from the vector `fuchsia.intl.Profile.locales`. (This is
-currently blocked by a
-[limitation](https://github.com/dart-lang/sdk/issues/37586) in the Dart SDK.)
-
-#### flutter_runner
-
-The Flutter runner on Fuchsia is [wired up][flutter-source] to
-`fuchsia.intl.PropertyProvider`, so using the standard
-[Flutter localization API][flutter-l10n] should allow a Flutter application to
-access the current context's locale preferences and detect changes. For details
-and examples, see [Localizing mods](localizing_mods.md).
-
-Note: Both Dart and Flutter components that are built _only for Fuchsia_ have
-the option of directly accessing the `fuchsia.intl.PropertyProvider` FIDL
-service — in addition to using the OS-agnostic APIs. Cross-platform apps should
-use the properties provided by their runtimes.
-
-### Other integrations {#other-integrations}
+### Integrations {#integrations}
 
 #### Web (e.g., Chrome & WebEngine)
 The list of preferred locales from `Profile` is sent to web servers in the HTTP
@@ -217,7 +194,5 @@ Fuchsia products.
 
 <!--xrefs-->
 
-[flutter-source]: https://cs.opensource.google/flutter/engine/+/master:shell/platform/fuchsia/flutter/engine.cc;?q=%5Cbintl_property_provider_%5Cb
-[flutter-l10n]: https://flutter.dev/docs/development/accessibility-and-localization/internationalization
 [accept-language]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
 [navigator-languages]: https://developer.mozilla.org/en-US/docs/Web/API/NavigatorLanguage/languages

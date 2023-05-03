@@ -22,6 +22,11 @@ Typically, localization refers to the work done by language experts, designers,
 tech writers, and other content producers. Internationalization refers to the
 work done by software engineers.
 
+Note: Currently, Fuchsia-based products use I18N and L10N only in the context
+of Accessibility's screen reader. Specifically, the L10N data is fed into
+the semantic data collected by Accessibility Manager and surfaced to the user
+with text-to-speech.
+
 ## Fuchsia's approach {#fuchsias-approach}
 
 Because Fuchsia is designed to be extensible and to flexibly
@@ -52,8 +57,7 @@ the operating system itself, in multi-language environments.
     Fuchsia's shared ICU time zone data to ensure consistent time among
     components.
 
--   **Localizing components:** Fuchsia offers some basic guidance on
-    [how to localize in-tree components](localizing_mods.md), as well as a
+-   **Localizing components:** Fuchsia offers some basic guidance a
     [string lookup library and workflow](localization/message_translation.md)
     for C++ components.
 

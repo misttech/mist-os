@@ -42,20 +42,18 @@ The future work is classified roughly by area.
 
 ## Locale fallback
 
-The following desirable properties are not built into the fallbck mechanism
+The following desirable properties are not built into the fallback mechanism
 today but would be very nice to have.
 
 1. There is no support for changing the locale dynamically.  The calling
    program must listen to [`OnChange`][fioc] events and update the `Lookup`
    accordingly.
 
-   This is normally not an issue for Flutter programs, as they monitor for
-   locale changes and redraw their UI.  However, in general, it is up to the
-   program author to implement reacting to locale changes in a correct way.
-   This should not be a big departure from the communication infrastructure
-   that supposedly already exists, since we expect that the users of the
-   `Lookup` API already integrate with [`fuchsia.intl`][fi] to be aware of the
-   user's locale preferences.
+   In general, it is up to the program author to implement reacting to locale
+   changes in a correct way.  This should not be a big departure from the
+   communication infrastructure that supposedly already exists, since we expect
+   that the users of the `Lookup` API already integrate with
+   [`fuchsia.intl`][fi] to be aware of the user's locale preferences.
 
 [fioc]: https://fuchsia.dev/reference/fidl/fuchsia.intl#PropertyProvider.OnChange
 [fi]: https://fuchsia.dev/reference/fidl/fuchsia.intl
