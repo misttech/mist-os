@@ -129,10 +129,12 @@ rustc_binary("starnix_kernel_bin") {
     "//zircon/system/ulib/backtrace-request/rust",
   ]
 
-  deps += [
-    ":vdso-data($target_linux_toolchain)",
-    "//src/lib/fuchsia-fs",
-  ]
+  if (current_cpu == "x64" || current_cpu == "arm64") {
+    deps += [
+      ":vdso-data($target_linux_toolchain)",
+      "//src/lib/fuchsia-fs",
+    ]
+  }
 
   if (is_debug) {
     deps += [ "//third_party/rust_crates:tracing-mutex" ]
@@ -419,8 +421,9 @@ loadable_module("vdso") {
 }
 
 resource("vdso-data") {
+  sources = []
   if (current_cpu == "x64" || current_cpu == "arm64") {
-    sources = [ "$root_out_dir/libvdso.so" ]
+    sources += [ "$root_out_dir/libvdso.so" ]
   }
   outputs = [ "data/libvdso.so" ]
   deps = [ ":vdso" ]
