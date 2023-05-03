@@ -9,7 +9,7 @@
 //! protocol families each offering different functionality. This crate targets
 //! the implementation of families related to networking.
 
-use futures::{future::Future, FutureExt as _};
+use futures::future::Future;
 
 /// The implementation of the Netlink protocol suite.
 pub struct Netlink {
@@ -41,6 +41,8 @@ async fn run_event_loop() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use futures::FutureExt as _;
 
     // Placeholder test to ensure the build targets are setup properly.
     #[test]

@@ -5,8 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("lib") {
-  name = "netlink"
+rustc_library("netlink") {
   version = "0.0.1"
   edition = "2021"
   with_unit_tests = true
@@ -21,7 +20,7 @@ rustc_library("lib") {
 }
 
 fuchsia_unittest_package("netlink-lib-test") {
-  deps = [ ":lib_test" ]
+  deps = [ ":netlink_test" ]
 }
 
 group("tests") {
