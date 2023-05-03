@@ -769,6 +769,57 @@ impl Zxio {
         zx::ok(status)?;
         Ok(zxio)
     }
+
+    pub fn xattr_list(&self) -> Result<Vec<Vec<u8>>, zx::Status> {
+        unsafe extern "C" fn callback(context: *mut c_void, name: *const u8, name_len: usize) {
+            let out_names = &mut *(context as *mut Vec<Vec<u8>>);
+            let name_slice = std::slice::from_raw_parts(name, name_len);
+            out_names.push(name_slice.to_vec());
+        }
+        let mut out_names = Vec::new();
+        let status = unsafe {
+            zxio::zxio_xattr_list(
+                self.as_ptr(),
+                Some(callback),
+                &mut out_names as *mut _ as *mut c_void,
+            )
+        };
+        zx::ok(status)?;
+        Ok(out_names)
+    }
+
+    pub fn xattr_get(&self, name: &[u8], value: &mut [u8]) -> Result<usize, zx::Status> {
+        let mut out_value_len = 0;
+        let status = unsafe {
+            zxio::zxio_xattr_get(
+                self.as_ptr(),
+                name.as_ptr(),
+                name.len(),
+                value.as_mut_ptr(),
+                value.len(),
+                &mut out_value_len,
+            )
+        };
+        zx::ok(status)?;
+        Ok(out_value_len)
+    }
+
+    pub fn xattr_set(&self, name: &[u8], value: &[u8]) -> Result<(), zx::Status> {
+        let status = unsafe {
+            zxio::zxio_xattr_set(
+                self.as_ptr(),
+                name.as_ptr(),
+                name.len(),
+                value.as_ptr(),
+                value.len(),
+            )
+        };
+        zx::ok(status)
+    }
+
+    pub fn xattr_remove(&self, name: &[u8]) -> Result<(), zx::Status> {
+        zx::ok(unsafe { zxio::zxio_xattr_remove(self.as_ptr(), name.as_ptr(), name.len()) })
+    }
 }
 
 impl Drop for Zxio {

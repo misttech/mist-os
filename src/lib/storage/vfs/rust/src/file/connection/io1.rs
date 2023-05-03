@@ -5,7 +5,9 @@
 use {
     crate::{
         common::{
-            inherit_rights_for_clone, io2_conversions, send_on_open_with_error, GET_FLAGS_VISIBLE,
+            decode_extended_attribute_value, encode_extended_attribute_value,
+            extended_attributes_sender, inherit_rights_for_clone, io2_conversions,
+            send_on_open_with_error, GET_FLAGS_VISIBLE,
         },
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
@@ -289,6 +291,22 @@ where
         attrs: fio::NodeAttributes,
     ) -> Result<(), Status> {
         self.as_file().set_attrs(flags, attrs).await
+    }
+
+    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
+        self.as_file().list_extended_attributes().await
+    }
+
+    async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
+        self.as_file().get_extended_attribute(name).await
+    }
+
+    async fn set_extended_attribute(&self, name: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+        self.as_file().set_extended_attribute(name, value).await
+    }
+
+    async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
+        self.as_file().remove_extended_attribute(name).await
     }
 
     async fn close(&self) -> Result<(), Status> {
@@ -782,6 +800,28 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
+            fio::FileRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
+                fuchsia_trace::duration!("storage", "File::ListExtendedAttributes");
+                self.handle_list_extended_attribute(iterator).await;
+            }
+            fio::FileRequest::GetExtendedAttribute { name, responder } => {
+                fuchsia_trace::duration!("storage", "File::GetExtendedAttribute");
+                let mut res =
+                    self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
+            fio::FileRequest::SetExtendedAttribute { name, value, responder } => {
+                fuchsia_trace::duration!("storage", "File::SetExtendedAttribute");
+                let mut res =
+                    self.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
+            fio::FileRequest::RemoveExtendedAttribute { name, responder } => {
+                fuchsia_trace::duration!("storage", "File::RemoveExtendedAttribute");
+                let mut res =
+                    self.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
             fio::FileRequest::Read { count, responder } => {
                 fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
                 let result = self.handle_read(count).await;
@@ -979,6 +1019,47 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
     ) -> Result<zx::Vmo, zx::Status> {
         get_backing_memory_validate_flags(flags, self.flags)?;
         self.file.get_backing_memory(flags).await
+    }
+
+    async fn handle_list_extended_attribute(
+        &mut self,
+        iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
+    ) {
+        let attributes = match self.file.list_extended_attributes().await {
+            Ok(attributes) => attributes,
+            Err(status) => {
+                tracing::error!(?status, "list extended attributes failed");
+                iterator
+                    .close_with_epitaph(status)
+                    .unwrap_or_else(|error| tracing::error!(?error, "failed to send epitaph"));
+                return;
+            }
+        };
+        self.scope.spawn(extended_attributes_sender(iterator, attributes));
+    }
+
+    async fn handle_get_extended_attribute(
+        &mut self,
+        name: Vec<u8>,
+    ) -> Result<fio::ExtendedAttributeValue, zx::Status> {
+        let value = self.file.get_extended_attribute(name).await?;
+        encode_extended_attribute_value(value)
+    }
+
+    async fn handle_set_extended_attribute(
+        &mut self,
+        name: Vec<u8>,
+        value: fio::ExtendedAttributeValue,
+    ) -> Result<(), zx::Status> {
+        if name.iter().any(|c| *c == 0) {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        let val = decode_extended_attribute_value(value)?;
+        self.file.set_extended_attribute(name, val).await
+    }
+
+    async fn handle_remove_extended_attribute(&mut self, name: Vec<u8>) -> Result<(), zx::Status> {
+        self.file.remove_extended_attribute(name).await
     }
 }
 

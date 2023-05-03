@@ -8,7 +8,8 @@ use {
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
+    fuchsia_zircon::{Status, Vmo},
+    futures::StreamExt as _,
     libc,
     std::{convert::TryFrom, sync::Arc},
 };
@@ -150,6 +151,64 @@ pub fn rights_to_posix_mode_bits(readable: bool, writable: bool, executable: boo
     return if readable { libc::S_IRUSR } else { 0 }
         | if writable { libc::S_IWUSR } else { 0 }
         | if executable { libc::S_IXUSR } else { 0 };
+}
+
+pub async fn extended_attributes_sender(
+    iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
+    attributes: Vec<Vec<u8>>,
+) {
+    let mut stream = match iterator.into_stream() {
+        Ok(stream) => stream,
+        Err(error) => {
+            tracing::error!(
+                ?error,
+                "failed to turn extended attributes iterator request into a stream!"
+            );
+            return;
+        }
+    };
+
+    let mut chunks = attributes.chunks(fio::MAX_LIST_ATTRIBUTES_CHUNK as usize).peekable();
+
+    while let Some(Ok(fio::ExtendedAttributeIteratorRequest::GetNext { responder })) =
+        stream.next().await
+    {
+        let (chunk, last) = match chunks.next() {
+            Some(chunk) => (chunk.to_vec(), chunks.peek().is_none()),
+            None => (Vec::new(), true),
+        };
+        responder.send(&mut Ok((chunk, last))).unwrap_or_else(|error| {
+            tracing::error!(?error, "list extended attributes failed to send a chunk");
+        });
+        if last {
+            break;
+        }
+    }
+}
+
+pub fn encode_extended_attribute_value(
+    value: Vec<u8>,
+) -> Result<fio::ExtendedAttributeValue, Status> {
+    let size = value.len() as u64;
+    if size > fio::MAX_INLINE_ATTRIBUTE_VALUE {
+        let vmo = Vmo::create(size)?;
+        vmo.write(&value, 0)?;
+        Ok(fio::ExtendedAttributeValue::Buffer(vmo))
+    } else {
+        Ok(fio::ExtendedAttributeValue::Bytes(value))
+    }
+}
+
+pub fn decode_extended_attribute_value(
+    value: fio::ExtendedAttributeValue,
+) -> Result<Vec<u8>, Status> {
+    match value {
+        fio::ExtendedAttributeValue::Bytes(val) => Ok(val),
+        fio::ExtendedAttributeValue::Buffer(vmo) => {
+            let length = vmo.get_content_size()?;
+            vmo.read_to_vec(0, length)
+        }
+    }
 }
 
 // TODO(https://fxbug.dev/124432): Consolidate with other implementations that do the same thing.

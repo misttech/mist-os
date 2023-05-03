@@ -272,3 +272,24 @@ zx_status_t zxio_default_create_symlink(zxio_t* io, const char* name, size_t nam
                                         zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }
+
+zx_status_t zxio_default_xattr_list(zxio_t* io,
+                                    void (*callback)(void* context, const uint8_t* name,
+                                                     size_t name_len),
+                                    void* context) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t zxio_default_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
+                                   size_t value_capacity, size_t* out_value_actual) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t zxio_default_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len,
+                                   const uint8_t* value, size_t value_len) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len) {
+  return ZX_ERR_NOT_SUPPORTED;
+}

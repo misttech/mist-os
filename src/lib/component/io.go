@@ -145,6 +145,23 @@ func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Nod
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
+func (*Service) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
+	_ = request.Close()
+	return nil
+}
+
+func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
+	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*Service) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*Service) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
+	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (*Service) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
 	return int32(zx.ErrNotSupported), 0, nil
 }
@@ -296,6 +313,23 @@ func (*directoryState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.N
 func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
 	// TODO(https://fxbug.dev/77623): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*directoryState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
+	_ = request.Close()
+	return nil
+}
+
+func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
+	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*directoryState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*directoryState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
+	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 const dot = "."
@@ -647,6 +681,23 @@ func (*fileState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2G
 func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
 	// TODO(https://fxbug.dev/77623): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*fileState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
+	_ = request.Close()
+	return nil
+}
+
+func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
+	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*fileState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue) (io.Node2SetExtendedAttributeResult, error) {
+	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*fileState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
+	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (fState *fileState) Read(_ fidl.Context, count uint64) (io.ReadableReadResult, error) {

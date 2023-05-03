@@ -509,6 +509,18 @@ impl BlockServer {
             VolumeAndNodeRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
+            VolumeAndNodeRequest::ListExtendedAttributes { iterator, .. } => {
+                iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
+            }
+            VolumeAndNodeRequest::GetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::SetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::RemoveExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetFlags { responder } => {
                 responder.send(zx::sys::ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;

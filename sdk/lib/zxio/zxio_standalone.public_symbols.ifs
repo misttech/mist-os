@@ -60,4 +60,8 @@ Symbols:
   - { Name: zxio_write_at, Type: Func }
   - { Name: zxio_writev, Type: Func }
   - { Name: zxio_writev_at, Type: Func }
+  - { Name: zxio_xattr_get, Type: Func }
+  - { Name: zxio_xattr_list, Type: Func }
+  - { Name: zxio_xattr_remove, Type: Func }
+  - { Name: zxio_xattr_set, Type: Func }
 ...

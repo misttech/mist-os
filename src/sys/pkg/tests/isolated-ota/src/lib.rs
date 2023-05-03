@@ -570,6 +570,18 @@ async fn serve_failing_blobfs(
                 let _ = responder;
                 todo!("https://fxbug.dev/77623: payload={:?}", payload);
             }
+            fio::DirectoryRequest::ListExtendedAttributes { iterator: _, control_handle: _ } => {
+                todo!("https://fxbug.dev/122123");
+            }
+            fio::DirectoryRequest::GetExtendedAttribute { name, responder: _ } => {
+                todo!("https://fxbug.dev/122123: name={:?}", name);
+            }
+            fio::DirectoryRequest::SetExtendedAttribute { name, value, responder: _ } => {
+                todo!("https://fxbug.dev/122123: name={:?} value={:?}", name, value);
+            }
+            fio::DirectoryRequest::RemoveExtendedAttribute { name, responder: _ } => {
+                todo!("https://fxbug.dev/122123: name={:?}", name);
+            }
             fio::DirectoryRequest::GetFlags { responder } => responder
                 .send(zx::Status::IO.into_raw(), fio::OpenFlags::empty())
                 .context("failing getflags")?,

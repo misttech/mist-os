@@ -58,6 +58,10 @@
 		zxio_write_at;
 		zxio_writev;
 		zxio_writev_at;
+		zxio_xattr_get;
+		zxio_xattr_list;
+		zxio_xattr_remove;
+		zxio_xattr_set;
 	local:
 		*;
 };

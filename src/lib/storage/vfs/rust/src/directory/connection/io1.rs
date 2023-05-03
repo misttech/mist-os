@@ -229,6 +229,22 @@ where
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
+            fio::DirectoryRequest::ListExtendedAttributes { iterator, .. } => {
+                fuchsia_trace::duration!("storage", "Directory::ListExtendedAttributes");
+                iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
+            }
+            fio::DirectoryRequest::GetExtendedAttribute { responder, .. } => {
+                fuchsia_trace::duration!("storage", "Directory::GetExtendedAttribute");
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            fio::DirectoryRequest::SetExtendedAttribute { responder, .. } => {
+                fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            fio::DirectoryRequest::RemoveExtendedAttribute { responder, .. } => {
+                fuchsia_trace::duration!("storage", "Directory::RemoveExtendedAttribute");
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::DirectoryRequest::GetFlags { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetFlags");
                 responder.send(zx::Status::OK.into_raw(), self.options.into_io1())?;

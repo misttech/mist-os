@@ -191,6 +191,18 @@ impl Connection {
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
+            fio::SymlinkRequest::ListExtendedAttributes { iterator, .. } => {
+                iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
+            }
+            fio::SymlinkRequest::GetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            fio::SymlinkRequest::SetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            fio::SymlinkRequest::RemoveExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder
                     .send(fio::SymlinkInfo { target: Some(target), ..Default::default() })?,

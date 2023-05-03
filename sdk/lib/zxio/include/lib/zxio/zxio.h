@@ -513,6 +513,39 @@ ZXIO_EXPORT zx_status_t zxio_create_symlink(zxio_t* io, const char* name, size_t
                                             const uint8_t* target, size_t target_len,
                                             zxio_storage_t* storage);
 
+// Takes a callback, to which all the extended attribute names associated with this node are passed
+// one by one. This function calls the callback for all the names, and then returns.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support extended attributes. Returns
+// ZX_ERR_BUFFER_TOO_SMALL if the buffer_len is not large enough to hold all the names. In that
+// case, out_names_len is set to the currently required size.
+ZXIO_EXPORT zx_status_t zxio_xattr_list(zxio_t* io,
+                                        void (*callback)(void* context, const uint8_t* name,
+                                                         size_t name_len),
+                                        void* context);
+
+// Returns the value for the given extended attribute |name|. |buffer_len| is the size of the
+// allocated buffer at |out_value|. The value is returned in the |out_value| buffer, and
+// |out_value_len| is set to the size of the value.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support extended attributes. Returns
+// ZX_ERR_BUFFER_TOO_SMALL if the buffer_len is not large enough to hold the value. In that case,
+// out_value_len is set to the currently required size.
+ZXIO_EXPORT zx_status_t zxio_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len,
+                                       uint8_t* value, size_t value_capacity,
+                                       size_t* out_value_actual);
+
+// Sets the |value| for the given extended attribute |name|.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support extended attributes.
+ZXIO_EXPORT zx_status_t zxio_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len,
+                                       const uint8_t* value, size_t value_len);
+
+// Removes the value for the given extended attribute |name|.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support extended attributes.
+ZXIO_EXPORT zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len);
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_ZXIO_H_
