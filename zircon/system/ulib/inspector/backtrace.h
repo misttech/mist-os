@@ -16,7 +16,6 @@ namespace inspector {
 // Writes to |f|: the stack from ngunwind and the markup context for modules found in the stack. If
 // the stack and SCS mismatch, the SCS and markup context for all modules will also be written.
 void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
-                            inspector_dsoinfo_t* dso_list, uintptr_t pc, uintptr_t sp, uintptr_t fp,
                             bool skip_markup_context);
 
 }  // namespace inspector

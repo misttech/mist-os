@@ -17,9 +17,6 @@
 
 __BEGIN_CDECLS
 
-// Opaque handle for fetching and using the list of the process's DSOs.
-typedef struct inspector_dsoinfo inspector_dsoinfo_t;
-
 // The type of the buffer that holds the general registers, and exception info.
 #if defined(__x86_64__)
 typedef zx_x86_64_exc_data_t inspector_excp_data_t;
@@ -33,30 +30,11 @@ typedef int inspector_excp_data_t;
 // |thread| must currently be stopped: either suspended or in an exception.
 // The format of the output is verify specific: It outputs the format
 // documented at //docs/reference/kernel/symbolizer_markup.md
-extern void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
-                                             inspector_dsoinfo_t* dso_list, uintptr_t pc,
-                                             uintptr_t sp, uintptr_t fp);
-
-// Fetch the list of the DSOs of |process|.
-// |name| is the name of the application binary.
-extern inspector_dsoinfo_t* inspector_dso_fetch_list(zx_handle_t process);
-
-// Free the value returned by dso_fetch_list().
-extern void inspector_dso_free_list(inspector_dsoinfo_t*);
-
-// Return the DSO that contains |pc|.
-// Returns NULL if not found.
-extern inspector_dsoinfo_t* inspector_dso_lookup(inspector_dsoinfo_t* dso_list, zx_vaddr_t pc);
+void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread);
 
 // Print markup context to |f|. This includes every module and every mapped
 // region of memory derived from those modules.
 void inspector_print_markup_context(FILE* f, zx_handle_t process);
-
-// Try to find the copy of |dso| that contains debug information.
-// On success returns ZX_OK with the path of the file stored in
-// |out_debug_file|. On failure returns an error code.
-extern zx_status_t inspector_dso_find_debug_file(inspector_dsoinfo_t* dso,
-                                                 const char** out_debug_file);
 
 // Fetch the general registers of |thread|.
 zx_status_t inspector_read_general_regs(zx_handle_t thread, zx_thread_state_general_regs_t* regs);

@@ -355,13 +355,9 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
             thread_name, tid);
   }
 
-  inspector_dsoinfo_t* dso_list = inspector_dso_fetch_list(process->get());
-  print_backtrace_markup(out, process->get(), thread->get(), dso_list, decoded.pc, decoded.sp,
-                         decoded.fp, skip_markup_context);
+  print_backtrace_markup(out, process->get(), thread->get(), skip_markup_context);
   if (on_exception)
     print_gwp_asan_info(out, *process, report);
-
-  inspector_dso_free_list(dso_list);
 }
 
 }  // namespace inspector

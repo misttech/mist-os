@@ -17,17 +17,6 @@
 
 namespace component {
 
-struct DsoListWrapper {
-  DsoListWrapper(const zx::process& process) { info = inspector_dso_fetch_list(process.get()); }
-  ~DsoListWrapper() {
-    if (info) {
-      inspector_dso_free_list(info);
-      info = nullptr;
-    }
-  }
-  inspector_dsoinfo_t* info = nullptr;
-};
-
 class DebugInfoRetriever {
  public:
   // Retrieve stack traces for threads in the given process.

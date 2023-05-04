@@ -78,7 +78,6 @@ fbl::String DebugInfoRetriever::GetInfo(const zx::process* process, zx_koid_t* t
     entry.name = temp_name;
   }
 
-  DsoListWrapper dso(*process);
   FILE* output = tmpfile();
   if (output == nullptr) {
     FX_LOGS(ERROR) << "Failed to open tmpfile for output.";
@@ -96,26 +95,18 @@ fbl::String DebugInfoRetriever::GetInfo(const zx::process* process, zx_koid_t* t
     inspector_print_general_regs(output, &regs, nullptr);
 
     // Get the program counter, stack, and frame pointers.
-    zx_vaddr_t pc, sp, fp;
     const char* arch = "unknown";
 #if defined(__x86_64__)
     arch = "x86_64";
-    pc = regs.rip;
-    sp = regs.rsp;
-    fp = regs.rbp;
 #elif defined(__aarch64__)
     arch = "aarch64";
-    pc = regs.pc;
-    sp = regs.sp;
-    fp = regs.r[29];
 #else
     fprintf(output, "unsupported architecture\n");
     continue;
 #endif
 
     fprintf(output, "arch: %s\n", arch);
-    inspector_print_backtrace_markup(output, process->get(), entry.thread.get(), dso.info, pc, sp,
-                                     fp);
+    inspector_print_backtrace_markup(output, process->get(), entry.thread.get());
 
     fprintf(output, "\n");
   }

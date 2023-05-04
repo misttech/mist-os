@@ -86,10 +86,9 @@ void dump_memory(zx_handle_t proc, uintptr_t start, size_t len, FILE* out) {
   }
 }
 
-void dump_thread(zx_handle_t process, inspector_dsoinfo_t* dso_list, uint64_t tid,
-                 zx_handle_t thread, FILE* out) {
+void dump_thread(zx_handle_t process, uint64_t tid, zx_handle_t thread, FILE* out) {
   zx_thread_state_general_regs_t regs;
-  zx_vaddr_t pc = 0, sp = 0, fp = 0;
+  zx_vaddr_t sp = 0;
 
   if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
     // Error message has already been printed.
@@ -97,13 +96,9 @@ void dump_thread(zx_handle_t process, inspector_dsoinfo_t* dso_list, uint64_t ti
   }
 
 #if defined(__x86_64__)
-  pc = regs.rip;
   sp = regs.rsp;
-  fp = regs.rbp;
 #elif defined(__aarch64__)
-  pc = regs.pc;
   sp = regs.sp;
-  fp = regs.r[29];
 #else
   // It's unlikely we'll get here as trying to read the regs will likely
   // fail, but we don't assume that.
@@ -124,7 +119,7 @@ void dump_thread(zx_handle_t process, inspector_dsoinfo_t* dso_list, uint64_t ti
   fprintf(out, "bottom of user stack:\n");
   dump_memory(process, sp, kMemoryDumpSize, out);
 
-  inspector_print_backtrace_markup(out, process, thread, dso_list, pc, sp, fp);
+  inspector_print_backtrace_markup(out, process, thread);
 
   if (verbosity_level >= 1)
     fprintf(out, "Done handling thread %" PRIu64 ".%" PRIu64 ".\n", get_koid(process),
@@ -154,7 +149,6 @@ void dump_all_threads(uint64_t pid, zx_handle_t process, FILE* out) {
 
   fprintf(out, "%zu thread(s)\n", num_threads);
 
-  inspector_dsoinfo_t* dso_list = inspector_dso_fetch_list(process);
   inspector_print_markup_context(out, process);
 
   // TODO(dje): Move inspector's DebugInfoCache here, so that we can use it
@@ -195,7 +189,7 @@ void dump_all_threads(uint64_t pid, zx_handle_t process, FILE* out) {
         fprintf(out, "Unable to print backtrace of thread %" PRIu64 ".%" PRIu64 ": terminated\n",
                 pid, tid);
       } else {
-        dump_thread(process, dso_list, tid, thread, out);
+        dump_thread(process, tid, thread, out);
       }
     } else {
       print_zx_error(status,
@@ -206,8 +200,6 @@ void dump_all_threads(uint64_t pid, zx_handle_t process, FILE* out) {
     zx_handle_close(suspend_token);
     zx_handle_close(thread);
   }
-
-  inspector_dso_free_list(dso_list);
 }
 
 void dump_process(zx_koid_t pid, zx::unowned_process process, FILE* out) {

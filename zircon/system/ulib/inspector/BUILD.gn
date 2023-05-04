@@ -10,9 +10,6 @@ group("tests") {
 }
 
 zx_library("inspector") {
-  # This should only ever be used as a shared library because it hides
-  # the otherwise problematic ngunwind symbols.
-
   sdk = "shared"
   sdk_headers = [ "inspector/inspector.h" ]
   sources = [
@@ -31,7 +28,6 @@ zx_library("inspector") {
     "//zircon/system/ulib/elf-search",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
-    "//zircon/third_party/ulib/ngunwind",
   ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
