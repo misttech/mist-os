@@ -27,7 +27,6 @@ use futures::TryStreamExt;
 use serde_json::json;
 use std::{
     collections::HashSet,
-    fs,
     io::{stdout, BufWriter, ErrorKind, Write},
     path::PathBuf,
     process::Command,
@@ -299,47 +298,8 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 
     if cmd.repair_keys {
         let keys = SshKeyFiles::load().await?;
-
-        // Be gentle in repairing, we should not remove keys unnecessarily.
-        // Do we need to repair anything?
-        let mut del_priv_key = false;
-        let mut recreate_keys = false;
-        let message = match keys.check_keys() {
-            Ok(_) => format!("SSH Public/Private keys match"),
-            Err(e) => match e.kind {
-                SshKeyErrorKind::BadKeyType => {
-                    format!("SSH keys type not supported: {}", e.message)
-                }
-                SshKeyErrorKind::BadKeyFormat => {
-                    del_priv_key = true;
-                    recreate_keys = true;
-                    format!("{}.", e.message)
-                }
-                _ => {
-                    recreate_keys = true;
-                    format!("{}.", e.message)
-                }
-            },
-        };
+        let message = keys.check_keys(true)?;
         writeln!(&mut writer, "{message}")?;
-        if recreate_keys {
-            match keys.create_keys_if_needed() {
-                Ok(_) => writeln!(&mut writer, "SSH Keys repaired.")?,
-                Err(e) => {
-                    // If there was an error, print it, delete the keys,
-                    // and recreate.
-                    writeln!(&mut writer, "Error repairing SSH keys {e:?}. Existing keys will be deleted and new keys generated.")?;
-                    if del_priv_key && keys.private_key.exists() {
-                        fs::remove_file(&keys.private_key)?;
-                    }
-
-                    if keys.authorized_keys.exists() {
-                        fs::remove_file(&keys.authorized_keys)?;
-                    }
-                    keys.create_keys_if_needed()?;
-                }
-            }
-        }
     }
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
@@ -918,7 +878,7 @@ async fn doctor_summary<W: Write>(
     let ssh_node: usize;
     match SshKeyFiles::load().await {
         Ok(ssh_files) => {
-            let ( description, outcome) = match ssh_files.check_keys() {
+            let ( description, outcome) = match ssh_files.check_keys(false) {
                 Ok(_) => (format!("SSH Public/Private keys match"), LedgerOutcome::Success),
                 Err(e)  => {
                     match e.kind {
