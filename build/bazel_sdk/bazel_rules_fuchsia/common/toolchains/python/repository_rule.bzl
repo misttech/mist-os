@@ -26,7 +26,7 @@ Example usage:
 
   ...
 
-  # Load the repository rule. Ntoe that this requires @rules_python to already be loaded.
+  # Load the repository rule. Note that this requires @rules_python to already be loaded.
   load("//path/to:this/repository_rule.bzl", "compact_python_runtime_repository")
 
   # Create the repository for the compact python runtime.
@@ -135,7 +135,7 @@ def _compact_python_runtime_impl(repo_ctx):
             # more portable than relying on a host `zip` tool being available.
             # On Linux, this is slightly slower than using the host zip command
             # (i.e. 0.77s vs 0.483s).
-            zip_directory_script = repo_ctx.path(Label("//:build/bazel/scripts/zip-directory.py"))
+            zip_directory_script = repo_ctx.path(Label("//:scripts/zip-directory.py"))
             ret = repo_ctx.execute(
                 [
                     str(python_interpreter),
@@ -191,7 +191,7 @@ exec "${{_SCRIPT_DIR}}/{python3_real}" -S -s "$@"
 
     repo_ctx.template(
         "BUILD.bazel",
-        str(repo_ctx.path(Label("//:build/bazel/toolchains/python/template.BUILD.bazel"))),
+        str(repo_ctx.path(Label("//:toolchains/python/template.BUILD.bazel"))),
         substitutions = {
             "{python_launcher}": python3_launcher,
             "{python_runtime_files}": str(python_runtime_files),
