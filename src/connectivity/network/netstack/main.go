@@ -548,9 +548,12 @@ func Main() {
 	componentCtx.OutgoingService.AddDiagnostics("counters", &component.DirectoryWrapper{
 		Directory: &inspectDirectory{
 			asService: (&inspectImpl{
-				inner: &statCounterInspectImpl{
-					name:  "Networking Stat Counters",
-					value: reflect.ValueOf(&ns.stats).Elem(),
+				inner: &networkingStatCountersInspectImpl{
+					statCounterInspectImpl: statCounterInspectImpl{
+						name:  "Networking Stat Counters",
+						value: reflect.ValueOf(&ns.stats).Elem(),
+					},
+					ns: ns,
 				},
 			}).asService,
 		},

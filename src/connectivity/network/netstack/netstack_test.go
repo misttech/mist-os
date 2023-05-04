@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"sync/atomic"
 	"syscall/zx"
 	"testing"
 	"time"
@@ -1545,5 +1546,71 @@ func TestInFlightPacketsConsumeUDPSendBuffer(t *testing.T) {
 	// Expect Write() succeeds now that the send buffer has space.
 	if err := validateWrite(int64(len(data)), nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func cmpAtomicUint32(a, b atomic.Uint32) bool {
+	return a.Load() == b.Load()
+}
+
+func TestNetworkSocketOptionStatsUpdateMax(t *testing.T) {
+	var candidate NetworkSocketOptionStats
+	candidate.SetReuseAddress.Add(1)
+
+	var max MaxSocketOptionStats
+	max.GetReuseAddress.Add(2)
+	max.updateMax(&candidate)
+
+	var want MaxSocketOptionStats
+	want.SetReuseAddress.Add(1)
+	want.GetReuseAddress.Add(2)
+	if diff := cmp.Diff(want, max, cmp.Comparer(cmpAtomicUint32)); diff != "" {
+		t.Fatalf("unexpected value after updateMax (-want +got):\n%s", diff)
+	}
+}
+
+func TestStreamSocketOptionStatsUpdateMax(t *testing.T) {
+	candidate := streamSocketOptionStats{
+		NetworkSocketOptionStats: &NetworkSocketOptionStats{},
+	}
+	// These two stats are in different embedded types in streamSocketOptionStats.
+	candidate.SetReuseAddress.Add(1)
+	candidate.SetTcpNoDelay.Add(1)
+
+	var max MaxSocketOptionStats
+	max.GetReuseAddress.Add(2)
+	max.GetTcpNoDelay.Add(2)
+	max.updateMax(&candidate)
+
+	var want MaxSocketOptionStats
+	want.SetReuseAddress.Add(1)
+	want.SetTcpNoDelay.Add(1)
+	want.GetReuseAddress.Add(2)
+	want.GetTcpNoDelay.Add(2)
+	if diff := cmp.Diff(want, max, cmp.Comparer(cmpAtomicUint32)); diff != "" {
+		t.Fatalf("unexpected value after updateMax (-want +got):\n%s", diff)
+	}
+}
+
+func TestRawSocketOptionStatsUpdateMax(t *testing.T) {
+	candidate := rawSocketOptionStats{
+		NetworkSocketOptionStats: &NetworkSocketOptionStats{},
+	}
+	// These two stats are in different embedded types in rawSocketOptionStats.
+	candidate.SetReuseAddress.Add(1)
+	candidate.SetIpHeaderIncluded.Add(1)
+
+	var max MaxSocketOptionStats
+	max.GetReuseAddress.Add(2)
+	max.GetIpHeaderIncluded.Add(2)
+	max.updateMax(&candidate)
+
+	var want MaxSocketOptionStats
+	want.SetReuseAddress.Add(1)
+	want.SetIpHeaderIncluded.Add(1)
+	want.GetReuseAddress.Add(2)
+	want.GetIpHeaderIncluded.Add(2)
+	if diff := cmp.Diff(want, max, cmp.Comparer(cmpAtomicUint32)); diff != "" {
+		t.Fatalf("unexpected value after updateMax (-want +got):\n%s", diff)
 	}
 }

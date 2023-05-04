@@ -381,9 +381,7 @@ var _ socketOptionStats = (*NetworkSocketOptionStats)(nil)
 func (s *NetworkSocketOptionStats) isSocketOptionStats() {
 }
 
-type streamSocketOptionStats struct {
-	*NetworkSocketOptionStats
-
+type StreamSocketSpecificOptionStats struct {
 	SetTcpNoDelay           atomicUint32Stat
 	GetTcpNoDelay           atomicUint32Stat
 	SetTcpMaxSegment        atomicUint32Stat
@@ -413,17 +411,25 @@ type streamSocketOptionStats struct {
 	GetTcpUserTimeout       atomicUint32Stat
 }
 
+type streamSocketOptionStats struct {
+	*NetworkSocketOptionStats
+	StreamSocketSpecificOptionStats
+}
+
 var _ socketOptionStats = (*streamSocketOptionStats)(nil)
 
-type rawSocketOptionStats struct {
-	*NetworkSocketOptionStats
-
+type RawSocketSpecificOptionStats struct {
 	SetIpHeaderIncluded atomicUint32Stat
 	GetIpHeaderIncluded atomicUint32Stat
 	SetIcmpv6Filter     atomicUint32Stat
 	GetIcmpv6Filter     atomicUint32Stat
 	SetIpv6Checksum     atomicUint32Stat
 	GetIpv6Checksum     atomicUint32Stat
+}
+
+type rawSocketOptionStats struct {
+	*NetworkSocketOptionStats
+	RawSocketSpecificOptionStats
 }
 
 var _ socketOptionStats = (*rawSocketOptionStats)(nil)
@@ -3970,7 +3976,11 @@ func (ns *Netstack) onRemoveEndpoint(key uint64) bool {
 	if key == 0 {
 		return false
 	}
-	_, deleted := ns.endpoints.LoadAndDelete(key)
+	endpointStats, deleted := ns.endpoints.LoadAndDelete(key)
+	// Update the max socket option stats if any of this endpoint's stats are
+	// larger. Making the update only when sockets close and when inspect data
+	// is queried minimizes overhead.
+	ns.stats.MaxSocketOptionStats.updateMax(endpointStats.sockOptStats)
 	return deleted
 }
 

@@ -1227,3 +1227,17 @@ func (*memstatsInspectImpl) ListChildren() []string {
 func (*memstatsInspectImpl) GetChild(string) inspectInner {
 	return nil
 }
+
+type networkingStatCountersInspectImpl struct {
+	statCounterInspectImpl
+
+	ns *Netstack
+}
+
+func (n *networkingStatCountersInspectImpl) ReadData() inspect.Object {
+	n.ns.endpoints.Range(func(_ uint64, stats endpointAndStats) bool {
+		n.ns.stats.MaxSocketOptionStats.updateMax(stats.sockOptStats)
+		return true
+	})
+	return n.statCounterInspectImpl.ReadData()
+}

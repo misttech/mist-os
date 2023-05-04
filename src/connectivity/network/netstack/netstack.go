@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"reflect"
 	"syscall/zx"
 	"time"
 	"unsafe"
@@ -84,6 +85,44 @@ func ipv6MulticastSubnet() tcpip.AddressWithPrefix {
 	}
 }
 
+type MaxSocketOptionStats struct {
+	NetworkSocketOptionStats
+	StreamSocketSpecificOptionStats
+	RawSocketSpecificOptionStats
+}
+
+func (s *MaxSocketOptionStats) updateMax(sockOptStats socketOptionStats) {
+	updateMax := func(max, candidate any) {
+		maxValue := reflect.ValueOf(max).Elem()
+		candidateValue := reflect.ValueOf(candidate).Elem()
+		for i := 0; i < maxValue.NumField(); i++ {
+			candidateValue := candidateValue.Field(i).Addr().Interface().(*atomicUint32Stat).Load()
+			max := maxValue.Field(i).Addr().Interface().(*atomicUint32Stat)
+			for {
+				if maxOld := max.Load(); candidateValue > maxOld {
+					if max.CompareAndSwap(maxOld, candidateValue) {
+						break
+					}
+				} else {
+					break
+				}
+			}
+		}
+	}
+	switch sockOptStats := sockOptStats.(type) {
+	case *NetworkSocketOptionStats:
+		updateMax(&s.NetworkSocketOptionStats, sockOptStats)
+	case *streamSocketOptionStats:
+		updateMax(&s.NetworkSocketOptionStats, sockOptStats.NetworkSocketOptionStats)
+		updateMax(&s.StreamSocketSpecificOptionStats, &sockOptStats.StreamSocketSpecificOptionStats)
+	case *rawSocketOptionStats:
+		updateMax(&s.NetworkSocketOptionStats, sockOptStats.NetworkSocketOptionStats)
+		updateMax(&s.RawSocketSpecificOptionStats, &sockOptStats.RawSocketSpecificOptionStats)
+	default:
+		panic(fmt.Sprintf("unknown socket option stat type: %T", sockOptStats))
+	}
+}
+
 type stats struct {
 	tcpip.Stats
 	SocketCount      tcpip.StatCounter
@@ -100,6 +139,13 @@ type stats struct {
 		DHCPv6ManagedAddressOnly            tcpip.StatCounter
 		GlobalSLAACAndDHCPv6ManagedAddress  tcpip.StatCounter
 	}
+	// MaxSocketOptionStats holds the stack-wide maximum of each socket option
+	// stat across the lifetime of the stack.
+	//
+	// Note that because this is updated whenever a socket is closed, and on every
+	// inspect fetch, the values returned via inspect are always accurate, but the
+	// values contained within may not be the stack-wide max at any moment in time.
+	MaxSocketOptionStats MaxSocketOptionStats
 }
 
 type endpointAndStats struct {
