@@ -580,18 +580,22 @@ std::optional<std::string> DriverRunner::BindNodeToResult(
       return std::nullopt;
     }
 
-    // If it doesn't have a value but there was no error it just means the node was added
-    // to a composite node spec but the spec is still incomplete.
-    auto composite_node_and_driver = result.value();
-    if (!composite_node_and_driver.has_value()) {
+    // If the list is empty, then there are no completed composite node specs.
+    auto composite_list = result.value();
+    if (composite_list.empty()) {
       return "";
     }
 
-    auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver->node);
+    // TODO(fxb/122531): Support composite multibind.
+    ZX_ASSERT_MSG(composite_list.size() == 1u, "Unexpected composite list size of %zu",
+                  composite_list.size());
+    auto composite_node_and_driver = composite_list[0];
+
+    auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver.node);
     auto locked_composite_node = composite_node.lock();
     ZX_ASSERT(locked_composite_node);
 
-    driver_info = composite_node_and_driver->driver;
+    driver_info = composite_node_and_driver.driver;
     driver_node = locked_composite_node.get();
   }
 

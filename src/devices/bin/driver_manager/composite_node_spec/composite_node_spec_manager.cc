@@ -60,7 +60,7 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
   return fit::ok();
 }
 
-zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
+zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
     fdi::wire::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
     bool enable_multibind) {
   if (!match_info.has_specs() || match_info.specs().empty()) {
@@ -71,6 +71,7 @@ zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::Bind
   // Go through each spec until we find an available one with an unbound parent. If
   // |enable_multibind| is true, then we will go through every spec.
   auto found_parent_spec = false;
+  std::vector<CompositeNodeAndDriver> node_and_drivers;
   for (auto spec_info : match_info.specs()) {
     if (!spec_info.has_composite()) {
       continue;
@@ -111,34 +112,34 @@ zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::Bind
 
     auto &spec = specs_[name_val];
     auto result = spec->BindParent(spec_info, device_or_node);
-    if (result.is_ok()) {
-      found_parent_spec = true;
-      if (enable_multibind) {
-        continue;
-      }
 
-      auto composite_node = result.value();
-      if (composite_node.has_value() && driver.has_driver_info()) {
-        return zx::ok(
-            CompositeNodeAndDriver{.driver = driver.driver_info(), .node = composite_node.value()});
+    if (result.is_error()) {
+      if (result.error_value() != ZX_ERR_ALREADY_BOUND) {
+        LOGF(ERROR, "Failed to bind node: %s", result.status_string());
       }
-
-      return zx::ok(std::nullopt);
+      continue;
     }
 
-    if (result.error_value() != ZX_ERR_ALREADY_BOUND) {
-      LOGF(ERROR, "Failed to bind node: %d", result.error_value());
+    found_parent_spec = true;
+    auto composite_node = result.value();
+    if (composite_node.has_value() && driver.has_driver_info()) {
+      node_and_drivers.push_back(
+          CompositeNodeAndDriver{.driver = driver.driver_info(), .node = composite_node.value()});
+    }
+
+    if (!enable_multibind) {
+      return zx::ok(std::move(node_and_drivers));
     }
   }
 
   if (found_parent_spec) {
-    return zx::ok(std::nullopt);
+    return zx::ok(std::move(node_and_drivers));
   }
 
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
+zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
     fdi::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
     bool enable_multibind) {
   fidl::Arena<> arena;
