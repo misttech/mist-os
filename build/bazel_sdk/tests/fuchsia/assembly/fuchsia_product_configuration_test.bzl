@@ -4,21 +4,15 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaProductConfigInfo")
-load(":test_utils.bzl", "create_validation_script")
+load(":test_utils.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
 
 def _fuchsia_product_configuration_test_impl(ctx):
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     golden_file = ctx.file.golden_file
-
-    runfiles = ctx.runfiles(
-        files = [
-            golden_file,
-            product_config_file,
-        ],
-    ).merge(ctx.attr._json_comparator[DefaultInfo].default_runfiles)
+    script, runfiles = create_validation_script(ctx, product_config_file, golden_file)
     return [
         DefaultInfo(
-            executable = create_validation_script(ctx, product_config_file, golden_file),
+            executable = script,
             runfiles = runfiles,
             files = depset(
                 direct = ctx.files.product_config,
@@ -41,10 +35,5 @@ fuchsia_product_configuration_test = rule(
             allow_single_file = True,
             mandatory = True,
         ),
-        "_json_comparator": attr.label(
-            default = "@fuchsia_sdk//fuchsia/tools:json_comparator",
-            executable = True,
-            cfg = "exec",
-        ),
-    },
+    } | CREATE_VALIDATION_SCRIPT_ATTRS,
 )
