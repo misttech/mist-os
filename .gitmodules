@@ -178,11 +178,6 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/ARM-software/HWCPipe
 	name = third_party/github.com/ARM-software/HWCPipe
 	ignore = all
-[submodule "third_party/github.com/google/cppdap"]
-	path = third_party/github.com/google/cppdap
-	url = https://fuchsia.googlesource.com/third_party/github.com/google/cppdap
-	name = third_party/github.com/google/cppdap
-	ignore = all
 [submodule "third_party/github.com/google/emboss/src"]
 	path = third_party/github.com/google/emboss/src
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/emboss
@@ -627,4 +622,9 @@
 	path = third_party/jellyfish/jellyfish
 	url = https://fuchsia.googlesource.com/third_party/github.com/jamesturk/jellyfish
 	name = third_party/jellyfish
+	ignore = all
+[submodule "third_party/github.com/google/cppdap/src"]
+	path = third_party/github.com/google/cppdap/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/google/cppdap
+	name = third_party/github.com/google/cppdap
 	ignore = all
