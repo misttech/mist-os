@@ -95,6 +95,72 @@ pub(crate) fn add_route<
     })
 }
 
+fn del_entries<
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpStateContext<I, C>,
+    F: Fn(&Entry<I::Addr, SC::DeviceId>) -> bool,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    predicate: F,
+) -> Result<(), NotFoundError> {
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+        let removed = table.del_entries(predicate);
+        if removed.is_empty() {
+            Err(NotFoundError)
+        } else {
+            Ok(removed
+                .into_iter()
+                .for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry))))
+        }
+    })
+}
+
+/// Delete all routes to a subnet, returning `Err` if no route was found to
+/// be deleted.
+///
+/// Note, `del_subnet_routes` will remove *all* routes to a `subnet`,
+/// including routes that consider `subnet` on-link for some device and
+/// routes that require packets destined to a node within `subnet` to be
+/// routed through some next-hop node.
+// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+pub(crate) fn del_subnet_route<
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpStateContext<I, C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    del_subnet: Subnet<I::Addr>,
+) -> Result<(), NotFoundError> {
+    debug!("deleting routes to subnet: {del_subnet}");
+    del_entries(sync_ctx, ctx, |Entry { subnet, device: _, gateway: _, metric: _ }| {
+        subnet == &del_subnet
+    })
+}
+
+/// Delete all routes on a device.
+///
+/// Unlike ['del_subnet_routes'], this function always succeeds, even if
+/// there are no device routes.
+// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+pub(crate) fn del_device_routes<
+    I: IpLayerIpExt,
+    SC: IpStateContext<I, C>,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    del_device: &SC::DeviceId,
+) {
+    debug!("deleting routes on device: {del_device:?}");
+    let _: Result<(), NotFoundError> =
+        del_entries(sync_ctx, ctx, |Entry { subnet: _, device, gateway: _, metric: _ }| {
+            device == del_device
+        });
+}
+
 /// Deletes all routes matching the provided specifiers exactly.
 ///
 /// Returns all the deleted routes, or an error if no routes were deleted.
@@ -106,14 +172,15 @@ pub(super) fn del_specific_routes<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    subnet: Subnet<I::Addr>,
-    device: &SC::DeviceId,
-    gateway: Option<SpecifiedAddr<I::Addr>>,
+    del_subnet: Subnet<I::Addr>,
+    del_device: &SC::DeviceId,
+    del_gateway: Option<SpecifiedAddr<I::Addr>>,
 ) -> Result<(), NotFoundError> {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.del_specific_routes(subnet, device, gateway).map(|removed| {
-            removed.into_iter().for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
-        })
+    debug!(
+        "deleting routes with subnet={del_subnet} device={del_device:?} gateway={del_gateway:?}",
+    );
+    del_entries(sync_ctx, ctx, |Entry { subnet, device, gateway, metric: _ }| {
+        device == del_device && subnet == &del_subnet && gateway == &del_gateway
     })
 }
 
@@ -221,7 +288,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     // Applies the given predicate to the entries in the forwarding table,
     // removing (and returning) those that yield `true` while retaining those
     // that yield `false`.
-    fn del_routes<F: Fn(&Entry<I::Addr, D>) -> bool>(
+    fn del_entries<F: Fn(&Entry<I::Addr, D>) -> bool>(
         &mut self,
         predicate: F,
     ) -> Vec<Entry<I::Addr, D>> {
@@ -232,61 +299,6 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         let (removed, owned_table) = owned_table.into_iter().partition(|entry| predicate(entry));
         *table = owned_table;
         removed
-    }
-
-    /// Delete all routes to a subnet, returning `Err` if no route was found to
-    /// be deleted.
-    ///
-    /// Returns all the deleted entries on success.
-    ///
-    /// Note, `del_subnet_routes` will remove *all* routes to a `subnet`,
-    /// including routes that consider `subnet` on-link for some device and
-    /// routes that require packets destined to a node within `subnet` to be
-    /// routed through some next-hop node.
-    pub(crate) fn del_subnet_routes(
-        &mut self,
-        subnet: Subnet<I::Addr>,
-    ) -> Result<Vec<Entry<I::Addr, D>>, NotFoundError> {
-        debug!("deleting routes to subnet: {}", subnet);
-        let removed = self.del_routes(|entry: &Entry<I::Addr, D>| entry.subnet == subnet);
-        if removed.is_empty() {
-            // If a path to `subnet` was not in our installed table, then it
-            // definitely won't be in our active routes cache.
-            return Err(NotFoundError);
-        }
-        Ok(removed)
-    }
-
-    /// Delete all routes on a device.
-    ///
-    /// Unlike ['del_subnet_routes'], this function always succeeds, even if
-    /// there are no device routes.
-    pub(crate) fn del_device_routes(&mut self, device: D) -> Vec<Entry<I::Addr, D>> {
-        debug!("deleting routes on device: {:?}", device);
-        self.del_routes(|entry: &Entry<I::Addr, D>| entry.device == device)
-    }
-
-    /// Deletes all routes matching the provided specifiers exactly.
-    ///
-    /// Returns all the deleted routes, or an error if no routes were deleted.
-    fn del_specific_routes(
-        &mut self,
-        del_subnet: Subnet<I::Addr>,
-        del_device: &D,
-        del_gateway: Option<SpecifiedAddr<I::Addr>>,
-    ) -> Result<Vec<Entry<I::Addr, D>>, crate::error::NotFoundError> {
-        debug!(
-            "deleting routes with subnet={del_subnet} device={del_device:?} gateway={del_gateway:?}",
-        );
-        let removed =
-            self.del_routes(|Entry { subnet, device, gateway, metric: _ }: &Entry<I::Addr, D>| {
-                device == del_device && subnet == &del_subnet && gateway == &del_gateway
-            });
-        if removed.is_empty() {
-            Err(crate::error::NotFoundError)
-        } else {
-            Ok(removed)
-        }
     }
 
     /// Get an iterator over all of the forwarding entries ([`Entry`]) this
@@ -521,7 +533,12 @@ mod tests {
 
         // Delete all routes to subnet.
         assert_eq!(
-            table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
+            table
+                .del_entries(
+                    |Entry { subnet, device: _, gateway: _, metric: _ }| subnet == &config.subnet
+                )
+                .into_iter()
+                .collect::<HashSet<_>>(),
             HashSet::from([
                 Entry { subnet: config.subnet, device: device.clone(), gateway: None, metric },
                 Entry {
@@ -537,31 +554,6 @@ mod tests {
             table.iter_table().collect::<Vec<_>>(),
             &[&Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None, metric }]
         );
-    }
-
-    #[ip_test]
-    fn test_delete_device_routes<I: Ip + TestIpExt>() {
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-
-        let config = I::FAKE_CONFIG;
-        let subnet = config.subnet;
-        let device_a = MultipleDevicesId::A;
-        let device_b = MultipleDevicesId::B;
-        let metric = Metric::ExplicitMetric(RawMetric(0));
-
-        // Should add the routes successfully.
-        let entry_a = Entry { subnet, device: device_a.clone(), gateway: None, metric };
-        let entry_b = Entry { subnet, device: device_b.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry_a.clone()), Ok(&entry_a));
-        assert_eq!(table.add_entry(entry_b.clone()), Ok(&entry_b));
-        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry_a, &entry_b]);
-
-        assert_eq!(
-            table.del_device_routes(device_a.clone()).into_iter().collect::<Vec<_>>(),
-            &[entry_a]
-        );
-
-        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry_b]);
     }
 
     #[ip_test]
@@ -588,7 +580,12 @@ mod tests {
         // Delete routes to the subnet and make sure that we can no longer route
         // to destinations in the subnet.
         assert_eq!(
-            table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
+            table
+                .del_entries(
+                    |Entry { subnet, device: _, gateway: _, metric: _ }| subnet == &config.subnet
+                )
+                .into_iter()
+                .collect::<HashSet<_>>(),
             HashSet::from([
                 Entry { subnet: config.subnet, device: device.clone(), gateway: None, metric },
                 Entry {

@@ -59,7 +59,6 @@ use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
-    error::NotFoundError,
     ip::{
         device::{
             state::IpDeviceStateIpExt, BufferIpv4DeviceHandler, IpDeviceIpExt,
@@ -2462,43 +2461,6 @@ fn lookup_route_table<
     dst_ip: I::Addr,
 ) -> Option<Destination<I::Addr, SC::DeviceId>> {
     sync_ctx.with_ip_routing_table(|sync_ctx, table| table.lookup(sync_ctx, device, dst_ip))
-}
-
-/// Delete a route from the forwarding table, returning `Err` if no
-/// route was found to be deleted.
-// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
-pub(crate) fn del_route<
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpStateContext<I, C>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    subnet: Subnet<I::Addr>,
-) -> Result<(), NotFoundError> {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.del_subnet_routes(subnet).map(|removed| {
-            removed.into_iter().for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
-        })
-    })
-}
-
-// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
-pub(crate) fn del_device_routes<
-    I: IpLayerIpExt,
-    SC: IpStateContext<I, C>,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    to_delete: &SC::DeviceId,
-) {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table
-            .del_device_routes(to_delete.clone())
-            .into_iter()
-            .for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
-    })
 }
 
 /// Get all the routes.

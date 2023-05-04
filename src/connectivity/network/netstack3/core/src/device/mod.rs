@@ -1742,8 +1742,8 @@ pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
         crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
 
         // Uninstall all routes associated with the device.
-        crate::ip::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
-        crate::ip::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
+        crate::ip::forwarding::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
+        crate::ip::forwarding::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
     }
 
     let EthernetDeviceId(id, rc) = device;

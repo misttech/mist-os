@@ -1869,8 +1869,12 @@ mod tests {
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
         // Make sure that sending on an unroutable socket fails.
-        crate::ip::del_route::<I, _, _>(&mut Locked::new(sync_ctx), &mut non_sync_ctx, subnet)
-            .unwrap();
+        crate::ip::forwarding::del_subnet_route::<I, _, _>(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            subnet,
+        )
+        .unwrap();
         let res = BufferIpSocketHandler::<I, _, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,

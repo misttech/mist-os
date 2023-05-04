@@ -492,8 +492,8 @@ pub fn del_route<NonSyncCtx: NonSyncContext>(
     let mut sync_ctx = Locked::new(sync_ctx);
     map_addr_version!(
         subnet: SubnetEither;
-        crate::ip::del_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet),
-        crate::ip::del_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet)
+        crate::ip::forwarding::del_subnet_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet),
+        crate::ip::forwarding::del_subnet_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet)
     )
     .map_err(From::from)
 }
