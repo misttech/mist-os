@@ -159,6 +159,7 @@ def fuchsia_package_tasks(
         is_test = False,
         tags = [],
         package_repository_name = None,
+        driver_repository_name = None,
         **kwargs):
     # TODO(fxbug.dev/98996): Use ffx isolation. ffx test run currently needs
     # to access ~/.local/share/Fuchsia/ffx/ or else it crashes.
@@ -242,7 +243,7 @@ def fuchsia_package_tasks(
         fuchsia_task_run_component(
             name = component_run_tasks[-1],
             default_argument_scope = "global",
-            repository = package_repository_name or anonymous_repo_name,
+            repository = driver_repository_name or (package_repository_name or anonymous_repo_name),
             package = package,
             component = component,
             tags = tags,

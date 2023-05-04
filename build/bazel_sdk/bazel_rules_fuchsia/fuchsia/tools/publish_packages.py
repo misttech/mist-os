@@ -143,11 +143,12 @@ class FuchsiaTaskPublish(FuchsiaTask):
         args.repo_path = existing_repo_path or Path(tempfile.mkdtemp())
 
     def ensure_repo(self, args):
-        # Ensure pm repo.
+        # Ensure repository.
         if (args.repo_path / 'repository').is_dir():
-            print(f'Using existing pm repo: {args.repo_path}')
+            print(f'Using existing repo: {args.repo_path}')
+            return
         else:
-            print(f'Creating a new pm repository: {args.repo_path}')
+            print(f'Creating a new repository: {args.repo_path}')
             run(args.pm, 'newrepo', '-vt', '-repo', args.repo_path)
 
         # Ensure ffx repository.

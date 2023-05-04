@@ -66,6 +66,11 @@ def fuchsia_package(
         archive_name: An option name for the far file.
         **kwargs: extra attributes to pass along to the build rule.
     """
+
+    # Temporary work around to pass in a repository name for driver URL.
+    # This will help us unblock the Intel WIFI driver hot reload issue.
+    driver_repository_name = kwargs.pop("driver_repository_name", None)
+
     _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
         components = components,
@@ -81,6 +86,7 @@ def fuchsia_package(
         package = "%s_fuchsia_package" % name,
         components = {component: component for component in components},
         tools = {tool: tool for tool in tools},
+        driver_repository_name = driver_repository_name,
         **kwargs
     )
 
