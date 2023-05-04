@@ -19,7 +19,8 @@ SECTIONS {
 }
 /* Entry point should not normally be used directly in vDSO, so here it is used to store
    the offset at which vDSO constants are located, for easy reference. */
-ENTRY(DATA_CONSTANTS)
+start = DEFINED(DATA_CONSTANTS) ? DATA_CONSTANTS : 0 ;
+ENTRY(start)
 
 PHDRS {
   /* The LOAD section must include at least FILEHDR so that it covers the start of the file.
