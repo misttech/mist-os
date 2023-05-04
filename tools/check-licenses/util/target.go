@@ -17,6 +17,9 @@ type Target struct {
 	Deps                []string `json:"deps"`
 	Args                []string `json:"args,omitempty"`
 	Inputs              []string `json:"inputs,omitempty"`
+	Sources             []string `json:"sources,omitempty"`
+	PublicConfigs       []string `json:"public_configs,omitempty"`
+	IncludeDirs         []string `json:"include_dirs,omitempty"`
 	Script              string   `json:"script,omitempty"`
 	LibDirs             []string `json:"lib_dirs,omitempty"`
 	Libs                []string `json:"libs,omitempty"`
@@ -39,6 +42,9 @@ func (t *Target) Clean(re *regexp.Regexp) error {
 	paths = append(paths, t.Inputs...)
 	paths = append(paths, t.LibDirs...)
 	paths = append(paths, t.Libs...)
+	paths = append(paths, t.Sources...)
+	paths = append(paths, t.PublicConfigs...)
+	paths = append(paths, t.IncludeDirs...)
 
 	var err error
 	t.CleanNames, err = clean([]string{t.Name}, re)
