@@ -1186,7 +1186,9 @@ void VmMapping::TryMergeRightNeighborLocked(VmMapping* right_candidate) {
   // Destroy / DestroyLocked perform a lot more cleanup than we want, we just need to clear out a
   // few things from right_candidate and then mark it as dead, as we do not want to clear out any
   // arch page table mappings etc.
-  {
+  // Use a lambda here instead of a regular scope so that the AssertHeld has its range correctly
+  // limited.
+  [&]() TA_REQ(right_candidate->lock()) TA_REQ(lock()) {
     // Although it was safe to read size_ without holding the object lock, we need to acquire it to
     // perform changes.
     Guard<CriticalMutex> guard{right_candidate->object_->lock()};
@@ -1206,7 +1208,7 @@ void VmMapping::TryMergeRightNeighborLocked(VmMapping* right_candidate) {
     right_candidate->set_size_locked(0);
 
     right_candidate->object_->RemoveMappingLocked(right_candidate);
-  }
+  }();
 
   // Detach from the VMO. As we have removed ourselves as a mapping we also need to remove any
   // priority we might have been propagating to that VMO. Additionally, we're destroying this
