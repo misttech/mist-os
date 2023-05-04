@@ -17,7 +17,8 @@ async fn test_devfs_exporter() -> Result<()> {
     // Build the Realm.
     let instance = builder.build().await?;
     // Start the DriverTestRealm.
-    let args = fdt::RealmArgs::default();
+    let mut args = fdt::RealmArgs::default();
+    args.use_driver_framework_v2 = Some(false);
     instance.driver_test_realm_start(args).await?;
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
