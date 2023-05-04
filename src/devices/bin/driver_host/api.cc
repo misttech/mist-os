@@ -447,16 +447,6 @@ __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_lo
   }
 }
 
-__EXPORT zx_status_t driver_log_set_tags_internal(zx_driver_t* drv, const char* const* tags,
-                                                  size_t num_tags) {
-  if (drv != nullptr) {
-    fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-    return drv->ReconfigureLogger(cpp20::span(tags, num_tags));
-  } else {
-    return ZX_ERR_INVALID_ARGS;
-  }
-}
-
 __EXPORT void driver_logvf_internal(const zx_driver_t* drv, fx_log_severity_t flag, const char* tag,
                                     const char* file, int line, const char* msg, va_list args) {
   if (drv != nullptr && flag != DDK_LOG_SERIAL) {
