@@ -833,8 +833,10 @@ mod tests {
             value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
         };
 
-        let config_values = ValuesData {
-            values: vec![ValueSpec { value: Value::Single(SingleValue::Bool(true)) }],
+        let config_values = ConfigValuesData {
+            values: vec![ConfigValueSpec {
+                value: ConfigValue::Single(ConfigSingleValue::Bool(true)),
+            }],
             checksum: checksum.clone(),
         };
 

@@ -42,7 +42,7 @@ pub struct ResolvedComponent {
     pub context_to_resolve_children: Option<ComponentResolutionContext>,
     pub decl: cm_rust::ComponentDecl,
     pub package: Option<ResolvedPackage>,
-    pub config_values: Option<cm_rust::ValuesData>,
+    pub config_values: Option<cm_rust::ConfigValuesData>,
     pub abi_revision: Option<AbiRevision>,
 }
 

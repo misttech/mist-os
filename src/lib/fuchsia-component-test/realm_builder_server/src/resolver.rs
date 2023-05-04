@@ -37,7 +37,7 @@ struct ResolveableComponent {
 
     /// Any configuration values provided by the caller. If `config_override_policy` is
     /// `RequireAllValuesFromBuilder`, must provide a value for every field in the component's schema.
-    config_value_replacements: HashMap<usize, cm_rust::ValueSpec>,
+    config_value_replacements: HashMap<usize, cm_rust::ConfigValueSpec>,
 }
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ impl Registry {
         decl: &fcdecl::Component,
         name: String,
         package_dir: fio::DirectoryProxy,
-        config_value_replacements: HashMap<usize, cm_rust::ValueSpec>,
+        config_value_replacements: HashMap<usize, cm_rust::ConfigValueSpec>,
         config_override_policy: ConfigOverridePolicy,
     ) -> Result<String, cm_fidl_validator::error::ErrorList> {
         cm_fidl_validator::validate(decl)?;
@@ -117,7 +117,7 @@ impl Registry {
     async fn resolve_structured_config(
         decl: &fcdecl::Component,
         package_dir: Option<&fio::DirectoryProxy>,
-        config_value_replacements: &HashMap<usize, cm_rust::ValueSpec>,
+        config_value_replacements: &HashMap<usize, cm_rust::ConfigValueSpec>,
     ) -> Result<Option<fmem::Data>, Error> {
         if let Some(schema) = &decl.config {
             let existing_values = match (&schema.value_source, package_dir) {
@@ -144,7 +144,7 @@ impl Registry {
     async fn verify_and_replace_config_values(
         schema: &fcdecl::ConfigSchema,
         values_data: Option<fmem::Data>,
-        config_value_replacements: &HashMap<usize, cm_rust::ValueSpec>,
+        config_value_replacements: &HashMap<usize, cm_rust::ConfigValueSpec>,
     ) -> Result<fmem::Data, Error> {
         let mut values_data: fconfig::ValuesData = if let Some(v) = values_data {
             let bytes = mem_util::bytes_from_data(&v)?;

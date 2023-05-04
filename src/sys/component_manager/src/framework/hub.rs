@@ -490,9 +490,9 @@ mod tests {
             },
         },
         cm_rust::{
-            self, Availability, CapabilityPath, ComponentDecl, DependencyType, DirectoryDecl,
-            ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget,
-            ProtocolDecl, UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseSource, ValuesData,
+            self, Availability, CapabilityPath, ComponentDecl, ConfigValuesData, DependencyType,
+            DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource,
+            ExposeTarget, ProtocolDecl, UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints::ServerEnd,
@@ -549,7 +549,7 @@ mod tests {
     struct ComponentDescriptor {
         pub name: &'static str,
         pub decl: ComponentDecl,
-        pub config: Option<(&'static str, ValuesData)>,
+        pub config: Option<(&'static str, ConfigValuesData)>,
         pub host_fn: Option<DirectoryCallback>,
         pub runtime_host_fn: Option<DirectoryCallback>,
     }

@@ -15,7 +15,7 @@ use {
     anyhow::format_err,
     async_trait::async_trait,
     cm_runner::Runner,
-    cm_rust::{ComponentDecl, ExposeDecl, UseDecl, ValuesData},
+    cm_rust::{ComponentDecl, ConfigValuesData, ExposeDecl, UseDecl},
     fidl::prelude::*,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -138,7 +138,7 @@ fn new_proxy_routing_fn(ty: CapabilityType) -> RoutingFn {
 #[derive(Debug, Clone)]
 pub struct MockResolver {
     components: HashMap<String, ComponentDecl>,
-    configs: HashMap<String, ValuesData>,
+    configs: HashMap<String, ConfigValuesData>,
     blockers: HashMap<String, Arc<Mutex<Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>>>>,
 }
 
@@ -216,7 +216,7 @@ impl MockResolver {
         self.components.insert(name.to_string(), component);
     }
 
-    pub fn add_config_values(&mut self, path: &str, values: ValuesData) {
+    pub fn add_config_values(&mut self, path: &str, values: ConfigValuesData) {
         self.configs.insert(path.to_string(), values);
     }
 

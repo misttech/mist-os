@@ -122,11 +122,11 @@ macro_rules! values_data {
     [ck@ $checksum:expr, $($value:expr,)*] => {{
         let mut values = vec![];
         $(
-            values.push(cm_rust::ValueSpec {
+            values.push(cm_rust::ConfigValueSpec {
                 value: $value,
             });
         )*
-        cm_rust::ValuesData {
+        cm_rust::ConfigValuesData {
             values,
             checksum: $checksum
         }

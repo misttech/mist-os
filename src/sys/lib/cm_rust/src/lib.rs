@@ -1130,81 +1130,81 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_table = "fdecl::ConfigValuesData")]
-pub struct ValuesData {
-    pub values: Vec<ValueSpec>,
+pub struct ConfigValuesData {
+    pub values: Vec<ConfigValueSpec>,
     pub checksum: ConfigChecksum,
 }
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_table = "fdecl::ConfigValueSpec")]
-pub struct ValueSpec {
-    pub value: Value,
+pub struct ConfigValueSpec {
+    pub value: ConfigValue,
 }
 
-impl ValueSpec {
+impl ConfigValueSpec {
     // TODO(https://fxbug.dev/126609) delete this once fuchsia.component.config is removed
     pub fn native_into_fidl_todo_fxb_126609(self) -> fconfig::ValueSpec {
         fidl_fuchsia_component_config::ValueSpec {
             value: match self.value {
-                Value::Single(SingleValue::Bool(b)) => {
+                ConfigValue::Single(ConfigSingleValue::Bool(b)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Bool(b)))
                 }
-                Value::Single(SingleValue::Uint8(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint8(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(n)))
                 }
-                Value::Single(SingleValue::Uint16(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint16(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Uint16(n)))
                 }
-                Value::Single(SingleValue::Uint32(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint32(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Uint32(n)))
                 }
-                Value::Single(SingleValue::Uint64(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint64(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Uint64(n)))
                 }
-                Value::Single(SingleValue::Int8(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int8(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Int8(n)))
                 }
-                Value::Single(SingleValue::Int16(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int16(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Int16(n)))
                 }
-                Value::Single(SingleValue::Int32(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int32(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Int32(n)))
                 }
-                Value::Single(SingleValue::Int64(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int64(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::Int64(n)))
                 }
-                Value::Single(SingleValue::String(n)) => {
+                ConfigValue::Single(ConfigSingleValue::String(n)) => {
                     Some(fconfig::Value::Single(fconfig::SingleValue::String(n)))
                 }
-                Value::Vector(VectorValue::BoolVector(b)) => {
+                ConfigValue::Vector(ConfigVectorValue::BoolVector(b)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(b)))
                 }
-                Value::Vector(VectorValue::Uint8Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint8Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Uint8Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint16Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint16Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Uint16Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint32Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint32Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Uint32Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint64Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint64Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Uint64Vector(n)))
                 }
-                Value::Vector(VectorValue::Int8Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int8Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Int8Vector(n)))
                 }
-                Value::Vector(VectorValue::Int16Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int16Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Int16Vector(n)))
                 }
-                Value::Vector(VectorValue::Int32Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int32Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Int32Vector(n)))
                 }
-                Value::Vector(VectorValue::Int64Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int64Vector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::Int64Vector(n)))
                 }
-                Value::Vector(VectorValue::StringVector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::StringVector(n)) => {
                     Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(n)))
                 }
             },
@@ -1217,64 +1217,64 @@ impl ValueSpec {
         Self {
             value: match spec.value {
                 Some(fconfig::Value::Single(fconfig::SingleValue::Bool(b))) => {
-                    Value::Single(SingleValue::Bool(b))
+                    ConfigValue::Single(ConfigSingleValue::Bool(b))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(n))) => {
-                    Value::Single(SingleValue::Uint8(n))
+                    ConfigValue::Single(ConfigSingleValue::Uint8(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Uint16(n))) => {
-                    Value::Single(SingleValue::Uint16(n))
+                    ConfigValue::Single(ConfigSingleValue::Uint16(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Uint32(n))) => {
-                    Value::Single(SingleValue::Uint32(n))
+                    ConfigValue::Single(ConfigSingleValue::Uint32(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Uint64(n))) => {
-                    Value::Single(SingleValue::Uint64(n))
+                    ConfigValue::Single(ConfigSingleValue::Uint64(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Int8(n))) => {
-                    Value::Single(SingleValue::Int8(n))
+                    ConfigValue::Single(ConfigSingleValue::Int8(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Int16(n))) => {
-                    Value::Single(SingleValue::Int16(n))
+                    ConfigValue::Single(ConfigSingleValue::Int16(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Int32(n))) => {
-                    Value::Single(SingleValue::Int32(n))
+                    ConfigValue::Single(ConfigSingleValue::Int32(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::Int64(n))) => {
-                    Value::Single(SingleValue::Int64(n))
+                    ConfigValue::Single(ConfigSingleValue::Int64(n))
                 }
                 Some(fconfig::Value::Single(fconfig::SingleValue::String(n))) => {
-                    Value::Single(SingleValue::String(n))
+                    ConfigValue::Single(ConfigSingleValue::String(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(b))) => {
-                    Value::Vector(VectorValue::BoolVector(b))
+                    ConfigValue::Vector(ConfigVectorValue::BoolVector(b))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Uint8Vector(n))) => {
-                    Value::Vector(VectorValue::Uint8Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Uint8Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Uint16Vector(n))) => {
-                    Value::Vector(VectorValue::Uint16Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Uint16Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Uint32Vector(n))) => {
-                    Value::Vector(VectorValue::Uint32Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Uint32Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Uint64Vector(n))) => {
-                    Value::Vector(VectorValue::Uint64Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Uint64Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Int8Vector(n))) => {
-                    Value::Vector(VectorValue::Int8Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Int8Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Int16Vector(n))) => {
-                    Value::Vector(VectorValue::Int16Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Int16Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Int32Vector(n))) => {
-                    Value::Vector(VectorValue::Int32Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Int32Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::Int64Vector(n))) => {
-                    Value::Vector(VectorValue::Int64Vector(n))
+                    ConfigValue::Vector(ConfigVectorValue::Int64Vector(n))
                 }
                 Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(n))) => {
-                    Value::Vector(VectorValue::StringVector(n))
+                    ConfigValue::Vector(ConfigVectorValue::StringVector(n))
                 }
                 Some(other) => panic!("expected known variant, got {other:?}"),
                 None => panic!("expected Some, got None, validation must have not been called"),
@@ -1286,12 +1286,12 @@ impl ValueSpec {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigValue")]
-pub enum Value {
-    Single(SingleValue),
-    Vector(VectorValue),
+pub enum ConfigValue {
+    Single(ConfigSingleValue),
+    Vector(ConfigVectorValue),
 }
 
-impl Value {
+impl ConfigValue {
     /// Return the type of this value.
     pub fn ty(&self) -> ConfigValueType {
         match self {
@@ -1301,11 +1301,11 @@ impl Value {
     }
 }
 
-impl fmt::Display for Value {
+impl fmt::Display for ConfigValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Single(sv) => sv.fmt(f),
-            Value::Vector(lv) => lv.fmt(f),
+            ConfigValue::Single(sv) => sv.fmt(f),
+            ConfigValue::Vector(lv) => lv.fmt(f),
         }
     }
 }
@@ -1313,7 +1313,7 @@ impl fmt::Display for Value {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigSingleValue")]
-pub enum SingleValue {
+pub enum ConfigSingleValue {
     Bool(bool),
     Uint8(u8),
     Uint16(u16),
@@ -1326,27 +1326,27 @@ pub enum SingleValue {
     String(String),
 }
 
-impl SingleValue {
+impl ConfigSingleValue {
     fn ty(&self) -> ConfigValueType {
         match self {
-            SingleValue::Bool(_) => ConfigValueType::Bool,
-            SingleValue::Uint8(_) => ConfigValueType::Uint8,
-            SingleValue::Uint16(_) => ConfigValueType::Uint16,
-            SingleValue::Uint32(_) => ConfigValueType::Uint32,
-            SingleValue::Uint64(_) => ConfigValueType::Uint64,
-            SingleValue::Int8(_) => ConfigValueType::Int8,
-            SingleValue::Int16(_) => ConfigValueType::Int16,
-            SingleValue::Int32(_) => ConfigValueType::Int32,
-            SingleValue::Int64(_) => ConfigValueType::Int64,
+            ConfigSingleValue::Bool(_) => ConfigValueType::Bool,
+            ConfigSingleValue::Uint8(_) => ConfigValueType::Uint8,
+            ConfigSingleValue::Uint16(_) => ConfigValueType::Uint16,
+            ConfigSingleValue::Uint32(_) => ConfigValueType::Uint32,
+            ConfigSingleValue::Uint64(_) => ConfigValueType::Uint64,
+            ConfigSingleValue::Int8(_) => ConfigValueType::Int8,
+            ConfigSingleValue::Int16(_) => ConfigValueType::Int16,
+            ConfigSingleValue::Int32(_) => ConfigValueType::Int32,
+            ConfigSingleValue::Int64(_) => ConfigValueType::Int64,
             // We substitute the max size limit because the value itself doesn't carry the info.
-            SingleValue::String(_) => ConfigValueType::String { max_size: std::u32::MAX },
+            ConfigSingleValue::String(_) => ConfigValueType::String { max_size: std::u32::MAX },
         }
     }
 }
 
-impl fmt::Display for SingleValue {
+impl fmt::Display for ConfigSingleValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use SingleValue::*;
+        use ConfigSingleValue::*;
         match self {
             Bool(v) => write!(f, "{}", v),
             Uint8(v) => write!(f, "{}", v),
@@ -1365,7 +1365,7 @@ impl fmt::Display for SingleValue {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigVectorValue")]
-pub enum VectorValue {
+pub enum ConfigVectorValue {
     BoolVector(Vec<bool>),
     Uint8Vector(Vec<u8>),
     Uint16Vector(Vec<u16>),
@@ -1378,47 +1378,47 @@ pub enum VectorValue {
     StringVector(Vec<String>),
 }
 
-impl VectorValue {
+impl ConfigVectorValue {
     fn ty(&self) -> ConfigValueType {
         // We substitute the max size limit because the value itself doesn't carry the info.
         match self {
-            VectorValue::BoolVector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::BoolVector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Bool,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Uint8Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Uint8Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Uint8,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Uint16Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Uint16Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Uint16,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Uint32Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Uint32Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Uint32,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Uint64Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Uint64Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Uint64,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Int8Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Int8Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Int8,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Int16Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Int16Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Int16,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Int32Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Int32Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Int32,
                 max_count: std::u32::MAX,
             },
-            VectorValue::Int64Vector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::Int64Vector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::Int64,
                 max_count: std::u32::MAX,
             },
-            VectorValue::StringVector(_) => ConfigValueType::Vector {
+            ConfigVectorValue::StringVector(_) => ConfigValueType::Vector {
                 nested_type: ConfigNestedValueType::String { max_size: std::u32::MAX },
                 max_count: std::u32::MAX,
             },
@@ -1426,9 +1426,9 @@ impl VectorValue {
     }
 }
 
-impl fmt::Display for VectorValue {
+impl fmt::Display for ConfigVectorValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use VectorValue::*;
+        use ConfigVectorValue::*;
         macro_rules! print_list {
             ($f:ident, $list:ident) => {{
                 $f.write_str("[")?;

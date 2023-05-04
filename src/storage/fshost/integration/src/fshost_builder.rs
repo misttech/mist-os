@@ -10,29 +10,35 @@ use {
 };
 
 pub trait IntoValueSpec {
-    fn into_value_spec(self) -> cm_rust::ValueSpec;
+    fn into_value_spec(self) -> cm_rust::ConfigValueSpec;
 }
 
 impl IntoValueSpec for bool {
-    fn into_value_spec(self) -> cm_rust::ValueSpec {
-        cm_rust::ValueSpec { value: cm_rust::Value::Single(cm_rust::SingleValue::Bool(self)) }
+    fn into_value_spec(self) -> cm_rust::ConfigValueSpec {
+        cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(self)),
+        }
     }
 }
 
 impl IntoValueSpec for u64 {
-    fn into_value_spec(self) -> cm_rust::ValueSpec {
-        cm_rust::ValueSpec { value: cm_rust::Value::Single(cm_rust::SingleValue::Uint64(self)) }
+    fn into_value_spec(self) -> cm_rust::ConfigValueSpec {
+        cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(self)),
+        }
     }
 }
 
 impl IntoValueSpec for String {
-    fn into_value_spec(self) -> cm_rust::ValueSpec {
-        cm_rust::ValueSpec { value: cm_rust::Value::Single(cm_rust::SingleValue::String(self)) }
+    fn into_value_spec(self) -> cm_rust::ConfigValueSpec {
+        cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(self)),
+        }
     }
 }
 
 impl<'a> IntoValueSpec for &'a str {
-    fn into_value_spec(self) -> cm_rust::ValueSpec {
+    fn into_value_spec(self) -> cm_rust::ConfigValueSpec {
         self.to_string().into_value_spec()
     }
 }
@@ -47,7 +53,7 @@ impl<'a> IntoValueSpec for &'a str {
 #[derive(Debug, Clone)]
 pub struct FshostBuilder {
     component_name: &'static str,
-    config_values: HashMap<&'static str, cm_rust::ValueSpec>,
+    config_values: HashMap<&'static str, cm_rust::ConfigValueSpec>,
 }
 
 impl FshostBuilder {

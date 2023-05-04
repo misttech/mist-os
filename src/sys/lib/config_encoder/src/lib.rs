@@ -8,7 +8,8 @@
 
 use cm_rust::{
     ConfigChecksum, ConfigDecl, ConfigField as ConfigFieldDecl, ConfigNestedValueType,
-    ConfigValueType, NativeIntoFidl, SingleValue, Value, ValueSpec, ValuesData, VectorValue,
+    ConfigSingleValue, ConfigValue, ConfigValueSpec, ConfigValueType, ConfigValuesData,
+    ConfigVectorValue, NativeIntoFidl,
 };
 use dynfidl::{BasicField, Field, Structure, VectorField};
 use fidl_fuchsia_component_decl as fdecl;
@@ -26,7 +27,7 @@ pub struct ConfigFields {
 impl ConfigFields {
     /// Resolve a component's configuration values according to its declared schema. Should not fail if
     /// `decl` and `specs` are well-formed.
-    pub fn resolve(decl: &ConfigDecl, specs: ValuesData) -> Result<Self, ResolutionError> {
+    pub fn resolve(decl: &ConfigDecl, specs: ConfigValuesData) -> Result<Self, ResolutionError> {
         if decl.checksum != specs.checksum {
             return Err(ResolutionError::ChecksumFailure {
                 expected: decl.checksum.clone(),
@@ -65,68 +66,72 @@ impl ConfigFields {
         let mut structure = Structure::default();
         for ConfigField { value, .. } in fields {
             structure = match value {
-                Value::Single(SingleValue::Bool(b)) => {
+                ConfigValue::Single(ConfigSingleValue::Bool(b)) => {
                     structure.field(Field::Basic(BasicField::Bool(b)))
                 }
-                Value::Single(SingleValue::Uint8(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint8(n)) => {
                     structure.field(Field::Basic(BasicField::UInt8(n)))
                 }
-                Value::Single(SingleValue::Uint16(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint16(n)) => {
                     structure.field(Field::Basic(BasicField::UInt16(n)))
                 }
-                Value::Single(SingleValue::Uint32(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint32(n)) => {
                     structure.field(Field::Basic(BasicField::UInt32(n)))
                 }
-                Value::Single(SingleValue::Uint64(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Uint64(n)) => {
                     structure.field(Field::Basic(BasicField::UInt64(n)))
                 }
-                Value::Single(SingleValue::Int8(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int8(n)) => {
                     structure.field(Field::Basic(BasicField::Int8(n)))
                 }
-                Value::Single(SingleValue::Int16(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int16(n)) => {
                     structure.field(Field::Basic(BasicField::Int16(n)))
                 }
-                Value::Single(SingleValue::Int32(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int32(n)) => {
                     structure.field(Field::Basic(BasicField::Int32(n)))
                 }
-                Value::Single(SingleValue::Int64(n)) => {
+                ConfigValue::Single(ConfigSingleValue::Int64(n)) => {
                     structure.field(Field::Basic(BasicField::Int64(n)))
                 }
-                Value::Single(SingleValue::String(s)) => {
+                ConfigValue::Single(ConfigSingleValue::String(s)) => {
                     // TODO(https://fxbug.dev/88174) improve string representation too
                     structure.field(Field::Vector(VectorField::UInt8Vector(s.into_bytes())))
                 }
-                Value::Vector(VectorValue::BoolVector(b)) => {
+                ConfigValue::Vector(ConfigVectorValue::BoolVector(b)) => {
                     structure.field(Field::Vector(VectorField::BoolVector(b)))
                 }
-                Value::Vector(VectorValue::Uint8Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint8Vector(n)) => {
                     structure.field(Field::Vector(VectorField::UInt8Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint16Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint16Vector(n)) => {
                     structure.field(Field::Vector(VectorField::UInt16Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint32Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint32Vector(n)) => {
                     structure.field(Field::Vector(VectorField::UInt32Vector(n)))
                 }
-                Value::Vector(VectorValue::Uint64Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Uint64Vector(n)) => {
                     structure.field(Field::Vector(VectorField::UInt64Vector(n)))
                 }
-                Value::Vector(VectorValue::Int8Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int8Vector(n)) => {
                     structure.field(Field::Vector(VectorField::Int8Vector(n)))
                 }
-                Value::Vector(VectorValue::Int16Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int16Vector(n)) => {
                     structure.field(Field::Vector(VectorField::Int16Vector(n)))
                 }
-                Value::Vector(VectorValue::Int32Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int32Vector(n)) => {
                     structure.field(Field::Vector(VectorField::Int32Vector(n)))
                 }
-                Value::Vector(VectorValue::Int64Vector(n)) => {
+                ConfigValue::Vector(ConfigVectorValue::Int64Vector(n)) => {
                     structure.field(Field::Vector(VectorField::Int64Vector(n)))
                 }
-                Value::Vector(VectorValue::StringVector(s)) => structure.field(Field::Vector(
-                    // TODO(https://fxbug.dev/88174) improve string representation too
-                    VectorField::UInt8VectorVector(s.into_iter().map(|s| s.into_bytes()).collect()),
-                )),
+                ConfigValue::Vector(ConfigVectorValue::StringVector(s)) => {
+                    structure.field(Field::Vector(
+                        // TODO(https://fxbug.dev/88174) improve string representation too
+                        VectorField::UInt8VectorVector(
+                            s.into_iter().map(|s| s.into_bytes()).collect(),
+                        ),
+                    ))
+                }
             };
         }
 
@@ -153,47 +158,53 @@ pub struct ConfigField {
     pub key: String,
 
     /// The configuration field's value.
-    pub value: Value,
+    pub value: ConfigValue,
 }
 
 impl ConfigField {
     /// Reconciles a config field schema from the manifest with a value from the value file.
     /// If the types and constraints don't match, an error is returned.
     pub fn resolve(
-        spec_field: ValueSpec,
+        spec_field: ConfigValueSpec,
         decl_field: &ConfigFieldDecl,
     ) -> Result<Self, ValueError> {
         let key = decl_field.key.clone();
 
         match (&spec_field.value, &decl_field.type_) {
-            (Value::Single(SingleValue::Bool(_)), ConfigValueType::Bool)
-            | (Value::Single(SingleValue::Uint8(_)), ConfigValueType::Uint8)
-            | (Value::Single(SingleValue::Uint16(_)), ConfigValueType::Uint16)
-            | (Value::Single(SingleValue::Uint32(_)), ConfigValueType::Uint32)
-            | (Value::Single(SingleValue::Uint64(_)), ConfigValueType::Uint64)
-            | (Value::Single(SingleValue::Int8(_)), ConfigValueType::Int8)
-            | (Value::Single(SingleValue::Int16(_)), ConfigValueType::Int16)
-            | (Value::Single(SingleValue::Int32(_)), ConfigValueType::Int32)
-            | (Value::Single(SingleValue::Int64(_)), ConfigValueType::Int64) => (),
-            (Value::Single(SingleValue::String(text)), ConfigValueType::String { max_size }) => {
+            (ConfigValue::Single(ConfigSingleValue::Bool(_)), ConfigValueType::Bool)
+            | (ConfigValue::Single(ConfigSingleValue::Uint8(_)), ConfigValueType::Uint8)
+            | (ConfigValue::Single(ConfigSingleValue::Uint16(_)), ConfigValueType::Uint16)
+            | (ConfigValue::Single(ConfigSingleValue::Uint32(_)), ConfigValueType::Uint32)
+            | (ConfigValue::Single(ConfigSingleValue::Uint64(_)), ConfigValueType::Uint64)
+            | (ConfigValue::Single(ConfigSingleValue::Int8(_)), ConfigValueType::Int8)
+            | (ConfigValue::Single(ConfigSingleValue::Int16(_)), ConfigValueType::Int16)
+            | (ConfigValue::Single(ConfigSingleValue::Int32(_)), ConfigValueType::Int32)
+            | (ConfigValue::Single(ConfigSingleValue::Int64(_)), ConfigValueType::Int64) => (),
+            (
+                ConfigValue::Single(ConfigSingleValue::String(text)),
+                ConfigValueType::String { max_size },
+            ) => {
                 let max_size = *max_size as usize;
                 if text.len() > max_size {
                     return Err(ValueError::StringTooLong { max: max_size, actual: text.len() });
                 }
             }
-            (Value::Vector(list), ConfigValueType::Vector { nested_type, max_count }) => {
+            (ConfigValue::Vector(list), ConfigValueType::Vector { nested_type, max_count }) => {
                 let max_count = *max_count as usize;
                 let actual_count = match (list, nested_type) {
-                    (VectorValue::BoolVector(l), ConfigNestedValueType::Bool) => l.len(),
-                    (VectorValue::Uint8Vector(l), ConfigNestedValueType::Uint8) => l.len(),
-                    (VectorValue::Uint16Vector(l), ConfigNestedValueType::Uint16) => l.len(),
-                    (VectorValue::Uint32Vector(l), ConfigNestedValueType::Uint32) => l.len(),
-                    (VectorValue::Uint64Vector(l), ConfigNestedValueType::Uint64) => l.len(),
-                    (VectorValue::Int8Vector(l), ConfigNestedValueType::Int8) => l.len(),
-                    (VectorValue::Int16Vector(l), ConfigNestedValueType::Int16) => l.len(),
-                    (VectorValue::Int32Vector(l), ConfigNestedValueType::Int32) => l.len(),
-                    (VectorValue::Int64Vector(l), ConfigNestedValueType::Int64) => l.len(),
-                    (VectorValue::StringVector(l), ConfigNestedValueType::String { max_size }) => {
+                    (ConfigVectorValue::BoolVector(l), ConfigNestedValueType::Bool) => l.len(),
+                    (ConfigVectorValue::Uint8Vector(l), ConfigNestedValueType::Uint8) => l.len(),
+                    (ConfigVectorValue::Uint16Vector(l), ConfigNestedValueType::Uint16) => l.len(),
+                    (ConfigVectorValue::Uint32Vector(l), ConfigNestedValueType::Uint32) => l.len(),
+                    (ConfigVectorValue::Uint64Vector(l), ConfigNestedValueType::Uint64) => l.len(),
+                    (ConfigVectorValue::Int8Vector(l), ConfigNestedValueType::Int8) => l.len(),
+                    (ConfigVectorValue::Int16Vector(l), ConfigNestedValueType::Int16) => l.len(),
+                    (ConfigVectorValue::Int32Vector(l), ConfigNestedValueType::Int32) => l.len(),
+                    (ConfigVectorValue::Int64Vector(l), ConfigNestedValueType::Int64) => l.len(),
+                    (
+                        ConfigVectorValue::StringVector(l),
+                        ConfigNestedValueType::String { max_size },
+                    ) => {
                         let max_size = *max_size as usize;
                         for (i, s) in l.iter().enumerate() {
                             if s.len() > max_size {
@@ -281,9 +292,9 @@ mod tests {
     use fidl_fuchsia_component_config_ext::{config_decl, values_data};
     use fidl_test_config_encoder::BasicSuccessSchema;
 
-    use SingleValue::*;
-    use Value::*;
-    use VectorValue::*;
+    use ConfigSingleValue::*;
+    use ConfigValue::*;
+    use ConfigVectorValue::*;
 
     #[test]
     fn basic_success() {
@@ -447,7 +458,7 @@ mod tests {
         };
         let specs = values_data! [
             ck@ received.clone(),
-            Value::Single(SingleValue::Bool(true)),
+            ConfigValue::Single(ConfigSingleValue::Bool(true)),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs).unwrap_err(),
@@ -463,8 +474,8 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            Value::Single(SingleValue::Bool(true)),
-            Value::Single(SingleValue::Bool(false)),
+            ConfigValue::Single(ConfigSingleValue::Bool(true)),
+            ConfigValue::Single(ConfigSingleValue::Bool(false)),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs).unwrap_err(),
@@ -495,7 +506,7 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            Value::Single(SingleValue::String("hello, world!".into())),
+            ConfigValue::Single(ConfigSingleValue::String("hello, world!".into())),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs).unwrap_err(),
@@ -514,7 +525,7 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            Value::Vector(VectorValue::Uint8Vector(vec![1, 2, 3])),
+            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(vec![1, 2, 3])),
         ];
         assert_eq!(
             ConfigFields::resolve(&decl, specs).unwrap_err(),
@@ -533,7 +544,7 @@ mod tests {
         };
         let specs = values_data! [
             ck@ decl.checksum.clone(),
-            Value::Vector(VectorValue::StringVector(vec![
+            ConfigValue::Vector(ConfigVectorValue::StringVector(vec![
                 "valid".into(),
                 "invalid".into(),
             ])),
@@ -580,7 +591,7 @@ mod tests {
                     Vector(StringVector(vec![])),
                 ] {
                     let should_succeed = matches!(value, $valid_spec);
-                    let spec = ValueSpec { value };
+                    let spec = ConfigValueSpec { value };
                     match ConfigField::resolve(spec, &decl) {
                         Ok(..) if should_succeed => (),
                         Err(ValueError::TypeMismatch { .. }) if !should_succeed => (),

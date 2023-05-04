@@ -578,7 +578,7 @@ mod tests {
         let expected_fields = config_encoder::ConfigFields {
             fields: vec![config_encoder::ConfigField {
                 key: "foo".to_string(),
-                value: cm_rust::Value::Single(cm_rust::SingleValue::String(
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
                     "hello, world!".to_string(),
                 )),
             }],

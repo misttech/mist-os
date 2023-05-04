@@ -11,7 +11,7 @@
 pub mod field;
 
 use crate::field::{config_value_from_json_value, FieldError};
-use cm_rust::{ConfigDecl, ValueSpec, ValuesData};
+use cm_rust::{ConfigDecl, ConfigValueSpec, ConfigValuesData};
 use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
 
@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 pub fn populate_value_file(
     config_decl: &ConfigDecl,
     mut json_values: BTreeMap<String, JsonValue>,
-) -> Result<ValuesData, FileError> {
+) -> Result<ConfigValuesData, FileError> {
     let values = config_decl
         .fields
         .iter()
@@ -31,9 +31,9 @@ pub fn populate_value_file(
                 .ok_or_else(|| FileError::MissingValue { key: field.key.clone() })?;
             let value = config_value_from_json_value(&json_value, &field.type_)
                 .map_err(|reason| FileError::InvalidField { key: field.key.clone(), reason })?;
-            Ok(ValueSpec { value })
+            Ok(ConfigValueSpec { value })
         })
-        .collect::<Result<Vec<ValueSpec>, _>>()?;
+        .collect::<Result<Vec<ConfigValueSpec>, _>>()?;
 
     // we remove the definitions from the values map above, so any remaining keys are undefined
     // in the manifest
@@ -41,7 +41,7 @@ pub fn populate_value_file(
         return Err(FileError::ExtraValues { keys: json_values.into_keys().collect() });
     }
 
-    Ok(ValuesData { values, checksum: config_decl.checksum.clone() })
+    Ok(ConfigValuesData { values, checksum: config_decl.checksum.clone() })
 }
 
 /// Error from working with a configuration value file.
@@ -65,7 +65,7 @@ pub enum FileError {
 #[cfg(test)]
 mod tests {
     use super::{field::JsonTy, *};
-    use cm_rust::{ConfigChecksum, SingleValue, Value, VectorValue};
+    use cm_rust::{ConfigChecksum, ConfigSingleValue, ConfigValue, ConfigVectorValue};
     use fidl_fuchsia_component_config_ext::{config_decl, values_data};
     use serde_json::json;
 
@@ -134,26 +134,28 @@ mod tests {
 
         let expected = values_data![
             ck@ test_checksum(),
-            Value::Single(SingleValue::Bool(false)),
-            Value::Single(SingleValue::Uint8(255u8)),
-            Value::Single(SingleValue::Uint16(65535u16)),
-            Value::Single(SingleValue::Uint32(4000000000u32)),
-            Value::Single(SingleValue::Uint64(8000000000u64)),
-            Value::Single(SingleValue::Int8(-127i8)),
-            Value::Single(SingleValue::Int16(-32766i16)),
-            Value::Single(SingleValue::Int32(-2000000000i32)),
-            Value::Single(SingleValue::Int64(-4000000000i64)),
-            Value::Single(SingleValue::String("hello, world!".into())),
-            Value::Vector(VectorValue::BoolVector(vec![true, false])),
-            Value::Vector(VectorValue::Uint8Vector(vec![1, 2, 3])),
-            Value::Vector(VectorValue::Uint16Vector(vec![2, 3, 4])),
-            Value::Vector(VectorValue::Uint32Vector(vec![3, 4, 5])),
-            Value::Vector(VectorValue::Uint64Vector(vec![4, 5, 6])),
-            Value::Vector(VectorValue::Int8Vector(vec![-1, -2, 3])),
-            Value::Vector(VectorValue::Int16Vector(vec![-2, -3, 4])),
-            Value::Vector(VectorValue::Int32Vector(vec![-3, -4, 5])),
-            Value::Vector(VectorValue::Int64Vector(vec![-4, -5, 6])),
-            Value::Vector(VectorValue::StringVector(vec!["hello, world!".into(), "hello, again!".into()])),
+            ConfigValue::Single(ConfigSingleValue::Bool(false)),
+            ConfigValue::Single(ConfigSingleValue::Uint8(255u8)),
+            ConfigValue::Single(ConfigSingleValue::Uint16(65535u16)),
+            ConfigValue::Single(ConfigSingleValue::Uint32(4000000000u32)),
+            ConfigValue::Single(ConfigSingleValue::Uint64(8000000000u64)),
+            ConfigValue::Single(ConfigSingleValue::Int8(-127i8)),
+            ConfigValue::Single(ConfigSingleValue::Int16(-32766i16)),
+            ConfigValue::Single(ConfigSingleValue::Int32(-2000000000i32)),
+            ConfigValue::Single(ConfigSingleValue::Int64(-4000000000i64)),
+            ConfigValue::Single(ConfigSingleValue::String("hello, world!".into())),
+            ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![true, false])),
+            ConfigValue::Vector(ConfigVectorValue::Uint8Vector(vec![1, 2, 3])),
+            ConfigValue::Vector(ConfigVectorValue::Uint16Vector(vec![2, 3, 4])),
+            ConfigValue::Vector(ConfigVectorValue::Uint32Vector(vec![3, 4, 5])),
+            ConfigValue::Vector(ConfigVectorValue::Uint64Vector(vec![4, 5, 6])),
+            ConfigValue::Vector(ConfigVectorValue::Int8Vector(vec![-1, -2, 3])),
+            ConfigValue::Vector(ConfigVectorValue::Int16Vector(vec![-2, -3, 4])),
+            ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![-3, -4, 5])),
+            ConfigValue::Vector(ConfigVectorValue::Int64Vector(vec![-4, -5, 6])),
+            ConfigValue::Vector(ConfigVectorValue::StringVector(
+                vec!["hello, world!".into(), "hello, again!".into()])
+            ),
         ];
 
         let observed = populate_value_file(&decl, values).unwrap();

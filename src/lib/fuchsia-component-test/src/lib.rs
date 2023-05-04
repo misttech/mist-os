@@ -1091,7 +1091,7 @@ impl RealmBuilder {
         &self,
         name: impl Into<ChildRef>,
         key: &str,
-        value: cm_rust::ValueSpec,
+        value: cm_rust::ConfigValueSpec,
     ) -> Result<(), Error> {
         self.root_realm.set_config_value(name, key, value).await
     }
@@ -1448,7 +1448,7 @@ impl SubRealmBuilder {
         &self,
         child_ref: impl Into<ChildRef>,
         key: &str,
-        value: cm_rust::ValueSpec,
+        value: cm_rust::ConfigValueSpec,
     ) -> Result<(), Error> {
         let child_ref: ChildRef = child_ref.into();
         child_ref.check_scope(&self.realm_path)?;
@@ -1456,7 +1456,7 @@ impl SubRealmBuilder {
             .set_config_value(
                 &child_ref.name,
                 key,
-                cm_rust::ValueSpec::native_into_fidl_todo_fxb_126609(value),
+                cm_rust::ConfigValueSpec::native_into_fidl_todo_fxb_126609(value),
             )
             .await?
             .map_err(Into::into)
@@ -1469,8 +1469,9 @@ impl SubRealmBuilder {
         key: &str,
         value: bool,
     ) -> Result<(), Error> {
-        let value =
-            cm_rust::ValueSpec { value: cm_rust::Value::Single(cm_rust::SingleValue::Bool(value)) };
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(value)),
+        };
         self.set_config_value(child_ref, key, value).await
     }
 
@@ -1481,8 +1482,8 @@ impl SubRealmBuilder {
         key: &str,
         value: u8,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Uint8(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint8(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1494,8 +1495,8 @@ impl SubRealmBuilder {
         key: &str,
         value: u16,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Uint16(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint16(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1507,8 +1508,8 @@ impl SubRealmBuilder {
         key: &str,
         value: u32,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Uint32(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint32(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1520,8 +1521,8 @@ impl SubRealmBuilder {
         key: &str,
         value: u64,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Uint64(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1533,8 +1534,9 @@ impl SubRealmBuilder {
         key: &str,
         value: i8,
     ) -> Result<(), Error> {
-        let value =
-            cm_rust::ValueSpec { value: cm_rust::Value::Single(cm_rust::SingleValue::Int8(value)) };
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int8(value)),
+        };
         self.set_config_value(child_ref, key, value).await
     }
 
@@ -1545,8 +1547,8 @@ impl SubRealmBuilder {
         key: &str,
         value: i16,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Int16(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int16(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1558,8 +1560,8 @@ impl SubRealmBuilder {
         key: &str,
         value: i32,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Int32(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int32(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1571,8 +1573,8 @@ impl SubRealmBuilder {
         key: &str,
         value: i64,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::Int64(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int64(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1584,8 +1586,10 @@ impl SubRealmBuilder {
         key: &str,
         value: impl ToString,
     ) -> Result<(), Error> {
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Single(cm_rust::SingleValue::String(value.to_string())),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
+                value.to_string(),
+            )),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1598,8 +1602,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = bool>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::BoolVector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::BoolVector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1612,8 +1616,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = u8>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Uint8Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Uint8Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1626,8 +1630,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = u16>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Uint16Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Uint16Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1640,8 +1644,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = u32>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Uint32Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Uint32Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1654,8 +1658,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = u64>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Uint64Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Uint64Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1668,8 +1672,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = i8>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Int8Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Int8Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1682,8 +1686,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = i16>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Int16Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Int16Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1696,8 +1700,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = i32>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Int32Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Int32Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1710,8 +1714,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = i64>,
     ) -> Result<(), Error> {
         let value = value.into_iter().collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::Int64Vector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::Int64Vector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }
@@ -1724,8 +1728,8 @@ impl SubRealmBuilder {
         value: impl IntoIterator<Item = impl ToString>,
     ) -> Result<(), Error> {
         let value = value.into_iter().map(|s| s.to_string()).collect();
-        let value = cm_rust::ValueSpec {
-            value: cm_rust::Value::Vector(cm_rust::VectorValue::StringVector(value)),
+        let value = cm_rust::ConfigValueSpec {
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(value)),
         };
         self.set_config_value(child_ref, key, value).await
     }

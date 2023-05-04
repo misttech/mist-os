@@ -65,34 +65,34 @@ impl From<ConfigFields> for ComponentConfig {
 }
 
 // We can't make this the behavior of Serialize because then we wouldn't be able to Deserialize
-// as a round-trip, and we can't add this as an Into impl on cm_rust::Value because we don't want
+// as a round-trip, and we can't add this as an Into impl on cm_rust::ConfigValue because we don't want
 // to add a serde_json dependency to that crate.
-fn config_value_to_json_value(value: cm_rust::Value) -> serde_json::Value {
-    use cm_rust::{SingleValue, Value, VectorValue};
+fn config_value_to_json_value(value: cm_rust::ConfigValue) -> serde_json::Value {
+    use cm_rust::{ConfigSingleValue, ConfigValue, ConfigVectorValue};
     match value {
-        Value::Single(sv) => match sv {
-            SingleValue::Bool(b) => b.into(),
-            SingleValue::Uint8(n) => n.into(),
-            SingleValue::Uint16(n) => n.into(),
-            SingleValue::Uint32(n) => n.into(),
-            SingleValue::Uint64(n) => n.into(),
-            SingleValue::Int8(n) => n.into(),
-            SingleValue::Int16(n) => n.into(),
-            SingleValue::Int32(n) => n.into(),
-            SingleValue::Int64(n) => n.into(),
-            SingleValue::String(s) => s.into(),
+        ConfigValue::Single(sv) => match sv {
+            ConfigSingleValue::Bool(b) => b.into(),
+            ConfigSingleValue::Uint8(n) => n.into(),
+            ConfigSingleValue::Uint16(n) => n.into(),
+            ConfigSingleValue::Uint32(n) => n.into(),
+            ConfigSingleValue::Uint64(n) => n.into(),
+            ConfigSingleValue::Int8(n) => n.into(),
+            ConfigSingleValue::Int16(n) => n.into(),
+            ConfigSingleValue::Int32(n) => n.into(),
+            ConfigSingleValue::Int64(n) => n.into(),
+            ConfigSingleValue::String(s) => s.into(),
         },
-        Value::Vector(vv) => match vv {
-            VectorValue::BoolVector(bv) => bv.into(),
-            VectorValue::Uint8Vector(nv) => nv.into(),
-            VectorValue::Uint16Vector(nv) => nv.into(),
-            VectorValue::Uint32Vector(nv) => nv.into(),
-            VectorValue::Uint64Vector(nv) => nv.into(),
-            VectorValue::Int8Vector(nv) => nv.into(),
-            VectorValue::Int16Vector(nv) => nv.into(),
-            VectorValue::Int32Vector(nv) => nv.into(),
-            VectorValue::Int64Vector(nv) => nv.into(),
-            VectorValue::StringVector(sv) => sv.into(),
+        ConfigValue::Vector(vv) => match vv {
+            ConfigVectorValue::BoolVector(bv) => bv.into(),
+            ConfigVectorValue::Uint8Vector(nv) => nv.into(),
+            ConfigVectorValue::Uint16Vector(nv) => nv.into(),
+            ConfigVectorValue::Uint32Vector(nv) => nv.into(),
+            ConfigVectorValue::Uint64Vector(nv) => nv.into(),
+            ConfigVectorValue::Int8Vector(nv) => nv.into(),
+            ConfigVectorValue::Int16Vector(nv) => nv.into(),
+            ConfigVectorValue::Int32Vector(nv) => nv.into(),
+            ConfigVectorValue::Int64Vector(nv) => nv.into(),
+            ConfigVectorValue::StringVector(sv) => sv.into(),
         },
     }
 }
@@ -303,14 +303,14 @@ pub enum VerifyConfigError {
         error: String, // Can't use the original error because scrutiny needs Serialize.
     },
     #[error("`{field}` has a different value ({observed}) than expected ({expected}).")]
-    ValueMismatch { field: String, expected: cm_rust::Value, observed: cm_rust::Value },
+    ValueMismatch { field: String, expected: cm_rust::ConfigValue, observed: cm_rust::ConfigValue },
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use cm_rust::{ConfigChecksum, SingleValue, Value};
+    use cm_rust::{ConfigChecksum, ConfigSingleValue, ConfigValue};
     use maplit::btreemap;
     use serde_json::json;
 
@@ -332,7 +332,7 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::Uint8(5)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
                     }
                 ],
             }
@@ -359,11 +359,11 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::Uint8(5)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
                     },
                     ConfigField {
                         key: "b".to_string(),
-                        value: Value::Single(SingleValue::Uint8(10)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
                     },
                 ],
             }
@@ -390,7 +390,7 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::Uint8(10)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
                     }
                 ],
             }
@@ -401,8 +401,8 @@ mod tests {
             res["fuchsia-pkg://foo"][0],
             VerifyConfigError::ValueMismatch {
                 field: "a".to_string(),
-                expected: Value::Single(SingleValue::Uint8(5)),
-                observed: Value::Single(SingleValue::Uint8(10)),
+                expected: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                observed: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
             }
         );
         aggregate_policy_errors(&res).unwrap_err();
@@ -427,7 +427,7 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::Uint8(10)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
                     }
                 ],
             }
@@ -438,8 +438,8 @@ mod tests {
             res["fuchsia-pkg://foo"][0],
             VerifyConfigError::ValueMismatch {
                 field: "a".to_string(),
-                expected: Value::Single(SingleValue::Uint8(5)),
-                observed: Value::Single(SingleValue::Uint8(10)),
+                expected: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                observed: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
             }
         );
         aggregate_policy_errors(&res).unwrap_err();
@@ -466,7 +466,7 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::Uint8(10)),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
                     }
                 ],
             }
@@ -477,8 +477,8 @@ mod tests {
             res["fuchsia-pkg://foo"][0],
             VerifyConfigError::ValueMismatch {
                 field: "a".to_string(),
-                expected: Value::Single(SingleValue::Uint8(5)),
-                observed: Value::Single(SingleValue::Uint8(10)),
+                expected: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                observed: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
             }
         );
         aggregate_policy_errors(&res).unwrap_err();
@@ -593,7 +593,7 @@ mod tests {
                 fields: vec![
                     ConfigField {
                         key: "a".to_string(),
-                        value: Value::Single(SingleValue::String("not an int".to_string())),
+                        value: ConfigValue::Single(ConfigSingleValue::String("not an int".to_string())),
                     }
                 ],
             }

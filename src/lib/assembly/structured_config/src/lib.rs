@@ -201,7 +201,7 @@ pub fn validate_component(
         let config_bytes = reader.read_file(&path).map_err(ValidationError::ConfigValuesMissing)?;
 
         // read and validate the config values
-        let config_values: cm_rust::ValuesData =
+        let config_values: cm_rust::ConfigValuesData =
             read_and_validate_fidl(&config_bytes, cm_fidl_validator::validate_values_data)
                 .map_err(ValidationError::ParseConfig)?;
 

@@ -20,7 +20,8 @@ use {
     anyhow::{Context, Error},
     cm_rust::{
         Availability, CapabilityDecl, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl,
-        EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource, ValuesData,
+        ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl,
+        UseSource,
     },
     cm_types::Url,
     diagnostics_message::MonikerWithUrl,
@@ -291,7 +292,7 @@ pub struct TestModelResult {
 pub struct TestEnvironmentBuilder {
     root_component: String,
     components: Vec<(&'static str, ComponentDecl)>,
-    config_values: Vec<(&'static str, ValuesData)>,
+    config_values: Vec<(&'static str, ConfigValuesData)>,
     runtime_config: RuntimeConfig,
     component_id_index_path: Option<String>,
     realm_moniker: Option<AbsoluteMoniker>,
@@ -321,7 +322,10 @@ impl TestEnvironmentBuilder {
         self
     }
 
-    pub fn set_config_values(mut self, config_values: Vec<(&'static str, ValuesData)>) -> Self {
+    pub fn set_config_values(
+        mut self,
+        config_values: Vec<(&'static str, ConfigValuesData)>,
+    ) -> Self {
         self.config_values = config_values;
         self
     }

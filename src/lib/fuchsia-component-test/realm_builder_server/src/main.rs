@@ -726,7 +726,7 @@ impl Realm {
         // cm_fidl_validator::validate_value_spec(&value_spec)
         //     .map_err(|e| RealmBuilderError::ConfigValueInvalid(key.clone(), anyhow::anyhow!(e)))?;
 
-        let value_spec = cm_rust::ValueSpec::fidl_into_native_todo_fxb_126609(value_spec);
+        let value_spec = cm_rust::ConfigValueSpec::fidl_into_native_todo_fxb_126609(value_spec);
         for (index, field) in config.fields.iter().enumerate() {
             if field.key == key {
                 config_encoder::ConfigField::resolve(value_spec.clone(), &field).map_err(|e| {
@@ -828,7 +828,7 @@ struct RealmNodeState {
 
     /// Stores indices to configuration values that must be replaced when the config value file
     /// of a component is read in from the package directory during resolve.
-    config_value_replacements: HashMap<usize, cm_rust::ValueSpec>,
+    config_value_replacements: HashMap<usize, cm_rust::ConfigValueSpec>,
 
     /// Policy for allowing values from SetConfigValue and whether to also load a component's
     /// packaged/default values.

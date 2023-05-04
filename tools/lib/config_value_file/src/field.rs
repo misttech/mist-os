@@ -4,7 +4,9 @@
 
 //! Validating and encoding individual configuration fields.
 
-use cm_rust::{ConfigNestedValueType, ConfigValueType, SingleValue, Value, VectorValue};
+use cm_rust::{
+    ConfigNestedValueType, ConfigSingleValue, ConfigValue, ConfigValueType, ConfigVectorValue,
+};
 use serde_json::Value as JsonValue;
 use std::{
     convert::TryFrom,
@@ -17,22 +19,22 @@ use std::{
 pub fn config_value_from_json_value(
     val: &JsonValue,
     value_type: &ConfigValueType,
-) -> Result<Value, FieldError> {
+) -> Result<ConfigValue, FieldError> {
     Ok(match value_type {
-        ConfigValueType::Bool => Value::Single(SingleValue::Bool(val.parse_bool()?)),
-        ConfigValueType::Uint8 => Value::Single(SingleValue::Uint8(val.parse_u8()?)),
-        ConfigValueType::Uint16 => Value::Single(SingleValue::Uint16(val.parse_u16()?)),
-        ConfigValueType::Uint32 => Value::Single(SingleValue::Uint32(val.parse_u32()?)),
-        ConfigValueType::Uint64 => Value::Single(SingleValue::Uint64(val.parse_u64()?)),
-        ConfigValueType::Int8 => Value::Single(SingleValue::Int8(val.parse_i8()?)),
-        ConfigValueType::Int16 => Value::Single(SingleValue::Int16(val.parse_i16()?)),
-        ConfigValueType::Int32 => Value::Single(SingleValue::Int32(val.parse_i32()?)),
-        ConfigValueType::Int64 => Value::Single(SingleValue::Int64(val.parse_i64()?)),
+        ConfigValueType::Bool => ConfigValue::Single(ConfigSingleValue::Bool(val.parse_bool()?)),
+        ConfigValueType::Uint8 => ConfigValue::Single(ConfigSingleValue::Uint8(val.parse_u8()?)),
+        ConfigValueType::Uint16 => ConfigValue::Single(ConfigSingleValue::Uint16(val.parse_u16()?)),
+        ConfigValueType::Uint32 => ConfigValue::Single(ConfigSingleValue::Uint32(val.parse_u32()?)),
+        ConfigValueType::Uint64 => ConfigValue::Single(ConfigSingleValue::Uint64(val.parse_u64()?)),
+        ConfigValueType::Int8 => ConfigValue::Single(ConfigSingleValue::Int8(val.parse_i8()?)),
+        ConfigValueType::Int16 => ConfigValue::Single(ConfigSingleValue::Int16(val.parse_i16()?)),
+        ConfigValueType::Int32 => ConfigValue::Single(ConfigSingleValue::Int32(val.parse_i32()?)),
+        ConfigValueType::Int64 => ConfigValue::Single(ConfigSingleValue::Int64(val.parse_i64()?)),
         ConfigValueType::String { max_size } => {
-            Value::Single(SingleValue::String(val.parse_string(*max_size)?))
+            ConfigValue::Single(ConfigSingleValue::String(val.parse_string(*max_size)?))
         }
         ConfigValueType::Vector { max_count, nested_type } => {
-            Value::Vector(vector_value_from_json(val, max_count, nested_type)?)
+            ConfigValue::Vector(vector_value_from_json(val, max_count, nested_type)?)
         }
     })
 }
@@ -42,7 +44,7 @@ fn vector_value_from_json(
     val: &JsonValue,
     max_count: &u32,
     nested_type: &ConfigNestedValueType,
-) -> Result<VectorValue, FieldError> {
+) -> Result<ConfigVectorValue, FieldError> {
     // define our array up here so its identifier is available for our helper macro
     let array = val.as_array().ok_or_else(|| FieldError::JsonTypeMismatch {
         expected: JsonTy::Array,
@@ -53,7 +55,7 @@ fn vector_value_from_json(
         return Err(FieldError::VectorTooLong { max, actual: array.len() });
     }
 
-    /// Build a VectorValue out of all the array elements.
+    /// Build a ConfigVectorValue out of all the array elements.
     ///
     /// A macro because enum variants don't exist at the type level in Rust at time of writing.
     macro_rules! vector_from_array {
@@ -62,7 +64,7 @@ fn vector_value_from_json(
             for $val in array {
                 list.push($convert);
             }
-            VectorValue::$list_variant(list)
+            ConfigVectorValue::$list_variant(list)
         }};
     }
 
@@ -479,9 +481,9 @@ mod tests {
         mod: parse_string,
         type: { string, max_size: 13 },
         tests: [
-            can_be_empty: json!("") => Ok(Value::Single(SingleValue::String("".into()))),
+            can_be_empty: json!("") => Ok(ConfigValue::Single(ConfigSingleValue::String("".into()))),
             max_length_fits: json!("hello, world!") =>
-                Ok(Value::Single(SingleValue::String("hello, world!".into()))),
+                Ok(ConfigValue::Single(ConfigSingleValue::String("hello, world!".into()))),
             cant_be_too_long: json!("1234567890 uhoh") =>
                 Err(StringTooLong { max: 13, actual: 15 }),
             cant_be_null: json!(null) =>
@@ -502,8 +504,8 @@ mod tests {
         type: { vector, element: int32, max_count: 5 },
         tests: [
             max_length_fits: json!([1, 2, 3, 4, 5]) =>
-                Ok(Value::Vector(VectorValue::Int32Vector(vec![1, 2, 3, 4, 5]))),
-            can_be_empty: json!([]) => Ok(Value::Vector(VectorValue::Int32Vector(vec![]))),
+                Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![1, 2, 3, 4, 5]))),
+            can_be_empty: json!([]) => Ok(ConfigValue::Vector(ConfigVectorValue::Int32Vector(vec![]))),
             cant_be_too_long: json!([1, 2, 3, 4, 5, 6]) => Err(VectorTooLong { max: 5, actual: 6}),
             element_type_must_match: json!(["foo"]) =>
                 Err(JsonTypeMismatch { expected: JsonTy::Number, received: JsonTy::String }),

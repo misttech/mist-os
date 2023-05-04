@@ -192,7 +192,7 @@ pub async fn read_and_validate_manifest(
 
 pub fn read_and_validate_config_values(
     data: &fmem::Data,
-) -> Result<cm_rust::ValuesData, ResolverError> {
+) -> Result<cm_rust::ConfigValuesData, ResolverError> {
     let bytes = mem_util::bytes_from_data(&data).map_err(ResolverError::config_values_invalid)?;
     let values = fidl::encoding::unpersist(&bytes).map_err(ResolverError::fidl_error)?;
     cm_fidl_validator::validate_values_data(&values)
@@ -525,29 +525,28 @@ mod tests {
             checksum: Some(fdecl::ConfigChecksum::Sha256([0; 32])),
             ..Default::default()
         };
-        let config_values = cm_rust::ValuesData {
+        let config_values = cm_rust::ConfigValuesData {
             values: vec![
-                cm_rust::ValueSpec {
-                    value: cm_rust::Value::Single(cm_rust::SingleValue::Bool(false)),
+                cm_rust::ConfigValueSpec {
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
                 },
-                cm_rust::ValueSpec {
-                    value: cm_rust::Value::Single(cm_rust::SingleValue::Uint8(5)),
+                cm_rust::ConfigValueSpec {
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint8(5)),
                 },
-                cm_rust::ValueSpec {
-                    value: cm_rust::Value::Single(cm_rust::SingleValue::String(
+                cm_rust::ConfigValueSpec {
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
                         "hello!".to_string(),
                     )),
                 },
-                cm_rust::ValueSpec {
-                    value: cm_rust::Value::Vector(cm_rust::VectorValue::BoolVector(vec![
-                        true, false,
-                    ])),
+                cm_rust::ConfigValueSpec {
+                    value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::BoolVector(
+                        vec![true, false],
+                    )),
                 },
-                cm_rust::ValueSpec {
-                    value: cm_rust::Value::Vector(cm_rust::VectorValue::StringVector(vec![
-                        "hello!".to_string(),
-                        "world!".to_string(),
-                    ])),
+                cm_rust::ConfigValueSpec {
+                    value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                        vec!["hello!".to_string(), "world!".to_string()],
+                    )),
                 },
             ],
             checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
