@@ -19,21 +19,19 @@
 
 #include <inspector/inspector.h>
 
-#include "backtrace.h"
 #include "gwp-asan.h"
-#include "utils-impl.h"
 
-namespace inspector {
+namespace {
 
 #if defined(__x86_64__)
-static const char* kArch = "x86_64";
+const char* kArch = "x86_64";
 #elif defined(__aarch64__)
-static const char* kArch = "aarch64";
+const char* kArch = "aarch64";
 #else
 #error unsupported architecture
 #endif
 
-static const char* excp_type_to_str(const zx_excp_type_t type) {
+const char* excp_type_to_str(const zx_excp_type_t type) {
   switch (type) {
     case ZX_EXCP_GENERAL:
       return "general fault";
@@ -57,7 +55,7 @@ static const char* excp_type_to_str(const zx_excp_type_t type) {
   }
 }
 
-static const char* policy_exception_code_to_str(uint32_t policy_exception_code) {
+const char* policy_exception_code_to_str(uint32_t policy_exception_code) {
   switch (policy_exception_code) {
     case ZX_EXCP_POLICY_CODE_BAD_HANDLE:
       return "BAD_HANDLE";
@@ -103,14 +101,14 @@ static const char* policy_exception_code_to_str(uint32_t policy_exception_code) 
 }
 
 // Globs the general registers and the interpretation of them as IP, SP, FP, etc.
-typedef struct decoded_registers_t {
+struct decoded_registers_t {
   zx_vaddr_t pc = 0;
   zx_vaddr_t sp = 0;
   zx_vaddr_t fp = 0;
-} decoded_registers;
+};
 
 decoded_registers_t decode_registers(const zx_thread_state_general_regs_t* regs) {
-  decoded_registers decoded;
+  decoded_registers_t decoded;
 #if defined(__x86_64__)
   decoded.pc = regs->rip;
   decoded.sp = regs->rsp;
@@ -127,9 +125,9 @@ decoded_registers_t decode_registers(const zx_thread_state_general_regs_t* regs)
 }
 
 // How much memory to dump, in bytes.
-static constexpr size_t kMemoryDumpSize = 256;
+constexpr size_t kMemoryDumpSize = 256;
 
-static zx_koid_t get_koid(zx_handle_t handle) {
+zx_koid_t get_koid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   zx_status_t status =
       zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -140,17 +138,17 @@ static zx_koid_t get_koid(zx_handle_t handle) {
   return info.koid;
 }
 
-static void get_name(zx_handle_t handle, char* buf, size_t size) {
+void get_name(zx_handle_t handle, char* buf, size_t size) {
   zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, buf, size);
   if (status != ZX_OK) {
     strlcpy(buf, "<unknown>", size);
   }
 }
 
-static void print_exception_report(FILE* out, const zx_exception_report_t& report,
-                                   const zx_thread_state_general_regs_t* regs,
-                                   const inspector_excp_data_t* excp_data) {
-  inspector::decoded_registers decoded = inspector::decode_registers(regs);
+void print_exception_report(FILE* out, const zx_exception_report_t& report,
+                            const zx_thread_state_general_regs_t* regs,
+                            const inspector_excp_data_t* excp_data) {
+  decoded_registers_t decoded = decode_registers(regs);
 
   if (report.header.type == ZX_EXCP_FATAL_PAGE_FAULT) {
     const char* access_type;
@@ -230,19 +228,18 @@ static void print_exception_report(FILE* out, const zx_exception_report_t& repor
     switch (report.context.synth_code) {
       case ZX_EXCP_POLICY_CODE_BAD_SYSCALL:
         fprintf(out, "<== policy error: %s (%d, syscall %d), PC at %#" PRIxPTR "\n",
-                inspector::policy_exception_code_to_str(report.context.synth_code),
-                report.context.synth_code, report.context.synth_data, decoded.pc);
+                policy_exception_code_to_str(report.context.synth_code), report.context.synth_code,
+                report.context.synth_data, decoded.pc);
         break;
 
       default:
         fprintf(out, "<== policy error: %s (%d), PC at %#" PRIxPTR "\n",
-                inspector::policy_exception_code_to_str(report.context.synth_code),
-                report.context.synth_code, decoded.pc);
+                policy_exception_code_to_str(report.context.synth_code), report.context.synth_code,
+                decoded.pc);
         break;
     }
   } else {
-    fprintf(out, "<== %s, PC at %#" PRIxPTR "\n", inspector::excp_type_to_str(report.header.type),
-            decoded.pc);
+    fprintf(out, "<== %s, PC at %#" PRIxPTR "\n", excp_type_to_str(report.header.type), decoded.pc);
   }
 }
 
@@ -250,7 +247,7 @@ static void print_exception_report(FILE* out, const zx_exception_report_t& repor
 // The process and the thread must be readable.
 void print_gwp_asan_info(FILE* out, const zx::process& process,
                          const zx_exception_report_t& exception_report) {
-  GwpAsanInfo info;
+  inspector::GwpAsanInfo info;
   if (inspector_get_gwp_asan_info(process, exception_report, &info) && info.error_type) {
     fprintf(out, "GWP-ASan Error: %s at %#lx\n", info.error_type, info.faulting_addr);
     fprintf(out, "Allocated at %lu with size %lu here:\n", info.allocation_address,
@@ -275,14 +272,14 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
   zx_thread_state_general_regs_t regs;
 
   zx::unowned<zx::process> process(process_handle);
-  zx_koid_t pid = inspector::get_koid(process->get());
+  zx_koid_t pid = get_koid(process->get());
   char process_name[ZX_MAX_NAME_LEN];
-  inspector::get_name(process->get(), process_name, sizeof(process_name));
+  get_name(process->get(), process_name, sizeof(process_name));
 
   zx::unowned<zx::thread> thread(thread_handle);
-  zx_koid_t tid = inspector::get_koid(thread->get());
+  zx_koid_t tid = get_koid(thread->get());
   char thread_name[ZX_MAX_NAME_LEN];
-  inspector::get_name(thread->get(), thread_name, sizeof(thread_name));
+  get_name(thread->get(), thread_name, sizeof(thread_name));
 
   // Attempt to obtain the registers. If this fails, it means that the thread wasn't provided in a
   // valid state.
@@ -292,7 +289,7 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
            thread_name, zx_status_get_string(status));
     return;
   }
-  inspector::decoded_registers decoded = inspector::decode_registers(&regs);
+  decoded_registers_t decoded = decode_registers(&regs);
 
   // Backtrace requests are special software breakpoints that get resumed. They need to be clearly
   // differentiable from other exceptions.
@@ -326,11 +323,11 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
 #error unsupported architecture
 #endif
 
-      inspector::print_exception_report(out, report, &regs, excp_data);
+      print_exception_report(out, report, &regs, excp_data);
       inspector_print_general_regs(out, &regs, excp_data);
       // Print the common stack part of the thread.
       fprintf(out, "bottom of user stack:\n");
-      inspector_print_memory(out, process->get(), decoded.sp, inspector::kMemoryDumpSize,
+      inspector_print_memory(out, process->get(), decoded.sp, kMemoryDumpSize,
                              inspector_print_memory_format::Hex32);
 
       // Print the bytes "around" the PC to assist in debugging "undefined instruction" exceptions
@@ -346,7 +343,7 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
       inspector_print_memory(out, process->get(), dumpAddr, kPcDumpSize,
                              inspector_print_memory_format::Hex8);
 
-      fprintf(out, "arch: %s\n", inspector::kArch);
+      fprintf(out, "arch: %s\n", kArch);
     }
   } else {
     // Print minimal information for threads not on an exception, e.g., other threads in a backtrace
@@ -355,16 +352,20 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
             thread_name, tid);
   }
 
-  print_backtrace_markup(out, process->get(), thread->get(), skip_markup_context);
+  if (!skip_markup_context)
+    inspector_print_markup_context(out, process->get());
+
+  inspector_print_backtrace_markup(out, process->get(), thread->get());
+
   if (on_exception)
     print_gwp_asan_info(out, *process, report);
 }
 
-}  // namespace inspector
+}  // namespace
 
 __EXPORT void inspector_print_debug_info(FILE* out, zx_handle_t process_handle,
                                          zx_handle_t thread_handle) {
-  inspector::inspector_print_debug_info_impl(out, process_handle, thread_handle, false);
+  inspector_print_debug_info_impl(out, process_handle, thread_handle, false);
 
   // Print one last reset to clear all symbolizer contextual state for the process.
   fprintf(out, "{{{reset}}}\n");
@@ -378,8 +379,8 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
 
   zx::unowned<zx::process> process(process_handle);
   char process_name[ZX_MAX_NAME_LEN];
-  inspector::get_name(process->get(), process_name, sizeof(process_name));
-  zx_koid_t process_koid = inspector::get_koid(process->get());
+  get_name(process->get(), process_name, sizeof(process_name));
+  zx_koid_t process_koid = get_koid(process->get());
 
   // Suspend the process so that each thread is suspended and no more threads get spawned.
   // NOTE: A process cannot suspend itself, so this could fail on some environments (like calling
@@ -429,7 +430,7 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
 
     // Get the name.
     char thread_name[ZX_MAX_NAME_LEN];
-    inspector::get_name(child.get(), thread_name, sizeof(thread_name));
+    get_name(child.get(), thread_name, sizeof(thread_name));
     thread_names[i] = thread_name;
 
     // Get the thread infos.
@@ -460,8 +461,7 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
 
     // We print the thread and then mark this koid as empty, so that it won't be printed on the
     // suspended pass. This means we can free the handle after this.
-    inspector::inspector_print_debug_info_impl(out, process->get(), child.get(),
-                                               skip_markup_context);
+    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context);
     skip_markup_context = true;
     thread_handles[i].reset();
   }
@@ -500,8 +500,7 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
     }
 
     // We can now print the thread.
-    inspector::inspector_print_debug_info_impl(out, process->get(), child.get(),
-                                               skip_markup_context);
+    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context);
     skip_markup_context = true;
   }
 

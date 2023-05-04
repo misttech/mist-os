@@ -12,7 +12,6 @@
 #include <pretty/hexdump.h>
 
 #include "inspector/inspector.h"
-#include "utils-impl.h"
 
 // How much memory we can dump at a time, in bytes.
 // Space for this is allocated on the stack, so this can't be too large.

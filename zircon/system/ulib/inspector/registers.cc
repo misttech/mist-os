@@ -5,16 +5,16 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 
-#include "inspector/inspector.h"
-#include "utils-impl.h"
+#include <inspector/inspector.h>
 
 __EXPORT zx_status_t inspector_read_general_regs(zx_handle_t thread,
                                                  zx_thread_state_general_regs_t* regs) {
   auto status = zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, regs, sizeof(*regs));
   if (status < 0) {
-    print_zx_error("unable to access general regs", status);
+    fprintf(stderr, "inspector: unable to access general regs: %s\n", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
