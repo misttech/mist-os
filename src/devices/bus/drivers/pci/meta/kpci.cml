@@ -17,7 +17,7 @@
         { service: 'fuchsia.hardware.pci.Service' },
     ],
     use: [
-        { protocol: "fuchsia.kernel.RootResource" },
+        { protocol: "fuchsia.boot.RootResource" },
     ],
     expose: [
         {
