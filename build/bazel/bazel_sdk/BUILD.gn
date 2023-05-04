@@ -1,0 +1,53 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
+# script, which runs the test suite for the Fuchsia Bazel
+# SDK rules, using the IDK built from the platform build
+# as well as the prebuilt Clang in the Fuchsia source
+# checkout.
+#
+# Note that this does not use bazel_action() because:
+#
+#  1) The test suite is run in its own Bazel workspace,
+#     completely separate from the one used by the platform
+#     build.
+#
+#  2) bazel_action() may change the target build configuration
+#     in ways that are not supported by the test suite, for
+#     example, changing `is_debug` or `optimize` in args.gn may
+#     change Bazel output paths, which will fail tests that rely
+#     on golden file that embeds hard-coded versions of them.
+#
+#  3) There is no way to list all inputs / outputs properly.
+#
+action("bazel_sdk_tests") {
+  testonly = true
+  script = "//build/bazel_sdk/tests/scripts/bazel_test.sh"
+  inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
+  outputs = [ "$target_gen_dir/$target_name.stamp" ]
+
+  _output_base = target_gen_dir + "/output_base"
+  _output_user_root = target_gen_dir + "/output_user_root"
+
+  args = [
+    "--verbose",
+    "--fuchsia_build_dir=" + rebase_path(root_build_dir, root_build_dir),
+    "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
+    "--output_base=" + rebase_path(_output_base, root_build_dir),
+    "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
+    "--target_cpu=${target_cpu}",
+    "--bazel=" + rebase_path(inputs[0], root_build_dir),
+    "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+  ]
+  deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+  pool = "//:console"
+  hermetic_deps = false
+  no_output_dir_leaks = true
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":bazel_sdk_tests" ]
+}

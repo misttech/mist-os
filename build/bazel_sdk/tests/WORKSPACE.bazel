@@ -21,6 +21,11 @@ bazel_skylib_workspace()
 
 # Setup fuchsia rules
 local_repository(
+    name = "fuchsia_sdk_common",
+    path = "../bazel_rules_fuchsia/common",
+)
+
+local_repository(
     name = "fuchsia_workspace",
     path = "../bazel_rules_fuchsia",
 )
@@ -49,6 +54,20 @@ fuchsia_clang_repository(
 load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")
 
 register_clang_toolchains()
+
+# Register compact python runtime toolchain. This picks up the host
+# python3 interpreter in the current PATH, and packages it in a way
+# that allows sandboxes and remote builders to access / use it.
+load(
+    "@fuchsia_sdk_common//:toolchains/python/repository_rule.bzl",
+    "compact_python_runtime_repository",
+)
+
+compact_python_runtime_repository(
+    name = "prebuilt_python",
+)
+
+register_toolchains("@prebuilt_python//:py_toolchain")
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk_x64_only",
