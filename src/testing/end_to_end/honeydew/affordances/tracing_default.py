@@ -74,7 +74,7 @@ class TracingDefault(tracing.Tracing):
             errors.FuchsiaDeviceError: On failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError("Cannot start: Trace session is not"
+            raise errors.FuchsiaStateError("Cannot start: Trace session is not "
                                            f"initialized on {self._name}")
         _LOGGER.info("Starting trace on '%s'", self._name)
         self._sl4f.run(method=_SL4F_METHODS["Start"])
@@ -89,7 +89,7 @@ class TracingDefault(tracing.Tracing):
             errors.FuchsiaDeviceError: On failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError("Cannot stop: Trace session is not"
+            raise errors.FuchsiaStateError("Cannot stop: Trace session is not "
                                            f"initialized on {self._name}")
         if not self._tracing_active:
             raise errors.FuchsiaStateError(
@@ -106,7 +106,7 @@ class TracingDefault(tracing.Tracing):
             errors.FuchsiaDeviceError: On failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError("Cannot terminate: Trace session is"
+            raise errors.FuchsiaStateError("Cannot terminate: Trace session is "
                                            f"not initialized on {self._name}")
 
         _LOGGER.info("Terminating trace session on '%s'", self._name)
@@ -128,7 +128,7 @@ class TracingDefault(tracing.Tracing):
 
             trace_file: Name of the output trace file.
                 If not provided, API will create a name using
-                "Trace_{device_name}_{'%Y-%m-%d-%I-%M-%S-%p'}" format.
+                "trace_{device_name}_{'%Y-%m-%d-%I-%M-%S-%p'}" format.
 
         Returns:
             The path to the trace file.
@@ -138,7 +138,7 @@ class TracingDefault(tracing.Tracing):
             errors.FuchsiaDeviceError: On failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError("Cannot terminate: Trace session is"
+            raise errors.FuchsiaStateError("Cannot terminate: Trace session is "
                                            f"not initialized on {self._name}")
 
         _LOGGER.info("Terminating trace session on '%s'", self._name)
@@ -155,13 +155,13 @@ class TracingDefault(tracing.Tracing):
 
         if not trace_file:
             timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
-            trace_file = f"Trace_{self._name}_{timestamp}.fxt"
+            trace_file = f"trace_{self._name}_{timestamp}.fxt"
         trace_file_path: str = os.path.join(directory, trace_file)
 
         with open(trace_file_path, "wb") as trace_file_handle:
             trace_data: str = resp.get("result", {}).get("data", "")
             trace_file_handle.write(base64.b64decode(trace_data))
 
-        _LOGGER.info("Trace downloaded, see '%s'", trace_file_path)
+        _LOGGER.info("Trace downloaded at '%s'", trace_file_path)
 
         return trace_file_path

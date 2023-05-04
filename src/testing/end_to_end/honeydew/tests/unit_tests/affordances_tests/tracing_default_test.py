@@ -4,8 +4,9 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.tracing_default.py."""
 
-import unittest
 import base64
+import tempfile
+import unittest
 
 from typing import Any, Dict
 from unittest import mock
@@ -160,14 +161,12 @@ class TracingDefaultTests(unittest.TestCase):
             (
                 {
                     "label": "when_session_is_not_initialized",
-                    "trace_dir": "/tmp/log/trace",
                     "session_initialized": False
                 },),
             (
                 {
                     "label": "with_tracing_download_default_file_name",
                     "session_initialized": True,
-                    "trace_dir": "/tmp/log/trace",
                     "return_value":
                         {
                             "data":
@@ -179,7 +178,6 @@ class TracingDefaultTests(unittest.TestCase):
                 {
                     "label": "with_tracing_download_given_file_name",
                     "session_initialized": True,
-                    "trace_dir": "/tmp/log/trace",
                     "trace_file": "trace.fxt",
                     "return_value":
                         {
@@ -192,27 +190,27 @@ class TracingDefaultTests(unittest.TestCase):
         name_func=_custom_test_name_func)
     def test_terminate_and_download(self, parameterized_dict) -> None:
         """Test for TracingDefault.terminate_and_download() method."""
-        trace_dir: str = parameterized_dict.get("trace_dir")
-        trace_file: str = parameterized_dict.get("trace_file")
 
-        if not parameterized_dict.get("session_initialized"):
-            with self.assertRaises(errors.FuchsiaStateError):
-                self.tracing_obj.terminate_and_download(directory=trace_dir)
-        else:
-            # Initialize the tracing session.
-            self.tracing_obj.initialize()
-            return_value: str = parameterized_dict.get("return_value")
-            self.sl4f_obj.run.return_value = return_value
-
-            trace_path: str = self.tracing_obj.terminate_and_download(
-                directory=trace_dir, trace_file=trace_file)
-            self.sl4f_obj.run.assert_called()
-
-            # Check the return value of the terminate method.
-            if trace_file:
-                self.assertEqual(trace_path, f"{trace_dir}/{trace_file}")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            if not parameterized_dict.get("session_initialized"):
+                with self.assertRaises(errors.FuchsiaStateError):
+                    self.tracing_obj.terminate_and_download(directory=tmpdir)
             else:
-                self.assertRegex(trace_path, f"{trace_dir}/Trace_.*.fxt")
+                trace_file: str = parameterized_dict.get("trace_file")
+                # Initialize the tracing session.
+                self.tracing_obj.initialize()
+                return_value: str = parameterized_dict.get("return_value")
+                self.sl4f_obj.run.return_value = return_value
+
+                trace_path: str = self.tracing_obj.terminate_and_download(
+                    directory=tmpdir, trace_file=trace_file)
+                self.sl4f_obj.run.assert_called()
+
+                # Check the return value of the terminate method.
+                if trace_file:
+                    self.assertEqual(trace_path, f"{tmpdir}/{trace_file}")
+                else:
+                    self.assertRegex(trace_path, f"{tmpdir}/trace_.*.fxt")
 
 
 if __name__ == "__main__":
