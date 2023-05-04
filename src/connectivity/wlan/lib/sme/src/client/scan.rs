@@ -952,7 +952,8 @@ mod tests {
     fn sme_inspect() -> (Inspector, Arc<inspect::SmeTree>) {
         let inspector = Inspector::default();
         let hasher = WlanHasher::new([88, 77, 66, 55, 44, 33, 22, 11]);
-        let sme_inspect = Arc::new(inspect::SmeTree::new(inspector.root(), hasher));
+        let sme_inspect =
+            Arc::new(inspect::SmeTree::new(inspector.root().create_child("sme"), hasher));
         (inspector, sme_inspect)
     }
 }

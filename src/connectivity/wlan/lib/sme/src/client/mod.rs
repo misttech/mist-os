@@ -496,7 +496,7 @@ impl ClientSme {
     pub fn new(
         cfg: ClientConfig,
         info: fidl_mlme::DeviceInfo,
-        iface_tree_holder: Arc<wlan_inspect::iface_mgr::IfaceTreeHolder>,
+        inspect_node: fuchsia_inspect::Node,
         hasher: WlanHasher,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         mac_sublayer_support: fidl_common::MacSublayerSupport,
@@ -506,8 +506,7 @@ impl ClientSme {
         let device_info = Arc::new(info);
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (mut timer, time_stream) = timer::create_timer();
-        let inspect = Arc::new(inspect::SmeTree::new(&iface_tree_holder.node, hasher));
-        iface_tree_holder.add_iface_subtree(inspect.clone());
+        let inspect = Arc::new(inspect::SmeTree::new(inspect_node, hasher));
         let _ = timer.schedule(event::InspectPulseCheck);
         let _ = timer.schedule(event::InspectPulsePersist);
         let mut auto_persist_last_pulse =
@@ -1193,7 +1192,7 @@ mod tests {
         let (mut sme, _mlme_sink, mut mlme_stream, _time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(CLIENT_ADDR),
-            Arc::new(wlan_inspect::iface_mgr::IfaceTreeHolder::new(sme_root_node)),
+            sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             mac_sublayer_support,
@@ -1713,7 +1712,7 @@ mod tests {
         let (mut sme, _mlme_sink, _mlme_stream, mut time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(CLIENT_ADDR),
-            Arc::new(wlan_inspect::iface_mgr::IfaceTreeHolder::new(sme_root_node)),
+            sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             fake_mac_sublayer_support(),
@@ -1794,7 +1793,7 @@ mod tests {
         let (client_sme, _mlme_sink, mlme_stream, time_stream) = ClientSme::new(
             ClientConfig::default(),
             test_utils::fake_device_info(CLIENT_ADDR),
-            Arc::new(wlan_inspect::iface_mgr::IfaceTreeHolder::new(sme_root_node)),
+            sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             mac_sublayer_support,

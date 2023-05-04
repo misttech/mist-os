@@ -34,6 +34,8 @@ const IDLE_STR: &'static str = "idle";
 
 /// Wrapper struct SME inspection nodes
 pub struct SmeTree {
+    /// Base SME inspection node that holds all other nodes in the SmeTree.
+    pub root_node: Node,
     /// Inspection node to log recent state transitions, or cases where an event would that would
     /// normally cause a state transition doesn't due to an error.
     pub state_events: Mutex<BoundedListNode>,
@@ -61,7 +63,7 @@ pub struct SmeTree {
 }
 
 impl SmeTree {
-    pub fn new(node: &Node, hasher: WlanHasher) -> Self {
+    pub fn new(node: Node, hasher: WlanHasher) -> Self {
         let state_events =
             BoundedListNode::new(node.create_child("state_events"), STATE_EVENTS_LIMIT);
         let rsn_events = BoundedListNode::new(node.create_child("rsn_events"), RSN_EVENTS_LIMIT);
@@ -71,6 +73,7 @@ impl SmeTree {
         let scan_discard_fidl_bss = node.create_uint("scan_discard_fidl_bss", 0);
         let scan_merge_ie_failures = node.create_uint("scan_merge_ie_failures", 0);
         Self {
+            root_node: node,
             state_events: Mutex::new(state_events),
             rsn_events: Mutex::new(rsn_events),
             join_scan_events: Mutex::new(join_scan_events),

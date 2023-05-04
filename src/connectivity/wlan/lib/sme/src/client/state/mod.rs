@@ -2254,19 +2254,21 @@ mod tests {
         assert_idle(state);
 
         assert_data_tree!(h._inspector, root: contains {
-            state_events: {
-                "0": {
-                    "@time": AnyProperty,
-                    ctx: AnyProperty,
-                    from: AnyProperty,
-                    to: AnyProperty,
+            sme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        ctx: AnyProperty,
+                        from: AnyProperty,
+                        to: AnyProperty,
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        from: AnyProperty,
+                        to: AnyProperty,
+                    },
                 },
-                "1": {
-                    "@time": AnyProperty,
-                    from: AnyProperty,
-                    to: AnyProperty,
-                },
-            }
+            },
         });
     }
 
@@ -2418,14 +2420,16 @@ mod tests {
         );
 
         assert_data_tree!(h._inspector, root: contains {
-            state_events: {
-                "0": {
-                    "@time": AnyProperty,
-                    ctx: AnyProperty,
-                    from: AnyProperty,
-                    to: AnyProperty,
-                }
-            }
+            sme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        ctx: AnyProperty,
+                        from: AnyProperty,
+                        to: AnyProperty,
+                    }
+                },
+            },
         });
     }
 
@@ -2921,7 +2925,10 @@ mod tests {
                 mlme_sink: MlmeSink::new(mlme_sink),
                 timer,
                 att_id: 0,
-                inspect: Arc::new(inspect::SmeTree::new(inspector.root(), hasher)),
+                inspect: Arc::new(inspect::SmeTree::new(
+                    inspector.root().create_child("sme"),
+                    hasher,
+                )),
                 mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
             };

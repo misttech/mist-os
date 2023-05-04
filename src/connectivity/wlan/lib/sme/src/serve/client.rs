@@ -21,7 +21,6 @@ use pin_utils::pin_mut;
 use std::sync::{Arc, Mutex};
 use tracing::error;
 use wlan_common::hasher::WlanHasher;
-use wlan_inspect;
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;
 type Sme = client_sme::ClientSme;
@@ -37,7 +36,7 @@ pub fn serve(
     new_telemetry_fidl_clients: mpsc::UnboundedReceiver<
         fidl::endpoints::ServerEnd<fidl_sme::TelemetryMarker>,
     >,
-    iface_tree_holder: Arc<wlan_inspect::iface_mgr::IfaceTreeHolder>,
+    inspect_node: fuchsia_inspect::Node,
     hasher: WlanHasher,
     persistence_req_sender: auto_persist::PersistenceReqSender,
 ) -> (MlmeSink, MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
@@ -48,7 +47,7 @@ pub fn serve(
     let (sme, mlme_sink, mlme_stream, time_stream) = Sme::new(
         cfg,
         device_info,
-        iface_tree_holder,
+        inspect_node,
         hasher,
         persistence_req_sender,
         mac_sublayer_support,

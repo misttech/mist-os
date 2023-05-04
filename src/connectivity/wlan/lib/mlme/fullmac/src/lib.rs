@@ -22,10 +22,8 @@ use {
         select, StreamExt,
     },
     rand,
-    std::sync::Arc,
     tracing::{error, info, warn},
     wlan_common::{hasher::WlanHasher, sink::UnboundedSink},
-    wlan_inspect,
     wlan_sme::{self, serve::create_sme},
 };
 
@@ -291,7 +289,6 @@ impl FullmacMlme {
         // According to doc, `rand::random` uses ThreadRng, which is cryptographically secure:
         // https://docs.rs/rand/0.5.0/rand/rngs/struct.ThreadRng.html
         let wlan_hasher = WlanHasher::new(rand::random::<u64>().to_le_bytes());
-        let iface_tree_holder = Arc::new(wlan_inspect::IfaceTreeHolder::new(inspect_usme_node));
 
         // TODO(fxbug.dev/113677): Get persistence working by adding the appropriate configs
         //                         in *.cml files
@@ -316,7 +313,7 @@ impl FullmacMlme {
             mac_sublayer_support,
             security_support,
             spectrum_management_support,
-            iface_tree_holder.clone(),
+            inspect_usme_node,
             wlan_hasher,
             persistence_req_sender,
             generic_sme_stream,

@@ -24,7 +24,6 @@ rustc_library("wlan-fullmac-mlme") {
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
-    "//src/connectivity/wlan/lib/inspect:wlan-inspect",
     "//src/connectivity/wlan/lib/sme:wlan-sme",
     "//src/diagnostics/persistence/fidl:persist_rust",
     "//src/lib/diagnostics/inspect/contrib/rust",

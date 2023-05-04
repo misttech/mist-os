@@ -134,7 +134,7 @@ pub fn create_sme(
     mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
-    iface_tree_holder: Arc<wlan_inspect::iface_mgr::IfaceTreeHolder>,
+    inspect_node: fuchsia_inspect::Node,
     hasher: WlanHasher,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
@@ -154,7 +154,7 @@ pub fn create_sme(
                 mlme_event_stream,
                 receiver,
                 telemetry_endpoint_receiver,
-                iface_tree_holder,
+                inspect_node,
                 hasher,
                 persistence_req_sender,
             );
@@ -339,7 +339,7 @@ mod tests {
         fuchsia_inspect::Inspector,
         futures::task::Poll,
         pin_utils::pin_mut,
-        std::{pin::Pin, sync::Arc},
+        std::pin::Pin,
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -348,7 +348,6 @@ mod tests {
                 fake_spectrum_management_support_empty,
             },
         },
-        wlan_inspect::IfaceTreeHolder,
     };
 
     const PLACEHOLDER_HASH_KEY: [u8; 8] = [88, 77, 66, 55, 44, 33, 22, 11];
@@ -358,7 +357,7 @@ mod tests {
         let mut _exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
+        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (_generic_sme_proxy, generic_sme_stream) =
@@ -375,7 +374,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            Arc::new(iface_tree_holder),
+            inspect_node,
             WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
@@ -389,7 +388,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let inspector = Inspector::default();
-        let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
+        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
@@ -402,7 +401,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            Arc::new(iface_tree_holder),
+            inspect_node,
             WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
@@ -440,7 +439,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
+        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
@@ -454,7 +453,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            Arc::new(iface_tree_holder),
+            inspect_node,
             WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
