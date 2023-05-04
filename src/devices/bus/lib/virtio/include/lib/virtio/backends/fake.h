@@ -5,15 +5,13 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_FAKE_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_FAKE_H_
 
-#include <assert.h>
 #include <lib/virtio/backends/backend.h>
+#include <zircon/assert.h>
 
 #include <initializer_list>
 #include <map>
 #include <set>
 #include <utility>
-
-#include <zxtest/zxtest.h>
 
 namespace virtio {
 
@@ -37,38 +35,40 @@ class FakeBackend : public Backend {
   zx_status_t Bind() override { return ZX_OK; }
   void Unbind() override {}
   bool ReadFeature(uint32_t bit) override { return false; }
-  void SetFeature(uint32_t bit) override { EXPECT_NE(state_, State::DRIVER_OK); }
+  void SetFeature(uint32_t bit) override { ZX_ASSERT(state_ != State::DRIVER_OK); }
   zx_status_t ConfirmFeatures() override { return ZX_OK; }
   void DriverStatusOk() override {
-    EXPECT_EQ(state_, State::DEVICE_STATUS_ACK);
+    ZX_ASSERT_MSG(state_ == State::DEVICE_STATUS_ACK, "State: %d", state_);
     state_ = State::DRIVER_OK;
   }
   void DriverStatusAck() override {
-    EXPECT_EQ(state_, State::DEVICE_RESET);
+    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", state_);
     state_ = State::DEVICE_STATUS_ACK;
   }
   void DeviceReset() override {
     state_ = State::DEVICE_RESET;
     kicked_queues_.clear();
   }
-  void WaitForDeviceReset() override { EXPECT_EQ(state_, State::DEVICE_RESET); }
+  void WaitForDeviceReset() override {
+    ZX_ASSERT_MSG(state_ == State::DEVICE_RESET, "State: %d", state_);
+  }
   void ReadDeviceConfig(uint16_t offset, uint8_t* value) override {
     auto shifted_offset = static_cast<uint16_t>(offset + kISRStatus + 1);
-    EXPECT_GT(registers8_.count(shifted_offset), 0, "offset-%xh/8", offset);
+    ZX_ASSERT_MSG(registers8_.count(shifted_offset) > 0, "offset-%xh/8", offset);
     *value = registers8_[shifted_offset];
   }
   void ReadDeviceConfig(uint16_t offset, uint16_t* value) override {
     auto shifted_offset = static_cast<uint16_t>(offset + kISRStatus + 1);
-    EXPECT_GT(registers16_.count(shifted_offset), 0, "offset-%xh/16", offset);
+    ZX_ASSERT_MSG(registers16_.count(shifted_offset) > 0, "offset-%xh/16", offset);
     *value = registers16_[shifted_offset];
   }
   void ReadDeviceConfig(uint16_t offset, uint32_t* value) override {
     auto shifted_offset = static_cast<uint16_t>(offset + kISRStatus + 1);
-    EXPECT_GT(registers32_.count(shifted_offset), 0, "offset-%xh/32", offset);
+    ZX_ASSERT_MSG(registers32_.count(shifted_offset) > 0, "offset-%xh/32", offset);
     *value = registers32_[shifted_offset];
   }
   void ReadDeviceConfig(uint16_t offset, uint64_t* value) override {
-    EXPECT_TRUE(0);  // Not Implemented.
+    ZX_ASSERT_MSG(false, "Not Implemented");
   }
   void WriteDeviceConfig(uint16_t offset, uint8_t value) override {
     auto shifted_offset = static_cast<uint16_t>(offset + kISRStatus + 1);
@@ -83,10 +83,10 @@ class FakeBackend : public Backend {
     registers32_[shifted_offset] = value;
   }
   void WriteDeviceConfig(uint16_t offset, uint64_t value) override {
-    EXPECT_TRUE(0);  // Not Implemented.
+    ZX_ASSERT_MSG(false, "Not Implemented");
   }
   uint16_t GetRingSize(uint16_t index) override {
-    EXPECT_GT(queue_sizes_.count(index), 0);
+    ZX_ASSERT_MSG(queue_sizes_.count(index) > 0, "index-%xh", index);
     return queue_sizes_[index];
   }
   zx_status_t SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc, zx_paddr_t pa_avail,
@@ -94,8 +94,8 @@ class FakeBackend : public Backend {
     return ZX_OK;
   }
   void RingKick(uint16_t ring_index) override {
-    EXPECT_EQ(state_, State::DRIVER_OK);
-    EXPECT_GT(queue_sizes_.count(ring_index), 0);
+    ZX_ASSERT_MSG(state_ == State::DRIVER_OK, "State: %d", state_);
+    ZX_ASSERT_MSG(queue_sizes_.count(ring_index) > 0, "index-%xh", ring_index);
     kicked_queues_.insert(ring_index);
   }
   uint32_t IsrStatus() override { return registers8_.find(kISRStatus)->second; }
