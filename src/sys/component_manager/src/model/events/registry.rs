@@ -284,7 +284,7 @@ impl EventRegistry {
         target_moniker: &AbsoluteMoniker,
         events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
-        let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
+        let model = self.model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
         let component = model.look_up(&target_moniker).await?;
         let decl = {
             let state = component.lock_state().await;
@@ -299,7 +299,7 @@ impl EventRegistry {
                 }
                 InstanceState::Resolved(ref s) => s.decl().clone(),
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_destroyed(target_moniker.clone()));
+                    return Err(ModelError::EventsError { err: EventsError::InstanceDestroyed });
                 }
             }
         };

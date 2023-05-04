@@ -58,7 +58,7 @@ impl EventSource {
         stream_provider: Weak<EventStreamProvider>,
     ) -> Result<Self, ModelError> {
         let subscriber = {
-            let model = model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
+            let model = model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
             match &subscriber {
                 ExtendedMoniker::ComponentInstance(m) => {
                     WeakExtendedInstance::Component(model.look_up(&m).await?.as_weak())
@@ -95,9 +95,9 @@ impl EventSource {
                     // time opening the event stream.
                     if request.event_name.source_name.to_string() == "capability_requested" {
                         // Don't support creating a new capability_requested stream.
-                        return Err(ModelError::unsupported(
-                            "capability_requested cannot be taken twice.",
-                        ));
+                        return Err(ModelError::EventsError {
+                            err: EventsError::CapabilityRequestedStreamTaken,
+                        });
                     }
                     let stream = registry.subscribe(&self.subscriber, vec![request]).await?;
                     static_streams.push(stream);

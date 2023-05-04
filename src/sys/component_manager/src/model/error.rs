@@ -26,21 +26,11 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    #[error("component instance with moniker {} has shut down", moniker)]
-    InstanceShutDown { moniker: AbsoluteMoniker },
-    #[error("component instance with moniker {} is being destroyed", moniker)]
-    InstanceDestroyed { moniker: AbsoluteMoniker },
     #[error("component collection not found with name {}", name)]
     CollectionNotFound { name: String },
-    #[error("{} is not supported", feature)]
-    Unsupported { feature: String },
-    #[error("package directory handle missing")]
-    PackageDirectoryMissing,
     // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
     #[error("path is not utf-8: {:?}", path)]
     PathIsNotUtf8 { path: PathBuf },
-    #[error("path is not valid: {:?}", path)]
-    PathInvalid { path: String },
     #[error("Moniker error: {}", err)]
     MonikerError {
         #[from]
@@ -54,12 +44,6 @@ pub enum ModelError {
     RoutingError {
         #[from]
         err: RoutingError,
-    },
-    #[error("Failed to open path `{}` in component manager's namespace: {}", path, err)]
-    OpenComponentManagerNamespaceFailed {
-        path: String,
-        #[source]
-        err: ClonableError,
     },
     #[error(
         "Failed to open path `{}`, in storage directory for `{}` backed by `{}`: {}",
@@ -101,11 +85,6 @@ pub enum ModelError {
     },
     #[error("failed to open directory '{}' for component '{}'", relative_path, moniker)]
     OpenDirectoryError { moniker: AbsoluteMoniker, relative_path: String },
-    #[error("failed to create stream from channel")]
-    StreamCreationError {
-        #[source]
-        err: fidl::Error,
-    },
     #[error("events error: {}", err)]
     EventsError {
         #[from]
@@ -121,9 +100,7 @@ pub enum ModelError {
         #[from]
         err: ComponentIdIndexError,
     },
-    #[error("timed out after {:?}", duration)]
-    Timeout { duration: zx::Duration },
-    #[error("{err}")]
+    #[error("error with resolve action: {err}")]
     ResolveActionError {
         #[from]
         err: ResolveActionError,
@@ -156,28 +133,12 @@ pub enum ModelError {
 }
 
 impl ModelError {
-    pub fn instance_shut_down(moniker: AbsoluteMoniker) -> ModelError {
-        ModelError::InstanceShutDown { moniker }
-    }
-
-    pub fn instance_destroyed(moniker: AbsoluteMoniker) -> ModelError {
-        ModelError::InstanceDestroyed { moniker }
-    }
-
     pub fn instance_not_found(moniker: AbsoluteMoniker) -> ModelError {
         ModelError::from(ComponentInstanceError::instance_not_found(moniker))
     }
 
-    pub fn unsupported(feature: impl Into<String>) -> ModelError {
-        ModelError::Unsupported { feature: feature.into() }
-    }
-
     pub fn path_is_not_utf8(path: PathBuf) -> ModelError {
         ModelError::PathIsNotUtf8 { path }
-    }
-
-    pub fn path_invalid(path: impl Into<String>) -> ModelError {
-        ModelError::PathInvalid { path: path.into() }
     }
 
     pub fn open_directory_error(
@@ -185,14 +146,6 @@ impl ModelError {
         relative_path: impl Into<String>,
     ) -> ModelError {
         ModelError::OpenDirectoryError { moniker, relative_path: relative_path.into() }
-    }
-
-    pub fn stream_creation_error(err: fidl::Error) -> ModelError {
-        ModelError::StreamCreationError { err }
-    }
-
-    pub fn timeout(duration: zx::Duration) -> ModelError {
-        ModelError::Timeout { duration }
     }
 
     pub fn as_zx_status(&self) -> zx::Status {
@@ -203,8 +156,6 @@ impl ModelError {
             ModelError::ComponentInstanceError {
                 err: ComponentInstanceError::InstanceNotFound { .. },
             } => zx::Status::NOT_FOUND,
-            ModelError::Unsupported { .. } => zx::Status::NOT_SUPPORTED,
-            ModelError::Timeout { .. } => zx::Status::TIMED_OUT,
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
             ModelError::RouteAndOpenCapabilityError { err } => err.as_zx_status(),
             ModelError::CapabilityProviderError { err } => err.as_zx_status(),

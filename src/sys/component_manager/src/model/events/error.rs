@@ -6,6 +6,15 @@ use {cm_rust::CapabilityName, thiserror::Error};
 
 #[derive(Debug, Error, Clone)]
 pub enum EventsError {
+    #[error("capability_requested event streams cannot be taken twice")]
+    CapabilityRequestedStreamTaken,
+
+    #[error("Model not available")]
+    ModelNotAvailable,
+
+    #[error("Instance destroyed")]
+    InstanceDestroyed,
+
     #[error("Registry not found")]
     RegistryNotFound,
 
