@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp},
-    fidl_fuchsia_hardware_bluetooth::HciSynchronousProxy,
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, Channel, MessageBuf},
-    futures::Stream,
-    std::{
-        fs::{File, OpenOptions},
-        marker::Unpin,
-        path::PathBuf,
-        pin::Pin,
-        task::{Context, Poll},
-        time::Duration,
-    },
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
+use fidl_fuchsia_hardware_bluetooth::HciMarker as HardwareHciMarker;
+use fidl_fuchsia_io::DirectoryProxy;
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, Channel, MessageBuf};
+use futures::Stream;
+use std::{
+    marker::Unpin,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
 };
 
 use crate::bounded_queue::{CreatedAt, SizeOf};
@@ -116,29 +113,29 @@ impl CreatedAt for SnoopPacket {
 /// stream can be polled for `SnoopPacket`s coming off the channel.
 pub(crate) struct Snooper {
     pub device_name: String,
-    pub device_path: PathBuf,
     pub chan: fuchsia_async::Channel,
 }
 
 impl Snooper {
     /// Create a new snooper from a device path. This opens a new snoop channel, returning an error
     /// if the devices doesn't exist or the channel cannot be created.
-    pub fn new(device_path: PathBuf) -> Result<Snooper, Error> {
-        let hci_device = OpenOptions::new().read(true).open(&device_path)?;
-        let channel = open_snoop_channel(&hci_device)?;
-        Snooper::from_channel(channel, device_path)
+    pub fn new(dir: &DirectoryProxy, path: &str) -> Result<Snooper, Error> {
+        let hci = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            HardwareHciMarker,
+        >(dir, path)
+        .context("failed to open bt-hci device")?;
+
+        let (ours, theirs) = Channel::create();
+        hci.open_snoop_channel(theirs)?;
+        Snooper::from_channel(ours, path)
     }
 
     /// Take a channel and wrap it in a `Snooper`.
-    pub fn from_channel(chan: Channel, device_path: PathBuf) -> Result<Snooper, Error> {
+    pub fn from_channel(chan: Channel, path: &str) -> Result<Snooper, Error> {
         let chan = fasync::Channel::from_channel(chan)?;
 
-        let device_name = device_path
-            .file_name()
-            .ok_or(format_err!("A device has no name"))?
-            .to_string_lossy()
-            .into_owned();
-        Ok(Snooper { device_name, device_path, chan })
+        let device_name = path.to_owned();
+        Ok(Snooper { device_name, chan })
     }
 
     /// Parse a raw byte buffer and return a SnoopPacket. Returns `None` if the buffer does not
@@ -170,32 +167,21 @@ impl Stream for Snooper {
     }
 }
 
-// TODO (belgum) use asynchronous client
-pub fn open_snoop_channel(device: &File) -> Result<Channel, Error> {
-    let hci_channel = fdio::clone_channel(device)?;
-    let interface = HciSynchronousProxy::new(hci_channel);
-    let (ours, theirs) = Channel::create();
-    interface.open_snoop_channel(theirs)?;
-    Ok(ours)
-}
-
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        fuchsia_zircon::Channel,
-        futures::StreamExt,
-        std::{path::PathBuf, task::Poll},
-    };
+    use super::*;
+
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::Channel;
+    use futures::StreamExt;
+    use std::task::Poll;
 
     #[test]
     fn test_from_channel() {
         let _exec = fasync::TestExecutor::new();
         let (channel, _) = Channel::create();
-        let snooper = Snooper::from_channel(channel, PathBuf::from("/a/b/c")).unwrap();
+        let snooper = Snooper::from_channel(channel, "c").unwrap();
         assert_eq!(snooper.device_name, "c");
-        assert_eq!(snooper.device_path, PathBuf::from("/a/b/c"));
     }
 
     #[test]
@@ -220,7 +206,7 @@ mod tests {
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (tx, rx) = Channel::create();
-        let mut snooper = Snooper::from_channel(rx, PathBuf::from("/a/b/c")).unwrap();
+        let mut snooper = Snooper::from_channel(rx, "c").unwrap();
         let flags = HciFlags::IS_RECEIVED | HciFlags::PACKET_TYPE_EVENT;
         tx.write(&[flags, 0, 1, 2], &mut vec![]).unwrap();
         tx.write(&[0, 3, 4, 5], &mut vec![]).unwrap();

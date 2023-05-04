@@ -4,29 +4,26 @@
 
 #![recursion_limit = "256"]
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    argh::FromArgs,
-    fidl::prelude::*,
-    fidl::Error as FidlError,
-    fidl_fuchsia_bluetooth_snoop::{SnoopRequest, SnoopRequestStream},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_bluetooth::bt_fidl_status,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
-    fuchsia_inspect as inspect, fuchsia_trace as trace,
-    futures::{
-        future::{join, ready, Join, Ready, TryFutureExt},
-        select,
-        stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture},
-    },
-    std::{
-        fmt,
-        path::{Path, PathBuf},
-        time::Duration,
-    },
-    tracing::{debug, error, info, trace, warn},
+use anyhow::{format_err, Context as _, Error};
+use argh::FromArgs;
+use fidl::prelude::*;
+use fidl::Error as FidlError;
+use fidl_fuchsia_bluetooth_snoop::{SnoopRequest, SnoopRequestStream};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_io::DirectoryProxy;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::bt_fidl_status;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
+use fuchsia_inspect as inspect;
+use fuchsia_trace as trace;
+use futures::{
+    future::{join, ready, Join, Ready, TryFutureExt},
+    select,
+    stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture},
 };
+use std::{fmt, time::Duration};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     clock::{set_utc_clock, utc_clock_transformation},
@@ -88,46 +85,38 @@ impl IdGenerator {
     }
 }
 
-/// Create a lossy `String` clone of a `Path`
-fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
-}
-
-fn absolute_device_path<P: AsRef<Path>>(dev_name: &P) -> PathBuf {
-    let mut path = PathBuf::from(HCI_DEVICE_CLASS_PATH);
-    path.push(dev_name);
-    path
-}
-
-/// Handle an event on the virtual filesystem in the HCI device directory. This should log or
-/// internally handle most errors that come from the stream of filesystem watch events. Only errors
-/// in the `Watcher` itself result in returning an Error to the caller.
+/// Handle an event on the virtual filesystem in the HCI device directory.
 fn handle_hci_device_event(
     message: WatchMessage,
+    directory: &DirectoryProxy,
     snoopers: &mut ConcurrentSnooperPacketFutures,
     subscribers: &mut SubscriptionManager,
     packet_logs: &mut PacketLogs,
 ) {
-    let path = absolute_device_path(&message.filename);
+    let WatchMessage { event, filename } = message;
 
-    match message.event {
+    let path = filename.to_str().expect("utf-8 path");
+    match event {
         WatchEvent::ADD_FILE | WatchEvent::EXISTING => {
-            info!("Opening snoop channel for hci device \"{}\"", path.display());
-            match Snooper::new(path.clone()) {
+            if filename == std::path::Path::new(".") {
+                return;
+            }
+            info!(path, "Opening snoop channel");
+            match Snooper::new(directory, &path) {
                 Ok(snooper) => {
                     snoopers.push(snooper.into_future());
-                    let removed_device = packet_logs.add_device(path_to_string(&message.filename));
+                    let removed_device = packet_logs.add_device(path.to_owned());
                     if let Some(device) = removed_device {
                         subscribers.remove_device(&device);
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to open snoop channel for \"{}\": {}", path.display(), e);
+                    warn!("Failed to open snoop channel for \"{path}\": {e:?}");
                 }
             }
         }
         WatchEvent::REMOVE_FILE => {
-            info!("Removing snoop channel for hci device: \"{}\"", path.display());
+            info!("Removing snoop channel for hci device: \"{path}\"");
             // TODO(belgum): What should be done with the logged packets in this case?
             //               Find out how to remove snooper from ConcurrentTask (perhaps cancel
             //               and wake)
@@ -233,7 +222,7 @@ async fn handle_packet(
     truncate_payload: Option<usize>,
 ) {
     if let Some((device, mut packet)) = packet {
-        trace!("Received packet from {:?}.", snooper.device_path);
+        trace!("Received packet from {}.", snooper.device_name);
         if let Some(len) = truncate_payload {
             packet.payload.truncate(len);
         }
@@ -366,7 +355,7 @@ async fn run(
                     .and_then(|r| Ok(r?));
                 match message {
                     Ok(message) => {
-                        handle_hci_device_event(message, &mut snoopers, &mut subscribers,
+                        handle_hci_device_event(message, &directory, &mut snoopers, &mut subscribers,
                             &mut packet_logs);
                     }
                     Err(e) => {
