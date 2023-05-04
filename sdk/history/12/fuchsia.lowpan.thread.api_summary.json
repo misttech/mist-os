@@ -32,6 +32,57 @@
         "name": "fuchsia.lowpan.thread/DatasetConnector"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_ALERT",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_CRIT",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_DEBUG",
+        "value": "8"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_EMERG",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_ERR",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_INFO",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_NOTICE",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_UNSPECIFIED",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_WARNING",
+        "value": "5"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.thread/Feature.GetFeatureConfig",
         "ordinal": "3076391112764831249",
@@ -46,6 +97,18 @@
     {
         "kind": "protocol",
         "name": "fuchsia.lowpan.thread/Feature"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.detailed_logging_enabled",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.detailed_logging_level",
+        "ordinal": "5",
+        "type": "fuchsia.lowpan.thread/DetailedLoggingLevel"
     },
     {
         "kind": "table/member",

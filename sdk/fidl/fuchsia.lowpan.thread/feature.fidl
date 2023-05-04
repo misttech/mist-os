@@ -5,6 +5,19 @@ library fuchsia.lowpan.thread;
 
 using fuchsia.lowpan;
 
+@available(added=12)
+type DetailedLoggingLevel = flexible enum {
+    LOWPAN_LOG_UNSPECIFIED = 0; // Zero value enum is UNSPECIFIED
+    LOWPAN_LOG_EMERG = 1; // System is unusable
+    LOWPAN_LOG_ALERT = 2; // Action must be taken immediately
+    LOWPAN_LOG_CRIT = 3; // Critical conditions
+    LOWPAN_LOG_ERR = 4; // Error conditions
+    LOWPAN_LOG_WARNING = 5; // Warning conditions
+    LOWPAN_LOG_NOTICE = 6; // Normal but significant condition
+    LOWPAN_LOG_INFO = 7; // Informational
+    LOWPAN_LOG_DEBUG = 8; // Debug level messages
+};
+
 /// OpenThread feature configuration.
 ///
 /// This table describes what OpenThread features are enabled or disabled
@@ -19,6 +32,17 @@ type FeatureConfig = table {
 
     /// Determines if SRP replication is enabled or disabled.
     3: srp_replication_enabled bool;
+
+    /// Determines if detailed logging is enabled. If set to
+    /// false, default logging level set in config file should
+    /// be used in lowpan-ot-driver.
+    @available(added=12)
+    4: detailed_logging_enabled bool;
+
+    /// Set target log level. The value will be used only if
+    /// `detailed_logging_enabled` is set to true.
+    @available(added=12)
+    5: detailed_logging_level DetailedLoggingLevel;
 };
 
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.
