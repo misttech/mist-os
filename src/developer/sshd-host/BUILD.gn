@@ -5,6 +5,8 @@
 import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/icu/icu_fuchsia_component.gni")
+import("//build/icu/icu_fuchsia_package.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
@@ -46,20 +48,26 @@ executable("bin") {
 group("for_transition") {
 }
 
-fuchsia_package_with_single_component("sshd-host") {
+icu_fuchsia_component("sshd-host-component") {
+  component_name = "sshd-host"
   manifest = "meta/sshd-host.cml"
+
+  # Used by programs that need to load ICU locale data, such as tz-util.
+  icu_deps = [ "//src/lib/icu:icudtl" ]
+
   deps = [
     # Ensure this isn't included in production
-    "//build/validate:non_production_tag",
-
-    # Used by programs that need to load ICU locale data, such as tz-util.
     ":bin",
-    "//src/intl:icudtl",
+    "//build/validate:non_production_tag",
     "//third_party/openssh-portable:hostkeygen",
     "//third_party/openssh-portable:scp",
     "//third_party/openssh-portable:sftp-server",
     "//third_party/openssh-portable:sshd",
   ]
+}
+
+icu_fuchsia_package("sshd-host") {
+  icu_deps = [ ":sshd-host-component" ]
 }
 
 # Enabling a soft-transition, remove when complete
