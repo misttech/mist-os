@@ -93,7 +93,7 @@ pub fn create_image(
     let create_info = current_task.mm.read_object(UserRef::new(create_info_address))?;
 
     let (vmo, token, info) = create_drm_image(0, &create_info).map_err(|e| {
-        log_warn!(current_task, "Error creating drm image: {:?}", e);
+        log_warn!("Error creating drm image: {:?}", e);
         errno!(EINVAL)
     })?;
 

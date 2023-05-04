@@ -434,7 +434,7 @@ impl SocketOps for BaseNetlinkSocket {
         };
 
         if destination.groups != 0 {
-            not_implemented!("?", "BaseNetlinkSockets multicasting is stubbed");
+            not_implemented!("BaseNetlinkSockets multicasting is stubbed");
             return Ok(data.drain());
         }
 
@@ -457,7 +457,7 @@ impl SocketOps for BaseNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("?", "BaseNetlinkSocket::shutdown is stubbed");
+        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
         Ok(())
     }
 
@@ -621,7 +621,7 @@ impl SocketOps for UEventNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("?", "BaseNetlinkSocket::shutdown is stubbed");
+        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
         Ok(())
     }
 
@@ -692,7 +692,6 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
             ),
             _ => {
                 crate::logging::not_implemented!(
-                    "?",
                     "Device event for {} is not implemented!",
                     device,
                 );

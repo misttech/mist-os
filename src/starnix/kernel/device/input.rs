@@ -300,7 +300,7 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             _ => {
-                not_implemented!(current_task, "ioctl() {} on input device", request);
+                not_implemented!("ioctl() {} on input device", request);
                 error!(EOPNOTSUPP)
             }
         }
@@ -331,10 +331,10 @@ impl FileOps for Arc<InputFile> {
     fn write(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!(current_task, "write() on input device");
+        not_implemented!("write() on input device");
         error!(EOPNOTSUPP)
     }
 

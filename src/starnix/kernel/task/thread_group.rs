@@ -264,7 +264,7 @@ impl ThreadGroup {
 
         if task.id == state.leader() {
             let exit_status = task.read().exit_status.clone().unwrap_or_else(|| {
-                log_error!(task, "Exiting without an exit code.");
+                log_error!("Exiting without an exit code.");
                 ExitStatus::Exit(u8::MAX)
             });
             state.zombie_leader = Some(ZombieProcess {

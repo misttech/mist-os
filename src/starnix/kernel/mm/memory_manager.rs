@@ -241,7 +241,7 @@ impl MemoryManagerState {
 
     fn remap(
         &mut self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         old_addr: UserAddress,
         old_length: usize,
         new_length: usize,
@@ -268,7 +268,7 @@ impl MemoryManagerState {
 
         // TODO(fxbug.dev/88262): Implement support for MREMAP_DONTUNMAP.
         if flags.contains(MremapFlags::DONTUNMAP) {
-            not_implemented!(current_task, "mremap flag MREMAP_DONTUNMAP not implemented");
+            not_implemented!("mremap flag MREMAP_DONTUNMAP not implemented");
             return error!(EOPNOTSUPP);
         }
 
@@ -650,7 +650,7 @@ impl MemoryManagerState {
 
     fn madvise(
         &self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,
         advice: u32,
@@ -682,7 +682,6 @@ impl MemoryManagerState {
                     // zx::VmoOp::DONT_NEED because they have different
                     // semantics.
                     not_implemented!(
-                        current_task,
                         "madvise advise {} with file-backed mapping not implemented",
                         advice
                     );
@@ -691,7 +690,7 @@ impl MemoryManagerState {
                 MADV_DONTNEED => zx::VmoOp::ZERO,
                 MADV_WILLNEED => zx::VmoOp::COMMIT,
                 advice => {
-                    not_implemented!(current_task, "madvise advice {} not implemented", advice);
+                    not_implemented!("madvise advice {} not implemented", advice);
                     return error!(EINVAL);
                 }
             };

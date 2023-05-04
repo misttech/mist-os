@@ -110,7 +110,7 @@ impl DeviceOps for Arc<BinderDriver> {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let binder_proc = self.create_local_process(current_task.get_pid());
-        log_trace!(current_task, "opened new BinderConnection id={}", binder_proc.identifier);
+        log_trace!("opened new BinderConnection id={}", binder_proc.identifier);
         Ok(Box::new(BinderConnection { identifier: binder_proc.identifier, driver: self.clone() }))
     }
 }
@@ -171,7 +171,7 @@ impl FileOps for BinderConnection {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        log_trace!(current_task, "binder wait_async");
+        log_trace!("binder wait_async");
         match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
@@ -640,11 +640,10 @@ impl BinderProcess {
     /// binder object.
     fn handle_refcount_operation(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<(), Errno> {
-        let actions = self.lock().handle_refcount_operation(current_task, command, handle)?;
+        let actions = self.lock().handle_refcount_operation(command, handle)?;
         for action in actions {
             action.execute();
         }
@@ -669,23 +668,18 @@ impl BinderProcess {
     /// Subscribe a process to the death of the owner of `handle`.
     fn handle_request_death_notification(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         handle: Handle,
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
         let proxy = match handle {
             Handle::SpecialServiceManager => {
-                not_implemented!(current_task, "death notification for service manager");
+                not_implemented!("death notification for service manager");
                 return Ok(());
             }
             Handle::Object { index } => {
                 // Requesting a death notification implies keeping a reference to the handle until the
                 // client is not interested in the notification anymore.
-                self.handle_refcount_operation(
-                    current_task,
-                    binder_driver_command_protocol_BC_INCREFS,
-                    handle,
-                )?;
+                self.handle_refcount_operation(binder_driver_command_protocol_BC_INCREFS, handle)?;
                 self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
@@ -704,13 +698,12 @@ impl BinderProcess {
     /// Remove a previously subscribed death notification.
     fn handle_clear_death_notification(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         handle: Handle,
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
         let proxy = match handle {
             Handle::SpecialServiceManager => {
-                not_implemented!(current_task, "clear death notification for service manager");
+                not_implemented!("clear death notification for service manager");
                 self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
@@ -731,11 +724,7 @@ impl BinderProcess {
         self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
         // The client is not interested in the notification anymore, release the weak reference
         // that was taken when registering the notification.
-        self.handle_refcount_operation(
-            current_task,
-            binder_driver_command_protocol_BC_DECREFS,
-            handle,
-        )?;
+        self.handle_refcount_operation(binder_driver_command_protocol_BC_DECREFS, handle)?;
         Ok(())
     }
 
@@ -814,7 +803,6 @@ impl<'a> BinderProcessGuard<'a> {
     /// `BinderProcess`.
     fn handle_refcount_operation(
         &mut self,
-        current_task: &CurrentTask,
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<Vec<RefCountAction>, Errno> {
@@ -822,7 +810,7 @@ impl<'a> BinderProcessGuard<'a> {
             Handle::SpecialServiceManager => {
                 // TODO: Figure out how to acquire/release refs for the context manager
                 // object.
-                not_implemented!(current_task, "acquire/release refs for context manager object");
+                not_implemented!("acquire/release refs for context manager object");
                 return Ok(vec![]);
             }
             Handle::Object { index } => index,
@@ -830,19 +818,19 @@ impl<'a> BinderProcessGuard<'a> {
 
         match command {
             binder_driver_command_protocol_BC_ACQUIRE => {
-                log_trace!(current_task, "Strong increment on handle {}", idx);
+                log_trace!("Strong increment on handle {}", idx);
                 self.handles.inc_strong(idx)
             }
             binder_driver_command_protocol_BC_RELEASE => {
-                log_trace!(current_task, "Strong decrement on handle {}", idx);
+                log_trace!("Strong decrement on handle {}", idx);
                 self.handles.dec_strong(idx)
             }
             binder_driver_command_protocol_BC_INCREFS => {
-                log_trace!(current_task, "Weak increment on handle {}", idx);
+                log_trace!("Weak increment on handle {}", idx);
                 self.handles.inc_weak(idx)
             }
             binder_driver_command_protocol_BC_DECREFS => {
-                log_trace!(current_task, "Weak decrement on handle {}", idx);
+                log_trace!("Weak decrement on handle {}", idx);
                 self.handles.dec_weak(idx)
             }
             _ => unreachable!(),
@@ -2420,15 +2408,15 @@ impl ResourceAccessor for RemoteResourceAccessor {
 /// Implementation of `ResourceAccessor` for a local client represented as a `CurrentTask`.
 impl ResourceAccessor for CurrentTask {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        log_trace!(self, "Closing fd {:?}", fd);
+        log_trace!("Closing fd {:?}", fd);
         self.files.close(fd)
     }
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        log_trace!(self, "Getting file {:?} with flags", fd);
+        log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        log_trace!(self, "Adding file {:?} with flags {:?}", file, flags);
+        log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
 
@@ -2439,15 +2427,15 @@ impl ResourceAccessor for CurrentTask {
 
 impl MemoryAccessor for CurrentTask {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        log_trace!(self, "Reading {} bytes of memory from {:?}", bytes.len(), addr);
+        log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory(addr, bytes)
     }
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        log_trace!(self, "Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
+        log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!(self, "Writing {} bytes to {:?}", bytes.len(), addr);
+        log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
 }
@@ -2455,15 +2443,15 @@ impl MemoryAccessor for CurrentTask {
 /// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
 impl ResourceAccessor for Task {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        log_trace!(self, "Closing fd {:?}", fd);
+        log_trace!("Closing fd {:?}", fd);
         self.files.close(fd)
     }
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        log_trace!(self, "Getting file {:?} with flags", fd);
+        log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        log_trace!(self, "Adding file {:?} with flags {:?}", file, flags);
+        log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
 
@@ -2474,15 +2462,15 @@ impl ResourceAccessor for Task {
 
 impl MemoryAccessor for Task {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        log_trace!(self, "Reading {} bytes of memory from {:?}", bytes.len(), addr);
+        log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory(addr, bytes)
     }
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        log_trace!(self, "Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
+        log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!(self, "Writing {} bytes to {:?}", bytes.len(), addr);
+        log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
 }
@@ -2682,7 +2670,7 @@ impl BinderDriver {
                 }
                 let response =
                     binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
-                log_trace!(current_task, "binder version is {:?}", response);
+                log_trace!("binder version is {:?}", response);
                 binder_proc
                     .get_resource_accessor(current_task)
                     .write_object(UserRef::new(user_arg), &response)?;
@@ -2704,7 +2692,7 @@ impl BinderDriver {
                     0
                 };
 
-                log_trace!(current_task, "binder setting context manager with flags {:x}", flags);
+                log_trace!("binder setting context manager with flags {:x}", flags);
 
                 let mut state = self.context_manager_and_queue.lock();
                 state.context_manager =
@@ -2723,7 +2711,7 @@ impl BinderDriver {
                 let user_ref = UserRef::<binder_write_read>::new(user_arg);
                 let mut input = resource_accessor.read_object(user_ref)?;
 
-                log_trace!(current_task, "binder write/read request start {:?}", input);
+                log_trace!("binder write/read request start {:?}", input);
 
                 // We will be writing this back to userspace, don't trust what the client gave us.
                 input.write_consumed = 0;
@@ -2771,7 +2759,7 @@ impl BinderDriver {
                     input.read_consumed = read_result? as u64;
                 }
 
-                log_trace!(current_task, "binder write/read request end {:?}", input);
+                log_trace!("binder write/read request end {:?}", input);
 
                 // Write back to the calling thread how much data was read/written.
                 resource_accessor.write_object(user_ref, &input)?;
@@ -2785,36 +2773,33 @@ impl BinderDriver {
                 let user_ref = UserRef::<u32>::new(user_arg);
                 let new_max_threads =
                     binder_proc.get_resource_accessor(current_task).read_object(user_ref)? as usize;
-                log_trace!(current_task, "setting max binder threads to {}", new_max_threads);
+                log_trace!("setting max binder threads to {}", new_max_threads);
                 binder_proc.lock().max_thread_count = new_max_threads;
                 Ok(SUCCESS)
             }
             uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
-                not_implemented!(
-                    current_task,
-                    "binder ignoring ENABLE_ONEWAY_SPAM_DETECTION ioctl"
-                );
+                not_implemented!("binder ignoring ENABLE_ONEWAY_SPAM_DETECTION ioctl");
                 Ok(SUCCESS)
             }
             uapi::BINDER_THREAD_EXIT => {
-                log_trace!(current_task, "binder thread {} exiting", binder_thread.tid);
+                log_trace!("binder thread {} exiting", binder_thread.tid);
                 binder_proc.lock().unregister_thread(binder_thread.tid);
                 Ok(SUCCESS)
             }
             uapi::BINDER_GET_NODE_DEBUG_INFO => {
-                not_implemented!(current_task, "binder GET_NODE_DEBUG_INFO ioctl not supported");
+                not_implemented!("binder GET_NODE_DEBUG_INFO ioctl not supported");
                 error!(EOPNOTSUPP)
             }
             uapi::BINDER_GET_NODE_INFO_FOR_REF => {
-                not_implemented!(current_task, "binder GET_NODE_INFO_FOR_REF ioctl not supported");
+                not_implemented!("binder GET_NODE_INFO_FOR_REF ioctl not supported");
                 error!(EOPNOTSUPP)
             }
             uapi::BINDER_FREEZE => {
-                not_implemented!(current_task, "binder BINDER_FREEZE ioctl not supported");
+                not_implemented!("binder BINDER_FREEZE ioctl not supported");
                 error!(EOPNOTSUPP)
             }
             _ => {
-                log_error!(current_task, "binder received unknown ioctl request 0x{:08x}", request);
+                log_error!("binder received unknown ioctl request 0x{:08x}", request);
                 error!(EINVAL)
             }
         }
@@ -2848,7 +2833,7 @@ impl BinderDriver {
             | binder_driver_command_protocol_BC_DECREFS
             | binder_driver_command_protocol_BC_RELEASE => {
                 let handle = cursor.read_object::<u32>()?.into();
-                binder_proc.handle_refcount_operation(current_task, command, handle)
+                binder_proc.handle_refcount_operation(command, handle)
             }
             binder_driver_command_protocol_BC_INCREFS_DONE
             | binder_driver_command_protocol_BC_ACQUIRE_DONE => {
@@ -2865,12 +2850,12 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION => {
                 let handle = cursor.read_object::<u32>()?.into();
                 let cookie = cursor.read_object::<binder_uintptr_t>()?;
-                binder_proc.handle_request_death_notification(current_task, handle, cookie)
+                binder_proc.handle_request_death_notification(handle, cookie)
             }
             binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION => {
                 let handle = cursor.read_object::<u32>()?.into();
                 let cookie = cursor.read_object::<binder_uintptr_t>()?;
-                binder_proc.handle_clear_death_notification(current_task, handle, cookie)
+                binder_proc.handle_clear_death_notification(handle, cookie)
             }
             binder_driver_command_protocol_BC_DEAD_BINDER_DONE => {
                 let _cookie = cursor.read_object::<binder_uintptr_t>()?;
@@ -2907,7 +2892,7 @@ impl BinderDriver {
                     .or_else(|err| err.dispatch(binder_thread))
             }
             _ => {
-                log_error!(current_task, "binder received unknown RW command: {:#08x}", command);
+                log_error!("binder received unknown RW command: {:#08x}", command);
                 error!(EINVAL)
             }
         };
@@ -2916,7 +2901,7 @@ impl BinderDriver {
             // TODO(fxbug.dev/117639): Right now there are many errors that happen that are due to
             // errors in the kernel driver and not because of an issue in userspace. Until the
             // driver is more stable, log these.
-            log_error!(current_task, "binder command {:#x} failed: {:?}", command, err);
+            log_error!("binder command {:#x} failed: {:?}", command, err);
         }
         result
     }
@@ -5948,7 +5933,7 @@ pub mod tests {
 
     #[fuchsia::test]
     fn death_notification_fires_when_process_dies() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
@@ -5971,7 +5956,7 @@ pub mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(&current_task, handle, DEATH_NOTIFICATION_COOKIE)
+            .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
             .expect("request death notification");
 
         // Now the owner process dies.
@@ -5987,7 +5972,7 @@ pub mod tests {
 
     #[fuchsia::test]
     fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
@@ -6014,7 +5999,7 @@ pub mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(&current_task, handle, DEATH_NOTIFICATION_COOKIE)
+            .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
             .expect("request death notification");
 
         // The client thread should not have a notification, as the calling thread is not allowed
@@ -6028,7 +6013,7 @@ pub mod tests {
 
     #[fuchsia::test]
     fn death_notification_is_cleared_before_process_dies() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, _current_task) = create_kernel_and_task();
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
@@ -6051,12 +6036,12 @@ pub mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(&current_task, handle, death_notification_cookie)
+            .handle_request_death_notification(handle, death_notification_cookie)
             .expect("request death notification");
 
         // Now clear the death notification handler.
         client_proc
-            .handle_clear_death_notification(&current_task, handle, death_notification_cookie)
+            .handle_clear_death_notification(handle, death_notification_cookie)
             .expect("clear death notification");
 
         // Check that the client received an acknowlgement

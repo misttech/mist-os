@@ -78,7 +78,7 @@ pub fn sys_gettimeofday(
         current_task.mm.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
-        not_implemented!(current_task, "gettimeofday does not implement tz argument");
+        not_implemented!("gettimeofday does not implement tz argument");
     }
     Ok(())
 }
@@ -98,16 +98,11 @@ pub fn sys_clock_nanosleep(
     let use_monotonic_clock =
         which_clock == CLOCK_MONOTONIC || (which_clock == CLOCK_REALTIME && !is_absolute);
     if !use_monotonic_clock || flags & !TIMER_ABSTIME != 0 {
-        not_implemented!(
-            current_task,
-            "clock_nanosleep, clock {:?}, flags {:?}",
-            which_clock,
-            flags
-        );
+        not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
         return error!(EINVAL);
     }
     let request = current_task.mm.read_object(user_request)?;
-    log_trace!(current_task, "clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
+    log_trace!("clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
     if timespec_is_zero(request) {
         return Ok(());
@@ -303,7 +298,7 @@ pub fn sys_timer_create(
     event: UserRef<sigevent>,
     timerid: UserRef<uapi::__kernel_timer_t>,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "timer_create");
+    not_implemented!("timer_create");
     let timers = &current_task.thread_group.read().timers;
     let user_event = current_task.mm.read_object(event)?;
     let id = timers.create(clockid, &user_event)? as uapi::__kernel_timer_t;
@@ -315,7 +310,7 @@ pub fn sys_timer_delete(
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "timer_delete");
+    not_implemented!("timer_delete");
     let timers = &current_task.thread_group.read().timers;
     timers.delete(id as usize)
 }
@@ -339,13 +334,13 @@ pub fn sys_timer_getoverrun(
 }
 
 pub fn sys_timer_settime(
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     _id: uapi::__kernel_timer_t,
     _flags: i32,
     _new_value: UserRef<itimerspec>,
     _old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "timer_settime");
+    not_implemented!("timer_settime");
     Ok(())
 }
 

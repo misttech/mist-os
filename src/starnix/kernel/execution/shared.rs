@@ -81,15 +81,15 @@ pub fn execute_syscall(
         }
     }
 
-    log_trace!(current_task, "{:?}", syscall);
+    log_trace!("{:?}", syscall);
     match dispatch_syscall(current_task, &syscall) {
         Ok(return_value) => {
-            log_trace!(current_task, "-> {:#x}", return_value.value());
+            log_trace!("-> {:#x}", return_value.value());
             current_task.registers.set_return_register(return_value.value());
             None
         }
         Err(errno) => {
-            log_trace!(current_task, "!-> {:?}", errno);
+            log_trace!("!-> {:?}", errno);
             current_task.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
@@ -109,13 +109,12 @@ pub fn process_completed_syscall(
     }
 
     if let Some(exit_status) = current_task.read().exit_status.as_ref() {
-        log_trace!(current_task, "exiting with status {:?}", exit_status);
+        log_trace!("exiting with status {:?}", exit_status);
         if let Some(error_context) = error_context {
             match exit_status {
                 ExitStatus::Exit(value) if *value == 0 => {}
                 _ => {
                     log_trace!(
-                        current_task,
                         "last failing syscall before exit: {:?}, failed with {:?}",
                         error_context.syscall,
                         error_context.error

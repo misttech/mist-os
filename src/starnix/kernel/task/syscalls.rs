@@ -13,7 +13,7 @@ use crate::auth::{Credentials, SecureBits};
 use crate::execution::*;
 use crate::fs::*;
 use crate::lock::RwLock;
-use crate::logging::{log, log_trace};
+use crate::logging::{log_info, log_trace};
 use crate::mm::*;
 use crate::syscalls::*;
 use crate::task::*;
@@ -134,7 +134,6 @@ pub fn sys_execveat(
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
 
     log_trace!(
-        current_task,
         "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
         dir_fd,
         String::from_utf8_lossy(path),
@@ -441,7 +440,7 @@ pub fn sys_setresgid(
 }
 
 pub fn sys_exit(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
-    log!(level = info, task = current_task, tag = "exit", "exit({})", code);
+    log_info!(tag = "exit", "exit({})", code);
     // Only change the current exit status if this has not been already set by exit_group, as
     // otherwise it has priority.
     current_task.write().exit_status.get_or_insert(ExitStatus::Exit(code as u8));
@@ -449,7 +448,7 @@ pub fn sys_exit(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
 }
 
 pub fn sys_exit_group(current_task: &CurrentTask, code: i32) -> Result<(), Errno> {
-    log!(level = info, task = current_task, tag = "exit", "exit_group({})", code);
+    log_info!(tag = "exit", "exit_group({})", code);
     current_task.thread_group.exit(ExitStatus::Exit(code as u8));
     Ok(())
 }
@@ -551,7 +550,7 @@ pub fn sys_prctl(
     match option {
         PR_SET_VMA => {
             if arg2 != PR_SET_VMA_ANON_NAME as u64 {
-                not_implemented!(current_task, "prctl: PR_SET_VMA: Unknown arg2: 0x{:x}", arg2);
+                not_implemented!("prctl: PR_SET_VMA: Unknown arg2: 0x{:x}", arg2);
                 return error!(ENOSYS);
             }
             let addr = UserAddress::from(arg3);
@@ -598,7 +597,7 @@ pub fn sys_prctl(
             })
         }
         PR_SET_PDEATHSIG => {
-            not_implemented!(current_task, "PR_SET_PDEATHSIG");
+            not_implemented!("PR_SET_PDEATHSIG");
             Ok(().into())
         }
         PR_SET_NAME => {
@@ -616,6 +615,7 @@ pub fn sys_prctl(
                 thread.set_name(&name_str).map_err(|_| errno!(EINVAL))?;
             }
             current_task.set_command_name(name_str);
+            crate::logging::set_current_task_info(current_task);
             Ok(0.into())
         }
         PR_GET_NAME => {
@@ -631,11 +631,11 @@ pub fn sys_prctl(
                 // kernel does not support PTRACER_ANY.
                 return error!(EINVAL);
             }
-            not_implemented!(current_task, "prctl(PR_SET_PTRACER, {})", arg2);
+            not_implemented!("prctl(PR_SET_PTRACER, {})", arg2);
             Ok(().into())
         }
         PR_SET_KEEPCAPS => {
-            not_implemented!(current_task, "prctl(PR_SET_KEEPCAPS, {})", arg2);
+            not_implemented!("prctl(PR_SET_KEEPCAPS, {})", arg2);
             Ok(().into())
         }
         PR_SET_NO_NEW_PRIVS => {
@@ -686,7 +686,7 @@ pub fn sys_prctl(
             }
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
-                not_implemented!(current_task, "PR_SET_SECUREBITS: bits 0x{:x}", arg2);
+                not_implemented!("PR_SET_SECUREBITS: bits 0x{:x}", arg2);
                 errno!(ENOSYS)
             })?;
             creds.securebits = securebits;
@@ -758,7 +758,7 @@ pub fn sys_prctl(
             }
         }
         _ => {
-            not_implemented!(current_task, "prctl: Unknown option: 0x{:x}", option);
+            not_implemented!("prctl: Unknown option: 0x{:x}", option);
             error!(ENOSYS)
         }
     }
@@ -820,7 +820,7 @@ pub fn sys_prlimit64(
 ) -> Result<(), Errno> {
     // TODO: Lookup tasks by pid.
     if pid != 0 {
-        not_implemented!(current_task, "prlimit64 with non 0 pid");
+        not_implemented!("prlimit64 with non 0 pid");
         return error!(ENOSYS);
     }
     let task = &current_task.task;
@@ -841,7 +841,7 @@ pub fn sys_prlimit64(
         // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
         Resource::STACK => {
             if maybe_new_limit.is_some() {
-                not_implemented!(current_task, "prlimit64 cannot set RLIMIT_STACK");
+                not_implemented!("prlimit64 cannot set RLIMIT_STACK");
             }
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
@@ -935,7 +935,7 @@ pub fn sys_capset(
     // Permission checks. Copied out of TLPI section 39.7.
     let mut creds = target_task.creds();
     {
-        log_trace!(target_task, "Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
+        log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
         if !creds.has_capability(CAP_SETPCAP)
             && !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable)
         {
@@ -996,14 +996,14 @@ pub fn sys_seccomp(
             if flags != 0 {
                 return error!(EINVAL);
             }
-            not_implemented!(current_task, "seccomp not implemented");
+            not_implemented!("seccomp not implemented");
             error!(ENOSYS)
         }
         SECCOMP_GET_NOTIF_SIZES => {
             if flags != 0 {
                 return error!(EINVAL);
             }
-            not_implemented!(current_task, "seccomp not implemented");
+            not_implemented!("seccomp not implemented");
             error!(ENOSYS)
         }
         _ => error!(EINVAL),
@@ -1087,11 +1087,7 @@ pub fn sys_setpriority(
 pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> {
     const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
-        not_implemented!(
-            current_task,
-            "unshare does not implement flags: 0x{:x}",
-            flags & !IMPLEMENTED_FLAGS
-        );
+        not_implemented!("unshare does not implement flags: 0x{:x}", flags & !IMPLEMENTED_FLAGS);
         return error!(EINVAL);
     }
 

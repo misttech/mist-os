@@ -3,71 +3,49 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use std::{cell::RefCell, fmt};
 
-use crate::types::Errno;
+use crate::task::CurrentTask;
+use crate::types::{pid_t, Errno};
 
 macro_rules! log {
-    (level = $level:ident, task = $task:expr, tag = $tag:expr, $fmt:expr $(, $($arg:tt)*)?) => {
-        if !cfg!(feature = "disable_logging") {
-          tracing::$level!(tag = $tag, concat!("{:?} ", $fmt), $task $(, $($arg)*)?);
+    (level = $level:ident, $($arg:tt)*) => {{
+        #[cfg(not(feature = "disable_logging"))]
+        {
+            $crate::logging::with_current_task_info(|_task_info| {
+                tracing::$level!(tag = %_task_info, $($arg)*);
+            });
         }
-    };
-    (level = $level:ident, task = $task:expr, $fmt:expr $(, $($arg:tt)*)?) => {
-        if !cfg!(feature = "disable_logging") {
-          tracing::$level!(concat!("{:?} ", $fmt), $task $(, $($arg)*)?);
-        }
-    };
-    (level = $level:ident, tag = $tag:expr, $fmt:expr $(, $($arg:tt)*)?) => {
-        if !cfg!(feature = "disable_logging") {
-          tracing::$level!(tag = $tag, $fmt $(, $($arg)*)?);
-        }
-    };
-    (level = $level:ident, $fmt:expr $(, $($arg:tt)*)?) => {
-        if !cfg!(feature = "disable_logging") {
-          tracing::$level!($fmt $(, $($arg)*)?);
-        }
-    };
+    }};
 }
 
 macro_rules! log_trace {
-    ($task:ident, $fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = trace, task = $task, $fmt $(, $($arg)*)?)
-    };
-    ($fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = trace, $fmt $(, $($arg)*)?)
+    ($($arg:tt)*) => {
+        $crate::logging::log!(level = trace, $($arg)*)
     };
 }
 
 macro_rules! log_info {
-    ($task:ident, $fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = info, task = $task, $fmt $(, $($arg)*)?)
-    };
-    ($fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = info, $fmt $(, $($arg)*)?)
+    ($($arg:tt)*) => {
+        $crate::logging::log!(level = info, $($arg)*)
     };
 }
 
 macro_rules! log_warn {
-    ($task:ident, $fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = warn, task = $task, $fmt $(, $($arg)*)?)
-    };
-    ($fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = warn, $fmt $(, $($arg)*)?)
+    ($($arg:tt)*) => {
+        $crate::logging::log!(level = warn, $($arg)*)
     };
 }
 
 macro_rules! log_error {
-    ($task:ident, $fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = error, task = $task, $fmt $(, $($arg)*)?)
-    };
-    ($fmt:expr $(, $($arg:tt)*)?) => {
-        $crate::logging::log!(level = error, $fmt $(, $($arg)*)?)
+    ($($arg:tt)*) => {
+        $crate::logging::log!(level = error, $($arg)*)
     };
 }
 
 macro_rules! not_implemented {
-    ($task:expr, $fmt:expr $(, $($arg:tt)*)?) => (
-        $crate::logging::log!(level = warn, task = $task, tag = "not_implemented", $fmt $(, $($arg)*)?)
+    ($($arg:tt)*) => (
+        $crate::logging::log!(level = warn, tag = "not_implemented", $($arg)*)
     )
 }
 
@@ -114,6 +92,55 @@ fn truncate_name(name: &[u8]) -> std::ffi::CString {
 
 pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: &[u8]) {
     obj.set_name(&truncate_name(name)).map_err(impossible_error).unwrap();
+}
+
+/// Set the context for log messages from this thread. Should only be called when a thread has been
+/// created to execute a user-level task, and should only be called once at the start of that
+/// thread's execution.
+pub fn set_current_task_info(current_task: &CurrentTask) {
+    CURRENT_TASK_INFO.with(|task_info| {
+        *task_info.borrow_mut() = TaskDebugInfo::User {
+            pid: current_task.task.thread_group.leader,
+            tid: current_task.id,
+            command: current_task.task.command().to_string_lossy().to_string(),
+        };
+    });
+}
+
+/// Access this thread's task info for debugging. Intended for use internally by Starnix's log
+/// macros.
+///
+/// *Do not use this for kernel logic.* If you need access to the current pid/tid/etc for the
+/// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
+/// through the `CurrentTask` type as an argument explicitly passed to your function.
+pub fn with_current_task_info<T>(f: impl FnOnce(&(dyn fmt::Display)) -> T) -> T {
+    CURRENT_TASK_INFO.with(|task_info| f(&task_info.borrow()))
+}
+
+/// Used to track the current thread's logical context.
+enum TaskDebugInfo {
+    /// The thread with this set is used for internal logic within the starnix kernel.
+    Kernel,
+    /// The thread with this set is used to service syscalls for a specific user thread, and this
+    /// describes the user thread's identity.
+    User { pid: pid_t, tid: pid_t, command: String },
+}
+
+// TODO(b/280356702) replace this with a tracing span
+thread_local! {
+    /// When a thread in this kernel is started, it is a kthread by default. Once the thread
+    /// becomes aware of the user-level task it is executing, this thread-local should be set to
+    /// include that info.
+    static CURRENT_TASK_INFO: RefCell<TaskDebugInfo> = RefCell::new(TaskDebugInfo::Kernel);
+}
+
+impl fmt::Display for TaskDebugInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Kernel => write!(f, "kthread"),
+            Self::User { pid, tid, command } => write!(f, "{}:{}[{}]", pid, tid, command),
+        }
+    }
 }
 
 #[cfg(test)]

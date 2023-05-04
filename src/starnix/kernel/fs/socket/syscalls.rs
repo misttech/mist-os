@@ -22,8 +22,8 @@ pub fn sys_socket(
     protocol: u32,
 ) -> Result<FdNumber, Errno> {
     let flags = socket_type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
-    let domain = parse_socket_domain(current_task, domain)?;
-    let socket_type = parse_socket_type(current_task, domain, socket_type)?;
+    let domain = parse_socket_domain(domain)?;
+    let socket_type = parse_socket_type(domain, socket_type)?;
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
     let socket_file = Socket::new_file(
@@ -51,20 +51,16 @@ fn socket_flags_to_fd_flags(flags: u32) -> FdFlags {
     }
 }
 
-fn parse_socket_domain(current_task: &CurrentTask, domain: u32) -> Result<SocketDomain, Errno> {
+fn parse_socket_domain(domain: u32) -> Result<SocketDomain, Errno> {
     SocketDomain::from_raw(domain.try_into().map_err(|_| errno!(EAFNOSUPPORT))?).ok_or_else(|| {
-        not_implemented!(current_task, "unsupported socket domain {}", domain);
+        not_implemented!("unsupported socket domain {}", domain);
         errno!(EAFNOSUPPORT)
     })
 }
 
-fn parse_socket_type(
-    current_task: &CurrentTask,
-    domain: SocketDomain,
-    socket_type: u32,
-) -> Result<SocketType, Errno> {
+fn parse_socket_type(domain: SocketDomain, socket_type: u32) -> Result<SocketType, Errno> {
     let socket_type = SocketType::from_raw(socket_type & 0xf).ok_or_else(|| {
-        not_implemented!(current_task, "unsupported socket type 0x{:x}", socket_type);
+        not_implemented!("unsupported socket type 0x{:x}", socket_type);
         errno!(EPROTONOSUPPORT)
     })?;
     // For AF_UNIX, SOCK_RAW sockets are treated as if they were SOCK_DGRAM.
@@ -235,11 +231,7 @@ pub fn sys_connect(
     let peer = match address {
         SocketAddress::Unspecified => return error!(ECONNREFUSED),
         SocketAddress::Unix(ref name) => {
-            log_trace!(
-                current_task,
-                "connect to unix socket named {:?}",
-                String::from_utf8_lossy(name)
-            );
+            log_trace!("connect to unix socket named {:?}", String::from_utf8_lossy(name));
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
@@ -260,11 +252,7 @@ pub fn sys_connect(
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
-            log_trace!(
-                current_task,
-                "connect to inet socket named {:?}",
-                String::from_utf8_lossy(addr)
-            );
+            log_trace!("connect to inet socket named {:?}", String::from_utf8_lossy(addr));
             SocketPeer::Address(address)
         }
         SocketAddress::Netlink(_) => SocketPeer::Address(address),
@@ -332,11 +320,11 @@ pub fn sys_socketpair(
     user_sockets: UserRef<[FdNumber; 2]>,
 ) -> Result<(), Errno> {
     let flags = socket_type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
-    let domain = parse_socket_domain(current_task, domain)?;
+    let domain = parse_socket_domain(domain)?;
     if domain != SocketDomain::Unix {
         return error!(EAFNOSUPPORT);
     }
-    let socket_type = parse_socket_type(current_task, domain, socket_type)?;
+    let socket_type = parse_socket_type(domain, socket_type)?;
     let open_flags = socket_flags_to_open_flags(flags);
 
     let (left, right) = UnixSocket::new_pair(current_task, domain, socket_type, open_flags)?;
@@ -349,7 +337,7 @@ pub fn sys_socketpair(
     let right_fd = current_task.add_file(right, fd_flags)?;
 
     let fds = [left_fd, right_fd];
-    log_trace!(current_task, "socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());
+    log_trace!("socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());
     current_task.mm.write_object(user_sockets, &fds)?;
 
     Ok(())

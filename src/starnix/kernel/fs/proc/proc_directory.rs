@@ -182,7 +182,7 @@ impl FileOps for ProcKmsgFile {
         _offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!(current_task, "ProcKmsgFile.read() is stubbed.");
+        not_implemented!("ProcKmsgFile.read() is stubbed.");
         Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
         error!(EAGAIN)
     }
@@ -302,12 +302,12 @@ impl FileOps for PressureFile {
     fn write_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         // Ignore the request for now.
-        not_implemented!(current_task, "pressure notification setup");
+        not_implemented!("pressure notification setup");
         Ok(data.drain())
     }
 

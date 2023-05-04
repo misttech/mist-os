@@ -48,7 +48,7 @@ pub fn sys_mmap(
 ) -> Result<UserAddress, Errno> {
     // These are the flags that are currently supported.
     if prot & !(PROT_READ | PROT_WRITE | PROT_EXEC) != 0 {
-        not_implemented!(current_task, "mmap: prot: 0x{:x}", prot);
+        not_implemented!("mmap: prot: 0x{:x}", prot);
         return error!(EINVAL);
     }
 
@@ -64,7 +64,7 @@ pub fn sys_mmap(
         | MAP_DENYWRITE
         | MAP_GROWSDOWN;
     if flags & !valid_flags != 0 {
-        not_implemented!(current_task, "mmap: flags: 0x{:x}", flags);
+        not_implemented!("mmap: flags: 0x{:x}", flags);
         return error!(EINVAL);
     }
 
@@ -148,7 +148,7 @@ pub fn sys_mprotect(
 ) -> Result<(), Errno> {
     // These are the flags that are currently supported.
     if prot & !(PROT_READ | PROT_WRITE | PROT_EXEC) != 0 {
-        not_implemented!(current_task, "mmap: prot: 0x{:x}", prot);
+        not_implemented!("mmap: prot: 0x{:x}", prot);
         return error!(EINVAL);
     }
     current_task.mm.protect(addr, length, mmap_prot_to_vm_opt(prot))?;
@@ -184,7 +184,7 @@ pub fn sys_msync(
     length: usize,
     _flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "msync not implemented");
+    not_implemented!("msync not implemented");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
     current_task.mm.ensure_mapped(addr, length)?;
@@ -233,7 +233,6 @@ pub fn sys_process_vm_readv(
     let local_iov = task.mm.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = task.mm.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
-        current_task,
         "process_vm_readv(pid={}, local_iov={:?}, remote_iov={:?})",
         pid,
         local_iov,
@@ -248,19 +247,13 @@ pub fn sys_process_vm_readv(
 }
 
 pub fn sys_membarrier(
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     cmd: uapi::membarrier_cmd,
     flags: u32,
     cpu_id: i32,
 ) -> Result<u32, Errno> {
     // TODO(fxbug.dev/103867): This membarrier implementation does not do any real work.
-    not_implemented!(
-        current_task,
-        "membarrier: cmd: 0x{:x}, flags: 0x{:x}, cpu_id: 0x{:x}",
-        cmd,
-        flags,
-        cpu_id
-    );
+    not_implemented!("membarrier: cmd: 0x{:x}, flags: 0x{:x}, cpu_id: 0x{:x}", cmd, flags, cpu_id);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
@@ -332,7 +325,7 @@ pub fn sys_futex(
         }
         FUTEX_REQUEUE => futexes.requeue(current_task, addr, value as usize, addr2),
         _ => {
-            not_implemented!(current_task, "futex: command 0x{:x} not implemented.", cmd);
+            not_implemented!("futex: command 0x{:x} not implemented.", cmd);
             error!(ENOSYS)
         }
     }

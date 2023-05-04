@@ -38,7 +38,7 @@ impl FileOps for InotifyFileObject {
         current_task: &CurrentTask,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!(current_task, "InotifyFileObject.read() is stubbed.");
+        not_implemented!("InotifyFileObject.read() is stubbed.");
         Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
         error!(EAGAIN)
     }

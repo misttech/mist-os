@@ -32,7 +32,7 @@ impl FileOps for DevNull {
     fn write_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -47,11 +47,7 @@ impl FileOps for DevNull {
         let mut log_buffer = vec![0; bytes_to_log];
         let bytes_logged = match data.read(&mut log_buffer) {
             Ok(bytes) => {
-                log_info!(
-                    current_task,
-                    "write to devnull: {:?}",
-                    String::from_utf8_lossy(&log_buffer[0..bytes])
-                );
+                log_info!("write to devnull: {:?}", String::from_utf8_lossy(&log_buffer[0..bytes]));
                 bytes
             }
             Err(_) => 0,

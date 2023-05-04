@@ -582,22 +582,15 @@ impl Task {
             // the two processes. And the vfork() man page explicitly allows vfork() to be
             // implemented as fork() which is what we do here.
             if !clone_vfork {
-                log_warn!(
-                    self,
-                    "CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork)."
-                );
+                log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
             }
         } else if clone_thread && !clone_vm {
-            not_implemented!(self, "CLONE_THREAD without CLONE_VM is not implemented");
+            not_implemented!("CLONE_THREAD without CLONE_VM is not implemented");
             return error!(ENOSYS);
         }
 
         if flags & !IMPLEMENTED_FLAGS != 0 {
-            not_implemented!(
-                self,
-                "clone does not implement flags: 0x{:x}",
-                flags & !IMPLEMENTED_FLAGS
-            );
+            not_implemented!("clone does not implement flags: 0x{:x}", flags & !IMPLEMENTED_FLAGS);
             return error!(ENOSYS);
         }
 
@@ -1396,6 +1389,7 @@ impl CurrentTask {
         set_zx_name(&fuchsia_runtime::thread_self(), basename.as_bytes());
         set_zx_name(&self.thread_group.process, basename.as_bytes());
         self.set_command_name(basename);
+        crate::logging::set_current_task_info(self);
 
         Ok(())
     }

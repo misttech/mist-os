@@ -45,7 +45,7 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
 }
 
 pub fn force_signal(current_task: &CurrentTask, mut siginfo: SignalInfo) {
-    log_trace!(current_task, "forced signal {:?}", siginfo);
+    log_trace!("forced signal {:?}", siginfo);
     siginfo.force = true;
     send_signal(current_task, siginfo)
 }
@@ -131,7 +131,7 @@ pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut Regi
     loop {
         let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
         let action = action_for_signal(&siginfo, sigaction);
-        log_trace!(task, "handling signal {:?} with action {:?}", siginfo, action);
+        log_trace!("handling signal {:?} with action {:?}", siginfo, action);
         match action {
             DeliveryAction::Ignore => {}
             DeliveryAction::CallHandler => {
@@ -143,7 +143,7 @@ pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut Regi
                     siginfo,
                     sigaction,
                 ) {
-                    log_warn!(task, "failed to deliver signal {:?}: {:?}", signal, err);
+                    log_warn!("failed to deliver signal {:?}: {:?}", signal, err);
 
                     siginfo = SignalInfo::default(SIGSEGV);
                     // The behavior that we want is:
@@ -320,7 +320,7 @@ pub fn sys_restart_syscall(current_task: &mut CurrentTask) -> Result<SyscallResu
             // This may indicate a bug where a syscall returns ERESTART_RESTARTBLOCK without
             // setting a restart func. But it can also be triggered by userspace, e.g. by directly
             // calling restart_syscall or injecting an ERESTART_RESTARTBLOCK error through ptrace.
-            log_warn!(current_task, "restart_syscall called, but nothing to restart");
+            log_warn!("restart_syscall called, but nothing to restart");
             error!(EINTR)
         }
     }

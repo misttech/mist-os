@@ -209,7 +209,7 @@ impl Pipe {
                 current_task.mm.write_object(addr, &value)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(current_task, request),
+            _ => default_ioctl(request),
         }
     }
 }

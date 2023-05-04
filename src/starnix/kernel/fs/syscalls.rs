@@ -122,7 +122,7 @@ pub fn sys_fcntl(
         F_SETOWN => {
             if arg > std::i32::MAX as u64 {
                 // Negative values are process groups.
-                not_implemented!(current_task, "fcntl(F_SETOWN) does not support process groups");
+                not_implemented!("fcntl(F_SETOWN) does not support process groups");
                 return error!(EINVAL);
             }
             let file = current_task.files.get(fd)?;
@@ -332,7 +332,7 @@ pub fn sys_sendfile(
     count: i32,
 ) -> Result<usize, Errno> {
     if !offset.is_null() {
-        not_implemented!(current_task, "sendfile non-null offset");
+        not_implemented!("sendfile non-null offset");
         return error!(ENOSYS);
     }
 
@@ -394,12 +394,7 @@ fn open_file_at(
 ) -> Result<FileHandle, Errno> {
     let mut buf = [0u8; PATH_MAX as usize];
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!(
-        current_task,
-        "open_file_at(dir_fd={}, path={:?})",
-        dir_fd,
-        String::from_utf8_lossy(path)
-    );
+    log_trace!("open_file_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
     current_task.open_file_at(dir_fd, path, OpenFlags::from_bits_truncate(flags), mode)
 }
 
@@ -414,12 +409,7 @@ where
 {
     let mut buf = [0u8; PATH_MAX as usize];
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!(
-        current_task,
-        "lookup_parent_at(dir_fd={}, path={:?})",
-        dir_fd,
-        String::from_utf8_lossy(path)
-    );
+    log_trace!("lookup_parent_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
     if path.is_empty() {
         return error!(ENOENT);
     }
@@ -472,12 +462,7 @@ fn lookup_at(
 ) -> Result<NamespaceNode, Errno> {
     let mut buf = [0u8; PATH_MAX as usize];
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
-    log_trace!(
-        current_task,
-        "lookup_at(dir_fd={}, path={:?})",
-        dir_fd,
-        String::from_utf8_lossy(path)
-    );
+    log_trace!("lookup_at(dir_fd={}, path={:?})", dir_fd, String::from_utf8_lossy(path));
     if path.is_empty() {
         if options.allow_empty_path {
             let (node, _) = current_task.resolve_dir_fd(dir_fd, path)?;
@@ -598,7 +583,7 @@ pub fn sys_newfstatat(
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
         // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
-        not_implemented!(current_task, "newfstatat: flags 0x{:x}", flags);
+        not_implemented!("newfstatat: flags 0x{:x}", flags);
         return error!(ENOSYS);
     }
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
@@ -630,7 +615,7 @@ pub fn sys_statx(
     }
     if flags & unimplemented_flags != 0 {
         // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
-        not_implemented!(current_task, "statx: flags 0x{:x}", flags);
+        not_implemented!("statx: flags 0x{:x}", flags);
         return error!(ENOSYS);
     }
 
@@ -733,7 +718,7 @@ pub fn sys_linkat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
-        not_implemented!(current_task, "linkat: flags 0x{:x}", flags);
+        not_implemented!("linkat: flags 0x{:x}", flags);
         return error!(EINVAL);
     }
 
@@ -795,7 +780,7 @@ pub fn sys_renameat2(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !RENAME_NOREPLACE != 0 {
-        not_implemented!(current_task, "renameat flags {:?}", flags);
+        not_implemented!("renameat flags {:?}", flags);
         return error!(EINVAL);
     }
 
@@ -1161,7 +1146,7 @@ pub fn sys_pipe2(
     let fd_flags = get_fd_flags(flags);
     let fd_read = current_task.add_file(read, fd_flags)?;
     let fd_write = current_task.add_file(write, fd_flags)?;
-    log_trace!(current_task, "pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
+    log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.mm.write_object(user_pipe, &fd_read)?;
     let user_pipe = user_pipe.next();
@@ -1246,7 +1231,7 @@ pub fn sys_memfd_create(
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
-        not_implemented!(current_task, "memfd_create: flags: {}", flags);
+        not_implemented!("memfd_create: flags: {}", flags);
     }
 
     let mut name = [0u8; MEMFD_NAME_MAX_LEN];
@@ -1282,7 +1267,6 @@ pub fn sys_mount(
 
     let flags = MountFlags::from_bits(flags).ok_or_else(|| {
         not_implemented!(
-            current_task,
             "unsupported mount flags: {:#x}",
             flags & !MountFlags::from_bits_truncate(flags).bits()
         );
@@ -1294,7 +1278,7 @@ pub fn sys_mount(
     if flags.contains(MountFlags::BIND) {
         do_mount_bind(current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
-        do_mount_change_propagation_type(current_task, target, flags)
+        do_mount_change_propagation_type(target, flags)
     } else {
         do_mount_create(current_task, source_addr, target, filesystemtype_addr, data_addr, flags)
     }
@@ -1308,7 +1292,6 @@ fn do_mount_bind(
 ) -> Result<(), Errno> {
     let source = lookup_at(current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
     log_trace!(
-        current_task,
         "mount(source={:?}, target={:?}, flags={:?})",
         String::from_utf8_lossy(&source.path()),
         String::from_utf8_lossy(&target.path()),
@@ -1317,17 +1300,8 @@ fn do_mount_bind(
     target.mount(WhatToMount::Bind(source), flags)
 }
 
-fn do_mount_change_propagation_type(
-    current_task: &CurrentTask,
-    target: NamespaceNode,
-    flags: MountFlags,
-) -> Result<(), Errno> {
-    log_trace!(
-        current_task,
-        "mount(target={:?}, flags={:?})",
-        String::from_utf8_lossy(&target.path()),
-        flags
-    );
+fn do_mount_change_propagation_type(target: NamespaceNode, flags: MountFlags) -> Result<(), Errno> {
+    log_trace!("mount(target={:?}, flags={:?})", String::from_utf8_lossy(&target.path()), flags);
 
     // Flag validation. Of the three propagation type flags, exactly one must be passed. The only
     // valid flags other than propagation type are MS_SILENT and MS_REC.
@@ -1375,7 +1349,6 @@ fn do_mount_create(
         current_task.mm.read_c_string(data_addr, &mut buf)?
     };
     log_trace!(
-        current_task,
         "mount(source={:?}, target={:?}, type={:?}, data={:?})",
         String::from_utf8_lossy(source),
         String::from_utf8_lossy(&target.path()),
@@ -1429,10 +1402,7 @@ pub fn sys_timerfd_create(
                 return error!(EPERM);
             }
             // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!(
-                current_task,
-                "timerfd_create: CLOCK_BOOTTIME_ALARM is mapped to CLOCK_BOOTTIME"
-            );
+            not_implemented!("timerfd_create: CLOCK_BOOTTIME_ALARM is mapped to CLOCK_BOOTTIME");
             TimerFileClock::Monotonic
         }
         CLOCK_REALTIME_ALARM => {
@@ -1440,20 +1410,17 @@ pub fn sys_timerfd_create(
                 return error!(EPERM);
             }
             // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!(
-                current_task,
-                "timerfd_create: CLOCK_REALTIME_ALARM is mapped to CLOCK_REALTIME"
-            );
+            not_implemented!("timerfd_create: CLOCK_REALTIME_ALARM is mapped to CLOCK_REALTIME");
             TimerFileClock::Realtime
         }
         CLOCK_REALTIME => TimerFileClock::Realtime,
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
-        not_implemented!(current_task, "timerfd_create: flags {:#x}", flags);
+        not_implemented!("timerfd_create: flags {:#x}", flags);
         return error!(EINVAL);
     }
-    log_trace!(current_task, "timerfd_create(clock_id={:?}, flags={:#x})", clock_id, flags);
+    log_trace!("timerfd_create(clock_id={:?}, flags={:#x})", clock_id, flags);
 
     let mut open_flags = OpenFlags::RDWR;
     if flags & TFD_NONBLOCK != 0 {
@@ -1478,7 +1445,7 @@ pub fn sys_timerfd_gettime(
     let file = current_task.files.get(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EBADF))?;
     let timer_info = timer_file.current_timer_spec();
-    log_trace!(current_task, "timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
+    log_trace!("timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
     current_task.mm.write_object(user_current_value, &timer_info)?;
     Ok(())
 }
@@ -1491,16 +1458,13 @@ pub fn sys_timerfd_settime(
     user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
-        not_implemented!(current_task, "timerfd_settime: flags {:#x}", flags);
+        not_implemented!("timerfd_settime: flags {:#x}", flags);
         return error!(EINVAL);
     }
 
     if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
         // TODO(fxbug.dev/121607): Respect the cancel on set.
-        not_implemented!(
-            current_task,
-            "timerfd_settime: TFD_TIMER_CANCEL_ON_SET accepted, but not implemented",
-        );
+        not_implemented!("timerfd_settime: TFD_TIMER_CANCEL_ON_SET accepted, but not implemented",);
     }
 
     let file = current_task.files.get(fd)?;
@@ -1509,7 +1473,6 @@ pub fn sys_timerfd_settime(
     let new_timer_spec = current_task.mm.read_object(user_new_value)?;
     let old_timer_spec = timer_file.set_timer_spec(new_timer_spec, flags)?;
     log_trace!(
-        current_task,
         "timerfd_settime(fd={:?}, flags={:#x}, new_value={:?}, current_value={:?})",
         fd,
         flags,
@@ -1981,26 +1944,26 @@ pub fn sys_flock(current_task: &CurrentTask, fd: FdNumber, operation: u32) -> Re
     file.flock(current_task, operation)
 }
 
-pub fn sys_sync(current_task: &CurrentTask) -> Result<(), Errno> {
-    not_implemented!(current_task, "sync");
+pub fn sys_sync(_current_task: &CurrentTask) -> Result<(), Errno> {
+    not_implemented!("sync");
     Ok(())
 }
 
 pub fn sys_syncfs(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
     let _file = current_task.files.get_unless_opath(fd)?;
-    not_implemented!(current_task, "syncfs");
+    not_implemented!("syncfs");
     Ok(())
 }
 
 pub fn sys_fsync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
     let _file = current_task.files.get(fd)?;
-    not_implemented!(current_task, "fsync");
+    not_implemented!("fsync");
     Ok(())
 }
 
 pub fn sys_fdatasync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
     let _file = current_task.files.get(fd)?;
-    not_implemented!(current_task, "fdatasync");
+    not_implemented!("fdatasync");
     Ok(())
 }
 
@@ -2049,7 +2012,7 @@ pub fn sys_fallocate(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     if mode != 0 {
-        not_implemented!(current_task, "fallocate({}, {}, {}, {})", fd, mode, offset, len);
+        not_implemented!("fallocate({}, {}, {}, {})", fd, mode, offset, len);
         return Ok(());
     }
 
@@ -2066,7 +2029,7 @@ pub fn sys_fallocate(
 }
 
 pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNumber, Errno> {
-    not_implemented!(current_task, "inotify_init1({})", flags);
+    not_implemented!("inotify_init1({})", flags);
     if flags & !(IN_NONBLOCK | IN_CLOEXEC) != 0 {
         return error!(EINVAL);
     }
@@ -2079,32 +2042,32 @@ pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNum
 }
 
 pub fn sys_inotify_add_watch(
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     fd: FdNumber,
     user_path: UserCString,
     mask: u32,
 ) -> Result<u32, Errno> {
-    not_implemented!(current_task, "sys_inotify_add_watch({}, {}, {})", fd, user_path, mask);
+    not_implemented!("sys_inotify_add_watch({}, {}, {})", fd, user_path, mask);
     Ok(1)
 }
 
 pub fn sys_inotify_rm_watch(
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     fd: FdNumber,
     wd: u32,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "sys_inotify_rm_watch({}, {})", fd, wd);
+    not_implemented!("sys_inotify_rm_watch({}, {})", fd, wd);
     Ok(())
 }
 
 pub fn sys_utimensat(
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     _dir_fd: FdNumber,
     _user_path: UserCString,
     _user_times: UserRef<[timespec; 2]>,
     _flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented!(current_task, "utimensat");
+    not_implemented!("utimensat");
     Ok(())
 }
 
@@ -2128,7 +2091,7 @@ pub fn sys_splice(
     }
 
     // TODO(fxbug.dev/119324) implement splice().
-    not_implemented!(current_task, "splice");
+    not_implemented!("splice");
     error!(ENOSYS)
 }
 

@@ -82,17 +82,17 @@ struct selinux_status_t {
 
 struct SeLoad;
 impl BytesFileOps for SeLoad {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!(current_task, "got selinux policy, length {}, ignoring", data.len());
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        not_implemented!("got selinux policy, length {}, ignoring", data.len());
         Ok(())
     }
 }
 
 struct SeEnforce;
 impl BytesFileOps for SeEnforce {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let enforce = parse_int(&data)?;
-        not_implemented!(current_task, "selinux setenforce: {}", enforce);
+        not_implemented!("selinux setenforce: {}", enforce);
         Ok(())
     }
 
@@ -123,21 +123,17 @@ impl BytesFileOps for SeCreate {
 
 struct SeCheckReqProt;
 impl BytesFileOps for SeCheckReqProt {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let checkreqprot = parse_int(&data)?;
-        not_implemented!(current_task, "selinux checkreqprot: {}", checkreqprot);
+        not_implemented!("selinux checkreqprot: {}", checkreqprot);
         Ok(())
     }
 }
 
 struct SeContext;
 impl BytesFileOps for SeContext {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!(
-            current_task,
-            "selinux validate context: {}",
-            String::from_utf8_lossy(&data)
-        );
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        not_implemented!("selinux validate context: {}", String::from_utf8_lossy(&data));
         Ok(())
     }
 }

@@ -236,11 +236,11 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     fn ioctl(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         request: u32,
         _user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(current_task, request)
+        default_ioctl(request)
     }
 
     fn fcntl(
@@ -444,8 +444,8 @@ pub(crate) use fileops_impl_nonseekable;
 pub(crate) use fileops_impl_seekable;
 pub(crate) use fileops_impl_seekless;
 
-pub fn default_ioctl(current_task: &CurrentTask, request: u32) -> Result<SyscallResult, Errno> {
-    not_implemented!(current_task, "ioctl: request=0x{:x}", request);
+pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {
+    not_implemented!("ioctl: request=0x{:x}", request);
     error!(ENOTTY)
 }
 
@@ -465,7 +465,7 @@ pub fn default_fcntl(
             Ok(SUCCESS)
         }
         _ => {
-            not_implemented!(current_task, "fcntl: command={} not implemented", cmd);
+            not_implemented!("fcntl: command={} not implemented", cmd);
             error!(EINVAL)
         }
     }
@@ -554,7 +554,7 @@ impl FileOps for OPathOps {
     fn fcntl(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         cmd: u32,
         _arg: u64,
     ) -> Result<SyscallResult, Errno> {
@@ -564,7 +564,7 @@ impl FileOps for OPathOps {
             }
             _ => {
                 // Note: this can be a valid operation for files opened with O_PATH.
-                not_implemented!(current_task, "fcntl: command={} not implemented", cmd);
+                not_implemented!("fcntl: command={} not implemented", cmd);
                 error!(EINVAL)
             }
         }

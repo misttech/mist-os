@@ -150,7 +150,7 @@ pub async fn start_component(
 
     run_component_features(&component_features, &current_task, &mut start_info.outgoing_dir)
         .unwrap_or_else(|e| {
-            log_error!(current_task, "failed to set component features for {} - {:?}", url, e);
+            log_error!("failed to set component features for {} - {:?}", url, e);
         });
 
     execute_task(current_task, move |result| {

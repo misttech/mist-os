@@ -82,7 +82,7 @@ impl FileOps for UEventFile {
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -97,7 +97,7 @@ impl FileOps for UEventFile {
             }
             _ => {
                 // TODO(fxb/119437): Retrieve DEVNAME from DeviceRegistry
-                not_implemented!(current_task, "read_at for {}", self.device);
+                not_implemented!("read_at for {}", self.device);
                 error!(EOPNOTSUPP)
             }
         }

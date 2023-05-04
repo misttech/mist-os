@@ -97,7 +97,6 @@ impl TmpFs {
         }
         if !mount_options.is_empty() {
             not_implemented!(
-                "[system]",
                 "Unknown tmpfs option: {:?}",
                 itertools::join(
                     mount_options.iter().map(|(k, v)| format!(

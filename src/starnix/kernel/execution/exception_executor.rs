@@ -15,7 +15,7 @@ use std::mem;
 use std::sync::Arc;
 
 use super::shared::*;
-use crate::logging::{log_trace, log_warn, set_zx_name};
+use crate::logging::{log_trace, log_warn, set_current_task_info, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::*;
 use crate::syscalls::decls::SyscallDecl;
@@ -47,16 +47,16 @@ where
 {
     std::thread::spawn(move || {
         task_complete(|| -> Result<ExitStatus, Error> {
+            // This sets the logging debug info for the current thread, but does not do so for
+            // the thread started immediately below. That thread will never execute Starnix kernel
+            // code, so we don't need to worry about providing it with the right thread-local.
+            set_current_task_info(&current_task);
             let exceptions = start_task_thread(&current_task)?;
             // Unwrap the error because if we don't, we'll panic anyway from destroying the task
             // without having previous called sys_exit(), and that will swallow the actual error.
             let run_result = match run_exception_loop(&mut current_task, exceptions) {
                 Err(error) => {
-                    log_warn!(
-                        current_task,
-                        "Died unexpectedly from {:?}! treating as SIGKILL",
-                        error
-                    );
+                    log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
                     let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
                     current_task.write().exit_status = Some(exit_status.clone());
                     Ok(exit_status)
@@ -168,7 +168,6 @@ fn run_exception_loop(
                         let (pc, sp) = (current_task.registers.pc, current_task.registers.sp);
 
                         log_trace!(
-                            current_task,
                             "page fault, ip={:#x}, sp={:#x}, fault={:#x}",
                             pc,
                             sp,
@@ -178,7 +177,7 @@ fn run_exception_loop(
                     force_signal(current_task, signal);
                 }
                 ExceptionResult::Unhandled => {
-                    log_warn!(current_task, "unhandled exception. info={:?} report.header={:?} synth_code={:?} synth_data={:?}", info, report.header, report.context.synth_code, report.context.synth_data);
+                    log_warn!("unhandled exception. info={:?} report.header={:?} synth_code={:?} synth_data={:?}", info, report.header, report.context.synth_code, report.context.synth_data);
                     exception.set_exception_state(&ZX_EXCEPTION_STATE_TRY_NEXT)?;
                     continue;
                 }

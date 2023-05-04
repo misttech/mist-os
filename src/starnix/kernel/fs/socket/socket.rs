@@ -175,11 +175,11 @@ pub trait SocketOps: Send + Sync + AsAny {
     fn ioctl(
         &self,
         _socket: &Socket,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         request: u32,
         _address: UserAddress,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(current_task, request)
+        default_ioctl(request)
     }
 }
 

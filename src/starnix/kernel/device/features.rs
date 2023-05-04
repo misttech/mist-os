@@ -57,7 +57,7 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 )?;
             }
             feature => {
-                log_warn!(current_task, "Unsupported feature: {:?}", feature);
+                log_warn!("Unsupported feature: {:?}", feature);
             }
         }
     }
@@ -88,7 +88,7 @@ pub fn run_component_features(
             "selinux_enabled" => {}
             "magma" => {}
             feature => {
-                log_warn!(current_task, "Unsupported feature: {:?}", feature);
+                log_warn!("Unsupported feature: {:?}", feature);
             }
         }
     }

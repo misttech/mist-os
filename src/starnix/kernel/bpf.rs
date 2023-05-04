@@ -183,7 +183,7 @@ pub fn sys_bpf(
         // Create a map and return a file descriptor that refers to the map.
         bpf_cmd_BPF_MAP_CREATE => {
             let map_attr: bpf_attr__bindgen_ty_1 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_MAP_CREATE {:?}", map_attr);
+            log_trace!("BPF_MAP_CREATE {:?}", map_attr);
             let mut map = Map {
                 map_type: map_attr.map_type,
                 key_size: map_attr.key_size,
@@ -209,7 +209,7 @@ pub fn sys_bpf(
         // Create or update an element (key/value pair) in a specified map.
         bpf_cmd_BPF_MAP_UPDATE_ELEM => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_MAP_UPDATE_ELEM");
+            log_trace!("BPF_MAP_UPDATE_ELEM");
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
@@ -229,7 +229,7 @@ pub fn sys_bpf(
         // be used to iterate over all elements in the map.
         bpf_cmd_BPF_MAP_GET_NEXT_KEY => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_MAP_GET_NEXT_KEY");
+            log_trace!("BPF_MAP_GET_NEXT_KEY");
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
@@ -259,15 +259,15 @@ pub fn sys_bpf(
         // program.
         bpf_cmd_BPF_PROG_LOAD => {
             let _prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_PROG_LOAD");
+            log_trace!("BPF_PROG_LOAD");
             // Just pretend to load the program. We certainly can't execute it.
             install_bpf_fd(current_task, Program)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
         bpf_cmd_BPF_PROG_ATTACH => {
-            log_trace!(current_task, "BPF_PROG_ATTACH");
-            not_implemented!("?", "Bpf::BPF_PROG_ATTACH is stubbed");
+            log_trace!("BPF_PROG_ATTACH");
+            not_implemented!("Bpf::BPF_PROG_ATTACH is stubbed");
             Ok(SUCCESS)
         }
 
@@ -275,7 +275,7 @@ pub fn sys_bpf(
         // the filesystem.
         bpf_cmd_BPF_OBJ_PIN => {
             let pin_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_OBJ_PIN {:?}", pin_attr);
+            log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
             let object = get_bpf_fd(current_task, pin_attr.bpf_fd)?;
             let mut pathname = vec![0u8; PATH_MAX as usize];
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
@@ -299,7 +299,7 @@ pub fn sys_bpf(
         // Open a file descriptor for the eBPF object pinned to the specified pathname.
         bpf_cmd_BPF_OBJ_GET => {
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_OBJ_GET {:?}", path_attr);
+            log_trace!("BPF_OBJ_GET {:?}", path_attr);
             let mut pathname = vec![0u8; PATH_MAX as usize];
             let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
             let pathname = current_task.mm.read_c_string(path_addr, &mut pathname)?.to_owned();
@@ -314,7 +314,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_OBJ_GET_INFO_BY_FD => {
             let mut get_info_attr: bpf_attr__bindgen_ty_9 =
                 read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_OBJ_GET_INFO_BY_FD {:?}", get_info_attr);
+            log_trace!("BPF_OBJ_GET_INFO_BY_FD {:?}", get_info_attr);
             let fd = get_bpf_fd(current_task, get_info_attr.bpf_fd)?;
 
             let mut info = if let Some(map) = fd.downcast::<Map>() {
@@ -357,14 +357,14 @@ pub fn sys_bpf(
         // https://www.kernel.org/doc/html/latest/bpf/btf.html.
         bpf_cmd_BPF_BTF_LOAD => {
             let btf_attr: bpf_attr__bindgen_ty_12 = read_attr(current_task, attr_addr, attr_size)?;
-            log_trace!(current_task, "BPF_BTF_LOAD {:?}", btf_attr);
+            log_trace!("BPF_BTF_LOAD {:?}", btf_attr);
             let mut data = vec![0u8; btf_attr.btf_size as usize];
             current_task.mm.read_memory(UserAddress::from(btf_attr.btf), &mut data)?;
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }
 
         _ => {
-            not_implemented!(current_task, "bpf command {}", cmd);
+            not_implemented!("bpf command {}", cmd);
             error!(EINVAL)
         }
     }

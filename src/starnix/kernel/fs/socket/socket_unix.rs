@@ -756,7 +756,7 @@ impl SocketOps for UnixSocket {
                 current_task.mm.write_object(UserRef::<i32>::new(user_addr), &length)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(current_task, request),
+            _ => default_ioctl(request),
         }
     }
 }
