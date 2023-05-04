@@ -22,7 +22,7 @@ assembled_system("zedboot_assembly") {
   include_shell_commands = false
   generate_fvm = false
   fshost_config = board_zedboot_fshost_config
-  allow_eng_platform_bundle_use = true
+  use_bringup_platform_bundles_only = true
 
   product_assembly_config_label = "//build/assembly:default_product_config"
 

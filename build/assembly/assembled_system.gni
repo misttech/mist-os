@@ -377,8 +377,11 @@ template("assembled_system") {
     compare_images_manifests = "${namespace}.compare_images_manifests"
 
     # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
-    if (defined(invoker.allow_eng_platform_bundle_use) &&
-        invoker.allow_eng_platform_bundle_use) {
+    if (defined(invoker.use_bringup_platform_bundles_only) &&
+        invoker.use_bringup_platform_bundles_only) {
+      platform_common_aibs = bringup_platform_aib_labels
+    } else if (defined(invoker.allow_eng_platform_bundle_use) &&
+               invoker.allow_eng_platform_bundle_use) {
       platform_common_aibs = eng_platform_aib_labels
       not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
     } else {
@@ -477,8 +480,11 @@ template("assembled_system") {
     #
     # This isn't strictly required, but it allows the AIB input files to be
     # specified in GN.
-    if (defined(invoker.allow_eng_platform_bundle_use) &&
-        invoker.allow_eng_platform_bundle_use) {
+    if (defined(invoker.use_bringup_platform_bundles_only) &&
+        invoker.use_bringup_platform_bundles_only) {
+      platform_common_aibs = bringup_platform_aib_files
+    } else if (defined(invoker.allow_eng_platform_bundle_use) &&
+               invoker.allow_eng_platform_bundle_use) {
       platform_common_aibs = eng_platform_aib_files
     } else {
       if (defined(invoker.allow_userdebug_platform_bundle_use) &&

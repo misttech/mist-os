@@ -6,82 +6,102 @@ import("//build/icu/config.gni")  # icu_git_info
 
 platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
 
-# The names of all of the platform's 'testonly=false' Assembly Input Bundles
 # LINT.IfChange
-user_platform_aib_names = [
-  ###
-  # The common platform bundles
 
+# These are the user-buildtype-safe platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+bootstrap_user_platform_aib_names = [
   # The bootstrap feature-set-level
   "bootstrap",
-
-  ## The core realm bundles
-
-  # `/core` itself
-  "core_realm",
-  "core_realm_user_and_userdebug",
-
-  # The additional children of core we add when we have networking enabled
-  "core_realm_networking",
-
-  # The minimal feature-set-level
-  "common_minimal",
-  "common_minimal_userdebug",
-
-  # Emulator Support
-  "emulator_support",
-
-  ###
-  # Feature-level / Subsystem-level bundles
-
-  # Graphics
-  "virtcon",
-
-  # SWD (Software Delivery)
-  "omaha_client",
-
-  # Kernel args
-  "kernel_args_user",
-  "kernel_args_userdebug",
-
-  # Netstack
-  "netstack2",
-  "netstack3",
-
-  # WLAN
-  "wlan_base",
-  "wlan_legacy_privacy_support",
-  "wlan_contemporary_privacy_only_support",
-  "wlan_fullmac_support",
-  "wlan_softmac_support",
-
-  # Storage
-  "fshost_fxfs",
-
-  # Session
-  "session_manager",
-
-  "starnix_support",
-  "virtualization_support",
-  "empty_live_usb",
-  "live_usb",
-
-  # ICU-specific version of intl_services
-  "intl_services.icu_default_${icu_git_info.default}",
-  "intl_services.icu_latest_${icu_git_info.latest}",
-  "intl_services.icu_stable_${icu_git_info.stable}",
 
   # Driver Framework
   "driver_framework_v1",
   "driver_framework_v2",
 
-  # UI
-  "ui",
-  "ui_legacy",
-  "ui_user_and_userdebug",
-  "ui_package_user_and_userdebug",
-  "ui_legacy_package_user_and_userdebug",
+  # Graphics
+  "virtcon",
+
+  # Kernel args
+  "kernel_args_user",
+  "kernel_args_userdebug",
+
+  # RCS live usb support
+  "empty_live_usb",
+  "live_usb",
+
+  # Emulator Support
+  "emulator_support",
 ]
+
+# These are the eng-buildtype-safe platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+bootstrap_eng_platform_aib_names = [
+  # Kernel args
+  "kernel_args_eng",
+]
+
+# The names of all of the platform's 'testonly=false' Assembly Input Bundles
+#
+# These are used by the `utility` and the default feature-set-level assembled
+# systems.
+user_platform_aib_names =
+    bootstrap_user_platform_aib_names + [
+      ###
+      # The common platform bundles
+
+      ## The core realm bundles
+
+      # `/core` itself
+      "core_realm",
+      "core_realm_user_and_userdebug",
+
+      # The additional children of core we add when we have networking enabled
+      "core_realm_networking",
+
+      # The minimal feature-set-level
+      "common_minimal",
+      "common_minimal_userdebug",
+
+      ###
+      # Feature-level / Subsystem-level bundles
+
+      # SWD (Software Delivery)
+      "omaha_client",
+
+      # Netstack
+      "netstack2",
+      "netstack3",
+
+      # WLAN
+      "wlan_base",
+      "wlan_legacy_privacy_support",
+      "wlan_contemporary_privacy_only_support",
+      "wlan_fullmac_support",
+      "wlan_softmac_support",
+
+      # Storage
+      "fshost_fxfs",
+
+      # Session
+      "session_manager",
+
+      "starnix_support",
+      "virtualization_support",
+
+      # ICU-specific version of intl_services
+      "intl_services.icu_default_${icu_git_info.default}",
+      "intl_services.icu_latest_${icu_git_info.latest}",
+      "intl_services.icu_stable_${icu_git_info.stable}",
+
+      # UI
+      "ui",
+      "ui_legacy",
+      "ui_user_and_userdebug",
+      "ui_package_user_and_userdebug",
+      "ui_legacy_package_user_and_userdebug",
+    ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
 
@@ -98,32 +118,41 @@ userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
 
 # The names of all of the platform's Assembly Input Bundles.
 # LINT.IfChange
-_eng_aib_names = [
-  # the core realm additions for eng build-type assemblies
-  "core_realm_eng",
+_eng_aib_names = bootstrap_eng_platform_aib_names + [
+                   # the core realm additions for eng build-type assemblies
+                   "core_realm_eng",
 
-  "common_minimal_eng",
+                   "common_minimal_eng",
 
-  # SWD (Software Delivery)
-  "system_update_checker",
+                   # SWD (Software Delivery)
+                   "system_update_checker",
 
-  # Kernel args
-  "kernel_args_eng",
+                   # Testing Support
+                   "testing_support",
 
-  # Testing Support
-  "testing_support",
+                   # UI
+                   "ui_eng",
+                   "ui_package_eng",
+                   "ui_legacy_package_eng",
 
-  # UI
-  "ui_eng",
-  "ui_package_eng",
-  "ui_legacy_package_eng",
-
-  # Example AIB
-  "example_assembly_bundle",
-]
+                   # Example AIB
+                   "example_assembly_bundle",
+                 ]
 eng_platform_aib_names = userdebug_platform_aib_names + _eng_aib_names
 
 # LINT.ThenChange(platform_aib_names.bzl)
+
+bringup_platform_aib_labels = []
+bringup_platform_aib_files = []
+foreach(name,
+        bootstrap_user_platform_aib_names + bootstrap_eng_platform_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+
+  bringup_platform_aib_labels += [ label ]
+  bringup_platform_aib_files +=
+      [ "${_target_out_dir}/${name}/assembly_config.json" ]
+}
 
 user_platform_aib_labels = []
 user_platform_aib_files = []

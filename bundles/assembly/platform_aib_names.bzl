@@ -6,20 +6,40 @@
 
 load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 
-# The names of all of the platform's 'testonly=false' Assembly Input Bundles
-USER_PLATFORM_AIB_NAMES = [
+# These are the user-buildtype-safe platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "bootstrap",
+    "kernel_args_user",
+    "kernel_args_userdebug",
+    "driver_framework_v1",
+    "driver_framework_v2",
+    "empty_live_usb",
+    "live_usb",
+    "emulator_support",
+    "virtcon",
+]
+
+# These are the eng-buildtype-safe platform AIBs that are used by bootstrap
+# feature-set-level assemblies.  This is a subset of the overall platform AIBs
+# so that these systems (e.g. bringup) don't need to build the entire platform.
+BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
+    "kernel_args_eng",
+]
+
+# This is the combined set of valid AIBs for "bringup" builds (which are the
+# ones that need to use the bootstrap feature-set-level
+BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
+
+# The names of all of the platform's 'testonly=false' Assembly Input Bundles
+USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm",
     "core_realm_networking",
     "core_realm_user_and_userdebug",
     "common_minimal",
     "common_minimal_userdebug",
-    "empty_live_usb",
-    "emulator_support",
     "fshost_fxfs",
-    "kernel_args_user",
-    "kernel_args_userdebug",
-    "live_usb",
     "netstack2",
     "netstack3",
     "omaha_client",
@@ -35,13 +55,10 @@ USER_PLATFORM_AIB_NAMES = [
     "ui_user_and_userdebug",
     "ui_package_user_and_userdebug",
     "ui_legacy_package_user_and_userdebug",
-    "virtcon",
     "virtualization_support",
     "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),
     "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
-    "driver_framework_v1",
-    "driver_framework_v2",
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
@@ -49,11 +66,10 @@ USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
 ]
 
 # The names of all of the platform's Assembly Input Bundles.
-ENG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES + [
+ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES + [
     "core_realm_eng",
     "common_minimal_eng",
     "system_update_checker",
-    "kernel_args_eng",
     "testing_support",
     "example_assembly_bundle",
     "ui_eng",
