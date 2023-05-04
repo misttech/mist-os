@@ -15,10 +15,14 @@ use {
         select,
         stream::FusedStream,
     },
+    std::time::Duration,
+    thiserror::Error,
     tracing::{error, warn},
 };
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";
+// Suspend is allowed at most 7 days, after that update will automatically resume.
+const MAX_SUSPEND_DURATION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
 /// Start a install manager task that:
 ///  * Runs an update attempt in a seperate task.
@@ -85,14 +89,17 @@ async fn run<N, U, E>(
 
         // Set up inspect nodes.
         let mut status_node = node.create_child(INSPECT_STATUS_NODE_NAME);
-        let _time_property =
-            node.create_int("start_timestamp_nanos", zx::Time::get_monotonic().into_nanos());
+        let start_time = zx::Time::get_monotonic();
+        let _time_property = node.create_int("start_timestamp_nanos", start_time.into_nanos());
 
         // Don't forget to add the first monitor to the queue and respond to StartUpdate :)
         if let Err(e) = monitor_queue.add_client(monitor).await {
             warn!("error adding client to monitor queue: {:#}", anyhow!(e));
         }
         let _ = responder.send(Ok(attempt_id.clone()));
+
+        let mut suspend_state = SuspendState::Running;
+        let suspend_deadline = start_time + MAX_SUSPEND_DURATION.into();
 
         // For this update attempt, handle events both from the FIDL server and the update task.
         loop {
@@ -102,9 +109,22 @@ async fn run<N, U, E>(
                 Request(ControlRequest<N>),
                 Status(Option<State>),
             }
-            let op = select! {
-                req = recv.select_next_some() => Op::Request(req),
-                state = attempt_stream.next() => Op::Status(state)
+            let op = match suspend_state {
+                SuspendState::Suspended => {
+                    select! {
+                        req = recv.select_next_some() => Op::Request(req),
+                        () = fasync::Timer::new(suspend_deadline).fuse() => {
+                            suspend_state.resume();
+                            continue;
+                        }
+                    }
+                }
+                SuspendState::Running => {
+                    select! {
+                        req = recv.select_next_some() => Op::Request(req),
+                        state = attempt_stream.next() => Op::Status(state)
+                    }
+                }
             };
             match op {
                 // We got a FIDL requests (via the mpsc::Receiver).
@@ -115,6 +135,8 @@ async fn run<N, U, E>(
                         &attempt_id,
                         update_url,
                         should_write_recovery,
+                        &mut suspend_state,
+                        suspend_deadline,
                     )
                     .await
                 }
@@ -166,6 +188,12 @@ where
             ControlRequest::Monitor(MonitorRequestData { responder, .. }) => {
                 let _ = responder.send(false);
             }
+            ControlRequest::Suspend(responder) => {
+                let _ = responder.send(Err(SuspendError::NoUpdateInProgress));
+            }
+            ControlRequest::Resume(responder) => {
+                let _ = responder.send(Err(ResumeError::NoUpdateInProgress));
+            }
         }
     }
     None
@@ -179,6 +207,8 @@ async fn handle_active_control_request<N>(
     attempt_id: &str,
     update_url: &fuchsia_url::AbsolutePackageUrl,
     should_write_recovery: bool,
+    suspend_state: &mut SuspendState,
+    suspend_deadline: zx::Time,
 ) where
     N: Notify,
 {
@@ -204,6 +234,7 @@ async fn handle_active_control_request<N>(
             } else {
                 let _ = responder.send(Err(UpdateNotStartedReason::AlreadyInProgress));
             }
+            suspend_state.resume();
         }
         ControlRequest::Monitor(MonitorRequestData { attempt_id: id, monitor, responder }) => {
             // If an attempt ID is provided, ensure it matches the current attempt.
@@ -218,6 +249,18 @@ async fn handle_active_control_request<N>(
                 warn!("error adding client to monitor queue: {:#}", anyhow!(e));
             }
             let _ = responder.send(true);
+        }
+        ControlRequest::Suspend(responder) => {
+            if zx::Time::get_monotonic() > suspend_deadline {
+                let _ = responder.send(Err(SuspendError::SuspendLimitExceeded));
+                return;
+            }
+            suspend_state.suspend();
+            let _ = responder.send(Ok(()));
+        }
+        ControlRequest::Resume(responder) => {
+            suspend_state.resume();
+            let _ = responder.send(Ok(()));
         }
     }
 }
@@ -281,15 +324,35 @@ where
             .await?;
         Ok(receive_response.await?)
     }
+
+    /// Forward SuspendUpdate requests to the install manager task.
+    // TODO(fxbug.dev/125721): use this
+    #[allow(dead_code)]
+    pub async fn suspend_update(&mut self) -> Result<Result<(), SuspendError>, InstallManagerGone> {
+        let (responder, receive_response) = oneshot::channel();
+        self.0.send(ControlRequest::Suspend(responder)).await?;
+        Ok(receive_response.await?)
+    }
+
+    /// Forward ResumeUpdate requests to the install manager task.
+    // TODO(fxbug.dev/125721): use this
+    #[allow(dead_code)]
+    pub async fn resume_update(&mut self) -> Result<Result<(), ResumeError>, InstallManagerGone> {
+        let (responder, receive_response) = oneshot::channel();
+        self.0.send(ControlRequest::Resume(responder)).await?;
+        Ok(receive_response.await?)
+    }
 }
 
-/// Requests that can be forwarded to the sinstall manager task.
+/// Requests that can be forwarded to the install manager task.
 enum ControlRequest<N>
 where
     N: Notify,
 {
     Start(StartRequestData<N>),
     Monitor(MonitorRequestData<N>),
+    Suspend(oneshot::Sender<Result<(), SuspendError>>),
+    Resume(oneshot::Sender<Result<(), ResumeError>>),
 }
 
 struct StartRequestData<N>
@@ -309,6 +372,35 @@ where
     attempt_id: Option<String>,
     monitor: N,
     responder: oneshot::Sender<bool>,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum SuspendError {
+    #[error("no update in progress")]
+    NoUpdateInProgress,
+    #[error("suspend time exceeded max limit")]
+    SuspendLimitExceeded,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ResumeError {
+    #[error("no update in progress")]
+    NoUpdateInProgress,
+}
+
+enum SuspendState {
+    Suspended,
+    Running,
+}
+
+impl SuspendState {
+    fn suspend(&mut self) {
+        *self = Self::Suspended
+    }
+
+    fn resume(&mut self) {
+        *self = Self::Running
+    }
 }
 
 #[cfg(test)]
@@ -331,7 +423,7 @@ mod tests {
         fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
         mpsc::{Receiver, Sender},
         parking_lot::Mutex,
-        std::sync::Arc,
+        std::{sync::Arc, task::Poll},
     };
 
     const CALLBACK_CHANNEL_SIZE: usize = 20;
@@ -585,6 +677,130 @@ mod tests {
             state_receiver1.collect::<Vec<State>>().await,
             vec![State::Prepare, State::FailPrepare(PrepareFailureReason::Internal)]
         );
+    }
+
+    #[test]
+    fn suspend_resume_succeeds() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
+            exec.run_singlethreaded(start_install_manager_with_update_id("my-attempt"));
+        let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+
+        exec.run_singlethreaded(async {
+            assert_eq!(
+                install_manager_ch
+                    .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                    .await,
+                Ok(Ok("my-attempt".to_string()))
+            );
+
+            let () = state_sender.send(State::Prepare).await.unwrap();
+            assert_eq!(state_receiver.next().await, Some(State::Prepare));
+
+            assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+        });
+
+        // send and receive states are pending once suspended
+        let mut send_fut = state_sender.send(State::FailPrepare(PrepareFailureReason::Internal));
+        assert_eq!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+
+        let mut recv_fut = state_receiver.next();
+        assert_eq!(exec.run_until_stalled(&mut recv_fut), Poll::Pending);
+
+        exec.run_singlethreaded(async {
+            assert_eq!(install_manager_ch.resume_update().await, Ok(Ok(())));
+
+            // can send and receive states after resume
+            let () = send_fut.await.unwrap();
+            assert_eq!(recv_fut.await, Some(State::FailPrepare(PrepareFailureReason::Internal)));
+        });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn suspend_resume_errors() {
+        let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
+            start_install_manager_with_update_id("my-attempt").await;
+
+        assert_eq!(
+            install_manager_ch.suspend_update().await,
+            Ok(Err(SuspendError::NoUpdateInProgress))
+        );
+
+        assert_eq!(
+            install_manager_ch.resume_update().await,
+            Ok(Err(ResumeError::NoUpdateInProgress))
+        );
+
+        let (notifier, state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+        assert_eq!(
+            install_manager_ch
+                .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                .await,
+            Ok(Ok("my-attempt".to_string()))
+        );
+
+        let () = state_sender.send(State::Prepare).await.unwrap();
+
+        assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+        assert_eq!(install_manager_ch.resume_update().await, Ok(Ok(())));
+
+        let () =
+            state_sender.send(State::FailPrepare(PrepareFailureReason::Internal)).await.unwrap();
+        drop(state_sender);
+
+        assert_eq!(
+            state_receiver.collect::<Vec<State>>().await,
+            vec![State::Prepare, State::FailPrepare(PrepareFailureReason::Internal)]
+        );
+
+        assert_eq!(
+            install_manager_ch.suspend_update().await,
+            Ok(Err(SuspendError::NoUpdateInProgress))
+        );
+
+        assert_eq!(
+            install_manager_ch.resume_update().await,
+            Ok(Err(ResumeError::NoUpdateInProgress))
+        );
+    }
+
+    #[test]
+    fn suspend_exceed_max_duration() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
+            exec.run_singlethreaded(start_install_manager_with_update_id("my-attempt"));
+        let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
+
+        exec.run_singlethreaded(async {
+            assert_eq!(
+                install_manager_ch
+                    .start_update(ConfigBuilder::new().build().unwrap(), notifier, None)
+                    .await,
+                Ok(Ok("my-attempt".to_string()))
+            );
+
+            let () = state_sender.send(State::Prepare).await.unwrap();
+            assert_eq!(state_receiver.next().await, Some(State::Prepare));
+
+            assert_eq!(install_manager_ch.suspend_update().await, Ok(Ok(())));
+        });
+
+        // send and receive states are pending once suspended
+        let mut send_fut = state_sender.send(State::FailPrepare(PrepareFailureReason::Internal));
+        assert_eq!(exec.run_until_stalled(&mut send_fut), Poll::Pending);
+
+        let mut recv_fut = state_receiver.next();
+        assert_eq!(exec.run_until_stalled(&mut recv_fut), Poll::Pending);
+
+        let wait_duration = exec.wake_next_timer().unwrap() - exec.now();
+        assert!(wait_duration > (MAX_SUSPEND_DURATION - Duration::from_secs(1)).into());
+        assert!(wait_duration < (MAX_SUSPEND_DURATION + Duration::from_secs(1)).into());
+
+        // update should be resumed
+        exec.run_singlethreaded(async {
+            let () = send_fut.await.unwrap();
+            assert_eq!(recv_fut.await, Some(State::FailPrepare(PrepareFailureReason::Internal)));
+        });
     }
 
     #[fasync::run_singlethreaded(test)]
