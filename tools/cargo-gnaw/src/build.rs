@@ -6,28 +6,18 @@ use {
     crate::target::GnTarget,
     anyhow::{anyhow, Result},
     std::ffi::OsString,
+    std::path::PathBuf,
     std::process::Command,
-    std::{fs::File, io::Read, path::PathBuf},
     tempfile::{tempdir, TempDir},
 };
 
 pub struct BuildScriptOutput {
     pub cfgs: Vec<String>,
-    pub rerun: Vec<PathBuf>,
 }
 
 impl BuildScriptOutput {
-    #[allow(unused)]
-    pub fn parse_from_file(file: PathBuf) -> Result<Self> {
-        let mut file = File::open(file)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        let configs: Vec<&str> = contents.split('\n').collect();
-        Self::parse(configs)
-    }
-
     pub fn parse(lines: Vec<&str>) -> Result<Self> {
-        let mut bs = BuildScriptOutput { cfgs: vec![], rerun: vec![] };
+        let mut bs = BuildScriptOutput { cfgs: vec![] };
 
         let rustc_cfg = "cargo:rustc-cfg=";
         let rustc_rerun = "cargo:rerun-if-changed=";
