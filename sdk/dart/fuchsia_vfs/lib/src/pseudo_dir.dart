@@ -565,29 +565,6 @@ class _DirConnection extends Directory {
   }
 
   @override
-  Future<void> listExtendedAttributes(
-      fidl.InterfaceRequest<ExtendedAttributeIterator> objectRequest) async {
-    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
-  }
-
-  @override
-  Future<ExtendedAttributeValue> getExtendedAttribute(
-      Uint8List attribute) async {
-    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
-  }
-
-  @override
-  Future<void> setExtendedAttribute(
-      Uint8List attribute, ExtendedAttributeValue value) async {
-    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
-  }
-
-  @override
-  Future<void> removeExtendedAttribute(Uint8List attribute) async {
-    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
-  }
-
-  @override
   Future<void> open2(
       String path, ConnectionProtocols protocols, Channel objectRequest) async {
     throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);

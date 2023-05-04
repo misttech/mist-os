@@ -111,31 +111,4 @@ class ErrorNodeForSendingEvent extends Node {
     throw UnsupportedError(
         'ErrorNodeForSendingEvent.updateAttributes is unreachable.');
   }
-
-  @override
-  Future<void> listExtendedAttributes(
-      InterfaceRequest<ExtendedAttributeIterator> objectRequest) async {
-    throw UnsupportedError(
-        'ErrorNodeForSendingEvent.listExtendedAttributes is unreachable.');
-  }
-
-  @override
-  Future<ExtendedAttributeValue> getExtendedAttribute(
-      Uint8List attribute) async {
-    throw UnsupportedError(
-        'ErrorNodeForSendingEvent.getExtendedAttribute is unreachable.');
-  }
-
-  @override
-  Future<void> setExtendedAttribute(
-      Uint8List attribute, ExtendedAttributeValue value) async {
-    throw UnsupportedError(
-        'ErrorNodeForSendingEvent.setExtendedAttribute is unreachable.');
-  }
-
-  @override
-  Future<void> removeExtendedAttribute(Uint8List attribute) async {
-    throw UnsupportedError(
-        'ErrorNodeForSendingEvent.removeExtendedAttribute is unreachable.');
-  }
 }
