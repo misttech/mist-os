@@ -931,7 +931,7 @@ impl NetstackSeed {
     pub async fn serve(self) -> Result<(), anyhow::Error> {
         use anyhow::Context as _;
 
-        debug!("Serving netstack");
+        debug!("serving netstack with netstack3");
 
         let Self { netstack, interfaces_worker, interfaces_watcher_sink } = self;
 
