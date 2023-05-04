@@ -122,8 +122,6 @@
           "src/connectivity/bluetooth/hci/vendor": true,
           "src/connectivity/openthread/third_party": true,
           "src/virtualization/third_party": true,
-          "third_party": true,
-          "vendor": true,
           "zircon/third_party": true,
           "build/secondary/third_party/android/platform/system/core/demangle": true,
           "build/secondary/third_party/dart-pkg": true,
