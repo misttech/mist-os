@@ -201,13 +201,8 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->DebugLookupDepthLocked();
   }
 
-  zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
-                                uint64_t max_out_pages, uint64_t max_waitable_pages,
-                                list_node* alloc_list, LazyPageRequest* page_request,
-                                LookupInfo* out) override TA_REQ(lock()) {
-    return cow_pages_locked()->LookupPagesLocked(offset, pf_flags, mark_dirty, max_out_pages,
-                                                 max_waitable_pages, alloc_list, page_request, out);
-  }
+  zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
+                      LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) override;
 
   // Gets a reference to a LookupCursor for the specified range in the VMO. The returned cursor and
   // all the items returned by the cursor are only valid as long as the lock is contiguous held.

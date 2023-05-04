@@ -61,10 +61,10 @@ class VmObjectPhysical final : public VmObject {
 
   void Dump(uint depth, bool verbose) override;
 
-  zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
-                                uint64_t max_out_pages, uint64_t max_waitable_pages,
-                                list_node* alloc_list, LazyPageRequest* page_request,
-                                LookupInfo* out) TA_REQ(lock()) override;
+  zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
+                      LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) override {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   uint32_t GetMappingCachePolicy() const override;
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;

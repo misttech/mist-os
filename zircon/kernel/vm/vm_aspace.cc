@@ -605,7 +605,8 @@ zx_status_t VmAspace::AccessedFault(vaddr_t va) {
   const uint64_t max_mark = ktl::min(next_pt_base, base_ + size_);
   // Convert this into a number of pages, limiting to the max lookup pages for consistency with the
   // page fault path.
-  const uint64_t max_pages = ktl::min((max_mark - va) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages);
+  static constexpr uint64_t kMaxPages = 16;
+  const uint64_t max_pages = ktl::min((max_mark - va) / PAGE_SIZE, kMaxPages);
   return arch_aspace_.MarkAccessed(va, max_pages);
 }
 

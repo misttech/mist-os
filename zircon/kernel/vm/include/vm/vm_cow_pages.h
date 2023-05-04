@@ -375,19 +375,6 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PrepareForWriteLocked(uint64_t offset, uint64_t len, LazyPageRequest* page_request,
                                     uint64_t* dirty_len_out) TA_REQ(lock());
 
-  using LookupInfo = VmObject::LookupInfo;
-  using DirtyTrackingAction = VmObject::DirtyTrackingAction;
-  // See VmObject::GetPage
-  // The pages returned from this are assumed to be used in the following ways.
-  //  * Our VmObjectPaged backlink, or any of children's backlinks, are allowed to have readable
-  //    mappings, and will be informed to unmap via the backlinks when needed.
-  //  * Our VmObjectPaged backlink and our *slice* children are allowed to have writable mappings,
-  //    and will be informed to either unmap or remove writability when needed.
-  zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
-                                uint64_t max_out_pages, uint64_t max_waitable_pages,
-                                list_node* alloc_list, LazyPageRequest* page_request,
-                                LookupInfo* out) TA_REQ(lock());
-
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
   zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());

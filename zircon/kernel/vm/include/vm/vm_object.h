@@ -587,106 +587,14 @@ class VmObject : public VmHierarchyBase,
   // can be batched. The caller should continue to make successive GetPage requests
   // until this returns ZX_ERR_SHOULD_WAIT. If the caller runs out of requests, it
   // should finalize the request with PageSource::FinalizeRequest.
-  zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
-                      LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
-    Guard<CriticalMutex> guard{lock()};
-    return GetPageLocked(offset, pf_flags, alloc_list, page_request, page, pa);
-  }
+  virtual zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
+                              LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) = 0;
 
   // Helper variant of GetPage that will retry the operation after waiting on a PageRequest if
   // required.
   // Must not be called with any locks held.
   zx_status_t GetPageBlocking(uint64_t offset, uint pf_flags, list_node* alloc_list,
                               vm_page_t** page, paddr_t* pa);
-
-  // See VmObject::GetPage
-  zx_status_t GetPageLocked(uint64_t offset, uint pf_flags, list_node* alloc_list,
-                            LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa)
-      TA_REQ(lock()) {
-    __UNINITIALIZED LookupInfo lookup;
-    zx_status_t status = LookupPagesLocked(offset, pf_flags, DirtyTrackingAction::None, 1, 1,
-                                           alloc_list, page_request, &lookup);
-    if (status == ZX_OK) {
-      DEBUG_ASSERT(lookup.num_pages == 1);
-      if (unlikely(page)) {
-        // This reverse lookup isn't very expensive, and page_out is very rarely requested anyway.
-        *page = paddr_to_vm_page(lookup.paddrs[0]);
-      }
-      if (pa) {
-        *pa = lookup.paddrs[0];
-      }
-    }
-    return status;
-  }
-
-  // The dirty tracking action to be applied by LookupPagesLocked to the pages it returns.
-  enum class DirtyTrackingAction : uint8_t {
-    // The caller does not intend to modify any page contents.
-    None = 0,
-    // The caller intends to modify the contents of all looked up pages on a write (i.e. if
-    // the VMM_PF_FLAG_WRITE flag is set).
-    DirtyAllPagesOnWrite,
-    // TODO(rashaeqbal): Consider adding an option that dirties only the first page for batch
-    // mapping faults.
-  };
-  // Output struct for LookupPagesLocked to return a run of pages.
-  struct LookupInfo {
-    // Helper to add a paddr to the next slot in the array.
-    void add_page(paddr_t paddr) {
-      ASSERT(num_pages < kMaxPages);
-      paddrs[num_pages] = paddr;
-      num_pages++;
-    }
-    // This value is chosen conservatively as this structure is allocated directly on the stack, and
-    // larger values have diminishing returns for the benefit they provide.
-    static constexpr uint64_t kMaxPages = 16;
-    paddr_t paddrs[kMaxPages];
-    uint64_t num_pages = 0;
-    // If true the pages returned may be written to, even if the write flag was not specified in
-    // the lookup.
-    bool writable;
-  };
-
-  // See GetPage for a description of the core functionality.
-  //
-  // Beyond GetPage this allows for retrieving information about multiple pages, storing them in a
-  // |LookupInfo| output struct. |mark_dirty| specifies whether pages looked up for a write
-  // (VMM_PF_FLAG_WRITE) should be marked dirty, e.g. when called from a zx_vmo_write or a write
-  // fault. Note that |mark_dirty| only carries any meaning if |VMM_PF_FLAG_WRITE| is set, as it is
-  // specifying the dirty action on a write.
-  //
-  // |max_out_pages| represents an upper bound of pages for optimistic lookup.
-  // Optimistic lookup essentially treats the VMO's content as immutable, and will not perform page
-  // write forking or any page allocations, but may update page tracking metadata. For example, if a
-  // lookup is requested for a multi-page range with the write flag set, looked up pages in the
-  // range may be marked dirty in preparation for the write. Treating the VMO immutable makes this
-  // suitable for performing optimistic lookups without impacting memory usage. However, looking up
-  // additional pages is strictly optional and the caller may not infer anything based on the
-  // absence of these pages. |max_out_pages| will apply to the outputted |LookupInfo*|.
-  //
-  // |max_waitable_pages| represents an upper bound of pages for optimistic batching for
-  // |page_request|.
-  // Optimistic batching, in addition to optimistic lookup, may perform a request for additional
-  // pages from a page source if the page at |offset| needs to be provided by a page source.
-  // Optimistic batching is suitable for scenarios where an operation knows that sequentially
-  // adjacent pages are imminently required to complete the operation and can be used to amortize
-  // the cost of a page request. This will potentially have an impact on memory usage and may walk
-  // through more pages. However, fetching additional pages is strictly optional and the caller may
-  // not infer anything based on the absence of these pages.
-  //
-  //
-  // Notes:
-  //   * 1 <= max_out_pages <= LookupInfo::kMaxPages
-  //   * max_waitable_pages >= 1
-  //   * The first page, in the context of |max_out_pages| and |max_waitable_pages|, will always
-  //     be considered required.
-  virtual zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags,
-                                        DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
-                                        uint64_t max_waitable_pages, list_node* alloc_list,
-                                        LazyPageRequest* page_request, LookupInfo* out)
-      TA_REQ(lock()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
   void AddMappingLocked(VmMapping* r) TA_REQ(lock());
   void RemoveMappingLocked(VmMapping* r) TA_REQ(lock());

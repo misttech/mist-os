@@ -1924,3 +1924,43 @@ zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
   Guard<CriticalMutex> guard{lock()};
   return cow_pages_locked()->UnlockRangeLocked(offset, len);
 }
+
+zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
+                                   LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
+  Guard<CriticalMutex> guard{lock()};
+  const bool write = pf_flags & VMM_PF_FLAG_WRITE;
+  zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
+  if (cursor.is_error()) {
+    return cursor.error_value();
+  }
+  AssertHeld(cursor->lock_ref());
+  // Hardware faults are considered to update access times separately, all other lookup reasons
+  // should do the default update of access time.
+  if (pf_flags & VMM_PF_FLAG_HW_FAULT) {
+    cursor->DisableMarkAccessed();
+  }
+  if (!(pf_flags & VMM_PF_FLAG_FAULT_MASK)) {
+    vm_page_t* p = cursor->MaybePage(write);
+    if (!p) {
+      return ZX_ERR_NOT_FOUND;
+    }
+    if (page) {
+      *page = p;
+    }
+    if (pa) {
+      *pa = p->paddr();
+    }
+    return ZX_OK;
+  }
+  auto result = cursor->RequirePage(write, PAGE_SIZE, page_request);
+  if (result.is_error()) {
+    return result.error_value();
+  }
+  if (page) {
+    *page = result->page;
+  }
+  if (pa) {
+    *pa = result->page->paddr();
+  }
+  return ZX_OK;
+}

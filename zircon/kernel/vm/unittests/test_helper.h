@@ -131,12 +131,6 @@ bool verify_object_page_attribution(VmObject* vmo, uint64_t vmo_gen,
 bool verify_mapping_page_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
                                      VmObject::AttributionCounts pages);
 
-// Helper function that internally creates a PageRequest to pass to LookupPages.
-zx_status_t vmo_lookup_pages(VmObject* vmo, uint64_t offset, uint pf_flags,
-                             VmObject::DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
-                             uint64_t max_waitable_pages, list_node* alloc_list,
-                             VmObject::LookupInfo* out);
-
 // Use the function name as the test name
 #define VM_UNITTEST(fname) UNITTEST(#fname, fname)
 
