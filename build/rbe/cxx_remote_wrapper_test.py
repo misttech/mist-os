@@ -328,7 +328,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         mock_exists.assert_called_with()
 
     def test_rewrite_remote_depfile(self):
-        compiler = Path('g++')
+        compiler = Path('ppc-macho-g++')
         source = Path('hello.cc')
         output = Path('hello.o')
         depfile = Path('hello.d')

@@ -24,7 +24,7 @@ import fuchsia
 import remote_action
 
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Any, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
@@ -262,11 +262,10 @@ class CxxRemoteAction(object):
             # Let --remote_wrapper apply the prefix to the command remotely.
             remote_options.append(f'--remote_wrapper={compiler_swapper_rel}')
 
-        if self.verbose:
-            msg(f'remote inputs: {remote_inputs}')
-            msg(f'remote output files: {remote_output_files}')
-            msg(f'remote output dirs: {remote_output_dirs}')
-            msg(f'rewrapper options: {remote_options}')
+        self.vprintlist('remote inputs', remote_inputs)
+        self.vprintlist('remote output files', remote_output_files)
+        self.vprintlist('remote output dirs', remote_output_dirs)
+        self.vprintlist('rewrapper options', remote_options)
 
         downloads = []
         if self.depfile:  # always fetch the depfile
@@ -315,6 +314,24 @@ class CxxRemoteAction(object):
     @property
     def dry_run(self) -> bool:
         return self._main_args.dry_run
+
+    def vmsg(self, text: str):
+        if self.verbose:
+            msg(text)
+
+    def vprintlist(self, desc: str, items: Iterable[Any]):
+        """In verbose mode, print elements.
+
+        Args:
+          desc: text description of what is being printed.
+          items: stream of any type of object that is str-able.
+        """
+        if self.verbose:
+            msg(f'{desc}: {{')
+            for item in items:
+                text = str(item)
+                print(f'  {text}')
+            print(f'}}  # {desc}')
 
     def _resolve_cpp_strategy(self) -> str:
         """Resolve preprocessing strategy to 'local' or 'integrated'."""
@@ -375,8 +392,7 @@ class CxxRemoteAction(object):
         if self.dry_run:
             msg(f"[dry-run only] {local_cpp_cmd}")
             return 0
-        if self.verbose:
-            msg(f"Local C-preprocessing: {local_cpp_cmd}")
+        self.vmsg(f"Local C-preprocessing: {local_cpp_cmd}")
 
         cpp_status = subprocess.call(self.local_preprocess_command)
         if cpp_status != 0:

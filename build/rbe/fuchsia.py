@@ -150,16 +150,24 @@ def remote_clang_libcxx_static(clang_lib_triple: str) -> str:
 
 def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
     bindir = gcc_path.parent
+    # expect compiler to be named like {x64_64,aarch64}-elf-{g++,gcc}
+    try:
+        arch, objfmt, tool = gcc_path.name.split('-')
+    except ValueError:
+        raise ValueError(
+            f'Expecting compiler to be named like {{arch}}-{{objfmt}}-[gcc|g++], but got "{gcc_path.name}"'
+        )
+    target = '-'.join([arch, objfmt])
     install_root = bindir.parent
-    yield install_root / "x86_64-elf/bin/as"
-    libexec_base = install_root / "libexec/gcc/x86_64-elf"
+    yield install_root / target / "bin/as"
+    libexec_base = install_root / "libexec/gcc" / target
     libexec_dirs = list(libexec_base.glob("*"))  # dir is a version number
     if not libexec_dirs:
         return
 
     libexec_dir = Path(libexec_dirs[0])
-    yield libexec_dir / "cc1"
-    yield libexec_dir / "cc1plus"
+    parsers = {"gcc": "cc1", "g++": "cc1plus"}
+    yield libexec_dir / parsers[tool]
     # yield libexec_dir / "collect2"  # needed only if linking remotely
 
     # Workaround: gcc builds a COMPILER_PATH to its related tools with
@@ -173,7 +181,7 @@ def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
     # parent directories will be created in the remote environment.
     version = libexec_dir.name
     # need this dir to exist remotely:
-    lib_base = install_root / "lib/gcc/x86_64-elf" / version
+    lib_base = install_root / "lib/gcc" / target / version
     yield lib_base / "crtbegin.o"  # arbitrary unused file, just to setup its dir
 
 

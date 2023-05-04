@@ -34,16 +34,35 @@ class RemoteExecutableTests(unittest.TestCase):
 
 class GCCSupportToolsTests(unittest.TestCase):
 
-    def test_partial_paths(self):
-        gcc_install_base = Path('../../some/where/gcc')
-        version_dir = gcc_install_base / 'libexec/gcc/x86_64-elf/0.99'
+    def test_partial_paths_c(self):
+        arch = 'x86_64'
+        objfmt = 'elf'
+        gcc_install_base = Path('../../some/where/install_gcc')
+        version_dir = gcc_install_base / f'libexec/gcc/{arch}-{objfmt}/0.99'
         with mock.patch.object(Path, 'glob',
                                return_value=iter([version_dir
                                                  ])) as mock_version:
             tools = list(
-                fuchsia.gcc_support_tools(gcc_install_base / 'bin/g++'))
+                fuchsia.gcc_support_tools(
+                    gcc_install_base / f'bin/{arch}-{objfmt}-gcc'))
+        self.assertEqual({t.name for t in tools}, {'as', 'cc1', 'crtbegin.o'})
+        # we only need crtbegin.o for the remote setup of its parent dir
+        for t in tools:
+            self.assertIn(gcc_install_base, t.parents)
+
+    def test_partial_paths_cxx(self):
+        arch = 'powerpc64'
+        objfmt = 'macho'
+        gcc_install_base = Path('../../some/where/install_gcc')
+        version_dir = gcc_install_base / f'libexec/gcc/{arch}-{objfmt}/0.99'
+        with mock.patch.object(Path, 'glob',
+                               return_value=iter([version_dir
+                                                 ])) as mock_version:
+            tools = list(
+                fuchsia.gcc_support_tools(
+                    gcc_install_base / f'bin/{arch}-{objfmt}-g++'))
         self.assertEqual(
-            {t.name for t in tools}, {'as', 'cc1', 'cc1plus', 'crtbegin.o'})
+            {t.name for t in tools}, {'as', 'cc1plus', 'crtbegin.o'})
         # we only need crtbegin.o for the remote setup of its parent dir
         for t in tools:
             self.assertIn(gcc_install_base, t.parents)
