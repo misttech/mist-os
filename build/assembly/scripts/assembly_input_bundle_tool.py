@@ -191,6 +191,14 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
 
             main_def = instance_from_dict(
                 CompiledPackageMainDefinition, package_def)
+
+            # Type unsafe; see assembly_input_bundle.py
+            if (package_def.get("component_includes")):
+                main_def.includes = [
+                    instance_from_dict(FileEntry, x)
+                    for x in package_def["component_includes"]
+                ]
+
             if main_def.bootfs_unpackaged and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST:
                 raise ValueError(
                     f"Compiled package {main_def.name} not in bootfs allowlist!"
