@@ -56,6 +56,8 @@ def main():
         if image["type"] == "blk" and os.path.basename(
                 image["path"]) == "fvm.sparse.blk":
             parameters += ["--fvm", rel_path(image["path"])]
+        if image["type"] == "fxfs-blk":
+            parameters += ["--fxfs", rel_path(image["path"])]
         if image["type"] == "zbi":
             parameters += ["--zircona", rel_path(image["path"])]
         if image["type"] == "vbmeta":

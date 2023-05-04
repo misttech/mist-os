@@ -425,6 +425,19 @@ TEST_F(PaverTest, WriteSshAuth) {
   ASSERT_EQ(fake_svc_.fake_fshost().data_file_path(), "ssh/authorized_keys");
 }
 
+TEST_F(PaverTest, WriteFvmSparse) {
+  size_t size = sizeof(kFakeData);
+  fake_svc_.fake_paver().set_expected_payload_size(size);
+  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FVM_SPARSE_FILENAME, size, zx::duration::infinite()),
+            TFTP_NO_ERROR);
+  ASSERT_EQ(paver_.Write(kFakeData, &size, 0), TFTP_NO_ERROR);
+  ASSERT_EQ(size, sizeof(kFakeData));
+  ASSERT_NO_FATAL_FAILURE(AssertExitCode(ZX_OK));
+  paver_.Close();
+  ValidateCommandTrace(fake_svc_.fake_paver().GetCommandTrace(),
+                       {paver_test::Command::kWriteVolumes});
+}
+
 TEST_F(PaverTest, WriteFvm) {
   size_t size = sizeof(kFakeData);
   fake_svc_.fake_paver().set_expected_payload_size(size);
@@ -434,13 +447,26 @@ TEST_F(PaverTest, WriteFvm) {
   ASSERT_NO_FATAL_FAILURE(AssertExitCode(ZX_OK));
   paver_.Close();
   ValidateCommandTrace(fake_svc_.fake_paver().GetCommandTrace(),
-                       {paver_test::Command::kWriteVolumes});
+                       {paver_test::Command::kWriteOpaqueVolume});
+}
+
+TEST_F(PaverTest, WriteFxfs) {
+  size_t size = sizeof(kFakeData);
+  fake_svc_.fake_paver().set_expected_payload_size(size);
+  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FXFS_FILENAME, size, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(paver_.Write(kFakeData, &size, 0), TFTP_NO_ERROR);
+  ASSERT_EQ(size, sizeof(kFakeData));
+  ASSERT_NO_FATAL_FAILURE(AssertExitCode(ZX_OK));
+  paver_.Close();
+  ValidateCommandTrace(fake_svc_.fake_paver().GetCommandTrace(),
+                       {paver_test::Command::kWriteOpaqueVolume});
 }
 
 TEST_F(PaverTest, WriteFvmManySmallWrites) {
   size_t size = sizeof(kFakeData);
   fake_svc_.fake_paver().set_expected_payload_size(1024);
-  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FVM_FILENAME, 1024, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FVM_SPARSE_FILENAME, 1024, zx::duration::infinite()),
+            TFTP_NO_ERROR);
   for (size_t offset = 0; offset < 1024; offset += sizeof(kFakeData)) {
     size = std::min(sizeof(kFakeData), 1024 - offset);
     ASSERT_EQ(paver_.Write(kFakeData, &size, offset), TFTP_NO_ERROR);

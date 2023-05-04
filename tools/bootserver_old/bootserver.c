@@ -253,6 +253,7 @@ void usage(void) {
       "  --board_name <name>      name of the board files are meant for\n"
       "  --boot <file>            use the supplied file as a kernel\n"
       "  --fvm <file>             use the supplied file as a sparse FVM image (up to 4 times)\n"
+      "  --fxfs <file>            use the supplied file as an Fxfs image\n"
       "  --bootloader <file>      use the supplied file as a BOOTLOADER image\n"
       "  --firmware <file>        use the supplied file as a FIRMWARE image of default type\n"
       "  --firmware-<type> <file> use the supplied file as a FIRMWARE image of the given type\n"
@@ -401,6 +402,7 @@ int main(int argc, char** argv) {
   const char* vbmetar_image = NULL;
   const char* authorized_keys = NULL;
   const char* fvm_images[MAX_FVM_IMAGES] = {NULL, NULL, NULL, NULL};
+  const char* fxfs_image = NULL;
   const char* kernel_fn = NULL;
   const char* init_partition_tables_device_path = NULL;
   const char* wipe_partition_tables_device_path = NULL;
@@ -439,6 +441,14 @@ int main(int argc, char** argv) {
         return -1;
       }
       fvm_images[num_fvms++] = argv[1];
+    } else if (!strcmp(argv[1], "--fxfs")) {
+      argc--;
+      argv++;
+      if (argc <= 1) {
+        fprintf(stderr, "'--fxfs' option requires an argument (path to image)\n");
+        return -1;
+      }
+      fxfs_image = argv[1];
     } else if (!strcmp(argv[1], "--bootloader")) {
       argc--;
       argv++;
@@ -687,7 +697,7 @@ int main(int argc, char** argv) {
     argv++;
   }
   if (!kernel_fn && !bootloader_image && !num_firmware && !zircona_image && !zirconb_image &&
-      !zirconr_image && !vbmetaa_image && !vbmetab_image && !fvm_images[0] &&
+      !zirconr_image && !vbmetaa_image && !vbmetab_image && !fvm_images[0] && !fxfs_image &&
       !init_partition_tables_device_path && !wipe_partition_tables_device_path) {
     usage();
   }
@@ -915,6 +925,9 @@ int main(int argc, char** argv) {
       if (status == 0 && fvm_images[i]) {
         status = xfer(&ra, fvm_images[i], NETBOOT_FVM_FILENAME);
       }
+    }
+    if (status == 0 && fxfs_image) {
+      status = xfer(&ra, fxfs_image, NETBOOT_FXFS_FILENAME);
     }
     if (status == 0 && bootloader_image) {
       status = xfer(&ra, bootloader_image, NETBOOT_BOOTLOADER_FILENAME);

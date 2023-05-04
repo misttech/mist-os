@@ -17,6 +17,7 @@ const (
 	EfiNetsvcName            = "<<image>>efi.img"
 	FirmwareNetsvcPrefix     = "<<image>>firmware_"
 	FvmNetsvcName            = "<<image>>sparse.fvm"
+	FxfsNetsvcName           = "<<image>>fxfs.blk"
 	KerncNetsvcName          = "<<image>>kernc.img"
 	KernelNetsvcName         = "<<netboot>>kernel.bin"
 	VbmetaANetsvcName        = "<<image>>vbmetaa.img"

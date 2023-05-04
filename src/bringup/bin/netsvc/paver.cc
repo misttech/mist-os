@@ -488,6 +488,10 @@ zx_status_t Paver::MonitorBuffer() {
       [[fallthrough]];
     case Command::kAsset:
       return WriteABImage(std::move(data_sink), std::move(buffer));
+    case Command::kFvmFull: {
+      auto res = data_sink->WriteOpaqueVolume(std::move(buffer));
+      return (res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status());
+    }
     default:
       result = TFTP_ERR_INTERNAL;
       return ZX_ERR_INTERNAL;
@@ -570,9 +574,12 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
   }
 
   // Paving an image to disk.
-  if (host_filename == NETBOOT_FVM_HOST_FILENAME) {
+  if (host_filename == NETBOOT_FVM_HOST_FILENAME || host_filename == NETBOOT_FXFS_HOST_FILENAME) {
+    printf("netsvc: Running FVM/Fxfs Paver\n");
+    command_ = Command::kFvmFull;
+  } else if (host_filename == NETBOOT_FVM_SPARSE_HOST_FILENAME) {
     printf("netsvc: Running FVM Paver\n");
-    command_ = Command::kFvm;
+    command_ = Command::kFvmSparse;
   } else if (host_filename == NETBOOT_BOOTLOADER_HOST_FILENAME) {
     // WriteBootloader() has been replaced by WriteFirmware() with an empty
     // firmware type, but keep this function around for backwards-compatibility
@@ -678,8 +685,8 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
   sync_completion_reset(&data_ready_);
 
   threads_.emplace_back([this]() {
-    exit_code_.set_value_at_thread_exit(command_ == Command::kFvm ? StreamBuffer()
-                                                                  : MonitorBuffer());
+    exit_code_.set_value_at_thread_exit(command_ == Command::kFvmSparse ? StreamBuffer()
+                                                                        : MonitorBuffer());
   });
   svc_cleanup.cancel();
   buffer_cleanup.cancel();

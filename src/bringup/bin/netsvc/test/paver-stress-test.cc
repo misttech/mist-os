@@ -34,7 +34,7 @@ TEST_F(PaverTest, WriteFvmManyLargeWrites) {
 
   fake_svc_.fake_paver().set_expected_payload_size(payload_size);
   fake_svc_.fake_paver().set_wait_for_start_signal(true);
-  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FVM_FILENAME, payload_size, zx::duration::infinite()),
+  ASSERT_EQ(paver_.OpenWrite(NETBOOT_FVM_SPARSE_FILENAME, payload_size, zx::duration::infinite()),
             TFTP_NO_ERROR);
 
   loop_.StartThread();

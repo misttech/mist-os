@@ -39,6 +39,7 @@ enum class Command {
   kWriteAsset,
   kWriteFirmware,
   kWriteVolumes,
+  kWriteOpaqueVolume,
   kWriteDataFile,
   kWipeVolume,
   kInitPartitionTables,

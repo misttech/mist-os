@@ -172,6 +172,7 @@ void FakePaver::WriteAsset(WriteAssetRequestView request, WriteAssetCompleter::S
 void FakePaver::WriteOpaqueVolume(WriteOpaqueVolumeRequestView request,
                                   WriteOpaqueVolumeCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
+  AppendCommand(Command::kWriteOpaqueVolume);
   if (request->payload.size == expected_payload_size_) {
     completer.ReplySuccess();
   } else {
