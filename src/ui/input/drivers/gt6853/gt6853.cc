@@ -1011,14 +1011,18 @@ int Gt6853Device::Thread() {
     const zx::duration latency = zx::clock::get_monotonic() - timestamp;
 
     total_latency_ += latency;
-    total_report_count_.Set(++report_count_);
+    report_count_++;
     average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
 
     if (latency > max_latency_) {
       max_latency_ = latency;
       max_latency_usecs_.Set(max_latency_.to_usecs());
     }
-    last_event_timestamp_.Set(timestamp.get());
+
+    if (contacts > 0) {
+      total_report_count_.Add(1);
+      last_event_timestamp_.Set(timestamp.get());
+    }
   }
 
   return thrd_success;
