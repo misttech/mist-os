@@ -565,56 +565,60 @@ std::optional<std::string> DriverRunner::BindNodeToResult(
 
   // If this is a composite node spec match, bind the node into the spec. If the spec is
   // completed, use the returned node and driver to start the driver.
-  fdi::wire::MatchedDriverInfo driver_info;
-  Node* driver_node;
-
-  if (matched_driver.is_driver()) {
-    driver_info = matched_driver.driver();
-    driver_node = &node;
-  } else if (matched_driver.is_parent_spec()) {
-    auto node_groups = matched_driver.parent_spec();
-    auto result = composite_node_spec_manager_.BindParentSpec(node_groups, node.weak_from_this());
-    if (result.is_error()) {
-      LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
-           node.name().c_str());
+  if (matched_driver.is_parent_spec()) {
+    auto result = BindNodeToSpec(node, matched_driver.parent_spec());
+    if (!result.is_ok()) {
       return std::nullopt;
     }
-
-    // If the list is empty, then there are no completed composite node specs.
-    auto composite_list = result.value();
-    if (composite_list.empty()) {
-      return "";
-    }
-
-    // TODO(fxb/122531): Support composite multibind.
-    ZX_ASSERT_MSG(composite_list.size() == 1u, "Unexpected composite list size of %zu",
-                  composite_list.size());
-    auto composite_node_and_driver = composite_list[0];
-
-    auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver.node);
-    auto locked_composite_node = composite_node.lock();
-    ZX_ASSERT(locked_composite_node);
-
-    driver_info = composite_node_and_driver.driver;
-    driver_node = locked_composite_node.get();
+    return "";
   }
 
-  if (!driver_info.has_url()) {
-    LOGF(ERROR, "Failed to match Node '%s', the driver URL is missing", node.name().c_str());
-    return std::nullopt;
-  }
+  ZX_ASSERT(matched_driver.is_driver());
+  auto start_result = StartDriver(node, matched_driver.driver());
 
-  auto pkg_type =
-      driver_info.has_package_type() ? driver_info.package_type() : fdi::DriverPackageType::kBase;
-  auto start_result = StartDriver(*driver_node, driver_info.url().get(), pkg_type);
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
          zx_status_get_string(start_result.error_value()));
     return std::nullopt;
   }
 
-  driver_node->OnBind();
-  return std::string(driver_info.url().get().data());
+  node.OnBind();
+  return start_result.value();
+}
+
+zx::result<> DriverRunner::BindNodeToSpec(
+    Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents) {
+  auto result = composite_node_spec_manager_.BindParentSpec(parents, node.weak_from_this(), true);
+  if (result.is_error()) {
+    LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
+         node.name().c_str());
+    return result.take_error();
+  }
+
+  // If it doesn't have a value but there was no error it just means the node was added
+  // to a composite node spec but the spec is still incomplete.
+  auto composite_list = result.value();
+  if (composite_list.empty()) {
+    return zx::ok();
+  }
+
+  // TODO(fxb/122531): Support composite multibind.
+  ZX_ASSERT(composite_list.size() == 1u);
+  auto composite_node_and_driver = composite_list[0];
+
+  auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver.node);
+  auto locked_composite_node = composite_node.lock();
+  ZX_ASSERT(locked_composite_node);
+
+  auto start_result = StartDriver(*locked_composite_node, composite_node_and_driver.driver);
+  if (start_result.is_error()) {
+    LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
+         zx_status_get_string(start_result.error_value()));
+    return start_result.take_error();
+  }
+
+  node.OnBind();
+  return zx::ok();
 }
 
 void DriverRunner::ProcessPendingBindRequests() {
@@ -709,6 +713,23 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
   driver_hosts_.push_back(std::move(driver_host));
 
   return zx::ok(driver_host_ptr);
+}
+
+zx::result<std::string> DriverRunner::StartDriver(
+    Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) {
+  if (!driver_info.has_url()) {
+    LOGF(ERROR, "Failed to start driver for node '%s', the driver URL is missing",
+         node.name().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  auto pkg_type =
+      driver_info.has_package_type() ? driver_info.package_type() : fdi::DriverPackageType::kBase;
+  auto result = StartDriver(node, driver_info.url().get(), pkg_type);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok(std::string(driver_info.url().get()));
 }
 
 zx::result<> DriverRunner::CreateDriverHostComponent(

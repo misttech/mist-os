@@ -148,9 +148,15 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
       Node& node, fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
       bool has_tracker);
 
+  zx::result<> BindNodeToSpec(Node& node,
+                              fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents);
+
   // Process any pending bind requests that were queued during an ongoing bind process.
   // Should only be called when |bind_orphan_ongoing_| is true.
   void ProcessPendingBindRequests();
+
+  zx::result<std::string> StartDriver(Node& node,
+                                      fuchsia_driver_index::wire::MatchedDriverInfo driver_info);
 
   zx::result<> CreateDriverHostComponent(std::string moniker,
                                          fidl::ServerEnd<fuchsia_io::Directory> exposed_dir);
