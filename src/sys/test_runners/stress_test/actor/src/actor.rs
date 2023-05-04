@@ -70,7 +70,8 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
                 let (client_end, mut stream) = create_request_stream::<ActionIteratorMarker>()?;
                 responder.send(client_end)?;
 
-                let mut iter = actions.iter().map(|c| c.to_fidl());
+                let actions: Vec<_> = actions.iter().map(|c| c.to_fidl()).collect();
+                let mut remaining_actions = &actions[..];
 
                 while let Some(ActionIteratorRequest::GetNext { responder }) =
                     stream.try_next().await?
@@ -80,14 +81,15 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
 
                     // Determine how many actions can be sent in a single FIDL message,
                     // accounting for the header and `Action` size.
-                    for action in iter.clone() {
+                    for action in remaining_actions {
                         bytes_used += action.measure().num_bytes;
                         if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                             break;
                         }
                         action_count += 1;
                     }
-                    responder.send(&mut iter.by_ref().take(action_count))?;
+                    responder.send(&remaining_actions[..action_count])?;
+                    remaining_actions = &remaining_actions[action_count..];
 
                     // There are no more actions left to return. The client has gotten
                     // an empty response, so they also know that there are no more actions.

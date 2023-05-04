@@ -187,7 +187,7 @@ impl PiconetMember {
         let (connect_client, connect_requests) =
             f_end::create_request_stream().context("ConnectionReceiver creation")?;
         let _ = self.profile_svc.advertise(
-            &mut service_defs.into_iter(),
+            &service_defs,
             bredr::ChannelParameters::default(),
             connect_client,
         );

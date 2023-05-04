@@ -144,7 +144,7 @@ async fn host_device_restore_bonds() -> Result<(), Error> {
         match request {
             Ok(HostRequest::RestoreBonds { responder, .. }) => {
                 // Succeed always by not sending back any rejected bonds
-                let _ = responder.send(&mut std::iter::empty());
+                let _ = responder.send(&[]);
                 num_restore_bonds_calls += 1;
             }
             x => panic!("Expected RestoreBonds Request but got: {:?}", x),

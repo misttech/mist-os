@@ -148,8 +148,7 @@ impl InputFile {
                 // TODO(https://fxbug.dev/123718): Remove `close_fut`.
                 let mut close_fut = touch_source_proxy.on_closed();
                 loop {
-                    let query_fut =
-                        touch_source_proxy.watch(&mut previous_event_disposition.into_iter());
+                    let query_fut = touch_source_proxy.watch(&previous_event_disposition);
                     let query_res = match future::select(close_fut, query_fut).await {
                         Either::Left((Ok(Signals::CHANNEL_PEER_CLOSED), _)) => {
                             log_warn!("TouchSource server closed connection; input is stopped");
@@ -636,9 +635,7 @@ mod test {
     ) -> Vec<TouchResponse> {
         match request_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
-                responder
-                    .send(&mut vec![touch_event].into_iter())
-                    .expect("failure sending Watch reply");
+                responder.send(&[touch_event]).expect("failure sending Watch reply");
                 responses
             }
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
@@ -666,12 +663,11 @@ mod test {
     async fn later_watch_requests_have_responses_arg_matching_earlier_watch_replies() {
         // Set up resources.
         let (_input_file, mut touch_source_stream, relay_thread) = start_input();
-        let fake_touch_events = std::iter::repeat(TouchEvent::default());
 
         // Reply to first `Watch` with two `TouchEvent`s.
         match touch_source_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
-                .send(&mut fake_touch_events.clone().take(2).collect::<Vec<_>>().into_iter())
+                .send(&vec![TouchEvent::default(); 2])
                 .expect("failure sending Watch reply"),
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
@@ -682,7 +678,7 @@ mod test {
             Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
                 assert_matches!(responses.as_slice(), [_, _]);
                 responder
-                    .send(&mut fake_touch_events.clone().take(5).collect::<Vec<_>>().into_iter())
+                    .send(&vec![TouchEvent::default(); 5])
                     .expect("failure sending Watch reply")
             }
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),

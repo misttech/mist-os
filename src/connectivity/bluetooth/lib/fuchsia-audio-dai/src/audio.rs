@@ -151,11 +151,11 @@ async fn process_audio_requests(
                 responder.send(prop)?;
             }
             StreamConfigRequest::GetSupportedFormats { responder } => {
-                let formats_vector = vec![SupportedFormats {
+                let formats_vector = &[SupportedFormats {
                     pcm_supported_formats: Some(supported_formats.clone()),
                     ..Default::default()
                 }];
-                responder.send(&mut formats_vector.into_iter())?;
+                responder.send(formats_vector)?;
             }
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, .. } => {
                 dai.create_ring_buffer(dai_format, format, ring_buffer)?;

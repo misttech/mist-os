@@ -593,7 +593,7 @@ impl View {
         let mut pending_responses: Vec<TouchResponse> = vec![];
 
         loop {
-            let events = touch_source.watch(&mut pending_responses.into_iter());
+            let events = touch_source.watch(&pending_responses);
 
             match events.await {
                 Ok(events) => {

@@ -145,14 +145,12 @@ mod test {
                             .map(|name| to_fidl_target(name))
                             .collect()
                     };
-                const CHUNK_SIZE: usize = 10;
-                let mut iter = fidl_values.into_iter();
                 fuchsia_async::Task::local(async move {
+                    let mut iter = fidl_values.chunks(10);
                     loop {
-                        let next_chunk = iter.by_ref().take(CHUNK_SIZE);
-                        let next_chunk_len = next_chunk.len();
-                        reader.next(&mut next_chunk.collect::<Vec<_>>().into_iter()).await.unwrap();
-                        if next_chunk_len == 0 {
+                        let chunk = iter.next().unwrap_or(&[]);
+                        reader.next(&chunk).await.unwrap();
+                        if chunk.is_empty() {
                             break;
                         }
                     }

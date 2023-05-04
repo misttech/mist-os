@@ -96,42 +96,33 @@ mod test {
                                     if !sent {
                                         sent = true;
                                         responder
-                                            .send(
-                                                &mut vec![
-                                                    RepositoryTarget {
-                                                        repo_name: Some("bob".to_owned()),
-                                                        target_identifier: Some(
-                                                            "target1".to_owned(),
-                                                        ),
-                                                        aliases: Some(vec![
-                                                            "target1_alias1".to_owned(),
-                                                            "target1_alias2".to_owned(),
-                                                        ]),
-                                                        ..Default::default()
-                                                    },
-                                                    RepositoryTarget {
-                                                        repo_name: Some("smith".to_owned()),
-                                                        target_identifier: Some(
-                                                            "target2".to_owned(),
-                                                        ),
-                                                        storage_type: Some(
-                                                            RepositoryStorageType::Ephemeral,
-                                                        ),
-                                                        ..Default::default()
-                                                    },
-                                                    RepositoryTarget {
-                                                        repo_name: Some("bob".to_owned()),
-                                                        target_identifier: Some(
-                                                            "target3".to_owned(),
-                                                        ),
-                                                        ..Default::default()
-                                                    },
-                                                ]
-                                                .into_iter(),
-                                            )
+                                            .send(&[
+                                                RepositoryTarget {
+                                                    repo_name: Some("bob".to_owned()),
+                                                    target_identifier: Some("target1".to_owned()),
+                                                    aliases: Some(vec![
+                                                        "target1_alias1".to_owned(),
+                                                        "target1_alias2".to_owned(),
+                                                    ]),
+                                                    ..Default::default()
+                                                },
+                                                RepositoryTarget {
+                                                    repo_name: Some("smith".to_owned()),
+                                                    target_identifier: Some("target2".to_owned()),
+                                                    storage_type: Some(
+                                                        RepositoryStorageType::Ephemeral,
+                                                    ),
+                                                    ..Default::default()
+                                                },
+                                                RepositoryTarget {
+                                                    repo_name: Some("bob".to_owned()),
+                                                    target_identifier: Some("target3".to_owned()),
+                                                    ..Default::default()
+                                                },
+                                            ])
                                             .unwrap()
                                     } else {
-                                        responder.send(&mut vec![].into_iter()).unwrap()
+                                        responder.send(&[]).unwrap()
                                     }
                                 }
                             }

@@ -209,7 +209,7 @@ async fn test_commit_bootstrap_doesnt_fail_from_host_failure() {
         match host_server.try_next().await {
             Ok(Some(HostRequest::RestoreBonds { bonds, responder })) => {
                 // Fail by returning all bonds as errors
-                let _ = responder.send(&mut bonds.into_iter());
+                let _ = responder.send(&bonds);
             }
             x => panic!("Expected RestoreBonds Request but got: {:?}", x),
         }

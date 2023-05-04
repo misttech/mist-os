@@ -203,7 +203,7 @@ async fn set_device_muted(
     });
 
     states.push(input_state);
-    proxy.set(&mut states.into_iter()).await.expect("set completed").expect("set successful");
+    proxy.set(&states).await.expect("set completed").expect("set successful");
 }
 
 // Switch the hardware mic state to muted = [muted] for input.

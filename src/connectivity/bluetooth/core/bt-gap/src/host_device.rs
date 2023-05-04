@@ -187,17 +187,13 @@ impl HostDevice {
         // this time, the maximum message size is 64 KiB and a fully-populated BondingData without
         // peer service records is close to 700 B).
         const MAX_BONDS_PER_RESTORE_BONDS: usize = 16;
+        let bonds: Vec<_> = bonds.into_iter().map(sys::BondingData::from).collect();
         let bonds_chunks = bonds.chunks(MAX_BONDS_PER_RESTORE_BONDS);
 
         // Bonds that can't be restored are sent back in Ok(Vec<_>), which would not cause
         // try_join_all to bail early
-        try_join_all(bonds_chunks.map(|c| {
-            self.0
-                .proxy
-                .restore_bonds(&mut c.into_iter().cloned().map(sys::BondingData::from))
-                .map_err(|e| e.into())
-        }))
-        .map_ok(|v| v.into_iter().flatten().collect())
+        try_join_all(bonds_chunks.map(|c| self.0.proxy.restore_bonds(c).map_err(|e| e.into())))
+            .map_ok(|v| v.into_iter().flatten().collect())
     }
 
     pub fn set_connectable(&self, value: bool) -> impl Future<Output = types::Result<()>> {

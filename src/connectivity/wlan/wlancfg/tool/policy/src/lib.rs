@@ -1015,7 +1015,7 @@ mod tests {
             Poll::Ready(Some(Ok(wlan_policy::NetworkConfigIteratorRequest::GetNext {
                 responder
             }))) => {
-                match responder.send(&mut saved_networks_response.into_iter()) {
+                match responder.send(&saved_networks_response) {
                     Ok(()) => {}
                     Err(e) => panic!("failed to send saved networks: {}", e),
                 }
@@ -1831,18 +1831,17 @@ mod tests {
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // First send a `Starting` status.
-        let mut state_updates = vec![
-            create_ap_state_summary(wlan_policy::OperatingState::Starting),
-            create_ap_state_summary(wlan_policy::OperatingState::Active),
-        ];
-        let _ =
-            test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..1));
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Starting,
+        )]);
 
         // Future should still be waiting to see that the AP to be active
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Send the response indicating that the AP is active
-        let _ = test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..));
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Active,
+        )]);
 
         // Run the request to completion
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -1873,8 +1872,8 @@ mod tests {
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Send back a failure
-        let mut state_updates = vec![create_ap_state_summary(wlan_policy::OperatingState::Failed)];
-        let _ = test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..));
+        let state_updates = &[create_ap_state_summary(wlan_policy::OperatingState::Failed)];
+        let _ = test_values.update_proxy.on_access_point_state_update(state_updates);
 
         // Expect that the future returns an error
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
@@ -1907,29 +1906,26 @@ mod tests {
         let mut exec = TestExecutor::new();
         let test_values = ap_test_setup();
 
-        let mut state_updates = vec![
-            create_ap_state_summary(wlan_policy::OperatingState::Starting),
-            create_ap_state_summary(wlan_policy::OperatingState::Active),
-            create_ap_state_summary(wlan_policy::OperatingState::Failed),
-        ];
-
         let fut = handle_ap_listen(test_values.update_stream);
         pin_mut!(fut);
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ =
-            test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..1));
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Starting,
+        )]);
 
         // Listen should process the message and stall again
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ =
-            test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..1));
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Active,
+        )]);
 
         // Process message and stall again
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let _ =
-            test_values.update_proxy.on_access_point_state_update(&mut state_updates.drain(..1));
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Failed,
+        )]);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }

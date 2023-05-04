@@ -45,8 +45,8 @@ async fn handler(
 
 // Written as a free function in order to match the signature of the HangingGet
 pub fn observe_hosts(new_hosts: &Vec<HostInfo>, responder: sys::HostWatcherWatchResponder) -> bool {
-    let mut hosts = new_hosts.into_iter().map(|host| sys::HostInfo::from(host));
-    if let Err(err) = responder.send(&mut hosts) {
+    let hosts: Vec<_> = new_hosts.into_iter().map(|host| sys::HostInfo::from(host)).collect();
+    if let Err(err) = responder.send(&hosts) {
         warn!("Unable to respond to host_watcher watch hanging get: {:?}", err);
     }
     true

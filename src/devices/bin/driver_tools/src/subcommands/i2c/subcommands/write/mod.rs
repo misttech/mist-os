@@ -18,12 +18,12 @@ pub async fn write(
 ) -> Result<()> {
     let device = super::connect_to_i2c_device(&cmd.device_path, dev)
         .context("Failed to connect to I2C device")?;
-    let transactions = vec![fi2c::Transaction {
+    let transactions = &[fi2c::Transaction {
         data_transfer: Some(fi2c::DataTransfer::WriteData(cmd.data.clone())),
         ..Default::default()
     }];
     device
-        .transfer(&mut transactions.into_iter())
+        .transfer(transactions)
         .await
         .context("Failed to send request to transfer write transaction to I2C device")?
         .map_err(|status| zx::Status::from_raw(status))

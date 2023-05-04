@@ -921,7 +921,7 @@ async fn run_invocations(
 ) -> Result<SuiteStatus, anyhow::Error> {
     let (run_listener_client, mut run_listener) =
         fidl::endpoints::create_request_stream().expect("cannot create request stream");
-    suite.run(&mut invocations.into_iter().map(|i| i.into()), run_options, run_listener_client)?;
+    suite.run(&invocations, run_options, run_listener_client)?;
 
     let tasks = Arc::new(lock::Mutex::new(vec![]));
     let running_test_cases = Arc::new(lock::Mutex::new(HashSet::new()));

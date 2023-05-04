@@ -380,7 +380,7 @@ async fn run_driver_info_iterator_server(
                     };
 
                     responder
-                        .send(&mut result.into_iter())
+                        .send(&result)
                         .or_else(ignore_peer_closed)
                         .context("error responding to GetDriverInfo")?;
                 }
@@ -408,7 +408,7 @@ async fn run_composite_node_specs_iterator_server(
                     };
 
                     responder
-                        .send(&mut result.into_iter())
+                        .send(&result)
                         .or_else(ignore_peer_closed)
                         .context("error responding to GetNodeGroups")?;
                 }

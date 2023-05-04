@@ -79,7 +79,7 @@ async fn test_light_set_and_watch() {
     let light_proxy = LightRealm::connect_to_light_marker(&realm);
 
     light_proxy
-        .set_light_group_values(LIGHT_NAME_1, &mut [changed_light_state].into_iter())
+        .set_light_group_values(LIGHT_NAME_1, &[changed_light_state])
         .await
         .expect("fidl failed")
         .expect("set failed");
@@ -101,12 +101,7 @@ async fn test_light_set_no_lights() {
     let _ = light_proxy
         .set_light_group_values(
             LIGHT_NAME_1,
-            &mut vec![LightState {
-                value: Some(LightValue::Brightness(0.128)),
-                ..Default::default()
-            }]
-            .into_iter()
-            .map(LightState::into),
+            &[LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() }],
         )
         .await
         .expect("set completed")
@@ -126,12 +121,10 @@ async fn test_light_set_wrong_size() {
     let _ = light_proxy
         .set_light_group_values(
             LIGHT_NAME_1,
-            &mut vec![
+            &[
                 LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() },
                 LightState { value: Some(LightValue::Brightness(0.11)), ..Default::default() },
-            ]
-            .into_iter()
-            .map(LightState::into),
+            ],
         )
         .await
         .expect("set completed")
@@ -165,32 +158,26 @@ async fn test_individual_light_group() {
     assert_fidl_light_group_eq!(&settings, &light_group_2);
 
     // Set updated values for the two lights.
-    {
-        let light_group_1_updated = light_group_1_updated.clone();
-        light_proxy
-            .set_light_group_values(
-                light_group_1_updated.name.as_deref().unwrap(),
-                &mut light_group_1_updated.lights.unwrap().into_iter(),
-            )
-            .await
-            .expect("set called")
-            .expect("set completed");
-    }
+    light_proxy
+        .set_light_group_values(
+            light_group_1_updated.name.as_deref().unwrap(),
+            light_group_1_updated.lights.as_deref().unwrap(),
+        )
+        .await
+        .expect("set called")
+        .expect("set completed");
 
     let settings = light_proxy.watch_light_group(LIGHT_NAME_1).await.expect("watch completed");
     assert_fidl_light_group_eq!(&settings, &light_group_1_updated);
 
-    {
-        let light_group_2_updated = light_group_2_updated.clone();
-        light_proxy
-            .set_light_group_values(
-                light_group_2_updated.name.as_deref().unwrap(),
-                &mut light_group_2_updated.lights.unwrap().into_iter(),
-            )
-            .await
-            .expect("set called")
-            .expect("set completed");
-    }
+    light_proxy
+        .set_light_group_values(
+            light_group_2_updated.name.as_deref().unwrap(),
+            light_group_2_updated.lights.as_deref().unwrap(),
+        )
+        .await
+        .expect("set called")
+        .expect("set completed");
 
     let settings = light_proxy.watch_light_group(LIGHT_NAME_2).await.expect("watch completed");
     assert_fidl_light_group_eq!(&settings, &light_group_2_updated);
@@ -222,10 +209,8 @@ async fn test_set_unknown_light_group_name() {
     let lights = groups.remove(LIGHT_NAME_1).unwrap().lights.unwrap();
 
     // Unknown name should be rejected.
-    let result = light_proxy
-        .set_light_group_values("unknown_name", &mut lights.into_iter())
-        .await
-        .expect("set returns");
+    let result =
+        light_proxy.set_light_group_values("unknown_name", &lights).await.expect("set returns");
     assert_eq!(result, Err(LightError::InvalidName));
 
     let _ = realm.destroy().await;
@@ -239,10 +224,8 @@ async fn test_set_wrong_state_length() {
     let light_proxy = LightRealm::connect_to_light_marker(&realm);
 
     // Set with no light state should fail.
-    let result = light_proxy
-        .set_light_group_values(LIGHT_NAME_1, &mut vec![].into_iter())
-        .await
-        .expect("set returns");
+    let result =
+        light_proxy.set_light_group_values(LIGHT_NAME_1, &vec![]).await.expect("set returns");
     assert_eq!(result, Err(LightError::InvalidValue));
 
     // Set with an extra light state should fail.
@@ -250,10 +233,8 @@ async fn test_set_wrong_state_length() {
         fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
         fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
     ];
-    let result = light_proxy
-        .set_light_group_values(LIGHT_NAME_1, &mut extra_state.into_iter())
-        .await
-        .expect("set returns");
+    let result =
+        light_proxy.set_light_group_values(LIGHT_NAME_1, &extra_state).await.expect("set returns");
     assert_eq!(result, Err(LightError::InvalidValue));
 
     let _ = realm.destroy().await;
@@ -267,11 +248,9 @@ async fn test_set_wrong_value_type() {
     let light_proxy = LightRealm::connect_to_light_marker(&realm);
 
     // One of the light values is On instead of brightness, the set should fail.
-    let new_state = vec![LightState { value: Some(LightValue::On(true)), ..Default::default() }];
-    let result = light_proxy
-        .set_light_group_values(LIGHT_NAME_1, &mut new_state.into_iter())
-        .await
-        .expect("set returns");
+    let new_state = &[LightState { value: Some(LightValue::On(true)), ..Default::default() }];
+    let result =
+        light_proxy.set_light_group_values(LIGHT_NAME_1, new_state).await.expect("set returns");
     assert_eq!(result, Err(LightError::InvalidValue));
 
     let _ = realm.destroy().await;
@@ -300,15 +279,14 @@ async fn test_set_invalid_rgb_values() {
     let result = light_proxy
         .set_light_group_values(
             TEST_LIGHT_NAME,
-            &mut vec![fidl_fuchsia_settings::LightState {
+            &[fidl_fuchsia_settings::LightState {
                 value: Some(fidl_fuchsia_settings::LightValue::Color(ColorRgb {
                     red: LIGHT_START_VAL,
                     green: LIGHT_START_VAL,
                     blue: INVALID_VAL_1,
                 })),
                 ..Default::default()
-            }]
-            .into_iter(),
+            }],
         )
         .await
         .expect("set returns");
@@ -318,15 +296,14 @@ async fn test_set_invalid_rgb_values() {
     let result = light_proxy
         .set_light_group_values(
             TEST_LIGHT_NAME,
-            &mut vec![fidl_fuchsia_settings::LightState {
+            &[fidl_fuchsia_settings::LightState {
                 value: Some(fidl_fuchsia_settings::LightValue::Color(ColorRgb {
                     red: LIGHT_START_VAL,
                     green: INVALID_VAL_2,
                     blue: LIGHT_START_VAL,
                 })),
                 ..Default::default()
-            }]
-            .into_iter(),
+            }],
         )
         .await
         .expect("set returns");

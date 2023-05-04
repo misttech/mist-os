@@ -53,7 +53,8 @@ async fn restore_bonds(
     state: &HostDriverHarness,
     bonds: Vec<BondingData>,
 ) -> Result<Vec<BondingData>, Error> {
-    let fut = state.aux().host.restore_bonds(&mut bonds.into_iter().map(sys::BondingData::from));
+    let bonds: Vec<_> = bonds.into_iter().map(sys::BondingData::from).collect();
+    let fut = state.aux().host.restore_bonds(&bonds);
     let errors = fut.await?;
     Ok(errors.into_iter().map(BondingData::try_from).collect::<Result<Vec<_>, _>>()?)
 }

@@ -809,10 +809,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			val.ElementType.Kind == fidlgen.ArrayType ||
 			val.ElementType.Kind == fidlgen.VectorType ||
 			t.ElementType.Kind == fidlgen.StringType ||
-			(val.ElementType.Kind == fidlgen.IdentifierType && el.DeclType == fidlgen.UnionDeclType) ||
+			(val.ElementType.Kind == fidlgen.IdentifierType &&
+				(el.DeclType == fidlgen.TableDeclType || el.DeclType == fidlgen.UnionDeclType)) ||
 			el.IsResourceType() ||
 			val.Nullable ||
-			(val.ElementType.Nullable && val.ElementType.Kind != fidlgen.StringType) {
+			val.ElementType.Nullable {
 			if el.IsResourceType() {
 				t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
 			} else {
@@ -952,24 +953,17 @@ func convertParamToEncodeExpr(v string, t Type) string {
 			t.ElementType.Kind == fidlgen.ArrayType ||
 			t.ElementType.Kind == fidlgen.VectorType ||
 			t.ElementType.Kind == fidlgen.StringType ||
-			(t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.UnionDeclType) ||
+			(t.ElementType.Kind == fidlgen.IdentifierType &&
+				(t.ElementType.DeclType == fidlgen.TableDeclType || t.ElementType.DeclType == fidlgen.UnionDeclType)) ||
 			t.IsResourceType() ||
 			t.Nullable ||
-			(t.ElementType.Nullable && t.ElementType.Kind != fidlgen.StringType) {
+			t.ElementType.Nullable {
 			if t.IsResourceType() {
 				return v + ".as_mut()"
 			}
 			return v
 		}
-		var inner string
-		// Tables should be encoded by &/&mut, but encoding.rs also allows
-		// encoding by value specifically for when they occur in vectors.
-		// (Converting from Item=T to Item=&T requires a lending iterator.)
-		if t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.TableDeclType {
-			inner = "x"
-		} else {
-			inner = convertParamToEncodeExpr("x", *t.ElementType)
-		}
+		inner := convertParamToEncodeExpr("x", *t.ElementType)
 		if inner == "x" {
 			return fmt.Sprintf("fidl::encoding::Iterator(%s)", v)
 		}

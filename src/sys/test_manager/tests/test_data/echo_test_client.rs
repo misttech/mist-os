@@ -51,16 +51,17 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                 let mut stream = iterator.into_stream()?;
                 fasync::Task::spawn(
                     async move {
-                        let mut cases_iter = vec![ftest::Case {
+                        let case = ftest::Case {
                             name: Some("EchoTest".to_string()),
                             enabled: Some(true),
                             ..Default::default()
-                        }]
-                        .into_iter();
+                        };
+                        let mut remaining_cases = &[case][..];
                         while let Some(ftest::CaseIteratorRequest::GetNext { responder }) =
                             stream.try_next().await?
                         {
-                            responder.send(&mut cases_iter.by_ref())?;
+                            responder.send(remaining_cases)?;
+                            remaining_cases = &[];
                         }
                         Ok(())
                     }

@@ -818,12 +818,12 @@ mod tests {
                                 .collect();
 
                             fasync::Task::local(async move {
-                                let mut iter = repos.into_iter();
+                                let mut iter = repos.chunks(1).fuse();
 
                                 while let Some(RepositoryIteratorRequest::Next { responder }) =
                                     stream.try_next().await.unwrap()
                                 {
-                                    responder.send(&mut iter.by_ref().take(1)).unwrap();
+                                    responder.send(iter.next().unwrap_or(&[])).unwrap();
                                 }
                             })
                             .detach();

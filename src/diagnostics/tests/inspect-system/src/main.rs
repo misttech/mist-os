@@ -78,20 +78,21 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
                                 return;
                             }
                         };
-                        let mut iter = resp.into_iter();
+                        let mut remaining_cases = &resp[..];
                         while let Some(Ok(req)) = stream.next().await {
                             match req {
                                 ftest::CaseIteratorRequest::GetNext { responder } => {
                                     let mut bytes = 32; // overhead for header + vector
                                     let mut case_count = 0;
-                                    for case in iter.clone() {
+                                    for case in remaining_cases {
                                         bytes += case.measure().num_bytes;
                                         if bytes > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                                             break;
                                         }
                                         case_count += 1;
                                     }
-                                    responder.send(&mut iter.by_ref().take(case_count)).ok();
+                                    responder.send(&remaining_cases[..case_count]).ok();
+                                    remaining_cases = &remaining_cases[case_count..];
                                 }
                             }
                         }

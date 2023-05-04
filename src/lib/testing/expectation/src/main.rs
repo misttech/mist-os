@@ -188,7 +188,10 @@ impl ExpectationsComparer {
                     .context("error creating run listener request stream")?;
                 suite_proxy
                     .run(
-                        &mut not_skipped.into_iter().map(|(invocation, _outcome)| invocation),
+                        &not_skipped
+                            .into_iter()
+                            .map(|(invocation, _outcome)| invocation)
+                            .collect::<Vec<_>>(),
                         options,
                         listener,
                     )

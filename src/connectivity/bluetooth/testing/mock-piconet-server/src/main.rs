@@ -634,9 +634,7 @@ mod tests {
 
         // Advertise - the request should be handled by the server and remain active.
         let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>().unwrap();
-        let services = vec![];
-        let mut adv_fut =
-            c.advertise(&mut services.into_iter(), ChannelParameters::default(), target);
+        let mut adv_fut = c.advertise(&[], ChannelParameters::default(), target);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 

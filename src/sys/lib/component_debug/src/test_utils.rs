@@ -31,10 +31,10 @@ fn serve_instance_iterator(
     Task::spawn(async move {
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
-        responder.send(&mut instances.into_iter()).unwrap();
+        responder.send(&instances).unwrap();
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
-        responder.send(&mut std::iter::empty()).unwrap();
+        responder.send(&[]).unwrap();
     })
     .detach();
     client

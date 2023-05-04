@@ -71,11 +71,7 @@ async fn test_add_and_commit_identities((bootstrap, access): (BootstrapHarness, 
 
     let expected_peers: HashSet<PeerId> = identity.bonds.iter().map(|b| b.identifier).collect();
 
-    let identities: Vec<sys::Identity> = vec![identity.into()];
-    bootstrap
-        .add_identities(&mut identities.into_iter())
-        .context("Error adding identities")
-        .unwrap();
+    bootstrap.add_identities(&[identity.into()]).context("Error adding identities").unwrap();
     bootstrap
         .commit()
         .await

@@ -29,7 +29,7 @@ impl InputActor {
 impl Actor for InputActor {
     async fn perform(&mut self) -> Result<(), ActorError> {
         let event = self.state.next_event();
-        let fut = self.injector.inject(&mut std::iter::once(event));
+        let fut = self.injector.inject(&[event]);
         fut.await.expect("Injection failed");
         Ok(())
     }

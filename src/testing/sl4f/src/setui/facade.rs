@@ -273,7 +273,7 @@ impl SetUiFacade {
         }
 
         info!("SetMicMute: setting input state {:?}", input_states);
-        match input_proxy.set(&mut vec![input_states].into_iter()).await? {
+        match input_proxy.set(&[input_states]).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(e) => Err(format_err!("SetMicMute failed with err {:?}", e)),
         }

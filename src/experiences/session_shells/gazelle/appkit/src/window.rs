@@ -730,7 +730,7 @@ async fn serve_touch_source_watcher(
     let mut device_info: Option<fptr::TouchDeviceInfo> = None;
 
     loop {
-        let events = touch_source.watch(&mut pending_responses.into_iter());
+        let events = touch_source.watch(&pending_responses);
         match events.await {
             Ok(events) => {
                 // Generate responses which will be sent with the next call to `watch`.

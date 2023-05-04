@@ -33,7 +33,7 @@ impl PeripheralState {
     pub fn new() -> Self {
         let notify_fn: NotifyFn<WatcherWatchResponder> =
             Box::new(|peripherals: &Vec<Information>, responder: WatcherWatchResponder| {
-                if let Err(e) = responder.send(&mut peripherals.into_iter().cloned()) {
+                if let Err(e) = responder.send(&peripherals) {
                     warn!("Unable to respond to Peripheral Watcher hanging get: {:?}", e);
                 }
                 true

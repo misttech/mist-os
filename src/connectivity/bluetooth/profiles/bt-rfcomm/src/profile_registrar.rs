@@ -253,11 +253,7 @@ impl ProfileRegistrar {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         profile_upstream
-            .advertise(
-                &mut fidl_services.into_iter(),
-                (&params.parameters).try_into().unwrap(),
-                connect_client,
-            )
+            .advertise(&fidl_services, (&params.parameters).try_into().unwrap(), connect_client)
             .map(|_| ())
     }
 
@@ -382,8 +378,7 @@ impl ProfileRegistrar {
         receiver: ClientEnd<bredr::ConnectionReceiverMarker>,
         responder: bredr::ProfileAdvertiseResponder,
     ) -> impl Future<Output = ()> {
-        let adv_fut =
-            self.profile_upstream.advertise(&mut services.into_iter(), parameters, receiver);
+        let adv_fut = self.profile_upstream.advertise(&services, parameters, receiver);
         async move {
             let _ = adv_fut
                 .await
@@ -438,12 +433,8 @@ impl ProfileRegistrar {
             bredr::ProfileRequest::ConnectSco {
                 mut peer_id, initiator, params, receiver, ..
             } => {
-                let _ = self.profile_upstream.connect_sco(
-                    &mut peer_id,
-                    initiator,
-                    &mut params.into_iter(),
-                    receiver,
-                );
+                let _ =
+                    self.profile_upstream.connect_sco(&mut peer_id, initiator, &params, receiver);
             }
         }
         None
@@ -598,7 +589,7 @@ mod tests {
             .connect_sco(
                 &mut PeerId(1).into(),
                 /*initiator=*/ true,
-                &mut vec![bredr::ScoConnectionParameters::default()].into_iter(),
+                &[bredr::ScoConnectionParameters::default()],
                 receiver_client
             )
             .is_ok());
@@ -620,11 +611,7 @@ mod tests {
     ) {
         let (connection, connection_stream) =
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let adv_fut = client.advertise(
-            &mut services.into_iter(),
-            bredr::ChannelParameters::default(),
-            connection,
-        );
+        let adv_fut = client.advertise(&services, bredr::ChannelParameters::default(), connection);
         (connection_stream, adv_fut)
     }
 

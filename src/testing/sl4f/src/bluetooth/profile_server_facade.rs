@@ -562,7 +562,7 @@ impl ProfileServerFacade {
             fx_err_and_bail!(&with_line!(tag), log_err)
         };
 
-        let service_defs = vec![ServiceDefinition {
+        let service_defs = &[ServiceDefinition {
             service_class_uuids: Some(service_class_uuids.into_iter().map(Into::into).collect()),
             protocol_descriptor_list: Some(protocol_descriptors),
             profile_descriptors: Some(profile_descriptors),
@@ -580,11 +580,8 @@ impl ProfileServerFacade {
 
         match &self.inner.read().profile_server_proxy {
             Some(server) => {
-                let _ = server.advertise(
-                    &mut service_defs.into_iter(),
-                    ChannelParameters::default(),
-                    connect_client,
-                );
+                let _ =
+                    server.advertise(service_defs, ChannelParameters::default(), connect_client);
             }
             None => fx_err_and_bail!(&with_line!(tag), "No Server Proxy created."),
         };

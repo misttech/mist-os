@@ -291,10 +291,10 @@ impl MockRealmQuery {
                         let mut stream = server_end.into_stream().unwrap();
                         let fsys2::InstanceIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
-                        responder.send(&mut instances.into_iter()).unwrap();
+                        responder.send(&instances).unwrap();
                         let fsys2::InstanceIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
-                        responder.send(&mut std::iter::empty()).unwrap();
+                        responder.send(&[]).unwrap();
                     })
                     .detach();
 

@@ -35,9 +35,8 @@ async fn command(proxy: InputProxy, mut input_state: InputState) -> WatchOrSetRe
                 DeviceType::Microphone => Some("microphone".to_string()),
             };
         }
-        let input_states = vec![input_state];
-        let mut states = input_states.iter().map(|state| state.clone());
-        Ok(Either::Set(if let Err(err) = proxy.set(&mut states).await? {
+        let input_states = &[input_state];
+        Ok(Either::Set(if let Err(err) = proxy.set(input_states).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set input states to {:#?}\n", input_states)

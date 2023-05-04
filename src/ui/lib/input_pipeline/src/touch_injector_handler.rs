@@ -297,8 +297,7 @@ impl TouchInjectorHandler {
         let injector =
             self.mutable_state.borrow().injectors.get(&touch_descriptor.device_id).cloned();
         if let Some(injector) = injector {
-            let events_to_send = &mut events.into_iter();
-            let fut = injector.inject(events_to_send);
+            let fut = injector.inject(&events);
             // This trace duration ends before awaiting on the returned future.
             fuchsia_trace::duration_end!("input", "touch-inject-into-scenic");
             let _ = fut.await;
@@ -412,13 +411,12 @@ impl TouchInjectorHandler {
                     let injectors: Vec<pointerinjector::DeviceProxy> =
                         self.mutable_state.borrow_mut().injectors.values().cloned().collect();
                     for injector in injectors {
-                        let events = &mut vec![pointerinjector::Event {
+                        let events = &[pointerinjector::Event {
                             timestamp: Some(fuchsia_async::Time::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
                             ..Default::default()
-                        }]
-                        .into_iter();
+                        }];
                         injector.inject(events).await.expect("Failed to inject updated viewport.");
                     }
                 }

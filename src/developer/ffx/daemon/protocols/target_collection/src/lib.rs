@@ -234,12 +234,11 @@ impl FidlProtocol for TargetCollectionProtocol {
                 // This was chosen arbitrarily. It's possible to determine a
                 // better chunk size using some FIDL constant math.
                 const TARGET_CHUNK_SIZE: usize = 20;
-                let mut iter = targets.into_iter();
+                let mut iter = targets.chunks(TARGET_CHUNK_SIZE);
                 loop {
-                    let next_chunk = iter.by_ref().take(TARGET_CHUNK_SIZE);
-                    let next_chunk_len = next_chunk.len();
-                    reader.next(&mut next_chunk.collect::<Vec<_>>().into_iter()).await?;
-                    if next_chunk_len == 0 {
+                    let chunk = iter.next().unwrap_or(&[]);
+                    reader.next(chunk).await?;
+                    if chunk.is_empty() {
                         break;
                     }
                 }

@@ -132,12 +132,12 @@ impl RepositoryService {
 
         fasync::Task::spawn(
             async move {
-                let mut iter = results.into_iter();
+                let mut iter = results.chunks(LIST_CHUNK_SIZE).fuse();
 
                 while let Some(RepositoryIteratorRequest::Next { responder }) =
                     stream.try_next().await?
                 {
-                    responder.send(&mut iter.by_ref().take(LIST_CHUNK_SIZE))?;
+                    responder.send(iter.next().unwrap_or(&[]))?;
                 }
                 Ok(())
             }

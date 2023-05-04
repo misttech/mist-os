@@ -150,13 +150,9 @@ mod tests {
             match request {
                 fdd::CompositeNodeSpecIteratorRequest::GetNext { responder } => {
                     responder
-                        .send(
-                            &mut specs
-                                .drain(..)
-                                .collect::<Vec<fdd::CompositeNodeSpecInfo>>()
-                                .into_iter(),
-                        )
+                        .send(&specs)
                         .context("Failed to send composite node specs to responder")?;
+                    specs.clear();
                 }
             }
         }

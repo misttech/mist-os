@@ -123,7 +123,7 @@ async fn led_watcher_updates_light_groups_on_watch() {
 
     const NEW_LED1_VAL: f32 = 0.6;
     const NEW_LED2_VAL: f32 = 0.8;
-    let new_light_groups = vec![
+    let new_light_groups = &[
         LightGroupFidl {
             name: Some(String::from(LED1_NAME)),
             enabled: Some(true),
@@ -144,7 +144,7 @@ async fn led_watcher_updates_light_groups_on_watch() {
         },
     ];
     if let LightRequest::WatchLightGroups { responder } = light_request {
-        responder.send(&mut new_light_groups.into_iter()).expect("should be running");
+        responder.send(new_light_groups).expect("should be running");
     } else {
         panic!("Unexpected light call: {:?}", light_request);
     }

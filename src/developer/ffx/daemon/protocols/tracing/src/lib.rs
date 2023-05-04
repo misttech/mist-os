@@ -474,17 +474,13 @@ impl FidlProtocol for TracingProtocol {
                     .collect::<Vec<_>>();
                 self.iter_tasks.spawn(async move {
                     const CHUNK_SIZE: usize = 20;
-                    let mut iter = res.into_iter();
+                    let mut iter = res.chunks(CHUNK_SIZE).fuse();
                     while let Ok(Some(ffx::TracingStatusIteratorRequest::GetNext { responder })) =
                         stream.try_next().await
                     {
-                        let _ = responder
-                            .send(
-                                &mut iter.by_ref().take(CHUNK_SIZE).collect::<Vec<_>>().into_iter(),
-                            )
-                            .map_err(|e| {
-                                tracing::warn!("responding to tracing status iterator: {:?}", e);
-                            });
+                        let _ = responder.send(iter.next().unwrap_or(&[])).map_err(|e| {
+                            tracing::warn!("responding to tracing status iterator: {:?}", e);
+                        });
                     }
                 });
                 responder.send().map_err(Into::into)

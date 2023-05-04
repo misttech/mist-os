@@ -319,35 +319,30 @@ mod test {
                                             None
                                         };
                                     responder
-                                        .send(
-                                            &mut vec![
-                                                RepositoryPackage {
-                                                    name: Some("package1".to_string()),
-                                                    size: Some(1),
-                                                    hash: Some(
-                                                        "longhashlonghashlonghashlonghash"
-                                                            .to_string(),
-                                                    ),
-                                                    modified: Some(60 * 60 * 24),
-                                                    entries: pkg1_components,
-                                                    ..Default::default()
-                                                },
-                                                RepositoryPackage {
-                                                    name: Some("package2".to_string()),
-                                                    size: Some(2048),
-                                                    hash: Some(
-                                                        "secondhashsecondhashsecondhash"
-                                                            .to_string(),
-                                                    ),
-                                                    entries: pkg2_components,
-                                                    ..Default::default()
-                                                },
-                                            ]
-                                            .into_iter(),
-                                        )
+                                        .send(&[
+                                            RepositoryPackage {
+                                                name: Some("package1".to_string()),
+                                                size: Some(1),
+                                                hash: Some(
+                                                    "longhashlonghashlonghashlonghash".to_string(),
+                                                ),
+                                                modified: Some(60 * 60 * 24),
+                                                entries: pkg1_components,
+                                                ..Default::default()
+                                            },
+                                            RepositoryPackage {
+                                                name: Some("package2".to_string()),
+                                                size: Some(2048),
+                                                hash: Some(
+                                                    "secondhashsecondhashsecondhash".to_string(),
+                                                ),
+                                                entries: pkg2_components,
+                                                ..Default::default()
+                                            },
+                                        ])
                                         .unwrap()
                                 } else {
-                                    responder.send(&mut vec![].into_iter()).unwrap()
+                                    responder.send(&[]).unwrap()
                                 }
                             }
                         }
@@ -374,33 +369,28 @@ mod test {
                                 if !sent {
                                     sent = true;
                                     responder
-                                        .send(
-                                            &mut vec![
-                                                PackageEntry {
-                                                    path: Some("meta.far".to_string()),
-                                                    size: Some(1),
-                                                    hash: Some(
-                                                        "longhashlonghashlonghashlonghash"
-                                                            .to_string(),
-                                                    ),
-                                                    modified: Some(60 * 60 * 24),
-                                                    ..Default::default()
-                                                },
-                                                PackageEntry {
-                                                    path: Some("blob2".to_string()),
-                                                    size: Some(2048),
-                                                    hash: Some(
-                                                        "secondhashsecondhashsecondhash"
-                                                            .to_string(),
-                                                    ),
-                                                    ..Default::default()
-                                                },
-                                            ]
-                                            .into_iter(),
-                                        )
+                                        .send(&[
+                                            PackageEntry {
+                                                path: Some("meta.far".to_string()),
+                                                size: Some(1),
+                                                hash: Some(
+                                                    "longhashlonghashlonghashlonghash".to_string(),
+                                                ),
+                                                modified: Some(60 * 60 * 24),
+                                                ..Default::default()
+                                            },
+                                            PackageEntry {
+                                                path: Some("blob2".to_string()),
+                                                size: Some(2048),
+                                                hash: Some(
+                                                    "secondhashsecondhashsecondhash".to_string(),
+                                                ),
+                                                ..Default::default()
+                                            },
+                                        ])
                                         .unwrap()
                                 } else {
-                                    responder.send(&mut vec![].into_iter()).unwrap()
+                                    responder.send(&[]).unwrap()
                                 }
                             }
                         }

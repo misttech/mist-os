@@ -301,17 +301,14 @@ impl MouseInjectorHandler {
         self.inner_mut().injectors.insert(mouse_descriptor.device_id, device_proxy.clone());
 
         // Inject ADD event the first time a MouseDevice is seen.
-        let events_to_send = vec![self.create_pointer_sample_event(
+        let events_to_send = &[self.create_pointer_sample_event(
             mouse_event,
             event_time,
             pointerinjector::EventPhase::Add,
             self.inner().current_position,
             None,
         )];
-        device_proxy
-            .inject(&mut events_to_send.into_iter())
-            .await
-            .context("Failed to ADD new MouseDevice.")?;
+        device_proxy.inject(events_to_send).await.context("Failed to ADD new MouseDevice.")?;
 
         Ok(())
     }
@@ -408,14 +405,14 @@ impl MouseInjectorHandler {
                 }
                 _ => None,
             };
-            let events_to_send = vec![self.create_pointer_sample_event(
+            let events_to_send = &[self.create_pointer_sample_event(
                 mouse_event,
                 event_time,
                 pointerinjector::EventPhase::Change,
                 self.inner().current_position,
                 relative_motion,
             )];
-            let _ = injector.inject(&mut events_to_send.into_iter()).await;
+            let _ = injector.inject(events_to_send).await;
 
             Ok(())
         } else {
@@ -518,13 +515,12 @@ impl MouseInjectorHandler {
                     // Update Scenic with the latest viewport.
                     let injectors = self.inner().injectors.values().cloned().collect::<Vec<_>>();
                     for injector in injectors {
-                        let events = &mut vec![pointerinjector::Event {
+                        let events = &[pointerinjector::Event {
                             timestamp: Some(fuchsia_async::Time::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
                             ..Default::default()
-                        }]
-                        .into_iter();
+                        }];
                         injector.inject(events).await.expect("Failed to inject updated viewport.");
                     }
                 }

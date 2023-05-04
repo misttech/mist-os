@@ -101,12 +101,15 @@ pub trait SuiteServer: Sized + Sync + Send {
 
                     fasync::Task::spawn(
                         async move {
-                            let mut iter =
-                                tests.iter().map(|TestCaseInfo { name, enabled }| ftest::Case {
+                            let cases: Vec<_> = tests
+                                .iter()
+                                .map(|TestCaseInfo { name, enabled }| ftest::Case {
                                     name: Some(name.clone()),
                                     enabled: Some(*enabled),
                                     ..Default::default()
-                                });
+                                })
+                                .collect();
+                            let mut remaining_cases = &cases[..];
                             while let Some(ftest::CaseIteratorRequest::GetNext { responder }) =
                                 stream.try_next().await?
                             {
@@ -114,7 +117,7 @@ pub trait SuiteServer: Sized + Sync + Send {
                                 // Page overhead of message header + vector
                                 let mut bytes_used: usize = 32;
                                 let mut case_count = 0;
-                                for case in iter.clone() {
+                                for case in remaining_cases {
                                     bytes_used += case.measure().num_bytes;
                                     if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                                         break;
@@ -122,8 +125,9 @@ pub trait SuiteServer: Sized + Sync + Send {
                                     case_count += 1;
                                 }
                                 responder
-                                    .send(&mut iter.by_ref().take(case_count))
+                                    .send(&remaining_cases[..case_count])
                                     .map_err(SuiteServerError::Response)?;
+                                remaining_cases = &remaining_cases[case_count..];
                             }
                             Ok(())
                         }

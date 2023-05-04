@@ -128,14 +128,12 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>()
                 .expect("valid endpoints");
 
-        let records = vec![minimal_record(false)];
+        let records = &[minimal_record(false)];
         let (token_client, token_server) =
             fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()
                 .expect("valid endpoints");
-        let request_fut = c
-            .set_device_identification(&mut records.into_iter(), token_server)
-            .check()
-            .expect("valid fidl request");
+        let request_fut =
+            c.set_device_identification(records, token_server).check().expect("valid fidl request");
 
         let mut next = Box::pin(s.next());
         match exec.run_singlethreaded(&mut next).expect("fidl request") {
@@ -160,7 +158,7 @@ mod tests {
             let (c, _s) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
             let (c2, _s2) =
                 fidl::endpoints::create_request_stream::<ConnectionReceiverMarker>().unwrap();
-            let fut = c.advertise(&mut vec![].into_iter(), ChannelParameters::default(), c2);
+            let fut = c.advertise(&[], ChannelParameters::default(), c2);
             let task = fasync::Task::local(async {
                 let (_s, _s2, _c) = (_s, _s2, c); // Keep everything alive.
                 futures::future::pending::<()>().await;

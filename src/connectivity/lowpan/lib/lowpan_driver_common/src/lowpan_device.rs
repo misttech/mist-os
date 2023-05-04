@@ -534,12 +534,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceRequestStream> for T {
                     self.get_supported_channels()
                         .err_into::<Error>()
                         .and_then(|response| {
-                            ready(
-                                responder
-                                    .unwrap()
-                                    .send(&mut response.into_iter())
-                                    .map_err(Error::from),
-                            )
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in get_supported_channels request")?;
@@ -695,9 +690,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                         let ret = responder_stream
                             .zip(result_stream)
                             .map(move |x| match x {
-                                (Ok(responder), Ok(result)) => {
-                                    Ok(responder.send(&mut result.into_iter())?)
-                                }
+                                (Ok(responder), Ok(result)) => Ok(responder.send(&result)?),
                                 (Err(err), _) => {
                                     Err(Error::from(err).context("BeaconInfoStreamRequestStream"))
                                 }
@@ -823,9 +816,7 @@ impl<T: Driver> ServeTo<EnergyScanRequestStream> for T {
                         let ret = responder_stream
                             .zip(result_stream)
                             .map(move |x| match x {
-                                (Ok(responder), Ok(result)) => {
-                                    Ok(responder.send(&mut result.into_iter())?)
-                                }
+                                (Ok(responder), Ok(result)) => Ok(responder.send(&result)?),
                                 (Err(err), _) => {
                                     Err(Error::from(err).context("EnergyScanResultStreamRequest"))
                                 }
@@ -978,9 +969,7 @@ impl<T: Driver> ServeTo<DeviceTestRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_neighbor_table()
                         .err_into::<Error>()
-                        .and_then(|x| {
-                            ready(responder.unwrap().send(&mut x.into_iter()).map_err(Error::from))
-                        })
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_neighbor_table_snapshot request")?;
                 }
@@ -1071,9 +1060,7 @@ impl<T: Driver> ServeTo<DeviceRouteExtraRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_local_on_mesh_prefixes()
                         .err_into::<Error>()
-                        .and_then(|x| {
-                            ready(responder.unwrap().send(&mut x.into_iter()).map_err(Error::from))
-                        })
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_local_on_mesh_prefixes request")?;
                 }
@@ -1081,9 +1068,7 @@ impl<T: Driver> ServeTo<DeviceRouteExtraRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_local_external_routes()
                         .err_into::<Error>()
-                        .and_then(|x| {
-                            ready(responder.unwrap().send(&mut x.into_iter()).map_err(Error::from))
-                        })
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_local_external_routes request")?;
                 }

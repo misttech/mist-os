@@ -106,11 +106,7 @@ impl DeviceIdServer {
     ) -> Result<BrEdrAdvertisement, Error> {
         let (connect_client, connect_server) =
             fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
-        let adv_fut = profile.advertise(
-            &mut defs.into_iter(),
-            bredr::ChannelParameters::default(),
-            connect_client,
-        );
+        let adv_fut = profile.advertise(&defs, bredr::ChannelParameters::default(), connect_client);
         Ok(BrEdrAdvertisement { adv_fut, connect_server })
     }
 
@@ -247,12 +243,12 @@ pub(crate) mod tests {
         client: &di::DeviceIdentificationProxy,
         primary: bool,
     ) -> (di::DeviceIdentificationHandleProxy, QueryResponseFut<Result<(), i32>>) {
-        let records = vec![minimal_record(primary)];
+        let records = &[minimal_record(primary)];
         let (token_client, token_server) =
             fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()
                 .expect("valid endpoints");
         let request_fut = client
-            .set_device_identification(&mut records.into_iter(), token_server)
+            .set_device_identification(records, token_server)
             .check()
             .expect("valid fidl request");
         (token_client, request_fut)

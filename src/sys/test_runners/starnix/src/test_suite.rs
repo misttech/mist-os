@@ -188,17 +188,18 @@ async fn handle_case_iterator(
     test_name: &str,
     mut stream: ftest::CaseIteratorRequestStream,
 ) -> Result<(), Error> {
-    let mut cases_iter = vec![ftest::Case {
+    let case = ftest::Case {
         name: Some(test_name.to_string()),
         enabled: Some(true),
         ..Default::default()
-    }]
-    .into_iter();
+    };
+    let mut remaining_cases = &[case][..];
 
     while let Some(event) = stream.try_next().await? {
         match event {
             ftest::CaseIteratorRequest::GetNext { responder } => {
-                responder.send(&mut cases_iter)?;
+                responder.send(remaining_cases)?;
+                remaining_cases = &[];
             }
         }
     }

@@ -432,7 +432,7 @@ async fn send_next_chunk(
 ) -> Result<(), fidl::Error> {
     if let Some(req) = stream.try_next().await? {
         let fidl_policy::NetworkConfigIteratorRequest::GetNext { responder } = req;
-        responder.send(&mut chunk.into_iter())
+        responder.send(&chunk)
     } else {
         // This will happen if the iterator request stream was closed and we expected to send
         // another response.

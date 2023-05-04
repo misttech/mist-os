@@ -648,43 +648,40 @@ mod tests {
                     let ffx::TracingStatusIteratorRequest::GetNext { responder, .. } =
                         stream.try_next().await.unwrap().unwrap();
                     responder
-                        .send(
-                            &mut vec![
-                                ffx::TraceInfo {
-                                    target: Some(ffx::TargetInfo {
-                                        nodename: Some("foo".to_string()),
+                        .send(&[
+                            ffx::TraceInfo {
+                                target: Some(ffx::TargetInfo {
+                                    nodename: Some("foo".to_string()),
+                                    ..Default::default()
+                                }),
+                                output_file: Some("/foo/bar.fxt".to_string()),
+                                ..Default::default()
+                            },
+                            ffx::TraceInfo {
+                                output_file: Some("/foo/bar/baz.fxt".to_string()),
+                                ..Default::default()
+                            },
+                            ffx::TraceInfo {
+                                output_file: Some("/florp/o/matic.txt".to_string()),
+                                triggers: Some(vec![
+                                    ffx::Trigger {
+                                        alert: Some("foo".to_owned()),
+                                        action: Some(ffx::Action::Terminate),
                                         ..Default::default()
-                                    }),
-                                    output_file: Some("/foo/bar.fxt".to_string()),
-                                    ..Default::default()
-                                },
-                                ffx::TraceInfo {
-                                    output_file: Some("/foo/bar/baz.fxt".to_string()),
-                                    ..Default::default()
-                                },
-                                ffx::TraceInfo {
-                                    output_file: Some("/florp/o/matic.txt".to_string()),
-                                    triggers: Some(vec![
-                                        ffx::Trigger {
-                                            alert: Some("foo".to_owned()),
-                                            action: Some(ffx::Action::Terminate),
-                                            ..Default::default()
-                                        },
-                                        ffx::Trigger {
-                                            alert: Some("bar".to_owned()),
-                                            action: Some(ffx::Action::Terminate),
-                                            ..Default::default()
-                                        },
-                                    ]),
-                                    ..Default::default()
-                                },
-                            ]
-                            .into_iter(),
-                        )
+                                    },
+                                    ffx::Trigger {
+                                        alert: Some("bar".to_owned()),
+                                        action: Some(ffx::Action::Terminate),
+                                        ..Default::default()
+                                    },
+                                ]),
+                                ..Default::default()
+                            },
+                        ])
                         .unwrap();
                     let ffx::TracingStatusIteratorRequest::GetNext { responder, .. } =
                         stream.try_next().await.unwrap().unwrap();
-                    responder.send(&mut vec![].into_iter()).unwrap();
+                    responder.send(&[]).unwrap();
                 })
                 .detach();
                 responder.send().expect("responder err")
@@ -699,8 +696,7 @@ mod tests {
                 responder.send(categories.iter_mut().by_ref()).expect("should respond");
             }
             tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
-                let mut providers = fake_provider_infos();
-                responder.send(&mut providers.drain(..)).expect("should respond");
+                responder.send(&fake_provider_infos()).expect("should respond");
             }
             r => panic!("unsupported req: {:?}", r),
         })))

@@ -147,7 +147,7 @@ impl ScoConnector {
         proxy.connect_sco(
             &mut peer_id.into(),
             /* initiate = */ role == ScoInitiatorRole::Initiate,
-            &mut params.into_iter(),
+            &params,
             client,
         )?;
         match requests.next().await {

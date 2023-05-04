@@ -345,7 +345,7 @@ mod tests {
             request
                 .into_watch()
                 .context(format!("Received unexpected request {method_name}"))?
-                .send(&mut input_events.into_iter())
+                .send(&input_events)
                 .context("Failed to send MouseSource.Watch response")?;
             Ok::<(), anyhow::Error>(())
         })

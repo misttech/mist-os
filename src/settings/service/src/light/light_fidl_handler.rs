@@ -27,7 +27,7 @@ impl watch::Responder<Vec<LightGroup>, fuchsia_zircon::Status> for LightWatchLig
     fn respond(self, response: Result<Vec<LightGroup>, fuchsia_zircon::Status>) {
         match response {
             Ok(light_groups) => {
-                let _ = self.send(&mut light_groups.into_iter());
+                let _ = self.send(&light_groups);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);
@@ -273,7 +273,7 @@ mod tests {
         // Connect to the Light service and make a set request.
         let (proxy, server) =
             fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
-        let _fut = proxy.set_light_group_values("arbitrary name", &mut vec![].into_iter());
+        let _fut = proxy.set_light_group_values("arbitrary name", &[]);
         let mut request_stream: LightRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

@@ -159,7 +159,7 @@ mod tests {
                             dns_servers_responder
                                 .take()
                                 .expect("must have DNS servers responder")
-                                .send(&mut std::iter::empty())
+                                .send(&[])
                                 .expect("FIDL error");
                         }
                     };

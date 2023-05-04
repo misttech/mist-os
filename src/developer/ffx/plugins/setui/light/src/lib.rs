@@ -38,10 +38,7 @@ async fn command(proxy: LightProxy, light_group: LightGroup) -> WatchOrSetResult
 
     let light_states: Vec<LightState> = light_group.clone().into();
     let result = proxy
-        .set_light_group_values(
-            light_group.name.clone().unwrap().as_str(),
-            &mut light_states.clone().into_iter(),
-        )
+        .set_light_group_values(light_group.name.clone().unwrap().as_str(), &light_states)
         .await?;
 
     Ok(Either::Set(match result {
@@ -166,13 +163,14 @@ mod test {
     async fn validate_light_watch_output(
         expected_light_settings: LightGroupSettings,
     ) -> Result<()> {
-        let val_clone = expected_light_settings.clone();
+        let groups = [expected_light_settings];
+        let groups_clone = groups.clone();
         let proxy = setup_fake_light_proxy(move |req| match req {
             LightRequest::SetLightGroupValues { .. } => {
                 panic!("Unexpected call to set");
             }
             LightRequest::WatchLightGroups { responder } => {
-                let _ = responder.send(&mut vec![expected_light_settings.clone()].into_iter());
+                let _ = responder.send(&groups);
             }
             LightRequest::WatchLightGroup { .. } => {
                 panic!("Unexpected call to watch a light group");
@@ -183,7 +181,7 @@ mod test {
             proxy,
             LightGroup { name: None, simple: vec![], brightness: vec![], rgb: vec![] }
         ));
-        assert_eq!(output, format!("{:#?}", vec![val_clone]));
+        assert_eq!(output, format!("{:#?}", groups_clone));
         Ok(())
     }
 

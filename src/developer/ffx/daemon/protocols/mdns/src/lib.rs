@@ -47,12 +47,7 @@ impl FidlProtocol for Mdns {
         match req {
             ffx::MdnsRequest::GetTargets { responder } => responder
                 .send(
-                    &mut self
-                        .inner
-                        .as_ref()
-                        .expect("inner state should be initalized")
-                        .target_cache()
-                        .into_iter(),
+                    &self.inner.as_ref().expect("inner state should be initalized").target_cache(),
                 )
                 .map_err(Into::into),
             ffx::MdnsRequest::GetNextEvent { responder } => responder

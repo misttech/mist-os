@@ -37,7 +37,7 @@ impl RemoteServiceMock {
     ) -> Result<(), Error> {
         expect_call(&mut self.stream, self.timeout, move |req| match req {
             RemoteServiceRequest::DiscoverCharacteristics { responder } => {
-                match responder.send(&mut characteristics.clone().into_iter()) {
+                match responder.send(characteristics) {
                     Ok(_) => Ok(Status::Satisfied(())),
                     Err(e) => Err(e.into()),
                 }

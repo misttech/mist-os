@@ -197,14 +197,13 @@ impl StreamConfig {
                 {
                     Err(e) => {
                         tracing::warn!("Couldn't get DAI ring buffer formats for device: {:?}", e);
-                        let supported_formats: Vec<SupportedFormats> = vec![];
-                        responder.send(&mut supported_formats.into_iter())?;
+                        responder.send(&[])?;
                         return Ok(());
                     }
                     Ok(formats) => formats.map_err(|e| anyhow!(e.to_string()))?,
                 };
                 tracing::trace!("StreamConfig ring buffer formats: {:?}", formats);
-                responder.send(&mut formats.into_iter())?;
+                responder.send(&formats)?;
             }
 
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, control_handle: _ } => {

@@ -204,7 +204,7 @@ impl TestServer {
                                                 // Continually drain the |names| iterator on each
                                                 // call.
                                                 responder
-                                                    .send(&mut names.by_ref())
+                                                    .send(&names.by_ref().collect::<Vec<_>>())
                                                     .unwrap_or_default();
                                             }
                                         }

@@ -249,8 +249,7 @@ mod tests {
         let (result, mut watch_fut) = run_while(&mut exec, watch_fut, server_fut);
         let responder = result.unwrap().expect("fidl request").into_watch().unwrap();
 
-        let peers: Vec<Peer> = vec![];
-        let _ = responder.send(&mut peers.into_iter());
+        let _ = responder.send(&[]);
         // If the ScanResultWatcher server terminates, then the watcher future should terminate.
         drop(watch_server);
 
@@ -275,8 +274,7 @@ mod tests {
         let (result, mut watch_fut) = run_while(&mut exec, watch_fut, server_fut);
         let responder = result.unwrap().expect("fidl request").into_watch().unwrap();
         // Replying with no found peers is OK. Watcher should still be active.
-        let peers: Vec<Peer> = vec![];
-        let _ = responder.send(&mut peers.into_iter());
+        let _ = responder.send(&[]);
         let _ = exec.run_until_stalled(&mut watch_fut).expect_pending("still active");
     }
 
@@ -384,8 +382,7 @@ mod tests {
         let gatt_fut = gatt_server.select_next_some();
         let (gatt_result, connect_fut) = run_while(&mut exec, connect_fut, gatt_fut);
         let (_, responder) = gatt_result.unwrap().into_watch_services().unwrap();
-        let _ = responder
-            .send(&mut vec![example_battery_service()].into_iter(), &mut vec![].into_iter());
+        let _ = responder.send(&[example_battery_service()], &mut vec![].into_iter());
 
         // Expect a request to connect to the service and discover characteristics.
         let gatt_fut = gatt_server.select_next_some();
@@ -396,7 +393,7 @@ mod tests {
         let (discover_result, connect_fut) = run_while(&mut exec, connect_fut, discover_fut);
         let responder = discover_result.unwrap().into_discover_characteristics().unwrap();
         // Send back an example battery level characteristic.
-        let _ = responder.send(&mut vec![example_battery_level_characteristic()].into_iter());
+        let _ = responder.send(&[example_battery_level_characteristic()]);
 
         // Expect a request to read the battery level - send back an example battery level.
         let read_fut = remote_service_server.select_next_some();

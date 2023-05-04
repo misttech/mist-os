@@ -715,7 +715,7 @@ impl XdgSurface {
         fasync::Task::local(async move {
             let mut responses: Vec<fidl_fuchsia_ui_pointer::TouchResponse> = Vec::new();
             loop {
-                let result = touch_source.watch(&mut responses.into_iter()).await;
+                let result = touch_source.watch(&responses).await;
                 match result {
                     Ok(returned_events) => {
                         responses = returned_events

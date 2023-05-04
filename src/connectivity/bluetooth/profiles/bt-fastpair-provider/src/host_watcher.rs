@@ -225,7 +225,7 @@ pub(crate) mod tests {
 
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         // Respond with no hosts.
-        let _ = watch_responder.send(&mut vec![].into_iter()).unwrap();
+        let _ = watch_responder.send(&[]).unwrap();
 
         // By default, there are no hosts, so when the upstream watcher responds with no hosts, the
         // watcher stream should not yield an event.
@@ -246,7 +246,7 @@ pub(crate) mod tests {
         // Respond with an active host.
         let host1 =
             example_host(HostId(1), /* active= */ true, /* discoverable= */ false);
-        let _ = watch_responder.send(&mut vec![host1].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host1]).unwrap();
 
         // HostWatcher stream should yield a change in host state.
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
@@ -256,7 +256,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         // Respond with no hosts.
-        let _ = watch_responder.send(&mut vec![].into_iter()).unwrap();
+        let _ = watch_responder.send(&[]).unwrap();
 
         // HostWatcher stream should yield a change in host state.
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
@@ -280,7 +280,7 @@ pub(crate) mod tests {
             example_host(HostId(2), /* active= */ false, /* discoverable= */ false);
         let host3 =
             example_host(HostId(3), /* active= */ false, /* discoverable= */ false);
-        let _ = watch_responder.send(&mut vec![host2, host3].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host2, host3]).unwrap();
 
         // HostWatcher stream should yield a change in host state since it went from active host
         // to no active host.
@@ -304,7 +304,7 @@ pub(crate) mod tests {
         // Respond with the same active host, and a different inactive host.
         let host2 =
             example_host(HostId(2), /* active= */ false, /* discoverable= */ false);
-        let _ = watch_responder.send(&mut vec![host1.clone(), host2].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host1.clone(), host2]).unwrap();
 
         // No HostWatcher stream item because the active host has not changed.
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -313,7 +313,7 @@ pub(crate) mod tests {
         // Same active host changes - but not in a relevant way.
         host1.discovering = Some(false);
         host1.local_name = Some("123".to_string());
-        let _ = watch_responder.send(&mut vec![host1].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host1]).unwrap();
 
         // No HostWatcher stream item because the discoverable of the active host hasn't changed.
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -334,7 +334,7 @@ pub(crate) mod tests {
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         // The same active host becomes discoverable.
         host1.discoverable = Some(true);
-        let _ = watch_responder.send(&mut vec![host1.clone()].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host1.clone()]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
         assert_eq!(item, Some(HostEvent::Discoverable(true)));
@@ -356,7 +356,7 @@ pub(crate) mod tests {
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         let host2 =
             example_host(HostId(2), /* active= */ true, /* discoverable= */ false);
-        let _ = watch_responder.send(&mut vec![host2].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host2]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
         assert_eq!(item, Some(HostEvent::NewActiveHost { discoverable: false }));
@@ -365,7 +365,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         let host3 = example_host(HostId(3), /* active= */ true, /* discoverable= */ true);
-        let _ = watch_responder.send(&mut vec![host3].into_iter()).unwrap();
+        let _ = watch_responder.send(&[host3]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
         assert_eq!(item, Some(HostEvent::NewActiveHost { discoverable: true }));
@@ -385,7 +385,7 @@ pub(crate) mod tests {
         // HostInfo is missing a bunch of mandatory fields.
         let invalid_host =
             sys::HostInfo { id: Some(HostId(12).into()), active: Some(true), ..Default::default() };
-        let _ = watch_responder.send(&mut vec![invalid_host].into_iter()).unwrap();
+        let _ = watch_responder.send(&[invalid_host]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher termination");
         assert_eq!(item, None);
@@ -403,7 +403,7 @@ pub(crate) mod tests {
         assert!(!watcher.is_terminated());
 
         let watch_responder = expect_watch_request(&mut exec, &mut server);
-        let _ = watch_responder.send(&mut vec![].into_iter()).unwrap();
+        let _ = watch_responder.send(&[]).unwrap();
 
         // In between somewhere, the upstream `HostWatcher` protocol server disconnects. The next
         // time the `HostWatcher` stream is polled, it should detect closure and terminate.

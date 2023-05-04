@@ -96,8 +96,7 @@ impl Listener<Vec<fidl_policy::AccessPointState>> for fidl_policy::AccessPointSt
         update: Vec<fidl_policy::AccessPointState>,
     ) -> BoxFuture<'static, Option<Box<Self>>> {
         let fut = async move {
-            let mut iter = update.into_iter();
-            let fut = self.on_access_point_state_update(&mut iter);
+            let fut = self.on_access_point_state_update(&update);
             fut.await.ok().map(|()| Box::new(self))
         };
         fut.boxed()

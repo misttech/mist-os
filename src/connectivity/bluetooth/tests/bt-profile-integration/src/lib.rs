@@ -63,15 +63,12 @@ pub fn a2dp_sink_service_definition() -> ServiceDefinition {
 }
 
 fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStream, anyhow::Error> {
-    let service_defs = vec![service_definition_for_testing()];
+    let service_defs = &[service_definition_for_testing()];
     let (connect_client, connect_requests) =
         create_request_stream().context("ConnectionReceiver creation")?;
 
-    let _ = profile.aux().profile.advertise(
-        &mut service_defs.into_iter(),
-        ChannelParameters::default(),
-        connect_client,
-    );
+    let _ =
+        profile.aux().profile.advertise(service_defs, ChannelParameters::default(), connect_client);
     Ok(connect_requests)
 }
 

@@ -263,13 +263,9 @@ mod tests {
             match request {
                 fdd::DeviceInfoIteratorRequest::GetNext { responder } => {
                     responder
-                        .send(
-                            &mut device_infos
-                                .drain(..)
-                                .collect::<Vec<fdd::DeviceInfo>>()
-                                .into_iter(),
-                        )
+                        .send(&device_infos)
                         .context("Failed to send device infos to responder")?;
+                    device_infos.clear();
                 }
             }
         }

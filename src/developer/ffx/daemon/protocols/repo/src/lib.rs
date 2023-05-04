@@ -1065,7 +1065,7 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
                     Ok(ffx::RepositoryPackagesIteratorRequest::Next { responder }) => {
                         let chunk = chunks.next();
 
-                        if let Err(e) = responder.send(&mut chunk.iter().cloned()) {
+                        if let Err(e) = responder.send(chunk) {
                             tracing::warn!(
                                 "Error responding to RepositoryPackagesIterator request: {:?}",
                                 e
@@ -1132,7 +1132,7 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
                     Ok(ffx::PackageEntryIteratorRequest::Next { responder }) => {
                         let chunk = chunks.next();
 
-                        if let Err(e) = responder.send(&mut chunk.iter().cloned()) {
+                        if let Err(e) = responder.send(chunk) {
                             tracing::warn!(
                                 "Error responding to PackageEntryIteratorRequest request: {:?}",
                                 e
@@ -1416,7 +1416,7 @@ impl<
                             Ok(ffx::RepositoryTargetsIteratorRequest::Next { responder }) => {
                                 let chunk = chunks.next();
 
-                                if let Err(err) = responder.send(&mut chunk.iter().cloned()) {
+                                if let Err(err) = responder.send(chunk) {
                                     tracing::warn!(
                                         "Error responding to RepositoryTargetsIterator request: {:?}",
                                         err

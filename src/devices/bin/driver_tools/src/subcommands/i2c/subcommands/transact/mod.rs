@@ -74,7 +74,7 @@ pub async fn transact(
     let device = super::connect_to_i2c_device(&cmd.device_path, dev)
         .context("Failed to connect to I2C device")?;
     let read_data = device
-        .transfer(&mut transactions.into_iter())
+        .transfer(&transactions)
         .await
         .context("Failed to send request to transfer transactions to I2C device")?
         .map_err(|status| zx::Status::from_raw(status))

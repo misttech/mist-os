@@ -68,7 +68,7 @@ pub fn spawn_touch_source_watcher(
         }
 
         loop {
-            let events = touch_source.watch(&mut pending_responses.into_iter());
+            let events = touch_source.watch(&pending_responses);
 
             match events.await {
                 Ok(events) => {

@@ -325,7 +325,7 @@ impl FlatlandViewStrategy {
             fasync::Task::local(async move {
                 let mut events: Vec<fidl_fuchsia_ui_pointer::TouchResponse> = Vec::new();
                 loop {
-                    let result = touch_proxy.watch(&mut events.into_iter()).await;
+                    let result = touch_proxy.watch(&events).await;
                     match result {
                         Ok(returned_events) => {
                             events = returned_events

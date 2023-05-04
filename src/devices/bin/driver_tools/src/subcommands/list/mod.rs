@@ -212,13 +212,9 @@ mod tests {
             match request {
                 fdd::DriverInfoIteratorRequest::GetNext { responder } => {
                     responder
-                        .send(
-                            &mut driver_infos
-                                .drain(..)
-                                .collect::<Vec<fdd::DriverInfo>>()
-                                .into_iter(),
-                        )
+                        .send(&driver_infos)
                         .context("Failed to send driver infos to responder")?;
+                    driver_infos.clear();
                 }
             }
         }

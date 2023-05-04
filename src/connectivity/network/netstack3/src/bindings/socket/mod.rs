@@ -127,7 +127,7 @@ pub(crate) async fn serve(
                     responder_send!(responder, &mut response);
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
-                    responder_send!(responder, &mut get_interface_addresses(&ctx));
+                    responder_send!(responder, &get_interface_addresses(&ctx));
                 }
             }
             Ok(ctx)
@@ -141,39 +141,34 @@ pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
     fidl::endpoints::create_request_stream().expect("can't create stream")
 }
 
-fn get_interface_addresses(
-    ctx: &Ctx,
-) -> impl ExactSizeIterator<Item = psocket::InterfaceAddresses> {
+fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
     let Ctx { sync_ctx, non_sync_ctx } = ctx;
-    non_sync_ctx
-        .devices
-        .with_devices(|devices| {
-            devices
-                .map(|d| {
-                    // Generally, calling into `netstack3_core` while operating
-                    // on the non-sync context is a recipe for deadlocks. That's
-                    // not an issue here since the non-sync context isn't being
-                    // passed into `get_all_ip_addr_subnets`.
-                    let addresses = netstack3_core::get_all_ip_addr_subnets(&*sync_ctx, d)
-                        .into_iter()
-                        .map(fidl_fuchsia_net_ext::FromExt::from_ext)
-                        .collect();
+    non_sync_ctx.devices.with_devices(|devices| {
+        devices
+            .map(|d| {
+                // Generally, calling into `netstack3_core` while operating
+                // on the non-sync context is a recipe for deadlocks. That's
+                // not an issue here since the non-sync context isn't being
+                // passed into `get_all_ip_addr_subnets`.
+                let addresses = netstack3_core::get_all_ip_addr_subnets(&*sync_ctx, d)
+                    .into_iter()
+                    .map(fidl_fuchsia_net_ext::FromExt::from_ext)
+                    .collect();
 
-                    let info = d.external_state();
-                    let flags = flags_for_device(&info);
-                    let StaticCommonInfo { binding_id, name } = info.static_common_info();
+                let info = d.external_state();
+                let flags = flags_for_device(&info);
+                let StaticCommonInfo { binding_id, name } = info.static_common_info();
 
-                    psocket::InterfaceAddresses {
-                        id: Some(binding_id.get()),
-                        name: Some(name.clone()),
-                        addresses: Some(addresses),
-                        interface_flags: Some(flags),
-                        ..Default::default()
-                    }
-                })
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
+                psocket::InterfaceAddresses {
+                    id: Some(binding_id.get()),
+                    name: Some(name.clone()),
+                    addresses: Some(addresses),
+                    interface_flags: Some(flags),
+                    ..Default::default()
+                }
+            })
+            .collect::<Vec<_>>()
+    })
 }
 
 fn get_interface_flags(

@@ -30,7 +30,7 @@ fn connect_to_i2c_device(
 }
 
 async fn read_byte_from_i2c_device(device: &fi2c::DeviceProxy, address: &[u8]) -> Result<u8> {
-    let transactions = vec![
+    let transactions = &[
         fi2c::Transaction {
             data_transfer: Some(fi2c::DataTransfer::WriteData(address.to_owned())),
             ..Default::default()
@@ -42,7 +42,7 @@ async fn read_byte_from_i2c_device(device: &fi2c::DeviceProxy, address: &[u8]) -
         },
     ];
     let data = device
-        .transfer(&mut transactions.into_iter())
+        .transfer(transactions)
         .await
         .context("Failed to send request to transfer transactions to I2C device")?
         .map_err(|status| zx::Status::from_raw(status))

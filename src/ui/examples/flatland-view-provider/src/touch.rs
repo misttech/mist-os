@@ -71,7 +71,7 @@ pub fn spawn_touch_source_watcher(
         }
 
         loop {
-            let events = touch_source.watch(&mut pending_responses.into_iter());
+            let events = touch_source.watch(&pending_responses);
 
             match events.await {
                 Ok(events) => {
@@ -219,7 +219,7 @@ mod tests {
                         }
 
                         expected_client_response_count = events.len();
-                        responder.send(&mut events.clone().into_iter())?;
+                        responder.send(&events)?;
                     }
                     _ => {
                         return Err(anyhow!("unexpected request: only Watch() is supported"));

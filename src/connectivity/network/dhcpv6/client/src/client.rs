@@ -493,8 +493,9 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
         servers: Vec<Ipv6Addr>,
         hash: u64,
     ) -> Result<(), ClientError> {
-        let () = responder
-            .send(&mut servers.iter().map(|addr| {
+        let response: Vec<_> = servers
+            .iter()
+            .map(|addr| {
                 let address = fnet::Ipv6Address { addr: addr.ipv6_bytes() };
                 let zone_index =
                     if is_unicast_link_local_strict(&address) { self.interface_id } else { 0 };
@@ -513,7 +514,10 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                     )),
                     ..Default::default()
                 }
-            }))
+            })
+            .collect();
+        let () = responder
+            .send(&response)
             // The channel will be closed on error, so return an error to stop the client.
             .map_err(ClientError::Fidl)?;
         self.last_observed_dns_hash = hash;
@@ -1953,7 +1957,7 @@ mod tests {
                 .dns_responder
                 .take()
                 .expect("test client did not get a channel responder")
-                .send(&mut std::iter::once(fnet_name::DnsServer_ {
+                .send(&[fnet_name::DnsServer_ {
                     address: Some(fidl_socket_addr!("[fe01::2:3]:42")),
                     source: Some(fnet_name::DnsServerSource::Dhcpv6(
                         fnet_name::Dhcpv6DnsServerSource {
@@ -1962,7 +1966,7 @@ mod tests {
                         },
                     )),
                     ..Default::default()
-                }))
+                }])
                 .expect("failed to send response on test channel");
         };
         let (watcher_res, ()) = join!(client_proxy.watch_servers(), test_fut);

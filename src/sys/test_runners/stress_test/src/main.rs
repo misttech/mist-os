@@ -120,22 +120,21 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
 
 async fn serve_case_iterator(iterator: ServerEnd<ftest::CaseIteratorMarker>) -> Result<()> {
     let mut stream = iterator.into_stream()?;
-    let cases = vec![ftest::Case {
+    let cases = &[ftest::Case {
         name: Some("stress_test".to_string()),
         enabled: Some(true),
         ..Default::default()
     }];
-    let mut iter = cases.into_iter();
 
     // Send the `stress_test` case in the first call
     if let Some(ftest::CaseIteratorRequest::GetNext { responder }) = stream.try_next().await? {
-        responder.send(&mut iter)?;
+        responder.send(cases)?;
     }
 
     // Send an empty response in the second call. This instructs the test_manager that there are
     // no more cases in this test suite.
     if let Some(ftest::CaseIteratorRequest::GetNext { responder }) = stream.try_next().await? {
-        responder.send(&mut vec![].into_iter())?;
+        responder.send(&[])?;
     }
     Ok(())
 }

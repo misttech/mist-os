@@ -217,16 +217,18 @@ pub async fn run_test_manager_query_server(
                                                 responder,
                                             } => match names.next() {
                                                 Some(names) => {
-                                                    let _ =
-                                                        responder.send(&mut names.into_iter().map(
-                                                            |s| ftest_manager::Case {
+                                                    let _ = responder.send(
+                                                        &names
+                                                            .into_iter()
+                                                            .map(|s| ftest_manager::Case {
                                                                 name: Some(s.into()),
                                                                 ..Default::default()
-                                                            },
-                                                        ));
+                                                            })
+                                                            .collect::<Vec<_>>(),
+                                                    );
                                                 }
                                                 None => {
-                                                    let _ = responder.send(&mut vec![].into_iter());
+                                                    let _ = responder.send(&[]);
                                                 }
                                             },
                                         }

@@ -36,7 +36,6 @@ use {
         convert::TryFrom,
         fs::{create_dir, File},
         io::Write,
-        iter::FusedIterator,
         path::PathBuf,
         sync::Arc,
     },
@@ -331,14 +330,13 @@ impl MockRepositoryManagerService {
                 RepositoryManagerRequest::List { iterator, control_handle: _control_handle } => {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::List);
                     let mut stream = iterator.into_stream().expect("list iterator into_stream");
-                    let mut repos = self.repos.lock().clone().into_iter().map(|r| r.into());
-                    // repos must be fused b/c the Next() fidl method should return an empty vector
-                    // forever after iteration is complete
-                    let _: &dyn FusedIterator<Item = _> = &repos;
+                    let repos: Vec<_> =
+                        self.repos.lock().clone().into_iter().map(|r| r.into()).collect();
+                    let mut iter = repos.chunks(5).fuse();
                     while let Some(RepositoryIteratorRequest::Next { responder }) =
                         stream.try_next().await?
                     {
-                        responder.send(&mut repos.by_ref().take(5)).expect("next send")
+                        responder.send(iter.next().unwrap_or(&[])).expect("next send")
                     }
                 }
             }

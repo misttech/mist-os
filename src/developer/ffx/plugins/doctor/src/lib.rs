@@ -1696,10 +1696,10 @@ mod test {
                         let list_closure = list_closure.clone();
                         let results = (list_closure)(query);
                         if !results.is_empty() {
-                            reader.next(&mut results.into_iter()).await.unwrap();
-                            reader.next(&mut vec![].into_iter()).await.unwrap();
+                            reader.next(&results).await.unwrap();
+                            reader.next(&[]).await.unwrap();
                         } else {
-                            reader.next(&mut vec![].into_iter()).await.unwrap();
+                            reader.next(&[]).await.unwrap();
                         }
                     }
                     TargetCollectionRequest::OpenTarget { query, responder, target_handle } => {

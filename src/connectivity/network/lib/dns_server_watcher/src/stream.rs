@@ -60,8 +60,7 @@ mod tests {
         fn push_config(&mut self, config: Vec<DnsServer_>) {
             match self.pending_request.take() {
                 Some(req) => {
-                    let () =
-                        req.send(&mut config.into_iter()).expect("Failed to fulfill FIDL request");
+                    let () = req.send(&config).expect("Failed to fulfill FIDL request");
                 }
                 None => self.configs.push_back(config),
             }
@@ -82,9 +81,7 @@ mod tests {
                             }
 
                             if let Some(config) = w.configs.pop_front() {
-                                responder
-                                    .send(&mut config.into_iter())
-                                    .expect("Failed to fulfill FIDL request");
+                                responder.send(&config).expect("Failed to fulfill FIDL request");
                             } else {
                                 w.pending_request = Some(responder)
                             }

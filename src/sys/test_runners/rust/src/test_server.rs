@@ -727,7 +727,7 @@ mod tests {
         .detach();
 
         suite_proxy
-            .run(&mut invocations.into_iter().map(|i| i.into()), run_options, run_listener_client)
+            .run(&invocations, run_options, run_listener_client)
             .context("cannot call run")?;
 
         collect_listener_event(run_listener).await.context("Failed to collect results")

@@ -757,8 +757,8 @@ mod tests {
         let watch_responder = watch_request.into_watch().expect("HostWatcher::Watch request");
         // A new discoverable local Bluetooth host appears on the system.
         let discoverable =
-            vec![example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
-        let _ = watch_responder.send(&mut discoverable.into_iter()).unwrap();
+            &[example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
+        let _ = watch_responder.send(discoverable).unwrap();
 
         // Provider server should recognize this and attempt to advertise Model ID over LE.
         let advertise_request = le_peripheral.select_next_some().await.expect("fidl request");
@@ -772,8 +772,8 @@ mod tests {
         let watch_request = host_watcher.select_next_some().await.expect("fidl request");
         let watch_responder = watch_request.into_watch().expect("HostWatcher::Watch request");
         let non_discoverable =
-            vec![example_host(HostId(1), /* active= */ true, /* discoverable= */ false)];
-        let _ = watch_responder.send(&mut non_discoverable.into_iter()).unwrap();
+            &[example_host(HostId(1), /* active= */ true, /* discoverable= */ false)];
+        let _ = watch_responder.send(non_discoverable).unwrap();
 
         // Provider server should cancel the existing advertisement and attempt to advertise
         // Account Keys.
@@ -794,8 +794,8 @@ mod tests {
         let watch_request = host_watcher.select_next_some().await.expect("fidl request");
         let watch_responder = watch_request.into_watch().expect("HostWatcher::Watch request");
         let not_active =
-            vec![example_host(HostId(1), /* active= */ false, /* discoverable= */ false)];
-        let _ = watch_responder.send(&mut not_active.into_iter()).unwrap();
+            &[example_host(HostId(1), /* active= */ false, /* discoverable= */ false)];
+        let _ = watch_responder.send(not_active).unwrap();
 
         // Provider server should cancel the existing advertisement.
         let adv_client = adv_client.into_proxy().unwrap();
@@ -814,8 +814,8 @@ mod tests {
         let watch_responder = watch_request.into_watch().expect("HostWatcher::Watch request");
         // Set a local BT host that is discoverable.
         let discoverable =
-            vec![example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
-        let _ = watch_responder.send(&mut discoverable.into_iter()).unwrap();
+            &[example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
+        let _ = watch_responder.send(discoverable).unwrap();
         // Provider server should recognize this and attempt to advertise Model ID over LE.
         let advertise_request = le_peripheral.select_next_some().await.expect("fidl request");
         let (params, adv_client, _responder) =
@@ -879,8 +879,8 @@ mod tests {
             .expect("request is OK");
         let watch_responder = watch_request.into_watch().expect("HostWatcher::Watch request");
         let discoverable =
-            vec![example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
-        let _ = watch_responder.send(&mut discoverable.into_iter()).unwrap();
+            &[example_host(HostId(1), /* active= */ true, /* discoverable= */ true)];
+        let _ = watch_responder.send(discoverable).unwrap();
         // Even though there is an active Host, there should be no LE advertisement as Fast Pair is
         // currently disabled.
         let _ = exec

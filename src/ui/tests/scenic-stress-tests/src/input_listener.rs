@@ -19,10 +19,8 @@ pub fn autolisten_touch(touch_source: fpointer::TouchSourceProxy) -> Task<()> {
                     response
                 })
                 .collect();
-            returned_events = touch_source
-                .watch(&mut responses.into_iter())
-                .await
-                .expect("touch source Watch() error");
+            returned_events =
+                touch_source.watch(&responses).await.expect("touch source Watch() error");
             debug!("Touch event received");
         }
     })

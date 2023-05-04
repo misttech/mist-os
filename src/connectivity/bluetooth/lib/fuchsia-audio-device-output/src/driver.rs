@@ -329,11 +329,11 @@ impl SoftPcm {
             }
             StreamConfigRequest::GetSupportedFormats { responder } => {
                 let pcm_formats = self.supported_formats.clone();
-                let formats_vector = vec![SupportedFormats {
+                let formats_vector = &[SupportedFormats {
                     pcm_supported_formats: Some(pcm_formats),
                     ..Default::default()
                 }];
-                responder.send(&mut formats_vector.into_iter())?;
+                responder.send(formats_vector)?;
             }
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, control_handle: _ } => {
                 let pcm = (format.pcm_format.ok_or(format_err!("No pcm_format included")))?;

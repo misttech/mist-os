@@ -612,8 +612,9 @@ async fn get_fidl_instance_and_children(
 
 async fn serve_instance_iterator(
     server_end: ServerEnd<fsys::InstanceIteratorMarker>,
-    mut instances: Vec<fsys::Instance>,
+    instances: Vec<fsys::Instance>,
 ) {
+    let mut remaining_instances = &instances[..];
     let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
     while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await {
         let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
@@ -621,7 +622,7 @@ async fn serve_instance_iterator(
 
         // Determine how many info objects can be sent in a single FIDL message.
         // TODO(https://fxbug.dev/98653): This logic should be handled by FIDL.
-        for instance in &instances {
+        for instance in remaining_instances {
             bytes_used += instance.measure().num_bytes;
             if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                 break;
@@ -629,17 +630,15 @@ async fn serve_instance_iterator(
             instance_count += 1;
         }
 
-        let batch: Vec<fsys::Instance> = instances.drain(0..instance_count).collect();
-        let batch_size = batch.len();
-
-        let result = responder.send(&mut batch.into_iter());
+        let result = responder.send(&remaining_instances[..instance_count]);
+        remaining_instances = &remaining_instances[instance_count..];
         if let Err(error) = result {
             warn!(?error, "RealmQuery encountered error sending instance batch");
             break;
         }
 
         // Close the iterator because all the data was sent.
-        if batch_size == 0 {
+        if instance_count == 0 {
             break;
         }
     }

@@ -93,11 +93,15 @@ pub async fn handle_case_iterator_for_gtests(
         .await
         .expect("Failed to read tests from output file.");
     let tests = parse_test_cases(read_content).expect("Failed to parse tests.");
-    let mut iter = tests.iter().map(|TestCaseInfo { name, enabled }| ftest::Case {
-        name: Some(name.clone()),
-        enabled: Some(*enabled),
-        ..Default::default()
-    });
+    let cases: Vec<_> = tests
+        .iter()
+        .map(|TestCaseInfo { name, enabled }| ftest::Case {
+            name: Some(name.clone()),
+            enabled: Some(*enabled),
+            ..Default::default()
+        })
+        .collect();
+    let mut remaining_cases = &cases[..];
 
     while let Some(event) = stream.try_next().await? {
         match event {
@@ -106,7 +110,7 @@ pub async fn handle_case_iterator_for_gtests(
                 // Page overhead of message header + vector
                 let mut bytes_used: usize = 32;
                 let mut case_count = 0;
-                for case in iter.clone() {
+                for case in remaining_cases {
                     bytes_used += case.measure().num_bytes;
                     if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                         break;
@@ -114,8 +118,9 @@ pub async fn handle_case_iterator_for_gtests(
                     case_count += 1;
                 }
                 responder
-                    .send(&mut iter.by_ref().take(case_count))
+                    .send(&remaining_cases[..case_count])
                     .map_err(SuiteServerError::Response)?;
+                remaining_cases = &remaining_cases[case_count..];
             }
         }
     }
