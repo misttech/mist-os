@@ -194,7 +194,8 @@ impl BlobDirectory {
                 .await?;
                 let (tree, metadata) = match object.read_attr(BLOB_MERKLE_ATTRIBUTE_ID).await? {
                     None => {
-                        // TODO(fxbug.dev/122125): Should we abort if we fail to read metadata?
+                        // If the file is uncompressed and is small enough, it may not have any
+                        // metadata stored on disk.
                         (
                             MerkleTree::from_levels(vec![vec![hash]]),
                             BlobMetadata {

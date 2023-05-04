@@ -15,6 +15,7 @@ rustc_library("make-blob-image") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bincode",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:rayon",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:zstd",
