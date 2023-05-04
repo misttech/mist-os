@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.hardware.gpu.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -21,9 +19,6 @@
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <soc/aml-common/aml-registers.h>
-
-#define GPU_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define GPU_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 constexpr uint32_t kPwrKey = 0x14;
 constexpr uint32_t kPwrOverride1 = 0x16;

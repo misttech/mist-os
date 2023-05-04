@@ -16,7 +16,6 @@ group("tests") {
 
 driver_bind_rules("aml_gpu_bind") {
   rules = "aml_gpu.bind"
-  header_output = "aml_gpu-bind.h"
   bind_output = "aml-gpu.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
@@ -30,9 +29,6 @@ source_set("sources") {
   sources = [ "aml-gpu.cc" ]
   public_deps = [
     ":aml_gpu_bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.gpu.clock:fuchsia.hardware.gpu.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",

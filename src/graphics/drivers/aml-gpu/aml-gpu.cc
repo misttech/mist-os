@@ -6,8 +6,7 @@
 
 #include <fidl/fuchsia.hardware.gpu.amlogic/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
-#include <fuchsia/hardware/iommu/c/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -31,7 +30,6 @@
 #include "s905d2-gpu.h"
 #include "s912-gpu.h"
 #include "src/devices/tee/drivers/optee/tee-smc.h"
-#include "src/graphics/drivers/aml-gpu/aml_gpu-bind.h"
 #include "t931-gpu.h"
 
 namespace aml_gpu {
@@ -53,7 +51,8 @@ void AmlGpu::SetClkFreqSource(int32_t clk_source) {
     return;
   }
 
-  GPU_INFO("Setting clock source to %d: %d\n", clk_source, gpu_block_->gpu_clk_freq[clk_source]);
+  zxlogf(INFO, "Setting clock source to %d: %d\n", clk_source,
+         gpu_block_->gpu_clk_freq[clk_source]);
   uint32_t current_clk_cntl = hiu_buffer_->Read32(4 * gpu_block_->hhi_clock_cntl_offset);
   uint32_t enabled_mux = current_clk_cntl & (1 << kFinalMuxBitShift);
   uint32_t new_mux = enabled_mux == 0;
@@ -86,8 +85,8 @@ void AmlGpu::SetInitialClkFreqSource(int32_t clk_source) {
   if (current_clk_cntl & (1 << (mux_shift + kClkEnabledBitShift))) {
     SetClkFreqSource(clk_source);
   } else {
-    GPU_INFO("Setting initial clock source to %d: %d\n", clk_source,
-             gpu_block_->gpu_clk_freq[clk_source]);
+    zxlogf(INFO, "Setting initial clock source to %d: %d\n", clk_source,
+           gpu_block_->gpu_clk_freq[clk_source]);
     // Switching the final dynamic mux from a disabled source to an enabled
     // source doesn't work. If the current clock source is disabled, then
     // enable it instead of switching.
@@ -228,13 +227,13 @@ zx_status_t AmlGpu::SetProtected(uint32_t protection_mode) {
   params.arg2 = protection_mode;
   zx_status_t status = zx_smc_call(secure_monitor_.get(), &params, &result);
   if (status != ZX_OK) {
-    GPU_ERROR("Failed to set unit %ld protected status %ld code: %d", params.arg1, params.arg2,
-              status);
+    zxlogf(ERROR, "Failed to set unit %ld protected status %ld code: %d", params.arg1, params.arg2,
+           status);
     return status;
   }
   if (result.arg0 != 0) {
-    GPU_ERROR("Failed to set unit %ld protected status %ld: %lx", params.arg1, params.arg2,
-              result.arg0);
+    zxlogf(ERROR, "Failed to set unit %ld protected status %ld: %lx", params.arg1, params.arg2,
+           result.arg0);
     return ZX_ERR_INTERNAL;
   }
   current_protected_mode_property_.Set(protection_mode);
@@ -290,7 +289,7 @@ void AmlGpu::FinishExitProtectedMode(fdf::Arena& arena,
 void AmlGpu::SetFrequencySource(SetFrequencySourceRequestView request,
                                 SetFrequencySourceCompleter::Sync& completer) {
   if (request->source >= kMaxGpuClkFreq) {
-    GPU_ERROR("Invalid clock freq source index\n");
+    zxlogf(ERROR, "Invalid clock freq source index\n");
     completer.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -304,7 +303,7 @@ zx_status_t AmlGpu::ProcessMetadata(
   fit::result decoded = fidl::InplaceUnpersist<fuchsia_hardware_gpu_amlogic::wire::Metadata>(
       cpp20::span(raw_metadata));
   if (!decoded.is_ok()) {
-    GPU_ERROR("Unable to parse metadata %s", decoded.error_value().FormatDescription().c_str());
+    zxlogf(ERROR, "Unable to parse metadata %s", decoded.error_value().FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
   const auto& metadata = *decoded.value();
@@ -340,42 +339,42 @@ zx_status_t AmlGpu::Bind() {
     status = DdkGetMetadata(fuchsia_hardware_gpu_amlogic::wire::kMaliMetadata, raw_metadata.data(),
                             size, &actual);
     if (status != ZX_OK) {
-      GPU_ERROR("Failed to get metadata");
+      zxlogf(ERROR, "Failed to get metadata");
       return status;
     }
     if (size != actual) {
-      GPU_ERROR("Non-matching sizes %ld %ld", size, actual);
+      zxlogf(ERROR, "Non-matching sizes %ld %ld", size, actual);
       return ZX_ERR_INTERNAL;
     }
     status = ProcessMetadata(std::move(raw_metadata), builder);
     if (status != ZX_OK) {
-      GPU_ERROR("Error processing metadata %d", status);
+      zxlogf(ERROR, "Error processing metadata %d", status);
       return status;
     }
   }
 
   pdev_ = ddk::PDevFidl::FromFragment(parent_);
   if (!pdev_.is_valid()) {
-    GPU_ERROR("could not get platform device protocol\n");
+    zxlogf(ERROR, "could not get platform device protocol\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   status = pdev_.MapMmio(MMIO_GPU, &gpu_buffer_);
   if (status != ZX_OK) {
-    GPU_ERROR("pdev_map_mmio_buffer failed\n");
+    zxlogf(ERROR, "pdev_map_mmio_buffer failed\n");
     return status;
   }
 
   status = pdev_.MapMmio(MMIO_HIU, &hiu_buffer_);
   if (status != ZX_OK) {
-    GPU_ERROR("pdev_map_mmio_buffer failed\n");
+    zxlogf(ERROR, "pdev_map_mmio_buffer failed\n");
     return status;
   }
 
   pdev_device_info_t info;
   status = pdev_.GetDeviceInfo(&info);
   if (status != ZX_OK) {
-    GPU_ERROR("pdev_get_device_info failed\n");
+    zxlogf(ERROR, "pdev_get_device_info failed\n");
     return status;
   }
 
@@ -393,7 +392,7 @@ zx_status_t AmlGpu::Bind() {
       gpu_block_ = &t931_gpu_blocks;
       break;
     default:
-      GPU_ERROR("unsupported SOC PID %u\n", info.pid);
+      zxlogf(ERROR, "unsupported SOC PID %u\n", info.pid);
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -401,7 +400,7 @@ zx_status_t AmlGpu::Bind() {
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent(),
                                                                                   "register-reset");
   if (reset_register_client.is_error() || !reset_register_client.value().is_valid()) {
-    GPU_ERROR("could not get reset_register fragment");
+    zxlogf(ERROR, "could not get reset_register fragment");
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -412,7 +411,7 @@ zx_status_t AmlGpu::Bind() {
     static constexpr uint32_t kTrustedOsSmcIndex = 0;
     status = pdev_.GetSmc(kTrustedOsSmcIndex, &secure_monitor_);
     if (status != ZX_OK) {
-      GPU_ERROR("Unable to retrieve secure monitor SMC: %d", status);
+      zxlogf(ERROR, "Unable to retrieve secure monitor SMC: %d", status);
       return status;
     }
     builder.use_protected_mode_callbacks(true);
@@ -421,7 +420,7 @@ zx_status_t AmlGpu::Bind() {
   if (info.pid == PDEV_PID_AMLOGIC_S905D2 || info.pid == PDEV_PID_AMLOGIC_S905D3) {
     status = Gp0Init();
     if (status != ZX_OK) {
-      GPU_ERROR("aml_gp0_init failed: %d\n", status);
+      zxlogf(ERROR, "aml_gp0_init failed: %d\n", status);
       return status;
     }
   }
