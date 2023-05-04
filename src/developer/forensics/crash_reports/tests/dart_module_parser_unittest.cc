@@ -45,26 +45,31 @@ os: fuchsia arch: x86 comp: no sim: no
 }
 
 TEST(DartModulesParserTest, WellFormedStackTrace) {
-  const auto [is_unsymbolicated, modules] = ParseDartModulesFromStackTrace(
-      BuildStackTrace(/*build_id=*/"0a1b2c3d4e5f0f1e2d3c4b5af0e1d2c3",
-                      /*isolate_dso_base=*/"7f91994000",
-                      /*stack_trace_addrs=*/
-                      {
-                          "0000007f92d8b467",
-                          "0000007f92d8b2cb",
-                          "0000007f92d89eb3",
-                          "0000007f92d89c9f",
-                          "0000007f92d8910f",
-                          "0000007f92d8904b",
-                          "0000007f9412cd87",
-                          "0000007f92d88ea7",
-                          "0000007f9336e88f",
-                          "0000007f9336e557",
-                      }));
+  std::string stack_trace = BuildStackTrace(/*build_id=*/"0a1b2c3d4e5f0f1e2d3c4b5af0e1d2c3",
+                                            /*isolate_dso_base=*/"7f91994000",
+                                            /*stack_trace_addrs=*/
+                                            {
+                                                "0000007f92d8b467",
+                                                "0000007f92d8b2cb",
+                                                "0000007f92d89eb3",
+                                                "0000007f92d89c9f",
+                                                "0000007f92d8910f",
+                                                "0000007f92d8904b",
+                                                "0000007f9412cd87",
+                                                "0000007f92d88ea7",
+                                                "0000007f9336e88f",
+                                                "0000007f9336e557",
+                                            });
+
+  // Assign the last frame a large frame number to mimic stack trace with omitted frames.
+  stack_trace += R"(...
+...
+#1000 abs 0000007f9412cd88 virt 00000000013f7467 _kDartIsolateSnapshotInstructions+0x25e9c7)";
+  const auto [is_unsymbolicated, modules] = ParseDartModulesFromStackTrace(stack_trace);
 
   EXPECT_TRUE(is_unsymbolicated);
   ASSERT_TRUE(modules.has_value());
-  EXPECT_EQ(*modules, "7f91994000,2798d88,<_>,3D2C1B0A5F4E1E0F2D3C4B5AF0E1D2C30");
+  EXPECT_EQ(*modules, "7f91994000,2798d89,<_>,3D2C1B0A5F4E1E0F2D3C4B5AF0E1D2C30");
 }
 
 TEST(DartModulesParserTest, BadBuildId) {

@@ -40,7 +40,7 @@ bool MatchesUnsymbolicatedDartStackTrace(const std::vector<std::string>& lines) 
 //
 // Stack frame.
 constexpr re2::LazyRE2 kStackFrameRegex =
-    MakeLazyRE2(R"(\s*#\d{2} abs ([\da-f]+)(?: virt [\da-f]+)? .*$)");
+    MakeLazyRE2(R"(\s*#\d+ abs ([\da-f]+)(?: virt [\da-f]+)? .*$)");
 
 std::optional<uint64_t> TryMatchStackAddress(const std::string& line) {
   std::string address;
