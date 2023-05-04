@@ -75,7 +75,7 @@ group("tests") {
   testonly = true
   deps = []
   if (!fxfs_blob) {
-    # TODO(fxbug.dev/122056): Support Fxblob in this test.
+    # TODO(fxbug.dev/125808): Support Fxblob in this test.
     deps += [ ":core_bad_signature_update-package($target_toolchain)" ]
     if (!is_coverage) {
       # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
