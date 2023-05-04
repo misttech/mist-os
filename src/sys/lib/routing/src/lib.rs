@@ -128,6 +128,67 @@ impl RouteRequest {
     }
 }
 
+impl std::fmt::Display for RouteRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ExposeDirectory(e) => {
+                write!(f, "directory `{}`", e.target_name)
+            }
+            Self::ExposeProtocol(e) => {
+                write!(f, "protocol `{}`", e.target_name)
+            }
+            Self::ExposeService(e) => {
+                write!(f, "service {:?}", e)
+            }
+            Self::Resolver(r) => {
+                write!(f, "resolver `{}`", r.resolver)
+            }
+            Self::Runner(r) => {
+                write!(f, "runner `{}`", r)
+            }
+            Self::UseDirectory(u) => {
+                write!(f, "directory `{}`", u.source_name)
+            }
+            Self::UseProtocol(u) => {
+                write!(f, "protocol `{}`", u.source_name)
+            }
+            Self::UseService(u) => {
+                write!(f, "service `{}`", u.source_name)
+            }
+            Self::UseStorage(u) => {
+                write!(f, "storage `{}`", u.source_name)
+            }
+            Self::UseEventStream(u) => {
+                write!(f, "event stream `{}`", u.source_name)
+            }
+            Self::StorageBackingDirectory(u) => {
+                write!(f, "storage backing directory `{}`", u.backing_dir)
+            }
+            Self::OfferDirectory(o) => {
+                write!(f, "directory `{}`", o.target_name)
+            }
+            Self::OfferProtocol(o) => {
+                write!(f, "protocol `{}`", o.target_name)
+            }
+            Self::OfferService(o) => {
+                write!(f, "service {:?}", o)
+            }
+            Self::OfferEventStream(o) => {
+                write!(f, "event stream `{}`", o.target_name)
+            }
+            Self::OfferStorage(o) => {
+                write!(f, "storage `{}`", o.target_name)
+            }
+            Self::OfferResolver(o) => {
+                write!(f, "resolver `{}`", o.target_name)
+            }
+            Self::OfferRunner(o) => {
+                write!(f, "runner `{}`", o.target_name)
+            }
+        }
+    }
+}
+
 /// The data returned after successfully routing a capability to its source.
 #[derive(Debug)]
 pub struct RouteSource<C: ComponentInstanceInterface> {

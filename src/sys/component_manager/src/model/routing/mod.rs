@@ -85,23 +85,51 @@ pub(super) async fn route_and_open_capability(
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
 ) -> Result<(), RouteAndOpenCapabilityError> {
-    match route_request {
+    match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
-            let storage_source = r.route(target).await?;
+            let storage_source = r.route(target).await.map_err(|e| {
+                RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
+            })?;
 
-            let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+            let backing_dir_info = storage::route_backing_directory(storage_source.source.clone())
+                .await
+                .map_err(|e| {
+                    let storage_decl = match &storage_source.source {
+                        CapabilitySource::Component {
+                            capability: ComponentCapability::Storage(storage_decl),
+                            ..
+                        } => storage_decl.clone(),
+                        r => unreachable!("unexpected storage source: {:?}", r),
+                    };
 
-            OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
+                    let request = RouteRequest::StorageBackingDirectory(storage_decl);
+
+                    RouteAndOpenCapabilityError::RoutingError { request, err: e }
+                })?;
+
+            Ok(OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
                 .open()
                 .await
-                .map_err(|e| RouteAndOpenCapabilityError::OpenError { err: Box::new(e) })
+                .map_err(|e| RouteAndOpenCapabilityError::OpenError {
+                    source: storage_source.source,
+                    err: e,
+                })?)
         }
         r => {
-            let route_source = r.route(target).await?;
-            OpenRequest::new_from_route_source(route_source, target, open_options)
+            let route_source = r.route(target).await.map_err(|e| {
+                RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
+            })?;
+
+            // clone the source as additional context in case of an error
+            let capability_source = route_source.source.clone();
+
+            Ok(OpenRequest::new_from_route_source(route_source, target, open_options)
                 .open()
                 .await
-                .map_err(|e| RouteAndOpenCapabilityError::OpenError { err: Box::new(e) })
+                .map_err(|e| RouteAndOpenCapabilityError::OpenError {
+                    source: capability_source,
+                    err: e,
+                })?)
         }
     }
 }
@@ -233,6 +261,7 @@ pub async fn report_routing_failure(
                                 RoutingError::AvailabilityRoutingError(
                                     AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
                                 ),
+                            ..
                         },
                 } => {
                     // If the route failed because the capability is
@@ -257,6 +286,7 @@ pub async fn report_routing_failure(
                                         ..
                                     },
                                 ),
+                            ..
                         },
                 } => {
                     // If the target declared the capability as optional, but

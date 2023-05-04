@@ -536,8 +536,9 @@ impl ComponentInstance {
             route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
                 .await
                 .map_err(|err| StartActionError::ResolveRunnerError {
-                    err,
+                    err: Box::new(err),
                     moniker: self.abs_moniker.clone(),
+                    runner,
                 })?;
 
             return Ok(Arc::new(RemoteRunner::new(client)) as Arc<dyn Runner>);

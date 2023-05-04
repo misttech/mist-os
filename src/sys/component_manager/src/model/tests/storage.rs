@@ -718,7 +718,8 @@ async fn use_restricted_storage_open_failure() {
     assert_matches!(
         result,
         Err(RouteAndOpenCapabilityError::RoutingError {
-            err: RoutingError::ComponentNotInIdIndex { .. }
+            err: RoutingError::ComponentNotInIdIndex { .. },
+            ..
         })
     );
 }

@@ -7,7 +7,7 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::{CapabilityProviderError, ModelError},
+            error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilitySource, OpenOptions, OpenRequest, RouteSource, RoutingError},
@@ -780,9 +780,7 @@ impl CollectionServiceDirectory {
             },
         )
         .open()
-        .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || {
-            Err(ModelError::timeout(OPEN_SERVICE_TIMEOUT))
-        })
+        .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
         .await?;
         let dirents = fuchsia_fs::directory::readdir(&proxy).await.map_err(|e| {
             error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);

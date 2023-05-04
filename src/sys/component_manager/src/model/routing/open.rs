@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
-            error::ModelError,
+            error::{ModelError, OpenError},
             hooks::{Event, EventPayload},
             routing::{
                 providers::{
@@ -18,7 +18,7 @@ use {
                     AggregateServiceDirectoryProvider, CollectionServiceDirectory,
                     CollectionServiceRoute, FilteredServiceProvider,
                 },
-                RouteSource, RoutingError,
+                RouteSource,
             },
             storage::{self, BackingDirectoryInfo},
         },
@@ -83,13 +83,15 @@ impl<'a> OpenRequest<'a> {
 
     /// Opens the capability in `self`, triggering a `CapabilityRouted` event and binding
     /// to the source component instance if necessary.
-    pub async fn open(self) -> Result<(), ModelError> {
+    pub async fn open(self) -> Result<(), OpenError> {
         match self {
             Self::OutgoingDirectory { open_options, source, target } => {
                 Self::open_outgoing_directory(open_options, source, target).await
             }
             Self::Storage { open_options, source, target } => {
-                Self::open_storage(open_options, &source, target).await
+                Self::open_storage(open_options, &source, target)
+                    .await
+                    .map_err(|e| OpenError::OpenStorageError { err: Box::new(e) })
             }
         }
     }
@@ -98,31 +100,37 @@ impl<'a> OpenRequest<'a> {
         mut open_options: OpenOptions<'a>,
         source: CapabilitySource,
         target: &Arc<ComponentInstance>,
-    ) -> Result<(), ModelError> {
-        let capability_provider =
-            if let Some(provider) = Self::get_default_provider(target.as_weak(), &source).await? {
-                Some(provider)
-            } else {
-                // Dispatch a CapabilityRouted event to get a capability provider
-                let mutexed_provider = Arc::new(Mutex::new(None));
+    ) -> Result<(), OpenError> {
+        let capability_provider = if let Some(provider) =
+            Self::get_default_provider(target.as_weak(), &source)
+                .await
+                .map_err(|e| OpenError::GetDefaultProviderError { err: Box::new(e) })?
+        {
+            Some(provider)
+        } else {
+            // Dispatch a CapabilityRouted event to get a capability provider
+            let mutexed_provider = Arc::new(Mutex::new(None));
 
-                let event = Event::new(
-                    &target,
-                    EventPayload::CapabilityRouted {
-                        source: source.clone(),
-                        capability_provider: mutexed_provider.clone(),
-                    },
-                );
+            let event = Event::new(
+                &target,
+                EventPayload::CapabilityRouted {
+                    source: source.clone(),
+                    capability_provider: mutexed_provider.clone(),
+                },
+            );
 
-                // Get a capability provider from the tree
-                target.hooks.dispatch(&event).await;
+            // Get a capability provider from the tree
+            target.hooks.dispatch(&event).await;
 
-                let provider = mutexed_provider.lock().await.take();
-                provider
-            };
+            let provider = mutexed_provider.lock().await.take();
+            provider
+        };
 
         if let Some(capability_provider) = capability_provider {
-            let source_instance = source.source_instance().upgrade()?;
+            let source_instance = source
+                .source_instance()
+                .upgrade()
+                .map_err(|_| OpenError::SourceInstanceNotFound)?;
             let task_scope = match source_instance {
                 ExtendedInstance::AboveRoot(top) => top.task_scope(),
                 ExtendedInstance::Component(component) => component.nonblocking_task_scope(),
@@ -137,46 +145,7 @@ impl<'a> OpenRequest<'a> {
                 .await?;
             Ok(())
         } else {
-            match &source {
-                CapabilitySource::Component { .. } => {
-                    unreachable!(
-                        "Capability source is a component, which should have been caught by \
-                    default_capability_provider: {:?}",
-                        source
-                    );
-                }
-                CapabilitySource::FilteredService { .. } => {
-                    Err(ModelError::unsupported("filtered service"))
-                }
-                CapabilitySource::Framework { capability, component } => {
-                    Err(RoutingError::capability_from_framework_not_found(
-                        &component.abs_moniker,
-                        capability.source_name().to_string(),
-                    )
-                    .into())
-                }
-                CapabilitySource::Capability { source_capability, component } => {
-                    Err(RoutingError::capability_from_capability_not_found(
-                        &component.abs_moniker,
-                        source_capability.to_string(),
-                    )
-                    .into())
-                }
-                CapabilitySource::Builtin { capability, .. } => Err(ModelError::from(
-                    RoutingError::capability_from_component_manager_not_found(
-                        capability.source_name().to_string(),
-                    ),
-                )),
-                CapabilitySource::Namespace { capability, .. } => Err(ModelError::from(
-                    RoutingError::capability_from_component_manager_not_found(
-                        capability.source_id(),
-                    ),
-                )),
-                CapabilitySource::Collection { .. } => Err(ModelError::unsupported("collections")),
-                CapabilitySource::Aggregate { .. } => {
-                    Err(ModelError::unsupported("aggregate capability"))
-                }
-            }
+            Err(OpenError::CapabilityProviderNotFound)
         }
     }
 

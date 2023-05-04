@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{events::error::EventsError, storage::StorageError},
+    crate::{
+        capability::CapabilitySource,
+        model::{events::error::EventsError, routing::RouteRequest, storage::StorageError},
+    },
     ::routing::{
         component_id_index::ComponentIdIndexError,
         config::AbiRevisionError,
@@ -13,6 +16,7 @@ use {
     },
     clonable_error::ClonableError,
     cm_moniker::{InstancedExtendedMoniker, InstancedRelativeMoniker},
+    cm_rust::CapabilityName,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::path::PathBuf,
@@ -134,7 +138,7 @@ pub enum ModelError {
         #[from]
         err: OpenOutgoingDirError,
     },
-    #[error("failed to route and open capability: {err}")]
+    #[error(transparent)]
     RouteAndOpenCapabilityError {
         #[from]
         err: RouteAndOpenCapabilityError,
@@ -143,6 +147,11 @@ pub enum ModelError {
     CapabilityProviderError {
         #[from]
         err: CapabilityProviderError,
+    },
+    #[error("failed to open capability: {err}")]
+    OpenError {
+        #[from]
+        err: OpenError,
     },
 }
 
@@ -622,27 +631,71 @@ impl CapabilityProviderError {
     }
 }
 
+#[derive(Debug, Clone, Error)]
+pub enum OpenError {
+    #[error("failed to get default capability provider: {err}")]
+    GetDefaultProviderError {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        #[source]
+        err: Box<ModelError>,
+    },
+    #[error("source instance not found")]
+    SourceInstanceNotFound,
+    #[error("no capability provider found")]
+    CapabilityProviderNotFound,
+    #[error("capability provider error: {err}")]
+    CapabilityProviderError {
+        #[from]
+        err: CapabilityProviderError,
+    },
+    #[error("failed to open storage capability: {err}")]
+    OpenStorageError {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        #[source]
+        err: Box<ModelError>,
+    },
+    #[error("timed out opening capability")]
+    Timeout,
+}
+
+impl OpenError {
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::GetDefaultProviderError { err } => err.as_zx_status(),
+            Self::OpenStorageError { err } => err.as_zx_status(),
+            Self::CapabilityProviderError { err } => err.as_zx_status(),
+            Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
+            Self::SourceInstanceNotFound => zx::Status::NOT_FOUND,
+            Self::Timeout => zx::Status::TIMED_OUT,
+        }
+    }
+}
+
 /// Describes all errors encountered when routing and opening a namespace capability.
 #[derive(Debug, Clone, Error)]
 pub enum RouteAndOpenCapabilityError {
     #[error("not a namespace capability")]
     NotNamespaceCapability,
-    #[error(transparent)]
+    #[error("could not route {request}: {err}")]
     RoutingError {
-        #[from]
+        request: RouteRequest,
+        #[source]
         err: RoutingError,
     },
-    // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
-    #[error(transparent)]
-    OpenError { err: Box<ModelError> },
+    #[error("could not open {source}: {err}")]
+    OpenError {
+        source: CapabilitySource,
+        #[source]
+        err: OpenError,
+    },
 }
 
 impl RouteAndOpenCapabilityError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::NotNamespaceCapability { .. } => zx::Status::INVALID_ARGS,
-            Self::RoutingError { err } => err.as_zx_status(),
-            Self::OpenError { err } => err.as_zx_status(),
+            Self::RoutingError { err, .. } => err.as_zx_status(),
+            Self::OpenError { err, .. } => err.as_zx_status(),
         }
     }
 }
@@ -659,11 +712,12 @@ pub enum StartActionError {
         #[source]
         err: ResolveActionError,
     },
-    #[error("Couldn't start `{moniker}` because its runner couldn't resolve: {err}")]
+    #[error("Couldn't start `{moniker}` because the runner `{runner}` couldn't resolve: {err}")]
     ResolveRunnerError {
         moniker: AbsoluteMoniker,
+        runner: CapabilityName,
         #[source]
-        err: RouteAndOpenCapabilityError,
+        err: Box<RouteAndOpenCapabilityError>,
     },
     #[error("Couldn't start `{moniker}` because it uses reboot_on_terminate but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {

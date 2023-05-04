@@ -1923,21 +1923,20 @@ async fn use_runner_from_environment_not_found() {
     let err = universe.start_instance(&vec!["b"].try_into().unwrap()).await.unwrap_err();
     let err = match err {
         ModelError::StartActionError {
-            err:
-                StartActionError::ResolveRunnerError {
-                    err: RouteAndOpenCapabilityError::RoutingError { err },
-                    moniker,
-                },
+            err: StartActionError::ResolveRunnerError { err, moniker, .. },
         } if moniker == vec!["b"].try_into().unwrap() => err,
         err => panic!("Unexpected error trying to start b: {}", err),
     };
 
     assert_matches!(
-        err,
-        RoutingError::UseFromEnvironmentNotFound {
-            moniker,
-            capability_type,
-            capability_name,
+        *err,
+        RouteAndOpenCapabilityError::RoutingError {
+            err: RoutingError::UseFromEnvironmentNotFound {
+                moniker,
+                capability_type,
+                capability_name,
+            },
+            ..
         }
         if moniker == AbsoluteMoniker::try_from(vec!["b"]).unwrap() &&
         capability_type == "runner" &&
