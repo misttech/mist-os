@@ -153,102 +153,47 @@ class GetBootActionTest : public Test {
 
 TEST_F(GetBootActionTest, BootbyteRecovery) {
   set_bootbyte(&mock_runtime_services, EFI_BOOT_RECOVERY);
-  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, BootbyteBootloader) {
   set_bootbyte(&mock_runtime_services, EFI_BOOT_BOOTLOADER);
-  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, BootbyteNormal) {
   set_bootbyte(&mock_runtime_services, EFI_BOOT_NORMAL);
-  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, BootbyteDefault) {
   set_bootbyte(&mock_runtime_services, EFI_BOOT_DEFAULT);
-  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectA) {
   SetUserInput('1');
-  EXPECT_EQ(kBootActionSlotA, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionSlotA, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectB) {
   SetUserInput('2');
-  EXPECT_EQ(kBootActionSlotB, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionSlotB, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectRecovery) {
   SetUserInput('r');
-  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectFastboot) {
   SetUserInput('f');
-  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
-}
-
-TEST_F(GetBootActionTest, MenuSelectDfv2) {
-  const char* input = "dyes1";
-  mock_input_.ExpectReadKeyStrokes(&input);
-  bool use_dfv2 = false;
-  EXPECT_EQ(kBootActionSlotA, get_boot_action(&mock_runtime_services, true, true, &use_dfv2));
-  EXPECT_TRUE(use_dfv2);
-}
-
-TEST_F(GetBootActionTest, MenuSelectDfv2Cancelled) {
-  const char* input = "dn1";
-  mock_input_.ExpectReadKeyStrokes(&input);
-  bool use_dfv2 = false;
-  EXPECT_EQ(kBootActionSlotA, get_boot_action(&mock_runtime_services, true, true, &use_dfv2));
-  EXPECT_FALSE(use_dfv2);
-}
-
-TEST_F(GetBootActionTest, MenuSelectDfv2NoUserInput) {
-  const efi_event kEventValue = reinterpret_cast<void* const>(0xd00dfeed);
-  EXPECT_CALL(mock_services_, CreateEvent)
-      .WillRepeatedly([kEventValue](uint32_t type, efi_tpl notify_tpl, efi_event_notify notify_fn,
-                                    void* notify_ctx, efi_event* event) {
-        *event = kEventValue;
-        return EFI_SUCCESS;
-      });
-  EXPECT_CALL(mock_services_, SetTimer)
-      .WillRepeatedly([kEventValue](efi_event event, efi_timer_delay type,
-                                    uint64_t trigger_time) -> efi_status {
-        if (type != TimerRelative) {
-          return EFI_SUCCESS;
-        }
-        EXPECT_EQ(event, kEventValue);
-        EXPECT_GT(trigger_time, 0u);
-        return EFI_SUCCESS;
-      });
-  EXPECT_CALL(mock_services_, CheckEvent).WillRepeatedly([kEventValue](efi_event event) {
-    EXPECT_EQ(event, kEventValue);
-    return EFI_SUCCESS;
-  });
-
-  bool called = false;
-  EXPECT_CALL(mock_input_, ReadKeyStroke)
-      .WillRepeatedly([&called](efi_input_key* key) -> efi_status {
-        if (!called) {
-          key->ScanCode = 0;
-          key->UnicodeChar = 'd';
-          called = true;
-          return EFI_SUCCESS;
-        }
-        return EFI_TIMEOUT;
-      });
-  bool use_dfv2 = false;
-  EXPECT_EQ(kBootActionNetboot, get_boot_action(&mock_runtime_services, true, true, &use_dfv2));
-  EXPECT_FALSE(use_dfv2);
+  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectNetboot) {
   SetUserInput('n');
-  EXPECT_EQ(kBootActionNetboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionNetboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectNetbootRequiresNetwork) {
@@ -256,44 +201,44 @@ TEST_F(GetBootActionTest, MenuSelectNetbootRequiresNetwork) {
   // to whatever the bootloader.default commandline arg has.
   cmdline_set("bootloader.default", "local");
   SetUserInput('n');
-  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true, nullptr));
+  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineLocal) {
   cmdline_set("bootloader.default", "local");
-  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineNetwork) {
   cmdline_set("bootloader.default", "network");
-  EXPECT_EQ(kBootActionNetboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionNetboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineNetworkRequiresNetwork) {
   // If commandline tries to select network but isn't connected, we should fall
   // back to a boot from disk.
   cmdline_set("bootloader.default", "network");
-  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true, nullptr));
+  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineFastboot) {
   cmdline_set("bootloader.default", "fastboot");
-  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineZedboot) {
   cmdline_set("bootloader.default", "zedboot");
-  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionSlotR, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineUnknown) {
   // If "bootloader.default" is an unknown value, default to local.
   cmdline_set("bootloader.default", "foo");
-  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineDefault) {
-  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kFallthroughBootAction, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, CommandlineDefaultRequiresNetwork) {
@@ -303,7 +248,7 @@ TEST_F(GetBootActionTest, CommandlineDefaultRequiresNetwork) {
 
   // If network is unavailable we should fall back to a boot from disk
   // (required for GCE).
-  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true, nullptr));
+  EXPECT_EQ(kBootActionDefault, get_boot_action(&mock_runtime_services, false, true));
 }
 
 TEST_F(GetBootActionTest, BootbyteFirst) {
@@ -311,14 +256,14 @@ TEST_F(GetBootActionTest, BootbyteFirst) {
   set_bootbyte(&mock_runtime_services, EFI_BOOT_BOOTLOADER);
   EXPECT_CALL(mock_input_, ReadKeyStroke).Times(0);
   cmdline_set("bootloader.default", "local");
-  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 TEST_F(GetBootActionTest, MenuSelectSecond) {
   // Make the user menu is given priority over the commandline.
   SetUserInput('f');
   cmdline_set("bootloader.default", "local");
-  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true, nullptr));
+  EXPECT_EQ(kBootActionFastboot, get_boot_action(&mock_runtime_services, true, true));
 }
 
 class UefiVariableDumpHelpers : public Test {
