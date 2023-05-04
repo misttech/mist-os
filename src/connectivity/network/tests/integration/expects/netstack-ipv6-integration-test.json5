@@ -30,18 +30,6 @@
             ],
         },
         {
-            type: "skip",
-
-            // Test times out because forwarding table is not updated in
-            // response to IPv6 route discovery yet.
-            // TODO(https://fxbug.dev/97203): Update forwarding table in
-            // response to IPv6 route discovery.
-            matchers: [
-                "on_and_off_link_route_discovery_ns3::host",
-                "on_and_off_link_route_discovery_ns3::router",
-            ],
-        },
-        {
             type: "expect_pass",
             matchers: [
                 "sends_mld_reports_ns3::default",

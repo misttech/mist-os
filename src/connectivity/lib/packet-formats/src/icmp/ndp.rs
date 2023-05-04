@@ -650,6 +650,11 @@ pub mod options {
             self.preference
         }
 
+        /// Returns the lifetime of the route.
+        pub fn route_lifetime(&self) -> Option<NonZeroNdpLifetime> {
+            NonZeroNdpLifetime::from_u32_with_infinite(self.route_lifetime_seconds)
+        }
+
         fn prefix_bytes_len(&self) -> usize {
             let RouteInformation { prefix, route_lifetime_seconds: _, preference: _ } = self;
 

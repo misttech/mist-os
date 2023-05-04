@@ -277,8 +277,8 @@ mod tests {
     use packet_formats::{
         icmp::{
             ndp::{
-                options::{NdpOptionBuilder, PrefixInformation},
-                OptionSequenceBuilder, RouterAdvertisement,
+                options::{NdpOptionBuilder, PrefixInformation, RouteInformation},
+                OptionSequenceBuilder, RoutePreference, RouterAdvertisement,
             },
             IcmpPacketBuilder, IcmpUnusedCode,
         },
@@ -419,6 +419,8 @@ mod tests {
         NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(1)));
     const TWO_SECONDS: NonZeroDuration =
         NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(2)));
+    const THREE_SECONDS: NonZeroDuration =
+        NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(3)));
 
     #[test]
     fn new_route_no_lifetime() {
@@ -688,6 +690,7 @@ mod tests {
         on_link_prefix: Subnet<Ipv6Addr>,
         on_link_prefix_flag: bool,
         on_link_prefix_valid_lifetime_secs: u32,
+        more_specific_route: Option<(Subnet<Ipv6Addr>, u32)>,
     ) -> impl BufferMut {
         let src_ip: Ipv6Addr = src_ip.get();
         let dst_ip = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get();
@@ -699,8 +702,16 @@ mod tests {
             0, /* preferred_lifetime */
             on_link_prefix.network(),
         );
-        let options = &[NdpOptionBuilder::PrefixInformation(p)];
-        OptionSequenceBuilder::new(options.iter())
+        let more_specific_route_opt = more_specific_route.map(|(subnet, secs)| {
+            NdpOptionBuilder::RouteInformation(RouteInformation::new(
+                subnet,
+                secs,
+                RoutePreference::default(),
+            ))
+        });
+        let options = [NdpOptionBuilder::PrefixInformation(p)];
+        let options = options.iter().chain(more_specific_route_opt.as_ref());
+        OptionSequenceBuilder::new(options)
             .into_serializer()
             .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
                 src_ip,
@@ -836,13 +847,17 @@ mod tests {
 
         let src_ip = remote_mac.to_ipv6_link_local().addr();
 
-        let buf = |router_lifetime_secs, on_link_prefix_flag, prefix_valid_lifetime_secs| {
+        let buf = |router_lifetime_secs,
+                   on_link_prefix_flag,
+                   prefix_valid_lifetime_secs,
+                   more_specified_route_lifetime_secs| {
             router_advertisement_buf(
                 src_ip,
                 router_lifetime_secs,
                 subnet,
                 on_link_prefix_flag,
                 prefix_valid_lifetime_secs,
+                Some((subnet, more_specified_route_lifetime_secs)),
             )
         };
 
@@ -855,7 +870,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(0, false, as_secs(ONE_SECOND).into()),
+            buf(0, false, as_secs(ONE_SECOND).into(), 0),
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(get_non_link_local_routes(sync_ctx), HashSet::new());
@@ -867,7 +882,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(as_secs(ONE_SECOND), true, 0),
+            buf(as_secs(ONE_SECOND), true, 0, 0),
         );
         let gateway_route =
             Ipv6DiscoveredRoute { subnet: IPV6_DEFAULT_SUBNET, gateway: Some(src_ip) };
@@ -888,7 +903,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into()),
+            buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), 0),
         );
         let on_link_route = Ipv6DiscoveredRoute { subnet, gateway: None };
         let on_link_route_entry = discovered_route_to_entry(&device_id, on_link_route);
@@ -898,17 +913,46 @@ mod tests {
         ]);
         assert_eq!(
             get_non_link_local_routes(sync_ctx),
-            HashSet::from([gateway_route_entry, on_link_route_entry.clone()]),
+            HashSet::from([gateway_route_entry.clone(), on_link_route_entry.clone()]),
         );
 
-        // Invalidate default router and update valid lifetime for on-link
-        // prefix.
+        // Discover more-specific route.
         receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(0, true, as_secs(TWO_SECONDS).into()),
+            buf(
+                as_secs(TWO_SECONDS),
+                true,
+                as_secs(ONE_SECOND).into(),
+                as_secs(THREE_SECONDS).into(),
+            ),
+        );
+        let more_specific_route = Ipv6DiscoveredRoute { subnet, gateway: Some(src_ip) };
+        let more_specific_route_entry = discovered_route_to_entry(&device_id, more_specific_route);
+        non_sync_ctx.timer_ctx().assert_timers_installed([
+            (timer_id(gateway_route), FakeInstant::from(TWO_SECONDS.get())),
+            (timer_id(on_link_route), FakeInstant::from(ONE_SECOND.get())),
+            (timer_id(more_specific_route), FakeInstant::from(THREE_SECONDS.get())),
+        ]);
+        assert_eq!(
+            get_non_link_local_routes(sync_ctx),
+            HashSet::from([
+                gateway_route_entry.clone(),
+                on_link_route_entry.clone(),
+                more_specific_route_entry.clone()
+            ]),
+        );
+
+        // Invalidate default router and more specific route, and update valid
+        // lifetime for on-link prefix.
+        receive_ip_packet::<_, _, Ipv6>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            FrameDestination::Individual { local: true },
+            buf(0, true, as_secs(TWO_SECONDS).into(), 0),
         );
         non_sync_ctx.timer_ctx().assert_timers_installed([(
             timer_id(on_link_route),
@@ -926,7 +970,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(0, false, 0),
+            buf(0, false, 0, 0),
         );
         non_sync_ctx.timer_ctx().assert_timers_installed([(
             timer_id(on_link_route),
@@ -940,7 +984,7 @@ mod tests {
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
-            buf(0, true, 0),
+            buf(0, true, 0, 0),
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(get_non_link_local_routes(sync_ctx), HashSet::new(),);
@@ -972,6 +1016,7 @@ mod tests {
                 subnet,
                 on_link_prefix_flag,
                 prefix_valid_lifetime_secs,
+                None,
             )
         };
 
@@ -1102,6 +1147,7 @@ mod tests {
                 subnet,
                 true,
                 as_secs(ONE_SECOND).into(),
+                None,
             ),
         );
         non_sync_ctx.timer_ctx().assert_timers_installed([

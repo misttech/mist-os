@@ -1493,6 +1493,7 @@ fn receive_ndp_packet<
                 IpDeviceHandler::set_default_hop_limit(sync_ctx, &device_id, hop_limit);
             }
 
+            // TODO(https://fxbug.dev/126654): Support default router preference.
             Ipv6DeviceHandler::update_discovered_ipv6_route(
                 sync_ctx,
                 ctx,
@@ -1505,8 +1506,7 @@ fn receive_ndp_packet<
                 match option {
                     NdpOption::TargetLinkLayerAddress(_)
                     | NdpOption::RedirectedHeader { .. }
-                    | NdpOption::RecursiveDnsServer(_)
-                    | NdpOption::RouteInformation(_) => {}
+                    | NdpOption::RecursiveDnsServer(_) => {}
                     NdpOption::SourceLinkLayerAddress(addr) => {
                         // As per RFC 4861 section 6.3.4,
                         //
@@ -1581,6 +1581,7 @@ fn receive_ndp_packet<
                         let valid_lifetime = prefix_info.valid_lifetime();
 
                         if prefix_info.on_link_flag() {
+                            // TODO(https://fxbug.dev/126654): Support route preference.
                             Ipv6DeviceHandler::update_discovered_ipv6_route(
                                 sync_ctx,
                                 ctx,
@@ -1600,6 +1601,19 @@ fn receive_ndp_packet<
                                 valid_lifetime,
                             );
                         }
+                    }
+                    NdpOption::RouteInformation(rio) => {
+                        // TODO(https://fxbug.dev/126654): Support route preference.
+                        Ipv6DeviceHandler::update_discovered_ipv6_route(
+                            sync_ctx,
+                            ctx,
+                            &device_id,
+                            Ipv6DiscoveredRoute {
+                                subnet: rio.prefix().clone(),
+                                gateway: Some(src_ip),
+                            },
+                            rio.route_lifetime(),
+                        )
                     }
                     NdpOption::Mtu(mtu) => {
                         // TODO(https://fxbug.dev/101357): Control whether or
