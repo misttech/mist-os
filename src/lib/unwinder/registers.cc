@@ -66,16 +66,9 @@ Error Registers::GetPC(uint64_t& pc) const { return Get(GetPcReg(arch_), pc); }
 Error Registers::SetPC(uint64_t pc) { return Set(GetPcReg(arch_), pc); }
 
 std::string Registers::Describe() const {
-  std::vector<RegisterID> keys;
-  keys.reserve(regs_.size());
-  for (const auto& [id, val] : regs_) {
-    keys.push_back(id);
-  }
-  std::sort(keys.begin(), keys.end());
-
   std::stringstream ss;
-  for (auto id : keys) {
-    ss << GetRegName(id) << "=0x" << std::hex << regs_.at(id) << " ";
+  for (const auto& [id, val] : regs_) {
+    ss << GetRegName(id) << "=0x" << std::hex << val << " ";
   }
 
   std::string s = std::move(ss).str();
@@ -97,9 +90,9 @@ const char* Registers::GetRegName(RegisterID reg_id) const {
       "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "lr",  "sp",  "pc",
   };
   static const char* riscv64_names[] = {
-      "zero", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
-      "a1",   "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
-      "s6",   "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+      "pc", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
+      "a1", "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
+      "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
   };
 
   const char** names;
@@ -114,9 +107,6 @@ const char* Registers::GetRegName(RegisterID reg_id) const {
       length = sizeof(arm64_names) / sizeof(char*);
       break;
     case Arch::kRiscv64:
-      if (reg_id == RegisterID::kRiscv64_pc) {
-        return "pc";
-      }
       names = riscv64_names;
       length = sizeof(riscv64_names) / sizeof(char*);
       break;

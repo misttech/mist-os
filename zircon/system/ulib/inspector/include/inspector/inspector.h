@@ -17,13 +17,15 @@
 
 __BEGIN_CDECLS
 
-// The type of the buffer that holds the general registers, and exception info.
+// The type of the buffer that holds the exception info.
 #if defined(__x86_64__)
 typedef zx_x86_64_exc_data_t inspector_excp_data_t;
 #elif defined(__aarch64__)
 typedef zx_arm64_exc_data_t inspector_excp_data_t;
-#else  // unsupported arch
-typedef int inspector_excp_data_t;
+#elif defined(__riscv)
+typedef zx_riscv64_exc_data_t inspector_excp_data_t;
+#else
+#error Unsupported arch
 #endif
 
 // Print a backtrace of |thread| to |f|.

@@ -27,6 +27,8 @@ namespace {
 const char* kArch = "x86_64";
 #elif defined(__aarch64__)
 const char* kArch = "aarch64";
+#elif defined(__riscv)
+const char* kArch = "riscv64";
 #else
 #error unsupported architecture
 #endif
@@ -117,6 +119,10 @@ decoded_registers_t decode_registers(const zx_thread_state_general_regs_t* regs)
   decoded.pc = regs->pc;
   decoded.sp = regs->sp;
   decoded.fp = regs->r[29];
+#elif defined(__riscv)
+  decoded.pc = regs->pc;
+  decoded.sp = regs->sp;
+  decoded.fp = regs->s0;
 #else
 #error unsupported architecture
 #endif
@@ -217,6 +223,44 @@ void print_exception_report(FILE* out, const zx_exception_report_t& report,
     }
 
     fault_addr = excp_data->far;
+#elif defined(__riscv)
+    static constexpr uint32_t RISCV64_EXCEPTION_IACCESS_FAULT = 1;
+    static constexpr uint32_t RISCV64_EXCEPTION_LOAD_ACCESS_FAULT = 5;
+    static constexpr uint32_t RISCV64_EXCEPTION_STORE_ACCESS_FAULT = 7;
+    static constexpr uint32_t RISCV64_EXCEPTION_INS_PAGE_FAULT = 12;
+    static constexpr uint32_t RISCV64_EXCEPTION_LOAD_PAGE_FAULT = 13;
+    static constexpr uint32_t RISCV64_EXCEPTION_STORE_PAGE_FAULT = 15;
+
+    switch (report.context.arch.u.riscv_64.cause) {
+      case RISCV64_EXCEPTION_IACCESS_FAULT:
+        access_type = "execute";
+        violation = "protection";
+        break;
+      case RISCV64_EXCEPTION_INS_PAGE_FAULT:
+        access_type = "execute";
+        violation = "not-present";
+        break;
+      case RISCV64_EXCEPTION_LOAD_ACCESS_FAULT:
+        access_type = "read";
+        violation = "protection";
+        break;
+      case RISCV64_EXCEPTION_LOAD_PAGE_FAULT:
+        access_type = "read";
+        violation = "not-present";
+        break;
+      case RISCV64_EXCEPTION_STORE_ACCESS_FAULT:
+        access_type = "write";
+        violation = "protection";
+        break;
+      case RISCV64_EXCEPTION_STORE_PAGE_FAULT:
+        access_type = "write";
+        violation = "not-present";
+        break;
+      default:
+        access_type = "unknown";
+        violation = "unknown";
+    }
+    fault_addr = report.context.arch.u.riscv_64.tval;
 #else
 #error unsupported architecture
 #endif
@@ -319,6 +363,8 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
       inspector_excp_data_t* excp_data = &report.context.arch.u.x86_64;
 #elif defined(__aarch64__)
       inspector_excp_data_t* excp_data = &report.context.arch.u.arm_64;
+#elif defined(__riscv)
+      inspector_excp_data_t* excp_data = &report.context.arch.u.riscv_64;
 #else
 #error unsupported architecture
 #endif

@@ -100,6 +100,8 @@ bool inspector_get_gwp_asan_info(const zx::process& process,
     faulting_addr = exception_report.context.arch.u.x86_64.cr2;
 #elif defined(__aarch64__)
     faulting_addr = exception_report.context.arch.u.arm_64.far;
+#elif defined(__riscv)
+    faulting_addr = exception_report.context.arch.u.riscv_64.tval;
 #else
 #error What arch?
 #endif

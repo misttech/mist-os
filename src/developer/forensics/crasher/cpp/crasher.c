@@ -82,13 +82,15 @@ int stack_buf_overrun(volatile unsigned int* arg) {
   return 0;
 }
 
-int undefined(volatile unsigned int* unused) {
+int sw_breakpoint(volatile unsigned int* unused) {
 #if defined(__x86_64__)
-  __asm__ volatile("ud2");
+  __asm__ volatile("int3");
 #elif defined(__aarch64__)
-  __asm__ volatile("brk #0");  // not undefined, but close enough
+  __asm__ volatile("brk #0");
+#elif defined(__riscv)
+  __asm__ volatile("ebreak");
 #else
-#error "need to define undefined for this architecture"
+#error What arch?
 #endif
   return 0;
 }
@@ -100,8 +102,11 @@ int invalid(volatile unsigned int* unused) {
 #elif defined(__aarch64__)
   // add xzr, xzr, xzr
   __asm__ volatile(".inst 0xff031f8b" ::: "memory");
+#elif defined(__riscv)
+  // ecall is 0x00000073; ebreak is 0x00100073; 0x00200073 should be invalid.
+  __asm__ volatile(".inst 0x00200073");
 #else
-#error "need to define undefined for this architecture"
+#error What arch?
 #endif
   return 0;
 }
@@ -303,8 +308,8 @@ command_t commands[] = {
     {"writero", ro_write, "write to read only code segment"},
     {"stackov", stack_overflow, "overflow the stack (recursive)"},
     {"stackbuf", stack_buf_overrun, "overrun a buffer on the stack"},
-    {"und", undefined, "undefined instruction"},
-    {"invalid", invalid, "invalid instruction"},
+    {"breakpoint", sw_breakpoint, "trigger a software breakpoint"},
+    {"invalid", invalid, "execute an invalid instruction"},
     {"nx_run", nx_run, "run in no-execute memory"},
     {"oom", oom, "out of memory c++ death"},
     {"mem", mem, "out of memory"},

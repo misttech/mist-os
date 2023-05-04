@@ -29,6 +29,7 @@
 #ifndef SRC_LIB_UNWINDER_THIRD_PARTY_LIBUNWINDSTACK_CONTEXT_H_
 #define SRC_LIB_UNWINDER_THIRD_PARTY_LIBUNWINDSTACK_CONTEXT_H_
 
+#include <cstddef>
 #include <cstdint>
 
 #include "src/lib/unwinder/registers.h"
@@ -71,11 +72,65 @@ constexpr auto kCurrentArch = Registers::Arch::kArm64;
 extern "C" void AsmGetRegs(void* regs);
 constexpr auto kCurrentArch = Registers::Arch::kX64;
 
+#elif defined(__riscv)
+
+[[gnu::always_inline]] inline void AsmGetRegs(void* reg_data) {
+  asm volatile(
+      "1:\n"
+      "sd ra, 8(%[base])\n"
+      "sd sp, 16(%[base])\n"
+      "sd gp, 24(%[base])\n"
+      "sd tp, 32(%[base])\n"
+      "sd t0, 40(%[base])\n"
+      "sd t1, 48(%[base])\n"
+      "sd t2, 56(%[base])\n"
+      "sd s0, 64(%[base])\n"
+      "sd s1, 72(%[base])\n"
+      "sd a0, 80(%[base])\n"
+      "sd a1, 88(%[base])\n"
+      "sd a2, 96(%[base])\n"
+      "sd a3, 104(%[base])\n"
+      "sd a4, 112(%[base])\n"
+      "sd a5, 120(%[base])\n"
+      "sd a6, 128(%[base])\n"
+      "sd a7, 136(%[base])\n"
+      "sd s2, 144(%[base])\n"
+      "sd s3, 152(%[base])\n"
+      "sd s4, 160(%[base])\n"
+      "sd s5, 168(%[base])\n"
+      "sd s6, 176(%[base])\n"
+      "sd s7, 184(%[base])\n"
+      "sd s8, 192(%[base])\n"
+      "sd s9, 200(%[base])\n"
+      "sd s10, 208(%[base])\n"
+      "sd s11, 216(%[base])\n"
+      "sd t3, 224(%[base])\n"
+      "sd t4, 232(%[base])\n"
+      "sd t5, 240(%[base])\n"
+      "sd t6, 248(%[base])\n"
+      "la t1, 1b\n"
+      "sd t1, 0(%[base])\n"
+      : [base] "+r"(reg_data)
+      :
+      : "t1", "memory");
+}
+constexpr auto kCurrentArch = Registers::Arch::kRiscv64;
+
+#else
+#error What platform?
 #endif
 
 [[gnu::always_inline]] inline Registers GetContext() {
-  constexpr auto kRegLast = static_cast<uint8_t>(
-      kCurrentArch == Registers::Arch::kX64 ? RegisterID::kX64_last : RegisterID::kArm64_last);
+  constexpr auto kRegLast = static_cast<uint8_t>([]() {
+    switch (kCurrentArch) {
+      case Registers::Arch::kX64:
+        return RegisterID::kX64_last;
+      case Registers::Arch::kArm64:
+        return RegisterID::kArm64_last;
+      case Registers::Arch::kRiscv64:
+        return RegisterID::kRiscv64_last;
+    }
+  }());
 
   uint64_t regs[kRegLast];
   AsmGetRegs(regs);
