@@ -478,12 +478,14 @@ impl ImageAssemblyConfigBuilder {
         // Add dynamically compiled packages first so they are all present
         // and can be repackaged and configured
         for (_, package_builder) in packages_to_compile {
+            let package_name = package_builder.name.to_owned();
             let package_manifest_path = package_builder
                 .build(cmc_tool.as_ref(), &mut bootfs_files.entries, outdir)
-                .context("building compiled package")?;
+                .with_context(|| format!("building compiled package {}", &package_name))?;
 
             if let Some(p) = package_manifest_path {
-                base.add_package_from_path(p).context("adding compiled package")?;
+                base.add_package_from_path(p)
+                    .with_context(|| format!("adding compiled package {}", &package_name))?;
             };
         }
 

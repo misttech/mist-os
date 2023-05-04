@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct CompiledPackageBuilder {
-    name: String,
+    pub name: String,
     component_shards: BTreeMap<String, BTreeSet<Utf8PathBuf>>,
     main_definition: Option<MainPackageDefinition>,
     main_bundle_dir: Utf8PathBuf,
