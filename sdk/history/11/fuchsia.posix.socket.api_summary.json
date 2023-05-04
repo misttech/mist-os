@@ -3191,7 +3191,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket/DatagramSocketDescribeResponse.socket",
         "ordinal": "1",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "table/member",
@@ -3272,7 +3272,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket/DatagramSocket_RecvMsgPostflight_Response.validity",
         "ordinal": "1",
-        "type": "zx/handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT>"
+        "type": "zx/Handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT>"
     },
     {
         "kind": "table",
@@ -3313,7 +3313,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket/DatagramSocket_SendMsgPreflight_Response.validity",
         "ordinal": "2",
-        "type": "vector<zx/handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT>>:63"
+        "type": "vector<zx/Handle:<EVENTPAIR,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT>>:63"
     },
     {
         "kind": "table",
@@ -4675,7 +4675,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket/StreamSocketDescribeResponse.socket",
         "ordinal": "1",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "table",
@@ -5891,7 +5891,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket/SynchronousDatagramSocketDescribeResponse.event",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table",

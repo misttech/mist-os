@@ -841,7 +841,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.gfx/ExportResourceCmdDeprecated.token",
         "ordinal": "2",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -852,7 +852,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.gfx/ExportToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -1025,7 +1025,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.gfx/ImportResourceCmdDeprecated.token",
         "ordinal": "2",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -1047,7 +1047,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.gfx/ImportToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -1129,7 +1129,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.gfx/MemoryArgs.vmo",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",
@@ -1258,7 +1258,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.gfx/PoseBufferProvider.SetPoseBuffer",
         "ordinal": "6092637130924467944",
-        "type": "(zx/handle:VMO buffer,uint32 num_entries,int64 base_time,uint64 time_interval)"
+        "type": "(zx/Handle:VMO buffer,uint32 num_entries,int64 base_time,uint64 time_interval)"
     },
     {
         "kind": "protocol",

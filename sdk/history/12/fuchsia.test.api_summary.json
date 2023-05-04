@@ -124,13 +124,13 @@
         "kind": "table/member",
         "name": "fuchsia.test/StdHandles.err",
         "ordinal": "2",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.test/StdHandles.out",
         "ordinal": "1",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "table",

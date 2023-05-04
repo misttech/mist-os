@@ -35,19 +35,19 @@
         "kind": "protocol/member",
         "name": "fuchsia.vulkan.loader/Loader.ConnectToDeviceFs",
         "ordinal": "1282790591899367127",
-        "type": "(zx/handle:CHANNEL channel)"
+        "type": "(zx/Handle:CHANNEL channel)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.vulkan.loader/Loader.ConnectToManifestFs",
         "ordinal": "312112136052048332",
-        "type": "(fuchsia.vulkan.loader/ConnectToManifestOptions options,zx/handle:CHANNEL channel)"
+        "type": "(fuchsia.vulkan.loader/ConnectToManifestOptions options,zx/Handle:CHANNEL channel)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.vulkan.loader/Loader.Get",
         "ordinal": "8348477123448091146",
-        "type": "(string:64 name) -> (zx/handle:<VMO,optional> lib)"
+        "type": "(string:64 name) -> (zx/Handle:<VMO,optional> lib)"
     },
     {
         "kind": "protocol/member",

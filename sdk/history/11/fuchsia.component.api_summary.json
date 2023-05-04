@@ -7,7 +7,7 @@
         "kind": "table/member",
         "name": "fuchsia.component/CapabilityRequestedPayload.capability",
         "ordinal": "2",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "table/member",
@@ -51,7 +51,7 @@
         "kind": "table/member",
         "name": "fuchsia.component/DebugStartedPayload.break_on_start",
         "ordinal": "2",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table/member",

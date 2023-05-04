@@ -158,10 +158,10 @@ func (n *symbolTable) fidlTypeString(t fidlgen.Type) Type {
 		ret.addParam(string(n.fidlTypeString(*t.ElementType)))
 	case fidlgen.HandleType:
 		if t.HandleSubtype != fidlgen.HandleSubtypeNone {
-			ret.setLayout("zx/handle")
+			ret.setLayout("zx/Handle")
 			ret.addConstraint(strings.ToUpper(string(t.HandleSubtype)))
 		} else {
-			ret.setLayout("zx/handle")
+			ret.setLayout("zx/Handle")
 		}
 		ret.addHandleRights(t.HandleRights)
 	case fidlgen.IdentifierType: // E.g. struct, enum, bits, etc.

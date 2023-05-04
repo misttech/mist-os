@@ -14,7 +14,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/View.Attach",
         "ordinal": "8955752207985670062",
-        "type": "(zx/handle:EVENTPAIR view_token)"
+        "type": "(zx/Handle:EVENTPAIR view_token)"
     },
     {
         "kind": "protocol/member",
@@ -40,7 +40,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/ViewProvider.CreateView",
         "ordinal": "4602213985402103992",
-        "type": "(zx/handle:EVENTPAIR token,server_end:<fuchsia.sys/ServiceProvider,optional> incoming_services,fuchsia.sys/ServiceProvider:optional outgoing_services)"
+        "type": "(zx/Handle:EVENTPAIR token,server_end:<fuchsia.sys/ServiceProvider,optional> incoming_services,fuchsia.sys/ServiceProvider:optional outgoing_services)"
     },
     {
         "kind": "protocol/member",
@@ -52,7 +52,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/ViewProvider.CreateViewWithViewRef",
         "ordinal": "6371788243217062534",
-        "type": "(zx/handle:EVENTPAIR token,fuchsia.ui.views/ViewRefControl view_ref_control,fuchsia.ui.views/ViewRef view_ref)"
+        "type": "(zx/Handle:EVENTPAIR token,fuchsia.ui.views/ViewRefControl view_ref_control,fuchsia.ui.views/ViewRef view_ref)"
     },
     {
         "kind": "protocol",

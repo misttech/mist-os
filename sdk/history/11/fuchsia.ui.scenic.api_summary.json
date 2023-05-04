@@ -51,13 +51,13 @@
         "kind": "table/member",
         "name": "fuchsia.ui.scenic/Present2Args.acquire_fences",
         "ordinal": "2",
-        "type": "vector<zx/handle:EVENT>"
+        "type": "vector<zx/Handle:EVENT>"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.ui.scenic/Present2Args.release_fences",
         "ordinal": "3",
-        "type": "vector<zx/handle:EVENT>"
+        "type": "vector<zx/Handle:EVENT>"
     },
     {
         "kind": "table/member",
@@ -104,7 +104,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.scenic/Scenic.GetDisplayOwnershipEvent",
         "ordinal": "6107185415463838934",
-        "type": "() -> (zx/handle:EVENT ownership_event)"
+        "type": "() -> (zx/Handle:EVENT ownership_event)"
     },
     {
         "kind": "protocol/member",
@@ -161,7 +161,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.ui.scenic/Session.Present",
         "ordinal": "3933454894216954750",
-        "type": "(uint64 presentation_time,vector<zx/handle:EVENT> acquire_fences,vector<zx/handle:EVENT> release_fences) -> (fuchsia.images/PresentationInfo presentation_info)"
+        "type": "(uint64 presentation_time,vector<zx/Handle:EVENT> acquire_fences,vector<zx/Handle:EVENT> release_fences) -> (fuchsia.images/PresentationInfo presentation_info)"
     },
     {
         "kind": "protocol/member",

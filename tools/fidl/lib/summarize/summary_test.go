@@ -16,12 +16,13 @@ var (
 	// zxLibrary is a shortened version of zx_common.fidl, for tests.
 	zxLibrary = `
 library zx;
-type obj_type = enum : uint32 {
+
+type ObjType = enum : uint32 {
   CHANNEL = 4;
 };
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
   properties {
-    subtype obj_type;
+    subtype ObjType;
   };
 };
 `
@@ -680,13 +681,13 @@ type Handles = resource struct {
         "kind": "struct/member",
         "name": "l/Handles.c",
         "ordinal": "2",
-        "type": "zx/handle:<CHANNEL,optional>"
+        "type": "zx/Handle:<CHANNEL,optional>"
     },
     {
         "kind": "struct/member",
         "name": "l/Handles.h",
         "ordinal": "1",
-        "type": "zx/handle"
+        "type": "zx/Handle"
     },
     {
         "kind": "struct",

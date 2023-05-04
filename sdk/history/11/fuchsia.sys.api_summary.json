@@ -109,19 +109,19 @@
         "kind": "struct/member",
         "name": "fuchsia.sys/FileDescriptor.handle0",
         "ordinal": "4",
-        "type": "zx/handle:optional"
+        "type": "zx/Handle:optional"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.sys/FileDescriptor.handle1",
         "ordinal": "5",
-        "type": "zx/handle:optional"
+        "type": "zx/Handle:optional"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.sys/FileDescriptor.handle2",
         "ordinal": "6",
-        "type": "zx/handle:optional"
+        "type": "zx/Handle:optional"
     },
     {
         "kind": "struct/member",
@@ -167,7 +167,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.sys/JobProvider.GetJob",
         "ordinal": "1071969128043400938",
-        "type": "() -> (zx/handle:JOB job)"
+        "type": "() -> (zx/Handle:JOB job)"
     },
     {
         "kind": "protocol",
@@ -322,7 +322,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.sys/ServiceProvider.ConnectToService",
         "ordinal": "8281255024273997880",
-        "type": "(string service_name,zx/handle:CHANNEL channel)"
+        "type": "(string service_name,zx/Handle:CHANNEL channel)"
     },
     {
         "kind": "protocol",

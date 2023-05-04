@@ -52,7 +52,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.runner/ComponentStartInfo.break_on_start",
         "ordinal": "8",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table/member",

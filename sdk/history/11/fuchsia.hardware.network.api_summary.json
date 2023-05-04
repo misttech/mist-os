@@ -270,13 +270,13 @@
         "kind": "struct/member",
         "name": "fuchsia.hardware.network/Fifos.rx",
         "ordinal": "1",
-        "type": "zx/handle:FIFO"
+        "type": "zx/Handle:FIFO"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.hardware.network/Fifos.tx",
         "ordinal": "2",
-        "type": "zx/handle:FIFO"
+        "type": "zx/Handle:FIFO"
     },
     {
         "kind": "struct",
@@ -740,7 +740,7 @@
         "kind": "table/member",
         "name": "fuchsia.hardware.network/SessionInfo.data",
         "ordinal": "2",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "table/member",
@@ -764,7 +764,7 @@
         "kind": "table/member",
         "name": "fuchsia.hardware.network/SessionInfo.descriptors",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "table/member",

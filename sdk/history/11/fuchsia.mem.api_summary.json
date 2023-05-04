@@ -9,7 +9,7 @@
         "kind": "struct/member",
         "name": "fuchsia.mem/Buffer.vmo",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",
@@ -50,7 +50,7 @@
         "kind": "struct/member",
         "name": "fuchsia.mem/Range.vmo",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",

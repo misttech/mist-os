@@ -79,7 +79,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.mediacodec/CodecFactory.AttachLifetimeTracking",
         "ordinal": "1190752722540201112",
-        "type": "(zx/handle:EVENTPAIR codec_end)"
+        "type": "(zx/Handle:EVENTPAIR codec_end)"
     },
     {
         "kind": "protocol/member",

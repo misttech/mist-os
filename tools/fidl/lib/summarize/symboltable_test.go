@@ -139,7 +139,7 @@ func TestSymboltable(t *testing.T) {
 				HandleSubtype: fidlgen.HandleSubtypeInterrupt,
 				Nullable:      true,
 			},
-			expected: "zx/handle:<INTERRUPT,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT,zx.APPLY_PROFILE,optional>",
+			expected: "zx/Handle:<INTERRUPT,zx.DUPLICATE,zx.TRANSFER,zx.WAIT,zx.INSPECT,zx.APPLY_PROFILE,optional>",
 		},
 	}
 	for _, test := range tests {

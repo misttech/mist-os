@@ -74,7 +74,7 @@
         "kind": "table/member",
         "name": "fuchsia.modular/AgentServiceRequest.channel",
         "ordinal": "2",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "table/member",

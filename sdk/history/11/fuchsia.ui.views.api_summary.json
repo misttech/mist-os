@@ -120,7 +120,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewCreationToken.value",
         "ordinal": "1",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "struct",
@@ -131,7 +131,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewHolderToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -159,7 +159,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewRef.reference",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -170,7 +170,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewRefControl.reference",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -233,7 +233,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -244,7 +244,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewportCreationToken.value",
         "ordinal": "1",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "struct",

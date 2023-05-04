@@ -45,7 +45,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.camera/Control.CreateStream",
         "ordinal": "4633303425909463570",
-        "type": "(fuchsia.sysmem/BufferCollectionInfo buffer_collection,fuchsia.camera/FrameRate rate,server_end:fuchsia.camera/Stream stream,zx/handle:EVENTPAIR stream_token)"
+        "type": "(fuchsia.sysmem/BufferCollectionInfo buffer_collection,fuchsia.camera/FrameRate rate,server_end:fuchsia.camera/Stream stream,zx/Handle:EVENTPAIR stream_token)"
     },
     {
         "kind": "protocol/member",
@@ -178,13 +178,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.camera/Manager.CreateStream",
         "ordinal": "2126659773403828857",
-        "type": "(fuchsia.camera/VideoStream request,fuchsia.sysmem/BufferCollectionInfo buffer_info,server_end:fuchsia.camera/Stream stream,zx/handle:EVENTPAIR client_token)"
+        "type": "(fuchsia.camera/VideoStream request,fuchsia.sysmem/BufferCollectionInfo buffer_info,server_end:fuchsia.camera/Stream stream,zx/Handle:EVENTPAIR client_token)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera/Manager.CreateStreamV2",
         "ordinal": "6698465947201955196",
-        "type": "(fuchsia.camera/VideoStreamV2 request,fuchsia.sysmem/BufferCollectionInfo buffer_info,server_end:fuchsia.camera/Stream stream,zx/handle:EVENTPAIR client_token)"
+        "type": "(fuchsia.camera/VideoStreamV2 request,fuchsia.sysmem/BufferCollectionInfo buffer_info,server_end:fuchsia.camera/Stream stream,zx/Handle:EVENTPAIR client_token)"
     },
     {
         "kind": "protocol/member",

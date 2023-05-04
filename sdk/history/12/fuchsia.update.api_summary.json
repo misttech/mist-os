@@ -69,7 +69,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.update/CommitStatusProvider.IsCurrentSystemCommitted",
         "ordinal": "5569020245381897649",
-        "type": "() -> (zx/handle:EVENTPAIR event)"
+        "type": "() -> (zx/Handle:EVENTPAIR event)"
     },
     {
         "kind": "protocol",

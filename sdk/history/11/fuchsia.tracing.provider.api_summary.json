@@ -97,7 +97,7 @@
         "kind": "struct/member",
         "name": "fuchsia.tracing.provider/ProviderConfig.buffer",
         "ordinal": "2",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct/member",
@@ -115,7 +115,7 @@
         "kind": "struct/member",
         "name": "fuchsia.tracing.provider/ProviderConfig.fifo",
         "ordinal": "3",
-        "type": "zx/handle:FIFO"
+        "type": "zx/Handle:FIFO"
     },
     {
         "kind": "struct",

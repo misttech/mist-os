@@ -19,7 +19,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/CpuResource.Get",
         "ordinal": "4747093326996575716",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -67,7 +67,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/DebugResource.Get",
         "ordinal": "2123965638151660660",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -77,7 +77,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/HypervisorResource.Get",
         "ordinal": "2031441404809979042",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -87,7 +87,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/InfoResource.Get",
         "ordinal": "2155233879084769383",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -97,7 +97,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/IoportResource.Get",
         "ordinal": "5598546592714442027",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -107,7 +107,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/IrqResource.Get",
         "ordinal": "5268056273734091241",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -263,7 +263,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/MmioResource.Get",
         "ordinal": "7382661600629358203",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -367,7 +367,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/PowerResource.Get",
         "ordinal": "3138438062431922278",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -377,7 +377,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/RootJob.Get",
         "ordinal": "8335237394535366316",
-        "type": "() -> (zx/handle:JOB job)"
+        "type": "() -> (zx/Handle:JOB job)"
     },
     {
         "kind": "protocol",
@@ -387,7 +387,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/RootJobForInspect.Get",
         "ordinal": "8335237394535366316",
-        "type": "() -> (zx/handle:JOB job)"
+        "type": "() -> (zx/Handle:JOB job)"
     },
     {
         "kind": "protocol",
@@ -397,7 +397,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/SmcResource.Get",
         "ordinal": "4119875881902861799",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",
@@ -435,7 +435,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.kernel/VmexResource.Get",
         "ordinal": "3736636248880907929",
-        "type": "() -> (zx/handle:RESOURCE resource)"
+        "type": "() -> (zx/Handle:RESOURCE resource)"
     },
     {
         "kind": "protocol",

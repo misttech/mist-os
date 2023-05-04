@@ -3,7 +3,7 @@
         "kind": "struct/member",
         "name": "fuchsia.process/HandleInfo.handle",
         "ordinal": "1",
-        "type": "zx/handle"
+        "type": "zx/Handle"
     },
     {
         "kind": "struct/member",
@@ -20,13 +20,13 @@
         "kind": "struct/member",
         "name": "fuchsia.process/LaunchInfo.executable",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.process/LaunchInfo.job",
         "ordinal": "2",
-        "type": "zx/handle:JOB"
+        "type": "zx/Handle:JOB"
     },
     {
         "kind": "struct/member",
@@ -73,7 +73,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.process/Launcher.Launch",
         "ordinal": "1239433936316120996",
-        "type": "(fuchsia.process/LaunchInfo info) -> (int32 status,zx/handle:<PROCESS,optional> process)"
+        "type": "(fuchsia.process/LaunchInfo info) -> (int32 status,zx/Handle:<PROCESS,optional> process)"
     },
     {
         "kind": "protocol/member",
@@ -118,7 +118,7 @@
         "kind": "struct/member",
         "name": "fuchsia.process/ProcessStartData.bootstrap",
         "ordinal": "6",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "struct/member",
@@ -130,13 +130,13 @@
         "kind": "struct/member",
         "name": "fuchsia.process/ProcessStartData.process",
         "ordinal": "1",
-        "type": "zx/handle:PROCESS"
+        "type": "zx/Handle:PROCESS"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.process/ProcessStartData.root_vmar",
         "ordinal": "2",
-        "type": "zx/handle:VMAR"
+        "type": "zx/Handle:VMAR"
     },
     {
         "kind": "struct/member",
@@ -148,7 +148,7 @@
         "kind": "struct/member",
         "name": "fuchsia.process/ProcessStartData.thread",
         "ordinal": "3",
-        "type": "zx/handle:THREAD"
+        "type": "zx/Handle:THREAD"
     },
     {
         "kind": "struct/member",
@@ -165,7 +165,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.process/Resolver.Resolve",
         "ordinal": "4329530577128037520",
-        "type": "(string:2048 name) -> (int32 status,zx/handle:<VMO,optional> executable,fuchsia.ldsvc/Loader:optional ldsvc)"
+        "type": "(string:2048 name) -> (int32 status,zx/Handle:<VMO,optional> executable,fuchsia.ldsvc/Loader:optional ldsvc)"
     },
     {
         "kind": "protocol",

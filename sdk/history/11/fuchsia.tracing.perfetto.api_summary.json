@@ -34,7 +34,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.tracing.perfetto/ConsumerConnector.ConnectConsumer",
         "ordinal": "5005526192643839293",
-        "type": "(zx/handle:SOCKET consumer_socket) -> (fuchsia.tracing.perfetto/ConsumerConnector_ConnectConsumer_Result result)"
+        "type": "(zx/Handle:SOCKET consumer_socket) -> (fuchsia.tracing.perfetto/ConsumerConnector_ConnectConsumer_Result result)"
     },
     {
         "kind": "protocol",
@@ -65,7 +65,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.tracing.perfetto/ProducerConnector.ConnectProducer",
         "ordinal": "8989116752979882863",
-        "type": "(zx/handle:SOCKET producer_socket,fuchsia.tracing.perfetto/TraceBuffer buffer) -> (fuchsia.tracing.perfetto/ProducerConnector_ConnectProducer_Result result)"
+        "type": "(zx/Handle:SOCKET producer_socket,fuchsia.tracing.perfetto/TraceBuffer buffer) -> (fuchsia.tracing.perfetto/ProducerConnector_ConnectProducer_Result result)"
     },
     {
         "kind": "protocol",

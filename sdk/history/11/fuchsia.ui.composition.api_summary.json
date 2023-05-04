@@ -50,7 +50,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.composition/BufferCollectionExportToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -61,7 +61,7 @@
         "kind": "struct/member",
         "name": "fuchsia.ui.composition/BufferCollectionImportToken.value",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct",
@@ -399,7 +399,7 @@
         "kind": "table/member",
         "name": "fuchsia.ui.composition/GetNextFrameArgs.event",
         "ordinal": "1",
-        "type": "zx/handle:EVENT"
+        "type": "zx/Handle:EVENT"
     },
     {
         "kind": "table",
@@ -587,13 +587,13 @@
         "kind": "table/member",
         "name": "fuchsia.ui.composition/PresentArgs.acquire_fences",
         "ordinal": "2",
-        "type": "vector<zx/handle:EVENT>:16"
+        "type": "vector<zx/Handle:EVENT>:16"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.ui.composition/PresentArgs.release_fences",
         "ordinal": "3",
-        "type": "vector<zx/handle:EVENT>:16"
+        "type": "vector<zx/Handle:EVENT>:16"
     },
     {
         "kind": "table/member",
@@ -605,13 +605,13 @@
         "kind": "table/member",
         "name": "fuchsia.ui.composition/PresentArgs.server_signal_fences",
         "ordinal": "6",
-        "type": "vector<zx/handle:EVENT>:16"
+        "type": "vector<zx/Handle:EVENT>:16"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.ui.composition/PresentArgs.server_wait_fences",
         "ordinal": "5",
-        "type": "vector<zx/handle:EVENT>:16"
+        "type": "vector<zx/Handle:EVENT>:16"
     },
     {
         "kind": "table/member",

@@ -215,13 +215,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.Connect",
         "ordinal": "7263263143300023835",
-        "type": "(zx/handle:SOCKET socket)"
+        "type": "(zx/Handle:SOCKET socket)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.ConnectStructured",
         "ordinal": "7157386067685058380",
-        "type": "(zx/handle:SOCKET socket)"
+        "type": "(zx/Handle:SOCKET socket)"
     },
     {
         "kind": "protocol/member",

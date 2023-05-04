@@ -43,7 +43,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader.RegisterVmos",
         "ordinal": "2154263285602135949",
-        "type": "(vector<uint32>:300 vmo_ids,vector<zx/handle:VMO>:300 vmos) -> (fuchsia.hardware.radar/RadarBurstReader_RegisterVmos_Result result)"
+        "type": "(vector<uint32>:300 vmo_ids,vector<zx/Handle:VMO>:300 vmos) -> (fuchsia.hardware.radar/RadarBurstReader_RegisterVmos_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -173,7 +173,7 @@
         "kind": "struct/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader_UnregisterVmos_Response.vmos",
         "ordinal": "1",
-        "type": "vector<zx/handle:VMO>:300"
+        "type": "vector<zx/Handle:VMO>:300"
     },
     {
         "kind": "struct",

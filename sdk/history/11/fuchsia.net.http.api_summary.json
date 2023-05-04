@@ -9,7 +9,7 @@
         "kind": "union/member",
         "name": "fuchsia.net.http/Body.stream",
         "ordinal": "2",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "union",
@@ -151,7 +151,7 @@
         "kind": "table/member",
         "name": "fuchsia.net.http/Response.body",
         "ordinal": "2",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "table/member",

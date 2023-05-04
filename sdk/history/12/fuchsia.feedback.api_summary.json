@@ -363,7 +363,7 @@
         "kind": "table/member",
         "name": "fuchsia.feedback/GetSnapshotParameters.response_channel",
         "ordinal": "2",
-        "type": "zx/handle:CHANNEL"
+        "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "table",

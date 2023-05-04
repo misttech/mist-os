@@ -881,7 +881,7 @@
         "kind": "struct/member",
         "name": "fuchsia.hardware.audio/RingBuffer_GetVmo_Response.ring_buffer",
         "ordinal": "2",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",

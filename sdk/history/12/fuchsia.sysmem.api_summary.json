@@ -37,7 +37,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollection.AttachLifetimeTracking",
         "ordinal": "1661000457110489481",
-        "type": "(zx/handle:EVENTPAIR server_end,uint32 buffers_remaining)"
+        "type": "(zx/Handle:EVENTPAIR server_end,uint32 buffers_remaining)"
     },
     {
         "kind": "protocol/member",
@@ -91,13 +91,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollection.GetNodeRef",
         "ordinal": "5078789850020985732",
-        "type": "() -> (zx/handle:EVENT node_ref)"
+        "type": "() -> (zx/Handle:EVENT node_ref)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollection.IsAlternateFor",
         "ordinal": "3720720616290479111",
-        "type": "(zx/handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
+        "type": "(zx/Handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -254,7 +254,7 @@
         "kind": "struct/member",
         "name": "fuchsia.sysmem/BufferCollectionInfo.vmos",
         "ordinal": "3",
-        "type": "array<zx/handle:<VMO,optional>,64>"
+        "type": "array<zx/Handle:<VMO,optional>,64>"
     },
     {
         "kind": "struct",
@@ -342,13 +342,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionToken.GetNodeRef",
         "ordinal": "5078789850020985732",
-        "type": "() -> (zx/handle:EVENT node_ref)"
+        "type": "() -> (zx/Handle:EVENT node_ref)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionToken.IsAlternateFor",
         "ordinal": "3720720616290479111",
-        "type": "(zx/handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
+        "type": "(zx/Handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -418,13 +418,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionTokenGroup.GetNodeRef",
         "ordinal": "5078789850020985732",
-        "type": "() -> (zx/handle:EVENT node_ref)"
+        "type": "() -> (zx/Handle:EVENT node_ref)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionTokenGroup.IsAlternateFor",
         "ordinal": "3720720616290479111",
-        "type": "(zx/handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
+        "type": "(zx/Handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -1377,13 +1377,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/Node.GetNodeRef",
         "ordinal": "5078789850020985732",
-        "type": "() -> (zx/handle:EVENT node_ref)"
+        "type": "() -> (zx/Handle:EVENT node_ref)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/Node.IsAlternateFor",
         "ordinal": "3720720616290479111",
-        "type": "(zx/handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
+        "type": "(zx/Handle:EVENT node_ref) -> (fuchsia.sysmem/Node_IsAlternateFor_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -2006,7 +2006,7 @@
         "kind": "struct/member",
         "name": "fuchsia.sysmem/VmoBuffer.vmo",
         "ordinal": "1",
-        "type": "zx/handle:<VMO,optional>"
+        "type": "zx/Handle:<VMO,optional>"
     },
     {
         "kind": "struct/member",

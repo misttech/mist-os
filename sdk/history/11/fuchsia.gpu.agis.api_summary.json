@@ -25,7 +25,7 @@
         "kind": "struct/member",
         "name": "fuchsia.gpu.agis/ComponentRegistry_GetVulkanSocket_Response.socket",
         "ordinal": "1",
-        "type": "zx/handle:<SOCKET,optional>"
+        "type": "zx/Handle:<SOCKET,optional>"
     },
     {
         "kind": "struct",
@@ -106,7 +106,7 @@
         "kind": "struct/member",
         "name": "fuchsia.gpu.agis/Connector_GetSocket_Response.socket",
         "ordinal": "1",
-        "type": "zx/handle:SOCKET"
+        "type": "zx/Handle:SOCKET"
     },
     {
         "kind": "struct",

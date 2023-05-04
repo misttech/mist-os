@@ -41,7 +41,7 @@
         "kind": "struct/member",
         "name": "fuchsia.images/EncodedImage.vmo",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",
@@ -121,7 +121,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.PresentImage",
         "ordinal": "8345087712037704762",
-        "type": "(uint32 image_id,uint64 presentation_time,vector<zx/handle:EVENT>:16 acquire_fences,vector<zx/handle:EVENT>:16 release_fences) -> (fuchsia.images/PresentationInfo presentation_info)"
+        "type": "(uint32 image_id,uint64 presentation_time,vector<zx/Handle:EVENT>:16 acquire_fences,vector<zx/Handle:EVENT>:16 release_fences) -> (fuchsia.images/PresentationInfo presentation_info)"
     },
     {
         "kind": "protocol/member",

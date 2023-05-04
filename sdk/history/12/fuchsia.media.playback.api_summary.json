@@ -85,7 +85,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media.playback/Player.CreateFileSource",
         "ordinal": "7811822393877703450",
-        "type": "(zx/handle:CHANNEL file_channel,server_end:fuchsia.media.playback/Source source_request)"
+        "type": "(zx/Handle:CHANNEL file_channel,server_end:fuchsia.media.playback/Source source_request)"
     },
     {
         "kind": "protocol/member",
@@ -127,13 +127,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.media.playback/Player.SetFileSource",
         "ordinal": "5339286397160132171",
-        "type": "(zx/handle:CHANNEL file_channel)"
+        "type": "(zx/Handle:CHANNEL file_channel)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.media.playback/Player.SetFileSourceWithOptions",
         "ordinal": "8169648831940831468",
-        "type": "(zx/handle:CHANNEL file_channel,fuchsia.media.playback/PlayerOptions options)"
+        "type": "(zx/Handle:CHANNEL file_channel,fuchsia.media.playback/PlayerOptions options)"
     },
     {
         "kind": "protocol/member",
@@ -281,7 +281,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media.playback/SeekingReader.ReadAt",
         "ordinal": "4341807502117189515",
-        "type": "(uint64 position) -> (int32 status,zx/handle:<SOCKET,optional> socket)"
+        "type": "(uint64 position) -> (int32 status,zx/Handle:<SOCKET,optional> socket)"
     },
     {
         "kind": "protocol",
@@ -313,7 +313,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media.playback/SourceManager.CreateFileSource",
         "ordinal": "7811822393877703450",
-        "type": "(zx/handle:CHANNEL file_channel,server_end:fuchsia.media.playback/Source source_request)"
+        "type": "(zx/Handle:CHANNEL file_channel,server_end:fuchsia.media.playback/Source source_request)"
     },
     {
         "kind": "protocol/member",

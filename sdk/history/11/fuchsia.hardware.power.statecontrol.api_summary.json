@@ -3,7 +3,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.hardware.power.statecontrol/Admin.Mexec",
         "ordinal": "2274853818497868998",
-        "type": "(zx/handle:VMO kernel_zbi,zx/handle:VMO data_zbi) -> (fuchsia.hardware.power.statecontrol/Admin_Mexec_Result result)"
+        "type": "(zx/Handle:VMO kernel_zbi,zx/Handle:VMO data_zbi) -> (fuchsia.hardware.power.statecontrol/Admin_Mexec_Result result)"
     },
     {
         "kind": "protocol/member",

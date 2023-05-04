@@ -85,7 +85,7 @@
         "kind": "table/member",
         "name": "fuchsia.hardware.pty/DeviceDescribeResponse.event",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table",

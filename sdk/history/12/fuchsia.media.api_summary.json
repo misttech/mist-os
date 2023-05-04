@@ -343,7 +343,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioCapturer.AddPayloadBuffer",
         "ordinal": "4267785153247337302",
-        "type": "(uint32 id,zx/handle:VMO payload_buffer)"
+        "type": "(uint32 id,zx/Handle:VMO payload_buffer)"
     },
     {
         "kind": "protocol/member",
@@ -373,7 +373,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioCapturer.GetReferenceClock",
         "ordinal": "5823215522988903793",
-        "type": "() -> (zx/handle:CLOCK reference_clock)"
+        "type": "() -> (zx/Handle:CLOCK reference_clock)"
     },
     {
         "kind": "protocol/member",
@@ -415,7 +415,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioCapturer.SetReferenceClock",
         "ordinal": "8298775432238603215",
-        "type": "(zx/handle:<CLOCK,optional> reference_clock)"
+        "type": "(zx/Handle:<CLOCK,optional> reference_clock)"
     },
     {
         "kind": "protocol/member",
@@ -568,7 +568,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioConsumer.CreateStreamSink",
         "ordinal": "5934402457977739396",
-        "type": "(vector<zx/handle:VMO>:16 buffers,fuchsia.media/AudioStreamType stream_type,box<fuchsia.media/Compression> compression,server_end:fuchsia.media/StreamSink stream_sink_request)"
+        "type": "(vector<zx/Handle:VMO>:16 buffers,fuchsia.media/AudioStreamType stream_type,box<fuchsia.media/Compression> compression,server_end:fuchsia.media/StreamSink stream_sink_request)"
     },
     {
         "kind": "protocol/member",
@@ -1004,7 +1004,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioRenderer.AddPayloadBuffer",
         "ordinal": "4267785153247337302",
-        "type": "(uint32 id,zx/handle:VMO payload_buffer)"
+        "type": "(uint32 id,zx/Handle:VMO payload_buffer)"
     },
     {
         "kind": "protocol/member",
@@ -1046,7 +1046,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioRenderer.GetReferenceClock",
         "ordinal": "3421186509650734974",
-        "type": "() -> (zx/handle:CLOCK reference_clock)"
+        "type": "() -> (zx/Handle:CLOCK reference_clock)"
     },
     {
         "kind": "protocol/member",
@@ -1118,7 +1118,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioRenderer.SetReferenceClock",
         "ordinal": "4155925656207319021",
-        "type": "(zx/handle:<CLOCK,optional> reference_clock)"
+        "type": "(zx/Handle:<CLOCK,optional> reference_clock)"
     },
     {
         "kind": "protocol/member",
@@ -2001,13 +2001,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/ProfileProvider.RegisterHandlerWithCapacity",
         "ordinal": "6937125412783096182",
-        "type": "(zx/handle:THREAD thread_handle,string:64 name,int64 period,float32 capacity) -> (int64 period,int64 capacity)"
+        "type": "(zx/Handle:THREAD thread_handle,string:64 name,int64 period,float32 capacity) -> (int64 period,int64 capacity)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.media/ProfileProvider.UnregisterHandler",
         "ordinal": "8236412328517522508",
-        "type": "(zx/handle:THREAD thread_handle,string:64 name) -> ()"
+        "type": "(zx/Handle:THREAD thread_handle,string:64 name) -> ()"
     },
     {
         "kind": "protocol",
@@ -2188,7 +2188,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/SimpleStreamSink.AddPayloadBuffer",
         "ordinal": "4267785153247337302",
-        "type": "(uint32 id,zx/handle:VMO payload_buffer)"
+        "type": "(uint32 id,zx/Handle:VMO payload_buffer)"
     },
     {
         "kind": "protocol/member",
@@ -2357,7 +2357,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.media/StreamBufferSet.AddPayloadBuffer",
         "ordinal": "4267785153247337302",
-        "type": "(uint32 id,zx/handle:VMO payload_buffer)"
+        "type": "(uint32 id,zx/Handle:VMO payload_buffer)"
     },
     {
         "kind": "protocol/member",

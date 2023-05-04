@@ -109,7 +109,7 @@
         "kind": "struct/member",
         "name": "fuchsia.camera3/FrameInfo.release_fence",
         "ordinal": "4",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "struct/member",
@@ -144,7 +144,7 @@
         "kind": "table/member",
         "name": "fuchsia.camera3/FrameInfo2.release_fence",
         "ordinal": "5",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table/member",

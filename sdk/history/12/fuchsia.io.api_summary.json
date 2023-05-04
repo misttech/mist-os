@@ -149,7 +149,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.AddInotifyFilter",
         "ordinal": "2291733984692638506",
-        "type": "(string:4095 path,fuchsia.io/InotifyWatchMask filter,uint32 watch_descriptor,zx/handle:SOCKET socket) -> ()"
+        "type": "(string:4095 path,fuchsia.io/InotifyWatchMask filter,uint32 watch_descriptor,zx/Handle:SOCKET socket) -> ()"
     },
     {
         "kind": "protocol/member",
@@ -203,13 +203,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetToken",
         "ordinal": "2787337947777369685",
-        "type": "() -> (int32 s,zx/handle:optional token)"
+        "type": "() -> (int32 s,zx/Handle:optional token)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Link",
         "ordinal": "8360374984291987687",
-        "type": "(string:255 src,zx/handle dst_parent_token,string:255 dst) -> (int32 s)"
+        "type": "(string:255 src,zx/Handle dst_parent_token,string:255 dst) -> (int32 s)"
     },
     {
         "kind": "protocol/member",
@@ -233,7 +233,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Open2",
         "ordinal": "3439711884268033238",
-        "type": "(string:4095 path,fuchsia.io/ConnectionProtocols protocols,zx/handle:CHANNEL object_request)"
+        "type": "(string:4095 path,fuchsia.io/ConnectionProtocols protocols,zx/Handle:CHANNEL object_request)"
     },
     {
         "kind": "protocol/member",
@@ -257,7 +257,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Rename",
         "ordinal": "8097726607824333022",
-        "type": "(string:255 src,zx/handle:EVENT dst_parent_token,string:255 dst) -> (fuchsia.io/Directory2_Rename_Result result)"
+        "type": "(string:255 src,zx/Handle:EVENT dst_parent_token,string:255 dst) -> (fuchsia.io/Directory2_Rename_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -333,13 +333,13 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory1.GetToken",
         "ordinal": "2787337947777369685",
-        "type": "() -> (int32 s,zx/handle:optional token)"
+        "type": "() -> (int32 s,zx/Handle:optional token)"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory1.Link",
         "ordinal": "8360374984291987687",
-        "type": "(string:255 src,zx/handle dst_parent_token,string:255 dst) -> (int32 s)"
+        "type": "(string:255 src,zx/Handle dst_parent_token,string:255 dst) -> (int32 s)"
     },
     {
         "kind": "protocol/member",
@@ -397,7 +397,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.AddInotifyFilter",
         "ordinal": "2291733984692638506",
-        "type": "(string:4095 path,fuchsia.io/InotifyWatchMask filter,uint32 watch_descriptor,zx/handle:SOCKET socket) -> ()"
+        "type": "(string:4095 path,fuchsia.io/InotifyWatchMask filter,uint32 watch_descriptor,zx/Handle:SOCKET socket) -> ()"
     },
     {
         "kind": "protocol/member",
@@ -439,7 +439,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.Open2",
         "ordinal": "3439711884268033238",
-        "type": "(string:4095 path,fuchsia.io/ConnectionProtocols protocols,zx/handle:CHANNEL object_request)"
+        "type": "(string:4095 path,fuchsia.io/ConnectionProtocols protocols,zx/Handle:CHANNEL object_request)"
     },
     {
         "kind": "protocol/member",
@@ -451,7 +451,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.Rename",
         "ordinal": "8097726607824333022",
-        "type": "(string:255 src,zx/handle:EVENT dst_parent_token,string:255 dst) -> (fuchsia.io/Directory2_Rename_Result result)"
+        "type": "(string:255 src,zx/Handle:EVENT dst_parent_token,string:255 dst) -> (fuchsia.io/Directory2_Rename_Result result)"
     },
     {
         "kind": "protocol/member",
@@ -809,13 +809,13 @@
         "kind": "table/member",
         "name": "fuchsia.io/FileInfo.observer",
         "ordinal": "2",
-        "type": "zx/handle:EVENT"
+        "type": "zx/Handle:EVENT"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.io/FileInfo.stream",
         "ordinal": "3",
-        "type": "zx/handle:STREAM"
+        "type": "zx/Handle:STREAM"
     },
     {
         "kind": "table",
@@ -826,13 +826,13 @@
         "kind": "struct/member",
         "name": "fuchsia.io/FileObject.event",
         "ordinal": "1",
-        "type": "zx/handle:<EVENT,optional>"
+        "type": "zx/Handle:<EVENT,optional>"
     },
     {
         "kind": "struct/member",
         "name": "fuchsia.io/FileObject.stream",
         "ordinal": "2",
-        "type": "zx/handle:<STREAM,optional>"
+        "type": "zx/Handle:<STREAM,optional>"
     },
     {
         "kind": "struct",
@@ -875,7 +875,7 @@
         "kind": "struct/member",
         "name": "fuchsia.io/File_GetBackingMemory_Response.vmo",
         "ordinal": "1",
-        "type": "zx/handle:VMO"
+        "type": "zx/Handle:VMO"
     },
     {
         "kind": "struct",

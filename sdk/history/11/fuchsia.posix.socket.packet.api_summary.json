@@ -470,7 +470,7 @@
         "kind": "table/member",
         "name": "fuchsia.posix.socket.packet/SocketDescribeResponse.event",
         "ordinal": "1",
-        "type": "zx/handle:EVENTPAIR"
+        "type": "zx/Handle:EVENTPAIR"
     },
     {
         "kind": "table",
