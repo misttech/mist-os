@@ -18,6 +18,9 @@ using cpp20::is_unbounded_array_v;
 using std::is_array;
 using std::is_array_v;
 
+using std::true_type;
+using std::false_type;
+
 using std::conjunction;
 using std::conjunction_v;
 
@@ -29,6 +32,8 @@ using std::conditional_t;
 
 using std::decay;
 using std::decay_t;
+
+using cpp17::void_t;
 
 using std::enable_if;
 using std::enable_if_t;
