@@ -1849,7 +1849,7 @@ fn check_string_length(actual_bytes: usize, max_bytes: usize) -> Result<()> {
 // Handles
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The FIDL type `zx.handle:<OBJECT_TYPE, RIGHTS>`, or a `client_end` or `server_end`.
+/// The FIDL type `zx.Handle:<OBJECT_TYPE, RIGHTS>`, or a `client_end` or `server_end`.
 pub struct HandleType<T: HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>(PhantomData<T>);
 
 /// An abbreviation of `HandleType` that for channels with default rights, used

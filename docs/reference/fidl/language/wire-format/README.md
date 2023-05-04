@@ -626,7 +626,7 @@ clients to servers.
 An epitaph's wire representation is equivalent to this FIDL:
 ```fidl
 struct {
-  error zx.status;
+  error zx.Status;
 };
 ```
 Epitaphs may be formally defined in FIDL in the future.

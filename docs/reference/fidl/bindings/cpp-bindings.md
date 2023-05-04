@@ -64,8 +64,8 @@ The FIDL types are converted to C++ types based on the following table:
 |`string`|`fidl::StringView`|
 |`client_end:P` |`fidl::ClientEnd<P>`|
 |`server_end:P` |`fidl::ServerEnd<P>`|
-|`zx.handle`|`zx::handle`|
-|`zx.handle:S`|The corresponding zx type is used whenever possible. For example, `zx::vmo` or `zx::channel`.|
+|`zx.Handle`|`zx::handle`|
+|`zx.Handle:S`|The corresponding zx type is used whenever possible. For example, `zx::vmo` or `zx::channel`.|
 
 Nullable built-in types do not have different generated types than their
 non-nullable counterparts in LLCPP, and are omitted from the table above.

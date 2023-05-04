@@ -18,7 +18,7 @@ pub fn flatten_zx_error<T>(
 /// Unwraps the result of a FIDL call that returns a zx::result into a
 /// Result<T, E>. If the result is an error, it has `context` attached to it.
 pub fn flatten_zx_status(fidl_result: Result<zx::zx_status_t, fidl::Error>) -> Result<(), Error> {
-    // Make the return type look like the FIDL call errors with zx.status.
+    // Make the return type look like the FIDL call errors with zx.Status.
     let zx_error_result =
         fidl_result
             .map(|zx_status| if zx_status == zx::sys::ZX_OK { Ok(()) } else { Err(zx_status) });

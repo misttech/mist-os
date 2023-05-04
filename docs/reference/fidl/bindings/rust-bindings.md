@@ -103,8 +103,8 @@ reuse the input value if it does not contain handles.
 |`string`|`&str` *(borrowed)*<br>`String` *(owned)*|
 |`server_end:P`|`fidl::endpoints::ServerEnd<PMarker>`, *where `PMarker` is the [marker type](#protocols) for this protocol.*|
 |`client_end:P`|`fidl::endpoints::ClientEnd<PMarker>` *where `PMarker` is the [marker type](#protocols) for this protocol.*|
-|`zx.handle`|`fidl::Handle`|
-|`zx.handle:S`|The corresponding handle type is used. For example,`fidl::Channel` or `fidl::Vmo`|
+|`zx.Handle`|`fidl::Handle`|
+|`zx.Handle:S`|The corresponding handle type is used. For example,`fidl::Channel` or `fidl::Vmo`|
 
 
 #### User defined types {#user-defined-types}

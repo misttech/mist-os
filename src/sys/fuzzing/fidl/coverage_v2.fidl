@@ -32,8 +32,8 @@ closed protocol CoverageDataCollectorV2 {
     ///
     /// The channel is closed on FIDL error. Clients should not attempt to reconnect.
     strict Initialize(resource struct {
-        eventpair zx.handle:EVENTPAIR;
-        process zx.handle:PROCESS;
+        eventpair zx.Handle:EVENTPAIR;
+        process zx.Handle:PROCESS;
     }) -> (struct {
         options Options;
     });
@@ -57,7 +57,7 @@ closed protocol CoverageDataCollectorV2 {
     /// See also:
     ///     https://clang.llvm.org/docs/SanitizerCoverage.html#inline-8bit-counters
     strict AddInline8bitCounters(resource struct {
-        inline_8bit_counters zx.handle:VMO;
+        inline_8bit_counters zx.Handle:VMO;
     }) -> ();
 };
 
@@ -67,8 +67,8 @@ closed protocol CoverageDataCollectorV2 {
 /// This struct wraps the eventpair and process provided to `CoverageDataCollector.Initialize` and
 /// associates it with a unique per-`CoverageDataCollector`-client target id.
 type InstrumentedProcessV2 = resource struct {
-    eventpair zx.handle:EVENTPAIR;
-    process zx.handle:PROCESS;
+    eventpair zx.Handle:EVENTPAIR;
+    process zx.Handle:PROCESS;
 };
 
 /// Represents an instrumented target process or the code coverage it is sharing.
@@ -81,7 +81,7 @@ type CoverageDataV2 = resource struct {
         1: instrumented InstrumentedProcessV2;
 
         /// See https://clang.llvm.org/docs/SanitizerCoverage.html#inline-8bit-counters
-        2: inline_8bit_counters zx.handle:VMO;
+        2: inline_8bit_counters zx.Handle:VMO;
     };
 };
 

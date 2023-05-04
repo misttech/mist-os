@@ -70,7 +70,7 @@ This is the file [`//sdk/banjo/fuchsia.hardware.i2cimpl/i2cimpl.fidl`](/sdk/banj
 [37]     GetMaxTransferSize(struct {
 [38]         bus_id uint32;
 [39]     }) -> (struct {
-[40]         s zx.status;
+[40]         s zx.Status;
 [41]         size uint64;
 [42]     });
 [43]     /// Sets the bitrate for the i2c bus in KHz units.
@@ -78,7 +78,7 @@ This is the file [`//sdk/banjo/fuchsia.hardware.i2cimpl/i2cimpl.fidl`](/sdk/banj
 [45]         bus_id uint32;
 [46]         bitrate uint32;
 [47]     }) -> (struct {
-[48]         s zx.status;
+[48]         s zx.Status;
 [49]     });
 [50]     /// |Transact| assumes that all ops buf are not null.
 [51]     /// |Transact| assumes that all ops length are not zero.
@@ -87,7 +87,7 @@ This is the file [`//sdk/banjo/fuchsia.hardware.i2cimpl/i2cimpl.fidl`](/sdk/banj
 [54]         bus_id uint32;
 [55]         op vector<I2cImplOp>:MAX;
 [56]     }) -> (struct {
-[57]         status zx.status;
+[57]         status zx.Status;
 [58]     });
 [59] };
 ```
@@ -869,7 +869,7 @@ In the protocol above there is a `Queue` method declared as:
 [270]     @in_out
 [271]     txn BlockOp;
 [272] }) -> (resource struct {
-[273]     status zx.status;
+[273]     status zx.Status;
 [274]     @mutable
 [275]     op BlockOp;
 [276] });
@@ -1047,8 +1047,8 @@ Consider the following Banjo protocol snippet:
 [54]     GetInterrupt(struct {
 [55]         flags uint32;
 [56]     }) -> (resource struct {
-[57]         s zx.status;
-[58]         irq zx.handle:INTERRUPT;
+[57]         s zx.Status;
+[58]         irq zx.Handle:INTERRUPT;
 [59]     });
  ...
 [82] };

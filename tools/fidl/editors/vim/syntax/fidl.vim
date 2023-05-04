@@ -31,12 +31,12 @@ syn keyword fidlKeyword alias as bits compose const enum error false flexible li
 syn match fidlType "\<request<@\?[a-zA-Z][a-zA-Z0-9]*\(\.[a-zA-Z][a-zA-Z0-9]*\)*>?\?"
 
 " From zircon/vdso/zx_common.fidl:
-syn match fidlBadType "\<zx.handle:[A-Z]*?\?"
-" The above flags zx.handle:TYPO, but then reallow zx.handle:< anything > for
+syn match fidlBadType "\<zx.Handle:[A-Z]*?\?"
+" The above flags zx.Handle:TYPO, but then reallow zx.Handle:< anything > for
 " complex handle types.
-syn match fidlType "\<zx.handle:<[^>]*>\?"
+syn match fidlType "\<zx.Handle:<[^>]*>\?"
 " And specifically make known handle subtypes recognized.
-syn match fidlType "\<zx.handle:\(BTI\|CHANNEL\|CLOCK\|EVENT\|EVENTPAIR\|EXCEPTION\|FIFO\|GUEST\|INTERRUPT\|IOMMU\|JOB\|LOG\|MSI\|PAGER\|PCI_DEVICE\|PMT\|PORT\|PROCESS\|PROFILE\|RESOURCE\|SOCKET\|STREAM\|SUSPEND_TOKEN\|THREAD\|TIMER\|VCPU\|VMAR\|VMO\)\>"
+syn match fidlType "\<zx.Handle:\(BTI\|CHANNEL\|CLOCK\|EVENT\|EVENTPAIR\|EXCEPTION\|FIFO\|GUEST\|INTERRUPT\|IOMMU\|JOB\|LOG\|MSI\|PAGER\|PCI_DEVICE\|PMT\|PORT\|PROCESS\|PROFILE\|RESOURCE\|SOCKET\|STREAM\|SUSPEND_TOKEN\|THREAD\|TIMER\|VCPU\|VMAR\|VMO\)\>"
 
 syn match fidlType "\<string\>\%(:\%(\d\+\|\K\k*\%(\.\K\k*\)*\)\)\??\?"
 syn match fidlType "\<bool\>"

@@ -11,7 +11,7 @@ changing the wire shape of its containing message.
 | `union {...}` | `union {...}:optional` | No |
 | `vector<T>` | `vector<T>:optional` | No |
 | `string` | `string:optional` | No |
-| `zx.handle` | `zx.handle:optional` | No |
+| `zx.Handle` | `zx.Handle:optional` | No |
 | `client_end:P` | `client_end:<P, optional>` | No |
 | `server_end:P` | `server_end:<P, optional>` | No |
 

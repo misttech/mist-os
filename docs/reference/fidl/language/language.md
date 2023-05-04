@@ -358,13 +358,13 @@ _T_ can be any FIDL type.
 
 Handles are denoted:
 
-*   **`zx.handle`** : required Zircon handle of unspecified type
-*   **`zx.handle:optional`** : optional Zircon handle of unspecified type
-*   **`zx.handle:H`** : required Zircon handle of type _H_
-*   **`zx.handle:<H, optional>`** : optional Zircon handle of type _H_
-*   **`zx.handle:<H, R>`** : required Zircon handle of type _H_ with rights
+*   **`zx.Handle`** : required Zircon handle of unspecified type
+*   **`zx.Handle:optional`** : optional Zircon handle of unspecified type
+*   **`zx.Handle:H`** : required Zircon handle of type _H_
+*   **`zx.Handle:<H, optional>`** : optional Zircon handle of type _H_
+*   **`zx.Handle:<H, R>`** : required Zircon handle of type _H_ with rights
     _R_
-*   **`zx.handle:<H, R, optional>`** : optional Zircon handle of type _H_ with
+*   **`zx.Handle:<H, R, optional>`** : optional Zircon handle of type _H_ with
     rights _R_
 
 _H_ can be any [object](/docs/reference/kernel_objects/objects.md) supported by
@@ -544,7 +544,7 @@ Value types must not contain resource types. For example, this is incorrect:
 
 ```fidl
 type Foo = struct { // ERROR: must be "resource struct Foo"
-    h zx.handle;
+    h zx.Handle;
 };
 ```
 

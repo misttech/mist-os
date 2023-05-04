@@ -266,12 +266,12 @@ through the data can be represented using a primitive:
 In performance-critical target languages, structs are represented in line, which
 reduces the cost of using structs to name important concepts.
 
-### `zx.time` has a well-defined timebase
+### `zx.Time` has a well-defined timebase
 
-The [`zx.time`](/zircon/vdso/zx_common.fidl) type monotonically measures the
+The [`zx.Time`](/zircon/vdso/zx_common.fidl) type monotonically measures the
 number of nanoseconds from a
 [device-specific timebase](/docs/concepts/kernel/time/monotonic.md).
-Uses of `zx.time` can assume this timebase, and it does not need to be spelled
+Uses of `zx.Time` can assume this timebase, and it does not need to be spelled
 out.
 
 ### Use anonymous types judiciously {#anonymous-types}
@@ -511,10 +511,10 @@ Use a domain-specific enum error type when you are following a well defined
 specification (say HTTP error codes), and the enum is meant to be an ergonomic
 way to represent the raw value dictated by the specification.
 
-In particular, use the `zx.status` type for errors related to kernel objects or
-IO. For example, `fuchsia.process` uses `zx.status` because the library is
+In particular, use the `zx.Status` type for errors related to kernel objects or
+IO. For example, `fuchsia.process` uses `zx.Status` because the library is
 largely concerned with manipulating kernel objects. As another example,
-`fuchsia.io` uses `zx.status` extensively because the library is concerned with
+`fuchsia.io` uses `zx.Status` extensively because the library is concerned with
 IO.
 
 #### Using optional value with error enum {#using-optional-value-with-error-enum}
@@ -654,9 +654,9 @@ Use `bytes` or `array<uint8>` for small non-text data:
 
 Use shared-memory primitives for blobs:
 
- * Use `zx.handle:VMO` for images and (large) protobufs, when it makes
+ * Use `zx.Handle:VMO` for images and (large) protobufs, when it makes
    sense to buffer the data completely.
- * Use `zx.handle:SOCKET` for audio and video streams because data may arrive over
+ * Use `zx.Handle:SOCKET` for audio and video streams because data may arrive over
    time, or when it makes sense to process data before completely written or
    available.
 
@@ -1338,7 +1338,7 @@ them to the server in a batch.  The client should flush the batch to the server
 before hitting the channel capacity limits in either bytes and handles.
 
 For protocols with even higher message volumes, consider using a ring buffer in
-a `zx.handle:VMO` for the data plane and an associated `zx.handle:FIFO` for the
+a `zx.Handle:VMO` for the data plane and an associated `zx.Handle:FIFO` for the
 control plane.  Such protocols place a higher implementation burden on the client
 and the server but are appropriate when you need maximal performance.  For example,
 the block device protocol uses this approach to optimize performance.

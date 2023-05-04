@@ -24,9 +24,9 @@
 //         response string:optional;
 //     });
 //     EchoHandle(resource struct {
-//         handle zx.handle;
+//         handle zx.Handle;
 //     }) -> (resource struct {
-//         handle zx.handle;
+//         handle zx.Handle;
 //     });
 //     -> OnPong();
 // };

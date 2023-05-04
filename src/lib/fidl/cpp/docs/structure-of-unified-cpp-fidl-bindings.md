@@ -602,7 +602,7 @@ used in method responses with a third variant:
 type result = union {
     1: response struct { pong Pong; };
     2: err uint32;
-    3: transport_err zx.status;  // used to communication unknown method errors.
+    3: transport_err zx.Status;  // used to communication unknown method errors.
 };
 ```
 

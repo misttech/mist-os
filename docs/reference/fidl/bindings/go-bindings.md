@@ -68,8 +68,8 @@ The FIDL types are converted to Go types based on the following table.
 |`string:optional`|`*string`|
 |`server_end:P`|The generated server end type `PInterfaceRequest`, see [Protocols](#protocols)|
 |`client_end:P`|The generated client end type `PInterface`, see [Protocols](#protocols)|
-|`zx.handle:S`,`zx.handle:<S, optional>`|The equivalent handle type is used if it is supported by the Go runtime (e.g. `zx.VMO`, `zx.Channel`, and `zx.Event`). Otherwise, `zx.Handle` is used|
-|`zx.handle`,`zx.handle:optional`|`zx.Handle`|
+|`zx.Handle:S`,`zx.Handle:<S, optional>`|The equivalent handle type is used if it is supported by the Go runtime (e.g. `zx.VMO`, `zx.Channel`, and `zx.Event`). Otherwise, `zx.Handle` is used|
+|`zx.Handle`,`zx.Handle:optional`|`zx.Handle`|
 
 ### User defined types {#user-defined-types}
 

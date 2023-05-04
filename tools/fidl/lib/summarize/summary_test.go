@@ -671,8 +671,8 @@ type Vectors = struct {
 library l;
 using zx;
 type Handles = resource struct {
-    h zx.handle;
-    c zx.handle:<CHANNEL, optional>;
+    h zx.Handle;
+    c zx.Handle:<CHANNEL, optional>;
 };
 `,
 			expected: `[

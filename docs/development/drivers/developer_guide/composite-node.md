@@ -244,7 +244,7 @@ API. This applies to both DFv1 and DFv2.
 AddCompositeNodeSpec(struct {
     node Node;
     spec fuchsia.driver.framework.CompositeNodeSpec;
-}) -> () error zx.status;
+}) -> () error zx.Status;
 ```
 
 The platform bus API uses the same `CompositeNodeSpec` struct defined in

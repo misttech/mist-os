@@ -81,7 +81,7 @@ WRAP_RESULT_TYPE(fpromise::consumer, Consumer);
 #undef WRAP_RESULT_TYPE
 
 // Like |Completer::bind|, but can handle |zx_status_t| errors. This is useful for bridging FIDL
-// callbacks for methods like "... -> ... error zx.status;".
+// callbacks for methods like "... -> ... error zx.Status;".
 template <typename V = void>
 inline fit::function<void(ZxResult<V>)> ZxBind(typename ZxBridge<V>::completer_type&& completer) {
   return [completer = std::move(completer)](ZxResult<V> result) mutable {

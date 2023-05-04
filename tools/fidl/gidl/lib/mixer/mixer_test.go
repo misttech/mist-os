@@ -408,7 +408,7 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `zx.handle` is compatible with all subtypes.
+	// The FIDL type `zx.Handle` is compatible with all subtypes.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
@@ -452,7 +452,7 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `zx.handle:EVENT` requires an event.
+	// The FIDL type `zx.Handle:EVENT` requires an event.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
@@ -498,7 +498,7 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `zx.handle:<PORT, optional>` requires a port or nil.
+	// The FIDL type `zx.Handle:<PORT, optional>` requires a port or nil.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
@@ -536,7 +536,7 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `zx.handle<CHANNEL, zx.Rights.READ | zx.Rights.WRITE>`
+	// The FIDL type `zx.Handle<CHANNEL, zx.Rights.READ | zx.Rights.WRITE>`
 	// requires a channel with the appropriate rights.
 	checkConforms(t,
 		context{

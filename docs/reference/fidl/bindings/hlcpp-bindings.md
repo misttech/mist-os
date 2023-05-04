@@ -64,8 +64,8 @@ The FIDL types are converted to C++ types based on the following table:
 |`string:optional`|`fidl::StringPtr`|
 |`server_end:P`, `server_end:<P, optional>`|`fidl::InterfaceRequest`|
 |`client_end:P`, `client_end:<P, optional>`|`fidl::InterfaceHandle`|
-|`zx.handle`, `zx.handle:optional`|`zx::handle`|
-|`zx.handle:S`, `zx.handle:<S, optional>`|The corresponding zx type is used. For example, `zx::vmo` or `zx::channel`.|
+|`zx.Handle`, `zx.Handle:optional`|`zx::handle`|
+|`zx.Handle:S`, `zx.Handle:<S, optional>`|The corresponding zx type is used. For example, `zx::vmo` or `zx::channel`.|
 
 ### User defined types {#user-defined-types}
 

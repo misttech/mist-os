@@ -440,7 +440,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         //     1: response @generated_name("P_M_Response") [user specified response type];
         //     // the "error variant"
         //     2: err @generated_name("P_M_Error") [user specified error type];
-        //     3: transport_err  zx.status;
+        //     3: transport_err  zx.Status;
         //   };
         // };
         //

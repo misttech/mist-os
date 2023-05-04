@@ -15,7 +15,7 @@ may or may not exist. There are three flavors of optionality in FIDL:
   [null envelope](/docs/reference/fidl/language/wire-format#envelopes). Enabling
   optionality for these types doesn't affect the wire shape of messages they are
   included in - it simply changes which values are valid for that particular
-  type. The `union`, `vector<T>`, `client_end`, `server_end`, and `zx.handle`
+  type. The `union`, `vector<T>`, `client_end`, `server_end`, and `zx.Handle`
   types can all be made optional via the addition of the `:optional` constraint.
   By making our `value` `union` optional, we are able to introduce a canonical
   "null" entry, in the form of an absent `value`. This means that empty `bytes`
