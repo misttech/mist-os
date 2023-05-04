@@ -79,12 +79,7 @@ class UsbXhci : public UsbXhciType,
   explicit UsbXhci(zx_device_t* parent, std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
                    async_dispatcher_t* dispatcher)
       : UsbXhciType(parent),
-#ifdef ENABLE_DFV2
-        // TODO(fxbug.dev/93333): Remove this when DFv2 has stabilised.
-        pci_(parent),
-#else
         pci_(parent, "pci"),
-#endif
         pdev_(parent),
         buffer_factory_(std::move(buffer_factory)),
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
