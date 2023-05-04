@@ -98,13 +98,6 @@ driver_bind_rules("fuchsia_bind") {
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }
 
-# TODO(fxbug.dev/93333: Remove this when DFv2 has stabilised.
-driver_bind_rules("fuchsia_bind_dfv2") {
-  rules = "iwlwifi_dfv2.bind"
-  header_output = "iwlwifi-dfv2-bind.h"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
-}
-
 # Fuchsia DDK device bindings for the iwlwifi driver.
 source_set("fuchsia_device") {
   sources = [

@@ -80,19 +80,6 @@ fuchsia_driver_component("iwlwifi_driver") {
   manifest = "platform/meta/iwlwifi.cml"
 }
 
-# TODO(fxbug.dev/93333): Remove this when DFv2 has stabilised.
-fuchsia_driver_component("iwlwifi_driver_dfv2") {
-  info = "iwlwifi_driver-info.json"
-  component_name = "iwlwifi"
-  deps = [
-    ":iwlwifi_driver-driver",
-    "platform:fuchsia_bind_dfv2",
-  ]
-  visibility = []
-  visibility = [ "*" ]
-  colocate = false
-}
-
 all_fw_files = [
   "iwlwifi-7265D-29.ucode",
   "iwlwifi-8265-31.ucode",
