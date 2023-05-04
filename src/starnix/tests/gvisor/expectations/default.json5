@@ -715,9 +715,6 @@
                 "RtSignalTest.SignoMatch",
                 "RtSignalTest.ValueDelivered",
 
-                // seccomp_test
-                "SeccompTest.TsyncAppliesToAllThreads",
-
                 // sendfile_test
                 "SendFileTest.InvalidOffset",
                 "SendFileTest.Overflow",

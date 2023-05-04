@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
 use crate::auth::Credentials;
@@ -117,6 +118,12 @@ pub struct ThreadGroup {
 
     /// The mutable state of the ThreadGroup.
     mutable_state: RwLock<ThreadGroupMutableState>,
+
+    /// The next unique identifier for a seccomp filter.  These are required to be
+    /// able to distinguish identical seccomp filters, which are treated differently
+    /// for the purposes of SECCOMP_FILTER_FLAG_TSYNC.  Inherited across clone because
+    /// seccomp filters are also inherited across clone.
+    pub next_seccomp_filter_id: AtomicU64,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -197,6 +204,7 @@ impl ThreadGroup {
             leader,
             signal_actions,
             drop_notifier: Default::default(),
+            next_seccomp_filter_id: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
@@ -221,6 +229,10 @@ impl ThreadGroup {
         if let Some(mut parent) = parent {
             parent.children.insert(leader, Arc::downgrade(&thread_group));
             process_group.insert(&thread_group);
+            thread_group.next_seccomp_filter_id.store(
+                parent.base.next_seccomp_filter_id.load(Ordering::Relaxed),
+                Ordering::Relaxed,
+            );
         }
         thread_group
     }

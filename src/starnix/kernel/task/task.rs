@@ -35,6 +35,8 @@ use crate::types::*;
 // See https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
 const DEFAULT_TASK_PRIORITY: u8 = 20;
 
+const SECCOMP_MAX_INSNS_PER_PATH: u16 = 32768;
+
 pub struct CurrentTask {
     pub task: Arc<Task>,
 
@@ -241,10 +243,10 @@ pub struct TaskMutableState {
     no_new_privs: bool,
 
     /// List of currently installed seccomp_filters; most recently added is last.
-    pub seccomp_filters: Vec<EbpfProgram>,
+    pub seccomp_filters: Vec<SeccompFilter>,
 
     // The total length of the provided seccomp filters, which cannot
-    // exceed 32768 - 4 * the number of filters.  This is stored
+    // exceed SECCOMP_MAX_INSNS_PER_PATH - 4 * the number of filters.  This is stored
     // instead of computed because we store seccomp filters in an
     // expanded form, and it is impossible to get the original length.
     pub seccomp_provided_instructions: u16,
@@ -372,7 +374,7 @@ impl Task {
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
         has_seccomp_filters: AtomicU8,
-        seccomp_filters: Vec<EbpfProgram>,
+        seccomp_filters: Vec<SeccompFilter>,
         seccomp_provided_instructions: u16,
     ) -> Self {
         let fs = {
@@ -1394,7 +1396,11 @@ impl CurrentTask {
         Ok(())
     }
 
-    pub fn add_seccomp_filter(&mut self, bpf_filter: UserAddress) -> Result<SyscallResult, Errno> {
+    pub fn add_seccomp_filter(
+        &mut self,
+        bpf_filter: UserAddress,
+        flags: u32,
+    ) -> Result<SyscallResult, Errno> {
         let fprog: sock_fprog = self.mm.read_object(UserRef::new(bpf_filter))?;
 
         if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
@@ -1417,14 +1423,93 @@ impl CurrentTask {
 
         match EbpfProgram::from_cbpf(&code) {
             Ok(program) => {
-                {
-                    let mut state = self.mutable_state.write();
-                    let maybe_new_length = state.seccomp_provided_instructions + fprog.len + 4;
-                    if maybe_new_length > 32768 {
+                let state = self.thread_group.write();
+                if flags & SECCOMP_FILTER_FLAG_TSYNC != 0 {
+                    // TSYNC synchronizes all filters for all threads in the current process to
+                    // the current thread's
+
+                    // We collect the filters for the current task upfront to save us acquiring
+                    // the task's lock a lot of times below.
+                    let mut filters: Vec<SeccompFilter> = self.read().seccomp_filters.clone();
+
+                    // For TSYNC to work, all of the other thread filters in this process have to
+                    // be a subsequence of this thread's filters, and none of them can be in
+                    // strict mode.
+                    let tasks = state.tasks().collect::<Vec<_>>();
+                    for task in &tasks {
+                        // nb: TSYNC indicates failure state by returning the first thread
+                        // id not to be able to sync, rather than by returning -1 and setting
+                        // errno.
+
+                        let other_task_state = task.mutable_state.read();
+                        let maybe_new_length =
+                            other_task_state.seccomp_provided_instructions + fprog.len + 4;
+
+                        if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
+                            return Ok(task.id.into());
+                        }
+
+                        // All threads need to do the length check, but only other threads need
+                        // the subsequence check.
+                        if task.id == self.id {
+                            continue;
+                        }
+
+                        // Target threads cannot be in SECCOMP_MODE_STRICT
+                        if task.has_seccomp_filters.load(Ordering::Acquire)
+                            & SeccompFilterState::Strict as u8
+                            != 0
+                        {
+                            return Ok(task.id.into());
+                        }
+
+                        // Check that target thread's filters are a subsequence of this thread's
+                        // filters.
+                        if other_task_state.seccomp_filters.len() > filters.len() {
+                            return Ok(task.id.into());
+                        }
+                        for (filter, other_filter) in
+                            filters.iter().zip(other_task_state.seccomp_filters.iter())
+                        {
+                            if other_filter.unique_id != filter.unique_id {
+                                return Ok(task.id.into());
+                            }
+                        }
+                    }
+                    // Now that we're sure we're allowed to do so, add the filter to all threads.
+                    let new_length = self.read().seccomp_provided_instructions + fprog.len + 4;
+                    filters.push(SeccompFilter {
+                        program,
+                        unique_id: self
+                            .thread_group
+                            .next_seccomp_filter_id
+                            .fetch_add(1, Ordering::SeqCst),
+                    });
+
+                    for task in &tasks {
+                        let mut other_task_state = task.mutable_state.write();
+
+                        other_task_state.enable_no_new_privs();
+                        other_task_state.seccomp_provided_instructions = new_length;
+                        other_task_state.seccomp_filters = filters.clone();
+                        task.set_seccomp_state(SeccompFilterState::UserDefined)?;
+                    }
+                } else {
+                    let mut task_state = self.mutable_state.write();
+                    let maybe_new_length = task_state.seccomp_provided_instructions + fprog.len + 4;
+                    if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
                         return Err(errno!(ENOMEM));
                     }
-                    state.seccomp_provided_instructions = maybe_new_length;
-                    state.seccomp_filters.push(program);
+
+                    task_state.seccomp_provided_instructions = maybe_new_length;
+                    task_state.seccomp_filters.push(SeccompFilter {
+                        program,
+                        unique_id: self
+                            .thread_group
+                            .next_seccomp_filter_id
+                            .fetch_add(1, Ordering::SeqCst),
+                    });
+                    self.set_seccomp_state(SeccompFilterState::UserDefined)?;
                 }
 
                 self.set_seccomp_state(SeccompFilterState::UserDefined)?;
@@ -1483,7 +1568,7 @@ impl CurrentTask {
             // Filters are executed in reverse order of addition
             for filter in filters.iter().rev() {
                 let mut new_result = SECCOMP_RET_ALLOW;
-                if let Ok(r) = filter.run(&mut data) {
+                if let Ok(r) = filter.program.run(&mut data) {
                     new_result = r as u32
                 }
                 if ((new_result & SECCOMP_RET_ACTION_FULL) as i32)
@@ -1580,6 +1665,18 @@ pub enum SeccompFilterState {
     None = 0,
     UserDefined = 1,
     Strict = 2,
+}
+
+#[derive(Clone)]
+pub struct SeccompFilter {
+    /// The BPF program associated with this filter.
+    program: EbpfProgram,
+
+    /// The unique-to-this-process id of this filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
+    /// threads in this process have filters that are a subsequence of the thread attempting to do
+    /// the TSYNC. Identical filters attached in separate seccomp calls are treated as different
+    /// from each other for this purpose, so we need a way of distinguishing them.
+    unique_id: u64,
 }
 
 impl fmt::Debug for Task {

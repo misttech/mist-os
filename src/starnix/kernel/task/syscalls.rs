@@ -988,7 +988,7 @@ pub fn sys_seccomp(
                 if args.is_null() {
                     return error!(EFAULT);
                 }
-                current_task.add_seccomp_filter(args)
+                current_task.add_seccomp_filter(args, flags)
             }
             _ => error!(EINVAL),
         },
