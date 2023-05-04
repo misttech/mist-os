@@ -8,15 +8,22 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, slice::Iter};
 
 use log::debug;
-use net_types::ip::{Ip, Subnet};
+use net_types::{
+    ip::{Ip, Subnet},
+    SpecifiedAddr,
+};
 use thiserror::Error;
 
-use crate::ip::{
-    types::{
-        AddableEntry, AddableMetric, DecomposedAddableEntry, Destination, Entry, Metric, NextHop,
-        RawMetric,
+use crate::{
+    error::NotFoundError,
+    ip::{
+        types::{
+            AddableEntry, AddableMetric, DecomposedAddableEntry, Destination, Entry, Metric,
+            NextHop, RawMetric,
+        },
+        AnyDevice, DeviceIdContext, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
+        IpStateContext,
     },
-    AnyDevice, DeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -47,7 +54,7 @@ impl From<crate::error::ExistsError> for AddRouteError {
 pub(crate) fn add_route<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
+    SC: IpStateContext<I, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -85,6 +92,28 @@ pub(crate) fn add_route<
         let metric = observe_metric(sync_ctx, &device, metric);
         let entry = table.add_entry(Entry { subnet, device, gateway, metric })?;
         Ok(ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
+    })
+}
+
+/// Deletes all routes matching the provided specifiers exactly.
+///
+/// Returns all the deleted routes, or an error if no routes were deleted.
+// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+pub(super) fn del_specific_routes<
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpStateContext<I, C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    subnet: Subnet<I::Addr>,
+    device: &SC::DeviceId,
+    gateway: Option<SpecifiedAddr<I::Addr>>,
+) -> Result<(), NotFoundError> {
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+        table.del_specific_routes(subnet, device, gateway).map(|removed| {
+            removed.into_iter().for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
+        })
     })
 }
 
@@ -217,13 +246,13 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     pub(crate) fn del_subnet_routes(
         &mut self,
         subnet: Subnet<I::Addr>,
-    ) -> Result<Vec<Entry<I::Addr, D>>, crate::error::NotFoundError> {
+    ) -> Result<Vec<Entry<I::Addr, D>>, NotFoundError> {
         debug!("deleting routes to subnet: {}", subnet);
         let removed = self.del_routes(|entry: &Entry<I::Addr, D>| entry.subnet == subnet);
         if removed.is_empty() {
             // If a path to `subnet` was not in our installed table, then it
             // definitely won't be in our active routes cache.
-            return Err(crate::error::NotFoundError);
+            return Err(NotFoundError);
         }
         Ok(removed)
     }
@@ -235,6 +264,29 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     pub(crate) fn del_device_routes(&mut self, device: D) -> Vec<Entry<I::Addr, D>> {
         debug!("deleting routes on device: {:?}", device);
         self.del_routes(|entry: &Entry<I::Addr, D>| entry.device == device)
+    }
+
+    /// Deletes all routes matching the provided specifiers exactly.
+    ///
+    /// Returns all the deleted routes, or an error if no routes were deleted.
+    fn del_specific_routes(
+        &mut self,
+        del_subnet: Subnet<I::Addr>,
+        del_device: &D,
+        del_gateway: Option<SpecifiedAddr<I::Addr>>,
+    ) -> Result<Vec<Entry<I::Addr, D>>, crate::error::NotFoundError> {
+        debug!(
+            "deleting routes with subnet={del_subnet} device={del_device:?} gateway={del_gateway:?}",
+        );
+        let removed =
+            self.del_routes(|Entry { subnet, device, gateway, metric: _ }: &Entry<I::Addr, D>| {
+                device == del_device && subnet == &del_subnet && gateway == &del_gateway
+            });
+        if removed.is_empty() {
+            Err(crate::error::NotFoundError)
+        } else {
+            Ok(removed)
+        }
     }
 
     /// Get an iterator over all of the forwarding entries ([`Entry`]) this

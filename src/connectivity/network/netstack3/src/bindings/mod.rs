@@ -518,24 +518,6 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
     }
 }
 
-impl
-    EventContext<
-        netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<
-            DeviceId<BindingsNonSyncCtxImpl>,
-        >,
-    > for BindingsNonSyncCtxImpl
-{
-    fn on_event(
-        &mut self,
-        _event: netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<
-            DeviceId<BindingsNonSyncCtxImpl>,
-        >,
-    ) {
-        // TODO(https://fxbug.dev/97203): Update forwarding table in response to
-        // the event.
-    }
-}
-
 impl BindingsNonSyncCtxImpl {
     fn notify_interface_update(
         &self,

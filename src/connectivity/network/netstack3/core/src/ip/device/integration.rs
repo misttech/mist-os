@@ -33,7 +33,10 @@ use crate::{
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_forwarding_enabled,
             nud::NudIpHandler,
-            route_discovery::{Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState},
+            route_discovery::{
+                Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
+                Ipv6RouteDiscoveryState,
+            },
             router_solicitation::{RsContext, RsHandler},
             send_ip_frame,
             slaac::{
@@ -46,12 +49,14 @@ use crate::{
             },
             IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext, RemovedReason,
         },
+        forwarding::AddRouteError,
         gmp::{
             self,
             igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata, IgmpStateContext},
             mld::{MldContext, MldFrameMetadata, MldGroupState, MldStateContext},
             GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
         },
+        types::{AddableEntry, AddableMetric},
         AddressStatus, IpLayerIpExt, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus,
         NonSyncContext, SyncCtx, DEFAULT_TTL,
     },
@@ -289,7 +294,7 @@ where
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     ip::IpDeviceStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
     fn get_local_addr_for_remote(
@@ -306,6 +311,18 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ip
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
+    }
+
+    fn address_status_for_device(
+        &mut self,
+        dst_ip: SpecifiedAddr<Ipv4Addr>,
+        device_id: &Self::DeviceId,
+    ) -> AddressStatus<Ipv4PresentAddressStatus> {
+        if dst_ip.is_limited_broadcast() {
+            return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
+        }
+
+        assignment_state_v4(self, device_id, dst_ip)
     }
 }
 
@@ -333,18 +350,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguratio
         )
     }
 
-    fn address_status_for_device(
-        &mut self,
-        dst_ip: SpecifiedAddr<Ipv4Addr>,
-        device_id: &Self::DeviceId,
-    ) -> AddressStatus<Ipv4PresentAddressStatus> {
-        if dst_ip.is_limited_broadcast() {
-            return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
-        }
-
-        assignment_state_v4(self, device_id, dst_ip)
-    }
-
     fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_forwarding_enabled::<Ipv4, _, _>(self, device_id)
     }
@@ -354,7 +359,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguratio
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     ip::IpDeviceStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     fn get_local_addr_for_remote(
@@ -378,6 +383,14 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ip
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
+    }
+
+    fn address_status_for_device(
+        &mut self,
+        addr: SpecifiedAddr<Ipv6Addr>,
+        device_id: &Self::DeviceId,
+    ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
+        assignment_state_v6(self, device_id, addr)
     }
 }
 
@@ -403,14 +416,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguratio
                 cb(FilterPresentWithDevices::new(devices, state, assignment_state_v6, addr))
             },
         )
-    }
-
-    fn address_status_for_device(
-        &mut self,
-        addr: SpecifiedAddr<Ipv6Addr>,
-        device_id: &Self::DeviceId,
-    ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
-        assignment_state_v6(self, device_id, addr)
     }
 
     fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -746,19 +751,87 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> RsContext<C
     }
 }
 
+impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
+    for Locked<&SyncCtx<C>, crate::lock_ordering::Ipv6DeviceRouteDiscovery>
+{
+    fn add_discovered_ipv6_route(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
+    ) -> Result<(), AddRouteError> {
+        let device_id = device_id.clone();
+        let entry = match gateway {
+            Some(gateway) => AddableEntry::with_gateway(
+                subnet,
+                Some(device_id),
+                (*gateway).into_specified(),
+                AddableMetric::MetricTracksInterface,
+            ),
+            None => AddableEntry::without_gateway(
+                subnet,
+                device_id,
+                AddableMetric::MetricTracksInterface,
+            ),
+        };
+
+        crate::ip::forwarding::add_route::<Ipv6, _, _>(self, ctx, entry)
+    }
+
+    fn del_discovered_ipv6_route(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
+    ) -> Result<(), NotFoundError> {
+        crate::ip::forwarding::del_specific_routes::<Ipv6, _, _>(
+            self,
+            ctx,
+            subnet,
+            device_id,
+            gateway.map(|g| (*g).into_specified()),
+        )
+    }
+}
+
 impl<'a, Config, C: NonSyncContext> Ipv6RouteDiscoveryContext<C>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, Ipv6, C>
 {
-    fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
+    type WithDiscoveredRoutesMutCtx<'b> =
+        Locked<&'b SyncCtx<C>, crate::lock_ordering::Ipv6DeviceRouteDiscovery>;
+
+    fn with_discovered_routes_mut<
+        F: FnOnce(&mut Ipv6RouteDiscoveryState, &mut Self::WithDiscoveredRoutesMutCtx<'_>),
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) {
         let Self { config: _, sync_ctx } = self;
-        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
-            let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>();
-            cb(&mut state)
-        })
+        crate::device::with_ip_device_state_and_sync_ctx(
+            sync_ctx,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>();
+                // We lock the state according to the IPv6 route discovery
+                // lock level but the callback needs access to the sync context
+                // so we cast its lock-level to IPv6 route discovery so that
+                // only locks that may be acquired _after_ the IPv6 route
+                // discovery lock may be acquired.
+                //
+                // Note that specifying the lock-level type in `cast_locked`
+                // is not explicitly needed as `Self::WithDiscoveredRoutesMutCtx`
+                // includes the lock-level, but we do it here to be explicit
+                // and catch changes to the associated type.
+                //
+                // TODO(https://fxbug.dev/126743): Support this natively in the
+                // lock-order crate.
+                cb(
+                    &mut state,
+                    &mut sync_ctx.cast_locked::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>(),
+                )
+            },
+        )
     }
 }
 

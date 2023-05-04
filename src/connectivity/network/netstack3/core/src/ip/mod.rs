@@ -515,7 +515,7 @@ impl IpLayerIpExt for Ipv6 {
 pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpForwardingDeviceContext
-        + IpDeviceContext<I, C>;
+        + IpDeviceStateContext<I, C>;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
@@ -541,7 +541,9 @@ pub(crate) trait Ipv4StateContext<C> {
 }
 
 /// Provices access to an IP device's state for the IP layer.
-pub(crate) trait IpDeviceStateContext<I: Ip, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, C>:
+    DeviceIdContext<AnyDevice>
+{
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
@@ -551,6 +553,17 @@ pub(crate) trait IpDeviceStateContext<I: Ip, C>: DeviceIdContext<AnyDevice> {
 
     /// Returns the hop limit.
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
+
+    /// Gets the status of an address.
+    ///
+    /// Only the specified device will be checked for the address. Returns
+    /// [`AddressStatus::Unassigned`] if the address is not assigned to the
+    /// device.
+    fn address_status_for_device(
+        &mut self,
+        addr: SpecifiedAddr<I::Addr>,
+        device_id: &Self::DeviceId,
+    ) -> AddressStatus<I::AddressStatus>;
 }
 
 /// The IP device context provided to the IP layer.
@@ -572,17 +585,6 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C>
         addr: SpecifiedAddr<I::Addr>,
         cb: F,
     ) -> R;
-
-    /// Gets the status of an address.
-    ///
-    /// Only the specified device will be checked for the address. Returns
-    /// [`AddressStatus::Unassigned`] if the address is not assigned to the
-    /// device.
-    fn address_status_for_device(
-        &mut self,
-        addr: SpecifiedAddr<I::Addr>,
-        device_id: &Self::DeviceId,
-    ) -> AddressStatus<I::AddressStatus>;
 
     /// Returns true iff the device has forwarding enabled.
     fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
@@ -653,7 +655,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 fn is_local_assigned_address<
     I: Ip + IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C>,
+    SC: IpDeviceStateContext<I, C>,
 >(
     sync_ctx: &mut SC,
     device: &SC::DeviceId,
@@ -671,7 +673,7 @@ fn is_local_assigned_address<
 fn get_local_addr<
     I: Ip + IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C>,
+    SC: IpDeviceStateContext<I, C>,
 >(
     sync_ctx: &mut SC,
     local_ip: Option<SpecifiedAddr<I::Addr>>,
@@ -2464,10 +2466,11 @@ fn lookup_route_table<
 
 /// Delete a route from the forwarding table, returning `Err` if no
 /// route was found to be deleted.
+// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
 pub(crate) fn del_route<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
+    SC: IpStateContext<I, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2480,9 +2483,10 @@ pub(crate) fn del_route<
     })
 }
 
+// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
 pub(crate) fn del_device_routes<
     I: IpLayerIpExt,
-    SC: IpLayerContext<I, C>,
+    SC: IpStateContext<I, C>,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
 >(
     sync_ctx: &mut SC,
@@ -3027,7 +3031,7 @@ pub(crate) mod testutil {
         let mut sync_ctx = Locked::new(sync_ctx);
         match addr.into() {
             IpAddr::V4(addr) => {
-                match IpDeviceContext::<Ipv4, _>::address_status_for_device(
+                match IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
                     &mut sync_ctx,
                     addr.into_specified(),
                     device,
@@ -3042,7 +3046,7 @@ pub(crate) mod testutil {
                 }
             }
             IpAddr::V6(addr) => {
-                match IpDeviceContext::<Ipv6, _>::address_status_for_device(
+                match IpDeviceStateContext::<Ipv6, _>::address_status_for_device(
                     &mut sync_ctx,
                     addr.into_specified(),
                     device,

@@ -33,7 +33,7 @@ use crate::{
         WeakDeviceId,
     },
     ip::{
-        device::{route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
+        device::IpDeviceEvent,
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent, SendIpPacketMeta,
@@ -908,7 +908,6 @@ pub(crate) enum DispatchedEvent {
     IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
     IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
-    Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent<WeakDeviceId<FakeNonSyncCtx>>),
 }
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>
@@ -985,20 +984,6 @@ impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
     }
 }
 
-impl From<Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>> for DispatchedEvent {
-    fn from(
-        Ipv6RouteDiscoveryEvent { device_id, route, action }: Ipv6RouteDiscoveryEvent<
-            DeviceId<FakeNonSyncCtx>,
-        >,
-    ) -> DispatchedEvent {
-        DispatchedEvent::Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent {
-            device_id: device_id.downgrade(),
-            route,
-            action,
-        })
-    }
-}
-
 impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) {
         let Self(this) = self;
@@ -1022,13 +1007,6 @@ impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSync
 
 impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
-    }
-}
-
-impl EventContext<Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>) {
         let Self(this) = self;
         this.on_event(DispatchedEvent::from(event))
     }
