@@ -12,15 +12,22 @@
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl-async/cpp/bind.h>
-#include <lib/virtio/backends/fake.h>
 #include <zircon/compiler.h>
+
+#include "fidl/fuchsia.hardware.sysmem/cpp/markers.h"
+#include "lib/fidl/cpp/wire/channel.h"
+
+#define USE_GTEST
+#include <lib/virtio/backends/fake.h>
+#undef USE_GTEST
 
 #include <list>
 
 #include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace sysmem = fuchsia_sysmem;
 
@@ -186,7 +193,7 @@ class FakeGpuBackend : public virtio::FakeBackend {
   FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
 };
 
-class VirtioGpuTest : public zxtest::Test, public loop_fixture::RealLoop {
+class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
  public:
   VirtioGpuTest() = default;
   void SetUp() override {
@@ -197,8 +204,9 @@ class VirtioGpuTest : public zxtest::Test, public loop_fixture::RealLoop {
     device_ = std::make_unique<virtio::GpuDevice>(nullptr, std::move(bti),
                                                   std::make_unique<FakeGpuBackend>());
 
-    zx::result sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-    ASSERT_OK(sysmem_endpoints);
+    zx::result<fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>> sysmem_endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+    ASSERT_OK(sysmem_endpoints.status_value());
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindSingleInFlightOnly(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
@@ -245,13 +253,13 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   RunLoopUntilIdle();
 
   PerformBlockingWork([&] {
-    zx::result buffer_info_result =
+    zx::result<virtio::GpuDevice::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
-    ASSERT_OK(buffer_info_result);
+    ASSERT_OK(buffer_info_result.status_value());
 
     const auto& buffer_info = buffer_info_result.value();
-    EXPECT_EQ(4, buffer_info.bytes_per_pixel);
-    EXPECT_EQ(16, buffer_info.bytes_per_row);
+    EXPECT_EQ(4u, buffer_info.bytes_per_pixel);
+    EXPECT_EQ(16u, buffer_info.bytes_per_row);
   });
 }
 
