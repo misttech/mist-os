@@ -1639,9 +1639,9 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'xyzzy'
-            mock_setxattr = mock.patch.object(
-                os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext()
-            with mock_setxattr:
+            with mock.patch.object(
+                    os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext(
+                    ) as mock_setxattr:
                 remote_action.make_download_stubs(
                     files=[p],
                     dirs=[],
@@ -1653,14 +1653,20 @@ remote_metadata: {{
             self.assertTrue(link.is_symlink())
             actual_stub = link.resolve()
             self.assertFalse(actual_stub.is_symlink())
+            if _HAVE_XATTR:
+                mock_setxattr.assert_called_once()
 
             exec_root = '/exec/root'
             with mock.patch.object(remote_action, '_download_blob',
                                    return_value=0) as mock_download:
                 with mock.patch.object(Path, 'unlink') as mock_unlink:
                     with mock.patch.object(Path, 'rename') as mock_rename:
-                        remote_action.download_from_stub(
-                            link, exec_root=exec_root, working_dir_abs=tdp)
+                        with mock.patch.object(
+                                os, 'removexattr'
+                        ) if _HAVE_XATTR else contextlib.nullcontext(
+                        ) as mock_removexattr:
+                            remote_action.download_from_stub(
+                                link, exec_root=exec_root, working_dir_abs=tdp)
             mock_download.assert_called_with(
                 output=Path(str(link) + '.download-tmp'),
                 is_dir=False,
@@ -1670,6 +1676,8 @@ remote_metadata: {{
             )
             mock_unlink.assert_called_with()
             mock_rename.assert_called_with(tdp / link)
+            if _HAVE_XATTR:
+                mock_removexattr.assert_called_once()
 
     def test_create_directory_stub_and_download(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1691,9 +1699,9 @@ remote_metadata: {{
 """
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'yzzyx'
-            mock_setxattr = mock.patch.object(
-                os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext()
-            with mock_setxattr:
+            with mock.patch.object(
+                    os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext(
+                    ) as mock_setxattr:
                 remote_action.make_download_stubs(
                     files=[],
                     dirs=[p],
@@ -1705,14 +1713,20 @@ remote_metadata: {{
             self.assertTrue(link.is_symlink())
             actual_stub = link.resolve()
             self.assertFalse(actual_stub.is_symlink())
+            if _HAVE_XATTR:
+                mock_setxattr.assert_called_once()
 
             exec_root = '/exec/root'
             with mock.patch.object(remote_action, '_download_blob',
                                    return_value=0) as mock_download:
                 with mock.patch.object(Path, 'unlink') as mock_unlink:
                     with mock.patch.object(Path, 'rename') as mock_rename:
-                        remote_action.download_from_stub(
-                            link, exec_root=exec_root, working_dir_abs=tdp)
+                        with mock.patch.object(
+                                os, 'removexattr'
+                        ) if _HAVE_XATTR else contextlib.nullcontext(
+                        ) as mock_removexattr:
+                            remote_action.download_from_stub(
+                                link, exec_root=exec_root, working_dir_abs=tdp)
             mock_download.assert_called_with(
                 output=Path(str(link) + '.download-tmp'),
                 is_dir=True,
@@ -1722,6 +1736,8 @@ remote_metadata: {{
             )
             mock_unlink.assert_called_with()
             mock_rename.assert_called_with(tdp / link)
+            if _HAVE_XATTR:
+                mock_removexattr.assert_called_once()
 
     def test_read_fail(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1756,7 +1772,12 @@ remote_metadata: {{
         )
         with tempfile.TemporaryDirectory() as td:
             full_path = td / path
-            stub.create(working_dir_abs=Path(td))
+            with mock.patch.object(
+                    os, 'setxattr') if _HAVE_XATTR else contextlib.nullcontext(
+                    ) as mock_setxattr:
+                stub.create(working_dir_abs=Path(td))
+            if _HAVE_XATTR:
+                mock_setxattr.assert_called_once()
             self.assertTrue(full_path.is_symlink())
             actual_stub = full_path.resolve()
             read_back = remote_action.DownloadStubInfo.read_from_file(
@@ -1771,17 +1792,24 @@ remote_metadata: {{
             action_digest="0923d1/21",
             build_id="random-id999",
         )
+        download_status = 1
         with mock.patch.object(remote_action, '_download_blob',
-                               return_value=1) as mock_download:
+                               return_value=download_status) as mock_download:
             with mock.patch.object(Path, 'unlink') as mock_unlink:
                 with mock.patch.object(Path, 'rename') as mock_rename:
-                    status = stub.download(
-                        exec_root=Path('/root'),
-                        working_dir_abs=Path('/root/work'))
-        self.assertEqual(status, 1)
+                    with mock.patch.object(
+                            os, 'removexattr'
+                    ) if _HAVE_XATTR else contextlib.nullcontext(
+                    ) as mock_removexattr:
+                        status = stub.download(
+                            exec_root=Path('/root'),
+                            working_dir_abs=Path('/root/work'))
+        self.assertEqual(status, download_status)
         mock_download.assert_called_once()
         mock_unlink.assert_not_called()
         mock_rename.assert_not_called()
+        if _HAVE_XATTR:
+            mock_removexattr.assert_not_called()
 
     def test_made_download_stubs(self):
         exec_root = Path('/home/project')
@@ -1942,11 +1970,17 @@ remote_metadata:  {{
                     with mock.patch(
                             'remote_action.RemoteAction._run_maybe_remotely',
                             new=fake_run_remote) as mock_run:
-                        exit_code = action.run()
+                        with mock.patch.object(
+                                os, 'setxattr'
+                        ) if _HAVE_XATTR else contextlib.nullcontext(
+                        ) as mock_setxattr:
+                            exit_code = action.run()
             self.assertEqual(exit_code, 0)
             mock_log_dir.assert_called_once()
             mock_download.assert_called_with(
                 exec_root=exec_root, working_dir=working_dir)
+            if _HAVE_XATTR:
+                mock_setxattr.assert_called_once()
 
 
 class RbeDiagnosticsTests(unittest.TestCase):

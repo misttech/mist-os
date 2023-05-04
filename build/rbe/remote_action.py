@@ -42,6 +42,11 @@ PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
 # This should only be used for workarounds as a last resort.
 _REMOTE_PROJECT_ROOT = Path('/b/f/w')
 
+# Extended attributes can be used to tell reproxy (filemetadata cache)
+# that an artifact already exists in the CAS.
+# TODO(http://fxbug.dev/123178): use 'xattr' for greater portability.
+_HAVE_XATTR = hasattr(os, 'setxattr')
+
 # Wrapper script to capture remote stdout/stderr, co-located with this script.
 _REMOTE_LOG_SCRIPT = Path('build', 'rbe', 'log-it.sh')
 
@@ -665,6 +670,16 @@ class DownloadStubInfo(object):
         self._write(stub_dest)
         cl_utils.symlink_relative(stub_dest, path)
 
+        if _HAVE_XATTR:
+            # Signal to the next reproxy invocation that the object already
+            # exists in the CAS and does not need to be uploaded.
+            os.setxattr(
+                path,
+                _RBE_XATTR_NAME,
+                self.blob_digest.encode(),
+                follow_symlinks=False,  # want the attribute on the link
+            )
+
     @staticmethod
     def read_from_file(stub: Path) -> 'DownloadStubInfo':
 
@@ -718,6 +733,14 @@ class DownloadStubInfo(object):
         if status == 0:  # download complete, success
             self.path.unlink()  # break symlink
             temp_dl.rename(dest)
+            # Removing this xattr will cause the next reproxy invocation
+            # to re-check the hash of this file before trying to upload it.
+            if _HAVE_XATTR:
+                os.removexattr(
+                    self.path,
+                    _RBE_XATTR_NAME,
+                    follow_symlinks=False,
+                )
 
         return status
 
@@ -739,15 +762,6 @@ def _write_download_stub(
     """
     stub_info = log_record.make_download_stub_info(path, build_id)
     stub_info.create(working_dir_abs)
-    # Signal to the next reproxy invocation that the object already
-    # exists in the CAS and does not need to be uploaded.
-    # TODO(http://fxbug.dev/123178): use xattr package for portability
-    if hasattr(os, 'setxattr'):  # not available on all platforms
-        os.setxattr(
-            path,
-            _RBE_XATTR_NAME,
-            stub_info.blob_digest.encode(),
-            follow_symlinks=False)
 
 
 def get_download_stub_file(path: Path) -> Optional[Path]:
