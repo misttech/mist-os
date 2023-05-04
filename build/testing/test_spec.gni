@@ -290,14 +290,21 @@ template("test_spec") {
   # Rely on metadata reachable through deps to determine any runtime
   # dependencies of the test; record them to a file.
   runtime_deps_file = ""
-  if (defined(invoker.deps) && invoker.deps != []) {
+  if ((defined(invoker.deps) && invoker.deps != []) ||
+      (defined(invoker.data_deps) && invoker.data_deps != []) ||
+      (defined(invoker.public_deps) && invoker.public_deps != [])) {
     runtime_deps_file = "$target_gen_dir/${target_name}.deps.json"
     runtime_deps_target_name = "${target_name}_deps"
 
     generated_file(runtime_deps_target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "data_deps",
+                               "deps",
+                               "public_deps",
+                             ])
       outputs = [ runtime_deps_file ]
       data_keys = [ "test_runtime_deps" ]
-      deps = invoker.deps
       rebase = root_build_dir
       output_conversion = "json"
     }

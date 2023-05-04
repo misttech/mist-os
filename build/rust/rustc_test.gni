@@ -54,18 +54,23 @@ template("rustc_test_internal") {
     host_test(target_name) {
       binary_path = "${root_out_dir}/${crate_name}"
 
-      # The host test can only depend on the _actual_ binary, because only the
-      # actual binary is able to properly depend on the toolchain variants
-      # correctly.  It cannot depend on any of the "deps" as they will be in the
-      # wrong toolchain when variants are in use, and it will cause the
-      # compilation of non-variant toolchain artifacts that aren't actually
-      # used.
-      deps = [ ":${exe_target_name}.actual" ]
+      # The host test should only depend on the _actual_ binary, because only
+      # the binary is able to properly depend on the toolchain variants
+      # correctly.
+      # It shouldn't depend on any of the "deps" as they will be in the wrong
+      # toolchain when variants are in use, and it will cause the compilation of
+      # non-variant toolchain artifacts that aren't actually used.
+      #
+      # HOWEVER, that bypasses clippy, which currently both uses rlibs and does
+      # know how to properly switch to the correct variant toolchain.  So this
+      # instead deps on the group that combines both clippy and the binary.  But
+      # it doesn't depend on any other deps.
+      deps = [ ":${exe_target_name}" ]
 
-      # However, if there is host-test-data, then that could be passed via
+      # However, if there is host-test-data, then that should be passed via
       # data_deps, so include those here
       if (defined(invoker.data_deps)) {
-        deps += invoker.data_deps
+        data_deps = invoker.data_deps
       }
 
       if (defined(invoker.test_environments)) {

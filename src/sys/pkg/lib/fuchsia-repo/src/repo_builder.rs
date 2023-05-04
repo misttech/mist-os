@@ -1121,7 +1121,7 @@ mod tests {
             test_utils::make_package_manifest("package", dir.as_std_path(), vec![]);
 
         // Delete a subpackage file.
-        std::fs::remove_file(&dir.join("package").join("meta.far")).unwrap();
+        std::fs::remove_file(dir.join("package").join("meta.far")).unwrap();
 
         // Commit the supackage to the repository. This should succeed because
         // `ignore_missing_files` is true.
@@ -1275,7 +1275,7 @@ mod tests {
         );
 
         // Delete a subpackage file.
-        std::fs::remove_file(&subpkg_dir.join("subpackage").join("meta.far")).unwrap();
+        std::fs::remove_file(subpkg_dir.join("subpackage").join("meta.far")).unwrap();
 
         // Commit the supackage to the repository. This should succeed because
         // `ignore_missing_files` is true.
