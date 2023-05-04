@@ -1603,6 +1603,8 @@ mod tests {
 
     #[test]
     fn test_partial_parse() {
+        #![allow(unknown_lints)] // TODO(fxbug.dev/126732)
+        #![allow(suspicious_double_ref_op)] // TODO(fxbug.dev/126727)
         use core::convert::TryInto as _;
         use core::ops::Deref as _;
 
