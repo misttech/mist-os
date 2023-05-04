@@ -44,7 +44,7 @@ impl Display for PidStatus {
                 NotRunning { pid: Some(pid) } =>
                     format!("Present, but not running (last pid: {pid})"),
                 NotRunning { pid: None } => format!("Present, but not valid"),
-                Running { pid } => format!("Present and running (pid: {pid}"),
+                Running { pid } => format!("Present and running (pid: {pid})"),
             }
         )
     }
@@ -113,6 +113,14 @@ impl SocketDetails {
         let pid = FileInfo::new(pid_path, pid_status);
 
         SocketDetails { socket, pid }
+    }
+
+    pub fn get_running_pid(&self) -> Option<u32> {
+        if let PidStatus::Running { pid } = self.pid.status {
+            Some(pid)
+        } else {
+            None
+        }
     }
 }
 

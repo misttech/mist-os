@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_command::{Error, FfxContext, Result};
+use ffx_config::EnvironmentContext;
 use ffx_fidl::{DaemonError, VersionInfo};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
@@ -436,6 +437,13 @@ impl TryFromEnv for ffx_writer::SimpleWriter {
 impl<T: serde::Serialize> TryFromEnv for ffx_writer::MachineWriter<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(ffx_writer::MachineWriter::new(env.ffx.global.machine))
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for EnvironmentContext {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(env.context.clone())
     }
 }
 
