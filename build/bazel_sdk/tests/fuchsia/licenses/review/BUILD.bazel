@@ -16,4 +16,5 @@ py_test(
     name = "review_test",
     srcs = ["review_test.py"],
     data = [":review.zip"] + glob(["goldens/**/*"]),
+    visibility = ["//visibility:public"],
 )

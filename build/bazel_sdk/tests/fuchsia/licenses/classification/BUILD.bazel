@@ -23,4 +23,5 @@ diff_test(
     name = "classification_test",
     file1 = ":actual_classification.json",
     file2 = "expected_classification.json",
+    visibility = ["//visibility:public"],
 )

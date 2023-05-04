@@ -15,4 +15,5 @@ diff_test(
     name = "notice_test",
     file1 = ":actual_notice",
     file2 = "expected_notice.txt",
+    visibility = ["//visibility:public"],
 )

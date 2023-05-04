@@ -110,6 +110,7 @@ fuchsia_product_configuration_test(
         "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_golden_file_x64.json",
     }),
     product_config = ":testing_product_config",
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_product_configuration(
@@ -128,6 +129,7 @@ fuchsia_product_configuration_test(
     name = "product_config_with_labels_golden_test",
     golden_file = ":test_data/product_config_with_labels_golden_file.json",
     product_config = ":testing_product_config_with_labels",
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_zbi(
@@ -245,12 +247,14 @@ fuchsia_images_configuration_test(
     name = "images_config_golden_test",
     golden_file = ":test_data/images_config_golden_file.json",
     images_config = ":my_images_configuration",
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_images_configuration_test(
     name = "images_config_no_vbmeta_no_account_golden_test",
     golden_file = ":test_data/images_config_golden_file_no_vbmeta.json",
     images_config = ":my_images_configuration_no_vbmeta_no_account",
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_bootstrap_partition(
@@ -320,4 +324,5 @@ fuchsia_partitions_configuration_test(
     name = "partitions_config_golden_test",
     golden_file = ":test_data/partitions_config_golden_file.json",
     partitions_config = ":my_partitions_config",
+    visibility = ["//visibility:public"],
 )

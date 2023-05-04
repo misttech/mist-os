@@ -64,4 +64,5 @@ diff_test(
     file1 = ":actual_licenses.spdx.json",
     # Copied from third_party/sdk-integration/tests/bazel-bin/fuchsia/licenses/spdx_dedup/actual_licenses.spdx.json
     file2 = "expected_licenses.spdx.json",
+    visibility = ["//visibility:public"],
 )
