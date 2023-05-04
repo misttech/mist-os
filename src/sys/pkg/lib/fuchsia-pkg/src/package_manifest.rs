@@ -383,7 +383,7 @@ impl PackageManifest {
                 ),
             };
 
-            Ok(Self(versioned))
+            Ok(PackageManifest(versioned))
         }
         inner(manifest_path.as_ref(), reader)
     }
