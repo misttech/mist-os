@@ -11,9 +11,6 @@
         runner: "driver",
         bind: "meta/bind/simple-intel-bind.bindbc",
         compat: "driver/simple.intel.so",
-
-        // TODO(fxbug.dev/93333): remove this once DFv2 is stabilised.
-        default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
         { protocol: "fuchsia.boot.RootResource" },
