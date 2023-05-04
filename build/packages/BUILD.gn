@@ -48,10 +48,14 @@ group("tests") {
 #    \|_________|
 #
 # This is an allow-list for package targets that are not fuchsia_test_package()
-# invocations that can use subpackages.  The use of  subpackages is being
-# restricted in-tree until we finish verifying that all workflows that use
-# packages have been validated to work correctly with subpackages.
+# invocations that can use subpackages. Subpackages are production ready, but
+# are gated behind an allowlist for now in case any issues are discovered
+# during their rollout.
 #
+# To add items to the allowlist, please send a change to one of the OWNERS of
+# this file to add an element to the visibility list below.
+# Please allowlist entire directories rather than individual targets as it
+# requires less allowlist churn over time.
 group("allowed_to_use_subpackages") {
   visibility = [
     "//examples/components/lifecycle:lifecycle-example-cpp",
