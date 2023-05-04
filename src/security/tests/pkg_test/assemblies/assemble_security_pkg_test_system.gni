@@ -15,7 +15,6 @@ import("//build/dist/zip_resource.gni")
 import("//build/packages/publish-archive.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/security/tests/pkg_test/assemblies/build_info.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 # Construct a system assembly for use in product security tests.
 #

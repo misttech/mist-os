@@ -57,7 +57,11 @@ impl BlobfsInstance {
         .expect("blobfs block did not appear");
 
         // Instantiate blobfs.
-        let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
+        let config = Blobfs {
+            component_type: ComponentType::StaticChild,
+            allow_delivery_blobs: true,
+            ..Default::default()
+        };
         let mut blobfs = Filesystem::new(blobfs_controller, config);
 
         // Check blobfs consistency.
