@@ -314,12 +314,6 @@ func doTestOTAs(
 		return nil
 	}
 
-	expectedSystemImageMerkle, err = repo.LookupUpdatePrimeSystemImageMerkle(ctx)
-	if err != nil {
-		logger.Infof(ctx, "No prime package info")
-		return nil
-	}
-
 	logger.Infof(ctx, "starting OTA N -> N' test")
 	otaTime := time.Now()
 	if err := systemPrimeOTA(ctx, device, rpcClient, repo, false); err != nil {

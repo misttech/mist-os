@@ -129,10 +129,6 @@ func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (string,
 	return r.lookupUpdateContentPackageMerkle(ctx, "update/0", "system_image/0")
 }
 
-func (r *Repository) LookupUpdatePrimeSystemImageMerkle(ctx context.Context) (string, error) {
-	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime/0", "system_image_prime/0")
-}
-
 func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (string, error) {
 	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime2/0", "system_image/0")
 }
@@ -146,14 +142,6 @@ func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context
 		return nil
 	}
 
-	systemPrimeImageMerkle, err := r.LookupUpdatePrimeSystemImageMerkle(ctx)
-	if err != nil {
-		return err
-	}
-	if merkle == systemPrimeImageMerkle {
-		return nil
-	}
-
 	systemPrimeImage2Merkle, err := r.LookupUpdatePrimeSystemImage2Merkle(ctx)
 	if err != nil {
 		return err
@@ -162,8 +150,8 @@ func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context
 		return nil
 	}
 
-	return fmt.Errorf("expected device to be running a system image of %s, %s or %s, got %s",
-		systemImageMerkle, systemPrimeImageMerkle, systemPrimeImage2Merkle, merkle)
+	return fmt.Errorf("expected device to be running a system image of %s or %s, got %s",
+		systemImageMerkle, systemPrimeImage2Merkle, merkle)
 }
 
 func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updatePackageName string, contentPackageName string) (string, error) {

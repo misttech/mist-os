@@ -198,7 +198,6 @@ function diff_file_relpath() {
     elf_sizes.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: build_id
     recovery-eng_blobs.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: bytes, merkle, size (ordering)
     *.zbi.json) expect=unknown; diff_json "$left" "$right" ;;  # diffs: crc32, size
-    update_prime_packages.manifest.json) expect=diff; diff_json "$left" "$right" ;;  # hashes
     update_packages.manifest.json) expect=diff; diff_json "$left" "$right" ;;  # hashes
 
     # Diff formatted JSON for readability.
@@ -216,7 +215,6 @@ function diff_file_relpath() {
     recovery-eng_devmgr_config.txt) expect=diff; diff_text "$left" "$right" ;;  # hashes
     recovery-eng_pkgsvr_index) expect=diff; diff_text "$left" "$right" ;;  # hashes
 
-    update_prime_packages.manifest) expect=diff; diff_text "$left" "$right" ;;  # hashes
     update_packages.manifest) expect=diff; diff_text "$left" "$right" ;;  # hashes
 
     # Various binaries.
