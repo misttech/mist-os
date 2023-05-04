@@ -244,10 +244,6 @@ class FakeDdkOptee : public zxtest::Test {
   FakeDdkOptee() : clients_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
-    fdf_env_reset();
-    ASSERT_OK(fdf_env_start());
-
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
@@ -282,11 +278,18 @@ class FakeDdkOptee : public zxtest::Test {
   FakeSysmem sysmem_;
   FakeRpmbService rpmb_service_;
 
-  std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  // Also fix the default dispatcher + managed runtime discrepancy.
+  // Using the runtime as well as attaching dispatchers as default can lead to false positives
+  // in the synchronization_checker (i.e. passes synchronization check even though managed threads
+  // can race vs main test thread).
+  fdf_testing::DriverRuntimeEnv runtime_;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+  std::shared_ptr<MockDevice> parent_ =
+      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   OpteeController* optee_ = nullptr;
 
   async::Loop clients_loop_;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_;
   std::optional<FakeTeeService> tee_service_;
   fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
 };

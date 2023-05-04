@@ -160,7 +160,9 @@ class Imx8mSdmmcTest : public zxtest::Test {
   async_dispatcher_t* DriverDispatcher() { return test_driver_dispatcher_.dispatcher(); }
 
  protected:
-  std::shared_ptr<MockDevice> fake_parent_{MockDevice::FakeRootParent()};
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  std::shared_ptr<MockDevice> fake_parent_{
+      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
   FakeMmio mmio_;
   Imx8mSdmmc* dut_;
 

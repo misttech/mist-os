@@ -70,7 +70,8 @@ class I2cMetadataTest : public zxtest::Test {
  public:
   void SetUp() override {
     EXPECT_TRUE(dispatcher_.Start({}, "i2c-test dispatcher").is_ok());
-    fake_root_ = MockDevice::FakeRootParent();
+    // TODO(fxb/124464): Migrate test to use dispatcher integration.
+    fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   }
 
   void TearDown() override {

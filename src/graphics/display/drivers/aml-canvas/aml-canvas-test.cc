@@ -59,7 +59,9 @@ class AmlCanvasWrap {
 
  private:
   async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  std::shared_ptr<MockDevice> fake_parent_ =
+      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   std::unique_ptr<AmlCanvas> canvas_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
 };

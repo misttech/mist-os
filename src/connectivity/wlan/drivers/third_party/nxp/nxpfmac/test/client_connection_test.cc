@@ -109,7 +109,8 @@ struct ClientConnectionTest : public zxtest::Test {
     ASSERT_OK(ioctl_adapter.status_value());
     ioctl_adapter_ = std::move(ioctl_adapter.value());
     key_ring_ = std::make_unique<wlan::nxpfmac::KeyRing>(ioctl_adapter_.get(), kTestBssIndex);
-    parent_ = MockDevice::FakeRootParent();
+    // TODO(fxb/124464): Migrate test to use dispatcher integration.
+    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     ASSERT_OK(TestDevice::Create(parent_.get(), env_.GetDispatcher(), &device_destructed_,
                                  &test_device_));
     ASSERT_OK(wlan::nxpfmac::TestDataPlane::Create(&data_plane_ifc_, &mock_bus_,

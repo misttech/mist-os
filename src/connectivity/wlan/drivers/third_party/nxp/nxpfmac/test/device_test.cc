@@ -103,7 +103,8 @@ struct TestDevice : public Device {
 
 struct DeviceTest : public zxtest::Test {
   void SetUp() override {
-    parent_ = MockDevice::FakeRootParent();
+    // TODO(fxb/124464): Migrate test to use dispatcher integration.
+    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
 
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "TestDriverDispatcher",

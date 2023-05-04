@@ -135,7 +135,9 @@ class I2cChildTest : public zxtest::Test {
     }
   }
 
-  std::shared_ptr<zx_device> fake_root_{MockDevice::FakeRootParent()};
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  std::shared_ptr<zx_device> fake_root_{
+      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
   fdf::TestSynchronizedDispatcher dispatcher_;
 };
 

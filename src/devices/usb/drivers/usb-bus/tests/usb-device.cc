@@ -325,7 +325,8 @@ class DeviceTest : public zxtest::Test {
   void SetEmptyState(bool should_return_empty) { hci_.SetEmptyState(should_return_empty); }
 
  protected:
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
 
  private:
   async::Loop fidl_loop_{&kAsyncLoopConfigNeverAttachToThread};

@@ -133,7 +133,8 @@ class HidDeviceTest : public zxtest::Test {
   void SetUp() override {
     ASSERT_EQ(ZX_OK, dispatcher_.StartAsDefault({}, "hid-test-dispatcher").status_value());
 
-    fake_root_ = MockDevice::FakeRootParent();
+    // TODO(fxb/124464): Migrate test to use dispatcher integration.
+    fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     client_ = ddk::HidbusProtocolClient(fake_hidbus_.GetProto());
     device_ = new HidDevice(fake_root_.get());
 

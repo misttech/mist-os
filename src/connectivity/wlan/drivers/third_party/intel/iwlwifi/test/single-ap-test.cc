@@ -14,8 +14,10 @@ extern "C" {
 
 namespace wlan::testing {
 
+// TODO(fxb/124464): Migrate tests to use dispatcher integration.
 SingleApTest::SingleApTest()
-    : fake_parent_(MockDevice::FakeRootParent()), sim_trans_(fake_parent_.get()) {
+    : fake_parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
+      sim_trans_(fake_parent_.get()) {
   // Add a default MVM firmware to the fake DDK.
   TlvFwBuilder fw_builder;
 

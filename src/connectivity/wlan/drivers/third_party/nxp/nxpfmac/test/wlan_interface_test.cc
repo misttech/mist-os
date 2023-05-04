@@ -101,7 +101,8 @@ struct TestDevice : public Device {
 
 struct WlanInterfaceTest : public zxtest::Test, public wlan::nxpfmac::DataPlaneIfc {
   void SetUp() override {
-    parent_ = MockDevice::FakeRootParent();
+    // TODO(fxb/124464): Migrate test to use dispatcher integration.
+    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     ASSERT_OK(wlan::nxpfmac::TestDataPlane::Create(this, &mock_bus_, mlan_mocks_.GetAdapter(),
                                                    &test_data_plane_));
 

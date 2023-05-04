@@ -515,7 +515,8 @@ TEST(Sdio, TxCtlCtrlFrameStateClearedWithError) {
 }
 
 TEST(Sdio, SdioDeviceMultipleShutdowns) {
-  auto parent = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  auto parent = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   wlan::brcmfmac::SdioDevice::Create(parent.get());
 
   zx_device_t* child = parent->GetLatestChild();

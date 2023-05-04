@@ -48,10 +48,11 @@ class PciDeviceTests : protected inspect::InspectTestHelper, public zxtest::Test
   void ConfigureDownstreamDevices() { return upstream_.ConfigureDownstreamDevices(); }
 
  protected:
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
   PciDeviceTests()
       : pciroot_(0, 1),
         client_(pciroot_.proto()),
-        parent_(MockDevice::FakeRootParent()),
+        parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
         upstream_(UpstreamNode::Type::ROOT, 0),
         inspect_vmo_(inspector_.DuplicateVmo()) {}
   ~PciDeviceTests() override {

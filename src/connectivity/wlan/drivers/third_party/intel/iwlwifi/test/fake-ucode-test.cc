@@ -15,9 +15,11 @@ extern "C" {
 
 namespace wlan::testing {
 
+// TODO(fxb/124464): Migrate test to use dispatcher integration.
 FakeUcodeTest::FakeUcodeTest(const std::vector<enum iwl_ucode_tlv_capa>& capas,
                              const std::vector<enum iwl_ucode_tlv_api>& apis)
-    : fake_parent_(MockDevice::FakeRootParent()), sim_trans_(fake_parent_.get()) {
+    : fake_parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
+      sim_trans_(fake_parent_.get()) {
   // Add a default MVM firmware to the fake DDK.
   TlvFwBuilder fw_builder;
 

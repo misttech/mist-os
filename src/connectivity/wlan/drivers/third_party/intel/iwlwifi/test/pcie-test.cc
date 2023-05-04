@@ -60,7 +60,8 @@ constexpr int kTestSubsysDeviceId = 0x9e10;
 class MockDdkTesterPci : public zxtest::Test, public loop_fixture::RealLoop {};
 
 TEST_F(MockDdkTesterPci, DeviceLifeCycle) {
-  auto parent = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  auto parent = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
 
   // Set up a fake pci:
   pci::FakePciProtocol fake_pci;

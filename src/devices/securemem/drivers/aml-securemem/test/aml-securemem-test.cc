@@ -172,7 +172,8 @@ class AmlogicSecureMemTest : public zxtest::Test {
 
  private:
   fdf::Unowned<fdf::Dispatcher> tee_server_loop_;
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};

@@ -39,12 +39,13 @@ namespace {
 //    |                                |    device     |
 //    |                                +---------------+
 //    |
+// TODO(fxb/124464): Migrate test to use dispatcher integration.
 class WlanphyDeviceTest : public ::zxtest::Test,
                           public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:
   WlanphyDeviceTest()
       : client_loop_phy_(async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread)),
-        fake_wlan_phy_impl_device_(MockDevice::FakeRootParent()) {
+        fake_wlan_phy_impl_device_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()) {
     zx_status_t status = ZX_OK;
 
     status = wlanphy_init_loop();
