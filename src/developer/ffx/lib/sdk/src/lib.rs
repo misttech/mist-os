@@ -97,24 +97,31 @@ impl SdkRoot {
             Self::Modular { manifest, module } => {
                 // Modular only ever makes sense as part of a build directory
                 // sdk, so there's no need to figure out what kind it is.
-                Sdk::from_build_dir(&manifest, Some(&module))
+                Sdk::from_build_dir(&manifest, Some(&module)).with_context(|| {
+                    anyhow!(
+                        "Loading sdk manifest at `{}` with module `{module}`",
+                        manifest.display()
+                    )
+                })
             }
             Self::Full(manifest) if manifest.join(SDK_MANIFEST_PATH).exists() => {
                 // If the packaged sdk manifest exists, use that.
                 Sdk::from_sdk_dir(&manifest)
+                    .with_context(|| anyhow!("Loading sdk manifest at `{}`", manifest.display()))
             }
             Self::Full(manifest) if manifest.join(SDK_BUILD_MANIFEST_PATH).exists() => {
                 // Otherwise assume this is a build manifest, but with no module.
                 Sdk::from_build_dir(&manifest, None)
+                    .with_context(|| anyhow!("Loading sdk manifest at `{}`", manifest.display()))
             }
             Self::Full(manifest) => Err(ffx_error!(
                 "Failed to load the SDK.\n\
-                    Expected '{0}' to contain a manifest at either:\n\
+                    Expected '{manifest}' to contain a manifest at either:\n\
                     - '{SDK_MANIFEST_PATH}'\n\
                     - '{SDK_BUILD_MANIFEST_PATH}'.\n\
                     Check your SDK configuration (`ffx config get sdk.root`) and verify that \
                     an SDK has been downloaded or built in that location.",
-                manifest.display()
+                manifest = manifest.display()
             )
             .into()),
         }
@@ -153,7 +160,7 @@ impl Sdk {
 
         // If we are able to parse the json file into atoms, creates a Sdk object from the atoms.
         Self::from_sdk_atoms(&path, atoms, SdkVersion::InTree)
-            .with_context(|| ffx_error!("Failed to parse atoms from SDK in `{}`", path.display()))
+            .with_context(|| anyhow!("Parsing atoms from SDK manifest at `{}`", path.display()))
     }
 
     pub fn from_sdk_dir(path_prefix: &Path) -> Result<Self> {
@@ -300,11 +307,15 @@ impl Sdk {
                 real_paths.insert(file.destination.clone(), file.source.clone());
             }
 
-            let meta = real_paths.get(&atom.meta).ok_or_else(|| {
-                anyhow!("Atom did not specify source for its metadata: {:?}", &atom,)
-            })?;
+            if atom.meta.len() > 0 {
+                let meta = real_paths.get(&atom.meta).ok_or_else(|| {
+                    anyhow!("Atom did not specify source for its metadata: {atom:?}")
+                })?;
 
-            metas.push(Part { meta: meta.clone(), kind: atom.kind.clone() });
+                metas.push(Part { meta: meta.clone(), kind: atom.kind.clone() });
+            } else {
+                tracing::debug!("Atom did not contain a meta file, skipping it: {atom:?}");
+            }
         }
 
         Ok(Sdk {
