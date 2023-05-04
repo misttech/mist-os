@@ -42,10 +42,6 @@ _common_bootfs_deps = [
   "//src/storage/flashmap:bootfs",
 ]
 
-# Include DFv2 specific bind rules for testing.
-# TODO(fxbug.dev/93333) : Add dynamic binding and remove these.
-_common_bootfs_deps += [ "//src/ui/input/drivers/i2c-hid:i2c-hid-dfv2" ]
-
 board_bootfs_labels += _common_bootfs_deps
 
 board_zedboot_bootfs_labels += _common_bootfs_deps
