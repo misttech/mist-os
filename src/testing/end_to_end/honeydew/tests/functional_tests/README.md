@@ -92,7 +92,10 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 ### Tracing tests
 ``` shell
 
-$ fx set workstation_eng.x64  --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+$ fx set workstation_eng.qemu-x64 --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+# Start the emulator
+$ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing_default:tracing_default_test --e2e --output
 ```
