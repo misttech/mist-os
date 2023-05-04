@@ -592,7 +592,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     path_from_root_to_generated.display(),
                     options.binary_name
                 )),
-                path: target.package_root(&opt.project_root),
+                path: target.package_root(),
             });
             gn::write_binary_top_level_rule(&mut output, None, target, options)
                 .context(format!("writing binary top level rule: {}", target.name()))?;
@@ -688,7 +688,16 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             }
         }
 
-        let package_root = target.package_root(&opt.project_root);
+        let package_root = target.package_root();
+        package_root.strip_prefix(&opt.project_root).unwrap_or_else(|e| {
+            panic!(
+                "{}: {} is not under the project_root ({})",
+                e,
+                target.package_root(),
+                opt.project_root.display()
+            )
+        });
+
         let shortcut_target = if top_level_metadata.contains(target.pkg_name) {
             Some(format!("//{}:{}", path_from_root_to_generated.display(), target.pkg_name))
         } else {

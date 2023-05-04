@@ -11,7 +11,6 @@ use {
     std::cmp::Ordering,
     std::collections::{hash_map::DefaultHasher, HashMap},
     std::hash::{Hash, Hasher},
-    std::path::Path,
 };
 
 #[derive(Clone)]
@@ -152,7 +151,7 @@ impl<'a> GnTarget<'a> {
         add_version_suffix(&prefix, &self.version)
     }
 
-    pub fn package_root(&self, project_root: &Path) -> Utf8PathBuf {
+    pub fn package_root(&self) -> Utf8PathBuf {
         let mut package_root = self.crate_root.canonicalize_utf8().unwrap();
 
         while !package_root.join("Cargo.toml").exists() {
@@ -162,12 +161,8 @@ impl<'a> GnTarget<'a> {
                 .to_path_buf();
         }
 
-        let package_root = package_root.strip_prefix(project_root).unwrap_or_else(|e| {
-            panic!("{}: {} is not under FUCHSIA_DIR({})", e, package_root, project_root.display())
-        });
-        assert_ne!(
-            package_root.as_os_str(),
-            "third_party/rust_crates",
+        assert!(
+            !package_root.ends_with("third_party/rust_crates"),
             "must find a cargo.toml before the root one"
         );
 
