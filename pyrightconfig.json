@@ -6,5 +6,12 @@
         "third_party/mako",
         "third_party/parameterized/src",
         "third_party/jellyfish/jellyfish/jellyfish"
+    ],
+    "exclude": [
+        "out",
+        "prebuilt",
+        "third_party",
+        "**/prebuilt_symlink",
+        "**/__pycache__"
     ]
 }
