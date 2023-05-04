@@ -303,7 +303,6 @@ fn add_execution_info_to_table(table: &mut Table, exec: Option<ShowCmdExecutionI
 mod tests {
     use super::*;
     use crate::test_utils::*;
-    use fidl_fuchsia_component_config as fconfig;
     use fidl_fuchsia_component_decl as fdecl;
     use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
     use std::collections::HashMap;
@@ -430,10 +429,10 @@ mod tests {
             )]),
             HashMap::from([(
                 "./my_foo".to_string(),
-                fconfig::ResolvedConfig {
-                    fields: vec![fconfig::ResolvedConfigField {
+                fdecl::ResolvedConfig {
+                    fields: vec![fdecl::ResolvedConfigField {
                         key: "foo".to_string(),
-                        value: fconfig::Value::Single(fconfig::SingleValue::Bool(false)),
+                        value: fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(false)),
                     }],
                     checksum: fdecl::ConfigChecksum::Sha256([0; 32]),
                 },

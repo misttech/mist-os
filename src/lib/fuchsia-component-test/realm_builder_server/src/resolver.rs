@@ -6,7 +6,6 @@ use {
     crate::ConfigOverridePolicy,
     anyhow::{Context, Error},
     cm_fidl_validator,
-    cm_rust::NativeIntoFidl,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::Vmo,
     fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
@@ -150,15 +149,12 @@ impl Registry {
         let mut values_data: fconfig::ValuesData = if let Some(v) = values_data {
             let bytes = mem_util::bytes_from_data(&v)?;
             let values_data = fidl::encoding::unpersist(&bytes)?;
-            cm_fidl_validator::validate_values_data(&values_data)?;
+            cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)?;
             values_data
         } else {
             // make a boilerplate ValuesData that our replacements can fill
-            let num_expected_values = schema
-                .fields
-                .as_ref()
-                .expect("schema must have fields TODO real error handling")
-                .len();
+            let num_expected_values =
+                schema.fields.as_ref().context("schema must have fields")?.len();
             let blank_values = (0..num_expected_values)
                 .map(|_| fconfig::ValueSpec { value: None, ..Default::default() })
                 .collect::<Vec<_>>();
@@ -176,10 +172,10 @@ impl Registry {
                 .expect("either validated or constructed above")
                 .get_mut(*index)
                 .expect("Config Value File and Schema should have the same number of fields!");
-            *value = replacement.clone().native_into_fidl();
+            *value = replacement.clone().native_into_fidl_todo_fxb_126609();
         }
 
-        cm_fidl_validator::validate_values_data(&values_data)
+        cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)
             .context("ensuring all values are populated")?;
 
         let data = fidl::encoding::persist(&values_data)?;

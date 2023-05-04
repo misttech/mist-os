@@ -1453,7 +1453,11 @@ impl SubRealmBuilder {
         let child_ref: ChildRef = child_ref.into();
         child_ref.check_scope(&self.realm_path)?;
         self.realm_proxy
-            .set_config_value(&child_ref.name, key, value.native_into_fidl())
+            .set_config_value(
+                &child_ref.name,
+                key,
+                cm_rust::ValueSpec::native_into_fidl_todo_fxb_126609(value),
+            )
             .await?
             .map_err(Into::into)
     }

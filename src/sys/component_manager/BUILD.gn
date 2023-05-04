@@ -22,7 +22,6 @@ rustc_library("lib") {
     ":measure_tape_for_instance",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
@@ -201,7 +200,6 @@ rustc_library("lib") {
 
   test_deps = [
     "//examples/components/routing/fidl:echo_rust",
-    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/log/message/rust",

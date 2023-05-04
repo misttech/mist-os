@@ -402,8 +402,7 @@ mod tests {
         cm_rust::{FidlIntoNative, NativeIntoFidl},
         fidl::encoding::persist,
         fidl::endpoints::{create_proxy, ServerEnd},
-        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_data as fdata,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
         fuchsia_fs::directory::open_in_namespace,
         std::sync::{Arc, Weak},
@@ -534,9 +533,9 @@ mod tests {
             ),
             ..Default::default()
         };
-        let values_data = fconfig::ValuesData {
-            values: Some(vec![fconfig::ValueSpec {
-                value: Some(fconfig::Value::Single(fconfig::SingleValue::String(
+        let values_data = fdecl::ConfigValuesData {
+            values: Some(vec![fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
                     "hello, world!".to_string(),
                 ))),
                 ..Default::default()

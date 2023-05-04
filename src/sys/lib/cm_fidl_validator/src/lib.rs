@@ -23,7 +23,57 @@ use {
 /// Validates Configuration Value Spec.
 ///
 /// For now, this simply verifies that all semantically required fields are present.
-pub fn validate_value_spec(spec: &fconfig::ValueSpec) -> Result<(), ErrorList> {
+pub fn validate_value_spec(spec: &fdecl::ConfigValueSpec) -> Result<(), ErrorList> {
+    let mut errors = vec![];
+    if let Some(value) = &spec.value {
+        match value {
+            fdecl::ConfigValue::Single(s) => match s {
+                fdecl::ConfigSingleValue::Bool(_)
+                | fdecl::ConfigSingleValue::Uint8(_)
+                | fdecl::ConfigSingleValue::Uint16(_)
+                | fdecl::ConfigSingleValue::Uint32(_)
+                | fdecl::ConfigSingleValue::Uint64(_)
+                | fdecl::ConfigSingleValue::Int8(_)
+                | fdecl::ConfigSingleValue::Int16(_)
+                | fdecl::ConfigSingleValue::Int32(_)
+                | fdecl::ConfigSingleValue::Int64(_)
+                | fdecl::ConfigSingleValue::String(_) => {}
+                fdecl::ConfigSingleValueUnknown!() => {
+                    errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+                }
+            },
+            fdecl::ConfigValue::Vector(l) => match l {
+                fdecl::ConfigVectorValue::BoolVector(_)
+                | fdecl::ConfigVectorValue::Uint8Vector(_)
+                | fdecl::ConfigVectorValue::Uint16Vector(_)
+                | fdecl::ConfigVectorValue::Uint32Vector(_)
+                | fdecl::ConfigVectorValue::Uint64Vector(_)
+                | fdecl::ConfigVectorValue::Int8Vector(_)
+                | fdecl::ConfigVectorValue::Int16Vector(_)
+                | fdecl::ConfigVectorValue::Int32Vector(_)
+                | fdecl::ConfigVectorValue::Int64Vector(_)
+                | fdecl::ConfigVectorValue::StringVector(_) => {}
+                fdecl::ConfigVectorValueUnknown!() => {
+                    errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+                }
+            },
+            fdecl::ConfigValueUnknown!() => {
+                errors.push(Error::invalid_field("ConfigValueSpec", "value"));
+            }
+        }
+    } else {
+        errors.push(Error::missing_field("ConfigValueSpec", "value"));
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(ErrorList::new(errors))
+    }
+}
+
+// TODO(https://fxbug.dev/126609)
+fn validate_value_spec_todo_fxb_126609(spec: &fconfig::ValueSpec) -> Result<(), ErrorList> {
     let mut errors = vec![];
     if let Some(value) = &spec.value {
         match value {
@@ -79,11 +129,42 @@ pub fn validate_value_spec(spec: &fconfig::ValueSpec) -> Result<(), ErrorList> {
 /// simply verifies that all semantically required fields are present.
 ///
 /// This method does not validate value data against a configuration schema.
-pub fn validate_values_data(data: &fconfig::ValuesData) -> Result<(), ErrorList> {
+pub fn validate_values_data(data: &fdecl::ConfigValuesData) -> Result<(), ErrorList> {
     let mut errors = vec![];
     if let Some(values) = &data.values {
         for spec in values {
             if let Err(mut e) = validate_value_spec(spec) {
+                errors.append(&mut e.errs);
+            }
+        }
+    } else {
+        errors.push(Error::missing_field("ConfigValuesData", "values"));
+    }
+
+    if let Some(checksum) = &data.checksum {
+        match checksum {
+            fdecl::ConfigChecksum::Sha256(_) => {}
+            fdecl::ConfigChecksumUnknown!() => {
+                errors.push(Error::invalid_field("ConfigValuesData", "checksum"));
+            }
+        }
+    } else {
+        errors.push(Error::missing_field("ConfigValuesData", "checksum"));
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(ErrorList::new(errors))
+    }
+}
+
+// TODO(https://fxbug.dev/126609) delete
+pub fn validate_values_data_todo_fxb_126609(data: &fconfig::ValuesData) -> Result<(), ErrorList> {
+    let mut errors = vec![];
+    if let Some(values) = &data.values {
+        for spec in values {
+            if let Err(mut e) = validate_value_spec_todo_fxb_126609(spec) {
                 errors.append(&mut e.errs);
             }
         }
@@ -2426,7 +2507,10 @@ mod tests {
         );
     }
 
-    fn validate_values_data_test(input: fconfig::ValuesData, expected_res: Result<(), ErrorList>) {
+    fn validate_values_data_test(
+        input: fdecl::ConfigValuesData,
+        expected_res: Result<(), ErrorList>,
+    ) {
         let res = validate_values_data(&input);
         assert_eq!(res, expected_res);
     }
@@ -2668,10 +2752,10 @@ mod tests {
 
     test_validate_values_data! {
         test_values_data_ok => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![
-                    fconfig::ValueSpec {
-                        value: Some(fconfig::Value::Single(fconfig::SingleValue::Bool(true))),
+                    fdecl::ConfigValueSpec {
+                        value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
                         ..Default::default()
                     }
                 ]),
@@ -2681,52 +2765,52 @@ mod tests {
             result = Ok(()),
         },
         test_values_data_no_checksum => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![]),
                 checksum: None,
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ValuesData", "checksum")
+                Error::missing_field("ConfigValuesData", "checksum")
             ])),
         },
         test_values_data_unknown_checksum => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![]),
                 checksum: Some(fdecl::ConfigChecksum::unknown_variant_for_testing()),
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ValuesData", "checksum")
+                Error::invalid_field("ConfigValuesData", "checksum")
             ])),
         },
         test_values_data_no_values => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: None,
                 checksum: Some(fdecl::ConfigChecksum::Sha256([0; 32])),
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ValuesData", "values")
+                Error::missing_field("ConfigValuesData", "values")
             ])),
         },
         test_values_data_no_inner_value => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![
-                    fconfig::ValueSpec::default()
+                    fdecl::ConfigValueSpec::default()
                 ]),
                 checksum: Some(fdecl::ConfigChecksum::Sha256([0; 32])),
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("ValueSpec", "value")
+                Error::missing_field("ConfigValueSpec", "value")
             ])),
         },
         test_values_data_unknown_inner_value => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![
-                    fconfig::ValueSpec {
-                        value: Some(fconfig::Value::unknown_variant_for_testing()),
+                    fdecl::ConfigValueSpec {
+                        value: Some(fdecl::ConfigValue::unknown_variant_for_testing()),
                         ..Default::default()
                     }
                 ]),
@@ -2734,14 +2818,14 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ValueSpec", "value")
+                Error::invalid_field("ConfigValueSpec", "value")
             ])),
         },
         test_values_data_unknown_single_value => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![
-                    fconfig::ValueSpec {
-                        value: Some(fconfig::Value::Single(fconfig::SingleValue::unknown_variant_for_testing())),
+                    fdecl::ConfigValueSpec {
+                        value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::unknown_variant_for_testing())),
                         ..Default::default()
                     }
                 ]),
@@ -2749,14 +2833,14 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ValueSpec", "value")
+                Error::invalid_field("ConfigValueSpec", "value")
             ])),
         },
         test_values_data_unknown_list_value => {
-            input = fconfig::ValuesData {
+            input = fdecl::ConfigValuesData {
                 values: Some(vec![
-                    fconfig::ValueSpec {
-                        value: Some(fconfig::Value::Vector(fconfig::VectorValue::unknown_variant_for_testing())),
+                    fdecl::ConfigValueSpec {
+                        value: Some(fdecl::ConfigValue::Vector(fdecl::ConfigVectorValue::unknown_variant_for_testing())),
                         ..Default::default()
                     }
                 ]),
@@ -2764,7 +2848,7 @@ mod tests {
                 ..Default::default()
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_field("ValueSpec", "value")
+                Error::invalid_field("ConfigValueSpec", "value")
             ])),
         },
     }

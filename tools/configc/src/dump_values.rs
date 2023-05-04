@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use argh::FromArgs;
 use cm_rust::FidlIntoNative;
 use fidl::encoding::unpersist;
-use fidl_fuchsia_component_config as fconfig;
+use fidl_fuchsia_component_decl as fdecl;
 use std::{collections::BTreeMap, path::PathBuf};
 
 /// dump configuration values for a component in a human-readable format
@@ -34,7 +34,8 @@ impl DumpValues {
 
         let cvf_bytes =
             std::fs::read(&cvf).with_context(|| format!("reading {}", cvf.display()))?;
-        let values: fconfig::ValuesData = unpersist(&cvf_bytes).context("decoding value file")?;
+        let values: fdecl::ConfigValuesData =
+            unpersist(&cvf_bytes).context("decoding value file")?;
         let values = values.fidl_into_native();
 
         let resolved = config_encoder::ConfigFields::resolve(&config_decl, values)

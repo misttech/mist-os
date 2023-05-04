@@ -201,7 +201,15 @@ protocol RealmQuery {
     }) error GetManifestError;
 
     /// Gets the structured config of an instance identified by its relative moniker.
-    @available(added=11)
+    @available(added=13)
+    GetStructuredConfig(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (struct {
+        config fuchsia.component.decl.ResolvedConfig;
+    }) error GetStructuredConfigError;
+
+    // replaced by ABI-compatible version above
+    @available(added=11, removed=13)
     GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {

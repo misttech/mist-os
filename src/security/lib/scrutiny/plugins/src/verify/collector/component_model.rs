@@ -15,8 +15,7 @@ use {
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
     config_encoder::ConfigFields,
     fidl::encoding::unpersist,
-    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_internal as component_internal,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
     once_cell::sync::Lazy,
     routing::{
@@ -98,9 +97,10 @@ impl V2ComponentModelDataCollector {
                                     let cvf_bytes = cvf_bytes
                                         .as_ref()
                                         .context("getting config values to match schema")?;
-                                    let values_data = unpersist::<fconfig::ValuesData>(cvf_bytes)
-                                        .context("decoding config values")?
-                                        .fidl_into_native();
+                                    let values_data =
+                                        unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
+                                            .context("decoding config values")?
+                                            .fidl_into_native();
                                     let resolved = ConfigFields::resolve(schema, values_data)
                                         .context("resolving configuration")?;
                                     Some(resolved)

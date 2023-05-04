@@ -4,8 +4,7 @@
 use {
     anyhow::Result,
     fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd},
-    fidl_fuchsia_component_config as fcconfig, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::Task,
     futures::StreamExt,
     std::collections::HashMap,
@@ -66,7 +65,7 @@ pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::Real
 pub fn serve_realm_query(
     instances: Vec<fsys::Instance>,
     manifests: HashMap<String, fcdecl::Component>,
-    configs: HashMap<String, fcconfig::ResolvedConfig>,
+    configs: HashMap<String, fcdecl::ResolvedConfig>,
     dirs: HashMap<(String, fsys::OpenDirType), TempDir>,
 ) -> fsys::RealmQueryProxy {
     let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();

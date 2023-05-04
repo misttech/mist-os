@@ -22,7 +22,7 @@ use {
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_component_config as fcconfig, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::lock::Mutex,
@@ -347,7 +347,7 @@ pub async fn get_structured_config(
     model: &Arc<Model>,
     scope_moniker: &AbsoluteMoniker,
     moniker_str: &str,
-) -> Result<fcconfig::ResolvedConfig, fsys::GetStructuredConfigError> {
+) -> Result<fcdecl::ResolvedConfig, fsys::GetStructuredConfigError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker = RelativeMoniker::try_from(moniker_str)
         .map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
@@ -680,8 +680,7 @@ mod tests {
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
-        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         routing_test_helpers::component_id_index::make_index_file,
     };
 
@@ -867,7 +866,10 @@ mod tests {
         assert_eq!(config.fields.len(), 1);
         let field = &config.fields[0];
         assert_eq!(field.key, "my_field");
-        assert_matches!(field.value, fconfig::Value::Single(fconfig::SingleValue::Bool(true)));
+        assert_matches!(
+            field.value,
+            fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(true))
+        );
         assert_eq!(config.checksum, checksum.native_into_fidl());
     }
 

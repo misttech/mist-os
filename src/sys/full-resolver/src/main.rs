@@ -241,8 +241,7 @@ mod tests {
         super::*,
         anyhow::Error,
         assert_matches::assert_matches,
-        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::server as fserver,
         fuchsia_component_test::{
             Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -603,11 +602,9 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let expected_config = fconfig::ValuesData {
-            values: Some(vec![fidl_fuchsia_component_config::ValueSpec {
-                value: Some(fidl_fuchsia_component_config::Value::Single(
-                    fidl_fuchsia_component_config::SingleValue::Uint8(3),
-                )),
+        let expected_config = fdecl::ConfigValuesData {
+            values: Some(vec![fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(3))),
                 ..Default::default()
             }]),
             ..Default::default()
@@ -643,7 +640,7 @@ mod tests {
             }
                 if {
                     let raw_bytes = mem_util::bytes_from_data(&data).unwrap();
-                    let actual_config: fconfig::ValuesData = fidl::encoding::unpersist(&raw_bytes[..]).unwrap();
+                    let actual_config: fdecl::ConfigValuesData = fidl::encoding::unpersist(&raw_bytes[..]).unwrap();
                     assert_eq!(actual_config, expected_config);
                     true
                 }
@@ -694,7 +691,8 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let cvf_bytes = fidl::encoding::persist(&fconfig::ValuesData::default().clone()).unwrap();
+        let cvf_bytes =
+            fidl::encoding::persist(&fdecl::ConfigValuesData::default().clone()).unwrap();
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {

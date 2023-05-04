@@ -721,9 +721,12 @@ impl Realm {
 
         let decl = child_node.get_decl().await;
         let config = decl.config.ok_or(RealmBuilderError::NoConfigSchema(name.clone()))?;
-        cm_fidl_validator::validate_value_spec(&value_spec)
-            .map_err(|e| RealmBuilderError::ConfigValueInvalid(key.clone(), anyhow::anyhow!(e)))?;
-        let value_spec = value_spec.fidl_into_native();
+
+        // TODO(https://fxbug.dev/126609) re-enable once fuchsia.component.config is being removed
+        // cm_fidl_validator::validate_value_spec(&value_spec)
+        //     .map_err(|e| RealmBuilderError::ConfigValueInvalid(key.clone(), anyhow::anyhow!(e)))?;
+
+        let value_spec = cm_rust::ValueSpec::fidl_into_native_todo_fxb_126609(value_spec);
         for (index, field) in config.fields.iter().enumerate() {
             if field.key == key {
                 config_encoder::ConfigField::resolve(value_spec.clone(), &field).map_err(|e| {

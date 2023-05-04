@@ -7,8 +7,7 @@ use {
     anyhow::Context,
     cm_rust::{ComponentDecl, FidlIntoNative},
     fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TimeoutExt,
     futures::TryFutureExt,
     moniker::{
@@ -272,15 +271,13 @@ pub struct ConfigField {
     pub value: String,
 }
 
-impl TryFrom<fconfig::ResolvedConfigField> for ConfigField {
+impl TryFrom<fcdecl::ResolvedConfigField> for ConfigField {
     type Error = ParseError;
 
-    fn try_from(
-        field: fidl_fuchsia_component_config::ResolvedConfigField,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(field: fcdecl::ResolvedConfigField) -> Result<Self, Self::Error> {
         let value = match &field.value {
-            fconfig::Value::Vector(value) => format!("{:#?}", value),
-            fconfig::Value::Single(value) => format!("{:?}", value),
+            fcdecl::ConfigValue::Vector(value) => format!("{:#?}", value),
+            fcdecl::ConfigValue::Single(value) => format!("{:?}", value),
             _ => {
                 return Err(ParseError::UnknownEnumValue {
                     struct_name: "fuchsia.component.config.Value",

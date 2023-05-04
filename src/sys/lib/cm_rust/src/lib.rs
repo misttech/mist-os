@@ -1129,7 +1129,7 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[fidl_decl(fidl_table = "fconfig::ValuesData")]
+#[fidl_decl(fidl_table = "fdecl::ConfigValuesData")]
 pub struct ValuesData {
     pub values: Vec<ValueSpec>,
     pub checksum: ConfigChecksum,
@@ -1137,14 +1137,155 @@ pub struct ValuesData {
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[fidl_decl(fidl_table = "fconfig::ValueSpec")]
+#[fidl_decl(fidl_table = "fdecl::ConfigValueSpec")]
 pub struct ValueSpec {
     pub value: Value,
 }
 
+impl ValueSpec {
+    // TODO(https://fxbug.dev/126609) delete this once fuchsia.component.config is removed
+    pub fn native_into_fidl_todo_fxb_126609(self) -> fconfig::ValueSpec {
+        fidl_fuchsia_component_config::ValueSpec {
+            value: match self.value {
+                Value::Single(SingleValue::Bool(b)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Bool(b)))
+                }
+                Value::Single(SingleValue::Uint8(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(n)))
+                }
+                Value::Single(SingleValue::Uint16(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Uint16(n)))
+                }
+                Value::Single(SingleValue::Uint32(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Uint32(n)))
+                }
+                Value::Single(SingleValue::Uint64(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Uint64(n)))
+                }
+                Value::Single(SingleValue::Int8(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Int8(n)))
+                }
+                Value::Single(SingleValue::Int16(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Int16(n)))
+                }
+                Value::Single(SingleValue::Int32(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Int32(n)))
+                }
+                Value::Single(SingleValue::Int64(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::Int64(n)))
+                }
+                Value::Single(SingleValue::String(n)) => {
+                    Some(fconfig::Value::Single(fconfig::SingleValue::String(n)))
+                }
+                Value::Vector(VectorValue::BoolVector(b)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(b)))
+                }
+                Value::Vector(VectorValue::Uint8Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Uint8Vector(n)))
+                }
+                Value::Vector(VectorValue::Uint16Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Uint16Vector(n)))
+                }
+                Value::Vector(VectorValue::Uint32Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Uint32Vector(n)))
+                }
+                Value::Vector(VectorValue::Uint64Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Uint64Vector(n)))
+                }
+                Value::Vector(VectorValue::Int8Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Int8Vector(n)))
+                }
+                Value::Vector(VectorValue::Int16Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Int16Vector(n)))
+                }
+                Value::Vector(VectorValue::Int32Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Int32Vector(n)))
+                }
+                Value::Vector(VectorValue::Int64Vector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::Int64Vector(n)))
+                }
+                Value::Vector(VectorValue::StringVector(n)) => {
+                    Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(n)))
+                }
+            },
+            ..Default::default()
+        }
+    }
+
+    // TODO(https://fxbug.dev/126609) delete this once fuchsia.component.config is being removed
+    pub fn fidl_into_native_todo_fxb_126609(spec: fconfig::ValueSpec) -> Self {
+        Self {
+            value: match spec.value {
+                Some(fconfig::Value::Single(fconfig::SingleValue::Bool(b))) => {
+                    Value::Single(SingleValue::Bool(b))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(n))) => {
+                    Value::Single(SingleValue::Uint8(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Uint16(n))) => {
+                    Value::Single(SingleValue::Uint16(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Uint32(n))) => {
+                    Value::Single(SingleValue::Uint32(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Uint64(n))) => {
+                    Value::Single(SingleValue::Uint64(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Int8(n))) => {
+                    Value::Single(SingleValue::Int8(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Int16(n))) => {
+                    Value::Single(SingleValue::Int16(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Int32(n))) => {
+                    Value::Single(SingleValue::Int32(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::Int64(n))) => {
+                    Value::Single(SingleValue::Int64(n))
+                }
+                Some(fconfig::Value::Single(fconfig::SingleValue::String(n))) => {
+                    Value::Single(SingleValue::String(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(b))) => {
+                    Value::Vector(VectorValue::BoolVector(b))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Uint8Vector(n))) => {
+                    Value::Vector(VectorValue::Uint8Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Uint16Vector(n))) => {
+                    Value::Vector(VectorValue::Uint16Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Uint32Vector(n))) => {
+                    Value::Vector(VectorValue::Uint32Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Uint64Vector(n))) => {
+                    Value::Vector(VectorValue::Uint64Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Int8Vector(n))) => {
+                    Value::Vector(VectorValue::Int8Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Int16Vector(n))) => {
+                    Value::Vector(VectorValue::Int16Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Int32Vector(n))) => {
+                    Value::Vector(VectorValue::Int32Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::Int64Vector(n))) => {
+                    Value::Vector(VectorValue::Int64Vector(n))
+                }
+                Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(n))) => {
+                    Value::Vector(VectorValue::StringVector(n))
+                }
+                Some(other) => panic!("expected known variant, got {other:?}"),
+                None => panic!("expected Some, got None, validation must have not been called"),
+            },
+        }
+    }
+}
+
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[fidl_decl(fidl_union = "fconfig::Value")]
+#[fidl_decl(fidl_union = "fdecl::ConfigValue")]
 pub enum Value {
     Single(SingleValue),
     Vector(VectorValue),
@@ -1171,7 +1312,7 @@ impl fmt::Display for Value {
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[fidl_decl(fidl_union = "fconfig::SingleValue")]
+#[fidl_decl(fidl_union = "fdecl::ConfigSingleValue")]
 pub enum SingleValue {
     Bool(bool),
     Uint8(u8),
@@ -1223,7 +1364,7 @@ impl fmt::Display for SingleValue {
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[fidl_decl(fidl_union = "fconfig::VectorValue")]
+#[fidl_decl(fidl_union = "fdecl::ConfigVectorValue")]
 pub enum VectorValue {
     BoolVector(Vec<bool>),
     Uint8Vector(Vec<u8>),

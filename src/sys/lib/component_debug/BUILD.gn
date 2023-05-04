@@ -12,7 +12,6 @@ rustc_library("component_debug") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

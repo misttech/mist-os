@@ -216,7 +216,7 @@ mod tests {
         cm_moniker::InstancedAbsoluteMoniker,
         cm_rust::NativeIntoFidl,
         cm_rust_testing::new_decl_from_json,
-        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
+        fidl_fuchsia_component_decl as fdecl,
         lazy_static::lazy_static,
         moniker::AbsoluteMonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
@@ -490,33 +490,35 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_and_validate_config_values() {
-        let fidl_config_values = fconfig::ValuesData {
+        let fidl_config_values = fdecl::ConfigValuesData {
             values: Some(vec![
-                fconfig::ValueSpec {
-                    value: Some(fconfig::Value::Single(fconfig::SingleValue::Bool(false))),
+                fdecl::ConfigValueSpec {
+                    value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(false))),
                     ..Default::default()
                 },
-                fconfig::ValueSpec {
-                    value: Some(fconfig::Value::Single(fconfig::SingleValue::Uint8(5))),
+                fdecl::ConfigValueSpec {
+                    value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(5))),
                     ..Default::default()
                 },
-                fconfig::ValueSpec {
-                    value: Some(fconfig::Value::Single(fconfig::SingleValue::String(
+                fdecl::ConfigValueSpec {
+                    value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
                         "hello!".to_string(),
                     ))),
                     ..Default::default()
                 },
-                fconfig::ValueSpec {
-                    value: Some(fconfig::Value::Vector(fconfig::VectorValue::BoolVector(vec![
-                        true, false,
-                    ]))),
+                fdecl::ConfigValueSpec {
+                    value: Some(fdecl::ConfigValue::Vector(fdecl::ConfigVectorValue::BoolVector(
+                        vec![true, false],
+                    ))),
                     ..Default::default()
                 },
-                fconfig::ValueSpec {
-                    value: Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(vec![
-                        "hello!".to_string(),
-                        "world!".to_string(),
-                    ]))),
+                fdecl::ConfigValueSpec {
+                    value: Some(fdecl::ConfigValue::Vector(
+                        fdecl::ConfigVectorValue::StringVector(vec![
+                            "hello!".to_string(),
+                            "world!".to_string(),
+                        ]),
+                    )),
                     ..Default::default()
                 },
             ]),

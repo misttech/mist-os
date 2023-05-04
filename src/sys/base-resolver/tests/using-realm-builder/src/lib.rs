@@ -6,8 +6,7 @@ use {
     assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_config as fcomponent_config,
-    fidl_fuchsia_component_decl as fcomponent_decl,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg as fpkg,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
@@ -344,7 +343,8 @@ async fn resolve_component() {
         ..Default::default()
     })
     .unwrap();
-    let config_data = fidl::encoding::persist(&fcomponent_config::ValuesData::default()).unwrap();
+    let config_data =
+        fidl::encoding::persist(&fcomponent_decl::ConfigValuesData::default()).unwrap();
     let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
         .abi_revision(version_history::AbiRevision::new(0x601665c5b1a89c7f))
         .add_resource_at("meta/manifest.cm", &*manifest)
