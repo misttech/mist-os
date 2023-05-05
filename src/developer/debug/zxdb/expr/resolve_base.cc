@@ -92,7 +92,7 @@ void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprVal
       vtable, sizeof(TargetPointer),
       [cb = std::move(cb), value, context, pointer = pointer_val.value()](
           const Err& err, std::vector<uint8_t> data) mutable {
-        if (err.has_error())
+        if (err.has_error() || data.size() != sizeof(TargetPointer))
           return cb(std::move(value));
 
         // Assume the same endian.
