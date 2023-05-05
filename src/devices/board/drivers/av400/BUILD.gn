@@ -22,8 +22,8 @@ driver_bind_rules("av400-emmc-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -47,8 +47,8 @@ driver_bind_rules("pwm_init_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.pwm",
   ]
 }
@@ -250,7 +250,7 @@ driver_bind_rules("av400-cpu-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.hardware.power",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -273,7 +273,7 @@ driver_bind_rules("av400-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
   ]

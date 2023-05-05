@@ -84,8 +84,8 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.clock.BIND_PROTOCOL.DEVICE",
-                    "fuchsia.clock.FUNCTION": " fuchsia.clock.FUNCTION.CAMERA_SENSOR"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.clock.FUNCTION": " fuchsia.hardware.clock.FUNCTION.CAMERA_SENSOR"
                 }
             }
         ]

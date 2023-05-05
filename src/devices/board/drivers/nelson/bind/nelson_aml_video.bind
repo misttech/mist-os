@@ -8,7 +8,7 @@ using fuchsia.hardware.amlogiccanvas;
 using fuchsia.platform;
 using fuchsia.amlogic.platform;
 using fuchsia.sysmem;
-using fuchsia.clock;
+using fuchsia.hardware.clock;
 using fuchsia.amlogic.platform.meson;
 using fuchsia.hardware.tee;
 
@@ -29,12 +29,12 @@ node "canvas" {
 }
 
 node "clock-dos-vdec" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.SM1_CLK_ID.CLK_DOS_GCLK_VDEC;
 }
 
 node "clock-dos" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.SM1_CLK_ID.CLK_DOS;
 }
 

@@ -223,7 +223,7 @@ driver_bind_rules("aml_thermal_pll_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",
   ]
@@ -273,8 +273,8 @@ driver_bind_rules("nelson_aml_video_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",

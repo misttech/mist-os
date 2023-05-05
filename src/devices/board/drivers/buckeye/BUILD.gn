@@ -17,8 +17,8 @@ driver_bind_rules("buckeye-emmc-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -54,8 +54,8 @@ driver_bind_rules("pwm_init_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.pwm",
   ]
 }
@@ -183,7 +183,7 @@ driver_bind_rules("buckeye-cpu-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.hardware.power",
     "//src/devices/bind/fuchsia.platform",
   ]

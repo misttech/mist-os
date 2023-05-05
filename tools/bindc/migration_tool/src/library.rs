@@ -32,7 +32,7 @@ impl Library {
             Library::Bluetooth => "fuchsia.bluetooth",
             Library::Dsi => "fuchsia.hardware.dsi",
             Library::I2c => "fuchsia.i2c",
-            Library::Clock => "fuchsia.clock",
+            Library::Clock => "fuchsia.hardware.clock",
             Library::Gpio => "fuchsia.gpio",
             Library::Pci => "fuchsia.pci",
             Library::Platform => "fuchsia.platform",
@@ -51,7 +51,7 @@ impl Library {
             Library::Acpi => "//src/devices/bind/fuchsia.acpi",
             Library::Amlogic => "//src/devices/bind/fuchsia.amlogic.platform",
             Library::Bluetooth => "//src/devices/bind/fuchsia.bluetooth",
-            Library::Clock => "//src/devices/bind/fuchsia.clock",
+            Library::Clock => "//src/devices/bind/fuchsia.hardware.clock",
             Library::Dsi => "//src/devices/bind/fuchsia.hardware.dsi",
             Library::Gpio => "//src/devices/bind/fuchsia.gpio",
             Library::I2c => "//src/devices/bind/fuchsia.i2c",
@@ -166,7 +166,7 @@ pub fn rename_and_add<'a>(libraries: &mut HashSet<Library>, original: &'a str) -
         }
         "ZX_PROTOCOL_CLOCK" => {
             libraries.insert(Library::Clock);
-            "fuchsia.clock.BIND_PROTOCOL.DEVICE"
+            "fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE"
         }
         "ZX_PROTOCOL_PDEV" => {
             libraries.insert(Library::Platform);

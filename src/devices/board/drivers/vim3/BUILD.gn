@@ -12,8 +12,8 @@ driver_bind_rules("vim3-video-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]
@@ -63,7 +63,7 @@ driver_bind_rules("vim3-cpu-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.hardware.power",
     "//src/devices/bind/fuchsia.platform",
   ]

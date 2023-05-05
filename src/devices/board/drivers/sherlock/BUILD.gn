@@ -101,8 +101,8 @@ driver_bind_rules("sherlock-video-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
@@ -117,8 +117,8 @@ driver_bind_rules("sherlock-video-enc-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]
@@ -132,7 +132,7 @@ driver_bind_rules("sherlock-hevc-enc-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]
@@ -220,7 +220,7 @@ driver_bind_rules("sherlock-thermal-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",
   ]
@@ -386,12 +386,12 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
       "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
       "//src/devices/bind/fuchsia.camerasensor2:fuchsia.camerasensor2_cpp",
-      "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
       "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
       "//src/devices/bind/fuchsia.gdc:fuchsia.gdc_cpp",
       "//src/devices/bind/fuchsia.ge2d:fuchsia.ge2d_cpp",
       "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+      "//src/devices/bind/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
       "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
       "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",

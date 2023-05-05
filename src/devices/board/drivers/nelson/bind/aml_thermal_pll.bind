@@ -8,7 +8,7 @@ using fuchsia.platform;
 using fuchsia.amlogic.platform;
 using fuchsia.pwm;
 using fuchsia.amlogic.platform.s905d3;
-using fuchsia.clock;
+using fuchsia.hardware.clock;
 using fuchsia.amlogic.platform.meson;
 
 primary node "pdev" {
@@ -25,11 +25,11 @@ node "pwm-a" {
 }
 
 node "clock-1" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.SM1_CLK_ID.CLK_SYS_PLL_DIV16;
 }
 
 node "clock-2" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.SM1_CLK_ID.CLK_SYS_CPU_CLK_DIV16;
 }

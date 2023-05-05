@@ -4,7 +4,7 @@
 
 composite imx227_sensor;
 
-using fuchsia.clock;
+using fuchsia.hardware.clock;
 using fuchsia.gpio;
 using fuchsia.i2c;
 using fuchsia.mipicsi;
@@ -42,6 +42,6 @@ node "gpio-vdig" {
 }
 
 node "clock-sensor" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
-  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.CAMERA_SENSOR;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.clock.FUNCTION == fuchsia.hardware.clock.FUNCTION.CAMERA_SENSOR;
 }

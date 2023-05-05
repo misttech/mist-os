@@ -9,7 +9,7 @@ using fuchsia.amlogic.platform.a1;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.amlogic.platform.meson;
-using fuchsia.clock;
+using fuchsia.hardware.clock;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -25,7 +25,7 @@ node "gpio-wifi-power-on" {
 }
 
 node "sdio-clk-gate" {
-  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A1_CLK_ID.CLK_SD_EMMC;
 }
 
