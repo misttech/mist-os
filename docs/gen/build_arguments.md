@@ -568,7 +568,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:25
 
-**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/media/audio/bundles:virtual_audio_driver"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/media/audio/bundles:virtual_audio_driver"]`
 
 From //boards/common/x64-common.gni:55
 
@@ -696,7 +696,7 @@ From //build/board.gni:47
 
 **Current value for `target_cpu = "x64"`:** `["//src/graphics/bin/vulkan_loader", "//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt"]`
 
-From //boards/common/x64-common.gni:64
+From //boards/common/x64-common.gni:63
 
 **Overridden from the default:** `[]`
 
@@ -1314,6 +1314,17 @@ From //third_party/crashpad/src/util/net/tls.gni:19
 **Current value (from the default):** `true`
 
 From //third_party/crashpad/src/util/net/tls.gni:30
+
+### create_legacy_aib_archive
+
+Create the package and archive for the legacy assembly input bundle.  This
+can be a time-consuming operation, which due to limits in GN and groups,
+ends up being a blocking step in the build, so only enable this if we know
+that we want the legacy AIB packaged and archived for a given product:
+
+**Current value (from the default):** `false`
+
+From //build/images/fuchsia/BUILD.gn:27
 
 ### cts_version
 
@@ -2760,6 +2771,12 @@ Enables the tracing feature of mdns, which can be turned on using
 **Current value (from the default):** `false`
 
 From //src/connectivity/network/mdns/service/BUILD.gn:13
+
+### enable_msd_arm_mali_dfv2
+
+**Current value (from the default):** `false`
+
+From //src/graphics/drivers/msd-arm-mali/BUILD.gn:10
 
 ### enable_netboot
 
