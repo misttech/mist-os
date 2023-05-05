@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/starnix/tests/syscalls/proc_test.h"
+#include "src/starnix/tests/syscalls/proc_test_base.h"
 #include "src/starnix/tests/syscalls/syscall_matchers.h"
 #include "src/starnix/tests/syscalls/test_helper.h"
 
@@ -252,7 +252,7 @@ TEST_F(MountTest, LotsOfShadowing) {
 // TODO(tbodt): write more tests:
 // - A and B are shared, make B downstream, make A private, should now both be private
 
-class ProcMountsTest : public ProcTest {
+class ProcMountsTest : public ProcTestBase {
   // Note that these tests can be affected by those in other suites e.g. a
   // MountTest above that doesn't clean up its mounts may change the value of
   // /proc/mounts observed by these tests. Ideally, we'd run a each suite in a

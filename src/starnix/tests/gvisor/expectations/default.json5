@@ -550,7 +550,6 @@
                 "ProcSelfRoot.IsRoot",
                 "ProcCpuinfo.RequiredFieldsArePresent",
                 "ProcCpuinfo.Stable",
-                "ProcUptime.IsPresent",
                 "ProcMeminfo.ContainsBasicFields",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",

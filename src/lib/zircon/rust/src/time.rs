@@ -178,6 +178,11 @@ impl Duration {
         self.into_millis() / 1_000
     }
 
+    /// Returns the duration as a floating-point value in seconds.
+    pub fn into_seconds_f64(self) -> f64 {
+        self.into_nanos() as f64 / 1_000_000_000f64
+    }
+
     /// Returns the total number of whole minutes contained by this `Duration`.
     pub const fn into_minutes(self) -> i64 {
         self.into_seconds() / 60

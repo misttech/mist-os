@@ -23,7 +23,7 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/starnix/tests/syscalls/proc_test.h"
+#include "src/starnix/tests/syscalls/proc_test_base.h"
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 constexpr size_t PAGE_SIZE = 0x1000;
@@ -209,7 +209,7 @@ TEST(MMapTest, MapFileThenGrow) {
   unlink(path.c_str());
 }
 
-class MMapProcTest : public ProcTest {};
+class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
   uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));

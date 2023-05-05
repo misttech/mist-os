@@ -60,6 +60,8 @@ impl ProcDirectory {
             &b"sys"[..] => sysctl_directory(fs),
             &b"pressure"[..] => pressure_directory(fs),
             &b"net"[..] => net_directory(fs),
+            &b"uptime"[..] =>
+                fs.create_node(UptimeFile::new_node(&kernel_stats), mode!(IFREG, 0o444), FsCred::root()),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })
@@ -352,6 +354,38 @@ impl DynamicFileSource for MeminfoFile {
                 + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
                 / 1024
         )?;
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct UptimeFile {
+    kernel_stats: Arc<KernelStatsStore>,
+}
+
+impl UptimeFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+
+impl DynamicFileSource for UptimeFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let uptime = (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds_f64();
+
+        // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
+        let cpu_stats =
+            self.kernel_stats.get().get_cpu_stats(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+        let idle_time = cpu_stats
+            .per_cpu_stats
+            .unwrap_or(vec![])
+            .iter()
+            .map(|s| s.idle_time.unwrap_or(0))
+            .sum();
+        let idle_time = zx::Duration::from_nanos(idle_time).into_seconds_f64();
+
+        writeln!(sink, "{:.2} {:.2}", uptime, idle_time)?;
+
         Ok(())
     }
 }

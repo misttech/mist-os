@@ -15,7 +15,7 @@
 // Some tests run in environments where /proc is not mounted by default, such as the chromiumos
 // container. This harness mounts the proc filesystem to /proc if needed.
 
-class ProcTest : public ::testing::Test {
+class ProcTestBase : public ::testing::Test {
  public:
   static constexpr char kProc[] = "/proc";
 

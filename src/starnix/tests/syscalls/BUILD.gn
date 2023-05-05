@@ -16,7 +16,7 @@ source_set("test_utils") {
   testonly = true
 
   sources = [
-    "proc_test.h",
+    "proc_test_base.h",
     "syscall_matchers.h",
     "task_test.h",
     "test_helper.cc",
@@ -43,6 +43,7 @@ test("syscalls_test_bin") {
     "pipe_test.cc",
     "poll_test.cc",
     "prctl_test.cc",
+    "proc_test.cc",
     "read_write_test.cc",
     "restart_read_test.cc",
     "seccomp_test.cc",
