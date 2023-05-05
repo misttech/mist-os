@@ -47,8 +47,32 @@ rustc_staticlib("lib") {
   ]
 }
 
+python_c_extension("fidl_codec") {
+  sources = [
+    "abi/convert.h",
+    "abi/macros.h",
+    "fidl_codec/encode.cc",
+    "fidl_codec/encode.h",
+    "fidl_codec/fidl_codec.cc",
+    "fidl_codec/ir.cc",
+    "fidl_codec/ir.h",
+    "fidl_codec/mod.cc",
+    "fidl_codec/mod.h",
+    "fidl_codec/object_converter.cc",
+    "fidl_codec/object_converter.h",
+  ]
+
+  deps = [
+    "//sdk/lib/fidl_base",
+    "//src/lib/fidl_codec",
+    "//third_party/rapidjson",
+    "//zircon/system/public",
+  ]
+}
+
 python_c_extension("fuchsia_controller_py") {
   sources = [
+    "abi/convert.h",
     "abi/fidl_channel.cc",
     "abi/fidl_channel.h",
     "abi/fidl_handle.cc",
@@ -75,13 +99,19 @@ python_binary("example") {
 }
 
 group("fuchsia-controller") {
-  public_deps = [
+  testonly = true
+  deps = [
     ":example",
+    ":fidl_codec",
     ":fuchsia_controller_py",
   ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_test($host_toolchain)" ]
+  deps = [
+    ":lib_test",
+    "tests:fuchsia_controller_encode_test",
+    "tests:fuchsia_controller_ir_test",
+  ]
 }

@@ -1,0 +1,41 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/toolchain.gni")
+import("//build/python/python_host_test.gni")
+import("//build/testing/host_test_data.gni")
+
+host_test_data("fuchsia_controller_test_base") {
+  sources = [
+    get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
+                   "root_out_dir") + "/all_fidl_json.txt",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+                   "root_out_dir") + "/fuchsia_controller_py.so",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+                   "root_out_dir") + "/fidl_codec.so",
+    get_label_info(
+            "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.controller.test.fidl.json",
+  ]
+  deps = [
+    "//src/developer/ffx:test_data",
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+    "//src/developer/ffx/lib/fuchsia-controller:lib",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test($fidl_toolchain)",
+  ]
+}
+
+python_host_test("fuchsia_controller_ir_test") {
+  main_source = "ir.py"
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
+  deps = [ ":fuchsia_controller_test_base" ]
+}
+
+python_host_test("fuchsia_controller_encode_test") {
+  main_source = "encode.py"
+  sources = [ "common.py" ]
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
+  deps = [ ":fuchsia_controller_test_base" ]
+}

@@ -4,6 +4,7 @@
 
 #include "fidl_channel.h"
 
+#include "convert.h"
 #include "mod.h"
 
 namespace fidl_channel {
@@ -28,8 +29,8 @@ int FidlChannel_init(FidlChannel *self, PyObject *args, PyObject *kwds) {
   // actually mutually exclusive of each other.
   assert(is_long != is_handle);
   if (is_long) {
-    zx_handle_t converted_handle = fidl_handle::RawHandleFromPyLong(handle);
-    if (converted_handle == static_cast<zx_handle_t>(-1) && PyErr_Occurred()) {
+    zx_handle_t converted_handle = convert::PyLong_AsU32(handle);
+    if (converted_handle == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
       return -1;
     }
     self->super.handle = converted_handle;

@@ -48,7 +48,7 @@ def main():
     shlib_source = os.path.basename(args.shlib_source)
 
     # Making this a list in the event that there are more deps.
-    deps = ' '.join([args.shlib_source])
+    deps = ' '.join([f'{args.shlib_source}.so'])
     args.depfile.write(f'{args.output}: {deps}\n')
     with open(main_file, 'w', encoding='utf-8') as main_file_out:
         main_file_out.write(

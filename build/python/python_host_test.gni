@@ -51,18 +51,17 @@ import("//build/testing/host_test_data.gni")
 #    Additional arguments to pass to the test.
 #    Type: list(string)
 #
-#   main_callable (optional)
-#     Main callable, which serves as the entry point of the output zip archive.
-#     In the example above, this is "my_module.main".
-#     Type: string
-#     Default: unittest.main
+#  main_callable (optional)
+#    Main callable, which serves as the entry point of the output zip archive.
+#    In the example above, this is "my_module.main".
+#    Type: string
+#    Default: unittest.main
 #
-#   deps
-#   environments
-#   visibility
+#  deps
+#  environments
+#  visibility
 template("python_host_test") {
   assert(defined(invoker.main_source), "main_source is required")
-
   _python_binary_name = "${target_name}.pyz"
   _python_binary_target = "${target_name}_python_binary"
   python_binary(_python_binary_target) {

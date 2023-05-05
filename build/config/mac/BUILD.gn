@@ -126,3 +126,9 @@ config("default_libs") {
     "IOKit.framework",
   ]
 }
+
+# This rule is expected to be used in conjunction with the removal of
+# `symbol_no_undefined` from configs.
+config("symbol_dynamic_lookup_undefined") {
+  ldflags = [ "-Wl,-undefined,dynamic_lookup" ]
+}

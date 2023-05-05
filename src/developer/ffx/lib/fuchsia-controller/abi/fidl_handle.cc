@@ -4,6 +4,7 @@
 
 #include "fidl_handle.h"
 
+#include "convert.h"
 #include "mod.h"
 
 namespace fidl_handle {
@@ -19,8 +20,7 @@ int FidlHandle_init(FidlHandle *self, PyObject *args, PyObject *kwds) {
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "I", const_cast<char **>(kwlist), &handle)) {
     return -1;
   }
-  handle = RawHandleFromU64Checked(handle);
-  if (handle == static_cast<zx_handle_t>(-1) && PyErr_Occurred()) {
+  if (handle == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
     return -1;
   }
   self->handle = handle;

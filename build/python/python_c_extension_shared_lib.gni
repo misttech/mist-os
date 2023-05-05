@@ -44,6 +44,14 @@ template("python_c_extension_shared_lib") {
     configs += [ "//build/config:symbol_no_undefined" ]
     configs -= [ "//build/config:symbol_no_undefined" ]
 
+    if (host_os == "mac") {
+      configs += [ "//build/config/mac:symbol_dynamic_lookup_undefined" ]
+
+      # For mac the usual naming convention is to have .dylib as the extension.
+      # However, Python only expects C extensions to have a .so extension.
+      output_extension = "so"
+    }
+
     # pie is not used when building on Linux. If this is enabled a warning is emitted.
     if (host_os == "linux") {
       configs -= [ "//build/config/linux:default-pie" ]

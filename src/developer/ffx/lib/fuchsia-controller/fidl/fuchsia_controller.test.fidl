@@ -1,0 +1,52 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.controller.test;
+
+using zx;
+
+type NoopUnion = flexible union {
+    1: union_str string:255;
+    2: union_bool bool;
+    3: union_int int64;
+};
+
+type SomeBits = strict bits : uint64 {
+    FOO = 0x8000000000000000;
+};
+
+type NoopTable = table {
+    1: dub float32;
+    2: str string:255;
+    3: union_field NoopUnion;
+    4: integer int64;
+};
+
+@discoverable
+protocol Noop {
+    DoStringNoop(struct {
+        value string:255;
+    }) -> ();
+
+    DoIntNoop(struct {
+        value int32;
+    }) -> ();
+
+    DoTableNoop(struct {
+        tab NoopTable;
+    }) -> ();
+
+    DoHandleNoop(resource struct {
+        server_end zx.Handle:CHANNEL;
+    }) -> ();
+
+    DoVectorNoop(struct {
+        v vector<string:255>:255;
+    }) -> ();
+
+    DoBitsNoop(struct {
+        b SomeBits;
+    }) -> ();
+
+    DoNoop() -> ();
+};

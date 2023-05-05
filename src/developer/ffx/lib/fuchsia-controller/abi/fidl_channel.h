@@ -8,7 +8,6 @@
 #include <Python.h>
 
 #include "fidl_handle.h"
-#include "fuchsia_controller.h"
 #include "macros.h"
 
 namespace fidl_channel {
