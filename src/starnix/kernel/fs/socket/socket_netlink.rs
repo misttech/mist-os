@@ -191,7 +191,7 @@ impl NetlinkSocketInner {
     fn read_message(&mut self) -> Option<Message> {
         let message = self.messages.read_message();
         if message.is_some() {
-            self.waiters.notify_events(FdEvents::POLLOUT);
+            self.waiters.notify_fd_events(FdEvents::POLLOUT);
         }
         message
     }
@@ -216,7 +216,7 @@ impl NetlinkSocketInner {
         };
         let bytes_written = self.messages.write_datagram(data, socket_address, ancillary_data)?;
         if bytes_written > 0 {
-            self.waiters.notify_events(FdEvents::POLLIN);
+            self.waiters.notify_fd_events(FdEvents::POLLIN);
         }
         Ok(bytes_written)
     }

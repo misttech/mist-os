@@ -141,7 +141,7 @@ impl SocketOps for VsockSocket {
                 downcast_socket_to_vsock(&remote_socket).lock().state =
                     VsockSocketState::Connected(file);
                 queue.sockets.push_back(remote_socket);
-                inner.waiters.notify_events(FdEvents::POLLIN);
+                inner.waiters.notify_fd_events(FdEvents::POLLIN);
                 Ok(())
             }
             _ => error!(EINVAL),

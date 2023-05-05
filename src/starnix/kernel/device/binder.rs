@@ -351,7 +351,7 @@ impl CommandQueueWithWaitQueue {
 
     fn push_back(&mut self, command: Command) {
         self.commands.push_back(command);
-        self.waiters.notify_events(FdEvents::POLLIN);
+        self.waiters.notify_fd_events(FdEvents::POLLIN);
     }
 
     fn has_waiters(&self) -> bool {

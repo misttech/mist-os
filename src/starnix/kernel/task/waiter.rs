@@ -66,45 +66,79 @@ impl HandleWaitCanceler {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct WaitKey {
-    key: u64,
+    raw: u64,
 }
 
 impl WaitKey {
     /// an empty key means no associated handler
     fn empty() -> WaitKey {
-        WaitKey { key: 0 }
+        WaitKey { raw: 0 }
     }
 }
 
-/// Wrapper around zx::UserPacket to handle packet created for the waiters.
-#[derive(Debug, Copy, Clone)]
-struct WaiterUserPacket(zx::UserPacket);
+/// The different type of event that can be waited on / triggered.
+#[derive(Clone, Copy, Debug)]
+enum WaitEvents {
+    /// All event: a wait on `All` will be woken up by all event, and a trigger on `All` will wake
+    /// every waiter.
+    All,
+    /// Wait on the set of FdEvents.
+    Fd(FdEvents),
+    /// Wait on the given mask.
+    Mask(u64),
+    /// Wait for the specified value.
+    Value(u64),
+}
 
-impl WaiterUserPacket {
-    pub fn from_mask(mask: u64) -> Self {
+impl WaitEvents {
+    /// Build a WaitEvents from the given `ordinal` and `value`.
+    fn from_data(ordinal: u8, value: u64) -> Self {
+        match ordinal {
+            0 => Self::All,
+            1 => Self::Fd(FdEvents::from_u64(value)),
+            2 => Self::Mask(value),
+            3 => Self::Value(value),
+            _ => panic!("Unknown ordinal"),
+        }
+    }
+
+    /// Returns whether a wait on `self` should be woken up by `other`.
+    fn intercept(self: &WaitEvents, other: &WaitEvents) -> bool {
+        match (self, other) {
+            (Self::All, _) | (_, Self::All) => true,
+            (Self::Fd(m1), Self::Fd(m2)) => m1.bits() & m2.bits() != 0,
+            (Self::Mask(m1), Self::Mask(m2)) => m1 & m2 != 0,
+            (Self::Value(v1), Self::Value(v2)) => v1 == v2,
+            _ => false,
+        }
+    }
+
+    /// Returns the data to serialize `self`.
+    fn data(&self) -> (u8, u64) {
+        match self {
+            Self::All => (0, 0),
+            Self::Fd(events) => (1, events.bits() as u64),
+            Self::Mask(value) => (2, *value),
+            Self::Value(value) => (3, *value),
+        }
+    }
+}
+
+impl From<WaitEvents> for zx::UserPacket {
+    fn from(events: WaitEvents) -> Self {
+        let (ordinal, value) = events.data();
         let mut packet_data = [0u8; 32];
-        packet_data[..8].copy_from_slice(&mask.to_ne_bytes());
-        Self(zx::UserPacket::from_u8_array(packet_data))
+        packet_data[0] = ordinal;
+        packet_data[8..16].copy_from_slice(&value.to_ne_bytes());
+        zx::UserPacket::from_u8_array(packet_data)
     }
 }
 
-impl From<FdEvents> for WaiterUserPacket {
-    fn from(events: FdEvents) -> Self {
-        Self::from_mask(events.as_waiter_mask())
-    }
-}
-
-impl From<WaiterUserPacket> for FdEvents {
-    fn from(value: WaiterUserPacket) -> Self {
-        let mut mask_bytes = [0u8; 8];
-        mask_bytes[..8].copy_from_slice(&value.0.as_u8_array()[..8]);
-        FdEvents::from_waiter_mask(u64::from_ne_bytes(mask_bytes))
-    }
-}
-
-impl Default for WaiterUserPacket {
-    fn default() -> Self {
-        Self::from_mask(0)
+impl From<zx::UserPacket> for WaitEvents {
+    fn from(packet: zx::UserPacket) -> Self {
+        let mut value_bytes = [0u8; 8];
+        value_bytes[..8].copy_from_slice(&packet.as_u8_array()[8..16]);
+        Self::from_data(packet.as_u8_array()[0], u64::from_ne_bytes(value_bytes))
     }
 }
 
@@ -226,7 +260,7 @@ impl Waiter {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
-                    let key = WaitKey { key: packet.key() };
+                    let key = WaitKey { raw: packet.key() };
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
                             let handler = self.0.key_map.lock().remove(&key);
@@ -242,14 +276,19 @@ impl Waiter {
                             }
                         }
                         zx::PacketContents::User(usrpkt) => {
-                            let observed = WaiterUserPacket(usrpkt);
-                            let events: FdEvents = observed.into();
+                            let events: WaitEvents = usrpkt.into();
                             let handler = self.0.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
                                 match callback {
                                     WaitCallback::EventHandler(handler) => {
-                                        assert!(events != FdEvents::empty());
-                                        handler(events)
+                                        let fd_events = match events {
+                                            // If the event is All, signal on all possible fd
+                                            // events.
+                                            WaitEvents::All => FdEvents::all(),
+                                            WaitEvents::Fd(events) => events,
+                                            _ => panic!("wrong type of handler called: {events:?}"),
+                                        };
+                                        handler(fd_events)
                                     }
                                     WaitCallback::SignalHandler(_) => {
                                         panic!("wrong type of handler called")
@@ -276,7 +315,7 @@ impl Waiter {
         let key = self.0.next_key.fetch_add(1, Ordering::Relaxed);
         // TODO - find a better reaction to wraparound
         assert!(key != 0, "bad key from u64 wraparound");
-        WaitKey { key }
+        WaitKey { raw: key }
     }
 
     fn register_callback(&self, callback: WaitCallback) -> WaitKey {
@@ -291,7 +330,7 @@ impl Waiter {
     pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
         let key = self.register_callback(callback);
-        self.queue_user_packet_data(&key, zx::sys::ZX_OK, events.into());
+        self.queue_events(&key, WaitEvents::Fd(events));
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
@@ -308,14 +347,14 @@ impl Waiter {
         let key = self.register_callback(callback);
         handle.wait_async_handle(
             &self.0.port,
-            key.key,
+            key.raw,
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
         let waiter_impl = Arc::downgrade(&self.0);
         Ok(HandleWaitCanceler::new(move |handle_ref| {
             if let Some(waiter_impl) = waiter_impl.upgrade() {
-                waiter_impl.port.cancel(&handle_ref, key.key).is_ok()
+                waiter_impl.port.cancel(&handle_ref, key.raw).is_ok()
             } else {
                 false
             }
@@ -343,8 +382,8 @@ impl Waiter {
         self.register_callback(callback)
     }
 
-    fn queue_events(&self, key: &WaitKey, event_mask: u64) {
-        self.queue_user_packet_data(key, zx::sys::ZX_OK, WaiterUserPacket::from_mask(event_mask));
+    fn queue_events(&self, key: &WaitKey, event: WaitEvents) {
+        self.queue_user_packet_data(key, zx::sys::ZX_OK, event)
     }
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
@@ -356,17 +395,13 @@ impl Waiter {
         if self.0.ignore_signals {
             return;
         }
-        self.queue_user_packet_data(
-            &WaitKey::empty(),
-            zx::sys::ZX_ERR_CANCELED,
-            Default::default(),
-        );
+        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
     /// waiter to wake up.
-    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, packet_data: WaiterUserPacket) {
-        let packet = zx::Packet::from_user_packet(key.key, status, packet_data.0);
+    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, events: WaitEvents) {
+        let packet = zx::Packet::from_user_packet(key.raw, status, events.into());
         self.0.port.queue(&packet).map_err(impossible_error).unwrap();
     }
 }
@@ -423,12 +458,13 @@ pub struct WaitQueue {
 }
 
 /// An entry in a WaitQueue.
+#[derive(Debug)]
 struct WaitEntry {
     /// The waiter that is waking for the FdEvent.
     waiter: WaiterRef,
 
-    /// The bitmask that the waiter is waiting for.
-    events: u64,
+    /// The events that the waiter is waiting for.
+    filter: WaitEvents,
 
     /// Whether the waiter wishes to remain in the WaitQueue after one of
     /// the events that the waiter is waiting for occurs.
@@ -436,18 +472,6 @@ struct WaitEntry {
 
     /// key for cancelling and queueing events
     key: WaitKey,
-}
-
-// Custom Debug implementation to emit `events` as a hex string.
-impl std::fmt::Debug for WaitEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WaitEntry")
-            .field("waiter", &self.waiter)
-            .field("events", &format_args!("0x{:08x}", self.events))
-            .field("persistent", &self.persistent)
-            .field("key", &self.key)
-            .finish()
-    }
 }
 
 impl WaitQueue {
@@ -491,11 +515,16 @@ impl WaitQueue {
     /// call the [`Waiter::wait`] function on the waiter.
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
-    pub fn wait_async_mask(&self, waiter: &Waiter, events: u64) -> WaitCanceler {
+    pub fn wait_async_mask(&self, waiter: &Waiter, mask: u64) -> WaitCanceler {
         let key = waiter.next_key();
         self.wait_async_on_entry(
             waiter,
-            WaitEntry { waiter: waiter.weak(), events, persistent: false, key },
+            WaitEntry {
+                waiter: waiter.weak(),
+                filter: WaitEvents::Mask(mask),
+                persistent: false,
+                key,
+            },
         )
     }
 
@@ -508,7 +537,11 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        self.wait_async_mask(waiter, u64::MAX)
+        let key = waiter.next_key();
+        self.wait_async_on_entry(
+            waiter,
+            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::All, persistent: false, key },
+        )
     }
 
     /// Establish a wait for the given events.
@@ -530,24 +563,14 @@ impl WaitQueue {
             waiter,
             WaitEntry {
                 waiter: waiter.weak(),
-                events: events.as_waiter_mask(),
+                filter: WaitEvents::Fd(events),
                 persistent: false,
                 key,
             },
         )
     }
 
-    /// Notify any waiters that the given events have occurred.
-    ///
-    /// Walks the wait queue and wakes each waiter that is waiting on an
-    /// event that matches the given mask. Persistent waiters remain in the
-    /// list. Non-persistent waiters are removed.
-    ///
-    /// The waiters will wake up on their own threads to handle these events.
-    /// They are not called synchronously by this function.
-    ///
-    /// Returns the number of waiters woken.
-    pub fn notify_mask_count(&self, events: u64, mut limit: usize) -> usize {
+    fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         let mut woken = 0;
         self.waiters.lock().retain(|entry| {
             entry.waiter.access(|waiter| {
@@ -558,7 +581,7 @@ impl WaitQueue {
                     return false;
                 };
 
-                if limit > 0 && (entry.events & events) != 0 {
+                if limit > 0 && entry.filter.intercept(&events) {
                     waiter.queue_events(&entry.key, events);
                     limit -= 1;
                     woken += 1;
@@ -571,16 +594,30 @@ impl WaitQueue {
         woken
     }
 
-    pub fn notify_mask(&self, events: u64) {
-        self.notify_mask_count(events, usize::MAX);
+    /// Notify any waiters that the given events have occurred.
+    ///
+    /// Walks the wait queue and wakes each waiter that is waiting on an
+    /// event that matches the given mask. Persistent waiters remain in the
+    /// list. Non-persistent waiters are removed.
+    ///
+    /// The waiters will wake up on their own threads to handle these events.
+    /// They are not called synchronously by this function.
+    ///
+    /// Returns the number of waiters woken.
+    pub fn notify_mask_count(&self, mask: u64, limit: usize) -> usize {
+        self.notify_events_count(WaitEvents::Mask(mask), limit)
     }
 
-    pub fn notify_events(&self, events: FdEvents) {
-        self.notify_mask(events.as_waiter_mask());
+    pub fn notify_mask(&self, mask: u64) {
+        self.notify_mask_count(mask, usize::MAX);
+    }
+
+    pub fn notify_fd_events(&self, events: FdEvents) {
+        self.notify_events_count(WaitEvents::Fd(events), usize::MAX);
     }
 
     pub fn notify_count(&self, limit: usize) {
-        self.notify_mask_count(u64::MAX, limit);
+        self.notify_events_count(WaitEvents::All, limit);
     }
 
     pub fn notify_all(&self) {

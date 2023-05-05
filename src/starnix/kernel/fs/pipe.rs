@@ -79,7 +79,7 @@ impl Pipe {
             pipe_locked.add_writer();
         }
         if events != FdEvents::empty() {
-            pipe_locked.waiters.notify_events(events);
+            pipe_locked.waiters.notify_fd_events(events);
         }
         Box::new(PipeFileObject { pipe: Arc::clone(pipe) })
     }
@@ -275,7 +275,7 @@ impl FileOps for PipeFileObject {
             }
         }
         if events != FdEvents::empty() {
-            pipe.waiters.notify_events(events);
+            pipe.waiters.notify_fd_events(events);
         }
     }
 
@@ -291,7 +291,7 @@ impl FileOps for PipeFileObject {
                 let mut pipe = self.pipe.lock();
                 let actual = pipe.read(data)?;
                 if actual > 0 {
-                    pipe.waiters.notify_events(FdEvents::POLLOUT);
+                    pipe.waiters.notify_fd_events(FdEvents::POLLOUT);
                 }
                 Ok(BlockableOpsResult::Done(actual))
             },
@@ -313,7 +313,7 @@ impl FileOps for PipeFileObject {
                 match pipe.write(current_task, data) {
                     Ok(chunk) => {
                         if chunk > 0 {
-                            pipe.waiters.notify_events(FdEvents::POLLIN);
+                            pipe.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
                     }
                     Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {

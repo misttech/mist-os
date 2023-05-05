@@ -527,11 +527,11 @@ impl TerminalMutableState<Base = Terminal> {
     fn notify_waiters(&mut self) {
         let main_events = self.main_query_events();
         if main_events.bits() != 0 {
-            self.main_wait_queue.notify_events(main_events);
+            self.main_wait_queue.notify_fd_events(main_events);
         }
         let replica_events = self.replica_query_events();
         if replica_events.bits() != 0 {
-            self.replica_wait_queue.notify_events(replica_events);
+            self.replica_wait_queue.notify_fd_events(replica_events);
         }
     }
 

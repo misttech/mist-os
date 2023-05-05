@@ -214,7 +214,7 @@ impl UnixSocket {
             _ => panic!("something changed the server socket state while I held a lock on it"),
         };
         queue.sockets.push_back(server);
-        listener.waiters.notify_events(FdEvents::POLLIN);
+        listener.waiters.notify_fd_events(FdEvents::POLLIN);
         Ok(())
     }
 
@@ -481,7 +481,7 @@ impl SocketOps for UnixSocket {
             if let Some(socket) = peer {
                 let unix_socket_peer = socket.downcast_socket::<UnixSocket>();
                 if let Some(socket) = unix_socket_peer {
-                    socket.lock().waiters.notify_events(FdEvents::POLLOUT);
+                    socket.lock().waiters.notify_fd_events(FdEvents::POLLOUT);
                 }
             }
         }
@@ -869,14 +869,14 @@ impl UnixSocketInner {
             self.messages.write_datagram(data, address, ancillary_data)?
         };
         if bytes_written > 0 {
-            self.waiters.notify_events(FdEvents::POLLIN);
+            self.waiters.notify_fd_events(FdEvents::POLLIN);
         }
         Ok(bytes_written)
     }
 
     fn shutdown_one_end(&mut self) {
         self.is_shutdown = true;
-        self.waiters.notify_events(FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP);
+        self.waiters.notify_fd_events(FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP);
     }
 }
 

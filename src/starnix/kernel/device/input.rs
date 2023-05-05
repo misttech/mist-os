@@ -195,7 +195,7 @@ impl InputFile {
                             inner.events.extend(new_events);
                             // TODO(https://fxbug.dev/124598): Skip notify if `inner.events`
                             // is empty.
-                            inner.waiters.notify_events(FdEvents::POLLIN);
+                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
                         Err(e) => {
                             log_warn!(

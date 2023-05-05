@@ -78,7 +78,7 @@ impl FileOps for EventFdFileObject {
                 }
                 inner.value += add_value;
                 if inner.value > 0 {
-                    inner.wait_queue.notify_events(FdEvents::POLLIN);
+                    inner.wait_queue.notify_fd_events(FdEvents::POLLIN);
                 }
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },
@@ -117,7 +117,7 @@ impl FileOps for EventFdFileObject {
                     }
                 };
                 data.write_all(&return_value.to_ne_bytes())?;
-                inner.wait_queue.notify_events(FdEvents::POLLOUT);
+                inner.wait_queue.notify_fd_events(FdEvents::POLLOUT);
 
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },

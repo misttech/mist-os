@@ -436,7 +436,7 @@ impl EpollFileObject {
 
         // Notify waiters of unprocessed events.
         if !state.trigger_list.is_empty() {
-            state.waiters.notify_events(FdEvents::POLLIN);
+            state.waiters.notify_fd_events(FdEvents::POLLIN);
         }
 
         Ok(result)

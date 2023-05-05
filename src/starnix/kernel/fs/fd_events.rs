@@ -25,13 +25,8 @@ bitflags::bitflags! {
 }
 
 impl FdEvents {
-    /// Build events from the given mask, truncating any bits that do not correspond to an event.
-    pub fn from_waiter_mask(mask: u64) -> Self {
-        Self::from_bits_truncate((mask & (u32::MAX as u64)) as u32)
-    }
-
-    /// Return the mask appropriate for waiting to these events in a Waiter.
-    pub fn as_waiter_mask(&self) -> u64 {
-        self.bits().into()
+    /// Build events from the given value, truncating any bits that do not correspond to an event.
+    pub fn from_u64(value: u64) -> Self {
+        Self::from_bits_truncate((value & (u32::MAX as u64)) as u32)
     }
 }
