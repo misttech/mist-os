@@ -17,6 +17,7 @@
 #include <kernel/spinlock.h>
 #include <ktl/atomic.h>
 #include <ktl/bit.h>
+#include <lockdep/guard.h>
 #include <lockdep/guard_multiple.h>
 #include <lockdep/lockdep.h>
 
@@ -283,6 +284,104 @@ void ResetTrackingState() {
     state.Reset();
 #endif
 }
+
+// This is a simplified example of a hazard with lock assertions that arises in use cases where
+// multiple objects share a synchronization domain (i.e. a lock) through a reference to a common
+// resource. Lock annotations in these use cases can run into tricky conflicts, since more than one
+// capability aliases the same lock.
+//
+// In this example, the Resource class models the common resource with a lock that is shared by
+// multiple instances of the Object class. Each Object instance has a pointer to a Resource and an
+// instance of Resource::State that may only be mutated while holding the resource lock.
+//
+// A tricky lock aliasing situation arises when attempting to call Resource::Merge on the state of
+// two different Objects that use the same Resource: static analysis cannot tell the resources are
+// the same and will complain if only one of the lock capabilities is acquired.
+//
+// A naive solution is to acquire one lock and assert the alias is held, however, this gives rise to
+// the scope hazard demonstrated in Object::HazardousMerge. The lock assertion is not limited to the
+// scope of the lock guard, causing static analysis to mistakenly allow an unprotected access to the
+// second object state.
+//
+// A better solution is to use the AliasedLock Guard constructor, which acquires and validates one
+// lock, checks the locks are aliases in debug builds, and acquires both capabilities.
+//
+class Resource {
+ public:
+  Resource() = default;
+  ~Resource() = default;
+
+  Lock<Mutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<Mutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+
+  struct State {
+    State() = default;
+    ~State() = default;
+
+    void Operation() {}
+  };
+
+  void Add(State* state) TA_REQ(lock()) {}
+  void Remove(State* state) TA_REQ(lock()) {}
+  void Merge(State* a, State* b) TA_REQ(lock()) {}
+
+ private:
+  mutable LOCK_DEP_INSTRUMENT(Resource, Mutex) lock_;
+};
+
+class Object {
+ public:
+  explicit Object(Resource* resource) : resource_{resource} { AddStateToResource(); }
+  ~Object() { RemoveStateFromResource(); }
+
+  Lock<Mutex>* lock() const TA_RET_CAP(resource_->lock()) { return resource_->lock(); }
+  Lock<Mutex>& lock_ref() const TA_RET_CAP(resource_->lock()) { return resource_->lock_ref(); }
+
+  void HazardousMerge(Object* other) {
+    ZX_DEBUG_ASSERT(resource_ == other->resource_);
+    {
+      Guard<Mutex> guard{lock()};
+      AssertHeld(other->lock_ref());
+      MergeLocked(other);
+    }
+    // Static analysis cannot tell this is dangerous, since lock assertions don't respect scopes
+    // unless the compiler can tell these are the same lock and sees the lock get released.
+    other->OperationLocked();
+  }
+
+  void SafeMerge(Object* other) {
+    ZX_DEBUG_ASSERT(resource_ == other->resource_);
+    {
+      Guard<Mutex> guard{AliasedLock, lock(), other->lock()};
+      MergeLocked(other);
+    }
+#if TEST_WILL_NOT_COMPILE || 0
+    other->OperationLocked();
+#endif
+  }
+
+  void Operation() TA_EXCL(lock()) {
+    Guard<Mutex> guard{lock()};
+    state_.Operation();
+  }
+  void OperationLocked() TA_REQ(lock()) { state_.Operation(); }
+
+ private:
+  void AddStateToResource() {
+    Guard<Mutex> guard{lock()};
+    resource_->Add(&state_);
+  }
+  void RemoveStateFromResource() {
+    Guard<Mutex> guard{lock()};
+    resource_->Remove(&state_);
+  }
+  void MergeLocked(Object* other) TA_REQ(lock()) TA_REQ(other->lock()) {
+    resource_->Merge(&state_, &other->state_);
+  }
+
+  Resource* resource_;
+  Resource::State state_ TA_GUARDED(lock());
+};
 
 }  // namespace test
 
@@ -1110,16 +1209,23 @@ static bool lock_dep_dynamic_analysis_tests() {
 
   // Test CallUntracked operation.
   {
-    Baz<Mutex> a, b;
+    Number<0> a;
+    Number<1> b;
 
     // A -> B
     {
       Guard<Mutex> guard_a{&a.lock};
+      EXPECT_TRUE(guard_a);
+      EXPECT_EQ(LockResult::Success, test::GetLastResult(guard_a));
+
       Guard<Mutex> guard_b{&b.lock};
+      EXPECT_TRUE(guard_b);
+      EXPECT_EQ(LockResult::Success, test::GetLastResult(guard_b));
     }
     // Now acquire B -> A using untracked to make it work.
     {
       Guard<Mutex> guard_b{&b.lock};
+      EXPECT_TRUE(guard_b);
       guard_b.CallUntracked([&] {
         // B should still be held.
         ASSERT(guard_b);
@@ -1134,6 +1240,64 @@ static bool lock_dep_dynamic_analysis_tests() {
         AssertNoLocksHeld();
       });
     }
+  }
+
+  // Test aliased locks.
+  {
+    test::Resource resource_a;
+    test::Resource resource_b;
+    test::Object object_a{&resource_a};
+    test::Object object_b{&resource_a};
+    test::Object object_c{&resource_b};
+    test::Object object_d{&resource_b};
+
+    object_a.Operation();
+    object_b.Operation();
+    object_c.Operation();
+    object_d.Operation();
+
+    {
+      Guard<Mutex> guard_a{AliasedLock, object_a.lock(), object_b.lock()};
+      EXPECT_TRUE(guard_a);
+      EXPECT_EQ(LockResult::Success, test::GetLastResult(guard_a));
+
+      object_a.OperationLocked();
+      object_b.OperationLocked();
+
+#if TEST_WILL_NOT_COMPILE || 0
+      object_c.OperationLocked();
+      object_d.OperationLocked();
+#endif
+    }
+    {
+      Guard<Mutex> guard_b{AliasedLock, object_c.lock(), object_d.lock()};
+      EXPECT_TRUE(guard_b);
+      EXPECT_EQ(LockResult::Success, test::GetLastResult(guard_b));
+
+      object_c.OperationLocked();
+      object_d.OperationLocked();
+
+#if TEST_WILL_NOT_COMPILE || 0
+      object_a.OperationLocked();
+      object_b.OperationLocked();
+#endif
+    }
+    {
+#if TEST_WILL_DEBUG_ASSERT || 0
+      Guard<Mutex> guard{AliasedLock, object_a.lock(), object_c.lock()};
+#endif
+    }
+
+    object_a.Operation();
+    object_b.Operation();
+    object_c.Operation();
+    object_d.Operation();
+
+    // The compiler will allow this unsafe operation becasue of the lock assertion error.
+    object_a.HazardousMerge(&object_b);
+
+    // This is safe because of the use of AliasedLock Guard.
+    object_a.SafeMerge(&object_b);
   }
 
   // With all locks released, regardless of what we did in the middle, should still detect no locks

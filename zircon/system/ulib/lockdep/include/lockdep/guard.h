@@ -103,6 +103,9 @@ enum AssertOrderedLockTag { AssertOrderedLock };
 // Type tag to select the adopting Guard constructor.
 enum AdoptLockTag { AdoptLock };
 
+// Type tag to select the aliased lock Guard constructor.
+enum AliasedLockTag { AliasedLock };
+
 // Base RAII type that automatically manages the duration of a lock acquisition.
 // TODO(eieio): Specializations handle exclusive and shared lock acquisitions.
 // These are largely identical except for the static lock analysis annotations.
@@ -155,6 +158,37 @@ class __TA_SCOPED_CAPABILITY
       __TA_ACQUIRE(lock->capability())
       : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
     ZX_DEBUG_ASSERT(lock->id() == kInvalidLockClassId || LockClassState::IsNestable(lock->id()));
+  }
+
+  // Acquires the given type erased lock and its alias. Only the first lock is
+  // actually acquired, the alias verified to be the same lock by a runtime
+  // check and its capability is acquired to satisfy static analysis.
+  //
+  // This constructor participates in overload resolution when the underlying
+  // lock type is not nestable.
+  template <typename Lockable, typename... Args,
+            typename = internal::EnableIfNotNestable<Lockable, LockType>>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AliasedLockTag, Lockable* lock, Lockable* alias,
+                                  Args&&... state_args) __TA_ACQUIRE(lock)
+      __TA_ACQUIRE(lock->capability()) __TA_ACQUIRE(alias) __TA_ACQUIRE(alias->capability())
+      : validator_{&lock->lock(), lock->id()}, state_{std::forward<Args>(state_args)...} {
+    ZX_DEBUG_ASSERT(lock == alias);
+    ValidateAndAcquire();
+  }
+
+  // Acquires the given type erased lock and its alias. Only the first lock is
+  // actually acquired, the alias verified to be the same lock by a runtime
+  // check and its capability is acquired to satisfy static analysis.
+  //
+  // This constructor participates in overload resolution when the underlying
+  // lock type is nestable.
+  template <typename Lockable, typename... Args,
+            typename = internal::EnableIfNestable<Lockable, LockType>>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AliasedLockTag, Lockable* lock, Lockable* alias, uintptr_t order,
+                                  Args&&... state_args) __TA_ACQUIRE(lock)
+      __TA_ACQUIRE(lock->capability()) __TA_ACQUIRE(alias) __TA_ACQUIRE(alias->capability())
+      : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
+    ZX_DEBUG_ASSERT(lock == alias);
   }
 
   // Destructor that automatically releases the lock if not already released.
@@ -420,6 +454,39 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
       __TA_ACQUIRE_SHARED(lock->capability())
       : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
     ZX_DEBUG_ASSERT(lock->id() == kInvalidLockClassId || LockClassState::IsNestable(lock->id()));
+  }
+
+  // Acquires the given type erased lock and its alias. Only the first lock is
+  // actually acquired, the alias verified to be the same lock by a runtime
+  // check and its capability is acquired to satisfy static analysis.
+  //
+  // This constructor participates in overload resolution when the underlying
+  // lock type is not nestable.
+  template <typename Lockable, typename... Args,
+            typename = internal::EnableIfNotNestable<Lockable, LockType>>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AliasedLockTag, Lockable* lock, Lockable* alias,
+                                  Args&&... state_args) __TA_ACQUIRE_SHARED(lock)
+      __TA_ACQUIRE_SHARED(lock->capability()) __TA_ACQUIRE_SHARED(alias)
+          __TA_ACQUIRE_SHARED(alias->capability())
+      : validator_{&lock->lock(), lock->id()}, state_{std::forward<Args>(state_args)...} {
+    ZX_DEBUG_ASSERT(lock == alias);
+    ValidateAndAcquire();
+  }
+
+  // Acquires the given type erased lock and its alias. Only the first lock is
+  // actually acquired, the alias verified to be the same lock by a runtime
+  // check and its capability is acquired to satisfy static analysis.
+  //
+  // This constructor participates in overload resolution when the underlying
+  // lock type is nestable.
+  template <typename Lockable, typename... Args,
+            typename = internal::EnableIfNestable<Lockable, LockType>>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AliasedLockTag, Lockable* lock, Lockable* alias, uintptr_t order,
+                                  Args&&... state_args) __TA_ACQUIRE_SHARED(lock)
+      __TA_ACQUIRE_SHARED(lock->capability()) __TA_ACQUIRE_SHARED(alias)
+          __TA_ACQUIRE_SHARED(alias->capability())
+      : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
+    ZX_DEBUG_ASSERT(lock == alias);
   }
 
   // Destructor that automatically releases the lock if not already released.
