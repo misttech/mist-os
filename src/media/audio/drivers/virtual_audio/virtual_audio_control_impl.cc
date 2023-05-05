@@ -116,9 +116,10 @@ VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
 
   // Default FIFO is 250 usec, at 48k stereo 16
   config.fifo_depth_bytes = 48;
+  config.internal_delay = zx::nsec(0);
   config.external_delay = zx::nsec(0);
 
-  // Default is 48kHz stereo 16bit.
+  // Default ring buffer format is 48kHz stereo 16bit.
   config.supported_formats.push_back({
       .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,
       .min_frames_per_second = 48000,
@@ -127,6 +128,17 @@ VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
       .max_channels = 2,
       .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
   });
+
+  // Default DAI format is 48kHz I2S (2 channels of 16-in-32, total frame size 8 bytes).
+  fuchsia_hardware_audio::DaiSupportedFormats item;
+  item.number_of_channels(std::vector<uint32_t>{2});
+  item.sample_formats(std::vector{fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned});
+  item.frame_formats(std::vector{fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+      fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)});
+  item.frame_rates(std::vector<uint32_t>{48'000});
+  item.bits_per_slot(std::vector<uint8_t>{32});
+  item.bits_per_sample(std::vector<uint8_t>{16});
+  config.dai_supported_formats.push_back(std::move(item));
 
   // Default is CLOCK_MONOTONIC.
   config.clock.domain = 0;

@@ -48,6 +48,7 @@ fuchsia_driver("virtual_audio_driver-driver") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/media/audio/drivers/lib/audio-driver-proto",
+    "//src/media/audio/drivers/lib/audio-proto-utils",
     "//src/media/audio/lib/simple-audio-stream",
     "//zircon/system/ulib/affine",
     "//zircon/system/ulib/async:async-cpp",

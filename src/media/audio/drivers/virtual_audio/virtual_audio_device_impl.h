@@ -4,6 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
 
+#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.virtualaudio/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
@@ -44,8 +45,10 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
     std::array<uint8_t, 16> unique_id;
 
     uint32_t fifo_depth_bytes;
+    zx::duration internal_delay;
     zx::duration external_delay;
     std::vector<audio_stream_format_range_t> supported_formats;
+    std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_supported_formats;
 
     fuchsia_virtualaudio::wire::ClockProperties clock;
     fuchsia_virtualaudio::wire::RingBufferConstraints ring_buffer;

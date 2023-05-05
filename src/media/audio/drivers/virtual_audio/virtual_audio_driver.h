@@ -66,16 +66,32 @@ class VirtualAudioDriver {
 
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
+  // Default to not supported.
+  // TODO(fxbug.dev/126797): Add the ability to trigger dynamic delay changes.
   //
-  virtual fit::result<ErrorT, CurrentFormat> GetFormatForVA() __TA_REQUIRES(domain_token()) = 0;
-  virtual fit::result<ErrorT, CurrentGain> GetGainForVA() __TA_REQUIRES(domain_token()) = 0;
-  virtual fit::result<ErrorT, CurrentBuffer> GetBufferForVA() __TA_REQUIRES(domain_token()) = 0;
-  virtual fit::result<ErrorT, CurrentPosition> GetPositionForVA() __TA_REQUIRES(domain_token()) = 0;
+  virtual fit::result<ErrorT, CurrentFormat> GetFormatForVA() __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
+  virtual fit::result<ErrorT, CurrentGain> GetGainForVA() __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
+  virtual fit::result<ErrorT, CurrentBuffer> GetBufferForVA() __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
+  virtual fit::result<ErrorT, CurrentPosition> GetPositionForVA() __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
   virtual fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring)
-      __TA_REQUIRES(domain_token()) = 0;
-  virtual fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) __TA_REQUIRES(domain_token()) = 0;
+      __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
+  virtual fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
   virtual fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic)
-      __TA_REQUIRES(domain_token()) = 0;
+      __TA_REQUIRES(domain_token()) {
+    return fit::error(ErrorT::kNotSupported);
+  }
 
  private:
   Token domain_token_;

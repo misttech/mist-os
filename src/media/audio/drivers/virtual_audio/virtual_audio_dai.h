@@ -6,18 +6,14 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.virtualaudio/cpp/wire.h>
-#include <lib/affine/transform.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/simple-audio-stream/simple-audio-stream.h>
-#include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 
 #include <cstdio>
 #include <deque>
 
-#include <audio-proto/audio-proto.h>
-#include <fbl/ref_ptr.h>
+#include <ddktl/device.h>
 
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_driver.h"
@@ -31,11 +27,12 @@ using VirtualAudioDaiDeviceType =
 class VirtualAudioDai : public VirtualAudioDaiDeviceType,
                         public ddk::internal::base_protocol,
                         public fidl::Server<fuchsia_hardware_audio::Dai>,
+                        public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
                         public VirtualAudioDriver {
  public:
-  VirtualAudioDai(const VirtualAudioDeviceImpl::Config& cfg,
+  VirtualAudioDai(VirtualAudioDeviceImpl::Config config,
                   std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent)
-      : VirtualAudioDaiDeviceType(parent), parent_(std::move(owner)) {
+      : VirtualAudioDaiDeviceType(parent), parent_(std::move(owner)), config_(std::move(config)) {
     ddk_proto_id_ = ZX_PROTOCOL_DAI;
     sprintf(instance_name_, "virtual-audio-dai-%d", instance_count_++);
     zx_status_t status = DdkAdd(ddk::DeviceAddArgs(instance_name_));
@@ -48,15 +45,11 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   void DdkRelease() {}
 
   // VirtualAudioDriver overrides.
+  // TODO(fxbug.dev/124865): Add support for GetPositionForVA, SetNotificationFrequencyFromVA,
+  // and AdjustClockRateFromVA.
   using ErrorT = fuchsia_virtualaudio::Error;
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() override;
-  fit::result<ErrorT, CurrentGain> GetGainForVA() override;
   fit::result<ErrorT, CurrentBuffer> GetBufferForVA() override;
-  fit::result<ErrorT, CurrentPosition> GetPositionForVA() override;
-
-  fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring) override;
-  fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) override;
-  fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic) override;
 
  protected:
   // FIDL LLCPP method for fuchsia.hardware.audio.DaiConnector.
@@ -66,12 +59,8 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
 
   // FIDL natural C++ methods for fuchsia.hardware.audio.Dai.
   void Reset(ResetCompleter::Sync& completer) override { completer.Reply(); }
-  void GetProperties(GetPropertiesCompleter::Sync& completer) override {
-    fidl::Arena arena;
-    fuchsia_hardware_audio::DaiProperties properties;
-    properties.is_input(false);
-    completer.Reply(std::move(properties));
-  }
+  void GetProperties(
+      fidl::Server<fuchsia_hardware_audio::Dai>::GetPropertiesCompleter::Sync& completer) override;
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
@@ -79,24 +68,47 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
                                SignalProcessingConnectCompleter::Sync& completer) override {
     request.protocol().Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void GetRingBufferFormats(GetRingBufferFormatsCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
+  void GetRingBufferFormats(GetRingBufferFormatsCompleter::Sync& completer) override;
+  void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override;
   void CreateRingBuffer(CreateRingBufferRequest& request,
-                        CreateRingBufferCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
+                        CreateRingBufferCompleter::Sync& completer) override;
+
+  // FIDL natural C++ methods for fuchsia.hardware.audio.RingBuffer.
+  void GetProperties(fidl::Server<fuchsia_hardware_audio::RingBuffer>::GetPropertiesCompleter::Sync&
+                         completer) override;
+  void GetVmo(
+      GetVmoRequest& request,
+      fidl::Server<fuchsia_hardware_audio::RingBuffer>::GetVmoCompleter::Sync& completer) override;
+  void Start(StartCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void WatchClockRecoveryPositionInfo(
+      WatchClockRecoveryPositionInfoCompleter::Sync& completer) override;
+  void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
+  void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
+                         SetActiveChannelsCompleter::Sync& completer) override;
 
  private:
+  void ResetRingBuffer();
+
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
   const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
-  int instance_count_;
+  static int instance_count_;
   char instance_name_[64];
+  fzl::VmoMapper ring_buffer_mapper_;
+  uint32_t notifications_per_ring_ = 0;
+  uint32_t num_ring_buffer_frames_ = 0;
+  uint32_t frame_size_ = 4;
+  zx::vmo ring_buffer_vmo_;
+  bool watch_delay_replied_ = false;
+  std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
+  bool watch_position_replied_ = false;
+  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
+  bool ring_buffer_vmo_fetched_ = false;
+  bool ring_buffer_started_ = false;
+  std::optional<fuchsia_hardware_audio::Format> ring_buffer_format_;
+  std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
+  const VirtualAudioDeviceImpl::Config config_;
 };
 
 }  // namespace virtual_audio
