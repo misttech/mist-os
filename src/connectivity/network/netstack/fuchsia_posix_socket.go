@@ -2713,6 +2713,7 @@ func (s *datagramSocketImpl) NotifyEvent(waiter.EventMask) {
 }
 
 func (s *datagramSocketImpl) GetError(fidl.Context) (socket.BaseSocketGetErrorResult, error) {
+	s.sockOptStats.GetError.Add(1)
 	if err := s.sharedState.err.consume(); err != nil {
 		return socket.BaseSocketGetErrorResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -2732,12 +2733,14 @@ func (s *datagramSocketImpl) Shutdown(ctx fidl.Context, how socket.ShutdownMode)
 // must invalidate any clients that depend upon the (now-outdated) cache.
 
 func (s *datagramSocketImpl) GetTimestamp(fidl.Context) (socket.BaseSocketGetTimestampResult, error) {
+	s.sockOptStats.GetTimestamp.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseSocketGetTimestampResultWithResponse(socket.BaseSocketGetTimestampResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.timestamp}), nil
 }
 
 func (s *datagramSocketImpl) SetTimestamp(ctx fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampResult, error) {
+	s.sockOptStats.SetTimestamp.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.timestamp = value
@@ -2746,12 +2749,14 @@ func (s *datagramSocketImpl) SetTimestamp(ctx fidl.Context, value socket.Timesta
 }
 
 func (s *datagramSocketImpl) GetIpReceiveTypeOfService(fidl.Context) (socket.BaseNetworkSocketGetIpReceiveTypeOfServiceResult, error) {
+	s.sockOptStats.GetIpReceiveTypeOfService.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseNetworkSocketGetIpReceiveTypeOfServiceResultWithResponse(socket.BaseNetworkSocketGetIpReceiveTypeOfServiceResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipTos}), nil
 }
 
 func (s *datagramSocketImpl) SetIpReceiveTypeOfService(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTypeOfServiceResult, error) {
+	s.sockOptStats.SetIpReceiveTypeOfService.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.ipTos = value
@@ -2760,12 +2765,14 @@ func (s *datagramSocketImpl) SetIpReceiveTypeOfService(ctx fidl.Context, value b
 }
 
 func (s *datagramSocketImpl) GetIpReceiveTtl(fidl.Context) (socket.BaseNetworkSocketGetIpReceiveTtlResult, error) {
+	s.sockOptStats.GetIpReceiveTtl.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseNetworkSocketGetIpReceiveTtlResultWithResponse(socket.BaseNetworkSocketGetIpReceiveTtlResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipTtl}), nil
 }
 
 func (s *datagramSocketImpl) SetIpReceiveTtl(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTtlResult, error) {
+	s.sockOptStats.SetIpReceiveTtl.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.ipTtl = value
@@ -2774,12 +2781,14 @@ func (s *datagramSocketImpl) SetIpReceiveTtl(ctx fidl.Context, value bool) (sock
 }
 
 func (s *datagramSocketImpl) GetIpv6ReceiveTrafficClass(fidl.Context) (socket.BaseNetworkSocketGetIpv6ReceiveTrafficClassResult, error) {
+	s.sockOptStats.GetIpv6ReceiveTrafficClass.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseNetworkSocketGetIpv6ReceiveTrafficClassResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceiveTrafficClassResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipv6Tclass}), nil
 }
 
 func (s *datagramSocketImpl) SetIpv6ReceiveTrafficClass(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveTrafficClassResult, error) {
+	s.sockOptStats.SetIpv6ReceiveTrafficClass.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.ipv6Tclass = value
@@ -2788,12 +2797,14 @@ func (s *datagramSocketImpl) SetIpv6ReceiveTrafficClass(ctx fidl.Context, value 
 }
 
 func (s *datagramSocketImpl) GetIpv6ReceiveHopLimit(fidl.Context) (socket.BaseNetworkSocketGetIpv6ReceiveHopLimitResult, error) {
+	s.sockOptStats.GetIpv6ReceiveHopLimit.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseNetworkSocketGetIpv6ReceiveHopLimitResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceiveHopLimitResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipv6HopLimit}), nil
 }
 
 func (s *datagramSocketImpl) SetIpv6ReceiveHopLimit(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveHopLimitResult, error) {
+	s.sockOptStats.SetIpv6ReceiveHopLimit.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.ipv6HopLimit = value
@@ -2802,6 +2813,7 @@ func (s *datagramSocketImpl) SetIpv6ReceiveHopLimit(ctx fidl.Context, value bool
 }
 
 func (s *datagramSocketImpl) SetIpv6ReceivePacketInfo(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceivePacketInfoResult, error) {
+	s.sockOptStats.SetIpv6ReceivePacketInfo.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	s.sharedState.cmsgCacheMu.cmsgCache.ipv6PktInfo = value
@@ -2810,6 +2822,7 @@ func (s *datagramSocketImpl) SetIpv6ReceivePacketInfo(ctx fidl.Context, value bo
 }
 
 func (s *datagramSocketImpl) GetIpv6ReceivePacketInfo(fidl.Context) (socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResult, error) {
+	s.sockOptStats.GetIpv6ReceivePacketInfo.Add(1)
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
 	return socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipv6PktInfo}), nil
