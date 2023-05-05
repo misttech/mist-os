@@ -153,6 +153,9 @@ variant("coverage-rust") {
     dynamic_linker_flags = "-dynamic-linker=coverage-rust/ld.so.1"
     ldflags = [ "-Wl,$dynamic_linker_flags" ]
     rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
+
+    # TODO(fxbug.dev/126803): Ensure this works for no_coverage Rust cases.
+    libs = [ "./llvm_profile_counter_bias.ld" ]
   } else if (is_linux) {
     rustflags += [ "-Cllvm-args=-runtime-counter-relocation" ]
   }
