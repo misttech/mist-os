@@ -70,9 +70,6 @@ exception_bounce:
 exception_bounce_exception_address:
   ud2
   jmp exception_bounce_exception_address
-.globl exception_bounce_exit
-exception_bounce_exit:
-  syscall
 
 .globl restricted_enter_wrapper
 restricted_enter_wrapper:

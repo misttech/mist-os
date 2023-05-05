@@ -94,13 +94,6 @@ exception_bounce:
 exception_bounce_exception_address:
   udf #0
   b exception_bounce_exception_address
-.globl exception_bounce_exit
-exception_bounce_exit:
-  // Perform a syscall to exit. This is needed if we're using channel-based
-  // exception handlers.
-  mov x16, xzr
-  add x16, x16, #64
-  svc #0
 
 .globl restricted_enter_wrapper
 restricted_enter_wrapper:

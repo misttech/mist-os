@@ -41,9 +41,6 @@ extern "C" void syscall_bounce();
 extern "C" void syscall_bounce_post_syscall();
 extern "C" void exception_bounce();
 extern "C" void exception_bounce_exception_address();
-// TODO(https://fxb/121511): We need this to break out of exception_bounce. We
-// should be able to remove this once kick is implemented.
-extern "C" void exception_bounce_exit();
 extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vector_table,
                                                 zx_restricted_reason_t* reason_code);
 extern "C" void store_one();
@@ -376,8 +373,7 @@ TEST(RestrictedMode, Basic) {
 }
 
 void ReadExceptionFromChannel(const zx::channel& exception_channel,
-                              zx_thread_state_general_regs_t& general_regs,
-                              std::optional<uintptr_t> new_pc) {
+                              zx_thread_state_general_regs_t& general_regs, bool kick) {
   zx_signals_t pending;
   ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
                                        zx::time::infinite(), &pending));
@@ -402,9 +398,10 @@ void ReadExceptionFromChannel(const zx::channel& exception_channel,
       thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr, nullptr));
   ASSERT_OK(thread.read_state(ZX_THREAD_STATE_GENERAL_REGS, &general_regs, sizeof(general_regs)));
 
-  // Update the PC if necessary.
-  if (new_pc.has_value()) {
-    ArchRegisterState::WritePcToGeneralRegs(general_regs, *new_pc);
+  // Kick the thread if requested
+  if (kick) {
+    uint32_t options = 0;
+    ASSERT_OK(zx_restricted_kick(thread.get(), options));
   }
   ASSERT_OK(thread.write_state(ZX_THREAD_STATE_GENERAL_REGS, &general_regs, sizeof(general_regs)));
   constexpr uint32_t kExceptionState = ZX_EXCEPTION_STATE_HANDLED;
@@ -465,11 +462,7 @@ TEST(RestrictedMode, Bench) {
       std::thread exception_handler([&]() {
         for (int i = 0; i < iter; ++i) {
           zx_thread_state_general_regs_t general_regs = {};
-          ReadExceptionFromChannel(
-              exception_channel, general_regs,
-              (i == iter - 1)
-                  ? std::make_optional(reinterpret_cast<uintptr_t>(exception_bounce_exit))
-                  : std::nullopt);
+          ReadExceptionFromChannel(exception_channel, general_regs, (i == iter - 1));
         }
       });
       state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
@@ -524,8 +517,7 @@ TEST(RestrictedMode, ExceptionChannel) {
   bool exception_handled = false;
   std::thread exception_thread([&]() {
     zx_thread_state_general_regs_t general_regs = {};
-    ReadExceptionFromChannel(exception_channel, general_regs,
-                             reinterpret_cast<uintptr_t>(exception_bounce_exit));
+    ReadExceptionFromChannel(exception_channel, general_regs, true /* kick */);
 
     state.InitializeFromThreadState(general_regs);
     state.VerifyTwiddledRestrictedState(RegisterMutation::kFromException);
@@ -540,6 +532,7 @@ TEST(RestrictedMode, ExceptionChannel) {
                                      &reason_code));
   exception_thread.join();
   ASSERT_TRUE(exception_handled);
+  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 }
 
 #if ARCH_HAS_IN_THREAD_EXCEPTIONS
