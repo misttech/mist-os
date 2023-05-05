@@ -22,11 +22,6 @@ type ConnectError = strict enum : uint32 {
     SERVICE_REROUTE_FAILED = 5;
 };
 
-type SelectError = strict enum : uint32 {
-    // There was an error when trying to find matching services.
-    SERVICE_DISCOVERY_FAILED = 1;
-};
-
 type ServiceMatch = struct {
     moniker vector<string:diagnostics.MAX_STRING_SELECTOR_LENGTH>:diagnostics.MAX_MONIKER_SEGMENTS;
     subdir string:MAX_COMPONENT_SUBDIR_LEN;

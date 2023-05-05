@@ -135,10 +135,6 @@ impl RemoteControlService {
                     .send(&mut self.clone().connect_to_service(selector, service_chan).await)?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::Select { responder, .. } => {
-                responder.send(&mut Err(rcs::SelectError::ServiceDiscoveryFailed))?;
-                Ok(())
-            }
             rcs::RemoteControlRequest::RootRealmExplorer { server, responder } => {
                 responder.send(
                     &mut fdio::service_connect(
