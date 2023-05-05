@@ -25,12 +25,15 @@ group("tests") {
     ":component-manager-status-tests",
     ":diagnostics-kcounter-inspect-tests",
     ":diagnostics-persistence-inspect-tests",
-    ":fshost-blobfs-metrics-tests",
     ":fshost-metrics-tests",
     ":legacy-metrics-tests",
     ":log-stats-inspect-tests",
     ":log_settings_min_severity",
   ]
+
+  if (!fxfs_blob) {
+    deps += [ ":fshost-blobfs-metrics-tests" ]
+  }
 
   if (data_filesystem_format == "fxfs") {
     deps += [ ":fshost-fxfs-metrics-tests" ]
