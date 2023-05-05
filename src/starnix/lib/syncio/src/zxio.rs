@@ -899,6 +899,41 @@ extern "C" {
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
+extern "C" {
+    pub fn zxio_xattr_list(
+        io: *mut zxio_t,
+        callback: ::std::option::Option<
+            unsafe extern "C" fn(
+                context: *mut ::std::os::raw::c_void,
+                name: *const u8,
+                name_len: usize,
+            ),
+        >,
+        context: *mut ::std::os::raw::c_void,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_xattr_get(
+        io: *mut zxio_t,
+        name: *const u8,
+        name_len: usize,
+        value: *mut u8,
+        value_capacity: usize,
+        out_value_actual: *mut usize,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_xattr_set(
+        io: *mut zxio_t,
+        name: *const u8,
+        name_len: usize,
+        value: *const u8,
+        value_len: usize,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_xattr_remove(io: *mut zxio_t, name: *const u8, name_len: usize) -> zx_status_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iovec {

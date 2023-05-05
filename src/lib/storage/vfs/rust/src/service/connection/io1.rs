@@ -168,6 +168,18 @@ impl Connection {
                 // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
             }
+            fio::NodeRequest::ListExtendedAttributes { iterator, .. } => {
+                iterator.close_with_epitaph(Status::NOT_SUPPORTED)?;
+            }
+            fio::NodeRequest::GetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+            }
+            fio::NodeRequest::SetExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+            }
+            fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
+                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
+            }
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;
             }

@@ -104,6 +104,14 @@ typedef struct zxio_ops {
   zx_status_t (*read_link)(zxio_t* io, const uint8_t** out_target, size_t* out_target_len);
   zx_status_t (*create_symlink)(zxio_t* io, const char* name, size_t name_len,
                                 const uint8_t* target, size_t target_len, zxio_storage_t* storage);
+  zx_status_t (*xattr_list)(zxio_t* io,
+                            void (*callback)(void* context, const uint8_t* name, size_t name_len),
+                            void* context);
+  zx_status_t (*xattr_get)(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
+                           size_t value_capacity, size_t* out_value_actual);
+  zx_status_t (*xattr_set)(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
+                           size_t value_len);
+  zx_status_t (*xattr_remove)(zxio_t* io, const uint8_t* name, size_t name_len);
 } zxio_ops_t;
 
 // Initialize a |zxio_t| object with the given |ops| table.

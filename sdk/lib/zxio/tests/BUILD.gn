@@ -84,7 +84,9 @@ rustc_test("zxio_rust_test") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/syncio",
     "//src/storage/fxfs/platform:fxfs-testing",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
   ]
 }
 

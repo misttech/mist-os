@@ -55,6 +55,24 @@ class DirectoryConnection final : public Connection,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  void ListExtendedAttributes(ListExtendedAttributesRequestView request,
+                              ListExtendedAttributesCompleter::Sync& completer) final {
+    request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetExtendedAttribute(GetExtendedAttributeRequestView request,
+                            GetExtendedAttributeCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetExtendedAttribute(SetExtendedAttributeRequestView request,
+                            SetExtendedAttributeCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void RemoveExtendedAttribute(RemoveExtendedAttributeRequestView request,
+                               RemoveExtendedAttributeCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
 
   //
   // |fuchsia.io/Directory| operations.

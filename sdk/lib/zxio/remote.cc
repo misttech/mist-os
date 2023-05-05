@@ -441,6 +441,17 @@ class Remote : public HasIo {
 
   zx_status_t SetWindowSize(uint32_t width, uint32_t height);
 
+  zx_status_t XattrList(void (*callback)(void* context, const uint8_t* name, size_t name_len),
+                        void* context);
+
+  zx_status_t XattrGet(const uint8_t* name, size_t name_len, uint8_t* value, size_t value_capacity,
+                       size_t* out_value_actual);
+
+  zx_status_t XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
+                       size_t value_len);
+
+  zx_status_t XattrRemove(const uint8_t* name, size_t name_len);
+
   const fidl::WireSyncClient<Protocol>& client() const { return client_; }
 
  private:
@@ -1046,6 +1057,164 @@ zx_status_t Remote<Protocol>::SetWindowSize(uint32_t width, uint32_t height) {
   return ZX_OK;
 }
 
+template <typename Protocol>
+zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const uint8_t* name,
+                                                         size_t name_len),
+                                        void* context) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (!client().is_valid()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::ExtendedAttributeIterator>();
+  if (endpoints.is_error()) {
+    return endpoints.error_value();
+  }
+  auto [client_end, server_end] = std::move(endpoints.value());
+  const fidl::OneWayStatus result = client()->ListExtendedAttributes(std::move(server_end));
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  while (true) {
+    const fidl::WireResult next_result = fidl::WireCall(client_end)->GetNext();
+    if (!next_result.ok()) {
+      return next_result.status();
+    }
+    const auto& response = next_result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    const fidl::VectorView data = response->attributes;
+    for (fidl::VectorView<uint8_t>& name : data) {
+      callback(context, name.data(), name.count());
+    }
+    if (response->last) {
+      break;
+    }
+  }
+
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len, uint8_t* value,
+                                       size_t value_capacity, size_t* out_value_actual) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (!client().is_valid()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  fidl::Arena arena;
+  const fidl::WireResult result =
+      client()->GetExtendedAttribute(fidl::VectorView<uint8_t>(arena, cpp20::span(name, name_len)));
+  if (!result.ok()) {
+    return result.status();
+  }
+  const auto& response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
+
+  const fuchsia_io::wire::ExtendedAttributeValue* value_resp = response.value();
+  if (value_resp->is_bytes()) {
+    const fidl::VectorView value_bytes = value_resp->bytes();
+    // Always return the length. If the buffer is too small, it will provide a hint for the caller.
+    *out_value_actual = value_bytes.count();
+    if (value_bytes.count() > value_capacity) {
+      return ZX_ERR_BUFFER_TOO_SMALL;
+    }
+
+    memcpy(value, value_bytes.data(), value_bytes.count());
+  } else {
+    const zx::vmo& value_vmo = value_resp->buffer();
+    uint64_t value_size;
+    if (zx_status_t status = value_vmo.get_prop_content_size(&value_size); status != ZX_OK) {
+      return status;
+    }
+    // Always return the length. If the buffer is too small, it will provide a hint for the caller.
+    *out_value_actual = value_size;
+    if (value_size > value_capacity) {
+      return ZX_ERR_BUFFER_TOO_SMALL;
+    }
+
+    if (zx_status_t status = value_vmo.read(value, 0, value_size); status != ZX_OK) {
+      return status;
+    }
+  }
+
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
+                                       size_t value_len) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (!client().is_valid()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  fidl::Arena arena;
+  fuchsia_io::wire::ExtendedAttributeValue attribute_value;
+  if (value_len > fuchsia_io::wire::kMaxInlineAttributeValue) {
+    zx::vmo val;
+    if (zx_status_t status = zx::vmo::create(value_len, 0, &val); status != ZX_OK) {
+      return status;
+    }
+    if (zx_status_t status = val.write(value, 0, value_len); status != ZX_OK) {
+      return status;
+    }
+    attribute_value = fuchsia_io::wire::ExtendedAttributeValue::WithBuffer(std::move(val));
+  } else {
+    auto value_vec = fidl::VectorView<uint8_t>(arena, cpp20::span(value, value_len));
+    fidl::ObjectView value_obj(arena, value_vec);
+    attribute_value = fuchsia_io::wire::ExtendedAttributeValue::WithBytes(value_obj);
+  }
+
+  const fidl::WireResult result = client()->SetExtendedAttribute(
+      fidl::VectorView<uint8_t>(arena, cpp20::span(name, name_len)), std::move(attribute_value));
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result.value().is_error()) {
+    return result.value().error_value();
+  }
+
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (!client().is_valid()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  fidl::Arena arena;
+  const fidl::WireResult result = client()->RemoveExtendedAttribute(
+      fidl::VectorView<uint8_t>(arena, cpp20::span(name, name_len)));
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result.value().is_error()) {
+    return result.value().error_value();
+  }
+
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
 class Node : public Remote<fio::Node> {
  public:
   explicit Node(fidl::ClientEnd<fio::Node> client_end) : Remote(std::move(client_end), kOps) {}
@@ -1266,6 +1435,10 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.advisory_lock = Adaptor::From<&Directory::AdvisoryLock>;
 
   ops.create_symlink = Adaptor::From<&Directory::CreateSymlink>;
+  ops.xattr_list = Adaptor::From<&Directory::XattrList>;
+  ops.xattr_get = Adaptor::From<&Directory::XattrGet>;
+  ops.xattr_set = Adaptor::From<&Directory::XattrSet>;
+  ops.xattr_remove = Adaptor::From<&Directory::XattrRemove>;
   return ops;
 })();
 
@@ -1391,6 +1564,11 @@ constexpr zxio_ops_t File::kOps = ([]() {
   ops.flags_get = Adaptor::From<&File::FlagsGet>;
   ops.flags_set = Adaptor::From<&File::FlagsSet>;
   ops.advisory_lock = Adaptor::From<&File::AdvisoryLock>;
+
+  ops.xattr_list = Adaptor::From<&File::XattrList>;
+  ops.xattr_get = Adaptor::From<&File::XattrGet>;
+  ops.xattr_set = Adaptor::From<&File::XattrSet>;
+  ops.xattr_remove = Adaptor::From<&File::XattrRemove>;
   return ops;
 })();
 

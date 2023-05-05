@@ -94,6 +94,15 @@ zx_status_t zxio_default_read_link(zxio_t* io, const uint8_t** out_target, size_
 zx_status_t zxio_default_create_symlink(zxio_t* io, const char* name, size_t name_len,
                                         const uint8_t* target, size_t target_len,
                                         zxio_storage_t* storage);
+zx_status_t zxio_default_xattr_list(zxio_t* io,
+                                    void (*callback)(void* context, const uint8_t* name,
+                                                     size_t name_len),
+                                    void* context);
+zx_status_t zxio_default_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
+                                   size_t value_capacity, size_t* out_value_actual);
+zx_status_t zxio_default_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len,
+                                   const uint8_t* value, size_t value_len);
+zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len);
 
 // An ops table filled with the default implementations.
 //
@@ -150,6 +159,10 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .ioctl = zxio_default_ioctl,
     .read_link = zxio_default_read_link,
     .create_symlink = zxio_default_create_symlink,
+    .xattr_list = zxio_default_xattr_list,
+    .xattr_get = zxio_default_xattr_get,
+    .xattr_set = zxio_default_xattr_set,
+    .xattr_remove = zxio_default_xattr_remove,
 };
 
 // Default implementations of the ZXIO operations.

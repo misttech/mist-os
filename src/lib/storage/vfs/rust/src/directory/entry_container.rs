@@ -135,4 +135,24 @@ pub trait MutableDirectory: Directory + Send + Sync {
     ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
     }
+
+    /// List extended attributes.
+    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
+    /// Get the value for an extended attribute.
+    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
+    /// Set the value for an extended attribute.
+    async fn set_extended_attribute(&self, _name: Vec<u8>, _value: Vec<u8>) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
+    /// Remove the value for an extended attribute.
+    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
 }

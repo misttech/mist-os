@@ -5,6 +5,10 @@
 //! Connection to a directory that can be modified by the client though a FIDL connection.
 
 use crate::{
+    common::{
+        decode_extended_attribute_value, encode_extended_attribute_value,
+        extended_attributes_sender,
+    },
     directory::{
         common::DirectoryOptions,
         connection::{
@@ -174,6 +178,28 @@ impl MutableConnection {
                     )?;
                 }
             }
+            fio::DirectoryRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
+                fuchsia_trace::duration!("storage", "Directory::ListExtendedAttributes");
+                this.handle_list_extended_attribute(iterator).await;
+            }
+            fio::DirectoryRequest::GetExtendedAttribute { name, responder } => {
+                fuchsia_trace::duration!("storage", "Directory::GetExtendedAttribute");
+                let mut res =
+                    this.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
+            fio::DirectoryRequest::SetExtendedAttribute { name, value, responder } => {
+                fuchsia_trace::duration!("storage", "Directory::SetExtendedAttribute");
+                let mut res =
+                    this.handle_set_extended_attribute(name, value).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
+            fio::DirectoryRequest::RemoveExtendedAttribute { name, responder } => {
+                fuchsia_trace::duration!("storage", "Directory::RemoveExtendedAttribute");
+                let mut res =
+                    this.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
+                responder.send(&mut res)?;
+            }
         }
         Ok(ConnectionState::Alive)
     }
@@ -269,6 +295,47 @@ impl MutableConnection {
             };
 
         dst_parent.clone().rename(self.base.directory.clone(), src, dst).await
+    }
+
+    async fn handle_list_extended_attribute(
+        &self,
+        iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
+    ) {
+        let attributes = match self.base.directory.list_extended_attributes().await {
+            Ok(attributes) => attributes,
+            Err(status) => {
+                tracing::error!(?status, "list extended attributes failed");
+                iterator
+                    .close_with_epitaph(status)
+                    .unwrap_or_else(|error| tracing::error!(?error, "failed to send epitaph"));
+                return;
+            }
+        };
+        self.base.scope.spawn(extended_attributes_sender(iterator, attributes));
+    }
+
+    async fn handle_get_extended_attribute(
+        &self,
+        name: Vec<u8>,
+    ) -> Result<fio::ExtendedAttributeValue, zx::Status> {
+        let value = self.base.directory.get_extended_attribute(name).await?;
+        encode_extended_attribute_value(value)
+    }
+
+    async fn handle_set_extended_attribute(
+        &self,
+        name: Vec<u8>,
+        value: fio::ExtendedAttributeValue,
+    ) -> Result<(), zx::Status> {
+        if name.iter().any(|c| *c == 0) {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        let val = decode_extended_attribute_value(value)?;
+        self.base.directory.set_extended_attribute(name, val).await
+    }
+
+    async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {
+        self.base.directory.remove_extended_attribute(name).await
     }
 
     fn prepare_connection(

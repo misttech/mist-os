@@ -900,3 +900,39 @@ zx_status_t zxio_create_symlink(zxio_t* io, const char* name, size_t name_len,
   zxio_internal_t* zio = to_internal(io);
   return zio->ops->create_symlink(io, name, name_len, target, target_len, storage);
 }
+
+zx_status_t zxio_xattr_list(zxio_t* io,
+                            void (*callback)(void* context, const uint8_t* name, size_t name_len),
+                            void* context) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->xattr_list(io, callback, context);
+}
+
+zx_status_t zxio_xattr_get(zxio_t* io, const uint8_t* name, size_t name_len, uint8_t* value,
+                           size_t value_capacity, size_t* out_value_actual) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->xattr_get(io, name, name_len, value, value_capacity, out_value_actual);
+}
+
+zx_status_t zxio_xattr_set(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
+                           size_t value_len) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->xattr_set(io, name, name_len, value, value_len);
+}
+
+zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->xattr_remove(io, name, name_len);
+}

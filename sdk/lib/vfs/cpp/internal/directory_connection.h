@@ -85,6 +85,23 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
                      CreateSymlinkCallback callback) override {
     callback(fuchsia::io::Directory2_CreateSymlink_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+  void ListExtendedAttributes(
+      fidl::InterfaceRequest<fuchsia::io::ExtendedAttributeIterator> iterator) override {
+    iterator.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetExtendedAttribute(std::vector<uint8_t> attribute,
+                            GetExtendedAttributeCallback callback) override {
+    callback(fuchsia::io::Node2_GetExtendedAttribute_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+  void SetExtendedAttribute(std::vector<uint8_t> attribute,
+                            fuchsia::io::ExtendedAttributeValue value,
+                            SetExtendedAttributeCallback callback) override {
+    callback(fuchsia::io::Node2_SetExtendedAttribute_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+  void RemoveExtendedAttribute(std::vector<uint8_t> attribute,
+                               RemoveExtendedAttributeCallback callback) override {
+    callback(fuchsia::io::Node2_RemoveExtendedAttribute_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
 #endif
 
  protected:

@@ -6,6 +6,34 @@ library fuchsia.io;
 using fuchsia.unknown;
 using zx;
 
+/// The maximum size for an extended attribute name.
+@available(added=HEAD)
+const MAX_ATTRIBUTE_NAME uint64 = 255;
+
+/// The name of an extended attribute. It can not contain any null bytes. Other
+/// than that and the maximum size, no particular structure is imposed on the
+/// name.
+@available(added=HEAD)
+alias ExtendedAttributeName = vector<uint8>:MAX_ATTRIBUTE_NAME;
+
+/// The maximum size for an extended attribute value to be included inline.
+/// Values larger than this size are passed in a vmo.
+@available(added=HEAD)
+const MAX_INLINE_ATTRIBUTE_VALUE uint64 = 32768;
+
+/// The maximum size of a chunk in the ListExtendedAttributes iterator.
+@available(added=HEAD)
+const MAX_LIST_ATTRIBUTES_CHUNK uint64 = 128;
+
+/// The value type for an extended attribute. If the value is less than 32768
+/// bytes, then it is included inline. Values larger than this size are written
+/// into a vmo buffer.
+@available(added=HEAD)
+type ExtendedAttributeValue = strict resource union {
+    1: bytes vector<uint8>:MAX_INLINE_ATTRIBUTE_VALUE;
+    2: buffer zx.Handle:VMO;
+};
+
 type MutableNodeAttributes = table {
     /// Time of creation in nanoseconds since the Unix epoch, UTC.
     1: creation_time uint64;
@@ -232,4 +260,71 @@ protocol Node2 {
     /// This method does not require any rights.
     @selector("fuchsia.io/Node.Sync")
     Sync() -> () error zx.Status;
+
+    /// Creates an iterator over all the extended attribute names associated
+    /// with this node. If an error occurs it is returned as an epitaph on the
+    /// iterator request channel, and then the channel is closed.
+    ///
+    /// GetExtendedAttributes can be used with any of these names to retrieve
+    /// the associated value.
+    ///
+    /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.ListExtendedAttributes")
+    @transitional
+    ListExtendedAttributes(resource struct {
+        iterator server_end:ExtendedAttributeIterator;
+    });
+
+    /// Get the value associated with the given attribute `name` for this node.
+    ///
+    /// Attribute names have a maximum length of MAX_ATTRIBUTE_NAME. No
+    /// particular structure is imposed on them.
+    ///
+    /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.GetExtendedAttribute")
+    @transitional
+    GetExtendedAttribute(struct {
+        name ExtendedAttributeName;
+    }) -> (ExtendedAttributeValue) error zx.Status;
+
+    /// Set the value for the given attribute `name` to `value` for this node.
+    ///
+    /// The attribute name may exist, in which case the attribute is updated.
+    /// If the attribute doesn't exist, it is created. The name should have no
+    /// null bytes in it. If it does, ZX_ERR_INVALID_ARGS is returned.
+    ///
+    /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.SetExtendedAttribute")
+    @transitional
+    SetExtendedAttribute(resource struct {
+        name ExtendedAttributeName;
+        value ExtendedAttributeValue;
+    }) -> () error zx.Status;
+
+    /// Remove the specified extended attribute.
+    ///
+    /// If the attribute doesn't exist, ZX_ERR_NOT_FOUND is returned.
+    ///
+    /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.RemoveExtendedAttribute")
+    @transitional
+    RemoveExtendedAttribute(struct {
+        name ExtendedAttributeName;
+    }) -> () error zx.Status;
+};
+
+@available(added=HEAD)
+protocol ExtendedAttributeIterator {
+    /// Get the next chunk of extended attribute names. If this is the last
+    /// chunk, last will be true, and the channel will be closed after the
+    /// call.
+    @selector("fuchsia.io/ExtendedAttributeIterator.GetNext")
+    GetNext() -> (struct {
+        attributes vector<ExtendedAttributeName>:MAX_LIST_ATTRIBUTES_CHUNK;
+        last bool;
+    }) error zx.Status;
 };
