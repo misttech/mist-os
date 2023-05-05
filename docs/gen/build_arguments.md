@@ -6310,7 +6310,7 @@ Whether or not the current target should build docs.
 
 From //third_party/pigweed/src/pw_docgen/docs.gni:22
 
-### pw_docs_google_analytics_id
+### pw_docgen_GOOGLE_ANALYTICS_ID
 
 Set to enable Google Analytics tracking of generated docs.
 
