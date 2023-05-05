@@ -1757,6 +1757,24 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
     DEBUG_ASSERT(cur_offset >= cur->parent_offset_);
     cur_offset -= cur->parent_offset_;
 
+    // We're either going to migrate the page or copy the page from |target_page_owner| to |cur|.
+    // Lookup the page list slot in |cur| that we're going to manipulate so that when we add the
+    // page later it does not encounter an allocation failure in the page list. We need to do this
+    // *before* we've made any changes to the |target_page_owner| page list so that we do not need
+    // to roll back in case of a failed migration.
+    auto [slot, is_in_interval] =
+        cur->page_list_.LookupOrAllocate(cur_offset, VmPageList::IntervalHandling::NoIntervals);
+    DEBUG_ASSERT(!is_in_interval);
+    // Bail if we could not allocate the slot.
+    if (!slot) {
+      *out_page = nullptr;
+      return ZX_ERR_NO_MEMORY;
+    }
+    // From this point on, we should ensure that the slot gets used to hold a page, or it is
+    // returned if empty.
+    VmPageOrMarker* cur_page = slot;
+    auto page_is_used = fit::defer([&cur_page] { DEBUG_ASSERT(!cur_page || cur_page->IsPage()); });
+
     if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
       // If the page we're covering in the parent is uni-accessible, then we
       // can directly move the page.
@@ -1786,6 +1804,9 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       alloc_status =
           AllocateCopyPage(pmm_alloc_flags_, page->paddr(), alloc_list, page_request, &cover_page);
       if (alloc_status != ZX_OK) {
+        // Return the empty slot we had allocated in preparation for the fork.
+        cur->page_list_.ReturnEmptySlot(cur_offset);
+        cur_page = nullptr;
         break;
       }
 
@@ -1806,7 +1827,9 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
     VmPageOrMarker add_page = VmPageOrMarker::Page(target_page);
     zx_status_t status =
         cur->AddPageLocked(&add_page, cur_offset, CanOverwriteContent::Zero, nullptr, false);
+    // Since we have allocated the slot already, we know this cannot fail.
     DEBUG_ASSERT_MSG(status == ZX_OK, "AddPageLocked returned %d\n", status);
+    DEBUG_ASSERT(cur_page->Page() == target_page);
 
     if (!skip_range_update) {
       if (cur != this) {
