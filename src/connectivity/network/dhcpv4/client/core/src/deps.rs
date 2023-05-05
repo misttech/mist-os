@@ -57,7 +57,8 @@ pub enum SocketError {
 // heap-allocated, we accept this because the DHCP client sends messages
 // infrequently (once every few seconds), and because we expect
 // async_fn_in_trait to be stabilized in the relatively near future.
-// TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
+// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
+// instead.
 #[async_trait(?Send)]
 /// Abstracts sending and receiving datagrams on a socket.
 pub trait Socket<T> {
@@ -73,7 +74,8 @@ pub trait Socket<T> {
 // heap-allocated, we accept this because we expect creating a socket to be an
 // infrequent operation, and because we expect async_fn_in_trait to be
 // stabilized in the relatively near future.
-// TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
+// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
+// instead.
 #[async_trait(?Send)]
 /// Provides access to AF_PACKET sockets.
 pub trait PacketSocketProvider {
@@ -108,7 +110,8 @@ impl Instant for fasync::Time {
 // heap-allocated, we accept this because waiting until a given time is expected
 // to be time-consuming (by definition), and because we expect async_fn_in_trait
 // to be stabilized in the relatively near future.
-// TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
+// TODO(https://github.com/rust-lang/rust/issues/91611): use async_fn_in_trait
+// instead.
 #[async_trait(?Send)]
 /// Provides access to system-time-related operations.
 pub trait Clock {
