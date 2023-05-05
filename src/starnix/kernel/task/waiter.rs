@@ -64,7 +64,7 @@ impl HandleWaitCanceler {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct WaitKey {
     key: u64,
 }
@@ -123,7 +123,7 @@ pub struct Waiter(Arc<WaiterImpl>);
 struct WaiterImpl {
     /// The underlying Zircon port that the thread sleeps in.
     port: zx::Port,
-    key_map: Mutex<HashMap<u64, WaitCallback>>, // the key 0 is reserved for 'no handler'
+    key_map: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
     next_key: AtomicU64,
     ignore_signals: bool,
 }
@@ -226,9 +226,9 @@ impl Waiter {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
+                    let key = WaitKey { key: packet.key() };
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
-                            let key = packet.key();
                             let handler = self.0.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
                                 match callback {
@@ -244,7 +244,6 @@ impl Waiter {
                         zx::PacketContents::User(usrpkt) => {
                             let observed = WaiterUserPacket(usrpkt);
                             let events: FdEvents = observed.into();
-                            let key = packet.key();
                             let handler = self.0.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
                                 match callback {
@@ -273,20 +272,25 @@ impl Waiter {
         }
     }
 
-    fn register_callback(&self, callback: WaitCallback) -> u64 {
+    fn next_key(&self) -> WaitKey {
         let key = self.0.next_key.fetch_add(1, Ordering::Relaxed);
         // TODO - find a better reaction to wraparound
         assert!(key != 0, "bad key from u64 wraparound");
+        WaitKey { key }
+    }
+
+    fn register_callback(&self, callback: WaitCallback) -> WaitKey {
+        let key = self.next_key();
         assert!(
             self.0.key_map.lock().insert(key, callback).is_none(),
-            "unexpected callback already present for key {key}"
+            "unexpected callback already present for key {key:?}"
         );
         key
     }
 
     pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
-        let key = WaitKey { key: self.register_callback(callback) };
+        let key = self.register_callback(callback);
         self.queue_user_packet_data(&key, zx::sys::ZX_OK, events.into());
     }
 
@@ -304,14 +308,14 @@ impl Waiter {
         let key = self.register_callback(callback);
         handle.wait_async_handle(
             &self.0.port,
-            key,
+            key.key,
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
         let waiter_impl = Arc::downgrade(&self.0);
         Ok(HandleWaitCanceler::new(move |handle_ref| {
             if let Some(waiter_impl) = waiter_impl.upgrade() {
-                waiter_impl.port.cancel(&handle_ref, key).is_ok()
+                waiter_impl.port.cancel(&handle_ref, key.key).is_ok()
             } else {
                 false
             }
@@ -336,8 +340,7 @@ impl Waiter {
 
     fn wake_on_events(&self, handler: EventHandler) -> WaitKey {
         let callback = WaitCallback::EventHandler(handler);
-        let key = self.register_callback(callback);
-        WaitKey { key }
+        self.register_callback(callback)
     }
 
     fn queue_events(&self, key: &WaitKey, event_mask: u64) {
@@ -448,28 +451,17 @@ impl std::fmt::Debug for WaitEntry {
 }
 
 impl WaitQueue {
-    /// Establish a wait for the given event mask.
+    /// Establish a wait for the given entry.
     ///
-    /// The waiter will be notified when an event matching the events mask
-    /// occurs.
+    /// The waiter will be notified when an event matching the entry occurs.
     ///
     /// This function does not actually block the waiter. To block the waiter,
     /// call the [`Waiter::wait`] function on the waiter.
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
-    pub fn wait_async_mask(
-        &self,
-        waiter: &Waiter,
-        events: u64,
-        handler: EventHandler,
-    ) -> WaitCanceler {
-        let key = waiter.wake_on_events(handler);
-        self.waiters.lock().push(WaitEntry {
-            waiter: waiter.weak(),
-            events,
-            persistent: false,
-            key,
-        });
+    fn wait_async_on_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
+        let key = entry.key;
+        self.waiters.lock().push(entry);
         let waiter = waiter.weak();
         let waiters = Arc::downgrade(&self.waiters);
         WaitCanceler::new(move || {
@@ -490,6 +482,22 @@ impl WaitQueue {
             }
         })
     }
+    /// Establish a wait for the given event mask.
+    ///
+    /// The waiter will be notified when an event matching the events mask
+    /// occurs.
+    ///
+    /// This function does not actually block the waiter. To block the waiter,
+    /// call the [`Waiter::wait`] function on the waiter.
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
+    pub fn wait_async_mask(&self, waiter: &Waiter, events: u64) -> WaitCanceler {
+        let key = waiter.next_key();
+        self.wait_async_on_entry(
+            waiter,
+            WaitEntry { waiter: waiter.weak(), events, persistent: false, key },
+        )
+    }
 
     /// Establish a wait for any event.
     ///
@@ -500,7 +508,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        self.wait_async_mask(waiter, u64::MAX, WaitCallback::none())
+        self.wait_async_mask(waiter, u64::MAX)
     }
 
     /// Establish a wait for the given events.
@@ -517,7 +525,16 @@ impl WaitQueue {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.wait_async_mask(waiter, events.as_waiter_mask(), handler)
+        let key = waiter.wake_on_events(handler);
+        self.wait_async_on_entry(
+            waiter,
+            WaitEntry {
+                waiter: waiter.weak(),
+                events: events.as_waiter_mask(),
+                persistent: false,
+                key,
+            },
+        )
     }
 
     /// Notify any waiters that the given events have occurred.
@@ -739,9 +756,9 @@ mod tests {
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
 
-        queue.wait_async_mask(&waiter0, 0x13, WaitCallback::none());
-        queue.wait_async_mask(&waiter1, 0x11, WaitCallback::none());
-        queue.wait_async_mask(&waiter2, 0x12, WaitCallback::none());
+        queue.wait_async_mask(&waiter0, 0x13);
+        queue.wait_async_mask(&waiter1, 0x11);
+        queue.wait_async_mask(&waiter2, 0x12);
 
         queue.notify_mask_count(0x2, 2);
         assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_ok());

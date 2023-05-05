@@ -48,7 +48,7 @@ impl FutexTable {
         let offset = key.offset;
 
         let waiter = Waiter::new();
-        self.get_waiters(key).wait_async_mask(&waiter, mask as u64, WaitCallback::none());
+        self.get_waiters(key).wait_async_mask(&waiter, mask as u64);
         // TODO: This read should be atomic.
         let mut buf = [0u8; 4];
         vmo.read(&mut buf, offset).map_err(impossible_error)?;
