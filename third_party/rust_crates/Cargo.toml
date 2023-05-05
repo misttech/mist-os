@@ -480,7 +480,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.js-sys."0.3.40"]
 env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/js-sys-0.3.40" ]
 
-[gn.package.libc."0.2.138"]
+[gn.package.libc."0.2.142"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -491,11 +491,13 @@ rustflags = [
   "--cfg=libc_cfg_target_vendor",
   "--cfg=libc_int128",
   "--cfg=libc_non_exhaustive",
+  "--cfg=libc_long_array",
   "--cfg=libc_ptr_addr_of",
   "--cfg=libc_underscore_const_names",
+  "--cfg=libc_const_extern_fn",
  ]
 
-[gn.package.libc."0.2.138".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.142".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.lock_api."0.4.7"]
@@ -622,7 +624,7 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 [gn.package.tokio."1.19.2".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
-  ":libc-v0_2_138",
+  ":libc-v0_2_142",
   ":memchr-v2_4_0",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
