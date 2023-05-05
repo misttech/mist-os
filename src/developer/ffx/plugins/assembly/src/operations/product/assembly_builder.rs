@@ -1260,6 +1260,8 @@ mod tests {
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
+                        "--config-package-path",
+                        "meta/component1.cvf",
                         "-o",
                         vars.outdir.join("foo/component1/component1.cm").as_str(),
                         vars.outdir.join("foo/component1/component1.cml").as_str()
@@ -1283,6 +1285,8 @@ mod tests {
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
+                        "--config-package-path",
+                        "meta/component2.cvf",
                         "-o",
                         vars.outdir.join("foo/component2/component2.cm").as_str(),
                         vars.outdir.join("foo/component2/component2.cml").as_str()
