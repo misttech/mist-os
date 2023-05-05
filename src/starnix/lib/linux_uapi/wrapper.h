@@ -39,7 +39,7 @@
 #include <linux/memfd.h>
 #include <linux/mman.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
-#include <linux/netfilter_ipv6/ipv6_tables.h>
+#include <linux/netfilter_ipv6/ip6_tables.h>
 #include <linux/netlink.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>
