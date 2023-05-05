@@ -69,6 +69,7 @@ if (is_host) {
     sources = [
       "c_family.go",
       "names.go",
+      "readme.go",
       "zither_ir.go",
       "zither_ir_test.go",
     ]
@@ -278,7 +279,9 @@ template("zither_golden_test") {
           rebase_path(source, root_build_dir),
         ]
         foreach(file, case.files) {
-          args += [ "${output_namespace}/${file}" ]
+          if (get_path_info(file, "extension") != "md") {
+            args += [ "${output_namespace}/${file}" ]
+          }
         }
         outputs = [ source ]
       }
@@ -400,7 +403,10 @@ zither_golden_test("constants") {
   cases = [
     {
       backend = "c"
-      files = [ "constants.h" ]
+      files = [
+        "constants.h",
+        "README.md",
+      ]
     },
     {
       backend = "asm"
@@ -431,7 +437,10 @@ zither_golden_test("enums") {
   cases = [
     {
       backend = "c"
-      files = [ "enums.h" ]
+      files = [
+        "enums.h",
+        "README.md",
+      ]
     },
     {
       backend = "asm"
@@ -462,7 +471,10 @@ zither_golden_test("bits") {
   cases = [
     {
       backend = "c"
-      files = [ "bits.h" ]
+      files = [
+        "bits.h",
+        "README.md",
+      ]
     },
     {
       backend = "asm"
@@ -493,7 +505,10 @@ zither_golden_test("structs") {
   cases = [
     {
       backend = "c"
-      files = [ "structs.h" ]
+      files = [
+        "structs.h",
+        "README.md",
+      ]
     },
     {
       backend = "asm"
@@ -532,6 +547,7 @@ zither_golden_test("multifile") {
         "a.h",
         "b.h",
         "c.h",
+        "README.md",
       ]
     },
     {
@@ -580,7 +596,10 @@ zither_golden_test("output_namespace_override") {
   cases = [
     {
       backend = "c"
-      files = [ "output_namespace_override.h" ]
+      files = [
+        "output_namespace_override.h",
+        "README.md",
+      ]
     },
     {
       backend = "asm"
@@ -597,7 +616,10 @@ zither_golden_test("aliases") {
   cases = [
     {
       backend = "c"
-      files = [ "aliases.h" ]
+      files = [
+        "aliases.h",
+        "README.md",
+      ]
     },
     {
       backend = "go"
@@ -677,7 +699,10 @@ zither_golden_test("experimental_zx_types") {
   cases = [
     {
       backend = "c"
-      files = [ "experimental_zx_types.h" ]
+      files = [
+        "experimental_zx_types.h",
+        "README.md",
+      ]
     },
     {
       backend = "go"
@@ -700,7 +725,10 @@ zither_golden_test("resources") {
   cases = [
     {
       backend = "c"
-      files = [ "resources.h" ]
+      files = [
+        "resources.h",
+        "README.md",
+      ]
     },
     {
       backend = "go"

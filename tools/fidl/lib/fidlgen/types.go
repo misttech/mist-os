@@ -1830,6 +1830,7 @@ type Library struct {
 // Root is the top-level object for a FIDL library.
 // It contains lists of all declarations and dependencies within the library.
 type Root struct {
+	Attributes
 	Name            EncodedLibraryIdentifier    `json:"name"`
 	Experiments     Experiments                 `json:"experiments,omitempty"`
 	Consts          []Const                     `json:"const_declarations"`

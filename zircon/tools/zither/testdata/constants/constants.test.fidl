@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This file excludes enum and bits constants, so that enum/bits support can be
-// tested as a whole.
+/// This library is used to test constant bindings.
+///
+/// It excludes enum and bits constants, so that enum/bits support can be
+/// tested as a whole.
 library zither.constants;
 
 const UINT8_ZERO uint8 = 0;

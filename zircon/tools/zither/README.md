@@ -36,7 +36,7 @@ type generator interface {
 
   // Generate generates bindings into the provided output directory, returning
   // the list of outputs emitted.
-  Generate(summaries []zither.FileSummary, outputDir string) ([]string, error)
+  Generate(summary zither.LibrarySummary, outputDir string) ([]string, error)
 }
 ```
 

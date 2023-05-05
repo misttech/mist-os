@@ -192,16 +192,16 @@ type generator interface {
 
 	// Generate generates bindings into the provided output directory,
 	// returning the list of outputs emitted.
-	Generate(summaries []zither.FileSummary, outputDir string) ([]string, error)
+	Generate(summary zither.LibrarySummary, outputDir string) ([]string, error)
 }
 
 func execute(ctx context.Context, gen generator, ir fidlgen.Root, sourceDir, outputDir, outputManifest string) error {
-	summaries, err := zither.Summarize(ir, sourceDir, gen.DeclOrder(), gen.DeclCallback)
+	summary, err := zither.Summarize(ir, sourceDir, gen.DeclOrder(), gen.DeclCallback)
 	if err != nil {
 		return err
 	}
 
-	outputs, err := gen.Generate(summaries, outputDir)
+	outputs, err := gen.Generate(*summary, outputDir)
 	if err != nil {
 		return err
 	}

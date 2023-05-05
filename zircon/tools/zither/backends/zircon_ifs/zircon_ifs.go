@@ -31,7 +31,7 @@ func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrde
 
 func (gen Generator) DeclCallback(zither.Decl) {}
 
-func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
+func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
 	symbols := []symbol{
 		// TODO(fxbug.dev/49971): These are not syscalls, but are a part of the
 		// vDSO interface today (they probably shouldn't be). For now, we
@@ -41,7 +41,7 @@ func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string)
 		{Name: "_zx_status_get_string", Weak: false},
 		{Name: "zx_status_get_string", Weak: true},
 	}
-	for _, summary := range summaries {
+	for _, summary := range summary.Files {
 		for _, decl := range summary.Decls {
 			if !decl.IsSyscallFamily() {
 				continue

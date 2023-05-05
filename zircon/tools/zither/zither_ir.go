@@ -279,6 +279,16 @@ func (summary FileSummary) TypeKinds() []TypeKind {
 	return kinds
 }
 
+type LibrarySummary struct {
+	// Library is the associated FIDL library.
+	Library fidlgen.LibraryName
+
+	// Documentation gives newline-separated library-level documentation.
+	Documentation []string
+
+	Files []FileSummary
+}
+
 type declMap map[string]Decl
 type memberMap map[string]Member
 
@@ -287,7 +297,7 @@ type memberMap map[string]Member
 // may be provided for extra bookkeeping, which will be called on each
 // zither-summarized Decl in topological 'dependency' order (à la
 // DependencyDeclOrder), irrespective of the provided `order`.
-func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)) ([]FileSummary, error) {
+func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)) (*LibrarySummary, error) {
 	libName, err := fidlgen.ReadLibraryName(string(ir.Name))
 	if err != nil {
 		return nil, err
@@ -429,7 +439,11 @@ func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)
 
 		files = append(files, *file)
 	}
-	return files, nil
+	return &LibrarySummary{
+		Library:       libName,
+		Documentation: ir.Attributes.DocComments(),
+		Files:         files,
+	}, nil
 }
 
 // TypeKind gives a rough categorization of FIDL primitive and declaration types.

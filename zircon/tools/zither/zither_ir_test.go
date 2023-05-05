@@ -41,12 +41,12 @@ func TestGeneratedFileCount(t *testing.T) {
 	const A bool = true;
 	`)
 
-		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+		summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(summaries) != 1 {
-			t.Fatalf("expected one summary; got %d", len(summaries))
+		if len(summary.Files) != 1 {
+			t.Fatalf("expected one summary; got %d", len(summary.Files))
 		}
 	}
 
@@ -70,12 +70,12 @@ func TestGeneratedFileCount(t *testing.T) {
 	`,
 		})
 
-		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+		summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(summaries) != 3 {
-			t.Fatalf("expected three summaries; got %d", len(summaries))
+		if len(summary.Files) != 3 {
+			t.Fatalf("expected three summary.Files; got %d", len(summary.Files))
 		}
 	}
 }
@@ -89,12 +89,12 @@ func TestCanSummarizeLibraryName(t *testing.T) {
 	const A bool = true;
 	`, name))
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summaries[0].Library.String() != name {
-		t.Errorf("expected %s; got %s", name, summaries[0].Library)
+	if summary.Files[0].Library.String() != name {
+		t.Errorf("expected %s; got %s", name, summary.Files[0].Library)
 	}
 }
 
@@ -125,7 +125,7 @@ const G int32 = 2;
 	{
 		var seenByCallback []string
 
-		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(decl Decl) {
+		summary, err := Summarize(ir, wd, SourceDeclOrder, func(decl Decl) {
 			seenByCallback = append(seenByCallback, decl.GetName().String())
 		})
 		if err != nil {
@@ -133,7 +133,7 @@ const G int32 = 2;
 		}
 
 		var actual []string
-		for _, decl := range summaries[0].Decls {
+		for _, decl := range summary.Files[0].Decls {
 			actual = append(actual, decl.Name().String())
 		}
 		expectedSourceOrder := []string{
@@ -157,7 +157,7 @@ const G int32 = 2;
 	{
 		var seenByCallback []string
 
-		summaries, err := Summarize(ir, wd, DependencyDeclOrder, func(decl Decl) {
+		summary, err := Summarize(ir, wd, DependencyDeclOrder, func(decl Decl) {
 			seenByCallback = append(seenByCallback, decl.GetName().String())
 		})
 		if err != nil {
@@ -165,7 +165,7 @@ const G int32 = 2;
 		}
 
 		var actual []string
-		for _, decl := range summaries[0].Decls {
+		for _, decl := range summary.Files[0].Decls {
 			actual = append(actual, decl.Name().String())
 		}
 		if diff := cmp.Diff(expectedDepOrder, actual); diff != "" {
@@ -250,13 +250,13 @@ const COMMENTED_BOOL bool = true;
 /// comment.
 const COMMENTED_STRING string = "YYY";
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var actual []Const
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsConst() {
 			actual = append(actual, decl.AsConst())
 		}
@@ -427,14 +427,14 @@ type Int64Enum = enum : int64 {
   HEX_DEADBEEF = 0xdeadbeef;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Normalize member order by name for a stable comparison.
 	var actual []Enum
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsEnum() {
 			enum := decl.AsEnum()
 			sort.Slice(enum.Members, func(i, j int) bool {
@@ -521,14 +521,14 @@ type Uint64Bits = bits : uint64 {
   MEMBER = 0x1000;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Normalize member order by name for a stable comparison.
 	var actual []Bits
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsBits() {
 			bits := decl.AsBits()
 			sort.Slice(bits.Members, func(i, j int) bool {
@@ -620,13 +620,13 @@ type StructWithArrayMembers = struct {
     nested array<array<bool, 2>, 4>;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var actual []Struct
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsStruct() {
 			actual = append(actual, decl.AsStruct())
 		}
@@ -885,13 +885,13 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 // Exercise more complicated aliases (e.g., aliases of aliases) when fixed.
 
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var actual []Alias
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsAlias() {
 			actual = append(actual, decl.AsAlias())
 		}
@@ -1135,14 +1135,14 @@ protocol SyscallWithParameters {
 		},
 	}
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Normalize member order by name for a stable comparison.
 	var actual []SyscallFamily
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsSyscallFamily() {
 			fam := decl.AsSyscallFamily()
 			sort.Slice(fam.Syscalls, func(i, j int) bool {
@@ -1402,13 +1402,13 @@ protocol Foo {
 };
 `)
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var actual []SyscallFamily
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsSyscallFamily() {
 			actual = append(actual, decl.AsSyscallFamily())
 		}
@@ -1502,13 +1502,13 @@ protocol Syscall {
 		Size: 1,
 	}
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var actual []SyscallFamily
-	for _, decl := range summaries[0].Decls {
+	for _, decl := range summary.Files[0].Decls {
 		if decl.IsSyscallFamily() {
 			actual = append(actual, decl.AsSyscallFamily())
 		}

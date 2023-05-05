@@ -41,9 +41,9 @@ func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDecl
 
 func (gen Generator) DeclCallback(zither.Decl) {}
 
-func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
+func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
 	var outputs []string
-	for _, summary := range summaries {
+	for _, summary := range summary.Files {
 		output := filepath.Join(outputDir, zither.CHeaderPath(summary, "asm", gen.outputNamespaceOverride))
 		if err := gen.GenerateFile(output, "GenerateAsmFile", summary); err != nil {
 			return nil, err

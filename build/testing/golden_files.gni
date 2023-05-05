@@ -102,6 +102,7 @@ template("golden_files") {
       # ultimately supplied to the diff action below, allowing for a degree of
       # format-insensitivity.
       formatted_goldens_dir = "$target_gen_dir/formatted-goldens"
+      not_needed([ "formatted_goldens_dir" ])
     }
 
     comparison_json_target = "_golden_files.$target_name.generated_file"

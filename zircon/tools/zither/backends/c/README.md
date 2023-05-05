@@ -10,6 +10,8 @@ Given a FIDL library by the name of `id1.id2.....idn`, one header
 `<fidl/id1/id2/.../idn/data/c/${filename}.h>` is generated per original FIDL
 source file, containing the bindings for the declarations defined therein.
 
+A README.md comprised of library-level FIDL documentation is generated as well.
+
 
 ## GN integration
 

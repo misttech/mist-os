@@ -37,6 +37,7 @@ _clang_format = {
   script = "$clang_prefix/clang-format"
   inputs = [ "//.clang-format" ]
   args = [ "--style=file:" + rebase_path(inputs[0], root_build_dir) ]
+  extensions = [ ".h" ]
 }
 
 _gofmt = {
@@ -396,6 +397,9 @@ template("_zither_c_family_library") {
   generated_files = []
   foreach(name, source_names) {
     generated_files += [ "${output_dir}/${output_namespace}/${name}.h" ]
+  }
+  if (invoker.backend == "c") {
+    generated_files += [ "${output_dir}/README.md" ]
   }
 
   _zither(zither_target) {

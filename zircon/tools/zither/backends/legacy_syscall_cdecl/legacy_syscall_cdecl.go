@@ -36,9 +36,9 @@ func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrde
 
 func (gen Generator) DeclCallback(zither.Decl) {}
 
-func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
+func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
 	var public, testonly, next []zither.Syscall
-	for _, summary := range summaries {
+	for _, summary := range summary.Files {
 		for _, decl := range summary.Decls {
 			if !decl.IsSyscallFamily() {
 				continue

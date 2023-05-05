@@ -130,14 +130,14 @@ func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *tr
 	return t
 }
 
-func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
-	lib := summaries[0].Library
+func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
+	lib := summary.Library
 	rootData := crateRootData{Library: lib}
 	crateParts := append([]string{"fidl", "data"}, lib.Parts()...)
 	outputDir = filepath.Join(outputDir, strings.Join(crateParts, "-"), "src")
 
 	var outputs []string
-	for _, summary := range summaries {
+	for _, summary := range summary.Files {
 		rootData.Modules = append(rootData.Modules, summary.Name())
 		output := filepath.Join(outputDir, summary.Name()+".rs")
 		if err := gen.GenerateFile(output, "GenerateRustFile", summary); err != nil {
