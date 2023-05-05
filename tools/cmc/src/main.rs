@@ -61,7 +61,7 @@ fn run_cmc() -> Result<(), Error> {
         opts::Commands::Merge { files, output, fromfile, depfile } => {
             merge::merge(files, output, fromfile, depfile)?
         }
-        opts::Commands::Include { file, output, depfile, includepath, includeroot } => {
+        opts::Commands::Include { file, output, depfile, includepath, includeroot, validate } => {
             path_exists(&file)?;
             include::merge_includes(
                 &file,
@@ -69,6 +69,7 @@ fn run_cmc() -> Result<(), Error> {
                 depfile.as_ref(),
                 &includepath,
                 &includeroot,
+                validate,
             )?
         }
         opts::Commands::CheckIncludes {
