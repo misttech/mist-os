@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 library fuchsia.developer.remotecontrol;
 
+using fuchsia.boot as boot;
+using fuchsia.component as component;
 using fuchsia.diagnostics as diagnostics;
+using fuchsia.io as io;
+using fuchsia.kernel as kernel;
 using fuchsia.net as net;
 using fuchsia.sys2 as sys2;
-using fuchsia.kernel as kernel;
-using fuchsia.boot as boot;
 using zx;
 
 const MAX_NUM_MATCHES uint16 = 250;
@@ -77,12 +79,23 @@ protocol RemoteControl {
     // Connects a channel to a service, given a selector and a channel iff the selector
     // matches exactly one service on the system.
     // If successful, returns information about the service connected to.
+    @deprecated("Please use `ConnectCapability`")
     Connect(resource struct {
         selector diagnostics.Selector;
         service_chan zx.Handle:CHANNEL;
     }) -> (struct {
         match ServiceMatch;
     }) error ConnectError;
+
+    // Connects a channel to a service, given a moniker and a channel iff the
+    // component identified by the given moniker exposes a capability of the
+    // requested name.
+    ConnectCapability(resource struct {
+        moniker string:component.MAX_MONIKER_LENGTH;
+        capability_name component.name;
+        server_chan zx.Handle:CHANNEL;
+        flags io.OpenFlags;
+    }) -> () error ConnectCapabilityError;
 
     // AddId adds an identifier that can be recovered from IdentifyHost in order
     // to match this peer against a list of possible source peers. Callers are

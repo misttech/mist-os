@@ -130,6 +130,21 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
+            rcs::RemoteControlRequest::ConnectCapability {
+                moniker,
+                capability_name,
+                server_chan,
+                flags,
+                responder,
+            } => {
+                responder.send(
+                    &mut self
+                        .clone()
+                        .connect_capability(moniker, capability_name, flags, server_chan)
+                        .await,
+                )?;
+                Ok(())
+            }
             rcs::RemoteControlRequest::Connect { selector, service_chan, responder } => {
                 responder
                     .send(&mut self.clone().connect_to_service(selector, service_chan).await)?;
@@ -410,6 +425,38 @@ impl RemoteControlService {
         Ok(())
     }
 
+    /// Connects to an exposed capability identified by the given moniker and capability name.
+    async fn connect_capability(
+        self: &Rc<Self>,
+        moniker: String,
+        capability_name: String,
+        flags: io::OpenFlags,
+        server_end: zx::Channel,
+    ) -> Result<(), rcs::ConnectCapabilityError> {
+        // Connect to the root LifecycleController protocol
+        let lifecycle = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
+            "/svc/fuchsia.sys2.LifecycleController.root",
+        )
+        .map_err(|err| {
+            error!(%err, "could not connect to lifecycle controller");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
+
+        // Connect to the root RealmQuery protocol
+        let query = connect_to_protocol_at_path::<fsys::RealmQueryMarker>(
+            "/svc/fuchsia.sys2.RealmQuery.root",
+        )
+        .map_err(|err| {
+            error!(%err, "could not connect to realm query");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
+
+        let moniker =
+            relative_moniker(moniker).ok_or(rcs::ConnectCapabilityError::InvalidMoniker)?;
+        connect_to_exposed_capability(moniker, capability_name, server_end, flags, lifecycle, query)
+            .await
+    }
+
     /// Connects to an exposed capability identified by the given selector.
     async fn connect_to_service(
         self: &Rc<Self>,
@@ -437,30 +484,64 @@ impl RemoteControlService {
             rcs::ConnectError::ServiceConnectFailed
         })?;
 
-        connect_to_exposed_protocol(selector, server_end, lifecycle, query).await
+        let (moniker, protocol_name) = extract_moniker_and_protocol_from_selector(selector)
+            .ok_or(rcs::ConnectError::ServiceConnectFailed)?;
+        let moniker_parts = moniker.path().iter().map(|part| part.to_string()).collect();
+
+        connect_to_exposed_capability(
+            moniker,
+            protocol_name.clone(),
+            server_end,
+            io::OpenFlags::RIGHT_READABLE,
+            lifecycle,
+            query,
+        )
+        .await
+        .map_err(|err| match err {
+            rcs::ConnectCapabilityError::NoMatchingComponent => {
+                rcs::ConnectError::NoMatchingServices
+            }
+            rcs::ConnectCapabilityError::CapabilityConnectFailed => {
+                rcs::ConnectError::ServiceConnectFailed
+            }
+            rcs::ConnectCapabilityError::NoMatchingCapabilities => {
+                rcs::ConnectError::NoMatchingServices
+            }
+            _ => unreachable!("we only emit the errors above"),
+        })?;
+
+        Ok(rcs::ServiceMatch {
+            moniker: moniker_parts,
+            subdir: "expose".to_string(),
+            service: protocol_name,
+        })
     }
 }
 
-async fn connect_to_exposed_protocol(
-    selector: Selector,
+fn relative_moniker(moniker: String) -> Option<RelativeMoniker> {
+    // If we have an absolute moniker, make it relative, otherwise attempt to parse as a relative
+    // moniker.
+    let moniker = if moniker.starts_with("/") { format!(".{moniker}") } else { moniker };
+    RelativeMoniker::try_from(moniker.as_str()).ok()
+}
+
+async fn connect_to_exposed_capability(
+    moniker: RelativeMoniker,
+    capability_name: String,
     server_end: zx::Channel,
+    flags: io::OpenFlags,
     lifecycle: fsys::LifecycleControllerProxy,
     query: fsys::RealmQueryProxy,
-) -> Result<rcs::ServiceMatch, rcs::ConnectError> {
-    let (moniker, protocol_name) = extract_moniker_and_protocol_from_selector(selector)
-        .ok_or(rcs::ConnectError::ServiceConnectFailed)?;
-
-    let moniker_parts = moniker.path().iter().map(|part| part.to_string()).collect();
-
+) -> Result<(), rcs::ConnectCapabilityError> {
     // This is a no-op if already resolved.
     resolve_instance(&lifecycle, &moniker)
         .map_err(|err| match err {
             ResolveError::ActionError(ActionError::InstanceNotFound) => {
-                rcs::ConnectError::NoMatchingServices
+                rcs::ConnectCapabilityError::NoMatchingComponent
             }
             err => {
                 error!(?err, "error resolving component");
-                rcs::ConnectError::ServiceConnectFailed
+                rcs::ConnectCapabilityError::CapabilityConnectFailed
             }
         })
         .await?;
@@ -468,17 +549,12 @@ async fn connect_to_exposed_protocol(
     let exposed_dir = open_instance_dir_root_readable(&moniker, OpenDirType::Exposed, &query)
         .map_err(|err| {
             error!(?err, "error opening exposed dir");
-            rcs::ConnectError::ServiceConnectFailed
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
         .await?;
 
-    connect_to_protocol_in_exposed_dir(&exposed_dir, &protocol_name, server_end).await?;
-
-    Ok(rcs::ServiceMatch {
-        moniker: moniker_parts,
-        subdir: "expose".to_string(),
-        service: protocol_name,
-    })
+    connect_to_capability_in_exposed_dir(&exposed_dir, &capability_name, server_end, flags).await?;
+    Ok(())
 }
 
 fn extract_moniker_and_protocol_from_selector(
@@ -516,31 +592,27 @@ fn extract_moniker_and_protocol_from_selector(
     Some((moniker, protocol_name))
 }
 
-async fn connect_to_protocol_in_exposed_dir(
+async fn connect_to_capability_in_exposed_dir(
     exposed_dir: &io::DirectoryProxy,
-    protocol_name: &str,
+    capability_name: &str,
     server_end: zx::Channel,
-) -> Result<(), rcs::ConnectError> {
+    flags: io::OpenFlags,
+) -> Result<(), rcs::ConnectCapabilityError> {
     // Check if capability exists in exposed dir.
     let entries = fuchsia_fs::directory::readdir(exposed_dir)
         .await
-        .map_err(|_| rcs::ConnectError::ServiceConnectFailed)?;
-    let is_protocol_exposed = entries.iter().any(|e| &e.name == &protocol_name);
-    if !is_protocol_exposed {
-        return Err(rcs::ConnectError::NoMatchingServices);
+        .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;
+    let is_capability_exposed = entries.iter().any(|e| &e.name == &capability_name);
+    if !is_capability_exposed {
+        return Err(rcs::ConnectCapabilityError::NoMatchingCapabilities);
     }
 
     // Connect to the capability
     exposed_dir
-        .open(
-            io::OpenFlags::RIGHT_READABLE,
-            io::ModeType::empty(),
-            protocol_name,
-            ServerEnd::new(server_end),
-        )
+        .open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end))
         .map_err(|err| {
             error!(%err, "error opening capability from exposed dir");
-            rcs::ConnectError::ServiceConnectFailed
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
 }
 
@@ -921,27 +993,46 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_connect_to_exposed_protocol() -> Result<()> {
-        let selector =
-            parse_selector::<VerboseError>("core/my_component:expose:fuchsia.hwinfo.Board")
-                .unwrap();
+    async fn test_relative_moniker() {
+        assert!(relative_moniker("/core/foo".to_string()).is_some());
+        assert!(relative_moniker("./core/foo".to_string()).is_some());
+        assert!(relative_moniker("core/foo".to_string()).is_none());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_connect_to_exposed_capability() -> Result<()> {
         let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
-        connect_to_exposed_protocol(selector, server, lifecycle, query).await.unwrap();
+        connect_to_exposed_capability(
+            RelativeMoniker::try_from("./core/my_component").unwrap(),
+            "fuchsia.hwinfo.Board".to_string(),
+            server,
+            io::OpenFlags::RIGHT_READABLE,
+            lifecycle,
+            query,
+        )
+        .await
+        .unwrap();
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_connect_to_protocol_not_exposed() -> Result<()> {
-        let selector =
-            parse_selector::<VerboseError>("core/my_component:expose:fuchsia.not.exposed").unwrap();
+    async fn test_connect_to_capability_not_exposed() -> Result<()> {
         let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
-        let error =
-            connect_to_exposed_protocol(selector, server, lifecycle, query).await.unwrap_err();
-        assert_eq!(error, rcs::ConnectError::NoMatchingServices);
+        let error = connect_to_exposed_capability(
+            RelativeMoniker::try_from("./core/my_component").unwrap(),
+            "fuchsia.not.exposed".to_string(),
+            server,
+            io::OpenFlags::RIGHT_READABLE,
+            lifecycle,
+            query,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, rcs::ConnectCapabilityError::NoMatchingCapabilities);
         Ok(())
     }
 
