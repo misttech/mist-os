@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -21,7 +22,6 @@
 #include "device.h"
 #include "driver.h"
 #include "macros.h"
-#include "src/devices/sysmem/drivers/sysmem/sysmem-bind.h"
 
 namespace sysmem_driver {
 zx_status_t sysmem_init(void** out_driver_ctx) {

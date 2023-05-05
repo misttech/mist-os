@@ -4,6 +4,7 @@
 
 #include "syn-dhub.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/port.h>
@@ -14,8 +15,6 @@
 #include <fbl/alloc_checker.h>
 #include <soc/as370/as370-dhub-regs.h>
 #include <soc/as370/as370-hw.h>
-
-#include "src/devices/shareddma/drivers/syn-dma/syn_dhub_bind.h"
 
 namespace {
 constexpr uint64_t kPortKeyIrqMsg = 0x00;

@@ -4,7 +4,7 @@
 
 #include "tools/create/goldens/my-driver-cpp/my_driver_cpp.h"
 
-#include "tools/create/goldens/my-driver-cpp/my_driver_cpp-bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace my_driver_cpp {
 

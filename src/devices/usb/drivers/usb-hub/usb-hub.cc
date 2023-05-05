@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/usb-hub/usb-hub.h"
 
 #include <fuchsia/hardware/usb/hubdescriptor/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/zx/time.h>
 #include <stdlib.h>
 #include <threads.h>
@@ -14,7 +15,6 @@
 #include <zircon/types.h>
 
 #include "lib/sync/completion.h"
-#include "src/devices/usb/drivers/usb-hub/usb_hub_bind.h"
 
 namespace usb_hub {
 

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
@@ -16,8 +17,6 @@
 
 #include <cstdlib>
 #include <vector>
-
-#include "src/devices/mailbox/drivers/aml-pl-mailbox/aml_pl_mailbox_bind.h"
 
 namespace {
 

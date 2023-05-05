@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.environment.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -15,7 +16,6 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/tests/ddk-environment-test/test-environment-bind.h"
 #include "src/lib/files/glob.h"
 
 namespace {

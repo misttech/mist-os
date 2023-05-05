@@ -7,14 +7,13 @@
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/zx/channel.h>
 #include <zircon/threads.h>
 
 #include <memory>
-
-#include "src/devices/power/drivers/nelson-brownout-protection/nelson-brownout-protection-bind.h"
 
 namespace {
 

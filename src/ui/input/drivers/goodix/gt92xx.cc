@@ -5,6 +5,7 @@
 #include "gt92xx.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
@@ -22,8 +23,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
-
-#include "src/ui/input/drivers/goodix/gt92xx_bind.h"
 
 namespace goodix {
 // clang-format off

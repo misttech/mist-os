@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -14,7 +15,6 @@
 #include <hid/descriptor.h>
 
 #include "lib/ddk/device.h"
-#include "src/devices/acpi/drivers/acpi-lid/acpi_lid-bind.h"
 #include "src/devices/lib/acpi/client.h"
 
 namespace acpi_lid {

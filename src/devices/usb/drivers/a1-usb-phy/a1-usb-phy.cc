@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/a1-usb-phy/a1-usb-phy.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -27,7 +28,6 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-power-domain.h>
 
-#include "src/devices/usb/drivers/a1-usb-phy/a1_usb_phy_bind.h"
 #include "src/devices/usb/drivers/a1-usb-phy/usb-phy-regs.h"
 
 namespace {

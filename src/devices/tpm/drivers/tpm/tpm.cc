@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.tpmimpl/cpp/wire.h>
 #include <fuchsia/hardware/tpmimpl/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <zircon/errors.h>
@@ -15,7 +16,6 @@
 
 #include "src/devices/tpm/drivers/tpm/commands.h"
 #include "src/devices/tpm/drivers/tpm/registers.h"
-#include "src/devices/tpm/drivers/tpm/tpm_bind.h"
 
 namespace tpm {
 namespace {
@@ -35,8 +35,8 @@ std::unique_ptr<TpmCmdHeader> make_cmd_header(
 }
 }  // namespace
 
-using fuchsia_hardware_tpmimpl::wire::RegisterAddress;
 using fuchsia_hardware_tpmimpl::wire::kTpmMaxDataTransfer;
+using fuchsia_hardware_tpmimpl::wire::RegisterAddress;
 
 zx_status_t TpmDevice::Create(void *ctx, zx_device_t *parent) {
   ddk::TpmImplProtocolClient tpm(parent);

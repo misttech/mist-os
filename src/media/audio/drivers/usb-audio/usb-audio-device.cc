@@ -4,6 +4,7 @@
 
 #include "usb-audio-device.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <string.h>
 #include <zircon/status.h>
@@ -15,7 +16,6 @@
 #include <fbl/intrusive_double_list.h>
 #include <usb/usb.h>
 
-#include "src/media/audio/drivers/usb-audio/usb_audio_bind.h"
 #include "usb-audio-stream-interface.h"
 #include "usb-audio-stream.h"
 #include "usb-audio.h"

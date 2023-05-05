@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -22,7 +23,6 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/devices/bus/drivers/platform/test/test-board-bind.h"
 #include "src/devices/bus/drivers/platform/test/test-metadata.h"
 #include "src/devices/bus/drivers/platform/test/test-resources.h"
 #include "src/devices/bus/drivers/platform/test/test.h"

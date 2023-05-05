@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/dsi-dw/dsi-dw.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -22,8 +23,6 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/graphics/display/drivers/dsi-dw/dsi_dw_bind.h"
 
 // Header Creation Macros
 #define GEN_HDR_WC_MSB(x) ((x & 0xFF) << 16)

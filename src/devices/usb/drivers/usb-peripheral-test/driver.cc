@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -28,8 +29,6 @@
 #include <fbl/mutex.h>
 #include <usb/peripheral-test.h>
 #include <usb/peripheral.h>
-
-#include "src/devices/usb/drivers/usb-peripheral-test/usb_peripheral_test-bind.h"
 
 namespace usb_function_test {
 

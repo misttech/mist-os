@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <fuchsia/hardware/usb/composite/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/operation/ethernet.h>
@@ -17,7 +18,6 @@
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
 
-#include "src/connectivity/ethernet/drivers/usb-cdc-ecm/ethernet_usb_cdc_ecm-bind.h"
 #include "src/connectivity/ethernet/drivers/usb-cdc-ecm/usb-cdc-ecm-lib.h"
 
 namespace {

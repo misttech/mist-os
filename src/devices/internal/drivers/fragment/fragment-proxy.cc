@@ -4,13 +4,12 @@
 
 #include "src/devices/internal/drivers/fragment/fragment-proxy.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/sync/completion.h>
 
 #include <memory>
-
-#include "src/devices/internal/drivers/fragment/fragment-proxy-bind.h"
 
 namespace fragment {
 

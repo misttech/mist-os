@@ -13,6 +13,7 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/zx/channel.h>
@@ -31,7 +32,6 @@
 
 #include "src/devices/lib/acpi/mock/mock-acpi.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/drivers/misc/goldfish/goldfish-bind.h"
 
 namespace goldfish {
 

@@ -5,13 +5,13 @@
 #include "spi.h"
 
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
 #include <fbl/alloc_checker.h>
 
 #include "spi-child.h"
-#include "src/devices/spi/drivers/spi/spi_bind.h"
 
 namespace spi {
 

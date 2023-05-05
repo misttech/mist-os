@@ -4,6 +4,7 @@
 
 #include "src/devices/tests/ddk-fidl-test/fidl-llcpp-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -14,8 +15,6 @@
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/tests/ddk-fidl-test/ddk-fidl-bind.h"
 
 namespace fidl {
 

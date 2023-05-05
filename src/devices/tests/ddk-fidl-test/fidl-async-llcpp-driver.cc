@@ -5,6 +5,7 @@
 #include "src/devices/tests/ddk-fidl-test/fidl-async-llcpp-driver.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -14,8 +15,6 @@
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/tests/ddk-fidl-test/ddk-fidl-async-bind.h"
 
 namespace fidl {
 

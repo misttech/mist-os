@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/ethernet/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -20,8 +21,6 @@
 #include <usb/cdc.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
-
-#include "src/connectivity/ethernet/drivers/rndis-host/rndishost_bind.h"
 
 #define READ_REQ_COUNT 8
 #define WRITE_REQ_COUNT 4

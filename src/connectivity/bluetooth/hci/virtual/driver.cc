@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/test/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <zircon/status.h>
@@ -12,7 +13,6 @@
 #include <memory>
 #include <thread>
 
-#include "src/connectivity/bluetooth/hci/virtual/bt-hci-virtual-bind.h"
 #include "src/connectivity/bluetooth/hci/virtual/controller.h"
 #include "src/connectivity/bluetooth/hci/virtual/log.h"
 

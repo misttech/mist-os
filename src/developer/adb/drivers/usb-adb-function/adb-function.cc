@@ -4,6 +4,7 @@
 
 #include "adb-function.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
@@ -13,8 +14,6 @@
 #include <fbl/auto_lock.h>
 #include <usb/peripheral.h>
 #include <usb/request-cpp.h>
-
-#include "src/developer/adb/drivers/usb-adb-function/usb_adb-bind.h"
 
 namespace usb_adb_function {
 

@@ -4,10 +4,9 @@
 
 #include "src/devices/tests/node-group-test/drivers/node-group-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-
-#include "src/devices/tests/node-group-test/drivers/node-group-driver-bind.h"
 
 namespace node_group_driver {
 
@@ -20,7 +19,8 @@ zx_status_t NodeGroupDriver::Bind(void* ctx, zx_device_t* device) {
     // Verify the metadata.
     char metadata[32] = "";
     size_t len = 0;
-    auto status = dev->DdkGetMetadata(DEVICE_METADATA_PRIVATE, &metadata, std::size(metadata), &len);
+    auto status =
+        dev->DdkGetMetadata(DEVICE_METADATA_PRIVATE, &metadata, std::size(metadata), &len);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to read metadata %d", status);
       return status;

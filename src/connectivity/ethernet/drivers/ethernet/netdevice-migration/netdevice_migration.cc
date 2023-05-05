@@ -4,6 +4,7 @@
 
 #include "netdevice_migration.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/system/public/zircon/assert.h>
@@ -11,8 +12,6 @@
 #include <algorithm>
 
 #include <fbl/alloc_checker.h>
-
-#include "src/connectivity/ethernet/drivers/ethernet/netdevice-migration/netdevice_migration_bind.h"
 
 namespace {
 

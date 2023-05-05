@@ -4,10 +4,9 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/ddk/binding_driver.h>
 
 #include <ddktl/device.h>
-
-#include "src/media/audio/drivers/tests/realm/dai_test-bind.h"
 
 namespace audio {
 

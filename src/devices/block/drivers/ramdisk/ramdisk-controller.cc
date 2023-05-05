@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -14,7 +15,6 @@
 #include <ddktl/device.h>
 
 #include "ramdisk.h"
-#include "src/devices/block/drivers/ramdisk/ramdisk_bind.h"
 
 namespace ramdisk {
 namespace {

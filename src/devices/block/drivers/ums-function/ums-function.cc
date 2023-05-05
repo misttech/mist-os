@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -24,8 +25,6 @@
 #include <usb/request-cpp.h>
 #include <usb/ums.h>
 #include <usb/usb-request.h>
-
-#include "src/devices/block/drivers/ums-function/usb_ums_bind.h"
 
 namespace ums {
 

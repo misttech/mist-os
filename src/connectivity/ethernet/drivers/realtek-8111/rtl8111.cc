@@ -5,6 +5,7 @@
 #include "rtl8111.h"
 
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -19,8 +20,6 @@
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
-
-#include "src/connectivity/ethernet/drivers/realtek-8111/realtek_rtl8111-bind.h"
 
 // DISCLAIMER: This driver has not been tested since rewriting in C++. See fxr/727017 for details.
 

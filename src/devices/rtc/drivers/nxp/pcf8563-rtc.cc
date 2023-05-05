@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.rtc/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <librtc.h>
 #include <librtc_llcpp.h>
 #include <stdlib.h>
 
 #include <ddktl/device.h>
-
-#include "src/devices/rtc/drivers/nxp/pcf8563_rtc_bind.h"
 
 namespace FidlRtc = rtc::FidlRtc;
 

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.btitest/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -12,8 +13,6 @@
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-
-#include "src/devices/bus/drivers/platform/test/test-bti-bind.h"
 
 namespace {
 

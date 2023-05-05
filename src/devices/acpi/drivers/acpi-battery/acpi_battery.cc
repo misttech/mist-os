@@ -6,13 +6,13 @@
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 #include <zircon/types.h>
 
-#include "src/devices/acpi/drivers/acpi-battery/acpi_battery-bind.h"
 #include "src/devices/lib/acpi/client.h"
 
 namespace acpi_battery {

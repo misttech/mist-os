@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 
 #include <memory>
 
 #include <ddktl/device.h>
-
-#include "src/devices/bus/drivers/platform/test/test-composite-node-spec-bind.h"
 
 namespace test_composite_node_spec {
 

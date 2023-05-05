@@ -5,6 +5,7 @@
 #include "ft_device.h"
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/hw/arch_ops.h>
@@ -29,8 +30,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
-
-#include "src/ui/input/drivers/focaltech/focaltech_touch_bind.h"
 
 namespace ft {
 

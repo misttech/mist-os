@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -16,8 +17,6 @@
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-
-#include "src/connectivity/bluetooth/hci/passthrough/bt_hci_passthrough_bind.h"
 
 namespace {
 

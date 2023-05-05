@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -17,8 +18,6 @@
 #include <fbl/alloc_checker.h>
 #include <hwreg/bitfields.h>
 #include <soc/as370/as370-reset.h>
-
-#include "src/devices/block/drivers/as370-sdhci/as370-sdhci-bind.h"
 
 namespace {
 

@@ -4,8 +4,9 @@
 
 #include "src/devices/tests/driver-multiname-test/parent_device.h"
 
+#include <lib/ddk/binding_driver.h>
+
 #include "src/devices/tests/driver-multiname-test/child_device.h"
-#include "src/devices/tests/driver-multiname-test/parent_device-bind.h"
 
 namespace parent_device {
 

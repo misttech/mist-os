@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.power.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -17,8 +18,6 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/tests/ddk-power/test-power-child-bind.h"
 
 using fuchsia_device::wire::DevicePerformanceStateInfo;
 using fuchsia_device::wire::DevicePowerState;

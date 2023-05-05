@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/aml-usb-crg-phy-v2/aml-usb-crg-phy.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -26,7 +27,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/usb/drivers/aml-usb-crg-phy-v2/aml_usb_crg_phy_bind.h"
 #include "src/devices/usb/drivers/aml-usb-crg-phy-v2/usb-phy-regs.h"
 
 namespace aml_usb_crg_phy {

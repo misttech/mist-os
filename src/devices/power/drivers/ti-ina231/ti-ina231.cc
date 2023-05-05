@@ -5,13 +5,12 @@
 #include "ti-ina231.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/power/drivers/ti-ina231/ti-ina231-bind.h"
 
 namespace {
 

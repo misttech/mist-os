@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -12,8 +13,6 @@
 #include <memory>
 
 #include <ddktl/device.h>
-
-#include "src/devices/bus/drivers/platform/test/test-bti-board-bind.h"
 
 namespace {
 

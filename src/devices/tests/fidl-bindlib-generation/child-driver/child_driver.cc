@@ -4,7 +4,7 @@
 
 #include "src/devices/tests/fidl-bindlib-generation/child-driver/child_driver.h"
 
-#include "src/devices/tests/fidl-bindlib-generation/child-driver/child_driver-bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace child_driver {
 

@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.driver.transport.test/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.transport.test/cpp/markers.h>
 #include <fidl/fuchsia.driver.transport.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,8 +15,6 @@
 #include <lib/fidl_driver/cpp/wire_messaging_declarations.h>
 
 #include <ddktl/device.h>
-
-#include "src/devices/tests/driver-transport/child-driver-bind.h"
 
 namespace fdtt = fuchsia_driver_transport_test;
 

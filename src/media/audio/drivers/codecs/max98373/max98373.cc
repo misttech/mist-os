@@ -4,6 +4,7 @@
 
 #include "max98373.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 
@@ -14,7 +15,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/media/audio/drivers/codecs/max98373/max98373-bind.h"
 
 namespace {
 
@@ -261,7 +261,7 @@ zx::result<CodecFormatInfo> Max98373::SetDaiFormat(const DaiFormat& format) {
 
   uint8_t rate = 0;
   switch (format.frame_rate) {
-    // clang-format off
+      // clang-format off
     case 16'000: rate = 3; break;
     case 22'050: rate = 4; break;
     case 24'000: rate = 5; break;

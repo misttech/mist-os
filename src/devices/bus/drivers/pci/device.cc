@@ -8,6 +8,7 @@
 #include <err.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/interrupt.h>
@@ -32,7 +33,6 @@
 #include "src/devices/bus/drivers/pci/capabilities/msix.h"
 #include "src/devices/bus/drivers/pci/capabilities/power_management.h"
 #include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/pci_bind.h"
 #include "src/devices/bus/drivers/pci/ref_counted.h"
 #include "src/devices/bus/drivers/pci/upstream_node.h"
 

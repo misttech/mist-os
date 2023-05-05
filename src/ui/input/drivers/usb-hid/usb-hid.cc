@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <fuchsia/hardware/usb/descriptor/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -26,8 +27,6 @@
 #include <usb/hid.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
-
-#include "src/ui/input/drivers/usb-hid/usb_hid-bind.h"
 
 namespace usb_hid {
 

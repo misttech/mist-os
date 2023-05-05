@@ -9,6 +9,7 @@
 
 #include <fidl/fuchsia.compat.runtime/cpp/driver/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -20,8 +21,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/intrusive_double_list.h>
-
-#include "src/devices/tests/v2/compat-runtime-v1/root/root-bind.h"
 
 namespace root {
 

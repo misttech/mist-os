@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <stdio.h>
@@ -25,7 +26,6 @@
 #include <usb/usb.h>
 
 #include "ftdi-i2c.h"
-#include "src/devices/serial/drivers/ftdi/ftdi_bind.h"
 
 #define FTDI_STATUS_SIZE 2
 #define FTDI_RX_HEADER_SIZE 4

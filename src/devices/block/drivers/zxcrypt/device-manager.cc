@@ -5,6 +5,7 @@
 #include "src/devices/block/drivers/zxcrypt/device-manager.h"
 
 #include <fidl/fuchsia.hardware.block.encrypted/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +22,6 @@
 
 #include "src/devices/block/drivers/zxcrypt/device-info.h"
 #include "src/devices/block/drivers/zxcrypt/device.h"
-#include "src/devices/block/drivers/zxcrypt/zxcrypt-bind.h"
 #include "src/security/lib/fcrypto/secret.h"
 #include "src/security/lib/zxcrypt/ddk-volume.h"
 #include "src/security/lib/zxcrypt/volume.h"

@@ -4,7 +4,7 @@
 
 #include "src/devices/tests/autobind/autobind.h"
 
-#include "src/devices/tests/autobind/autobind-bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace auto_bind {
 

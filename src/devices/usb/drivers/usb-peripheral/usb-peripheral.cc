@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/function/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -30,7 +31,6 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
-#include "src/devices/usb/drivers/usb-peripheral/usb_peripheral-bind.h"
 
 namespace usb_peripheral {
 

@@ -5,6 +5,7 @@
 #include "tas58xx.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
@@ -17,8 +18,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/media/audio/drivers/codecs/tas58xx/ti_tas58xx-bind.h"
 
 namespace {
 // clang-format off

@@ -4,6 +4,7 @@
 
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <zircon/status.h>
@@ -17,7 +18,6 @@
 
 #include "device.h"
 #include "logging.h"
-#include "src/connectivity/bluetooth/hci/vendor/atheros/bt_hci_atheros_bind.h"
 
 #define QCA_GET_TARGET_VERSION 0x09
 #define QCA_GET_STATUS 0x05

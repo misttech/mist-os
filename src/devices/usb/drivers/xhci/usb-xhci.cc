@@ -4,6 +4,7 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/ddk/metadata.h>
@@ -34,7 +35,6 @@
 #include <usb/usb-request.h>
 
 #include "src/devices/usb/drivers/xhci/registers.h"
-#include "src/devices/usb/drivers/xhci/usb_xhci_bind.h"
 #include "src/devices/usb/drivers/xhci/xhci-context.h"
 #include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 

@@ -5,6 +5,7 @@
 #include "one-endpoint-hid-function.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -21,8 +22,6 @@
 #include <fbl/algorithm.h>
 #include <usb/peripheral.h>
 #include <usb/usb-request.h>
-
-#include "src/ui/input/drivers/usb-hid/function/one_endpoint_hid-bind.h"
 
 constexpr int BULK_MAX_PACKET = 512;
 

@@ -9,12 +9,11 @@
 
 #include <fidl/fuchsia.compat.runtime/cpp/driver/fidl.h>
 #include <fidl/fuchsia.compat.runtime/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <ddktl/device.h>
-
-#include "src/devices/tests/v2/compat-runtime-v1/leaf/leaf-bind.h"
 
 namespace leaf {
 

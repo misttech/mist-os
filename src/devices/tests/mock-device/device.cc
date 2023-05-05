@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/test/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
@@ -30,7 +31,6 @@
 
 #include "ddktl/suspend-txn.h"
 #include "fidl.h"
-#include "src/devices/tests/mock-device/mock-device-bind.h"
 
 namespace mock_device {
 

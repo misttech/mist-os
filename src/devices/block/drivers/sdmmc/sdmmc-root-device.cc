@@ -5,6 +5,7 @@
 #include "sdmmc-root-device.h"
 
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <zircon/threads.h>
@@ -12,8 +13,6 @@
 #include <memory>
 
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/block/drivers/sdmmc/sdmmc-bind.h"
 
 namespace sdmmc {
 

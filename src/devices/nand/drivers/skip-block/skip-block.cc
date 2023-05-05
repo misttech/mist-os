@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/badblock/c/banjo.h>
 #include <fuchsia/hardware/nand/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -25,8 +26,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/nand/drivers/skip-block/skip-block-bind.h"
 
 namespace nand {
 

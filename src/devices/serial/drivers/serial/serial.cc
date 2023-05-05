@@ -5,6 +5,7 @@
 #include "serial.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/function.h>
 #include <lib/zx/handle.h>
@@ -16,8 +17,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/serial/drivers/serial/serial_bind.h"
 
 namespace serial {
 

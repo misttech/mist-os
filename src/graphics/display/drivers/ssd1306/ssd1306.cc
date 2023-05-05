@@ -4,14 +4,13 @@
 
 #include "src/graphics/display/drivers/ssd1306/ssd1306.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 
 #include <fbl/alloc_checker.h>
-
-#include "src/graphics/display/drivers/ssd1306/ssd1306-bind.h"
 
 namespace ssd1306 {
 

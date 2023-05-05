@@ -4,13 +4,13 @@
 
 #include "src/devices/tests/runtime-composite-test/drivers/leaf-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 
 #include <bind/composite/test/lib/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 
 #include "src/devices/tests/runtime-composite-test/drivers/composite-driver.h"
-#include "src/devices/tests/runtime-composite-test/drivers/leaf-driver-bind.h"
 
 namespace bind_test = bind_composite_test_lib;
 

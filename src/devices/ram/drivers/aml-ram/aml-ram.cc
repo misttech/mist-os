@@ -4,6 +4,7 @@
 
 #include "aml-ram.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -16,8 +17,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
-
-#include "src/devices/ram/drivers/aml-ram/aml_ram_bind.h"
 
 namespace amlogic_ram {
 

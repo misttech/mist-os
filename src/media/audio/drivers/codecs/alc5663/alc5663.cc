@@ -4,6 +4,7 @@
 
 #include "alc5663.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +22,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "alc5663_registers.h"
-#include "src/media/audio/drivers/codecs/alc5663/alc5663_bind.h"
 
 namespace audio::alc5663 {
 

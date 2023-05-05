@@ -5,6 +5,7 @@
 #include "gpio-light.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -22,8 +23,6 @@
 
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/ui/light/drivers/gpio-light/gpio-light-bind.h"
 
 namespace gpio_light {
 

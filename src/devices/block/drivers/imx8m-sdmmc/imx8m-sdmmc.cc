@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
@@ -36,7 +37,6 @@
 #include <fbl/algorithm.h>
 
 #include "imx8m-sdmmc-regs.h"
-#include "src/devices/block/drivers/imx8m-sdmmc/imx8m-sdmmc-bind.h"
 
 namespace {
 

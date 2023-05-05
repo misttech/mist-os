@@ -8,13 +8,13 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/wire_types.h>
 #include <iconv.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <zircon/types.h>
 
-#include "src/devices/acpi/drivers/intel-thermal/intel_thermal-bind.h"
 #include "src/devices/lib/acpi/client.h"
 
 namespace intel_thermal {

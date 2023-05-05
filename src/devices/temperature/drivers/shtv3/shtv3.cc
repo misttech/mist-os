@@ -5,13 +5,12 @@
 #include "shtv3.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/time.h>
 
 #include <ddktl/fidl.h>
-
-#include "src/devices/temperature/drivers/shtv3/shtv3-bind.h"
 
 namespace {
 

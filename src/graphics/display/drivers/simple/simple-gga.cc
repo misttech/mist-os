@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -13,7 +14,6 @@
 #include <limits>
 
 #include "src/graphics/display/drivers/simple/simple-display.h"
-#include "src/graphics/display/drivers/simple/simple-gga-bind.h"
 
 namespace {
 

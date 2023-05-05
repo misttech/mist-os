@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.inspect.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -13,8 +14,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/tests/driver-inspect-test/inspect-test-bind.h"
 
 namespace {
 

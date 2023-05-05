@@ -8,6 +8,7 @@
 #define ZX_PROTOCOL_PARENT bind_fuchsia_lifecycle::BIND_PROTOCOL_PARENT
 
 #include <fuchsia/lifecycle/test/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -17,8 +18,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/intrusive_double_list.h>
-
-#include "src/devices/tests/v2/v1_lifecycle/root/root-bind.h"
 
 namespace root {
 

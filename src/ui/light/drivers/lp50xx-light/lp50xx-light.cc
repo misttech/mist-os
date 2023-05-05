@@ -5,6 +5,7 @@
 #include "lp50xx-light.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -27,7 +28,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "lp50xx-regs.h"
-#include "src/ui/light/drivers/lp50xx-light/lp50xx_light-bind.h"
 
 namespace {
 

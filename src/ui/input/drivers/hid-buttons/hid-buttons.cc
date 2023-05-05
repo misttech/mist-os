@@ -4,6 +4,7 @@
 
 #include "hid-buttons.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -24,8 +25,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <hid/descriptor.h>
-
-#include "src/ui/input/drivers/hid-buttons/hid-buttons-bind.h"
 
 namespace buttons {
 

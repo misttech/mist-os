@@ -14,6 +14,7 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/phys-iter.h>
 #include <lib/zx/clock.h>
@@ -24,7 +25,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "sdhci-reg.h"
-#include "src/devices/block/drivers/sdhci/sdhci-bind.h"
 
 namespace {
 

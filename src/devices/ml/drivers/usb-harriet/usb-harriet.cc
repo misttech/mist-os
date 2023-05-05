@@ -5,13 +5,12 @@
 #include "usb-harriet.h"
 
 #include <fuchsia/hardware/usb/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 
 #include <fbl/alloc_checker.h>
 #include <usb/usb.h>
-
-#include "src/devices/ml/drivers/usb-harriet/usb_harriet_bind.h"
 
 namespace usb_harriet {
 

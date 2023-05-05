@@ -5,6 +5,7 @@
 #include "src/connectivity/ethernet/drivers/rndis-function/rndis_function.h"
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <zircon/status.h>
@@ -14,7 +15,6 @@
 #include <fbl/auto_lock.h>
 #include <usb/request-cpp.h>
 
-#include "src/connectivity/ethernet/drivers/rndis-function/rndis_function_bind.h"
 #include "src/connectivity/ethernet/lib/rndis/rndis.h"
 
 size_t RndisFunction::UsbFunctionInterfaceGetDescriptorsSize() { return sizeof(descriptors_); }

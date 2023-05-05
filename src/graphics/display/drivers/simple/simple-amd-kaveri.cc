@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
 #include "simple-display.h"
-#include "src/graphics/display/drivers/simple/simple-amd-kaveri-bind.h"
 
 // simple framebuffer device to match against an AMD Kaveri R7 device already
 // initialized from EFI

@@ -4,10 +4,9 @@
 
 #include "src/firmware/drivers/usb-fastboot-function/usb_fastboot_function.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/zircon-internal/align.h>
-
-#include "src/firmware/drivers/usb-fastboot-function/usb_fastboot_function-bind.h"
 
 namespace usb_fastboot_function {
 namespace {

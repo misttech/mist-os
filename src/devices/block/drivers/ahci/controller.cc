@@ -5,6 +5,7 @@
 #include "controller.h"
 
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -28,7 +29,6 @@
 
 #include "pci-bus.h"
 #include "sata.h"
-#include "src/devices/block/drivers/ahci/ahci_bind.h"
 
 namespace ahci {
 

@@ -5,13 +5,12 @@
 #include "tmp112.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
 #include <ddktl/fidl.h>
-
-#include "src/devices/temperature/drivers/tmp112/tmp112-bind.h"
 
 namespace temperature {
 

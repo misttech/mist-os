@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/clockimpl/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
@@ -16,8 +17,6 @@
 #include <soc/as370/as370-audio-regs.h>
 #include <soc/as370/as370-clk-regs.h>
 #include <soc/as370/as370-clk.h>
-
-#include "src/devices/clock/drivers/as370-clk/syn_clk_bind.h"
 
 namespace clk {
 

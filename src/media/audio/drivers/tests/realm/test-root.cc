@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
+
 #include <bind/fuchsia/test/audio/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <ddktl/device.h>
-
-#include "src/media/audio/drivers/tests/realm/test_root-bind.h"
 
 namespace audio {
 

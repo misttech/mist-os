@@ -4,12 +4,12 @@
 
 #include "src/devices/tests/node-group-test/drivers/leaf-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/node/group/test/lib/cpp/bind.h>
 
-#include "src/devices/tests/node-group-test/drivers/leaf-driver-bind.h"
 #include "src/devices/tests/node-group-test/drivers/node-group-driver.h"
 
 namespace bind_test = bind_node_group_test_lib;

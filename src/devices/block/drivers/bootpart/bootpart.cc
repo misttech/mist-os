@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -22,7 +23,6 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/block/drivers/bootpart/bootpart_bind.h"
 #include "src/devices/block/lib/common/include/common.h"
 
 namespace bootpart {

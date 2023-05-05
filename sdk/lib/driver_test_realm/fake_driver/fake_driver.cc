@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <ddktl/device.h>
+#include <lib/ddk/binding_driver.h>
 
-#include "sdk/lib/driver_test_realm/fake_driver/fake_driver-bind.h"
+#include <ddktl/device.h>
 
 namespace fake_driver {
 

@@ -4,13 +4,12 @@
 
 #include "src/devices/tests/node-group-test/drivers/root-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <bind/node/group/test/lib/cpp/bind.h>
-
-#include "src/devices/tests/node-group-test/drivers/root-driver-bind.h"
 
 namespace bind_test = bind_node_group_test_lib;
 

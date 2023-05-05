@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -30,7 +31,6 @@
 #include <ddktl/device.h>
 
 #include "lib/fidl/cpp/wire/connect_service.h"
-#include "src/devices/bus/drivers/pci/pci_bind.h"
 #include "zircon/system/ulib/async-loop/include/lib/async-loop/loop.h"
 
 namespace fpci = ::fuchsia_hardware_pci;

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fit/function.h>
@@ -18,7 +19,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
-#include "src/ui/input/drivers/goldfish_sensor/goldfish_sensor-bind.h"
 #include "src/ui/input/drivers/goldfish_sensor/input_device.h"
 #include "src/ui/input/drivers/goldfish_sensor/parser.h"
 #include "zircon/status.h"

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/virtio/driver_utils.h>
 #include <zircon/types.h>
 
 #include "src/graphics/display/drivers/virtio-guest/gpu.h"
-#include "src/graphics/display/drivers/virtio-guest/virtio_gpu_bind.h"
 
 static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {
   char flag[32];

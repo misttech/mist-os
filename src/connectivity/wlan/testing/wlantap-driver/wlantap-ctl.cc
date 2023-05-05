@@ -8,6 +8,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <zircon/fidl.h>
@@ -19,7 +20,6 @@
 #include <ddktl/fidl.h>
 #include <src/lib/fidl/cpp/include/lib/fidl/cpp/wire_natural_conversions.h>
 
-#include "src/connectivity/wlan/testing/wlantap-driver/wlantapctl_bind.h"
 #include "wlantap-phy.h"
 
 namespace {

@@ -4,6 +4,7 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 
@@ -11,7 +12,6 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
-#include "src/devices/usb/drivers/dwc3/dwc3_bind.h"
 
 namespace dwc3 {
 

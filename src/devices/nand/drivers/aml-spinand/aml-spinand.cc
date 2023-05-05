@@ -5,6 +5,7 @@
 #include "aml-spinand.h"
 
 #include <fuchsia/hardware/nandinfo/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -16,8 +17,6 @@
 #include <cstddef>
 
 #include <ddktl/device.h>
-
-#include "src/devices/nand/drivers/aml-spinand/aml-spinand-bind.h"
 
 namespace amlspinand {
 

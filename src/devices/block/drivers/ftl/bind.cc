@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 
@@ -10,7 +11,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "block_device.h"
-#include "src/devices/block/drivers/ftl/ftl_bind.h"
 
 namespace {
 

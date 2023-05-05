@@ -7,14 +7,13 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.google.ec/cpp/wire_types.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 
 #include <chromiumos-platform-ec/ec_commands.h>
-
-#include "src/devices/mcu/drivers/chromiumos-ec-lpc/chromiumos_ec_lpc_bind.h"
 
 namespace chromiumos_ec_lpc {
 namespace fcrosec = fuchsia_hardware_google_ec;

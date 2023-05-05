@@ -4,6 +4,7 @@
 
 #include "as370-thermal.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -14,7 +15,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "as370-thermal-reg.h"
-#include "src/devices/thermal/drivers/as370-thermal/as370-thermal-bind.h"
 
 namespace {
 

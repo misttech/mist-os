@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.manager.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -12,8 +13,6 @@
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/tests/isolateddevmgr/metadata-test-bind.h"
 
 class IsolatedDevMgrTestDriver;
 using DeviceType = ddk::Device<IsolatedDevMgrTestDriver,

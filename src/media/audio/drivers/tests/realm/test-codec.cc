@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/simple-codec/simple-codec-server.h>
-
-#include "src/media/audio/drivers/tests/realm/codec_test-bind.h"
 
 namespace audio {
 // Codec with good behavior.

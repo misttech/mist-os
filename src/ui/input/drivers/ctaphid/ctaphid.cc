@@ -6,6 +6,7 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.fido.report/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <zircon/status.h>
@@ -16,8 +17,6 @@
 #include <hid-parser/parser.h>
 #include <hid-parser/report.h>
 #include <hid-parser/usages.h>
-
-#include "src/ui/input/drivers/ctaphid/ctaphid_bind.h"
 
 namespace ctaphid {
 

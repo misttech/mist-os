@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.dsp/cpp/markers.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -24,7 +25,6 @@
 #include <soc/aml-common/aml-power-domain.h>
 
 #include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
-#include "src/media/audio/drivers/aml-dsp/aml_dsp_bind.h"
 
 namespace {
 

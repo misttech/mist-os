@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -24,8 +25,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/i2c/drivers/dw-i2c/dw_i2c-bind.h"
 
 namespace dw_i2c {
 

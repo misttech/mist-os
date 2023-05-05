@@ -4,12 +4,12 @@
 
 #include "sdio-function-device.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 
 #include <fbl/alloc_checker.h>
 
 #include "sdio-controller-device.h"
-#include "src/devices/block/drivers/sdmmc/sdmmc-bind.h"
 
 namespace sdmmc {
 

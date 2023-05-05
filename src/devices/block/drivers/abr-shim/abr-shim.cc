@@ -5,12 +5,12 @@
 #include "abr-shim.h"
 
 #include <lib/cksum.h>
+#include <lib/ddk/binding_driver.h>
 
 #include <memory>
 
 #include <fbl/auto_lock.h>
 
-#include "src/devices/block/drivers/abr-shim/abr-shim-bind.h"
 #include "src/storage/lib/paver/pinecrest_abr_avbab_conversion.h"
 
 // CRC32 implementation required for libabr.

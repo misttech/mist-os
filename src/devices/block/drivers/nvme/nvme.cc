@@ -4,6 +4,7 @@
 
 #include "src/devices/block/drivers/nvme/nvme.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -30,7 +31,6 @@
 #include "src/devices/block/drivers/nvme/commands/nvme-io.h"
 #include "src/devices/block/drivers/nvme/commands/queue.h"
 #include "src/devices/block/drivers/nvme/namespace.h"
-#include "src/devices/block/drivers/nvme/nvme_bind.h"
 #include "src/devices/block/drivers/nvme/registers.h"
 
 namespace nvme {

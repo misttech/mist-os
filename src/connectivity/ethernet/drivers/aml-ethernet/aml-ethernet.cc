@@ -5,6 +5,7 @@
 #include "aml-ethernet.h"
 
 #include <fuchsia/hardware/ethernet/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -22,7 +23,6 @@
 #include <soc/aml-s912/s912-hw.h>
 
 #include "aml-regs.h"
-#include "src/connectivity/ethernet/drivers/aml-ethernet/aml_eth-bind.h"
 
 namespace eth {
 

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <stdlib.h>
-
-#include "src/devices/bus/drivers/platform/test/test-child-3-bind.h"
 
 #define DRIVER_NAME "test-child-3"
 

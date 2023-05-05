@@ -4,6 +4,7 @@
 
 #include "aml-light.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -14,8 +15,6 @@
 #include <ddk/metadata/lights.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/ui/light/drivers/aml-light/aml_light_bind.h"
 
 namespace aml_light {
 

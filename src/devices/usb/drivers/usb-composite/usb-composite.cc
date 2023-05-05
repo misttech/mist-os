@@ -5,13 +5,13 @@
 #include "src/devices/usb/drivers/usb-composite/usb-composite.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <stdio.h>
 
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"
-#include "src/devices/usb/drivers/usb-composite/usb_composite_bind.h"
 
 namespace usb_composite {
 

@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -26,7 +27,6 @@
 #include <usb/usb-request.h>
 #include <usb/usb.h>
 
-#include "src/connectivity/bluetooth/hci/transport/usb/bt_transport_usb_bind.h"
 #include "src/lib/listnode/listnode.h"
 
 #define EVENT_REQ_COUNT 8

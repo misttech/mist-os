@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "audio-stream.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -19,8 +20,6 @@
 #include <utility>
 
 #include <pretty/hexdump.h>
-
-#include "src/media/audio/drivers/aml-g12-tdm/aml_tdm-bind.h"
 
 namespace audio {
 namespace aml_g12 {

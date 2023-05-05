@@ -5,6 +5,7 @@
 #include "alc5514.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -18,7 +19,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "alc5514-registers.h"
-#include "src/media/audio/drivers/codecs/alc5514/alc5514_bind.h"
 
 namespace audio {
 namespace alc5514 {

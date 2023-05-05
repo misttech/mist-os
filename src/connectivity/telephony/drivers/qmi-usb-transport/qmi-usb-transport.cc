@@ -5,6 +5,7 @@
 #include "qmi-usb-transport.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
@@ -20,8 +21,6 @@
 #include <fbl/mutex.h>
 #include <usb/cdc.h>
 #include <usb/usb.h>
-
-#include "src/connectivity/telephony/drivers/qmi-usb-transport/qmi_usb_bind.h"
 
 #ifndef _ALL_SOURCE
 #define _ALL_SOURCE

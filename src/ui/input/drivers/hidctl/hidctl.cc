@@ -5,6 +5,7 @@
 #include "hidctl.h"
 
 #include <fidl/fuchsia.hardware.hidctl/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -18,8 +19,6 @@
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <pretty/hexdump.h>
-
-#include "src/ui/input/drivers/hidctl/hidctl_bind.h"
 
 namespace hidctl {
 

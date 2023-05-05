@@ -4,6 +4,7 @@
 
 #include "clock.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -13,8 +14,6 @@
 
 #include <ddk/metadata/clock.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/clock/drivers/clock/clock-bind.h"
 
 zx_status_t ClockDevice::ClockEnable() { return clock_.Enable(id_); }
 

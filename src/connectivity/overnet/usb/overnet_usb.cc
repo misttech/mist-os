@@ -5,6 +5,7 @@
 #include "src/connectivity/overnet/usb/overnet_usb.h"
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <zircon/errors.h>
@@ -26,7 +27,6 @@
 #include "lib/async/cpp/wait.h"
 #include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl/cpp/wire/internal/transport.h"
-#include "src/connectivity/overnet/usb/overnet_usb_bind.h"
 
 static constexpr uint8_t kOvernetMagic[] = "OVERNET USB\xff\x00\xff\x00\xff";
 static constexpr size_t kOvernetMagicSize = sizeof(kOvernetMagic) - 1;

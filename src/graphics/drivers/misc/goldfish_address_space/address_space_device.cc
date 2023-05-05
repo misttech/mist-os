@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
@@ -22,8 +23,6 @@
 
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
-
-#include "src/graphics/drivers/misc/goldfish_address_space/goldfish_address_space-bind.h"
 
 namespace goldfish {
 namespace {

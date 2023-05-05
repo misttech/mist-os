@@ -4,11 +4,10 @@
 
 #include "ufs.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
-
-#include "src/devices/block/drivers/ufs/ufs_bind.h"
 
 namespace ufs {
 

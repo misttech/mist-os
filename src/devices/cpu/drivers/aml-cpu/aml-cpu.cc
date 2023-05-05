@@ -4,6 +4,7 @@
 
 #include "aml-cpu.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -17,8 +18,6 @@
 
 #include <ddktl/fidl.h>
 #include <fbl/string_buffer.h>
-
-#include "src/devices/cpu/drivers/aml-cpu/aml-cpu-bind.h"
 
 namespace amlogic_cpu {
 

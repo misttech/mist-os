@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/uart/ns8250.h>
@@ -14,8 +15,6 @@
 #include <zircon/types.h>
 
 #include <algorithm>
-
-#include "src/devices/serial/drivers/uart16550/uart16550_bind.h"
 
 // The register types and constants are defined in the uart library.
 using namespace uart::ns8250;

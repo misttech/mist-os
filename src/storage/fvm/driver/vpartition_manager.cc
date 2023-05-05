@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -37,7 +38,6 @@
 #include <safemath/clamped_math.h>
 
 #include "src/lib/uuid/uuid.h"
-#include "src/storage/fvm/driver/fvm_bind.h"
 #include "src/storage/fvm/driver/slice_extent.h"
 #include "src/storage/fvm/driver/vpartition.h"
 #include "src/storage/fvm/format.h"

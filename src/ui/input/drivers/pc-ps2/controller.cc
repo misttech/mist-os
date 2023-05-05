@@ -4,6 +4,7 @@
 
 #include "controller.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
 #include <lib/fit/defer.h>
@@ -11,7 +12,6 @@
 
 #include "src/ui/input/drivers/pc-ps2/commands.h"
 #include "src/ui/input/drivers/pc-ps2/device.h"
-#include "src/ui/input/drivers/pc-ps2/i8042_bind.h"
 #include "src/ui/input/drivers/pc-ps2/registers.h"
 
 #ifdef PS2_TEST

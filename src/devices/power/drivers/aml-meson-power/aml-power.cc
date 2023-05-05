@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -14,8 +15,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <soc/aml-common/aml-pwm-regs.h>
-
-#include "src/devices/power/drivers/aml-meson-power/aml-meson-power-bind.h"
 
 namespace power {
 

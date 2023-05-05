@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -25,7 +26,6 @@
 
 #include "src/devices/lib/acpi/client.h"
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
-#include "src/graphics/drivers/misc/goldfish/goldfish-bind.h"
 #include "src/graphics/drivers/misc/goldfish/instance.h"
 #include "zircon/status.h"
 

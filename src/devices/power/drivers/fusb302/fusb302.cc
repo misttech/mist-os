@@ -5,6 +5,7 @@
 #include "src/devices/power/drivers/fusb302/fusb302.h"
 
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/profile.h>
@@ -24,7 +25,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/string_buffer.h>
 
-#include "src/devices/power/drivers/fusb302/fusb302-bind.h"
 #include "src/devices/power/drivers/fusb302/fusb302-controls.h"
 #include "src/devices/power/drivers/fusb302/pd-sink-state-machine.h"
 #include "src/devices/power/drivers/fusb302/registers.h"

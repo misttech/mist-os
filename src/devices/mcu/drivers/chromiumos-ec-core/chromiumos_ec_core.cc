@@ -7,13 +7,13 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.google.ec/cpp/wire_types.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <zircon/errors.h>
 
 #include <chromiumos-platform-ec/ec_commands.h>
 
-#include "src/devices/mcu/drivers/chromiumos-ec-core/chromiumos_ec_core_bind.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/subdriver.h"
 
 namespace chromiumos_ec_core {

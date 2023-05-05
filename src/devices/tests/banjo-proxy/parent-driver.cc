@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -11,8 +12,6 @@
 
 #include <ddktl/device.h>
 #include <ddktl/unbind-txn.h>
-
-#include "src/devices/tests/banjo-proxy/parent-driver-bind.h"
 
 namespace {
 

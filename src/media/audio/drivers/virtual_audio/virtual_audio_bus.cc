@@ -1,10 +1,10 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_bind.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_control_impl.h"
 
 // Define a bus driver that binds to /dev/sys/platform/00:00:2f/virtual_audio.

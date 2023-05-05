@@ -4,8 +4,9 @@
 
 #include "src/connectivity/ethernet/drivers/gvnic/gvnic.h"
 
+#include <lib/ddk/binding_driver.h>
+
 #include "src/connectivity/ethernet/drivers/gvnic/abi.h"
-#include "src/connectivity/ethernet/drivers/gvnic/gvnic-bind.h"
 
 #define DIV_ROUND_UP(a, b) (((a) + (b)-1) / (b))
 #define ROUND_UP(a, b) (DIV_ROUND_UP(a, b) * b)

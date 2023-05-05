@@ -4,12 +4,11 @@
 
 #include "pwm.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/pwm/drivers/pwm/pwm-bind.h"
 
 namespace pwm {
 

@@ -10,6 +10,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
@@ -38,7 +39,6 @@
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "lib/fidl/cpp/wire/traits.h"
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
-#include "src/graphics/display/drivers/goldfish-display/goldfish-display-bind.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"

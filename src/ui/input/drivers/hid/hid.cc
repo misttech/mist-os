@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <fuchsia/hardware/hidbus/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -26,7 +27,6 @@
 
 #include "fuchsia/hardware/hiddevice/c/banjo.h"
 #include "src/ui/input/drivers/hid/hid-instance.h"
-#include "src/ui/input/drivers/hid/hid_bind.h"
 
 namespace hid_driver {
 

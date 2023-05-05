@@ -4,10 +4,10 @@
 
 #include "src/devices/tests/fidl-bindlib-generation/parent-driver/parent_driver.h"
 
+#include <lib/ddk/binding_driver.h>
+
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <bind/fuchsia/tools/bindc/test/cpp/bind.h>
-
-#include "src/devices/tests/fidl-bindlib-generation/parent-driver/parent_driver-bind.h"
 
 namespace parent_driver {
 

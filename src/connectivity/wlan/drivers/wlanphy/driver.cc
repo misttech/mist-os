@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <zircon/status.h>
@@ -16,7 +17,6 @@
 
 #include "debug.h"
 #include "device.h"
-#include "src/connectivity/wlan/drivers/wlanphy/wlanphy-bind.h"
 
 // Not guarded by a mutex, because it will be valid between .init and .release and nothing else will
 // exist outside those two calls.

@@ -5,6 +5,7 @@
 #include "cadence-hpnfc.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -17,7 +18,6 @@
 #include <fbl/auto_lock.h>
 
 #include "cadence-hpnfc-reg.h"
-#include "src/devices/nand/drivers/cadence-hpnfc/cadence-hpnfc-bind.h"
 
 namespace {
 

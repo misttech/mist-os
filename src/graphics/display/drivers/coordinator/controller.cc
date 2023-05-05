@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
@@ -32,7 +33,6 @@
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
-#include "src/graphics/display/drivers/coordinator/coordinator-bind.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"

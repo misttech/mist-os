@@ -6,6 +6,7 @@
 
 #include <endian.h>
 #include <fuchsia/hardware/spiimpl/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -25,7 +26,6 @@
 #include <fbl/auto_lock.h>
 
 #include "registers.h"
-#include "src/devices/spi/drivers/aml-spi/aml_spi_bind.h"
 
 namespace spi {
 

@@ -5,6 +5,7 @@
 #include "src/ui/backlight/drivers/vim3-pwm-backlight/vim3-pwm-backlight.h"
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -16,8 +17,6 @@
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <soc/aml-common/aml-pwm-regs.h>
-
-#include "src/ui/backlight/drivers/vim3-pwm-backlight/vim3-pwm-backlight-bind.h"
 
 namespace vim3_pwm_backlight {
 

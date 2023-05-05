@@ -4,6 +4,7 @@
 
 #include "aml-uart.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -23,7 +24,6 @@
 #include <hwreg/mmio.h>
 
 #include "registers.h"
-#include "src/devices/serial/drivers/aml-uart/aml_uart_bind.h"
 
 namespace serial {
 

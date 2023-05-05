@@ -4,7 +4,7 @@
 
 #include "src/devices/tests/nonbindable/nonbindable.h"
 
-#include "src/devices/tests/nonbindable/nonbindable-bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace auto_bind {
 

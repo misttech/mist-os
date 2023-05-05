@@ -4,6 +4,7 @@
 
 #include "aml-i2c.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
@@ -18,7 +19,6 @@
 #include <soc/aml-common/aml-i2c.h>
 
 #include "aml-i2c-regs.h"
-#include "src/devices/i2c/drivers/aml-i2c/aml_i2c_bind.h"
 
 namespace {
 

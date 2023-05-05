@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -23,7 +24,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/drivers/aml-canvas/aml_canvas-bind.h"
 #include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 
 namespace aml_canvas {

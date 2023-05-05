@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -27,7 +28,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
-#include "src/devices/usb/drivers/vim3-usb-phy/vim3_usb_phy_bind.h"
 
 namespace vim3_usb_phy {
 

@@ -5,6 +5,7 @@
 #include "tas27xx.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
@@ -15,8 +16,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/media/audio/drivers/codecs/tas27xx/ti_tas27xx-bind.h"
 
 namespace audio {
 

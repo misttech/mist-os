@@ -5,6 +5,7 @@
 #include "as370-gpio.h"
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -14,7 +15,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "as370-gpio-reg.h"
-#include "src/devices/gpio/drivers/as370-gpio/as370-gpio-bind.h"
 
 namespace {
 

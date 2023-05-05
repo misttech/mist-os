@@ -10,6 +10,7 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -31,7 +32,6 @@
 
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/devices/usb/drivers/aml-usb-crg-phy-v2/aml_usb_crg_phy_bind.h"
 #include "src/devices/usb/drivers/aml-usb-crg-phy-v2/usb-phy-regs.h"
 
 namespace aml_usb_crg_phy {
@@ -54,8 +54,7 @@ class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
 
       for (size_t c = 0; c < kRegisterCount; c++) {
         (*regions_[i])[c * sizeof(uint32_t)].SetReadCallback(
-            [this, i, c]() { return reg_values_[i][c]; }
-        );
+            [this, i, c]() { return reg_values_[i][c]; });
 
         (*regions_[i])[c * sizeof(uint32_t)].SetWriteCallback([this, i, c](uint64_t value) {
           reg_values_[i][c] = value;

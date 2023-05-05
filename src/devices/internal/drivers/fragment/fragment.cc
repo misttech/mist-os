@@ -4,6 +4,7 @@
 
 #include "src/devices/internal/drivers/fragment/fragment.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/fragment-device.h>
 #include <lib/ddk/trace/event.h>
@@ -18,7 +19,6 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/devices/internal/drivers/fragment/fragment-bind.h"
 #include "src/devices/internal/drivers/fragment/proxy-protocol.h"
 
 namespace fragment {

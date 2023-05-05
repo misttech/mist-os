@@ -4,13 +4,13 @@
 
 #include "fake_bus_driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
 
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/device.h"
 #include "src/devices/bus/drivers/pci/test/driver/driver_tests.h"
-#include "src/devices/bus/drivers/pci/test/driver/fake_pci_bus_driver_bind.h"
 #include "src/devices/bus/drivers/pci/test/fakes/test_device.h"
 
 namespace pci {

@@ -7,13 +7,13 @@
 #include <bind/fuchsia/compat/cpp/bind.h>
 #define ZX_PROTOCOL_PARENT bind_fuchsia_compat::BIND_PROTOCOL_PARENT
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
 #include <bind/fuchsia/test/cpp/bind.h>
 
-#include "src/devices/tests/v2/compat-node-group/root/root-bind.h"
 #include "src/devices/tests/v2/compat-node-group/root/root.h"
 
 namespace root {

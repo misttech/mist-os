@@ -4,6 +4,7 @@
 
 #include "rtl8211f.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -15,7 +16,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "mdio-regs.h"
-#include "src/connectivity/ethernet/drivers/realtek-8211f/rtl8211f-bind.h"
 
 namespace phy {
 

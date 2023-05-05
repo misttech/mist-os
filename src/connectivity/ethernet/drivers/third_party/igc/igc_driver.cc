@@ -14,11 +14,10 @@
 #include "igc_driver.h"
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <zircon/status.h>
 
 #include <fbl/auto_lock.h>
-
-#include "src/connectivity/ethernet/drivers/third_party/igc/igc_bind.h"
 
 namespace ethernet {
 namespace igc {

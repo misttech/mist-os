@@ -4,6 +4,7 @@
 
 #include "hdmi-codec.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -11,7 +12,6 @@
 #include <fbl/auto_lock.h>
 
 #include "hdmi-stream.h"
-#include "src/media/audio/drivers/intel-hda/codecs/hdmi/hdmi_ihda_codec-bind.h"
 
 namespace audio {
 namespace intel_hda {

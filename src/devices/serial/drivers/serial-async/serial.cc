@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/function.h>
 #include <lib/zx/handle.h>
@@ -17,8 +18,6 @@
 #include <memory>
 
 #include <fbl/auto_lock.h>
-
-#include "src/devices/serial/drivers/serial-async/serial_bind.h"
 
 namespace serial {
 

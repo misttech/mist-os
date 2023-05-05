@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/goldfish/sync/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/event.h>
@@ -14,8 +15,6 @@
 #include <unordered_set>
 
 #include <ddktl/device.h>
-
-#include "src/devices/bus/drivers/platform/test/test-goldfish-sync-bind.h"
 
 #define DRIVER_NAME "test-goldfish-sync"
 

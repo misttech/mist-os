@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.spi/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -16,7 +17,6 @@
 #include <memory>
 
 #include "registers.h"
-#include "src/devices/spi/drivers/intel-gspi/intel_gspi_bind.h"
 
 namespace gspi {
 namespace {

@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/pwm/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -21,7 +22,6 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
-#include "src/devices/bus/drivers/platform/test/test-composite-bind.h"
 #include "src/devices/bus/drivers/platform/test/test-metadata.h"
 
 #define DRIVER_NAME "test-composite"

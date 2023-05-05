@@ -4,13 +4,13 @@
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_control_impl.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 
 #include <ddktl/fidl.h>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_bind.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
 
 namespace virtual_audio {

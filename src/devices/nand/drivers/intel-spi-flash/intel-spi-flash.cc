@@ -5,6 +5,7 @@
 #include "intel-spi-flash.h"
 
 #include <fuchsia/hardware/nandinfo/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -18,7 +19,6 @@
 #include <safemath/checked_math.h>
 
 #include "src/devices/nand/drivers/intel-spi-flash/flash-chips.h"
-#include "src/devices/nand/drivers/intel-spi-flash/intel_spi_flash_bind.h"
 #include "src/devices/nand/drivers/intel-spi-flash/registers.h"
 
 // This driver is written against the "7th and 8th Generation Intel® Processor Family I/O for U/Y

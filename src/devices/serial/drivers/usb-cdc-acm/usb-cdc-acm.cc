@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 
@@ -14,8 +15,6 @@
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
-
-#include "src/devices/serial/drivers/usb-cdc-acm/cdc_acm_bind.h"
 
 namespace usb_cdc_acm_serial {
 

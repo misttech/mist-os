@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async/default.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdf/dispatcher.h>
@@ -21,7 +22,6 @@
 #include <ddktl/fidl.h>
 
 #include "log.h"
-#include "src/devices/securemem/drivers/aml-securemem/aml-securemem-bind.h"
 
 namespace amlogic_secure_mem {
 

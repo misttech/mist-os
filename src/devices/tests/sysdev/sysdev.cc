@@ -4,6 +4,7 @@
 
 #include "src/devices/tests/sysdev/sysdev.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -17,8 +18,6 @@
 #include <memory>
 
 #include <ddktl/device.h>
-
-#include "src/devices/tests/sysdev/sysdev-bind.h"
 
 namespace {
 

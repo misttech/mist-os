@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "audio-stream.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -19,7 +20,6 @@
 
 #include <pretty/hexdump.h>
 
-#include "src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp/aml_tdm-bind.h"
 #include "src/media/lib/memory_barriers/memory_barriers.h"
 
 namespace {

@@ -5,6 +5,7 @@
 #include "max98927.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -15,7 +16,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "max98927-registers.h"
-#include "src/media/audio/drivers/codecs/max98927/max98927_bind.h"
 
 namespace audio {
 namespace max98927 {

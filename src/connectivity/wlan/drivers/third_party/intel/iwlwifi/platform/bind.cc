@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <zircon/errors.h>
@@ -10,7 +11,6 @@
 #include <wlan/drivers/log_instance.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/debug.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/iwlwifi-bind.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-device.h"
 
 // Currently the Intel wlan driver only supports PCIe. When we add support for other forms of

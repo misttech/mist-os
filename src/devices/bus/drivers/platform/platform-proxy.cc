@@ -4,6 +4,7 @@
 
 #include "src/devices/bus/drivers/platform/platform-proxy.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/zircon-internal/align.h>
 #include <stdint.h>
@@ -16,8 +17,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/bus/drivers/platform/platform-bus-bind.h"
 
 namespace platform_bus {
 

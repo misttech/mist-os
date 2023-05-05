@@ -5,6 +5,7 @@
 #include "tcs3400.h"
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -19,7 +20,6 @@
 #include <ddktl/metadata/light-sensor.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/light-sensor/drivers/ams-light/tcs3400_light_bind.h"
 #include "tcs3400-regs.h"
 
 namespace {

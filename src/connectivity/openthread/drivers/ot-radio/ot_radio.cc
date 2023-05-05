@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -27,7 +28,6 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/connectivity/openthread/drivers/ot-radio/ot_radio_bind.h"
 #include "src/connectivity/openthread/drivers/ot-radio/ot_radio_bootloader.h"
 
 namespace ot {

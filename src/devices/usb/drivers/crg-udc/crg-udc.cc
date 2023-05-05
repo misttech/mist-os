@@ -4,6 +4,7 @@
 
 #include "src/devices/usb/drivers/crg-udc/crg-udc.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +22,6 @@
 #include <usb/usb-request.h>
 #include <usb/usb.h>
 
-#include "src/devices/usb/drivers/crg-udc/crg_udc_bind.h"
 #include "src/devices/usb/drivers/crg-udc/crg_udc_regs.h"
 
 namespace crg_udc {

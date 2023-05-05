@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/vmo.h>
@@ -28,7 +29,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "lib/ddk/driver.h"
-#include "src/devices/block/drivers/gpt/gpt_bind.h"
 #include "src/devices/block/lib/common/include/common.h"
 #include "zircon/errors.h"
 #include "zircon/status.h"

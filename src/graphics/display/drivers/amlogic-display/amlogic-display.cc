@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -32,7 +33,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/drivers/amlogic-display/amlogic-display-bind.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"

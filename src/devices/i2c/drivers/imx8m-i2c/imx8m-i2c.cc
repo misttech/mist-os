@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -26,8 +27,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/i2c/drivers/imx8m-i2c/imx8m-i2c-bind.h"
 
 namespace imx8m_i2c {
 

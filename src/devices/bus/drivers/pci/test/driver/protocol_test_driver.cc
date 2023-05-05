@@ -4,6 +4,7 @@
 #include "protocol_test_driver.h"
 
 #include <fidl/fuchsia.device.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/clock.h>
@@ -23,7 +24,6 @@
 #include "src/devices/bus/drivers/pci/capabilities/msi.h"
 #include "src/devices/bus/drivers/pci/common.h"
 #include "src/devices/bus/drivers/pci/config.h"
-#include "src/devices/bus/drivers/pci/test/driver/pci_protocol_test_driver_bind.h"
 #include "src/devices/bus/drivers/pci/test/fakes/test_device.h"
 
 namespace fpci = fuchsia_hardware_pci;

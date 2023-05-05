@@ -4,10 +4,9 @@
 
 #include "src/devices/tests/runtime-composite-test/drivers/composite-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-
-#include "src/devices/tests/runtime-composite-test/drivers/composite-driver-bind.h"
 
 namespace frct = fuchsia_runtime_composite_test;
 

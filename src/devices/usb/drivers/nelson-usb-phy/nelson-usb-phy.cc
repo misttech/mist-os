@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/nelson-usb-phy/nelson-usb-phy.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -19,7 +20,6 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-g12-reset.h>
 
-#include "src/devices/usb/drivers/nelson-usb-phy/nelson_usb_phy_bind.h"
 #include "src/devices/usb/drivers/nelson-usb-phy/usb-phy-regs.h"
 
 namespace nelson_usb_phy {

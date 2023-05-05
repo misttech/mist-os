@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -11,8 +12,6 @@
 #include <memory>
 
 #include <ddktl/device.h>
-
-#include "src/devices/misc/drivers/test-parent/test-parent-bind.h"
 
 namespace {
 

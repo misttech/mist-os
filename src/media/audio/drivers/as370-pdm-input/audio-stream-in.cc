@@ -4,6 +4,7 @@
 
 #include "audio-stream-in.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -11,8 +12,6 @@
 
 #include <optional>
 #include <utility>
-
-#include "src/media/audio/drivers/as370-pdm-input/as370_audio_in_bind.h"
 
 namespace audio {
 namespace as370 {

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.device.test/cpp/wire.h>
 #include <fuchsia/hardware/test/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -20,8 +21,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-
-#include "src/devices/misc/drivers/test/test_bind.h"
 
 namespace {
 

@@ -4,6 +4,7 @@
 
 #include "aml-nna.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +22,6 @@
 
 #include "a5-nna-regs.h"
 #include "s905d3-nna-regs.h"
-#include "src/devices/ml/drivers/aml-nna/aml_nna_bind.h"
 #include "t931-nna-regs.h"
 
 namespace {

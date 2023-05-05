@@ -20,7 +20,8 @@
 #include <memory>
 
 #if CONFIG_BRCMFMAC_SDIO
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmfmac_sdio_bind.h"  // nogncheck
+#include <lib/ddk/binding_driver.h>  // nogncheck
+
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"  // nogncheck
 #endif  // CONFIG_BRCMFMAC_SDIO
 

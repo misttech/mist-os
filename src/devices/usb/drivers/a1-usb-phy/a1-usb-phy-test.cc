@@ -9,6 +9,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -31,7 +32,6 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/devices/usb/drivers/a1-usb-phy/a1_usb_phy_bind.h"
 #include "src/devices/usb/drivers/a1-usb-phy/usb-phy-regs.h"
 
 namespace a1_usb_phy {

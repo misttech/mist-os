@@ -5,6 +5,7 @@
 #include "log-tester.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -18,8 +19,6 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/diagnostics/validator/logs/ddk/log-test-driver/log-test-bind.h"
 
 namespace log_test_driver {
 

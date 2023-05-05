@@ -4,10 +4,9 @@
 
 #include "ti-tca6408a.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-
-#include "src/devices/gpio/drivers/ti-tca6408a/ti-tca6408a-bind.h"
 
 namespace {
 

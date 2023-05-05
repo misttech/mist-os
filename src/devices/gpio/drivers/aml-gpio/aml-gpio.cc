@@ -4,6 +4,7 @@
 
 #include "aml-gpio.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -18,7 +19,6 @@
 #include "a5-blocks.h"
 #include "fidl/fuchsia.hardware.platform.bus/cpp/markers.h"
 #include "s905d2-blocks.h"
-#include "src/devices/gpio/drivers/aml-gpio/aml-gpio-bind.h"
 
 namespace {
 

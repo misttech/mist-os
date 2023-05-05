@@ -4,6 +4,7 @@
 
 #include "src/devices/usb/drivers/usb-bus/usb-bus.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/sync/completion.h>
 #include <stdio.h>
@@ -13,7 +14,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/usb/drivers/usb-bus/usb-device.h"
-#include "src/devices/usb/drivers/usb-bus/usb_bus_bind.h"
 
 namespace usb_bus {
 

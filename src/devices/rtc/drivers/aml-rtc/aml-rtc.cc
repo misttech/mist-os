@@ -5,6 +5,7 @@
 #include "src/devices/rtc/drivers/aml-rtc/aml-rtc.h"
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -17,7 +18,6 @@
 
 #include <ddktl/fidl.h>
 
-#include "src/devices/rtc/drivers/aml-rtc/aml_rtc_bind.h"
 #include "src/devices/rtc/lib/rtc/include/librtc_llcpp.h"
 
 namespace rtc {

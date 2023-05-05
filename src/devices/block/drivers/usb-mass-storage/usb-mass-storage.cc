@@ -5,6 +5,7 @@
 #include "usb-mass-storage.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/scsi/controller.h>
@@ -17,8 +18,6 @@
 #include <fbl/auto_lock.h>
 #include <usb/ums.h>
 #include <usb/usb.h>
-
-#include "src/devices/block/drivers/usb-mass-storage/usb_mass_storage_bind.h"
 
 namespace ums {
 namespace {

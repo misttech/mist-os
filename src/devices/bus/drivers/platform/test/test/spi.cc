@@ -4,6 +4,7 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -11,8 +12,6 @@
 #include <memory>
 
 #include <ddktl/device.h>
-
-#include "src/devices/bus/drivers/platform/test/test-spi-bind.h"
 
 #define DRIVER_NAME "test-spi"
 

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
@@ -10,8 +11,6 @@
 #include <bind/bindlib/codegen/testlib/cpp/bind.h>
 #include <bind/bindlibparent/codegen/testlib/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-
-#include "src/devices/tests/bindlib-codegen-test/parent-driver-bind.h"
 
 namespace lib = bind_bindlib_codegen_testlib;
 namespace parent = bind_bindlibparent_codegen_testlib;

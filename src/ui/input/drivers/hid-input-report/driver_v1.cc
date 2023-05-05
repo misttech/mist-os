@@ -4,7 +4,7 @@
 
 #include "driver_v1.h"
 
-#include "src/ui/input/drivers/hid-input-report/hid_input_report_bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace hid_input_report_dev {
 

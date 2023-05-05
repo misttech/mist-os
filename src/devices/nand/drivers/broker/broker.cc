@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.nand/cpp/wire.h>
 #include <fuchsia/hardware/nand/c/banjo.h>
 #include <fuchsia/hardware/nand/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/sync/completion.h>
 #include <stdio.h>
@@ -18,7 +19,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/lib/nand/nand.h"
-#include "src/devices/nand/drivers/broker/nand-broker-bind.h"
 
 namespace {
 

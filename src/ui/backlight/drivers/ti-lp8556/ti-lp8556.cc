@@ -4,6 +4,7 @@
 #include "ti-lp8556.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -18,7 +19,6 @@
 #include <fbl/alloc_checker.h>
 #include <pretty/hexdump.h>
 
-#include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556-bind.h"
 #include "ti-lp8556Metadata.h"
 
 namespace ti {

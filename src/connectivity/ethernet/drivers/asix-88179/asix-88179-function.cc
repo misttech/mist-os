@@ -6,6 +6,7 @@
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -30,7 +31,6 @@
 #include <usb/usb.h>
 
 #include "asix-88179-regs.h"
-#include "src/connectivity/ethernet/drivers/asix-88179/fake_usb_ax88179-bind.h"
 
 namespace fake_usb_ax88179_function {
 namespace {

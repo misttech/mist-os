@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "dai.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -16,8 +17,6 @@
 #include <utility>
 
 #include <fbl/algorithm.h>
-
-#include "src/media/audio/drivers/aml-g12-tdm/aml_tdm_dai_bind.h"
 
 namespace audio::aml_g12 {
 

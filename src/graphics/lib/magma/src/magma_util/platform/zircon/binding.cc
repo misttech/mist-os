@@ -7,7 +7,7 @@
 #ifndef TEST
 #include "bind.h"  //nogncheck
 #else
-#include "test_bind.h"  //nogncheck
+#include <lib/ddk/binding_driver.h>  //nogncheck
 #endif
 
 extern struct zx_driver_ops msd_driver_ops;

@@ -5,6 +5,7 @@
 #include "optee-controller.h"
 
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
@@ -31,7 +32,6 @@
 #include "ddktl/suspend-txn.h"
 #include "optee-client.h"
 #include "optee-util.h"
-#include "src/devices/tee/drivers/optee/optee-bind.h"
 #include "src/devices/tee/drivers/optee/tee-smc.h"
 
 namespace optee {

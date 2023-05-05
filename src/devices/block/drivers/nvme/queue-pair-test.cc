@@ -4,6 +4,7 @@
 
 #include "src/devices/block/drivers/nvme/queue-pair.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
@@ -13,7 +14,6 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
-#include "src/devices/block/drivers/nvme/nvme_bind.h"
 #include "src/devices/block/drivers/nvme/registers.h"
 
 namespace nvme {

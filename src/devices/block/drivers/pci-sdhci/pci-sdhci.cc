@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/sdhci/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -17,8 +18,6 @@
 #include <threads.h>
 #include <unistd.h>
 #include <zircon/status.h>
-
-#include "src/devices/block/drivers/pci-sdhci/pci-sdhci-bind.h"
 
 #define HOST_CONTROL1_OFFSET 0x28
 #define SDHCI_EMMC_HW_RESET (1 << 12)

@@ -4,6 +4,7 @@
 
 #include "tas5707.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/simple-codec/simple-codec-helper.h>
@@ -14,8 +15,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/media/audio/drivers/codecs/tas5707/ti_tas5707-bind.h"
 
 namespace {
 constexpr uint8_t kRegClockCtrl = 0x00;

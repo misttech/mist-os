@@ -5,14 +5,13 @@
 #include "as370-power.h"
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
 #include <fbl/alloc_checker.h>
 #include <soc/as370/as370-power.h>
-
-#include "src/devices/power/drivers/as370-power/as370_power-bind.h"
 
 namespace {
 enum As370RegulatorType { BUCK = 1 };

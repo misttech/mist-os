@@ -5,14 +5,13 @@
 #include "src/devices/nand/drivers/aml-rawnand/aml-rawnand.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 
 #include <algorithm>
 #include <memory>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/nand/drivers/aml-rawnand/aml-rawnand-bind.h"
 
 namespace amlrawnand {
 

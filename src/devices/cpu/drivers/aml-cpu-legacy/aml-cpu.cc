@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -22,7 +23,6 @@
 #include <soc/aml-common/aml-cpu-metadata.h>
 
 #include "fidl/fuchsia.hardware.thermal/cpp/wire.h"
-#include "src/devices/cpu/drivers/aml-cpu-legacy/aml-cpu-legacy-bind.h"
 
 namespace {
 using fuchsia_device::wire::kMaxDevicePerformanceStates;

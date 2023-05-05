@@ -114,7 +114,7 @@ The driver can now include the generated header and declare itself with the
 following macro. `"zircon"` is the vendor id and `"0.1"` is the driver version.
 
 ```c
-#include "src/devices/block/drivers/ahci/ahci-bind.h"
+#include <lib/ddk/binding_driver.h>
 ...
 ZIRCON_DRIVER(ahci, ahci_driver_ops, "zircon", "0.1");
 ```

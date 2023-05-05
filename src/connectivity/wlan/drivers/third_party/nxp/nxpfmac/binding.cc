@@ -20,9 +20,10 @@
 #include <memory>
 
 #if CONFIG_NXPFMAC_SDIO
-#include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/nxpfmac_sdio_bind.h"
+#include <lib/ddk/binding_driver.h>
+
 #include "sdio/sdio_device.h"
-#endif // CONFIG_NXPFMAC_SDIO
+#endif  // CONFIG_NXPFMAC_SDIO
 
 static constexpr zx_driver_ops_t nxpfmac_driver_ops = {
     .version = DRIVER_OPS_VERSION,
@@ -30,7 +31,7 @@ static constexpr zx_driver_ops_t nxpfmac_driver_ops = {
         [](void* ctx, zx_device_t* device) {
 #if CONFIG_NXPFMAC_SDIO
           return ::wlan::nxpfmac::SdioDevice::Create(device);
-#endif // CONFIG_NXPFMAC_SDIO
+#endif  // CONFIG_NXPFMAC_SDIO
         },
 };
 

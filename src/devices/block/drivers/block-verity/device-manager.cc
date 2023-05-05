@@ -5,6 +5,7 @@
 #include "src/devices/block/drivers/block-verity/device-manager.h"
 
 #include <fidl/fuchsia.hardware.block.verified/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -21,7 +22,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/macros.h>
 
-#include "src/devices/block/drivers/block-verity/block-verity-bind.h"
 #include "src/devices/block/drivers/block-verity/config.h"
 #include "src/devices/block/drivers/block-verity/device.h"
 #include "src/devices/block/drivers/block-verity/superblock-verifier.h"

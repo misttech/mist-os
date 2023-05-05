@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.driver.test.logger/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,8 +15,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/tests/device-watcher/test-driver-bind.h"
 
 class TestDriver;
 using DeviceType =

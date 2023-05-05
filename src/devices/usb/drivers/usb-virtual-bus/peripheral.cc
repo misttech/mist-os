@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/usb-virtual-bus/peripheral.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,8 +19,6 @@
 #include <vector>
 
 #include <usb/peripheral.h>
-
-#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus-tester-function-bind.h"
 
 namespace virtualbus {
 

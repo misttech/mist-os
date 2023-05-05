@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fidl.examples.echo/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -12,8 +13,6 @@
 
 #include <ddktl/device.h>
 #include <ddktl/unbind-txn.h>
-
-#include "src/devices/tests/fidl-service/child-driver-bind.h"
 
 namespace {
 

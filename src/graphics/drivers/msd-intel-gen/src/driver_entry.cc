@@ -31,7 +31,7 @@
 #include "sys_driver_cpp/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
-#include "test_bind.h"  //nogncheck
+#include <lib/ddk/binding_driver.h>  //nogncheck
 #else
 #include "bind.h"  //nogncheck
 #endif

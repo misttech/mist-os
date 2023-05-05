@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -50,7 +51,6 @@
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/fuse-config.h"
 #include "src/graphics/display/drivers/intel-i915/hdmi-display.h"
-#include "src/graphics/display/drivers/intel-i915/intel-i915-bind.h"
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/pipe-manager.h"

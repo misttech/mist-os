@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <stdio.h>
@@ -20,8 +21,6 @@
 #include <fbl/auto_lock.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
-
-#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus-tester-bind.h"
 
 namespace virtualbus {
 

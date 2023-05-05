@@ -6,6 +6,7 @@
 
 #include <endian.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -15,7 +16,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell_bind.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_frame.emb.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_hci.h"
 

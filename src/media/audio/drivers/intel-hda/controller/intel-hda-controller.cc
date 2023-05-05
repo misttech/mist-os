@@ -4,6 +4,7 @@
 
 #include "intel-hda-controller.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -23,7 +24,6 @@
 #include "device-ids.h"
 #include "hda-codec-connection.h"
 #include "src/devices/lib/acpi/client.h"
-#include "src/media/audio/drivers/intel-hda/controller/intel_hda-bind.h"
 #include "utils.h"
 
 namespace audio::intel_hda {

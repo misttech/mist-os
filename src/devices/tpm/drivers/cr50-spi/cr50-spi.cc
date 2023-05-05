@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.tpmimpl/cpp/wire.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,7 +15,6 @@
 #include <zircon/status.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/devices/tpm/drivers/cr50-spi/cr50-spi_bind.h"
 
 namespace cr50::spi {
 

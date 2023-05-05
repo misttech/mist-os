@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/aml-hdmi/aml-hdmi.h"
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
@@ -16,7 +17,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 
-#include "src/graphics/display/drivers/aml-hdmi/aml-hdmi-bind.h"
 #include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
 
 #define HDMI_ASPECT_RATIO_NONE 0

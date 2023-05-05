@@ -5,6 +5,7 @@
 #include "tas5720.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/time.h>
@@ -14,8 +15,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/media/audio/drivers/codecs/tas5720/ti_tas5720-bind.h"
 
 namespace audio {
 

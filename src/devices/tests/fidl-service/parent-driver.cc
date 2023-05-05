@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -19,8 +20,6 @@
 #include <ddktl/device.h>
 #include <ddktl/unbind-txn.h>
 #include <fbl/ref_ptr.h>
-
-#include "src/devices/tests/fidl-service/parent-driver-bind.h"
 
 namespace {
 

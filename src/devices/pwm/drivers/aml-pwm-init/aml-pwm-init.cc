@@ -5,12 +5,11 @@
 #include "aml-pwm-init.h"
 
 #include <fuchsia/hardware/clock/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <unistd.h>
 
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/pwm/drivers/aml-pwm-init/aml-pwm-init-bind.h"
 
 namespace pwm_init {
 

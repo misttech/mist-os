@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/partition/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -31,7 +32,6 @@
 #include <gpt/c/gpt.h>
 
 #include "mbr.h"
-#include "src/devices/block/drivers/mbr/mbr_bind.h"
 #include "src/devices/block/lib/common/include/common.h"
 
 namespace {

@@ -4,6 +4,7 @@
 
 #include "driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <zircon/status.h>
@@ -12,7 +13,6 @@
 
 #include "debug.h"
 #include "device.h"
-#include "src/connectivity/wlan/drivers/wlanif/wlanif-bind.h"
 
 zx_status_t wlan_fullmac_bind(void* ctx, zx_device_t* device) {
   wlan::drivers::log::Instance::Init(kFiltSetting);

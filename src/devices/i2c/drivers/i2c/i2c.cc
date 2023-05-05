@@ -4,6 +4,7 @@
 
 #include "i2c.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
@@ -15,7 +16,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "i2c-child.h"
-#include "src/devices/i2c/drivers/i2c/i2c_bind.h"
 
 namespace i2c {
 

@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <stdlib.h>
-
-#include "src/devices/bus/drivers/platform/test/test-parent-bind.h"
 
 #define DRIVER_NAME "test-parent"
 

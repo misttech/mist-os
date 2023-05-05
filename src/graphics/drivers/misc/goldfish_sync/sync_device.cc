@@ -9,6 +9,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -24,7 +25,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/graphics/drivers/misc/goldfish_sync/goldfish_sync-bind.h"
 #include "src/graphics/drivers/misc/goldfish_sync/sync_common_defs.h"
 
 namespace goldfish {

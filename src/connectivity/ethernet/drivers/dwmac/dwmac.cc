@@ -5,6 +5,7 @@
 #include "dwmac.h"
 
 #include <fuchsia/hardware/ethernet/mac/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/ddk/metadata.h>
@@ -25,7 +26,6 @@
 #include <fbl/ref_ptr.h>
 
 #include "dw-gmac-dma.h"
-#include "src/connectivity/ethernet/drivers/dwmac/dwmac-bind.h"
 
 namespace eth {
 

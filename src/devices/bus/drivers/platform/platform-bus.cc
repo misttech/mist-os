@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -40,7 +41,6 @@
 
 #include "src/devices/bus/drivers/platform/cpu-trace.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
-#include "src/devices/bus/drivers/platform/platform-bus-bind.h"
 
 namespace {
 // Adds a passthrough device which forwards all banjo connections to the parent device.

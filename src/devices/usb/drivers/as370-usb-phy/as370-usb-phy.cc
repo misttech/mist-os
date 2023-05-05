@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/as370-usb-phy/as370-usb-phy.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -21,8 +22,6 @@
 #include <soc/as370/as370-usb.h>
 #include <soc/vs680/vs680-reset.h>
 #include <soc/vs680/vs680-usb.h>
-
-#include "src/devices/usb/drivers/as370-usb-phy/as370_usb_phy_bind.h"
 
 namespace as370_usb_phy {
 

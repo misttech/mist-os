@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
@@ -39,7 +40,6 @@
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "aml-sdmmc-regs.h"
-#include "src/devices/block/drivers/aml-sdmmc/aml-sdmmc-bind.h"
 
 // Limit maximum number of descriptors to 512 for now
 #define AML_DMA_DESC_MAX_COUNT 512

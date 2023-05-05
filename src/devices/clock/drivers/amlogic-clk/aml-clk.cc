@@ -5,6 +5,7 @@
 #include "aml-clk.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -25,7 +26,6 @@
 #include "aml-g12b-blocks.h"
 #include "aml-gxl-blocks.h"
 #include "aml-sm1-blocks.h"
-#include "src/devices/clock/drivers/amlogic-clk/aml-clk-bind.h"
 
 namespace amlogic_clock {
 

@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <fuchsia/hardware/badblock/c/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -26,7 +27,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/nand/drivers/nandpart/nandpart-bind.h"
 #include "src/devices/nand/drivers/nandpart/nandpart-utils.h"
 
 namespace nand {

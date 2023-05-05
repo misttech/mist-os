@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.tpmimpl/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,7 +15,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/devices/tpm/drivers/tpm-lpc/tpm-lpc-bind.h"
 
 namespace tpm::lpc {
 

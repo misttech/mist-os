@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/test/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -14,7 +15,6 @@
 #include <thread>
 
 #include "fake-device.h"
-#include "src/connectivity/telephony/tests/fake-drivers/at-fake-transport/at_fake_bind.h"
 
 zx_status_t at_fake_bind(void* ctx, zx_device_t* device) {
   auto dev = std::make_unique<at_fake::AtDevice>(device);

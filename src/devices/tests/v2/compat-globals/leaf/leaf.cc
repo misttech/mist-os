@@ -10,11 +10,10 @@
 
 #include <fidl/fuchsia.hardware.compat/cpp/wire.h>
 #include <fuchsia/hardware/compat/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <ddktl/device.h>
-
-#include "src/devices/tests/v2/compat-globals/leaf/leaf-bind.h"
 
 namespace leaf {
 

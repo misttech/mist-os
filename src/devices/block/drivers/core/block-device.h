@@ -13,6 +13,7 @@
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -38,8 +39,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <storage-metrics/block-metrics.h>
-
-#include "src/devices/block/drivers/core/block-core-bind.h"
 
 // To maintain stats related to time taken by a command or its success/failure, we need to
 // intercept command completion with a callback routine. This might introduce memory

@@ -4,6 +4,7 @@
 
 #include "aml-thermal.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -20,7 +21,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "lib/fidl/cpp/wire/object_view.h"
-#include "src/devices/thermal/drivers/aml-thermal-s905d2g-legacy/aml-thermal-bind.h"
 
 namespace thermal {
 

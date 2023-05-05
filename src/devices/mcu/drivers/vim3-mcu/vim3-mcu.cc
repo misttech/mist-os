@@ -4,6 +4,7 @@
 
 #include "vim3-mcu.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -20,8 +21,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/mcu/drivers/vim3-mcu/vim3_mcu_bind.h"
 
 namespace stm {
 zx_status_t StmMcu::Create(void* ctx, zx_device_t* parent) {

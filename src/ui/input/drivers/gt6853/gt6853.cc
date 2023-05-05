@@ -5,6 +5,7 @@
 #include "gt6853.h"
 
 #include <endian.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/clock.h>
@@ -14,8 +15,6 @@
 
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
-
-#include "src/ui/input/drivers/gt6853/gt6853-bind.h"
 
 namespace {
 

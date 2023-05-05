@@ -4,6 +4,7 @@
 
 #include "qemu-codec.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 
@@ -11,7 +12,6 @@
 
 #include "debug-logging.h"
 #include "qemu-stream.h"
-#include "src/media/audio/drivers/intel-hda/codecs/qemu/qemu_ihda_codec-bind.h"
 
 namespace audio {
 namespace intel_hda {

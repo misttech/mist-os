@@ -8,6 +8,7 @@
 #include <endian.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -21,8 +22,6 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
-
-#include "src/connectivity/bluetooth/hci/vendor/broadcom/bcm_hci_bind.h"
 
 namespace bt_hci_broadcom {
 

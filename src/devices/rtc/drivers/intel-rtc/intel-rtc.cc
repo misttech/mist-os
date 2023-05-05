@@ -4,6 +4,7 @@
 
 #include "src/devices/rtc/drivers/intel-rtc/intel-rtc.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/inout.h>
 #include <librtc.h>
@@ -14,7 +15,6 @@
 #include <safemath/checked_math.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/devices/rtc/drivers/intel-rtc/intel_rtc_bind.h"
 
 // The Intel RTC is documented in "7th and 8th Generation Intel® Processor Family I/O for U/Y
 // Platforms and 10th Generation Intel® Processor Family I/O for Y Platforms", vol 1 section 27 and

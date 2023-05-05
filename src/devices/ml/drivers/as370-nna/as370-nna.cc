@@ -4,6 +4,7 @@
 
 #include "as370-nna.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -19,7 +20,6 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/as370/include/soc/as370/as370-nna.h"
-#include "src/devices/ml/drivers/as370-nna/as370_nna_bind.h"
 
 namespace as370_nna {
 

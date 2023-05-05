@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -30,8 +31,6 @@
 #include <usb/peripheral.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
-
-#include "src/devices/serial/drivers/ftdi/ftdi_function_bind.h"
 
 #define BULK_MAX_PACKET 512
 #define FTDI_STATUS_SIZE 2

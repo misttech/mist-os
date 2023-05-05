@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -20,8 +21,6 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
-
-#include "src/connectivity/bluetooth/hci/transport/uart/bt_transport_uart_bind.h"
 
 namespace bt_transport_uart {
 

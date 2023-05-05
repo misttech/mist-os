@@ -4,6 +4,7 @@
 
 #include "thermistor.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -16,8 +17,6 @@
 
 #include <fbl/ref_counted.h>
 #include <soc/aml-common/aml-g12-saradc.h>
-
-#include "src/devices/thermal/drivers/aml-thermistor/aml-thermistor-bind.h"
 
 namespace thermal {
 

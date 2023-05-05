@@ -4,11 +4,11 @@
 
 #include "da7219-dfv1.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/clock.h>
 
 #include "src/devices/lib/acpi/client.h"
-#include "src/media/audio/drivers/codecs/da7219/da7219-bind.h"
 
 namespace audio::da7219 {
 

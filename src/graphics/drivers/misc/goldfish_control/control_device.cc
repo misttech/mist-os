@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
@@ -20,7 +21,6 @@
 
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/drivers/misc/goldfish_control/device_local_heap.h"
-#include "src/graphics/drivers/misc/goldfish_control/goldfish_control_composite-bind.h"
 #include "src/graphics/drivers/misc/goldfish_control/host_visible_heap.h"
 #include "src/graphics/drivers/misc/goldfish_control/render_control_commands.h"
 

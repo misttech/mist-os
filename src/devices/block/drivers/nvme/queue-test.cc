@@ -4,13 +4,12 @@
 
 #include "src/devices/block/drivers/nvme/queue.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/fake-bti/bti.h>
 #include <zircon/syscalls.h>
 
 #include <zxtest/zxtest.h>
-
-#include "src/devices/block/drivers/nvme/nvme_bind.h"
 
 namespace nvme {
 

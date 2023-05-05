@@ -5,6 +5,7 @@
 #include "imx8m-gpio.h"
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -12,8 +13,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/gpio/drivers/imx8m-gpio/imx8m-gpio-bind.h"
 
 namespace {
 

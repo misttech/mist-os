@@ -5,6 +5,7 @@
 #include "src/devices/usb/tests/usb-hci-test/usb-hci-test-driver.h"
 
 #include <fuchsia/hardware/usb/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/defer.h>
@@ -20,8 +21,6 @@
 #include <usb/peripheral.h>
 #include <usb/request-cpp.h>
 #include <usb/usb.h>
-
-#include "src/devices/usb/tests/usb-hci-test/usb_hci_test_bind.h"
 
 namespace usb {
 

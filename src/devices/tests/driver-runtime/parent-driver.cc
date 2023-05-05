@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.device.runtime.test/cpp/driver/fidl.h>
 #include <fidl/fuchsia.device.runtime.test/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -17,8 +18,6 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
-
-#include "src/devices/tests/driver-runtime/parent-driver-bind.h"
 
 using fuchsia_device_runtime_test::TestDevice;
 

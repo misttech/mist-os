@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-
-#include "src/devices/tests/bind-fail-test/bind-fail-test-bind.h"
 
 zx_status_t not_supported_bind(void* ctx, zx_device_t* parent) { return ZX_ERR_NOT_SUPPORTED; }
 

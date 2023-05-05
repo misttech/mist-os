@@ -4,6 +4,7 @@
 
 #include "aml-pwm.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <zircon/assert.h>
@@ -17,8 +18,6 @@
 #include <soc/aml-common/aml-pwm-regs.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 #include <soc/aml-t931/t931-pwm.h>
-
-#include "src/devices/pwm/drivers/aml-pwm/aml-pwm-bind.h"
 
 namespace pwm {
 

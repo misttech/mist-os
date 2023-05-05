@@ -4,6 +4,7 @@
 
 #include "cy8cmbr3108.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -13,8 +14,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <hid/visalia-touch.h>
-
-#include "src/ui/input/drivers/cypress/cypress_cy8cmbr3108-bind.h"
 
 namespace cypress {
 

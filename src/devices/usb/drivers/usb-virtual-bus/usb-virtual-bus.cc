@@ -5,6 +5,7 @@
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus.h"
 
 #include <assert.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -18,8 +19,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <usb/usb.h>
-
-#include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus-bind.h"
 
 namespace usb_virtual_bus {
 

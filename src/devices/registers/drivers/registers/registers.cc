@@ -4,12 +4,11 @@
 
 #include "registers.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
-
-#include "src/devices/registers/drivers/registers/registers-bind.h"
 
 namespace registers {
 

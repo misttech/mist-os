@@ -4,6 +4,7 @@
 
 #include "audio-stream-in.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -17,7 +18,6 @@
 #include <optional>
 #include <utility>
 
-#include "src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp/aml_g12_pdm_bind.h"
 #include "src/media/lib/memory_barriers/memory_barriers.h"
 
 namespace {

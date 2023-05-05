@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/ethernet/c/banjo.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -24,7 +25,6 @@
 #include <usb/usb.h>
 
 #include "asix-88179-regs.h"
-#include "src/connectivity/ethernet/drivers/asix-88179/ethernet_ax88179-bind.h"
 
 static constexpr uint8_t kMediaMode[6][2] = {
     {0x30, 0x01},  // 10 Mbps, half-duplex
