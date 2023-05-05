@@ -6,7 +6,10 @@
 
 #include <lib/device-protocol/display-panel.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/graphics/display/drivers/amlogic-display/dsi.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_display {
 
@@ -50,8 +53,8 @@ TEST(AmlogicDisplayClock, PanelTiming) {
 
 TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
   for (const auto t : display_types) {
-    auto pll_r = Clock::GenerateHPLL(t);
-    EXPECT_OK(pll_r);
+    zx::result<PllConfig> pll_r = Clock::GenerateHPLL(t);
+    EXPECT_OK(pll_r.status_value());
   }
 }
 

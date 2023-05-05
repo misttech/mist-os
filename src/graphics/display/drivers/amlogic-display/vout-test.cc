@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace amlogic_display {
 

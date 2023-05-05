@@ -119,11 +119,13 @@ test("amlogic-display-test") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/testing/no_ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
@@ -133,7 +135,9 @@ test("clock-test") {
   deps = [
     ":amlogic_display_driver_src",
     ":common_srcs",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 }
 

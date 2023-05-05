@@ -14,10 +14,11 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/syscalls/object.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_display {
 
@@ -141,7 +142,7 @@ class MockBufferCollection : public MockBufferCollectionBase {
     EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints_count);
   }
 
-  void VerifyName(const std::string& name) override { EXPECT_STREQ(name, "Display"); }
+  void VerifyName(const std::string& name) override { EXPECT_EQ(name, "Display"); }
 
  private:
   std::vector<sysmem::wire::PixelFormatType> supported_pixel_format_types_;
@@ -182,7 +183,7 @@ class MockBufferCollectionForCapture : public MockBufferCollectionBase {
               fuchsia_sysmem::wire::kFormatModifierLinear);
   }
 
-  void VerifyName(const std::string& name) override { EXPECT_STREQ(name, "Display capture"); }
+  void VerifyName(const std::string& name) override { EXPECT_EQ(name, "Display capture"); }
 
  private:
   static constexpr sysmem::wire::ImageFormatConstraints kDefaultImageFormatConstraints = {
@@ -204,7 +205,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
       fit::function<std::unique_ptr<MockBufferCollectionBase>(void)>;
 
   explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-    ASSERT_TRUE(dispatcher_);
+    ZX_ASSERT(dispatcher_ != nullptr);
   }
 
   void set_mock_buffer_collection_builder(MockBufferCollectionBuilder builder) {
@@ -213,7 +214,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
                             BindSharedCollectionCompleter::Sync& completer) override {
-    ASSERT_TRUE(mock_buffer_collection_builder_ != nullptr);
+    ZX_ASSERT(mock_buffer_collection_builder_ != nullptr);
     auto buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_[buffer_collection_id] = {
         .token_client = std::move(request->token),
@@ -327,14 +328,15 @@ class FakeCanvasProtocol : public fidl::WireServer<fuchsia_hardware_amlogiccanva
   std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
 };
 
-class FakeSysmemTest : public zxtest::Test {
+class FakeSysmemTest : public testing::Test {
  public:
   FakeSysmemTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
     loop_.StartThread("sysmem-handler-loop");
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
-    ASSERT_OK(endpoints);
+    zx::result<fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>> endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
+    ASSERT_OK(endpoints.status_value());
     canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.value().server));
 
     display_ = std::make_unique<AmlogicDisplay>(/*parent=*/nullptr);
@@ -354,8 +356,9 @@ class FakeSysmemTest : public zxtest::Test {
     });
 
     {
-      zx::result endpoints = fidl::CreateEndpoints<sysmem::Allocator>();
-      ASSERT_OK(endpoints);
+      zx::result<fidl::Endpoints<sysmem::Allocator>> endpoints =
+          fidl::CreateEndpoints<sysmem::Allocator>();
+      ASSERT_OK(endpoints.status_value());
       fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), allocator_.get());
       display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints->client)));
     }
@@ -391,10 +394,12 @@ bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) 
 }
 
 TEST_F(FakeSysmemTest, ImportBufferCollection) {
-  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token1_endpoints);
-  zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token2_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token1_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token1_endpoints.status_value());
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token2_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token2_endpoints.status_value());
 
   // Test ImportBufferCollection().
   constexpr uint64_t kValidBufferCollectionId = 1u;
@@ -466,8 +471,9 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 }
 
 TEST_F(FakeSysmemTest, ImportImage) {
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -526,8 +532,9 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -579,8 +586,9 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
     return new_buffer_collection;
   });
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -611,8 +619,9 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     return format == fuchsia_images2::wire::PixelFormat::kBgra32;
   });
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -631,38 +640,39 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
 
 TEST(AmlogicDisplay, FloatToFix3_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000, Osd::FloatToFixed3_10(0.0f));
-  EXPECT_EQ(0x0066, Osd::FloatToFixed3_10(0.1f));
-  EXPECT_EQ(0x1f9a, Osd::FloatToFixed3_10(-0.1f));
+  EXPECT_EQ(0x0000u, Osd::FloatToFixed3_10(0.0f));
+  EXPECT_EQ(0x0066u, Osd::FloatToFixed3_10(0.1f));
+  EXPECT_EQ(0x1f9au, Osd::FloatToFixed3_10(-0.1f));
   // Test for maximum positive (<4)
-  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(4.0f));
-  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(40.0f));
-  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(3.9999f));
+  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(4.0f));
+  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(40.0f));
+  EXPECT_EQ(0x0FFFu, Osd::FloatToFixed3_10(3.9999f));
   // Test for minimum negative (>= -4)
-  EXPECT_EQ(0x1000, Osd::FloatToFixed3_10(-4.0f));
-  EXPECT_EQ(0x1000, Osd::FloatToFixed3_10(-14.0f));
+  EXPECT_EQ(0x1000u, Osd::FloatToFixed3_10(-4.0f));
+  EXPECT_EQ(0x1000u, Osd::FloatToFixed3_10(-14.0f));
 }
 
 TEST(AmlogicDisplay, FloatToFixed2_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000, Osd::FloatToFixed2_10(0.0f));
-  EXPECT_EQ(0x0066, Osd::FloatToFixed2_10(0.1f));
-  EXPECT_EQ(0x0f9a, Osd::FloatToFixed2_10(-0.1f));
+  EXPECT_EQ(0x0000u, Osd::FloatToFixed2_10(0.0f));
+  EXPECT_EQ(0x0066u, Osd::FloatToFixed2_10(0.1f));
+  EXPECT_EQ(0x0f9au, Osd::FloatToFixed2_10(-0.1f));
   // Test for maximum positive (<2)
-  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(2.0f));
-  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(20.0f));
-  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(1.9999f));
+  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(2.0f));
+  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(20.0f));
+  EXPECT_EQ(0x07FFu, Osd::FloatToFixed2_10(1.9999f));
   // Test for minimum negative (>= -2)
-  EXPECT_EQ(0x0800, Osd::FloatToFixed2_10(-2.0f));
-  EXPECT_EQ(0x0800, Osd::FloatToFixed2_10(-14.0f));
+  EXPECT_EQ(0x0800u, Osd::FloatToFixed2_10(-2.0f));
+  EXPECT_EQ(0x0800u, Osd::FloatToFixed2_10(-14.0f));
 }
 
 TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints);
+  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
+      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
   constexpr uint64_t kBufferCollectionId = 1u;
