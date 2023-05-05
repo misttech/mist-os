@@ -8,7 +8,6 @@ use super::sysctl::*;
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::lock::Mutex;
 use crate::logging::{log_error, not_implemented};
 use crate::task::*;
 use crate::types::*;
@@ -39,6 +38,9 @@ pub struct ProcDirectory {
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
     pub fn new(fs: &FileSystemHandle, kernel: Weak<Kernel>) -> Arc<ProcDirectory> {
+        // TODO: Move somewhere where it can be shared with other consumers.
+        let kernel_stats = Arc::new(KernelStatsStore::default());
+
         let nodes = btreemap! {
             &b"cmdline"[..] => {
                 let cmdline = kernel.upgrade().unwrap().cmdline.clone();
@@ -46,10 +48,8 @@ impl ProcDirectory {
             },
             &b"self"[..] => SelfSymlink::new_node(fs),
             &b"thread-self"[..] => ThreadSelfSymlink::new_node(fs),
-            // TODO(tbodt): Put actual data in /proc/meminfo. Android is currently satistified by
-            // an empty file though.
             &b"meminfo"[..] =>
-                fs.create_node(MeminfoFile::new_node(), mode!(IFREG, 0o444), FsCred::root()),
+                fs.create_node(MeminfoFile::new_node(&kernel_stats), mode!(IFREG, 0o444), FsCred::root()),
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
                 fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile)), mode!(IFREG, 0o100), FsCred::root()),
@@ -264,39 +264,25 @@ fn pressure_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     dir.build()
 }
 
-#[derive(Default)]
-struct PressureFile {
-    seq: Mutex<SeqFileState<()>>,
+struct PressureFileSource;
+impl DynamicFileSource for PressureFileSource {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
+        writeln!(sink, "full avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
+        Ok(())
+    }
 }
 
+struct PressureFile(DynamicFile<PressureFileSource>);
 impl PressureFile {
-    fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(|| Ok(Self::default()))
+    pub fn new_node() -> impl FsNodeOps {
+        SimpleFileNode::new(move || Ok(Self(DynamicFile::new(PressureFileSource {}))))
     }
 }
 
 impl FileOps for PressureFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        // TODO(115887): Replace with real implementation.
-        self.seq.lock().read_at(
-            current_task,
-            |_, sink: &mut SeqFileBuf| {
-                writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
-                writeln!(sink, "full avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
-                Ok(None)
-            },
-            offset,
-            data,
-        )
-    }
+    fileops_impl_delegate_read_and_seek!(self, self.0);
+    fileops_impl_seekable_write!();
 
     /// Pressure notifications are configured by writing to the file.
     fn write_at(
@@ -328,63 +314,44 @@ impl FileOps for PressureFile {
 }
 
 #[derive(Default)]
-struct MeminfoFile {
-    seq: Mutex<SeqFileState<()>>,
+struct KernelStatsStore(OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>);
 
-    kernel_stats: OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>,
-}
-
-impl MeminfoFile {
-    pub fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(move || {
-            Ok(MeminfoFile { seq: Default::default(), kernel_stats: OnceCell::new() })
-        })
-    }
-}
-
-impl FileOps for MeminfoFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let stats_proxy = self.kernel_stats.get_or_init(|| {
+impl KernelStatsStore {
+    pub fn get(&self) -> &fidl_fuchsia_kernel::StatsSynchronousProxy {
+        self.0.get_or_init(|| {
             let (client_end, server_end) = zx::Channel::create();
             connect_channel_to_protocol::<fidl_fuchsia_kernel::StatsMarker>(server_end)
                 .expect("Failed to connect to fuchsia.kernel.Stats.");
             fidl_fuchsia_kernel::StatsSynchronousProxy::new(client_end)
-        });
-        let memstats = stats_proxy.get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
-            log_error!("FIDL error getting memory stats: {e}");
-            errno!(EIO)
-        })?;
-        let mut seq = self.seq.lock();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            writeln!(sink, "MemTotal:\t {} kB", memstats.total_bytes.unwrap_or_default() / 1024)?;
-            writeln!(sink, "MemFree:\t {} kB", memstats.free_bytes.unwrap_or_default() / 1024)?;
-            writeln!(
-                sink,
-                "MemAvailable:\t {} kB",
-                (memstats.free_bytes.unwrap_or_default()
-                    + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
-                    / 1024
-            )?;
-            Ok(None)
-        };
-        seq.read_at(current_task, iter, offset, data)
+        })
     }
+}
 
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+#[derive(Clone)]
+struct MeminfoFile {
+    kernel_stats: Arc<KernelStatsStore>,
+}
+impl MeminfoFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+impl DynamicFileSource for MeminfoFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let memstats =
+            self.kernel_stats.get().get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
+                log_error!("FIDL error getting memory stats: {e}");
+                errno!(EIO)
+            })?;
+        writeln!(sink, "MemTotal:\t {} kB", memstats.total_bytes.unwrap_or_default() / 1024)?;
+        writeln!(sink, "MemFree:\t {} kB", memstats.free_bytes.unwrap_or_default() / 1024)?;
+        writeln!(
+            sink,
+            "MemAvailable:\t {} kB",
+            (memstats.free_bytes.unwrap_or_default()
+                + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
+                / 1024
+        )?;
+        Ok(())
     }
 }

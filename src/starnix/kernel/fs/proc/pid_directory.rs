@@ -6,9 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::Arc;
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::lock::Mutex;
 use crate::mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatusFile};
 use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, ThreadGroup};
@@ -363,270 +361,125 @@ impl FsNodeOps for FdSymlink {
     }
 }
 
-fn read_at_from_addr<F>(
-    seq: &Mutex<SeqFileState<()>>,
+fn fill_buf_from_addr_range(
     task: &Arc<Task>,
-    current_task: &CurrentTask,
-    offset: usize,
-    data: &mut dyn OutputBuffer,
-    get_range: F,
-) -> Result<usize, Errno>
-where
-    F: Fn() -> (UserAddress, UserAddress),
-{
-    let iter = move |_, sink: &mut SeqFileBuf| {
-        let (range_start, range_end) = get_range();
-        #[allow(clippy::manual_saturating_arithmetic)]
-        let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
-        let mut buf = vec![0u8; len];
-        let len = task.mm.read_memory_partial(range_start, &mut buf)?;
-        sink.write(&buf[..len]);
-        Ok(None)
-    };
-    seq.lock().read_at(current_task, iter, offset, data)
+    range_start: UserAddress,
+    range_end: UserAddress,
+    sink: &mut SeqFileBuf,
+) -> Result<(), Errno> {
+    #[allow(clippy::manual_saturating_arithmetic)]
+    let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
+    let mut buf = vec![0u8; len];
+    let len = task.mm.read_memory_partial(range_start, &mut buf)?;
+    sink.write(&buf[..len]);
+    Ok(())
 }
 
-/// `CmdlineFile` implements the `FsNodeOps` for a `proc/<pid>/cmdline` file.
-struct CmdlineFile {
-    /// The task from which the `CmdlineFile` fetches the command line parameters.
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+/// `CmdlineFile` implements `proc/<pid>/cmdline` file.
+#[derive(Clone)]
+pub struct CmdlineFile(Arc<Task>);
 impl CmdlineFile {
-    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(CmdlineFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
-
-impl FileOps for CmdlineFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let task = self.task.clone();
-        read_at_from_addr(&self.seq, &self.task, current_task, offset, data, move || {
-            let mm_state = task.mm.state.read();
+impl DynamicFileSource for CmdlineFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let (start, end) = {
+            let mm_state = self.0.mm.state.read();
             (mm_state.argv_start, mm_state.argv_end)
-        })
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        };
+        fill_buf_from_addr_range(&self.0, start, end, sink)
     }
 }
 
-/// `EnvironFile` implements the `FsNodeOps` for a `proc/<pid>/environ` file.
-struct EnvironFile {
-    /// The task from which the `EnvironFile` fetches the environment variables.
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+/// `EnvironFile` implements `proc/<pid>/environ` file.
+#[derive(Clone)]
+pub struct EnvironFile(Arc<Task>);
 impl EnvironFile {
-    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(EnvironFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
-
-impl FileOps for EnvironFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        read_at_from_addr(&self.seq, &self.task, current_task, offset, data, move || {
-            let mm_state = self.task.mm.state.read();
+impl DynamicFileSource for EnvironFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let (start, end) = {
+            let mm_state = self.0.mm.state.read();
             (mm_state.environ_start, mm_state.environ_end)
-        })
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        };
+        fill_buf_from_addr_range(&self.0, start, end, sink)
     }
 }
 
-/// `AuxvFile` implements the `FsNodeOps` for a `proc/<pid>/environ` file.
-struct AuxvFile {
-    /// The task from which the `AuxvFile` fetches the AUX vector.
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+/// `AuxvFile` implements `proc/<pid>/auxv` file.
+#[derive(Clone)]
+pub struct AuxvFile(Arc<Task>);
 impl AuxvFile {
-    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(AuxvFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
-
-impl FileOps for AuxvFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        read_at_from_addr(&self.seq, &self.task, current_task, offset, data, move || {
-            let mm_state = self.task.mm.state.read();
+impl DynamicFileSource for AuxvFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let (start, end) = {
+            let mm_state = self.0.mm.state.read();
             (mm_state.auxv_start, mm_state.auxv_end)
-        })
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        };
+        fill_buf_from_addr_range(&self.0, start, end, sink)
     }
 }
 
-/// `CommFile` implements the `FsNodeOps` for a `proc/<pid>/comm` file.
-pub struct CommFile {
-    /// The task from which the `CommFile` fetches the command line parameters.
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+/// `CommFile` implements `proc/<pid>/comm` file.
+#[derive(Clone)]
+pub struct CommFile(Arc<Task>);
 impl CommFile {
-    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(CommFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for CommFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        sink.write(self.0.command().as_bytes());
+        sink.write(b"\n");
+        Ok(())
     }
 }
 
-impl FileOps for CommFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let comm = self.task.command();
-        let mut seq = self.seq.lock();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            sink.write(comm.as_bytes());
-            sink.write(b"\n");
-            Ok(None)
-        };
-        seq.read_at(current_task, iter, offset, data)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
-    }
-}
-
-/// `LimitsFile` implements the `FsNodeOps` for a `proc/<pid>/limits` file.
-pub struct LimitsFile {
-    /// The task from which the `LimitsFile` fetches the limits.
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+/// `LimitsFile` implements `proc/<pid>/limits` file.
+#[derive(Clone)]
+pub struct LimitsFile(Arc<Task>);
 impl LimitsFile {
-    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(LimitsFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
-
-impl FileOps for LimitsFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let state = self.task.thread_group.read();
+impl DynamicFileSource for LimitsFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let state = self.0.thread_group.read();
         let limits = &state.limits;
-        let mut seq = self.seq.lock();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            let write_limit = |sink: &mut SeqFileBuf, value| {
-                if value == RLIM_INFINITY as u64 {
-                    sink.write(format!("{:<20}", "unlimited").as_bytes());
-                } else {
-                    sink.write(format!("{:<20}", value).as_bytes());
-                }
-            };
-            sink.write(
-                format!("{:<25}{:<20}{:<20}{:<10}\n", "Limit", "Soft Limit", "Hard Limit", "Units")
-                    .as_bytes(),
-            );
-            for resource in Resource::ALL {
-                let desc = resource.desc();
-                let limit = limits.get(resource);
-                sink.write(format!("{:<25}", desc.name).as_bytes());
-                write_limit(sink, limit.rlim_cur);
-                write_limit(sink, limit.rlim_max);
-                if !desc.unit.is_empty() {
-                    sink.write(format!("{:<10}", desc.unit).as_bytes());
-                }
-                sink.write(b"\n");
-            }
-            Ok(None)
-        };
-        seq.read_at(current_task, iter, offset, data)
-    }
 
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        let write_limit = |sink: &mut SeqFileBuf, value| {
+            if value == RLIM_INFINITY as u64 {
+                sink.write(format!("{:<20}", "unlimited").as_bytes());
+            } else {
+                sink.write(format!("{:<20}", value).as_bytes());
+            }
+        };
+        sink.write(
+            format!("{:<25}{:<20}{:<20}{:<10}\n", "Limit", "Soft Limit", "Hard Limit", "Units")
+                .as_bytes(),
+        );
+        for resource in Resource::ALL {
+            let desc = resource.desc();
+            let limit = limits.get(resource);
+            sink.write(format!("{:<25}", desc.name).as_bytes());
+            write_limit(sink, limit.rlim_cur);
+            write_limit(sink, limit.rlim_max);
+            if !desc.unit.is_empty() {
+                sink.write(format!("{:<10}", desc.unit).as_bytes());
+            }
+            sink.write(b"\n");
+        }
+        Ok(())
     }
 }

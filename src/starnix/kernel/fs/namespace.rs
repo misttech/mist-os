@@ -18,11 +18,8 @@ use super::tmpfs::TmpFs;
 use super::*;
 use crate::bpf::BpfFs;
 use crate::device::BinderFs;
-use crate::fs::{
-    buffers::{InputBuffer, OutputBuffer},
-    fuse::new_fuse_fs,
-};
-use crate::lock::{Mutex, RwLock};
+use crate::fs::{buffers::InputBuffer, fuse::new_fuse_fs};
+use crate::lock::RwLock;
 use crate::mutable_state::*;
 use crate::selinux::selinux_fs;
 use crate::task::*;
@@ -516,53 +513,46 @@ pub fn create_filesystem(
     Ok(WhatToMount::Fs(fs))
 }
 
+struct ProcMountsFileSource(Arc<Task>);
+
+impl DynamicFileSource for ProcMountsFileSource {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
+        // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
+        // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
+        // extra work to maintain it.
+        let ns = self.0.fs().namespace();
+        for_each_mount(&ns.root_mount, &mut |mount| {
+            let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
+            let origin =
+                NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
+            let fs_spec = String::from_utf8_lossy(&origin.path()).into_owned();
+            let fs_file = String::from_utf8_lossy(&mountpoint.path()).into_owned();
+            let fs_vfstype = "TODO";
+            let fs_mntopts = "TODO";
+            writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
+            Ok(())
+        })?;
+        Ok(())
+    }
+}
+
 pub struct ProcMountsFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
+    dynamic_file: DynamicFile<ProcMountsFileSource>,
 }
 
 impl ProcMountsFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = task.clone();
         SimpleFileNode::new(move || {
-            Ok(Self { task: task.clone(), seq: Mutex::new(SeqFileState::default()) })
+            Ok(Self { dynamic_file: DynamicFile::new(ProcMountsFileSource(task.clone())) })
         })
     }
 }
 
 impl FileOps for ProcMountsFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
-        // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
-        // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
-        // extra work to maintain it.
-        let ns = self.task.fs().namespace();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            for_each_mount(&ns.root_mount, &mut |mount| {
-                let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
-                let origin = NamespaceNode {
-                    mount: mount.origin_mount.clone(),
-                    entry: Arc::clone(&mount.root),
-                };
-                let fs_spec = String::from_utf8_lossy(&origin.path()).into_owned();
-                let fs_file = String::from_utf8_lossy(&mountpoint.path()).into_owned();
-                let fs_vfstype = "TODO";
-                let fs_mntopts = "TODO";
-                writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
-                Ok(())
-            })?;
-            Ok(None)
-        };
-        self.seq.lock().read_at(current_task, iter, offset, data)
-    }
+    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_seekable_write!();
 
     fn write_at(
         &self,
@@ -592,75 +582,45 @@ impl FileOps for ProcMountsFile {
     }
 }
 
-pub struct ProcMountinfoFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
+#[derive(Clone)]
+pub struct ProcMountinfoFile(Arc<Task>);
 impl ProcMountinfoFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(ProcMountinfoFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
-
-impl FileOps for ProcMountinfoFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+impl DynamicFileSource for ProcMountinfoFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let ns = self.task.fs().namespace();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            for_each_mount(&ns.root_mount, &mut |mount| {
-                let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
-                // Can't fail, mountpoint() and root() can't return a NamespaceNode with no mount
-                let parent = mountpoint.mount.as_ref().unwrap();
-                let origin = NamespaceNode {
-                    mount: mount.origin_mount.clone(),
-                    entry: Arc::clone(&mount.root),
-                };
-                write!(
-                    sink,
-                    "{} {} {} {} {}",
-                    mount.id,
-                    parent.id,
-                    mount.root.node.fs().dev_id,
-                    String::from_utf8_lossy(&origin.path()),
-                    String::from_utf8_lossy(&mountpoint.path())
-                )?;
-                if let Some(peer_group) = mount.read().peer_group() {
-                    write!(sink, " shared:{}", peer_group.id)?;
-                }
-                if let Some(upstream) = mount.read().upstream() {
-                    write!(sink, " master:{}", upstream.id)?;
-                }
-                writeln!(sink)?;
-                Ok(())
-            })?;
-            Ok(None)
-        };
-        self.seq.lock().read_at(current_task, iter, offset, data)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        let ns = self.0.fs().namespace();
+        for_each_mount(&ns.root_mount, &mut |mount| {
+            let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
+            // Can't fail, mountpoint() and root() can't return a NamespaceNode with no mount
+            let parent = mountpoint.mount.as_ref().unwrap();
+            let origin =
+                NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
+            write!(
+                sink,
+                "{} {} {} {} {}",
+                mount.id,
+                parent.id,
+                mount.root.node.fs().dev_id,
+                String::from_utf8_lossy(&origin.path()),
+                String::from_utf8_lossy(&mountpoint.path())
+            )?;
+            if let Some(peer_group) = mount.read().peer_group() {
+                write!(sink, " shared:{}", peer_group.id)?;
+            }
+            if let Some(upstream) = mount.read().upstream() {
+                write!(sink, " master:{}", upstream.id)?;
+            }
+            writeln!(sink)?;
+            Ok(())
+        })?;
+        Ok(())
     }
 }
 

@@ -283,7 +283,6 @@
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
 
                 // lseek_test
-                "LseekTest.ProcFile",
                 "LseekTest.ProcStatTwice",
                 "LseekTest.EtcPasswdDup",
 

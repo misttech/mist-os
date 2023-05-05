@@ -39,6 +39,7 @@ use crate::types::*;
 ///     }
 /// }
 /// ```
+// TODO: Rename to DynamicFileState.
 pub struct SeqFileState<C: Default> {
     /// The current position in the sequence. This is an opaque object. Stepping the iterator
     /// replaces it with the next value in the sequence.
@@ -75,7 +76,7 @@ impl<C: Default> SeqFileState<C> {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        if offset < self.byte_offset {
+        if offset != self.byte_offset {
             self.reset();
         }
         let read_size = data.available();
@@ -131,6 +132,7 @@ impl SeqFileBuf {
     }
 }
 
+// TODO: Remove and use SequenceFileSource instead.
 pub trait SeqIterator<'a, C> {
     /// Appends the next chunk of the file to the buffer and advances the cursor. A return of None
     /// means end-of-file.

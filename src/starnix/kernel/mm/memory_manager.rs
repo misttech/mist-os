@@ -13,7 +13,6 @@ use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::collections::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
 use crate::logging::*;
@@ -1705,250 +1704,146 @@ fn write_map(
     Ok(())
 }
 
-pub struct ProcMapsFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<UserAddress>>,
-}
-
+#[derive(Clone)]
+pub struct ProcMapsFile(Arc<Task>);
 impl ProcMapsFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(ProcMapsFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
 
-impl FileOps for ProcMapsFile {
-    fileops_impl_seekable!();
+impl SequenceFileSource for ProcMapsFile {
+    type Cursor = UserAddress;
 
-    fn read_at(
+    fn next(
         &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let iter = move |cursor: UserAddress, sink: &mut SeqFileBuf| {
-            let state = self.task.mm.state.read();
-            let mut iter = state.mappings.iter_starting_at(&cursor);
-            if let Some((range, map)) = iter.next() {
-                write_map(sink, range, map)?;
-                return Ok(Some(range.end));
-            }
-            Ok(None)
-        };
-        self.seq.lock().read_at(current_task, iter, offset, data)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+        cursor: UserAddress,
+        sink: &mut SeqFileBuf,
+    ) -> Result<Option<UserAddress>, Errno> {
+        let state = self.0.mm.state.read();
+        let mut iter = state.mappings.iter_starting_at(&cursor);
+        if let Some((range, map)) = iter.next() {
+            write_map(sink, range, map)?;
+            return Ok(Some(range.end));
+        }
+        Ok(None)
     }
 }
 
-pub struct ProcSmapsFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<UserAddress>>,
-}
-
+#[derive(Clone)]
+pub struct ProcSmapsFile(Arc<Task>);
 impl ProcSmapsFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(ProcSmapsFile { task: Arc::clone(&task), seq: Default::default() })
-        })
+        DynamicFile::new_node(Self(task.clone()))
     }
 }
 
-impl FileOps for ProcSmapsFile {
-    fileops_impl_seekable!();
+impl SequenceFileSource for ProcSmapsFile {
+    type Cursor = UserAddress;
 
-    fn read_at(
+    fn next(
         &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+        cursor: UserAddress,
+        sink: &mut SeqFileBuf,
+    ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
-        let iter = move |cursor: UserAddress, sink: &mut SeqFileBuf| {
-            let state = self.task.mm.state.read();
-            let mut iter = state.mappings.iter_starting_at(&cursor);
-            if let Some((range, map)) = iter.next() {
-                write_map(sink, range, map)?;
+        let state = self.0.mm.state.read();
+        let mut iter = state.mappings.iter_starting_at(&cursor);
+        if let Some((range, map)) = iter.next() {
+            write_map(sink, range, map)?;
 
-                let vmo_info = map.vmo.info().map_err(MemoryManager::get_errno_for_map_err)?;
-                let size_kb = vmo_info.size_bytes / 1024;
-                writeln!(sink, "Size:\t{size_kb} kB",)?;
-                writeln!(sink, "Rss:\t{size_kb} kB")?;
-                writeln!(
-                    sink,
-                    "Pss:\t{} kB",
-                    if map.options.contains(MappingOptions::SHARED) {
-                        size_kb / vmo_info.share_count as u64
-                    } else {
-                        size_kb
-                    }
-                )?;
-
-                let mut shared_clean_kb = 0;
-                let mut shared_dirty_kb = 0;
-                if vmo_info.share_count > 1 {
-                    shared_dirty_kb = vmo_info.committed_bytes / 1024;
-                    shared_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
-                }
-                writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
-                writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
-
-                let mut private_clean_kb = 0;
-                let mut private_dirty_kb = 0;
-                if vmo_info.share_count == 1 {
-                    private_dirty_kb = vmo_info.committed_bytes / 1024;
-                    private_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
-                }
-                writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
-                writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
-
-                let anonymous_kb = if map.options.contains(MappingOptions::ANONYMOUS)
-                    && !map.options.contains(MappingOptions::SHARED)
-                {
-                    size_kb
-                } else {
-                    0
-                };
-                writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
-                writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
-                writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
-
-                // TODO(https://fxrev.dev/79328): Add optional fields.
-                return Ok(Some(range.end));
-            }
-            Ok(None)
-        };
-        self.seq.lock().read_at(current_task, iter, offset, data)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
-    }
-}
-
-pub struct ProcStatFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
-impl ProcStatFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(ProcStatFile { task: Arc::clone(&task), seq: Default::default() })
-        })
-    }
-}
-
-impl FileOps for ProcStatFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let command = self.task.command();
-        let mut seq = self.seq.lock();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            let command = command.as_c_str().to_str().unwrap_or("unknown");
-            let mut stats = [0u64; 49];
-            {
-                let thread_group = self.task.thread_group.read();
-                stats[0] = thread_group.get_ppid() as u64;
-                stats[1] = thread_group.process_group.leader as u64;
-                stats[2] = thread_group.process_group.session.leader as u64;
-                stats[19] = thread_group.tasks.len() as u64;
-            }
-            {
-                let mm_state = self.task.mm.state.read();
-                stats[24] = mm_state.stack_start.ptr() as u64;
-            }
-            let stat_str = stats.map(|n| n.to_string()).join(" ");
-            writeln!(sink, "{} ({}) R {}", self.task.get_pid(), command, stat_str)?;
-            Ok(None)
-        };
-        seq.read_at(current_task, iter, offset, data)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
-    }
-}
-
-pub struct ProcStatusFile {
-    task: Arc<Task>,
-    seq: Mutex<SeqFileState<()>>,
-}
-
-impl ProcStatusFile {
-    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
-        let task = Arc::clone(task);
-        SimpleFileNode::new(move || {
-            Ok(ProcStatusFile { task: Arc::clone(&task), seq: Default::default() })
-        })
-    }
-}
-
-impl FileOps for ProcStatusFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let creds = self.task.creds();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented
-            // fsuid
+            let vmo_info = map.vmo.info().map_err(MemoryManager::get_errno_for_map_err)?;
+            let size_kb = vmo_info.size_bytes / 1024;
+            writeln!(sink, "Size:\t{size_kb} kB",)?;
+            writeln!(sink, "Rss:\t{size_kb} kB")?;
             writeln!(
                 sink,
-                "Uid:\t{} {} {} {}",
-                creds.uid, creds.euid, creds.saved_uid, creds.euid
+                "Pss:\t{} kB",
+                if map.options.contains(MappingOptions::SHARED) {
+                    size_kb / vmo_info.share_count as u64
+                } else {
+                    size_kb
+                }
             )?;
-            Ok(None)
-        };
-        self.seq.lock().read_at(current_task, iter, offset, data)
-    }
 
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(ENOSYS)
+            let mut shared_clean_kb = 0;
+            let mut shared_dirty_kb = 0;
+            if vmo_info.share_count > 1 {
+                shared_dirty_kb = vmo_info.committed_bytes / 1024;
+                shared_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
+            }
+            writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
+            writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
+
+            let mut private_clean_kb = 0;
+            let mut private_dirty_kb = 0;
+            if vmo_info.share_count == 1 {
+                private_dirty_kb = vmo_info.committed_bytes / 1024;
+                private_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
+            }
+            writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
+            writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
+
+            let anonymous_kb = if map.options.contains(MappingOptions::ANONYMOUS)
+                && !map.options.contains(MappingOptions::SHARED)
+            {
+                size_kb
+            } else {
+                0
+            };
+            writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
+            writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
+            writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
+
+            // TODO(https://fxrev.dev/79328): Add optional fields.
+            return Ok(Some(range.end));
+        }
+        Ok(None)
+    }
+}
+
+#[derive(Clone)]
+pub struct ProcStatFile(Arc<Task>);
+impl ProcStatFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for ProcStatFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let command = self.0.command();
+        let command = command.as_c_str().to_str().unwrap_or("unknown");
+        let mut stats = [0u64; 49];
+        {
+            let thread_group = self.0.thread_group.read();
+            stats[0] = thread_group.get_ppid() as u64;
+            stats[1] = thread_group.process_group.leader as u64;
+            stats[2] = thread_group.process_group.session.leader as u64;
+            stats[19] = thread_group.tasks.len() as u64;
+        }
+        {
+            let mm_state = self.0.mm.state.read();
+            stats[24] = mm_state.stack_start.ptr() as u64;
+        }
+        let stat_str = stats.map(|n| n.to_string()).join(" ");
+        writeln!(sink, "{} ({}) R {}", self.0.get_pid(), command, stat_str)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct ProcStatusFile(Arc<Task>);
+impl ProcStatusFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for ProcStatusFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let creds = self.0.creds();
+        // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
+        writeln!(sink, "Uid:\t{} {} {} {}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
+        Ok(())
     }
 }
 

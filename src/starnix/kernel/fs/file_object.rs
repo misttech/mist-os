@@ -298,9 +298,8 @@ macro_rules! fileops_impl_nonseekable {
     };
 }
 
-/// Implements [`FileOps`] methods in a way that makes sense for seekable files.
-/// You must implement [`FileOps::read_at`] and [`FileOps::write_at`].
-macro_rules! fileops_impl_seekable {
+/// Implements [`FileOps::read`] that calls [`FileOps::read_at`] with the current position.
+macro_rules! fileops_impl_seekable_read {
     () => {
         fn read(
             &self,
@@ -313,6 +312,12 @@ macro_rules! fileops_impl_seekable {
             *offset += size as crate::types::off_t;
             Ok(size)
         }
+    };
+}
+
+/// Implements [`FileOps::write`] that calls [`FileOps::write_at`] with the current position.
+macro_rules! fileops_impl_seekable_write {
+    () => {
         fn write(
             &self,
             file: &crate::fs::FileObject,
@@ -327,6 +332,16 @@ macro_rules! fileops_impl_seekable {
             *offset += size as crate::types::off_t;
             Ok(size)
         }
+    };
+}
+
+/// Implements [`FileOps`] methods in a way that makes sense for seekable files.
+/// You must implement [`FileOps::read_at`] and [`FileOps::write_at`].
+macro_rules! fileops_impl_seekable {
+    () => {
+        fileops_impl_seekable_read!();
+        fileops_impl_seekable_write!();
+
         fn seek(
             &self,
             file: &crate::fs::FileObject,
@@ -352,6 +367,39 @@ macro_rules! fileops_impl_seekable {
 
             *current_offset = new_offset;
             Ok(*current_offset)
+        }
+    };
+}
+
+macro_rules! fileops_impl_delegate_read_and_seek {
+    ($self:ident, $delegate:expr) => {
+        fn read(
+            &$self,
+            file: &FileObject,
+            current_task: &crate::task::CurrentTask,
+            data: &mut dyn crate::fs::buffers::OutputBuffer,
+        ) -> Result<usize, crate::types::Errno> {
+            $delegate.read(file, current_task, data)
+        }
+
+        fn read_at(
+            &$self,
+            file: &FileObject,
+            current_task: &crate::task::CurrentTask,
+            offset: usize,
+            data: &mut dyn crate::fs::buffers::OutputBuffer,
+        ) -> Result<usize, crate::types::Errno> {
+            $delegate.read_at(file, current_task, offset, data)
+        }
+
+        fn seek(
+            &$self,
+            file: &FileObject,
+            current_task: &crate::task::CurrentTask,
+            offset: off_t,
+            whence: crate::fs::SeekOrigin,
+        ) -> Result<off_t, crate::types::Errno> {
+            $delegate.seek(file, current_task, offset, whence)
         }
     };
 }
@@ -439,9 +487,12 @@ macro_rules! fileops_impl_directory {
 
 // Public re-export of macros allows them to be used like regular rust items.
 
+pub(crate) use fileops_impl_delegate_read_and_seek;
 pub(crate) use fileops_impl_directory;
 pub(crate) use fileops_impl_nonseekable;
 pub(crate) use fileops_impl_seekable;
+pub(crate) use fileops_impl_seekable_read;
+pub(crate) use fileops_impl_seekable_write;
 pub(crate) use fileops_impl_seekless;
 
 pub fn default_ioctl(request: u32) -> Result<SyscallResult, Errno> {

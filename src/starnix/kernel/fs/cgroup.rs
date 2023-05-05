@@ -10,10 +10,11 @@
 use std::sync::{Arc, Weak};
 
 use crate::auth::FsCred;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::buffers::InputBuffer;
 use crate::fs::{
-    fileops_impl_seekable, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
-    MemoryDirectoryFile, SeqFileBuf, SeqFileState,
+    fileops_impl_delegate_read_and_seek, fileops_impl_seekable_write, DynamicFile, FileObject,
+    FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, MemoryDirectoryFile, SeqFileBuf,
+    DynamicFileSource,
 };
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, Task};
@@ -123,27 +124,11 @@ impl FsNodeOps for ControlGroupNode {
 
 /// A `ControlGroupFile` currently represents the `cgroup.procs` file for the control group. Writing
 /// to this file will add tasks to the control group.
-struct ControlGroupFile {
+struct ControlGroupFileSource {
     control_group: ControlGroupHandle,
-    file_state: Mutex<SeqFileState<usize>>,
 }
-
-impl ControlGroupFile {
-    fn new(control_group: ControlGroupHandle) -> Self {
-        ControlGroupFile { control_group, file_state: Default::default() }
-    }
-}
-
-impl FileOps for ControlGroupFile {
-    fileops_impl_seekable!();
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+impl DynamicFileSource for ControlGroupFileSource {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
         let remaining_tasks = {
             let control_group = &mut *self.control_group.lock();
             let remaining_tasks: Vec<Arc<Task>> =
@@ -154,20 +139,27 @@ impl FileOps for ControlGroupFile {
             remaining_tasks
         };
 
-        self.file_state.lock().read_at(
-            current_task,
-            |cursor: usize, sink: &mut SeqFileBuf| {
-                if cursor >= remaining_tasks.len() {
-                    return Ok(None);
-                }
-                let pid = remaining_tasks[cursor].get_pid();
-                write!(sink, "{pid}")?;
-                Ok(Some(cursor + 1))
-            },
-            offset,
-            data,
-        )
+        for task in remaining_tasks {
+            let pid = task.get_pid();
+            write!(sink, "{pid}")?;
+        }
+        Ok(())
     }
+}
+
+pub struct ControlGroupFile {
+    dynamic_file: DynamicFile<ControlGroupFileSource>,
+}
+
+impl ControlGroupFile {
+    fn new(control_group: ControlGroupHandle) -> Self {
+        Self { dynamic_file: DynamicFile::new(ControlGroupFileSource { control_group }) }
+    }
+}
+
+impl FileOps for ControlGroupFile {
+    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_seekable_write!();
 
     fn write_at(
         &self,
@@ -184,7 +176,7 @@ impl FileOps for ControlGroupFile {
 
         // TODO(lindkvist): The task needs to be removed form any existing control group before
         // being added to a new one.
-        self.control_group.lock().tasks.push(Arc::downgrade(&task));
+        self.dynamic_file.source.control_group.lock().tasks.push(Arc::downgrade(&task));
 
         Ok(bytes.len())
     }
