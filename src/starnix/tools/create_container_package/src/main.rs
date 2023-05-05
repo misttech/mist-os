@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use ext4_metadata::ROOT_INODE_NUM;
 use fuchsia_async as fasync;
 use fuchsia_pkg::{PackageBuilder, PathToStringExt};
@@ -12,13 +12,16 @@ use std::path::Path;
 use tempfile::TempDir;
 
 mod args;
-use args::{Command, InputFormat};
+use args::{Command, ContainerArchitecture, InputFormat};
 
 mod component_manifest;
 use component_manifest::{compile_container_manifest, compile_exec_manifest};
 
+mod default_init;
+use default_init::{DEFAULT_INIT_ARM64, DEFAULT_INIT_X64};
+
 mod docker_archive;
-use docker_archive::DockerArchive;
+use docker_archive::{DockerArchive, DockerArchiveArchitecture};
 
 mod layered_image;
 use layered_image::{DirectoryVisitor, LayeredImage};
@@ -136,12 +139,15 @@ async fn main() -> Result<()> {
     // Create an empty LayeredImage and fill it with files from input archive.
     let mut image = LayeredImage::new(&temp_dir.path().join("extr"))?;
     let input_file = File::open(cmd.input_path)?;
-    match cmd.input_format {
+    let architecture = match cmd.input_format {
         InputFormat::Tarball => {
             // Load it as a tarball.
             let input_archive = tar::Archive::new(input_file);
 
             image = image.add_layer(input_archive, false)?;
+
+            // The target architecture must have been explicitly passed from command line arguments.
+            cmd.arch.context("missing --arch option")?
         }
         InputFormat::DockerArchive => {
             // Load it as a Docker archive.
@@ -159,8 +165,25 @@ async fn main() -> Result<()> {
                 let handle_whiteouts = i != 0; // the base layer cannot contain whiteouts
                 image = image.add_layer(layer, handle_whiteouts)?;
             }
+
+            // Read the architecture from the archive's metadata.
+            let arch_from_metadata = match input_archive.architecture() {
+                DockerArchiveArchitecture::Amd64 => ContainerArchitecture::X64,
+                DockerArchiveArchitecture::Arm64 => ContainerArchitecture::Arm64,
+            };
+            if cmd.arch.is_some_and(|given| given != arch_from_metadata) {
+                bail!("The --arch value does not match the contents of the input archive");
+            }
+            arch_from_metadata
         }
     };
+
+    // Add the default_init executable corresponding to the target architecture.
+    let default_init = match architecture {
+        ContainerArchitecture::Arm64 => DEFAULT_INIT_ARM64,
+        ContainerArchitecture::X64 => DEFAULT_INIT_X64,
+    };
+    package_builder.add_contents_as_blob("data/init", default_init, temp_dir.path())?;
 
     // Add the container's manifest and ensure that all of its mountpoints actually exist.
     package_builder.add_contents_to_far(

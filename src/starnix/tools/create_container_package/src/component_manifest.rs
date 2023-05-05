@@ -19,10 +19,7 @@ pub fn compile_container_manifest(container_name: &str, mounts: &[&str]) -> Vec<
             "runner": "starnix",
             "apex_hack": [],
             "features": [],
-            "init": [
-                "/bin/sleep",
-                "inf",
-            ],
+            "init": [],
             "init_user": "root:x:0:0",
             "kernel_cmdline": "",
             "mounts": mounts,

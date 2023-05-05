@@ -11,6 +11,18 @@ install_host_tools("host") {
 }
 
 if (is_host) {
+  _default_init_arm64_target =
+      "//src/starnix/containers/default_init(//build/toolchain:linux_arm64)"
+  _default_init_arm64_path =
+      get_label_info(_default_init_arm64_target, "root_out_dir") + "/" +
+      get_label_info(_default_init_arm64_target, "name")
+
+  _default_init_x64_target =
+      "//src/starnix/containers/default_init(//build/toolchain:linux_x64)"
+  _default_init_x64_path =
+      get_label_info(_default_init_x64_target, "root_out_dir") + "/" +
+      get_label_info(_default_init_x64_target, "name")
+
   rustc_binary("create_container_package_bin") {
     name = "create_container_package"
     edition = "2021"
@@ -28,14 +40,31 @@ if (is_host) {
       "//third_party/rust_crates:tar",
       "//third_party/rust_crates:tempfile",
       "//tools/lib/cml",
+      _default_init_arm64_target,
+      _default_init_x64_target,
     ]
 
     sources = [
       "src/args.rs",
       "src/component_manifest.rs",
+      "src/default_init.rs",
       "src/docker_archive.rs",
       "src/layered_image.rs",
       "src/main.rs",
+    ]
+
+    inputs = [
+      _default_init_arm64_path,
+      _default_init_x64_path,
+    ]
+
+    # The code being compiled uses these paths to embed the corresponding generated files at compile
+    # time, which makes the resulting files less reusable for caching because they depend on the
+    # path of the output directory.
+    configs += [ "//build/config/rust:output_dir_sensitive" ]
+    rustenv = [
+      "DEFAULT_INIT_ARM64_PATH=" + rebase_path(_default_init_arm64_path, "src"),
+      "DEFAULT_INIT_X64_PATH=" + rebase_path(_default_init_x64_path, "src"),
     ]
   }
 }

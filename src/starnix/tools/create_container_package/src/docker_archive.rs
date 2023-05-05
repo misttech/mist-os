@@ -26,6 +26,13 @@ pub struct DockerArchive {
     layers: Vec<String>,
 }
 
+#[derive(Clone, Copy, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum DockerArchiveArchitecture {
+    Amd64,
+    Arm64,
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct ManifestEntry {
@@ -35,6 +42,7 @@ struct ManifestEntry {
 
 #[derive(Deserialize, Debug)]
 struct Config {
+    architecture: DockerArchiveArchitecture,
     config: ConfigInner,
 }
 
@@ -103,6 +111,11 @@ impl DockerArchive {
             .map(|layer| Ok(Archive::new(safe_open_in_dir(self.temp_dir.path(), layer)?)))
             .collect();
         Ok(result?.into_iter())
+    }
+
+    /// Returns the container's target architecture.
+    pub fn architecture(&self) -> DockerArchiveArchitecture {
+        self.config.architecture
     }
 
     /// Returns the defined environment variables (in "KEY=VALUE" format).
