@@ -613,7 +613,7 @@ mod tests {
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
         ethernet::Mac,
-        ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        ip::{AddrSubnet, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         UnicastAddr, Witness as _,
     };
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
@@ -1337,6 +1337,152 @@ mod tests {
                 }),
             )]),
         );
+    }
+
+    const LOCAL_IP: Ipv6Addr = net_ip_v6!("fe80::1");
+    const OTHER_IP: Ipv6Addr = net_ip_v6!("fe80::2");
+    const MULTICAST_IP: Ipv6Addr = net_ip_v6!("ff02::1234");
+
+    #[test_case(LOCAL_IP, None, true; "targeting assigned address")]
+    #[test_case(LOCAL_IP, NonZeroU8::new(1), false; "targeting tentative address")]
+    #[test_case(OTHER_IP, None, false; "targeting other host")]
+    #[test_case(MULTICAST_IP, None, false; "targeting multicast address")]
+    fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU8>, expect_handle: bool) {
+        let FakeEventDispatcherConfig {
+            local_mac,
+            remote_mac,
+            local_ip: _,
+            remote_ip: _,
+            subnet: _,
+        } = Ipv6::FAKE_CONFIG;
+
+        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
+            crate::testutil::FakeCtx::default();
+        let mut sync_ctx = &sync_ctx;
+        let link_device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
+        );
+        let device_id = link_device_id.clone().into();
+        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+            config.ip_config.ip_enabled = true;
+        })
+        .unwrap();
+        // Set DAD config after enabling the device so that the default address
+        // does not perform DAD.
+        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+            config.dad_transmits = dad_transmits;
+        })
+        .unwrap();
+        crate::device::add_ip_addr_subnet(
+            &sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap(),
+        )
+        .unwrap();
+        if let Some(NonZeroU8 { .. }) = dad_transmits {
+            // Take DAD message.
+            assert_matches!(
+                &non_sync_ctx.take_frames()[..],
+                [(got_device_id, got_frame)] => {
+                    assert_eq!(got_device_id, &link_device_id);
+
+                    let (src_mac, dst_mac, got_src_ip, got_dst_ip, ttl, message, code) =
+                        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                            Ipv6,
+                            _,
+                            NeighborSolicitation,
+                            _,
+                        >(got_frame, EthernetFrameLengthCheck::NoCheck, |_| {})
+                            .unwrap();
+                    let dst_ip = LOCAL_IP.to_solicited_node_address();
+                    assert_eq!(src_mac, local_mac.get());
+                    assert_eq!(dst_mac, dst_ip.into());
+                    assert_eq!(got_src_ip, Ipv6::UNSPECIFIED_ADDRESS);
+                    assert_eq!(got_dst_ip, dst_ip.get());
+                    assert_eq!(ttl, REQUIRED_NDP_IP_PACKET_HOP_LIMIT);
+                    assert_eq!(message.target_address(), &LOCAL_IP);
+                    assert_eq!(code, IcmpUnusedCode);
+                }
+            );
+        }
+
+        // Send a neighbor solicitation with the test target address to the
+        // host.
+        let remote_mac_bytes = remote_mac.bytes();
+        let src_ip = remote_mac.to_ipv6_link_local().addr();
+        let snmc = target_addr.to_solicited_node_address();
+        let dst_ip = snmc.get();
+        receive_ip_packet::<_, _, Ipv6>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            FrameDestination::Multicast,
+            OptionSequenceBuilder::new(
+                [NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])].iter(),
+            )
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                NeighborSolicitation::new(target_addr),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b(),
+        );
+
+        // Check if a neighbor advertisement was sent as a response and the
+        // new state of the neighbor table.
+        let expected_neighbors = if expect_handle {
+            assert_matches!(
+                &non_sync_ctx.take_frames()[..],
+                [(got_device_id, got_frame)] => {
+                    assert_eq!(got_device_id, &link_device_id);
+
+                    let (src_mac, dst_mac, got_src_ip, got_dst_ip, ttl, message, code) =
+                        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                            Ipv6,
+                            _,
+                            NeighborAdvertisement,
+                            _,
+                        >(got_frame, EthernetFrameLengthCheck::NoCheck, |_| {})
+                            .unwrap();
+                    assert_eq!(src_mac, local_mac.get());
+                    assert_eq!(dst_mac, remote_mac.get());
+                    assert_eq!(got_src_ip, target_addr);
+                    assert_eq!(got_dst_ip, src_ip.into_addr());
+                    assert_eq!(ttl, REQUIRED_NDP_IP_PACKET_HOP_LIMIT);
+                    assert_eq!(message.target_address(), &target_addr);
+                    assert_eq!(code, IcmpUnusedCode);
+                }
+            );
+
+            HashMap::from([(
+                {
+                    let src_ip: UnicastAddr<_> = src_ip.into_addr();
+                    src_ip.into_specified()
+                },
+                NeighborState::Dynamic(DynamicNeighborState::Complete {
+                    link_address: remote_mac.get(),
+                }),
+            )])
+        } else {
+            assert_matches!(&non_sync_ctx.take_frames()[..], []);
+            HashMap::default()
+        };
+
+        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, expected_neighbors);
     }
 
     #[test]

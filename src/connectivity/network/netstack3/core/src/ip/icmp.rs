@@ -56,8 +56,9 @@ use crate::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockCreationError,
             IpSockSendError, IpSocketHandler,
         },
-        AnyDevice, BufferIpLayerHandler, BufferIpTransportContext, DeviceIdContext, EitherDeviceId,
-        IpExt, IpTransportContext, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+        AddressStatus, AnyDevice, BufferIpLayerHandler, BufferIpTransportContext, DeviceIdContext,
+        EitherDeviceId, IpDeviceStateContext, IpExt, IpTransportContext, Ipv6PresentAddressStatus,
+        SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{ConnSocketEntry, ConnSocketMap},
     sync::{Mutex, RwLock},
@@ -1230,6 +1231,7 @@ fn receive_ndp_packet<
     SC: InnerIcmpv6Context<C>
         + Ipv6DeviceHandler<C>
         + IpDeviceHandler<Ipv6, C>
+        + IpDeviceStateContext<Ipv6, C>
         + NudIpHandler<Ipv6, C>
         + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
 >(
@@ -1306,7 +1308,22 @@ fn receive_ndp_packet<
                     return;
                 }
                 Ipv6SourceAddr::Unicast(src_ip) => {
-                    // Neighbor is performing NUD.
+                    // Neighbor is performing link address resolution.
+                    match sync_ctx
+                        .address_status_for_device(target_address.into_specified(), device_id)
+                    {
+                        AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned) => {}
+                        AddressStatus::Present(
+                            Ipv6PresentAddressStatus::UnicastTentative
+                            | Ipv6PresentAddressStatus::Multicast,
+                        )
+                        | AddressStatus::Unassigned => {
+                            // Address is not considered assigned to us as a
+                            // unicast so don't send a neighbor advertisement
+                            // reply.
+                            return;
+                        }
+                    }
 
                     let link_addr = p.body().iter().find_map(|o| match o {
                         NdpOption::SourceLinkLayerAddress(a) => Some(a),
@@ -1634,6 +1651,7 @@ impl<
             + InnerBufferIcmpContext<Ipv6, C, B>
             + Ipv6DeviceHandler<C>
             + IpDeviceHandler<Ipv6, C>
+            + IpDeviceStateContext<Ipv6, C>
             + PmtuHandler<Ipv6, C>
             + NudIpHandler<Ipv6, C>
             + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
@@ -4165,6 +4183,28 @@ mod tests {
 
         fn set_default_hop_limit(&mut self, _device_id: &Self::DeviceId, _hop_limit: NonZeroU8) {
             unreachable!()
+        }
+    }
+
+    impl IpDeviceStateContext<Ipv6, Fakev6NonSyncCtx> for Fakev6SyncCtx {
+        fn get_local_addr_for_remote(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            _remote: Option<SpecifiedAddr<Ipv6Addr>>,
+        ) -> Option<SpecifiedAddr<Ipv6Addr>> {
+            unimplemented!()
+        }
+
+        fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
+            unimplemented!()
+        }
+
+        fn address_status_for_device(
+            &mut self,
+            _addr: SpecifiedAddr<Ipv6Addr>,
+            _device_id: &Self::DeviceId,
+        ) -> AddressStatus<Ipv6PresentAddressStatus> {
+            unimplemented!()
         }
     }
 
