@@ -526,7 +526,7 @@ impl SocketOps for UnixSocket {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
+        self.lock().waiters.wait_async_events(waiter, events, handler)
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {

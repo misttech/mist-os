@@ -127,7 +127,7 @@ impl EpollFileObject {
         // notifications. We handle this by deduping on the epoll_wait end.
         let events = target.query_events(current_task);
         if !(events & wait_object.events).is_empty() {
-            self.waiter.wake_immediately(events.bits(), self.new_wait_handler(key));
+            self.waiter.wake_immediately(events, self.new_wait_handler(key));
             wait_object
                 .wait_canceler
                 .as_ref()
@@ -472,7 +472,7 @@ impl FileOps for EpollFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.state.read().waiters.wait_async_mask(waiter, events.bits(), handler))
+        Some(self.state.read().waiters.wait_async_events(waiter, events, handler))
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

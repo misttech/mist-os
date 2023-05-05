@@ -78,7 +78,7 @@ impl FileOps for EventFdFileObject {
                 }
                 inner.value += add_value;
                 if inner.value > 0 {
-                    inner.wait_queue.notify_mask(FdEvents::POLLIN.bits());
+                    inner.wait_queue.notify_events(FdEvents::POLLIN);
                 }
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },
@@ -117,7 +117,7 @@ impl FileOps for EventFdFileObject {
                     }
                 };
                 data.write_all(&return_value.to_ne_bytes())?;
-                inner.wait_queue.notify_mask(FdEvents::POLLOUT.bits());
+                inner.wait_queue.notify_events(FdEvents::POLLOUT);
 
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },
@@ -134,7 +134,7 @@ impl FileOps for EventFdFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.inner.lock().wait_queue.wait_async_mask(waiter, events.bits(), handler))
+        Some(self.inner.lock().wait_queue.wait_async_events(waiter, events, handler))
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

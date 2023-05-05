@@ -340,7 +340,7 @@ impl FileOps for PipeFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.pipe.lock().waiters.wait_async_mask(waiter, events.bits(), handler))
+        Some(self.pipe.lock().waiters.wait_async_events(waiter, events, handler))
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

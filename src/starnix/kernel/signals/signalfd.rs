@@ -110,7 +110,7 @@ impl FileOps for SignalFd {
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
         let task_state = current_task.read();
-        Some(task_state.signals.signal_wait.wait_async_mask(waiter, events.bits(), handler))
+        Some(task_state.signals.signal_wait.wait_async_events(waiter, events, handler))
     }
 
     fn query_events(&self, current_task: &CurrentTask) -> FdEvents {

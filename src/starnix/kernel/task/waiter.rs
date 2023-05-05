@@ -76,6 +76,38 @@ impl WaitKey {
     }
 }
 
+/// Wrapper around zx::UserPacket to handle packet created for the waiters.
+#[derive(Debug, Copy, Clone)]
+struct WaiterUserPacket(zx::UserPacket);
+
+impl WaiterUserPacket {
+    pub fn from_mask(mask: u64) -> Self {
+        let mut packet_data = [0u8; 32];
+        packet_data[..8].copy_from_slice(&mask.to_ne_bytes());
+        Self(zx::UserPacket::from_u8_array(packet_data))
+    }
+}
+
+impl From<FdEvents> for WaiterUserPacket {
+    fn from(events: FdEvents) -> Self {
+        Self::from_mask(events.as_waiter_mask())
+    }
+}
+
+impl From<WaiterUserPacket> for FdEvents {
+    fn from(value: WaiterUserPacket) -> Self {
+        let mut mask_bytes = [0u8; 8];
+        mask_bytes[..8].copy_from_slice(&value.0.as_u8_array()[..8]);
+        FdEvents::from_waiter_mask(u64::from_ne_bytes(mask_bytes))
+    }
+}
+
+impl Default for WaiterUserPacket {
+    fn default() -> Self {
+        Self::from_mask(0)
+    }
+}
+
 impl WaitCallback {
     pub fn none() -> EventHandler {
         Box::new(|_| {})
@@ -210,11 +242,8 @@ impl Waiter {
                             }
                         }
                         zx::PacketContents::User(usrpkt) => {
-                            let observed = usrpkt.as_u8_array();
-                            let mut mask_bytes = [0u8; 4];
-                            mask_bytes[..4].copy_from_slice(&observed[..4]);
-                            let events =
-                                FdEvents::from_bits_truncate(u32::from_ne_bytes(mask_bytes));
+                            let observed = WaiterUserPacket(usrpkt);
+                            let events: FdEvents = observed.into();
                             let key = packet.key();
                             let handler = self.0.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
@@ -255,13 +284,10 @@ impl Waiter {
         key
     }
 
-    pub fn wake_immediately(&self, event_mask: u32, handler: EventHandler) {
+    pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
         let key = WaitKey { key: self.register_callback(callback) };
-        let mut packet_data = [0u8; 32];
-        packet_data[..4].copy_from_slice(&event_mask.to_ne_bytes()[..4]);
-
-        self.queue_user_packet_data(&key, zx::sys::ZX_OK, packet_data);
+        self.queue_user_packet_data(&key, zx::sys::ZX_OK, events.into());
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
@@ -314,11 +340,8 @@ impl Waiter {
         WaitKey { key }
     }
 
-    fn queue_events(&self, key: &WaitKey, event_mask: u32) {
-        let mut packet_data = [0u8; 32];
-        packet_data[..4].copy_from_slice(&event_mask.to_ne_bytes()[..4]);
-
-        self.queue_user_packet_data(key, zx::sys::ZX_OK, packet_data);
+    fn queue_events(&self, key: &WaitKey, event_mask: u64) {
+        self.queue_user_packet_data(key, zx::sys::ZX_OK, WaiterUserPacket::from_mask(event_mask));
     }
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
@@ -330,14 +353,17 @@ impl Waiter {
         if self.0.ignore_signals {
             return;
         }
-        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, [0u8; 32]);
+        self.queue_user_packet_data(
+            &WaitKey::empty(),
+            zx::sys::ZX_ERR_CANCELED,
+            Default::default(),
+        );
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
     /// waiter to wake up.
-    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, packet_data: [u8; 32]) {
-        let user_packet = zx::UserPacket::from_u8_array(packet_data);
-        let packet = zx::Packet::from_user_packet(key.key, status, user_packet);
+    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, packet_data: WaiterUserPacket) {
+        let packet = zx::Packet::from_user_packet(key.key, status, packet_data.0);
         self.0.port.queue(&packet).map_err(impossible_error).unwrap();
     }
 }
@@ -399,7 +425,7 @@ struct WaitEntry {
     waiter: WaiterRef,
 
     /// The bitmask that the waiter is waiting for.
-    events: u32,
+    events: u64,
 
     /// Whether the waiter wishes to remain in the WaitQueue after one of
     /// the events that the waiter is waiting for occurs.
@@ -434,7 +460,7 @@ impl WaitQueue {
     pub fn wait_async_mask(
         &self,
         waiter: &Waiter,
-        events: u32,
+        events: u64,
         handler: EventHandler,
     ) -> WaitCanceler {
         let key = waiter.wake_on_events(handler);
@@ -474,7 +500,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        self.wait_async_mask(waiter, u32::MAX, WaitCallback::none())
+        self.wait_async_mask(waiter, u64::MAX, WaitCallback::none())
     }
 
     /// Establish a wait for the given events.
@@ -491,7 +517,7 @@ impl WaitQueue {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.wait_async_mask(waiter, events.bits(), handler)
+        self.wait_async_mask(waiter, events.as_waiter_mask(), handler)
     }
 
     /// Notify any waiters that the given events have occurred.
@@ -504,7 +530,7 @@ impl WaitQueue {
     /// They are not called synchronously by this function.
     ///
     /// Returns the number of waiters woken.
-    pub fn notify_mask_count(&self, events: u32, mut limit: usize) -> usize {
+    pub fn notify_mask_count(&self, events: u64, mut limit: usize) -> usize {
         let mut woken = 0;
         self.waiters.lock().retain(|entry| {
             entry.waiter.access(|waiter| {
@@ -528,16 +554,16 @@ impl WaitQueue {
         woken
     }
 
-    pub fn notify_mask(&self, events: u32) {
+    pub fn notify_mask(&self, events: u64) {
         self.notify_mask_count(events, usize::MAX);
     }
 
     pub fn notify_events(&self, events: FdEvents) {
-        self.notify_mask(events.bits());
+        self.notify_mask(events.as_waiter_mask());
     }
 
     pub fn notify_count(&self, limit: usize) {
-        self.notify_mask_count(u32::MAX, limit);
+        self.notify_mask_count(u64::MAX, limit);
     }
 
     pub fn notify_all(&self) {

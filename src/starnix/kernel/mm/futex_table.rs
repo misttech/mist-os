@@ -48,7 +48,7 @@ impl FutexTable {
         let offset = key.offset;
 
         let waiter = Waiter::new();
-        self.get_waiters(key).wait_async_mask(&waiter, mask, WaitCallback::none());
+        self.get_waiters(key).wait_async_mask(&waiter, mask as u64, WaitCallback::none());
         // TODO: This read should be atomic.
         let mut buf = [0u8; 4];
         vmo.read(&mut buf, offset).map_err(impossible_error)?;
@@ -72,7 +72,7 @@ impl FutexTable {
         mask: u32,
     ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(task, addr)?;
-        Ok(self.get_waiters(key).notify_mask_count(mask, count))
+        Ok(self.get_waiters(key).notify_mask_count(mask as u64, count))
     }
 
     /// Requeue the waiters to another address.
@@ -91,7 +91,7 @@ impl FutexTable {
         if let Some(old_waiters) = self.state.lock().remove(&key) {
             waiters.transfer(&old_waiters);
         }
-        let woken = waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY, count);
+        let woken = waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY as u64, count);
         self.get_waiters(new_key).transfer(&waiters);
         Ok(woken)
     }

@@ -218,7 +218,7 @@ impl SocketOps for VsockSocket {
             VsockSocketState::Connected(file) => file
                 .wait_async(current_task, waiter, events, handler)
                 .expect("vsock socket should be connected to a file that can be waited on"),
-            _ => inner.waiters.wait_async_mask(waiter, events.bits(), handler),
+            _ => inner.waiters.wait_async_events(waiter, events, handler),
         }
     }
 
