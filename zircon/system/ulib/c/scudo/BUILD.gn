@@ -284,6 +284,7 @@ libc_test("gwp_asan-unittests") {
 
   sources = [
     "tests/alignment.cpp",
+    "tests/backtrace.cpp",
     "tests/basic.cpp",
     "tests/compression.cpp",
     "tests/crash_handler_api.cpp",
@@ -297,35 +298,13 @@ libc_test("gwp_asan-unittests") {
     # TODO(fxbug.dev/65522): flaky due to TLS pollution
     #"tests/late_init.cpp",
     "tests/mutex_test.cpp",
-    "tests/slot_reuse.cpp",
-    "tests/thread_contention.cpp",
+    "tests/never_allocated.cpp",
 
     # Exclude because signal handlers used in recoverable tests are unsupported
     #"tests/recoverable.cpp"
+    "tests/slot_reuse.cpp",
+    "tests/thread_contention.cpp",
   ]
-
-  # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp and tests/backtrace.cpp
-  # to sources after gwp_asan successfully rolls.
-  if (submodules) {
-    gwp_asan_git_link_path_list =
-        read_file("${gwp_asan_common_vars.dir}/.git", "list lines")
-    gwp_asan_git_link_path = gwp_asan_git_link_path_list[0]
-    gwp_asan_relative_git_dir_split = string_split(gwp_asan_git_link_path)
-    gwp_asan_relative_git_dir = gwp_asan_relative_git_dir_split[1]
-    gwp_asan_git_dir =
-        "${gwp_asan_common_vars.dir}/${gwp_asan_relative_git_dir}"
-    gwp_asan_git_revision = read_file("${gwp_asan_git_dir}/HEAD", "list lines")
-  } else {
-    gwp_asan_git_revision =
-        read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
-  }
-
-  if (gwp_asan_git_revision != [ "f36df953a3bab8b8e54e1ce7214cb710a5605a1a" ]) {
-    sources += [
-      "tests/backtrace.cpp",
-      "tests/never_allocated.cpp",
-    ]
-  }
 
   deps += [
     ":gwp_asan.testonly",
