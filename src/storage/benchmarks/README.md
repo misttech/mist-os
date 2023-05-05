@@ -45,6 +45,15 @@ contains 2 phases:
   All of the `fstatat` calls happen relative to the top level directory.
 * Phase 2: Walking the directory tree in a recursive DFS order to see if any new files were added.
 
+### PageInBlob Benchmarks
+The `PageInBlob` benchmarks measure page fault times for mmap'ed blobs.
+* `PageInBlobSequentialUncompressed` creates an incompressible blob and pages it in by sequentially
+  touching each page.
+* `PageInBlobSequentialCompressed` creates a compressible blob and pages it in by sequentially
+  touching each page.
+* `PageInBlobRandomCompressed` creates a compressible blob and randomly touches pages in a way
+  similar to executing an executable.
+
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
 Simply closing all handles to those files doesn't guarantee that the filesystem will immediately

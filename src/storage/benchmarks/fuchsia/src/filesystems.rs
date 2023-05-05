@@ -35,12 +35,17 @@ const MOUNT_PATH: &str = "/benchmark";
 struct FsmFilesystem {
     fs: fs_management::filesystem::Filesystem,
     serving_filesystem: Option<Either<ServingSingleVolumeFilesystem, ServingMultiVolumeFilesystem>>,
+    as_blob: bool,
     // Keep the underlying block device alive for as long as we are using the filesystem.
     _block_device: Box<dyn BlockDevice>,
 }
 
 impl FsmFilesystem {
-    pub async fn new<FSC: FSConfig>(config: FSC, mut block_device: Box<dyn BlockDevice>) -> Self {
+    pub async fn new<FSC: FSConfig>(
+        config: FSC,
+        mut block_device: Box<dyn BlockDevice>,
+        as_blob: bool,
+    ) -> Self {
         let controller = block_device.take_controller().expect("invalid device controller");
         let mut fs = fs_management::filesystem::Filesystem::new(controller, config);
         fs.format().await.expect("Failed to format the filesystem");
@@ -58,7 +63,18 @@ impl FsmFilesystem {
             serving_filesystem.bind_to_path(MOUNT_PATH).expect("Failed to bind the filesystem");
             Either::Left(serving_filesystem)
         };
-        Self { fs, serving_filesystem: Some(serving_filesystem), _block_device: block_device }
+        let mut fs = Self {
+            fs,
+            serving_filesystem: Some(serving_filesystem),
+            _block_device: block_device,
+            as_blob,
+        };
+        if as_blob {
+            // `create_volume` returns the opened volume but doesn't allow for opening the volume as
+            // a blob volume. Calling `clear_cache` re-opens the volume in blob mode.
+            fs.clear_cache().await
+        }
+        fs
     }
 }
 
@@ -84,7 +100,7 @@ impl Filesystem for FsmFilesystem {
                         "default",
                         MountOptions {
                             crypt: self.fs.config().crypt_client().map(|c| c.into()),
-                            as_blob: false,
+                            as_blob: self.as_blob,
                         },
                     )
                     .await
@@ -113,7 +129,6 @@ impl Filesystem for FsmFilesystem {
 pub struct Blobfs {}
 
 impl Blobfs {
-    #[allow(dead_code)] // Blobfs is not currently used in any benchmarks.
     pub fn new() -> Self {
         Self {}
     }
@@ -128,7 +143,14 @@ impl FilesystemConfig for Blobfs {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        Box::new(FsmFilesystem::new(fs_management::Blobfs::default(), block_device).await)
+        Box::new(
+            FsmFilesystem::new(
+                fs_management::Blobfs::default(),
+                block_device,
+                /*as_blob=*/ false,
+            )
+            .await,
+        )
     }
 
     fn name(&self) -> String {
@@ -206,6 +228,7 @@ impl FilesystemConfig for Fxfs {
         let fxfs = FsmFilesystem::new(
             fs_management::Fxfs::with_crypt_client(Arc::new(get_crypt_client)),
             block_device,
+            /*as_blob=*/ false,
         )
         .await;
         Box::new(fxfs)
@@ -213,6 +236,40 @@ impl FilesystemConfig for Fxfs {
 
     fn name(&self) -> String {
         "fxfs".to_owned()
+    }
+}
+
+pub struct Fxblob {}
+
+impl Fxblob {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl FilesystemConfig for Fxblob {
+    async fn start_filesystem(
+        &self,
+        block_device_factory: &dyn BlockDeviceFactory,
+    ) -> Box<dyn Filesystem> {
+        let block_device = block_device_factory
+            .create_block_device(&BlockDeviceConfig {
+                use_zxcrypt: false,
+                fvm_volume_size: Some(60 * 1024 * 1024),
+            })
+            .await;
+        let fxblob = FsmFilesystem::new(
+            fs_management::Fxfs::default(),
+            block_device,
+            /*as_blob=*/ true,
+        )
+        .await;
+        Box::new(fxblob)
+    }
+
+    fn name(&self) -> String {
+        "fxblob".to_owned()
     }
 }
 
@@ -237,7 +294,14 @@ impl FilesystemConfig for F2fs {
                 fvm_volume_size: Some(100 * 1024 * 1024),
             })
             .await;
-        Box::new(FsmFilesystem::new(fs_management::F2fs::default(), block_device).await)
+        Box::new(
+            FsmFilesystem::new(
+                fs_management::F2fs::default(),
+                block_device,
+                /*as_blob=*/ false,
+            )
+            .await,
+        )
     }
 
     fn name(&self) -> String {
@@ -350,7 +414,14 @@ impl FilesystemConfig for Minfs {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
             .await;
-        Box::new(FsmFilesystem::new(fs_management::Minfs::default(), block_device).await)
+        Box::new(
+            FsmFilesystem::new(
+                fs_management::Minfs::default(),
+                block_device,
+                /*as_blob=*/ false,
+            )
+            .await,
+        )
     }
 
     fn name(&self) -> String {
@@ -372,13 +443,12 @@ mod tests {
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = DEVICE_SIZE / BLOCK_SIZE;
 
-    #[fuchsia::test]
-    async fn start_blobfs() {
+    async fn check_blob_filesystem(filesystem: &dyn FilesystemConfig) {
         const BLOB_NAME: &str = "bd905f783ceae4c5ba8319703d7505ab363733c2db04c52c8405603a02922b15";
         const BLOB_CONTENTS: &str = "blob-contents";
 
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
-        let mut fs = Blobfs::new().start_filesystem(&ramdisk_factory).await;
+        let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
         let blob_path = fs.benchmark_dir().join(BLOB_NAME);
 
         {
@@ -425,8 +495,18 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn start_blobfs() {
+        check_blob_filesystem(&Blobfs::new()).await;
+    }
+
+    #[fuchsia::test]
     async fn start_fxfs() {
         check_filesystem(&Fxfs::new()).await;
+    }
+
+    #[fuchsia::test]
+    async fn start_fxblob() {
+        check_blob_filesystem(&Fxblob::new()).await;
     }
 
     #[fuchsia::test]

@@ -9,8 +9,7 @@ pub mod io_benchmarks;
 #[macro_use]
 mod trace;
 
-#[cfg(test)]
-mod testing;
+pub mod testing;
 
 use {
     async_trait::async_trait,

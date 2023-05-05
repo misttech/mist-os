@@ -4,8 +4,12 @@
 
 use {
     crate::{
+        blob_benchmarks::{
+            PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
+            PageInBlobSequentialUncompressed,
+        },
         block_devices::{FvmVolumeFactory, RamdiskFactory},
-        filesystems::{F2fs, Fxfs, Memfs, Minfs},
+        filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs},
     },
     regex::{Regex, RegexSetBuilder},
     std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
@@ -23,6 +27,7 @@ use {
     },
 };
 
+mod blob_benchmarks;
 mod block_devices;
 mod filesystems;
 
@@ -58,6 +63,10 @@ struct Args {
     /// from the start of the trace.
     #[argh(switch)]
     load_blobs_for_tracing: bool,
+
+    /// runs the blob benchmarks instead of the regular benchmarks.
+    #[argh(switch)]
+    blob_benchmarks: bool,
 }
 
 fn build_benchmark_set() -> BenchmarkSet {
@@ -98,6 +107,22 @@ fn build_benchmark_set() -> BenchmarkSet {
     benchmark_set
 }
 
+/// The blob benchmarks are separate from the others to prevent them from running in CQ until fxblob
+/// supports writing compressed blobs.
+fn build_blob_benchmark_set() -> BenchmarkSet {
+    let mut benchmark_set = BenchmarkSet::new();
+    let blob_filesystems: Vec<Arc<dyn FilesystemConfig>> =
+        vec![Arc::new(Blobfs::new()), Arc::new(Fxblob::new())];
+
+    const BLOB_SIZE: usize = 2 * 1024 * 1024; // 2 MiB
+    benchmark_set
+        .add_benchmark(PageInBlobSequentialUncompressed::new(BLOB_SIZE), &blob_filesystems);
+    benchmark_set.add_benchmark(PageInBlobSequentialCompressed::new(BLOB_SIZE), &blob_filesystems);
+    benchmark_set.add_benchmark(PageInBlobRandomCompressed::new(BLOB_SIZE), &blob_filesystems);
+
+    benchmark_set
+}
+
 async fn load_blobs_for_tracing() {
     let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![
         Arc::new(Fxfs::new()),
@@ -129,7 +154,8 @@ async fn main() {
     let filter = filter.build().unwrap();
 
     let fvm_volume_factory = FvmVolumeFactory::new().await;
-    let benchmark_suite = build_benchmark_set();
+    let benchmark_suite =
+        if args.blob_benchmarks { build_blob_benchmark_set() } else { build_benchmark_set() };
     let results = benchmark_suite.run(&fvm_volume_factory, &filter).await;
 
     results.write_table(std::io::stdout());
