@@ -506,6 +506,7 @@ impl WaitQueue {
             }
         })
     }
+
     /// Establish a wait for the given event mask.
     ///
     /// The waiter will be notified when an event matching the events mask
@@ -522,6 +523,27 @@ impl WaitQueue {
             WaitEntry {
                 waiter: waiter.weak(),
                 filter: WaitEvents::Mask(mask),
+                persistent: false,
+                key,
+            },
+        )
+    }
+
+    /// Establish a wait for the given value event.
+    ///
+    /// The waiter will be notified when an event with the same value occurs.
+    ///
+    /// This function does not actually block the waiter. To block the waiter,
+    /// call the [`Waiter::wait`] function on the waiter.
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
+    pub fn wait_async_value(&self, waiter: &Waiter, value: u64) -> WaitCanceler {
+        let key = waiter.next_key();
+        self.wait_async_on_entry(
+            waiter,
+            WaitEntry {
+                waiter: waiter.weak(),
+                filter: WaitEvents::Value(value),
                 persistent: false,
                 key,
             },
@@ -614,6 +636,10 @@ impl WaitQueue {
 
     pub fn notify_fd_events(&self, events: FdEvents) {
         self.notify_events_count(WaitEvents::Fd(events), usize::MAX);
+    }
+
+    pub fn notify_value_event(&self, value: u64) {
+        self.notify_events_count(WaitEvents::Value(value), usize::MAX);
     }
 
     pub fn notify_count(&self, limit: usize) {

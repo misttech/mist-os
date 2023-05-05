@@ -311,14 +311,14 @@ impl RemoteBinderHandleState {
             if matches!(self.pending_requests.insert(tid, Some(request)), Some(Some(_))) {
                 panic!("A single thread received 2 concurrent requests.");
             }
-            self.waiters.notify_all();
+            self.waiters.notify_value_event(tid as u64);
         } else if let Some(tid) = self.unassigned_tasks.iter().next().copied() {
             // There was no task associated with the koid, but there exists an unassigned task.
             // Associated the task with the koid, and insert the pending request.
             self.unassigned_tasks.remove(&tid);
             self.koid_to_task.insert(request.koid, tid);
             self.pending_requests.insert(tid, Some(request));
-            self.waiters.notify_all();
+            self.waiters.notify_value_event(tid as u64);
         } else {
             // Not unassigned task ready. Request userspace to spawn a new one.
             self.enqueue_taskless_request(TaskRequest::Return(true));
@@ -335,9 +335,12 @@ impl RemoteBinderHandleState {
         if let Some(thread_group) = self.thread_group.upgrade() {
             if let Ok(task) = thread_group.read().get_task() {
                 task.interrupt();
+                // One task is ready to handle the request.
+                return;
             }
         }
-        self.waiters.notify_all();
+        // Interrupt a single task to handle the request.
+        self.waiters.notify_count(1);
     }
 }
 
@@ -579,7 +582,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             }
             // Wait until some request is available.
             let waiter = Waiter::new();
-            state.waiters.wait_async(&waiter);
+            state.waiters.wait_async_value(&waiter, tid as u64);
             std::mem::drop(state);
             waiter.wait(current_task)?;
         }
