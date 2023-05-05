@@ -1,0 +1,11 @@
+{
+    "short_description": "Magma Service Driver for ARM Mali - DFv2 version",
+    "manufacturer": "ARM",
+    "families": [],
+    "models": [
+        "generic"
+    ],
+    "areas": [
+        "Graphics"
+    ]
+}

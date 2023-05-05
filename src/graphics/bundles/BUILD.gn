@@ -21,6 +21,7 @@ group("drivers") {
     "//src/graphics/drivers/misc/goldfish_control:control_driver",
     "//src/graphics/drivers/misc/goldfish_sync:goldfish_sync_driver",
     "//src/graphics/drivers/msd-arm-mali:msd_arm",
+    "//src/graphics/drivers/msd-arm-mali:msd_arm_dfv2",
     "//src/graphics/drivers/msd-arm-mali:msd_arm_rebind",
     "//src/graphics/drivers/msd-arm-mali:msd_arm_test",
     "//src/graphics/drivers/msd-intel-gen:msd_intel",

@@ -10,9 +10,6 @@
 
 #include "parent_device.h"
 
-// zx_device_t* == msd::DeviceHandle*.
-msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device);
-
 class ParentDeviceDFv1 : public ParentDevice {
  public:
   explicit ParentDeviceDFv1(zx_device_t* parent, ddk::PDevFidl pdev)
@@ -30,8 +27,11 @@ class ParentDeviceDFv1 : public ParentDevice {
   // Register an interrupt listed at |index| in the platform device.
   std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) override;
 
-  zx_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
-                                     fdf::Channel server_end) override;
+  zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>> ConnectToMaliRuntimeProtocol()
+      override;
+
+  // Ownership of |device_handle| is *not* transferred to the ParentDevice.
+  static std::unique_ptr<ParentDeviceDFv1> Create(zx_device_t* device_handle);
 
  private:
   zx_device_t* parent_;

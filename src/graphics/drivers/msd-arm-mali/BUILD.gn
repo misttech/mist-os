@@ -6,6 +6,10 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
+declare_args() {
+  enable_msd_arm_mali_dfv2 = false
+}
+
 fuchsia_driver("msd_arm-driver") {
   output_name = "libmsd_arm"
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
@@ -87,6 +91,52 @@ driver_bind_rules("msd_arm_test_bind") {
   disable_fragment_gen = true
 }
 
+dfv2_entry_deps = [
+  "src",
+  "src:parent_device_dfv2",
+  "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",
+  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_wire",
+  "//sdk/lib/driver/devfs/cpp",
+  "//src/graphics/lib/magma/src/magma_util:macros",
+  "//src/graphics/lib/magma/src/magma_util/platform:logger",
+  "//src/graphics/lib/magma/src/magma_util/platform:trace",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+  "//src/graphics/lib/magma/src/sys_driver_cpp",
+  "//zircon/system/ulib/trace",
+  "//zircon/system/ulib/trace-vthread",
+  "//zircon/system/ulib/zx",
+]
+
+source_set("msd_arm_entry_dfv2") {
+  sources = [ "src/driver_entry_dfv2.cc" ]
+  deps = dfv2_entry_deps + [
+           ":msd_arm_bind",
+           "//src/graphics/lib/magma/src/sys_driver_cpp:magma_driver_base",
+         ]
+}
+
+fuchsia_driver("msd_arm-dfv2-driver") {
+  output_name = "libmsd_arm_dfv2"
+  deps = [
+    ":msd_arm_entry_dfv2",
+    "src",
+  ]
+  assert_no_deps = [
+    "//src/devices/bin/driver_host:driver",
+    "//src/graphics/lib/magma/src/sys_driver",
+    "//zircon/system/ulib/trace-engine:trace-engine-static",
+  ]
+}
+
+fuchsia_driver_component("msd_arm_dfv2") {
+  component_name = "libmsd_arm_dfv2"
+  deps = [ ":msd_arm-dfv2-driver" ]
+  info = "msd_arm_dfv2-info.json"
+  manifest = "meta/msd_arm_dfv2.cml"
+}
+
 entry_deps = [
   "src:parent_device_dfv1",
   "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
@@ -137,11 +187,19 @@ group("tests") {
 }
 
 group("msd-system") {
-  deps = [ ":msd-arm-mali" ]
+  if (enable_msd_arm_mali_dfv2) {
+    deps = [ ":msd-arm-mali-dfv2" ]
+  } else {
+    deps = [ ":msd-arm-mali" ]
+  }
 }
 
 group("msd-config") {
   deps = [ "//src/diagnostics/config/triage:mali-detect" ]
+}
+
+fuchsia_driver_package("msd-arm-mali-dfv2") {
+  driver_components = [ ":msd_arm_dfv2" ]
 }
 
 fuchsia_driver_package("msd-arm-mali") {
