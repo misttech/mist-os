@@ -2804,9 +2804,12 @@ static bool vmo_discard_test() {
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
   EXPECT_EQ(kSize, vmo->size());
 
+  uint64_t reclamation_count = vmo->ReclamationEventCount();
+
   // Should be able to discard now.
   EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
   EXPECT_EQ(0u, vmo->AttributedPages().uncompressed);
+  EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
   // Verify that the size is not affected.
   EXPECT_EQ(kSize, vmo->size());
 
@@ -2827,16 +2830,20 @@ static bool vmo_discard_test() {
   EXPECT_EQ(kSize / PAGE_SIZE, vmo->AttributedPages().uncompressed);
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kNewSize));
 
+  reclamation_count = vmo->ReclamationEventCount();
+
   // Cannot discard a vmo with pinned pages.
   EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(kSize / PAGE_SIZE, vmo->AttributedPages().uncompressed);
+  EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Unpin the pages. Should be able to discard now.
   vmo->Unpin(0, kSize);
   EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(0u, vmo->AttributedPages().uncompressed);
+  EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
 
   // Lock and commit pages. Unlock.
   EXPECT_EQ(ZX_OK, vmo->LockRange(0, kNewSize, &lock_state));
@@ -2852,6 +2859,7 @@ static bool vmo_discard_test() {
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kSize, &vmo);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(0u, vmo->ReclamationEventCount());
 
   END_TEST;
 }

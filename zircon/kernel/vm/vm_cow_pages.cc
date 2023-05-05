@@ -6682,6 +6682,7 @@ uint64_t VmCowPages::DiscardPages(zx_duration_t min_duration_since_reclaimable,
     return pages_freed;
   }
 
+  reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
 
   // Set state to discarded.
