@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        target::{CustomBuildTarget, GnTarget},
-        types::*,
-    },
+    crate::{target::GnTarget, types::*},
     anyhow::{anyhow, Context as _, Result},
     cargo_metadata::{DependencyKind, Metadata, Package, PackageId},
     std::collections::{HashMap, HashSet},
@@ -67,25 +64,6 @@ impl<'a> GnBuildGraph<'a> {
             .iter()
             .filter(|node| node.id == cargo_pkg_id)
         {
-            // check if this crate has a build script in it
-            let mut build_script = package.targets.iter().find_map(|target| {
-                for kind in &target.kind {
-                    if GnRustType::try_from(kind.as_str())
-                        .with_context(|| {
-                            format!("Failed to resolve GN target type for: {:?}", &target)
-                        })
-                        .unwrap()
-                        == GnRustType::BuildScript
-                    {
-                        return Some(CustomBuildTarget {
-                            dependencies: vec![],
-                            path: &target.src_path,
-                        });
-                    }
-                }
-                None
-            });
-
             let mut dependencies = HashMap::<Option<Platform>, Vec<(&'a Package, String)>>::new();
 
             // collect the dependency edges for this node
@@ -112,11 +90,7 @@ impl<'a> GnBuildGraph<'a> {
                                 platform_deps.push((&self.metadata[id], node_dep.name.clone()));
                             }
                         }
-                        DependencyKind::Build => {
-                            if let Some(ref mut build_script) = build_script {
-                                build_script.dependencies.push(&self.metadata[id]);
-                            }
-                        }
+                        DependencyKind::Build => {}
                         DependencyKind::Development => {}
                         err => {
                             return Err(anyhow!(
@@ -127,6 +101,22 @@ impl<'a> GnBuildGraph<'a> {
                     }
                 }
             }
+
+            let has_build_script = package.targets.iter().any(|target| {
+                for kind in &target.kind {
+                    let gn_rust_type = GnRustType::try_from(kind.as_str())
+                        .with_context(|| {
+                            format!("Failed to resolve GN target type for: {:?}", target)
+                        })
+                        .unwrap();
+
+                    if gn_rust_type == GnRustType::BuildScript {
+                        return true;
+                    }
+                }
+
+                false
+            });
 
             for rust_target in package.targets.iter() {
                 for kind in &rust_target.kind {
@@ -142,7 +132,7 @@ impl<'a> GnBuildGraph<'a> {
                                 &package.version,
                                 target_type,
                                 node.features.as_slice(),
-                                build_script.clone(),
+                                has_build_script,
                                 dependencies.clone(),
                             );
                             self.targets.insert(gn_target);
@@ -176,7 +166,7 @@ impl<'a> GnBuildGraph<'a> {
                                 &package.version,
                                 target_type,
                                 node.features.as_slice(),
-                                build_script.clone(),
+                                has_build_script,
                                 deps,
                             );
                             self.targets.insert(gn_target);

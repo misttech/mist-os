@@ -569,7 +569,7 @@ mod tests {
             &version,
             GnRustType::Library,
             &[],
-            None,
+            false,
             HashMap::new(),
         );
 
@@ -602,7 +602,7 @@ mod tests {
             &version,
             GnRustType::Library,
             &[],
-            None,
+            false,
             HashMap::new(),
         );
 
@@ -660,7 +660,7 @@ mod tests {
             &version,
             GnRustType::Binary,
             &[],
-            None,
+            false,
             HashMap::new(),
         );
 
@@ -720,7 +720,7 @@ mod tests {
             &version,
             GnRustType::Binary,
             &[],
-            None,
+            false,
             HashMap::new(),
         );
 

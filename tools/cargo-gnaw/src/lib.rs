@@ -613,8 +613,8 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         };
 
         let target_cfg = target_cfgs.get(target);
-        if target.uses_build_script() && target_cfg.is_none() {
-            let build_output = BuildScript::compile(target).and_then(|s| s.execute());
+        if target.has_build_script && target_cfg.is_none() {
+            let build_output = BuildScript::execute(target);
             match build_output {
                 Ok(rules) => {
                     anyhow::bail!(
@@ -718,7 +718,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
 
         gn::write_rule(
             &mut output,
-            &target,
+            target,
             &opt.project_root,
             global_config,
             target_cfg,
@@ -731,7 +731,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         if targets_with_tests.contains(target) {
             gn::write_rule(
                 &mut output,
-                &target,
+                target,
                 &opt.project_root,
                 global_config,
                 target_cfg,

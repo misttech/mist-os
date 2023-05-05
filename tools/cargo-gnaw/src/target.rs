@@ -13,12 +13,6 @@ use {
     std::hash::{Hash, Hasher},
 };
 
-#[derive(Clone)]
-pub struct CustomBuildTarget<'a> {
-    pub path: &'a Utf8Path,
-    pub dependencies: Vec<&'a Package>,
-}
-
 pub struct GnTarget<'a> {
     /// Package ID from the Cargo metadata
     cargo_pkg_id: &'a PackageId,
@@ -40,7 +34,7 @@ pub struct GnTarget<'a> {
     /// rustc: --cfg=feature=<string>
     pub features: &'a [String],
     /// Target depends on Cargo running a custom build-script
-    pub build_script: Option<CustomBuildTarget<'a>>,
+    pub has_build_script: bool,
     /// Target depends on Cargo running a custom build-script
     pub dependencies: HashMap<Option<Platform>, Vec<(&'a Package, String)>>,
 }
@@ -52,7 +46,7 @@ impl std::fmt::Debug for GnTarget<'_> {
         } else {
             Cow::Borrowed(self.pkg_name)
         };
-        if self.build_script.is_some() {
+        if self.has_build_script {
             write!(f, "{:?} with custom-build: {}", self.target_type, display_name)
         } else {
             write!(f, "{:?}: {}", self.target_type, display_name)
@@ -102,7 +96,7 @@ impl<'a> GnTarget<'a> {
         version: &'a Version,
         target_type: GnRustType,
         features: &'a [Feature],
-        build_script: Option<CustomBuildTarget<'a>>,
+        has_build_script: bool,
         dependencies: HashMap<Option<Platform>, Vec<(&'a Package, String)>>,
     ) -> Self {
         GnTarget {
@@ -114,13 +108,9 @@ impl<'a> GnTarget<'a> {
             version,
             target_type,
             features,
-            build_script,
+            has_build_script,
             dependencies,
         }
-    }
-
-    pub fn uses_build_script(&self) -> bool {
-        self.build_script.is_some()
     }
 
     /// Name of the target given in Cargo.toml

@@ -5,10 +5,10 @@
 use {
     crate::target::GnTarget,
     anyhow::{anyhow, Result},
-    std::ffi::OsString,
-    std::path::PathBuf,
+    std::fs::File,
+    std::io::Read,
     std::process::Command,
-    tempfile::{tempdir, TempDir},
+    std::{path::PathBuf, str::FromStr},
 };
 
 pub struct BuildScriptOutput {
@@ -16,6 +16,14 @@ pub struct BuildScriptOutput {
 }
 
 impl BuildScriptOutput {
+    pub fn parse_from_file(file: PathBuf) -> Result<Self> {
+        let mut file = File::open(file)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let configs: Vec<&str> = contents.split('\n').collect();
+        Self::parse(configs)
+    }
+
     pub fn parse(lines: Vec<&str>) -> Result<Self> {
         let mut bs = BuildScriptOutput { cfgs: vec![] };
 
@@ -37,75 +45,69 @@ impl BuildScriptOutput {
     }
 }
 
-pub struct BuildScript<'a> {
-    path: PathBuf,
-    output_dir: TempDir,
-    target: &'a GnTarget<'a>,
-}
+pub struct BuildScript {}
 
-fn get_rustc() -> OsString {
-    std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc"))
-}
+impl BuildScript {
+    pub fn execute(target: &GnTarget<'_>) -> Result<BuildScriptOutput> {
+        // Previously, this code would compile build.rs scripts directly with rustc. However, build
+        // scripts can have dependencies of their own (e.g. build-dependencies in Cargo.toml).
+        // Rather than resolve the entire dependency chain ourselves, we call out to cargo to build
+        // the crate, performing the build.rs compilation along the way. This does more work than
+        // compiling the build.rs directly but we don't want to get into the dependency resolution
+        // business when cargo can do this already.
+        //
+        // Unfortunately, there is no way to tell cargo to build only the build script. We could
+        // link in the cargo library itself and call the correct functions to do only that part of
+        // the build but that seems overkill.
+        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| std::ffi::OsString::from("cargo"));
 
-impl<'a> BuildScript<'a> {
-    pub fn compile(target: &'a GnTarget<'_>) -> Result<BuildScript<'a>> {
-        let build_script = target.build_script.as_ref().unwrap();
-        let rustc = get_rustc();
-        // compile the build script
-        let crate_name = format!("{}_build_script", target.name().replace('-', "_"));
-        let mut out_file = std::env::temp_dir();
-        out_file.push(crate_name.clone());
-
-        let mut features = vec![];
-        for feature in target.features {
-            features.push(format!("--cfg=feature=\"{}\"", feature))
-        }
-
-        let output = Command::new(rustc)
-            .arg(format!("--edition={}", target.edition))
-            .arg(format!("--crate-name={}", crate_name))
-            .args(features)
-            .arg("--crate-type=bin")
-            .arg("-o")
-            .arg(out_file.clone())
-            .arg(build_script.path)
+        let command = Command::new(cargo)
+            .current_dir(target.package_root())
+            .arg("check")
+            .arg("--message-format=json-render-diagnostics")
             .output()
-            .expect("failed to execute process");
-        if !output.status.success() {
+            .expect("failed to execute cargo crate build");
+
+        if !command.status.success() {
             return Err(anyhow!(
                 "Failed to compile {}:\n{}",
                 target.gn_target_name(),
-                String::from_utf8_lossy(&output.stderr)
+                String::from_utf8_lossy(&command.stderr)
             ));
         }
 
-        let out_dir = tempdir()?;
-        Ok(BuildScript { path: out_file, output_dir: out_dir, target })
-    }
+        let stdout = String::from_utf8(command.stdout)?;
+        let messages: Vec<&str> = stdout.trim().split('\n').collect();
+        for message in messages {
+            let json: serde_json::Value =
+                serde_json::from_str(message).expect("JSON was not well-formatted");
 
-    pub fn execute(self) -> Result<BuildScriptOutput> {
-        let mut features = vec![];
-        for feature in self.target.features {
-            features.push((format!("CARGO_FEATURE_{}", feature.to_uppercase()), ""))
+            let reason = json.get("reason").unwrap();
+            if reason != "build-script-executed" {
+                continue;
+            }
+
+            let package_id = json.get("package_id").unwrap().to_string().replace('"', "");
+            let package_elements: Vec<&str> = package_id.split(' ').collect();
+            let crate_name = package_elements[0];
+
+            // this build script execution was for the crate that we are expecting to have a
+            // build script (avoids issues where a dependency has a build script and we use
+            // that one by mistake)
+            if crate_name != target.target_name {
+                continue;
+            }
+
+            // cargo executes the build script for us and stores the output in its cache, we just
+            // need to parse it
+            let out_dir = json.get("out_dir").unwrap().as_str().unwrap();
+            let output = PathBuf::from_str(out_dir).unwrap().parent().unwrap().join("output");
+            return BuildScriptOutput::parse_from_file(output);
         }
 
-        let output = Command::new(self.path.clone())
-            .env("RUSTC", get_rustc())
-            .env("OUT_DIR", self.output_dir.path())
-            // TODO more environment variables might be needed for Cargo
-            // https://doc.rust-lang.org/cargo/reference/environment-variables.html
-            .env("CARGO_CFG_TARGET_FEATURE", "")
-            .envs(features)
-            .env("TARGET", "x86_64-unknown-linux-gnu")
-            .output()
-            .expect("failed to execute process");
-        if !output.status.success() {
-            return Err(anyhow!("Failed to run {:?}", self.path));
-        }
-
-        let stdout = String::from_utf8(output.stdout)?;
-        let configs: Vec<&str> = stdout.split('\n').collect();
-
-        BuildScriptOutput::parse(configs)
+        Err(anyhow!(
+            "We detected a build script in {} but cargo didn't compile it",
+            target.gn_target_name()
+        ))
     }
 }
