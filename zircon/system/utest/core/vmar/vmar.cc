@@ -517,9 +517,9 @@ AlignTestdata align_data[]{
     {ZX_VM_ALIGN_256MB, 28}, {ZX_VM_ALIGN_512MB, 29}, {ZX_VM_ALIGN_1GB, 30},
     {ZX_VM_ALIGN_2GB, 31},   {ZX_VM_ALIGN_4GB, 32}};
 
-// Create a manually aligned |vmar| to |vmar_size|, this is needed only
+// Create a vmar with |alignment| of size |vmar_size|, this is needed only
 // needed when testing the alignment flags.
-zx_status_t MakeManualAlignedVmar(size_t vmar_size, zx_handle_t* vmar) {
+zx_status_t MakeManualAlignedVmar(size_t vmar_size, size_t alignment, zx_handle_t* vmar) {
   zx_info_vmar_t vmar_info;
   auto status = zx_object_get_info(zx_vmar_root_self(), ZX_INFO_VMAR, &vmar_info, sizeof(vmar_info),
                                    NULL, NULL);
@@ -528,10 +528,10 @@ zx_status_t MakeManualAlignedVmar(size_t vmar_size, zx_handle_t* vmar) {
   }
 
   const size_t root_vmar_end = vmar_info.base + vmar_info.len;
-  size_t start = fbl::round_up(vmar_info.base, vmar_size);
+  size_t start = fbl::round_up(vmar_info.base, alignment);
 
   zx_vaddr_t root_addr = 0u;
-  for (; start < root_vmar_end; start += vmar_size) {
+  for (; start < root_vmar_end; start += alignment) {
     status = zx_vmar_allocate(
         zx_vmar_root_self(),
         ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_SPECIFIC,
@@ -546,11 +546,12 @@ zx_status_t MakeManualAlignedVmar(size_t vmar_size, zx_handle_t* vmar) {
 TEST(Vmar, AlignmentVmarMapTest) {
   const size_t size = zx_system_get_page_size() * 2;
   const auto vmar_size = (8ull * 1024 * 1024 * 1024);
+  const auto vmar_alignment = (512ull * 1024 * 1024);
 
   zx_handle_t vmo;
   ASSERT_EQ(zx_vmo_create(size, 0, &vmo), ZX_OK);
   zx_handle_t vmar = ZX_HANDLE_INVALID;
-  ASSERT_EQ(MakeManualAlignedVmar(vmar_size, &vmar), ZX_OK);
+  ASSERT_EQ(MakeManualAlignedVmar(vmar_size, vmar_alignment, &vmar), ZX_OK);
 
   // Specific base + offset does not meet the alignment, so it fails.
   zx_vaddr_t dummy;
@@ -600,9 +601,10 @@ TEST(Vmar, AlignmentVmarMapTest) {
 TEST(Vmar, AlignmentVmarAllocateTest) {
   const size_t size = zx_system_get_page_size() * 16;
   const auto vmar_size = (8ull * 1024 * 1024 * 1024);
+  const auto vmar_alignment = (512ull * 1024 * 1024);
 
   zx_handle_t vmar = ZX_HANDLE_INVALID;
-  ASSERT_EQ(MakeManualAlignedVmar(vmar_size, &vmar), ZX_OK);
+  ASSERT_EQ(MakeManualAlignedVmar(vmar_size, vmar_alignment, &vmar), ZX_OK);
 
   // Specific base + offset does not meet the alignment, so it fails.
   zx_vaddr_t dummy_a;
