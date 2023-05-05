@@ -36,7 +36,9 @@ test("edid-test") {
   sources = [ "unit-tests.cc" ]
   deps = [
     ":edid",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 }
 

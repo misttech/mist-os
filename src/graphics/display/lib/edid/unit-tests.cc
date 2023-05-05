@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/stdcompat/span.h>
+
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/graphics/display/lib/edid/test-support.h"
@@ -83,15 +86,16 @@ class FakeDdcMemory {
       switch (message.addr) {
         case kDdcSegmentI2cAddress: {
           if (message.is_read) {
-            ADD_FAILURE("Segment index must not be read");
+            EXPECT_TRUE(false) << "Segment index must not be read";
             return false;
           }
           if (message.length != 1) {
-            ADD_FAILURE("Invalid segment index length (%u); valid length is 1", message.length);
+            EXPECT_TRUE(false) << "Invalid segment index length (" << message.length
+                               << "); valid length is 1";
             return false;
           }
           if (message.buf == nullptr) {
-            ADD_FAILURE("Invalid segment index pointer");
+            EXPECT_TRUE(false) << "Invalid segment index pointer";
             return false;
           }
 
@@ -99,8 +103,8 @@ class FakeDdcMemory {
           size_t num_segments =
               (edid_data_.size() + kBytesPerEdidSegment - 1) / kBytesPerEdidSegment;
           if (new_segment_index >= num_segments) {
-            ADD_FAILURE("Invalid segment index (%u); valid length must be less than %lu",
-                        new_segment_index, num_segments);
+            EXPECT_TRUE(false) << "Invalid segment index (" << new_segment_index
+                               << "); valid length must be less than " << num_segments;
             return false;
           }
           current_segment_index_ = new_segment_index;
@@ -112,30 +116,28 @@ class FakeDdcMemory {
           if (!message.is_read) {
             // Write data register to update offset.
             if (message.length != 1) {
-              ADD_FAILURE("Invalid offset length (%u); valid length is 1", message.length);
+              EXPECT_TRUE(false) << "Invalid offset length (" << message.length
+                                 << "); valid length is 1";
               return false;
             }
             if (message.buf == nullptr) {
-              ADD_FAILURE("Invalid offset buffer pointer");
+              EXPECT_TRUE(false) << "Invalid offset buffer pointer";
               return false;
             }
 
             uint8_t new_offset_in_segment = *message.buf;
             if (new_offset_in_segment != 0x00 && new_offset_in_segment != 0x80) {
-              ADD_FAILURE(
-                  "Invalid offset value (%u); E-DDC standard should only "
-                  "use 0x00 or 0x80 as offset",
-                  new_offset_in_segment);
+              EXPECT_TRUE(false) << "Invalid offset value (" << new_offset_in_segment
+                                 << "); E-DDC standard should only use 0x00 or 0x80 as offset";
               return false;
             }
 
             size_t current_byte_location =
                 current_segment_index_ * kBytesPerEdidSegment + new_offset_in_segment;
             if (current_byte_location >= edid_data_.size()) {
-              ADD_FAILURE(
-                  "Byte location (segment %u offset %u) out of range; "
-                  "the byte location must not exceed EDID data size (%lu)",
-                  current_segment_index_, new_offset_in_segment, edid_data_.size());
+              EXPECT_TRUE(false) << "Byte location (segment " << current_segment_index_
+                                 << " offset " << new_offset_in_segment
+                                 << ") exceeds EDID data size " << edid_data_.size();
               return false;
             }
             current_byte_offset_in_segment_ = new_offset_in_segment;
@@ -145,14 +147,12 @@ class FakeDdcMemory {
           } else {
             // Read EDID from I2C bus.
             if (message.length != 128) {
-              ADD_FAILURE(
-                  "Invalid EDID data length (%u); E-DDC recommends reading "
-                  "EDID data in 128-byte chunks",
-                  message.length);
+              EXPECT_TRUE(false) << "Invalid EDID data length (" << message.length
+                                 << "); E-DDC recommends reading EDID data in 128-byte chunks";
               return false;
             }
             if (message.buf == nullptr) {
-              ADD_FAILURE("Invalid EDID data buffer pointer");
+              EXPECT_TRUE(false) << "Invalid EDID data buffer pointer";
               return false;
             }
 
@@ -164,10 +164,10 @@ class FakeDdcMemory {
 
             if (!(begin >= edid_data_.begin() && begin < edid_data_.end() &&
                   end > edid_data_.begin() && end <= edid_data_.end())) {
-              ADD_FAILURE(
-                  "Byte location [%d..%d] not in a valid range; "
-                  "Byte location should be within [0..%lu]",
-                  start_byte_location, start_byte_location + message.length, edid_data_.size() - 1);
+              EXPECT_TRUE(false) << "Byte location [" << start_byte_location << ".."
+                                 << start_byte_location + message.length
+                                 << "] not in a valid range; Byte location should be within [0.."
+                                 << edid_data_.size() - 1 << "]";
             }
 
             std::copy(begin, end, message.buf);
@@ -178,7 +178,7 @@ class FakeDdcMemory {
           }
           break;
         default:
-          ADD_FAILURE("Invalid I2C address: 0x%02x", message.addr);
+          EXPECT_TRUE(false) << "Invalid I2C address: " << message.addr;
           return false;
       }
     }
@@ -201,46 +201,49 @@ TEST(EdidTest, ReadEdid_OneBlockOneSegment) {
   // One EDID blocks without extensions.
   FakeDdcMemory fake_ddc_memory(edid::kHpZr30wEdid);
 
-  auto result = edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error, "Error while reading EDID: %s", result.error_message);
+  edid::ReadEdidResult result =
+      edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
+  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
 
-  const auto& edid_data_transacted = result.edid_bytes;
-  ASSERT_EQ(edid_data_transacted.size(), 128u);
-  EXPECT_BYTES_EQ(edid::kHpZr30wEdid, edid_data_transacted.data(), 128);
+  static constexpr cpp20::span<const uint8_t> kHpZr30wEdidSpan(edid::kHpZr30wEdid);
+  EXPECT_EQ(std::vector(kHpZr30wEdidSpan.begin(), kHpZr30wEdidSpan.end()),
+            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
 
-  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0);
-  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 1);
-  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 128);
+  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0u);
+  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 1u);
+  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 128u);
 }
 
 TEST(EdidTest, ReadEdid_TwoBlocksOneSegment) {
   // 2 EDID blocks, including one extension block.
   FakeDdcMemory fake_ddc_memory(edid::kDellP2719hEdid);
 
-  auto result = edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error, "Error while reading EDID: %s", result.error_message);
+  edid::ReadEdidResult result =
+      edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
+  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
 
-  const auto& edid_data_transacted = result.edid_bytes;
-  ASSERT_EQ(edid_data_transacted.size(), 256u);
-  EXPECT_BYTES_EQ(edid::kDellP2719hEdid, edid_data_transacted.data(), 256);
+  static constexpr cpp20::span<const uint8_t> kDellP2719hEdidSpan(edid::kDellP2719hEdid);
+  EXPECT_EQ(std::vector(kDellP2719hEdidSpan.begin(), kDellP2719hEdidSpan.end()),
+            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
 
-  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0);
-  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 2);
-  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 256);
+  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0u);
+  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 2u);
+  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 256u);
 }
 
 TEST(EdidTest, ReadEdid_MultiSegment) {
   // 4 EDID blocks, including 3 extension blocks.
   FakeDdcMemory fake_ddc_memory(edid::kSamsungCrg9Edid);
 
-  auto result = edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error, "Error while reading EDID: %s", result.error_message);
+  edid::ReadEdidResult result =
+      edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
+  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
 
-  const auto& edid_data_transacted = result.edid_bytes;
-  ASSERT_EQ(edid_data_transacted.size(), 512u);
-  EXPECT_BYTES_EQ(edid::kSamsungCrg9Edid, edid_data_transacted.data(), 512);
+  static constexpr cpp20::span<const uint8_t> kSamsungCrg9EdidSpan(edid::kSamsungCrg9Edid);
+  EXPECT_EQ(std::vector(kSamsungCrg9EdidSpan.begin(), kSamsungCrg9EdidSpan.end()),
+            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
 
-  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 2);
-  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 4);
-  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 512);
+  EXPECT_EQ(fake_ddc_memory.total_segment_write(), 2u);
+  EXPECT_EQ(fake_ddc_memory.total_offset_write(), 4u);
+  EXPECT_EQ(fake_ddc_memory.total_bytes_read(), 512u);
 }
