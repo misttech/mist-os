@@ -47,6 +47,9 @@ pub enum State<I> {
     /// The Bound state (we actively have a lease and are waiting to transition
     /// to Renewing).
     Bound(Bound<I>),
+    /// The Renewing state (we actively have a lease that we are trying to
+    /// renew by unicasting requests to our known DHCP server).
+    Renewing(Renewing<I>),
     /// Waiting to restart the configuration process (via transitioning to Init).
     WaitingToRestart(WaitingToRestart<I>),
 }
@@ -168,8 +171,17 @@ impl<I: deps::Instant> State<I> {
             }
             State::Bound(bound) => {
                 let _: &Bound<_> = bound;
-
-                // TODO(https://fxbug.dev/125443): Implement Bound state.
+                Ok(match bound.do_bound(clock, stop_receiver).await {
+                    BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
+                    BoundOutcome::Renewing(renewing) => Step::NextState(Transition {
+                        next_state: State::Renewing(renewing),
+                        new_lease: None,
+                    }),
+                })
+            }
+            State::Renewing(renewing) => {
+                let _: &Renewing<_> = renewing;
+                // TODO(https://fxbug.dev/125443): Implement Renewing state.
                 // In order to unblock testing, rather than panicking here with
                 // a todo!, we instead just block until a shutdown request comes
                 // in.
@@ -209,7 +221,7 @@ impl<I: deps::Instant> State<I> {
                 );
                 Ok(AddressRejectionOutcome::ShouldBeImpossible)
             }
-            State::Bound(bound) => {
+            State::Bound(bound) | State::Renewing(Renewing { bound }) => {
                 let Bound {
                     discover_options,
                     yiaddr,
@@ -268,6 +280,7 @@ impl<I: deps::Instant> State<I> {
             State::Selecting(_) => "Selecting",
             State::Requesting(_) => "Requesting",
             State::Bound(_) => "Bound",
+            State::Renewing(_) => "Renewing",
             State::WaitingToRestart(_) => "Waiting to Restart",
         }
     }
@@ -278,6 +291,7 @@ impl<I: deps::Instant> State<I> {
             State::Selecting(_) => false,
             State::Requesting(_) => false,
             State::Bound(_) => true,
+            State::Renewing(_) => true,
             State::WaitingToRestart(_) => false,
         }
     }
@@ -445,7 +459,7 @@ async fn send_with_retransmits<T: Clone + Send>(
     Ok(())
 }
 
-fn default_retransmit_schedule(
+fn retransmit_schedule_during_acquisition(
     rng: &mut (impl rand::Rng + ?Sized),
 ) -> impl Iterator<Item = Duration> + '_ {
     const MILLISECONDS_PER_SECOND: i32 = 1000;
@@ -670,7 +684,7 @@ impl<I: deps::Instant> Selecting<I> {
 
         let send_fut = send_with_retransmits(
             time,
-            default_retransmit_schedule(rng.get_rng()),
+            retransmit_schedule_during_acquisition(rng.get_rng()),
             message.as_ref(),
             &socket,
             /* dest= */ Mac::BROADCAST,
@@ -822,7 +836,7 @@ impl<I: deps::Instant> Requesting<I> {
 
         let send_fut = send_with_retransmits(
             time,
-            default_retransmit_schedule(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
+            retransmit_schedule_during_acquisition(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
             message.as_ref(),
             &socket,
             Mac::BROADCAST,
@@ -940,20 +954,6 @@ fn build_request(
     )
 }
 
-/// The Bound state as depicted in the state-transition diagram in [RFC 2131].
-///
-/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4.1
-#[derive(Debug, PartialEq)]
-pub struct Bound<I> {
-    discover_options: DiscoverOptions,
-    yiaddr: SpecifiedAddr<net_types::ip::Ipv4Addr>,
-    server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
-    ip_address_lease_time: Duration,
-    start_time: I,
-    renewal_time: Option<Duration>,
-    rebinding_time: Option<Duration>,
-}
-
 /// A newly-acquired DHCP lease.
 #[derive(Debug)]
 pub struct NewlyAcquiredLease<I> {
@@ -967,6 +967,62 @@ pub struct NewlyAcquiredLease<I> {
     /// subset of the parameters requested in the `parameter_request_list` in
     /// `ClientConfig`.
     pub parameters: Vec<dhcp_protocol::DhcpOption>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum BoundOutcome<I> {
+    GracefulShutdown,
+    Renewing(Renewing<I>),
+}
+
+/// The Bound state as depicted in the state-transition diagram in [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
+#[derive(Debug, PartialEq, Clone)]
+pub struct Bound<I> {
+    discover_options: DiscoverOptions,
+    yiaddr: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    ip_address_lease_time: Duration,
+    start_time: I,
+    renewal_time: Option<Duration>,
+    rebinding_time: Option<Duration>,
+}
+
+impl<I: deps::Instant> Bound<I> {
+    async fn do_bound<C: deps::Clock<Instant = I>>(
+        &self,
+        time: &C,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+    ) -> BoundOutcome<I> {
+        let Self {
+            discover_options: _,
+            yiaddr: _,
+            server_identifier: _,
+            ip_address_lease_time,
+            start_time,
+            renewal_time,
+            rebinding_time: _,
+        } = self;
+
+        // Per RFC 2131 section 4.4.5, "T1 defaults to (0.5 * duration_of_lease)".
+        // (T1 is how the RFC refers to the time at which we transition to Renewing.)
+        let renewal_time = renewal_time.unwrap_or(*ip_address_lease_time / 2);
+        let renewal_timeout_fut = time.wait_until(start_time.add(renewal_time)).fuse();
+        pin_mut!(renewal_timeout_fut);
+        select! {
+            () = renewal_timeout_fut => BoundOutcome::Renewing(Renewing { bound: self.clone() }),
+            () = stop_receiver.select_next_some() => BoundOutcome::GracefulShutdown,
+        }
+    }
+}
+
+/// The Renewing state as depicted in the state-transition diagram in [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
+#[derive(Debug, PartialEq)]
+pub struct Renewing<I> {
+    bound: Bound<I>,
 }
 
 #[cfg(test)]
@@ -2028,5 +2084,40 @@ mod test {
         assert_eq!(outcome, WaitingToRestartOutcome::Init(Init));
 
         assert_eq!(time.now(), WAITING_UNTIL);
+    }
+
+    #[test_case(
+        build_test_bound_state() =>
+            Duration::from_secs(u64::from(DEFAULT_LEASE_LENGTH_SECONDS) / 2);
+        "waits default renewal time when not specified")]
+    #[test_case(
+        Bound {
+            renewal_time: Some(Duration::from_secs(10)),
+            ..build_test_bound_state()
+        } => Duration::from_secs(10);
+        "waits specified renewal time")]
+    fn bound_waits_for_renewal_time(bound: Bound<Duration>) -> Duration {
+        let time = &FakeTimeController::new();
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let main_fut = bound.do_bound(time, &mut stop_receiver).fuse();
+        pin_mut!(main_fut);
+        let mut executor = fasync::TestExecutor::new();
+        let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
+        assert_eq!(outcome, BoundOutcome::Renewing(Renewing { bound: bound.clone() }));
+        time.now()
+    }
+
+    #[test]
+    fn bound_obeys_graceful_shutdown() {
+        let time = &FakeTimeController::new();
+        let (stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let bound = build_test_bound_state();
+        let bound_fut = bound.do_bound(time, &mut stop_receiver).fuse();
+
+        stop_sender.unbounded_send(()).expect("send should succeed");
+        assert_eq!(
+            bound_fut.now_or_never().expect("should have completed"),
+            BoundOutcome::GracefulShutdown
+        );
     }
 }
