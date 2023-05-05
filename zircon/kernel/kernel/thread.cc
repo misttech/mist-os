@@ -417,7 +417,6 @@ zx_status_t Thread::RestrictedKick() {
 
   bool kicking_myself = (Thread::Current::Get() == this);
 
-  // Disable preemption to defer rescheduling until the end of this scope.
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   if (state() == THREAD_DEATH) {
