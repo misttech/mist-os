@@ -363,17 +363,17 @@ pub async fn test_filter(name: &str, test: Test) {
         .await
         .transform_result()
         .expect("failed to get client's filter rules");
-    if let Some(mut updates) = client_updates {
+    if let Some(updates) = client_updates {
         let () = client_filter
-            .update_rules(&mut updates.iter_mut(), client_generation)
+            .update_rules(&updates, client_generation)
             .await
             .transform_result()
             .expect("failed to update client's filter rules");
         client_generation += 1;
     }
-    if let Some(mut updates) = server_updates {
+    if let Some(updates) = server_updates {
         let () = server_filter
-            .update_rules(&mut updates.iter_mut(), server_generation)
+            .update_rules(&updates, server_generation)
             .await
             .transform_result()
             .expect("failed to update server's filter rules");
@@ -426,12 +426,12 @@ pub async fn test_filter(name: &str, test: Test) {
         .transform_result()
         .expect("error re-enabling filter on server");
     let () = server_filter
-        .update_rules(&mut Vec::new().iter_mut(), server_generation)
+        .update_rules(&[], server_generation)
         .await
         .transform_result()
         .expect("failed to reset client's filter rules");
     let () = client_filter
-        .update_rules(&mut Vec::new().iter_mut(), client_generation)
+        .update_rules(&[], client_generation)
         .await
         .transform_result()
         .expect("failed to reset client's filter rules");

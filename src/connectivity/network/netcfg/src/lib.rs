@@ -307,7 +307,7 @@ macro_rules! cas_filter_rules {
                 .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
 
             match $filter
-                .$update_rules(&mut $rules.iter_mut(), generation)
+                .$update_rules(&$rules, generation)
                 .await
                 .unwrap_or_else(|err| exit_with_fidl_error(err))
             {
@@ -340,7 +340,7 @@ macro_rules! no_update_filter_rules {
             .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
 
         match $filter
-            .$update_rules(&mut $rules.iter_mut(), generation)
+            .$update_rules(&$rules, generation)
             .await
             .unwrap_or_else(|err| exit_with_fidl_error(err))
         {
@@ -717,13 +717,13 @@ impl<'a> NetCfg<'a> {
         let FilterConfig { rules, nat_rules, rdr_rules } = config;
 
         if !rules.is_empty() {
-            let mut rules = netfilter::parser::parse_str_to_rules(&rules.join(""))
+            let rules = netfilter::parser::parse_str_to_rules(&rules.join(""))
                 .context("error parsing filter rules")?;
             cas_filter_rules!(self.filter, get_rules, update_rules, rules, FilterUpdateRulesError);
         }
 
         if !nat_rules.is_empty() {
-            let mut nat_rules = netfilter::parser::parse_str_to_nat_rules(&nat_rules.join(""))
+            let nat_rules = netfilter::parser::parse_str_to_nat_rules(&nat_rules.join(""))
                 .context("error parsing NAT rules")?;
             cas_filter_rules!(
                 self.filter,
@@ -735,7 +735,7 @@ impl<'a> NetCfg<'a> {
         }
 
         if !rdr_rules.is_empty() {
-            let mut rdr_rules = netfilter::parser::parse_str_to_rdr_rules(&rdr_rules.join(""))
+            let rdr_rules = netfilter::parser::parse_str_to_rdr_rules(&rdr_rules.join(""))
                 .context("error parsing RDR rules")?;
             // TODO(https://fxbug.dev/68279): Change this to cas_filter_rules once update is supported.
             no_update_filter_rules!(

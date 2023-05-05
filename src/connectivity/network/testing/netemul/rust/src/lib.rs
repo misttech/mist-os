@@ -164,11 +164,10 @@ impl TestSandbox {
     /// Creates new networks and endpoints as specified in `networks`.
     pub async fn setup_networks<'a>(
         &'a self,
-        mut networks: Vec<fnetemul_network::NetworkSetup>,
+        networks: Vec<fnetemul_network::NetworkSetup>,
     ) -> Result<TestNetworkSetup<'a>> {
         let ctx = self.get_network_context()?;
-        let (status, handle) =
-            ctx.setup(&mut networks.iter_mut()).await.context("setup FIDL error")?;
+        let (status, handle) = ctx.setup(&networks).await.context("setup FIDL error")?;
         let () = zx::Status::ok(status).context("setup failed")?;
         let handle = handle
             .ok_or_else(|| anyhow::anyhow!("setup didn't return a valid handle"))?

@@ -190,16 +190,14 @@ mod tests {
         // Remote peer connection.
         let id = PeerId(123);
         let (local, mut remote) = Channel::create();
-        let mut protocol = vec![
+        let protocol = &[
             ProtocolDescriptor { protocol: ProtocolIdentifier::L2Cap, params: vec![] },
             ProtocolDescriptor {
                 protocol: ProtocolIdentifier::Rfcomm,
                 params: vec![DataElement::Uint8(1)],
             },
         ];
-        connect_proxy
-            .connected(&mut id.into(), local.try_into().unwrap(), &mut protocol.iter_mut())
-            .unwrap();
+        connect_proxy.connected(&mut id.into(), local.try_into().unwrap(), protocol).unwrap();
 
         // Expect the MessageStream to produce the connected event.
         let connected_id = message_stream.select_next_some().await;

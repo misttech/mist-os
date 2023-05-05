@@ -590,7 +590,7 @@ async fn fwd_observer_callbacks(
             bredr::PeerObserverRequest::ServiceFound {
                 mut peer_id,
                 protocol,
-                mut attributes,
+                attributes,
                 responder,
             } => {
                 let proto = match protocol {
@@ -598,15 +598,14 @@ async fn fwd_observer_callbacks(
                     None => vec![],
                 };
 
-                observer
-                    .service_found(&mut peer_id, Some(&proto), &mut attributes.iter_mut())
-                    .await
-                    .or_else(|e| {
+                observer.service_found(&mut peer_id, Some(&proto), &attributes).await.or_else(
+                    |e| {
                         handle_fidl_err(
                             e,
                             format!("unexpected error forwarding observer event for: {}", id),
                         )
-                    })?;
+                    },
+                )?;
 
                 responder.send().or_else(|e| {
                     handle_fidl_err(
@@ -616,15 +615,13 @@ async fn fwd_observer_callbacks(
                 })?;
             }
 
-            bredr::PeerObserverRequest::PeerConnected { mut peer_id, mut protocol, responder } => {
-                observer.peer_connected(&mut peer_id, &mut protocol.iter_mut()).await.or_else(
-                    |e| {
-                        handle_fidl_err(
-                            e,
-                            format!("unexpected error forwarding observer event for: {}", id),
-                        )
-                    },
-                )?;
+            bredr::PeerObserverRequest::PeerConnected { mut peer_id, protocol, responder } => {
+                observer.peer_connected(&mut peer_id, &protocol).await.or_else(|e| {
+                    handle_fidl_err(
+                        e,
+                        format!("unexpected error forwarding observer event for: {}", id),
+                    )
+                })?;
                 responder.send().or_else(|e| {
                     handle_fidl_err(
                         e,

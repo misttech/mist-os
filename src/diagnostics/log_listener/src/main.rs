@@ -1001,15 +1001,20 @@ fn new_listener(local_options: LocalOptions) -> Result<Listener<Box<dyn Write + 
     Ok(Listener::new(writer, local_options.clone(), d))
 }
 
-fn run_log_listener(options: Option<&mut LogListenerOptions>) -> Result<(), Error> {
+fn run_log_listener(options: Option<LogListenerOptions>) -> Result<(), Error> {
     let mut executor = fasync::LocalExecutor::new();
-    let (filter_options, local_options, selectors) = options.map_or_else(
-        || (None, LocalOptions::default(), None),
-        |o| (Some(&o.filter), o.local.clone(), Some(&mut o.selectors)),
-    );
+    let (filter_options, local_options, selectors) = match options {
+        None => (None, LocalOptions::default(), None),
+        Some(o) => (Some(o.filter), o.local, Some(o.selectors)),
+    };
     let dump_logs = local_options.dump_logs;
     let l = new_listener(local_options)?;
-    let listener_fut = syslog_listener::run_log_listener(l, filter_options, dump_logs, selectors);
+    let listener_fut = syslog_listener::run_log_listener(
+        l,
+        filter_options.as_ref(),
+        dump_logs,
+        selectors.as_deref(),
+    );
     executor.run_singlethreaded(listener_fut)?;
     Ok(())
 }
@@ -1023,13 +1028,13 @@ fn main() -> Result<(), Error> {
     if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
         return Err(format_err!("{}\n", help(args[0].as_ref())));
     }
-    let mut options =
+    let options =
         parse_flags(&args[1..]).map_err(|e| format_err!("{}\n{}\n", e, help(args[0].as_ref())))?;
 
     let sleep_time = time::Duration::from_millis(options.local.startup_sleep);
     thread::sleep(sleep_time);
 
-    run_log_listener(Some(&mut options))
+    run_log_listener(Some(options))
 }
 
 #[cfg(test)]

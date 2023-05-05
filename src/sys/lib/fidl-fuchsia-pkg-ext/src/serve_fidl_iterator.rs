@@ -44,7 +44,7 @@ where
     let mut items = SliceChunker::new(items.as_mut());
 
     loop {
-        let mut chunk = items.next();
+        let chunk = items.next();
 
         let responder =
             match fidl_iterator.try_next().await.context("while waiting for next() request")? {
@@ -52,7 +52,7 @@ where
                 Some(request) => I::request_to_responder(request),
             };
 
-        let () = responder.send_chunk(&mut chunk).context("while responding")?;
+        let () = responder.send_chunk(&chunk).context("while responding")?;
 
         // Yield a single empty chunk, then stop serving the protocol.
         if chunk.is_empty() {
@@ -150,7 +150,7 @@ pub trait FidlIteratorRequestStream:
 pub trait FidlIteratorNextResponder {
     type Item: Measurable;
 
-    fn send_chunk(self, chunk: &mut [Self::Item]) -> Result<(), fidl::Error>;
+    fn send_chunk(self, chunk: &[Self::Item]) -> Result<(), fidl::Error>;
 }
 
 impl FidlIteratorRequestStream for PackageIndexIteratorRequestStream {
@@ -165,8 +165,8 @@ impl FidlIteratorRequestStream for PackageIndexIteratorRequestStream {
 impl FidlIteratorNextResponder for PackageIndexIteratorNextResponder {
     type Item = PackageIndexEntry;
 
-    fn send_chunk(self, chunk: &mut [Self::Item]) -> Result<(), fidl::Error> {
-        self.send(&mut chunk.iter_mut())
+    fn send_chunk(self, chunk: &[Self::Item]) -> Result<(), fidl::Error> {
+        self.send(chunk)
     }
 }
 
@@ -191,16 +191,16 @@ impl FidlIteratorRequestStream for BlobIdIteratorRequestStream {
 impl FidlIteratorNextResponder for BlobInfoIteratorNextResponder {
     type Item = fidl_fuchsia_pkg::BlobInfo;
 
-    fn send_chunk(self, chunk: &mut [Self::Item]) -> Result<(), fidl::Error> {
-        self.send(&mut chunk.iter_mut())
+    fn send_chunk(self, chunk: &[Self::Item]) -> Result<(), fidl::Error> {
+        self.send(chunk)
     }
 }
 
 impl FidlIteratorNextResponder for BlobIdIteratorNextResponder {
     type Item = fidl_fuchsia_pkg::BlobId;
 
-    fn send_chunk(self, chunk: &mut [Self::Item]) -> Result<(), fidl::Error> {
-        self.send(&mut chunk.iter_mut())
+    fn send_chunk(self, chunk: &[Self::Item]) -> Result<(), fidl::Error> {
+        self.send(chunk)
     }
 }
 

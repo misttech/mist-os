@@ -144,7 +144,7 @@ impl Accessor {
             async move {
                 let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
                 let mut stream = ListIteratorRequestStream::from_channel(server_chan);
-                let mut iter = list_results.into_iter();
+                let mut remaining_results = &list_results[..];
                 while let Some(ListIteratorRequest::GetNext { responder }) =
                     stream.try_next().await?
                 {
@@ -153,15 +153,15 @@ impl Accessor {
                     let mut bytes_used: usize = 32;
 
                     let mut item_index = 0;
-                    for result in iter.clone() {
+                    for result in remaining_results {
                         bytes_used += result.measure().num_bytes;
                         if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                             break;
                         }
                         item_index += 1;
                     }
-                    let mut chunk: Vec<_> = iter.by_ref().take(item_index).collect();
-                    responder.send(&mut chunk.iter_mut())?;
+                    responder.send(&remaining_results[..item_index])?;
+                    remaining_results = &remaining_results[item_index..];
                 }
                 Ok(())
             }

@@ -818,9 +818,9 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
         opts::FilterEnum::SetRules(opts::FilterSetRules { rules }) => {
             let (_cur_rules, generation) =
                 filter_fidl!(filter.get_rules(), "error getting filter rules")?;
-            let mut rules = netfilter::parser::parse_str_to_rules(&rules)?;
+            let rules = netfilter::parser::parse_str_to_rules(&rules)?;
             let () = filter_fidl!(
-                filter.update_rules(&mut rules.iter_mut(), generation),
+                filter.update_rules(&rules, generation),
                 "error setting filter rules"
             )?;
             info!("successfully set filter rules");
@@ -833,9 +833,9 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
         opts::FilterEnum::SetNatRules(opts::FilterSetNatRules { rules }) => {
             let (_cur_rules, generation) =
                 filter_fidl!(filter.get_nat_rules(), "error getting NAT rules")?;
-            let mut rules = netfilter::parser::parse_str_to_nat_rules(&rules)?;
+            let rules = netfilter::parser::parse_str_to_nat_rules(&rules)?;
             let () = filter_fidl!(
-                filter.update_nat_rules(&mut rules.iter_mut(), generation),
+                filter.update_nat_rules(&rules, generation),
                 "error setting NAT rules"
             )?;
             info!("successfully set NAT rules");
@@ -848,9 +848,9 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
         opts::FilterEnum::SetRdrRules(opts::FilterSetRdrRules { rules }) => {
             let (_cur_rules, generation) =
                 filter_fidl!(filter.get_rdr_rules(), "error getting RDR rules")?;
-            let mut rules = netfilter::parser::parse_str_to_rdr_rules(&rules)?;
+            let rules = netfilter::parser::parse_str_to_rdr_rules(&rules)?;
             let () = filter_fidl!(
-                filter.update_rdr_rules(&mut rules.iter_mut(), generation),
+                filter.update_rdr_rules(&rules, generation),
                 "error setting RDR rules"
             )?;
             info!("successfully set RDR rules");

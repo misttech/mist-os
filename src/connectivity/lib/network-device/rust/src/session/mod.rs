@@ -87,18 +87,14 @@ impl Session {
     }
 
     /// Attaches [`Session`] to a port.
-    pub async fn attach<IntoIter>(&self, port: Port, rx_frames: IntoIter) -> Result<()>
-    where
-        IntoIter: IntoIterator<Item = netdev::FrameType>,
-        IntoIter::IntoIter: ExactSizeIterator,
-    {
+    pub async fn attach(&self, port: Port, rx_frames: &[netdev::FrameType]) -> Result<()> {
         // NB: Need to bind the future returned by `proxy.attach` to a variable
         // otherwise this function's (`Session::attach`) returned future becomes
         // not `Send` and we get unexpected compiler errors at a distance.
         //
         // The dyn borrow in the signature of `proxy.attach` seems to be the
         // cause of the compiler's confusion.
-        let fut = self.inner()?.proxy.attach(&mut port.into(), &mut rx_frames.into_iter());
+        let fut = self.inner()?.proxy.attach(&mut port.into(), rx_frames);
         let () = fut.await?.map_err(|raw| Error::Attach(port, zx::Status::from_raw(raw)))?;
         Ok(())
     }

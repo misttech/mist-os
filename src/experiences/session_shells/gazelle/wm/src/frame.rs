@@ -283,14 +283,9 @@ impl Frame<ChildViewId> for WindowFrame {
             // Also enable/disable interaction based on active state.
             if active {
                 // Remove the hittest region above the child view to make it interactive.
-                self.flatland
-                    .set_hit_regions(
-                        &mut self.hit_region_transform,
-                        &mut Vec::<ui_comp::HitRegion>::new().iter_mut(),
-                    )
-                    .map_err(|source| LayoutError::<ChildViewId>::Failed {
-                        source: source.into(),
-                    })?;
+                self.flatland.set_hit_regions(&mut self.hit_region_transform, &[]).map_err(
+                    |source| LayoutError::<ChildViewId>::Failed { source: source.into() },
+                )?;
             } else {
                 // Add a hittest region above the child view to prevent interaction with it.
                 self.flatland

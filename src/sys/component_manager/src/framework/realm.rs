@@ -343,16 +343,15 @@ impl RealmCapabilityHost {
     }
 
     async fn serve_child_iterator(
-        mut children: Vec<fdecl::ChildRef>,
+        children: Vec<fdecl::ChildRef>,
         mut stream: fcomponent::ChildIteratorRequestStream,
         batch_size: usize,
     ) -> Result<(), Error> {
+        let mut iter = children.chunks(batch_size);
         while let Some(request) = stream.try_next().await? {
             match request {
                 fcomponent::ChildIteratorRequest::Next { responder } => {
-                    let n_to_send = std::cmp::min(children.len(), batch_size);
-                    let mut res: Vec<_> = children.drain(..n_to_send).collect();
-                    responder.send(&mut res.iter_mut())?;
+                    responder.send(iter.next().unwrap_or(&[]))?;
                 }
             }
         }

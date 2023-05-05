@@ -174,14 +174,14 @@ mod tests {
         let logger = get_logger_from_factory(factory).unwrap();
         task.await;
 
-        let mut event = MetricEvent {
+        let events = &[MetricEvent {
             metric_id: 42,
             event_codes: vec![],
             payload: MetricEventPayload::Count(1),
-        };
-        logger.log_metric_events(&mut std::iter::once(&mut event)).await.unwrap().unwrap();
-        let events = mock.wait_for_at_least_n_events_with_metric_id(1, 42).await;
-        assert_eq!(events, vec![event]);
+        }];
+        logger.log_metric_events(events).await.unwrap().unwrap();
+        let mock_events = mock.wait_for_at_least_n_events_with_metric_id(1, 42).await;
+        assert_eq!(mock_events, events);
     }
 
     /// Tests that the right payload is sent to Cobalt when logging the ota download time.

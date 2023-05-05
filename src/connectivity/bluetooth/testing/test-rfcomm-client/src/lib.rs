@@ -524,13 +524,13 @@ mod tests {
         let remote_id = PeerId(8978);
         let random_channel_number = ServerChannel::try_from(7).unwrap();
         let (_peer_channel, local_channel) = Channel::create();
-        let mut protocol: Vec<bredr::ProtocolDescriptor> =
+        let protocol: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(random_channel_number).iter().map(Into::into).collect();
         assert_matches!(
             connect_proxy.connected(
                 &mut remote_id.into(),
                 local_channel.try_into().unwrap(),
-                &mut protocol.iter_mut()
+                &protocol,
             ),
             Ok(_)
         );

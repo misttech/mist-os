@@ -178,7 +178,7 @@ impl RunningSuite {
 
         sender.send(Ok(SuiteEvents::suite_syslog(syslog).into())).await.unwrap();
 
-        if let Some(mut log_interest) = options.log_interest.take() {
+        if let Some(log_interest) = options.log_interest.take() {
             let log_settings = match self
                 .instance
                 .root
@@ -195,7 +195,7 @@ impl RunningSuite {
                 }
             };
 
-            let fut = log_settings.set_interest(&mut log_interest.iter_mut());
+            let fut = log_settings.set_interest(&log_interest);
             if let Err(e) = fut.await {
                 warn!("Error setting log interest");
                 sender.send(Err(LaunchTestError::SetLogInterest(e.into()).into())).await.unwrap();

@@ -1376,38 +1376,6 @@ unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Array<T, N>>
     }
 }
 
-/// Wrapper type for encoding resource arrays by value.
-// TODO(fxbug.dev/122199): Remove once migrated off iterators.
-#[repr(transparent)]
-pub struct ResourceArray<A>(pub A);
-
-// TODO(fxbug.dev/122199): This is only needed for encoding vector<array<T, N>>
-// in the old types. Remove once migrated off iterators.
-unsafe impl<'a, T: ValueTypeMarker, const N: usize> Encode<Array<T, N>> for [T::Owned; N] {
-    #[inline]
-    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
-        encoder.debug_check_bounds::<Array<T, N>>(offset);
-        encode_array_value::<T>(&self, encoder, offset, depth)
-    }
-}
-
-// TODO(fxbug.dev/122199): This is only needed for encoding vector<array<T, N>>
-// in the old types. Remove once migrated off iterators.
-unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Array<T, N>>
-    for ResourceArray<[T::Owned; N]>
-{
-    #[inline]
-    unsafe fn encode(
-        mut self,
-        encoder: &mut Encoder<'_>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
-        encoder.debug_check_bounds::<Array<T, N>>(offset);
-        encode_array_resource::<T>(&mut self.0, encoder, offset, depth)
-    }
-}
-
 impl<T: TypeMarker, const N: usize> Decode<Array<T, N>> for [T::Owned; N] {
     #[inline]
     fn new_empty() -> Self {
@@ -1590,21 +1558,6 @@ unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Vector<T, N>>
     }
 }
 
-/// Wrapper type for encoding iterators as vectors.
-// TODO(fxbug.dev/122199): Remove once migrated off iterators.
-#[repr(transparent)]
-pub struct Iterator<I>(pub I);
-
-unsafe impl<T: TypeMarker, const N: usize, E: Encode<T>, I: ExactSizeIterator<Item = E>>
-    Encode<Vector<T, N>> for Iterator<I>
-{
-    #[inline]
-    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
-        encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        encode_vector_iter::<T, E>(self.0, N, encoder, offset, depth)
-    }
-}
-
 impl<T: TypeMarker, const N: usize> Decode<Vector<T, N>> for Vec<T::Owned> {
     #[inline(always)]
     fn new_empty() -> Self {
@@ -1664,32 +1617,6 @@ unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
     let bytes_len = slice.len() * T::inline_size(encoder.context);
     let offset = encoder.out_of_line_offset(bytes_len);
     encode_array_resource::<T>(slice, encoder, offset, depth)
-}
-
-// TODO(fxbug.dev/122199): Remove once migrated off iterators.
-#[inline]
-unsafe fn encode_vector_iter<T: TypeMarker, E: Encode<T>>(
-    iter: impl ExactSizeIterator<Item = E>,
-    max_length: usize,
-    encoder: &mut Encoder<'_>,
-    offset: usize,
-    mut depth: Depth,
-) -> Result<()> {
-    encoder.write_num(iter.len() as u64, offset);
-    encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
-    // write_out_of_line must not be called with a zero-sized out-of-line block.
-    if iter.len() == 0 {
-        return Ok(());
-    }
-    check_vector_length(iter.len(), max_length)?;
-    depth.increment()?;
-    let stride = T::inline_size(encoder.context);
-    let bytes_len = iter.len() * stride;
-    let offset = encoder.out_of_line_offset(bytes_len);
-    for (i, item) in iter.enumerate() {
-        item.encode(encoder, offset + stride * i, depth)?;
-    }
-    Ok(())
 }
 
 #[inline]
@@ -3060,21 +2987,6 @@ macro_rules! fidl_table {
         }
 
         $crate::impl_value_or_resource_type!($name, $($resource)?);
-
-        // TODO(fxbug.dev/122199): This is only needed for encoding
-        // vector<Table> in the old types. Remove once migrated off iterators.
-        unsafe impl $crate::encoding::Encode<$name> for $name {
-            #[allow(unused_mut)]
-            unsafe fn encode(mut self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, depth: $crate::encoding::Depth) -> $crate::Result<()> {
-                $crate::encoding::Encode::<$name>::encode(
-                    $crate::switch! {
-                        $($resource)? => { &mut self }
-                        _ =>  { &self }
-                    },
-                    encoder, offset, depth
-                )
-            }
-        }
 
         unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
             $($resource)? => { &mut $name }

@@ -144,7 +144,7 @@ impl Controller {
     pub async fn exec(
         &self,
         command: &str,
-        mut env: Vec<fguest_interaction::EnvironmentVariable>,
+        env: Vec<fguest_interaction::EnvironmentVariable>,
         input: Option<&str>,
     ) -> Result<(i32, String, String)> {
         let (stdout_local, stdout_remote) = zx::Socket::create_stream();
@@ -164,7 +164,7 @@ impl Controller {
             .proxy()
             .execute_command(
                 command,
-                &mut env.iter_mut(),
+                &env,
                 stdin_remote,
                 Some(stdout_remote),
                 Some(stderr_remote),

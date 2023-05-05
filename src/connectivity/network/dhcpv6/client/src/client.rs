@@ -475,12 +475,12 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
             return Ok(());
         };
 
-        let mut prefixes = prefixes
+        let prefixes = prefixes
             .iter()
             .map(|(prefix, lifetimes)| Prefix { prefix: *prefix, lifetimes: *lifetimes })
             .collect::<Vec<_>>();
 
-        responder.send(&mut prefixes.iter_mut()).map_err(ClientError::Fidl)?;
+        responder.send(&prefixes).map_err(ClientError::Fidl)?;
         *prefixes_changed = false;
         Ok(())
     }

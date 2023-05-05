@@ -187,7 +187,7 @@ async fn get_player_application_settings<'a>(
         Ok(ids) => ids,
         Err(_) => return Err(format_err!("Invalid id in args {:?}", args)),
     };
-    let get_pas_fut = controller.get_player_application_settings(&mut ids.into_iter());
+    let get_pas_fut = controller.get_player_application_settings(&ids);
 
     match get_pas_fut.await? {
         Ok(settings) => Ok(format!("Player application setting attribute value: {:#?}", settings)),

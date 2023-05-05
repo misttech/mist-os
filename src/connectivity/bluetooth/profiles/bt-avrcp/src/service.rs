@@ -794,16 +794,14 @@ mod tests {
         expected_commands += 1;
 
         let attribute_ids =
-            vec![fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettingAttributeId::Equalizer];
+            &[fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettingAttributeId::Equalizer];
         let get_player_application_settings_fut =
-            controller_proxy.get_player_application_settings(&mut attribute_ids.into_iter()).fuse();
+            controller_proxy.get_player_application_settings(attribute_ids).fuse();
         pin_mut!(get_player_application_settings_fut);
         expected_commands += 1;
 
-        let attribute_ids_empty = vec![];
-        let get_all_player_application_settings_fut = controller_proxy
-            .get_player_application_settings(&mut attribute_ids_empty.into_iter())
-            .fuse();
+        let get_all_player_application_settings_fut =
+            controller_proxy.get_player_application_settings(&[]).fuse();
         pin_mut!(get_all_player_application_settings_fut);
         expected_commands += 1;
 

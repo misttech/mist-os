@@ -151,14 +151,10 @@ async fn handle_metric_event_logger(
 
         while let Some(hanging_get_state) = log_state.hanging.pop() {
             let mut last_observed = hanging_get_state.last_observed.lock().await;
-            let mut events: Vec<MetricEvent> = (&mut log_state.log)
-                .iter()
-                .skip(*last_observed)
-                .take(MAX_QUERY_LENGTH)
-                .map(Clone::clone)
-                .collect();
+            let new_logs = &log_state.log[*last_observed..];
+            let limited_new_logs = &new_logs[..std::cmp::min(new_logs.len(), MAX_QUERY_LENGTH)];
             *last_observed = log_state.log.len();
-            hanging_get_state.responder.send(&mut events.iter_mut(), false)?;
+            hanging_get_state.responder.send(limited_new_logs, false)?;
         }
         Ok(())
     });
@@ -212,14 +208,12 @@ async fn run_metrics_query_service(
                             let events = &mut log_state.log;
                             let more =
                                 events.len() > fidl_fuchsia_metrics_test::MAX_QUERY_LENGTH as usize;
-                            let mut events: Vec<_> = events
-                                .iter()
-                                .skip(*last_observed_len)
-                                .take(MAX_QUERY_LENGTH)
-                                .cloned()
-                                .collect();
+                            let new_events =
+                                &events[std::cmp::min(events.len(), *last_observed_len)..];
+                            let limited_new_events =
+                                &new_events[..std::cmp::min(new_events.len(), MAX_QUERY_LENGTH)];
                             *last_observed_len = current_len;
-                            responder.send(&mut events.iter_mut(), more)?;
+                            responder.send(limited_new_events, more)?;
                         } else {
                             log_state.hanging.push(MetricHangingGetState {
                                 responder: responder,
@@ -560,7 +554,7 @@ mod metrics_tests {
             .await?
             .map_err(|e| format_err!("cobalt error {:?}", e))?;
         logger_proxy
-            .log_integer_histogram(metric_id, &mut vec![].into_iter(), &[event_code])
+            .log_integer_histogram(metric_id, &[], &[event_code])
             .await?
             .map_err(|e| format_err!("cobalt error {:?}", e))?;
         logger_proxy
@@ -568,12 +562,9 @@ mod metrics_tests {
             .await?
             .map_err(|e| format_err!("cobalt error {:?}", e))?;
         logger_proxy
-            .log_metric_events(
-                &mut vec![&mut MetricEvent::builder(metric_id)
-                    .with_event_code(event_code)
-                    .as_occurrence(count)]
-                .into_iter(),
-            )
+            .log_metric_events(&[MetricEvent::builder(metric_id)
+                .with_event_code(event_code)
+                .as_occurrence(count)])
             .await?
             .map_err(|e| format_err!("cobalt error {:?}", e))?;
         let log = loggers.lock().await;

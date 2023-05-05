@@ -84,11 +84,11 @@ impl MockPeer {
 
     /// Notifies the `observer` with the ServiceFound update from the ServiceRecord.
     fn relay_service_found(observer: &bredr::PeerObserverProxy, record: ServiceRecord) {
-        let mut response = record.to_service_found_response().unwrap();
+        let response = record.to_service_found_response().unwrap();
         let _ = observer.service_found(
             &mut response.id.into(),
             response.protocol.as_deref(),
-            &mut response.attributes.iter_mut(),
+            &response.attributes,
         );
     }
 
@@ -96,9 +96,9 @@ impl MockPeer {
     fn relay_connected(
         observer: &bredr::PeerObserverProxy,
         other: PeerId,
-        mut protocol: Vec<bredr::ProtocolDescriptor>,
+        protocol: Vec<bredr::ProtocolDescriptor>,
     ) {
-        let _ = observer.peer_connected(&mut other.into(), &mut protocol.iter_mut());
+        let _ = observer.peer_connected(&mut other.into(), &protocol);
     }
 
     /// Notifies all the searches for service class `id` with the published
@@ -187,9 +187,9 @@ impl MockPeer {
             .ok_or(format_err!("Connection receiver doesn't exist"))?;
 
         // Build the L2CAP descriptor and notify the receiver.
-        let mut protocol = build_l2cap_descriptor(psm);
+        let protocol = build_l2cap_descriptor(psm);
         let (local, remote) = Channel::create_with_max_tx(DEFAULT_TX_SDU_SIZE);
-        proxy.connected(&mut other.into(), remote.try_into()?, &mut protocol.iter_mut())?;
+        proxy.connected(&mut other.into(), remote.try_into()?, &protocol)?;
 
         // Notify observer relay of the connection.
         let _ = self.observer.as_ref().map(|o| Self::relay_connected(o, other, protocol));

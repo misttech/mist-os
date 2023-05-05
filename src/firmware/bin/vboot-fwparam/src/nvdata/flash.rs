@@ -129,13 +129,13 @@ pub mod tests {
                 while let Some(req) = stream.try_next().await.unwrap() {
                     match req {
                         FlashmapRequest::GetAreas { responder } => {
-                            let areas: &mut [Area] = &mut [Area {
+                            let areas = &[Area {
                                 name: NVRAM_AREA_NAME.to_owned(),
                                 size: NVRAM_REGION_SIZE,
                                 offset: 0,
                                 flags: AreaFlags::empty(),
                             }];
-                            responder.send(&mut areas.iter_mut()).expect("Reply OK");
+                            responder.send(areas).expect("Reply OK");
                         }
                         FlashmapRequest::GetEraseBlockSize { .. } => todo!(),
                         FlashmapRequest::Read { name, offset, size, responder } => {

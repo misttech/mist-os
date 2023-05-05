@@ -99,10 +99,9 @@ impl TryFrom<fsys::DeclType> for DeclType {
 pub async fn route(
     route_validator: &fsys::RouteValidatorProxy,
     moniker: RelativeMoniker,
-    mut targets: Vec<fsys::RouteTarget>,
+    targets: Vec<fsys::RouteTarget>,
 ) -> Result<Vec<RouteReport>> {
-    let reports = match route_validator.route(&moniker.to_string(), &mut targets.iter_mut()).await?
-    {
+    let reports = match route_validator.route(&moniker.to_string(), &targets).await? {
         Ok(reports) => reports,
         Err(e) => {
             return Err(format_err!(

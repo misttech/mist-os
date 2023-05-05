@@ -1442,7 +1442,7 @@ mod tests {
             )
             .expect("failed to connect to network context through counter");
         assert_matches::assert_matches!(
-            network_context.setup(&mut Vec::new().iter_mut()).await,
+            network_context.setup(&[]).await,
             Ok((zx::sys::ZX_OK, Some(_setup_handle)))
         );
     }

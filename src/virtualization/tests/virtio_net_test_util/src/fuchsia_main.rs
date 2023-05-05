@@ -94,7 +94,7 @@ async fn network_device_send(
         .expect("open primary session");
     let _task_handle = fuchsia_async::Task::spawn(task.map(|r| r.expect("session task failed")));
     session
-        .attach(port, vec![fidl_fuchsia_hardware_network::FrameType::Ethernet])
+        .attach(port, &[fidl_fuchsia_hardware_network::FrameType::Ethernet])
         .await
         .expect("attach port");
 

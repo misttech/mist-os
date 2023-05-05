@@ -408,7 +408,7 @@ impl Telemetry {
         }
 
         if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &mut metric_events.iter_mut(), ctx);
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, ctx);
         }
 
         if let Some(new_state) = new_state {
@@ -448,7 +448,7 @@ impl Telemetry {
         }
 
         if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &mut metric_events.iter_mut(), ctx);
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, ctx);
         }
 
         if let Some(new_config) = new_config {

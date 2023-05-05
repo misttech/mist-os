@@ -750,20 +750,20 @@ mod tests {
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {
-                        let mut chunk = chunk
+                        let chunk = chunk
                             .into_iter()
                             .map(fidl_fuchsia_pkg::BlobInfo::from)
                             .collect::<Vec<_>>();
 
                         let BlobInfoIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
-                        responder.send(&mut chunk.iter_mut()).unwrap();
+                        responder.send(&chunk).unwrap();
                     }
 
                     // Then respond with an empty chunk.
                     let BlobInfoIteratorRequest::Next { responder } =
                         stream.next().await.unwrap().unwrap();
-                    responder.send(&mut std::iter::empty()).unwrap();
+                    responder.send(&[]).unwrap();
 
                     // Expect the client to stop asking.
                     assert_matches!(stream.next().await, None);
@@ -783,14 +783,14 @@ mod tests {
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {
-                        let mut chunk = chunk
+                        let chunk = chunk
                             .into_iter()
                             .map(fidl_fuchsia_pkg::BlobInfo::from)
                             .collect::<Vec<_>>();
 
                         let BlobInfoIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
-                        responder.send(&mut chunk.iter_mut()).unwrap();
+                        responder.send(&chunk).unwrap();
                     }
 
                     // The client closes the channel before we can respond with an empty chunk.

@@ -1172,9 +1172,9 @@ mod tests {
 
         // Upstream server gives us a connection.
         let id = PeerId(123);
-        let mut protocol = vec![];
+        let protocol = &[];
         assert!(connect_client
-            .connected(&mut id.into(), bredr::Channel::default(), &mut protocol.iter_mut())
+            .connected(&mut id.into(), bredr::Channel::default(), protocol)
             .is_ok());
 
         // Run the relay fut - should still be running.

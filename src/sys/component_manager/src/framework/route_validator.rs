@@ -847,7 +847,7 @@ mod tests {
         model.start().await;
 
         // Validate the root
-        let mut targets = vec![
+        let targets = &[
             fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Use },
             fsys::RouteTarget { name: "foo.bar".into(), decl_type: fsys::DeclType::Expose },
             fsys::RouteTarget {
@@ -855,7 +855,7 @@ mod tests {
                 decl_type: fsys::DeclType::Use,
             },
         ];
-        let mut results = validator.route(".", &mut targets.iter_mut()).await.unwrap().unwrap();
+        let mut results = validator.route(".", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 3);
 
@@ -896,10 +896,9 @@ mod tests {
         );
 
         // Validate `my_child`
-        let mut targets =
-            vec![fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Expose }];
-        let mut results =
-            validator.route("./my_child", &mut targets.iter_mut()).await.unwrap().unwrap();
+        let targets =
+            &[fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Expose }];
+        let mut results = validator.route("./my_child", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
 
@@ -981,7 +980,7 @@ mod tests {
         model.start().await;
 
         // Validate the root, passing an empty vector. This should match both capabilities
-        let mut results = validator.route(".", &mut vec![].iter_mut()).await.unwrap().unwrap();
+        let mut results = validator.route(".", &[]).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 2);
 
@@ -1107,9 +1106,8 @@ mod tests {
         model.start().await;
 
         // Validate the root
-        let mut targets =
-            vec![fsys::RouteTarget { name: "foo.".into(), decl_type: fsys::DeclType::Any }];
-        let mut results = validator.route(".", &mut targets.iter_mut()).await.unwrap().unwrap();
+        let targets = &[fsys::RouteTarget { name: "foo.".into(), decl_type: fsys::DeclType::Any }];
+        let mut results = validator.route(".", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 4);
 
@@ -1283,10 +1281,9 @@ mod tests {
                 .unwrap();
         }
 
-        let mut targets =
-            vec![fsys::RouteTarget { name: "my_service".into(), decl_type: fsys::DeclType::Use }];
-        let mut results =
-            validator.route("./target", &mut targets.iter_mut()).await.unwrap().unwrap();
+        let targets =
+            &[fsys::RouteTarget { name: "my_service".into(), decl_type: fsys::DeclType::Use }];
+        let mut results = validator.route("./target", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 1);
 
@@ -1399,13 +1396,13 @@ mod tests {
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
-        let mut targets = vec![
+        let targets = &[
             fsys::RouteTarget { name: "a".into(), decl_type: fsys::DeclType::Use },
             fsys::RouteTarget { name: "b".into(), decl_type: fsys::DeclType::Use },
             fsys::RouteTarget { name: "c".into(), decl_type: fsys::DeclType::Expose },
             fsys::RouteTarget { name: "d".into(), decl_type: fsys::DeclType::Expose },
         ];
-        let mut results = validator.route(".", &mut targets.iter_mut()).await.unwrap().unwrap();
+        let mut results = validator.route(".", targets).await.unwrap().unwrap();
         assert_eq!(results.len(), 4);
 
         let report = results.remove(0);

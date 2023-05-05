@@ -54,10 +54,10 @@ impl PeerWatcher {
         let raw_removed: Vec<_> =
             raw_removed.into_iter().take(PeerWatcher::MAX_PEERIDS_PER_WATCH).collect();
 
-        let mut removed: Vec<btfidl::PeerId> = raw_removed.iter().map(|&p| p.into()).collect();
+        let removed: Vec<btfidl::PeerId> = raw_removed.iter().map(|&p| p.into()).collect();
         let updated: Vec<sys::Peer> = raw_updated.iter().map(|p| (*p).into()).collect();
 
-        if let Err(err) = watcher.responder.send(&updated, &mut removed.iter_mut()) {
+        if let Err(err) = watcher.responder.send(&updated, &removed) {
             warn!("Unable to respond to watch_peers hanging get: {:?}", err);
         } else {
             // Apply only the truncated updates to our cache of the client's state; Updates that we

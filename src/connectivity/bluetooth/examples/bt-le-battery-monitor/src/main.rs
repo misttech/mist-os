@@ -114,8 +114,8 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     le_client.request_gatt_client(gatt_server)?;
 
     // Read the GATT services offered by the peer.
-    let mut uuids = vec![BATTERY_SERVICE_UUID.into()];
-    let (added, _) = gatt_client.watch_services(&mut uuids.iter_mut()).await?;
+    let uuids = &[BATTERY_SERVICE_UUID.into()];
+    let (added, _) = gatt_client.watch_services(uuids).await?;
     let mut service_handle = read_services(added)?;
     let (remote_client, remote_server) =
         fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>()?;
@@ -382,7 +382,7 @@ mod tests {
         let gatt_fut = gatt_server.select_next_some();
         let (gatt_result, connect_fut) = run_while(&mut exec, connect_fut, gatt_fut);
         let (_, responder) = gatt_result.unwrap().into_watch_services().unwrap();
-        let _ = responder.send(&[example_battery_service()], &mut vec![].into_iter());
+        let _ = responder.send(&[example_battery_service()], &[]);
 
         // Expect a request to connect to the service and discover characteristics.
         let gatt_fut = gatt_server.select_next_some();

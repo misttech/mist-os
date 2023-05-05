@@ -602,7 +602,7 @@ mod tests {
             Arguments::new_from_sources(Env::mock_new(vars), None, None, None).await?,
         )?;
 
-        let mut req: Vec<fboot::BoolPair> = expected
+        let req: Vec<fboot::BoolPair> = expected
             .iter()
             .map(|(key, default, _expected)| fboot::BoolPair {
                 key: String::from(*key),
@@ -610,7 +610,7 @@ mod tests {
             })
             .collect();
         let mut cur = 0;
-        for val in proxy.get_bools(&mut req.iter_mut()).await?.iter() {
+        for val in proxy.get_bools(&req).await?.iter() {
             assert_eq!(
                 *val, expected[cur].2,
                 "get_bools() index {} returned {} but want {}",

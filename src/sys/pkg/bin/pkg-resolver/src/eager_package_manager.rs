@@ -754,7 +754,7 @@ mod tests {
                                 let mut stream = iterator.into_stream().unwrap();
                                 let BlobInfoIteratorRequest::Next { responder } =
                                     stream.next().await.unwrap().unwrap();
-                                responder.send(&mut std::iter::empty()).unwrap();
+                                responder.send(&[]).unwrap();
                             }
                             r => panic!("Unexpected request: {r:?}"),
                         }

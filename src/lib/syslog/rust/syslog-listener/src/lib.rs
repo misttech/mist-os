@@ -57,7 +57,7 @@ pub async fn run_log_listener_with_proxy<'a>(
     processor: impl LogProcessor + 'a,
     options: Option<&'a LogFilterOptions>,
     dump_logs: bool,
-    selectors: Option<&'a mut Vec<LogInterestSelector>>,
+    selectors: Option<&'a [LogInterestSelector]>,
 ) -> Result<(), Error> {
     let (listener_ptr, listener_stream) = fidl::endpoints::create_request_stream()?;
 
@@ -67,7 +67,7 @@ pub async fn run_log_listener_with_proxy<'a>(
     } else {
         match selectors {
             Some(s) => logger
-                .listen_safe_with_selectors(listener_ptr, options, &mut s.into_iter())
+                .listen_safe_with_selectors(listener_ptr, options, s)
                 .context("failed to register listener with selectors")?,
             None => {
                 logger.listen_safe(listener_ptr, options).context("failed to register listener")?
@@ -85,7 +85,7 @@ pub async fn run_log_listener<'a>(
     processor: impl LogProcessor + 'a,
     options: Option<&'a LogFilterOptions>,
     dump_logs: bool,
-    selectors: Option<&'a mut Vec<LogInterestSelector>>,
+    selectors: Option<&'a [LogInterestSelector]>,
 ) -> Result<(), Error> {
     let logger = connect_to_protocol::<LogMarker>()?;
     run_log_listener_with_proxy(&logger, processor, options, dump_logs, selectors).await

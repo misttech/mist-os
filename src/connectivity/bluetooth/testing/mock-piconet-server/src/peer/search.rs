@@ -59,12 +59,12 @@ impl SearchInfo {
         }
 
         // Convert the record into the FIDL ServiceFound response.
-        let mut response = record.to_service_found_response()?;
+        let response = record.to_service_found_response()?;
 
         let _ = self.proxy.service_found(
             &mut response.id.into(),
             response.protocol.as_deref(),
-            &mut response.attributes.iter_mut(),
+            &response.attributes,
         );
 
         // This service has now been reported.

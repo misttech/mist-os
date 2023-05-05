@@ -469,7 +469,7 @@ mod tests {
         };
 
         // Random RFCOMM protocol.
-        let mut proto: Vec<bredr::ProtocolDescriptor> =
+        let proto: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(ServerChannel::try_from(10).unwrap())
                 .iter()
                 .map(Into::into)
@@ -478,7 +478,7 @@ mod tests {
             .receiver
             .as_ref()
             .unwrap()
-            .connected(&mut bt::PeerId { value: 1 }, chan, &mut proto.iter_mut())
+            .connected(&mut bt::PeerId { value: 1 }, chan, &proto)
             .expect("succeed");
         assert!(exec.run_until_stalled(&mut call_manager).is_ready());
     }
@@ -611,7 +611,7 @@ mod tests {
         let ((), hfp_fut) = run_while(&mut exec, hfp_fut, server.complete_registration());
 
         // Send an AudioGateway service found
-        let mut audio_gateway_service_class_attrs = vec![bredr::Attribute {
+        let audio_gateway_service_class_attrs = &[bredr::Attribute {
             id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
             element: bredr::DataElement::Sequence(vec![
                 Some(Box::new(bredr::DataElement::Uuid(
@@ -627,7 +627,7 @@ mod tests {
         let service_found_fut = server.results.as_ref().unwrap().service_found(
             &mut PeerId(1).into(),
             None,
-            &mut audio_gateway_service_class_attrs.iter_mut(),
+            audio_gateway_service_class_attrs,
         );
 
         let (result, _hfp_fut) = run_while(&mut exec, hfp_fut, service_found_fut);
@@ -676,7 +676,7 @@ mod tests {
             .results
             .as_ref()
             .unwrap()
-            .service_found(&mut bt::PeerId { value: 1 }, Some(&proto), &mut vec![].iter_mut())
+            .service_found(&mut bt::PeerId { value: 1 }, Some(&proto), &[])
             .await?;
 
         match server.stream.next().await {

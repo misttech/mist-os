@@ -60,17 +60,15 @@ impl MockCoordinator {
     ///
     /// Returns an error if `displays` contains entries with repeated display IDs.
     pub fn assign_displays(&mut self, displays: Vec<display::Info>) -> Result<()> {
-        let mut added = HashMap::new();
-        if !displays.into_iter().all(|info| added.insert(DisplayId(info.id), info).is_none()) {
+        let mut map = HashMap::new();
+        if !displays.into_iter().all(|info| map.insert(DisplayId(info.id), info).is_none()) {
             return Err(MockCoordinatorError::DuplicateIds);
         }
 
+        let added: Vec<_> = map.iter().sorted().map(|(_, info)| info.clone()).collect();
         let removed: Vec<u64> = self.displays.iter().map(|(_, info)| info.id).collect();
-        self.displays = added;
-        self.control_handle.send_on_displays_changed(
-            &mut self.displays.iter_mut().sorted().map(|(_, info)| info),
-            &removed,
-        )?;
+        self.displays = map;
+        self.control_handle.send_on_displays_changed(&added, &removed)?;
         Ok(())
     }
 

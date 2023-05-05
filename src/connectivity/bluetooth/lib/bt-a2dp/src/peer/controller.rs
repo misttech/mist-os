@@ -284,9 +284,9 @@ async fn start_control_service(
                 };
             }
             PeerManagerRequest::ConnectedPeers { responder } => {
-                let mut connected_peers: Vec<fidl_fuchsia_bluetooth::PeerId> =
+                let connected_peers: Vec<fidl_fuchsia_bluetooth::PeerId> =
                     controller_pool.lock().connected_peers().into_iter().map(Into::into).collect();
-                responder.send(&mut connected_peers.iter_mut())?;
+                responder.send(&connected_peers)?;
                 info!("ConnectedPeers request. Peers: {:?}", connected_peers);
             }
         }

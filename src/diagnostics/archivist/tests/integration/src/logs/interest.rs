@@ -56,21 +56,21 @@ async fn register_interest() {
     assert_messages(&mut logs, &expected_logs[1..], LOGGER_COMPONENT_FOR_INTEREST_URL).await;
 
     // 2. Interest registration with min_severity = debug
-    let mut interests = vec![LogInterestSelector {
+    let interests = &[LogInterestSelector {
         selector: selector.clone(),
         interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Default::default() },
     }];
-    log_settings.register_interest(&mut interests.iter_mut()).expect("registered interest");
+    log_settings.register_interest(interests).expect("registered interest");
 
     // 3. Assert logs
     assert_messages(&mut logs, &expected_logs, LOGGER_COMPONENT_FOR_INTEREST_URL).await;
 
     // 4. Interest registration with min_severity = warn
-    let mut interests = vec![LogInterestSelector {
+    let interests = &[LogInterestSelector {
         selector,
         interest: Interest { min_severity: Some(FidlSeverity::Warn), ..Default::default() },
     }];
-    log_settings.register_interest(&mut interests.iter_mut()).expect("registered interest");
+    log_settings.register_interest(interests).expect("registered interest");
 
     // 5. Assert logs
     assert_messages(&mut logs, &expected_logs[2..], LOGGER_COMPONENT_FOR_INTEREST_URL).await;
@@ -100,11 +100,11 @@ async fn set_interest_before_startup() {
         instance.root.child_name()
     ))
     .unwrap();
-    let mut interests = vec![LogInterestSelector {
+    let interests = &[LogInterestSelector {
         selector,
         interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Default::default() },
     }];
-    log_settings.set_interest(&mut interests.iter_mut()).await.expect("set interest");
+    log_settings.set_interest(interests).await.expect("set interest");
 
     // Start listening for logs
     let accessor = instance

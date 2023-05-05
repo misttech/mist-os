@@ -160,16 +160,15 @@ impl AvrcpFacade {
     ) -> Result<CustomPlayerApplicationSettings, Error> {
         let tag = "AvrcpFacade::get_player_application_settings";
         match self.inner.read().controller_proxy.clone() {
-            Some(proxy) => match proxy
-                .get_player_application_settings(&mut attribute_ids.to_vec().into_iter())
-                .await?
-            {
-                Ok(player_application_settings) => Ok(player_application_settings.into()),
-                Err(e) => fx_err_and_bail!(
-                    &with_line!(tag),
-                    format!("Error fetching player application settings: {:?}", e)
-                ),
-            },
+            Some(proxy) => {
+                match proxy.get_player_application_settings(&attribute_ids.to_vec()).await? {
+                    Ok(player_application_settings) => Ok(player_application_settings.into()),
+                    Err(e) => fx_err_and_bail!(
+                        &with_line!(tag),
+                        format!("Error fetching player application settings: {:?}", e)
+                    ),
+                }
+            }
             None => fx_err_and_bail!(&with_line!(tag), "No AVRCP service proxy available"),
         }
     }

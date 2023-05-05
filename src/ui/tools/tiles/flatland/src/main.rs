@@ -313,17 +313,11 @@ impl Service {
         let tile_count: u32 = self.tiles.len().try_into().unwrap();
 
         let spec = default_gridspec(tile_count, self.logical_width, self.logical_height);
-        let mut sizes: Vec<_> = iter
-            .clone()
-            .map(|_| Vec3 { x: spec.column_width as f32, y: spec.row_height as f32, z: 1.0 })
-            .collect();
+        let size = Vec3 { x: spec.column_width as f32, y: spec.row_height as f32, z: 1.0 };
+        let sizes = vec![size; self.tiles.len()];
         let focusabilities: Vec<_> = iter.clone().map(|(_, tile)| tile.focusable).collect();
-        if let Err(e) = responder.send(
-            &keys.collect::<Vec<u32>>(),
-            &urls,
-            &mut sizes.iter_mut(),
-            &focusabilities,
-        ) {
+        if let Err(e) = responder.send(&keys.collect::<Vec<u32>>(), &urls, &sizes, &focusabilities)
+        {
             warn!("ListTiles: fidl response error: {:?}", e);
         }
     }

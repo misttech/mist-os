@@ -228,8 +228,7 @@ impl TargetDelegate {
     ) -> Result<PlayerApplicationSettings, TargetAvcError> {
         let target_handler =
             self.target_handler().ok_or(TargetAvcError::RejectedNoAvailablePlayers)?;
-        let send_command_fut =
-            target_handler.get_player_application_settings(&mut attributes.into_iter());
+        let send_command_fut = target_handler.get_player_application_settings(&attributes);
         send_command_fut.await.map_err(|_| TargetAvcError::RejectedNoAvailablePlayers)?
     }
 

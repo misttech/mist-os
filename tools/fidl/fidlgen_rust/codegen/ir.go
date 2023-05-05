@@ -805,23 +805,10 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.Fidl, *val.ElementCount)
 		}
 		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
-		if val.ElementType.Kind == fidlgen.PrimitiveType ||
-			val.ElementType.Kind == fidlgen.ArrayType ||
-			val.ElementType.Kind == fidlgen.VectorType ||
-			t.ElementType.Kind == fidlgen.StringType ||
-			(val.ElementType.Kind == fidlgen.IdentifierType &&
-				(el.DeclType == fidlgen.TableDeclType || el.DeclType == fidlgen.UnionDeclType)) ||
-			el.IsResourceType() ||
-			val.Nullable ||
-			val.ElementType.Nullable {
-			if el.IsResourceType() {
-				t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
-			} else {
-				t.Param = fmt.Sprintf("&[%s]", el.Owned)
-			}
+		if el.IsResourceType() {
+			t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
 		} else {
-			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
-			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
+			t.Param = fmt.Sprintf("&[%s]", el.Owned)
 		}
 		if val.Nullable {
 			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
@@ -949,25 +936,10 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		}
 		return v
 	case fidlgen.VectorType:
-		if t.ElementType.Kind == fidlgen.PrimitiveType ||
-			t.ElementType.Kind == fidlgen.ArrayType ||
-			t.ElementType.Kind == fidlgen.VectorType ||
-			t.ElementType.Kind == fidlgen.StringType ||
-			(t.ElementType.Kind == fidlgen.IdentifierType &&
-				(t.ElementType.DeclType == fidlgen.TableDeclType || t.ElementType.DeclType == fidlgen.UnionDeclType)) ||
-			t.IsResourceType() ||
-			t.Nullable ||
-			t.ElementType.Nullable {
-			if t.IsResourceType() {
-				return v + ".as_mut()"
-			}
-			return v
+		if t.IsResourceType() {
+			return v + ".as_mut()"
 		}
-		inner := convertParamToEncodeExpr("x", *t.ElementType)
-		if inner == "x" {
-			return fmt.Sprintf("fidl::encoding::Iterator(%s)", v)
-		}
-		return fmt.Sprintf("fidl::encoding::Iterator(%s.map(|x| %s))", v, inner)
+		return v
 	case fidlgen.IdentifierType:
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:

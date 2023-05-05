@@ -209,7 +209,7 @@ fn test_session_task_dropped() {
             .await
             .expect("failed to create session");
         let () = session
-            .attach(port, vec![netdev::FrameType::Ethernet])
+            .attach(port, &[netdev::FrameType::Ethernet])
             .await
             .expect("failed to attach session");
         session
@@ -388,7 +388,7 @@ where
     let (session, task) =
         client.primary_session(name, SESSION_BUFFER_LEN).await.expect("failed to create session");
     let () = session
-        .attach(port, vec![netdev::FrameType::Ethernet])
+        .attach(port, &[netdev::FrameType::Ethernet])
         .await
         .expect("failed to attach session");
     futures::select! {

@@ -60,9 +60,9 @@ pub async fn generate_empty_watch_notification(
 
 async fn send_get_player_application_settings(target_proxy: TargetHandlerProxy) {
     // Send a GetPlayerApplicationSettings for the active session.
-    let attribute_ids = vec![]; // Get all supported.
+    let attribute_ids = &[]; // Get all supported.
     let res = target_proxy
-        .get_player_application_settings(&mut attribute_ids.into_iter())
+        .get_player_application_settings(attribute_ids)
         .await
         .expect("FIDL call should work");
     assert_eq!(
@@ -75,9 +75,9 @@ async fn send_get_player_application_settings(target_proxy: TargetHandlerProxy) 
     );
 
     // Request an unsupported PlayerApplicationSetting.
-    let attribute_ids = vec![PlayerApplicationSettingAttributeId::Equalizer];
+    let attribute_ids = &[PlayerApplicationSettingAttributeId::Equalizer];
     let res = target_proxy
-        .get_player_application_settings(&mut attribute_ids.into_iter())
+        .get_player_application_settings(attribute_ids)
         .await
         .expect("FIDL call should work");
     assert_eq!(Err(TargetAvcError::RejectedInvalidParameter), res);

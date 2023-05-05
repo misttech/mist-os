@@ -196,8 +196,7 @@ mod test {
             let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
             std::mem::drop(test_proxy); // Drop test_proxy without calling SetSuccess().
 
-            let auth_result =
-                proxy.authenticate(&mut test_ipse, &mut vec![enrollment].iter_mut()).await?;
+            let auth_result = proxy.authenticate(&mut test_ipse, &[enrollment]).await?;
 
             // Should return "Aborted" since we closed the channel without
             // calling SetSuccess().
@@ -222,7 +221,7 @@ mod test {
             let (_test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
 
             let mut auth_fut = proxy
-                .authenticate(&mut test_ipse, &mut vec![enrollment].iter_mut())
+                .authenticate(&mut test_ipse, &[enrollment])
                 .on_timeout(TEST_TIMEOUT.after_now(), || {
                     Err(fidl::Error::ServerRequestRead(zx::Status::TIMED_OUT))
                 });
@@ -249,10 +248,7 @@ mod test {
             test_proxy.set_success()?;
 
             let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy
-                    .authenticate(&mut test_ipse, &mut vec![enrollment].iter_mut())
-                    .await?
-                    .unwrap();
+                proxy.authenticate(&mut test_ipse, &[enrollment]).await?.unwrap();
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
@@ -271,10 +267,7 @@ mod test {
             test_proxy.set_success()?;
 
             let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy
-                    .authenticate(&mut test_ipse, &mut vec![enrollment, enrollment_2].iter_mut())
-                    .await?
-                    .unwrap();
+                proxy.authenticate(&mut test_ipse, &[enrollment, enrollment_2]).await?.unwrap();
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
@@ -302,10 +295,7 @@ mod test {
             // Fail authentication since it only supports Test IPSE.
             assert_eq!(
                 proxy
-                    .authenticate(
-                        &mut create_password_interaction_protocol(),
-                        &mut vec![enrollment].iter_mut(),
-                    )
+                    .authenticate(&mut create_password_interaction_protocol(), &[enrollment])
                     .await?,
                 Err(ApiError::InvalidRequest)
             );

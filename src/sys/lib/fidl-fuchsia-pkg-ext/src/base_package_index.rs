@@ -118,7 +118,7 @@ mod tests {
         }
 
         fn serve_package_iterator(&self, mut stream: PackageIndexIteratorRequestStream) {
-            let mut packages = self
+            let packages = self
                 .base_packages
                 .iter()
                 .map(|(path, hash)| PackageIndexEntry {
@@ -131,12 +131,10 @@ mod tests {
 
             fasync::Task::spawn(
                 async move {
-                    let mut iter = packages.iter_mut();
+                    let mut iter = packages.chunks(PACKAGE_INDEX_CHUNK_SIZE as usize);
                     while let Some(request) = stream.try_next().await? {
                         let PackageIndexIteratorRequest::Next { responder } = request;
-
-                        responder
-                            .send(&mut iter.by_ref().take(PACKAGE_INDEX_CHUNK_SIZE as usize))?;
+                        responder.send(iter.next().unwrap_or(&[]))?;
                     }
                     Ok(())
                 }

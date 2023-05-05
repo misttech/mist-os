@@ -1373,7 +1373,7 @@ impl<
                             Ok(ffx::RepositoryIteratorRequest::Next { responder }) => {
                                 let chunk = chunks.next();
 
-                                if let Err(err) = responder.send(&mut chunk.iter_mut()) {
+                                if let Err(err) = responder.send(chunk) {
                                     tracing::warn!(
                                         "Error responding to RepositoryIterator request: {:#?}",
                                         err

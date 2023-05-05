@@ -148,14 +148,14 @@ impl AccountEventEmitter {
     ) -> Result<(), fidl::Error> {
         let mut clients_lock = self.clients.lock().await;
         let future = if options.initial_state {
-            let mut v = initial_account_ids
+            let v = initial_account_ids
                 .iter()
                 .map(|id| AccountAuthState {
                     account_id: (*id).into(),
                     auth_state: minimum_auth_state(),
                 })
                 .collect::<Vec<_>>();
-            FutureObj::new(Box::pin(listener.on_initialize(&mut v.iter_mut())))
+            FutureObj::new(Box::pin(listener.on_initialize(&v)))
         } else {
             FutureObj::new(Box::pin(ok(())))
         };

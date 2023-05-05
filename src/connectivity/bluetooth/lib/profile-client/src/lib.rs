@@ -326,11 +326,7 @@ mod tests {
 
             let (_local, remote) = Channel::create();
             connect_proxy
-                .connected(
-                    &mut remote_peer.into(),
-                    bredr::Channel::try_from(remote).unwrap(),
-                    &mut vec![].iter_mut(),
-                )
+                .connected(&mut remote_peer.into(), bredr::Channel::try_from(remote).unwrap(), &[])
                 .expect("connection should work");
 
             match exec.run_until_stalled(&mut event_fut) {
@@ -419,13 +415,10 @@ mod tests {
         // Send a search request, process the request (by polling event stream) and confirm it responds.
 
         // Report a search result, which should be replied to.
-        let mut attributes = vec![];
+        let attributes = &[];
         let found_peer_id = PeerId(1);
-        let results_fut = source_results_proxy.service_found(
-            &mut found_peer_id.into(),
-            None,
-            &mut attributes.iter_mut(),
-        );
+        let results_fut =
+            source_results_proxy.service_found(&mut found_peer_id.into(), None, attributes);
         pin_mut!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {
@@ -440,11 +433,8 @@ mod tests {
             x => panic!("Expected a response from the source result, got {:?}", x),
         };
 
-        let results_fut = sink_results_proxy.service_found(
-            &mut found_peer_id.into(),
-            None,
-            &mut attributes.iter_mut(),
-        );
+        let results_fut =
+            sink_results_proxy.service_found(&mut found_peer_id.into(), None, attributes);
         pin_mut!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {
@@ -507,10 +497,9 @@ mod tests {
         assert_eq!(after_search_count, initial_count + 1);
 
         // Reporting a search result should work as intended. The stream should produce an event.
-        let mut attributes = vec![];
+        let attributes = &[];
         let found_peer_id = PeerId(123);
-        let results_fut =
-            search_proxy.service_found(&mut found_peer_id.into(), None, &mut attributes.iter_mut());
+        let results_fut = search_proxy.service_found(&mut found_peer_id.into(), None, attributes);
         pin_mut!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {

@@ -162,41 +162,36 @@ mod test {
                                     if !sent {
                                         sent = true;
                                         responder
-                                            .send(
-                                                &mut vec![
-                                                    &mut RepositoryConfig {
-                                                        name: "Test1".to_owned(),
-                                                        spec: RepositorySpec::FileSystem(
-                                                            FileSystemRepositorySpec {
-                                                                metadata_repo_path: Some(
-                                                                    "a/b/meta".to_owned(),
-                                                                ),
-                                                                blob_repo_path: Some(
-                                                                    "a/b/blobs".to_owned(),
-                                                                ),
-                                                                ..Default::default()
-                                                            },
-                                                        ),
-                                                    },
-                                                    &mut RepositoryConfig {
-                                                        name: "Test2".to_owned(),
-                                                        spec: RepositorySpec::Pm(
-                                                            PmRepositorySpec {
-                                                                path: Some("c/d".to_owned()),
-                                                                aliases: Some(vec![
-                                                                    "example.com".into(),
-                                                                    "fuchsia.com".into(),
-                                                                ]),
-                                                                ..Default::default()
-                                                            },
-                                                        ),
-                                                    },
-                                                ]
-                                                .into_iter(),
-                                            )
+                                            .send(&[
+                                                RepositoryConfig {
+                                                    name: "Test1".to_owned(),
+                                                    spec: RepositorySpec::FileSystem(
+                                                        FileSystemRepositorySpec {
+                                                            metadata_repo_path: Some(
+                                                                "a/b/meta".to_owned(),
+                                                            ),
+                                                            blob_repo_path: Some(
+                                                                "a/b/blobs".to_owned(),
+                                                            ),
+                                                            ..Default::default()
+                                                        },
+                                                    ),
+                                                },
+                                                RepositoryConfig {
+                                                    name: "Test2".to_owned(),
+                                                    spec: RepositorySpec::Pm(PmRepositorySpec {
+                                                        path: Some("c/d".to_owned()),
+                                                        aliases: Some(vec![
+                                                            "example.com".into(),
+                                                            "fuchsia.com".into(),
+                                                        ]),
+                                                        ..Default::default()
+                                                    }),
+                                                },
+                                            ])
                                             .unwrap()
                                     } else {
-                                        responder.send(&mut vec![].into_iter()).unwrap()
+                                        responder.send(&[]).unwrap()
                                     }
                                 }
                             }

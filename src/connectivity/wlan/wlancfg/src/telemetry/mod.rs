@@ -1893,7 +1893,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_daily_1d_cobalt_metrics",
         );
     }
@@ -1930,7 +1930,7 @@ impl StatsLogger {
 
             log_cobalt_1dot1_batch!(
                 self.cobalt_1dot1_proxy,
-                &mut metric_events.iter_mut(),
+                &metric_events,
                 "log_daily_7d_cobalt_metrics",
             );
         }
@@ -2051,7 +2051,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_daily_detailed_cobalt_metrics",
         );
     }
@@ -2071,22 +2071,22 @@ impl StatsLogger {
 
     // Send out the RSSI and RSSI velocity metrics that have been collected over the last hour.
     async fn log_hourly_rssi_histogram_metrics(&mut self) {
-        let mut rssi_buckets = self.rssi_hist.values_mut();
+        let rssi_buckets: Vec<_> = self.rssi_hist.values().copied().collect();
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer_histogram,
             metrics::CONNECTION_RSSI_METRIC_ID,
-            &mut rssi_buckets,
+            &rssi_buckets,
             &[],
         );
         self.rssi_hist.clear();
 
-        let mut velocity_buckets = self.rssi_velocity_hist.values_mut();
+        let velocity_buckets: Vec<_> = self.rssi_velocity_hist.values().copied().collect();
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer_histogram,
             metrics::RSSI_VELOCITY_METRIC_ID,
-            &mut velocity_buckets,
+            &velocity_buckets,
             &[],
         );
         self.rssi_velocity_hist.clear();
@@ -2142,7 +2142,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_hourly_fleetwise_quality_cobalt_metrics",
         );
     }
@@ -2323,7 +2323,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_disconnect_cobalt_metrics",
         );
     }
@@ -2383,7 +2383,7 @@ impl StatsLogger {
         ap_state: &client::types::ApState,
         connect_start_time: Option<fasync::Time>,
     ) {
-        let mut metric_events = self.build_establish_connection_cobalt_metrics(
+        let metric_events = self.build_establish_connection_cobalt_metrics(
             policy_connect_reason,
             code,
             multiple_bss_candidates,
@@ -2392,7 +2392,7 @@ impl StatsLogger {
         );
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_establish_connection_cobalt_metrics",
         );
     }
@@ -2538,7 +2538,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_reconnect_cobalt_metrics",
         );
     }
@@ -2637,7 +2637,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_device_connected_cobalt_metrics",
         );
     }
@@ -2649,7 +2649,7 @@ impl StatsLogger {
 
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
-            &mut metric_events.iter_mut(),
+            &metric_events,
             "log_device_connected_channel_cobalt_metrics",
         );
     }
@@ -2730,8 +2730,8 @@ impl StatsLogger {
         entry.count = entry.count + 1;
     }
 
-    async fn log_metric_events(&mut self, mut metric_events: Vec<MetricEvent>, ctx: &'static str) {
-        log_cobalt_1dot1_batch!(self.cobalt_1dot1_proxy, &mut metric_events.iter_mut(), ctx,);
+    async fn log_metric_events(&mut self, metric_events: Vec<MetricEvent>, ctx: &'static str) {
+        log_cobalt_1dot1_batch!(self.cobalt_1dot1_proxy, &metric_events, ctx,);
     }
 
     async fn log_iface_creation_failure(&mut self) {

@@ -107,18 +107,14 @@ impl Clients {
             .get(&server_channel)
             .ok_or(format_err!("ServerChannel {:?} not registered", server_channel))?;
         // Build the RFCOMM protocol descriptor and relay the channel.
-        let mut protocol: Vec<bredr::ProtocolDescriptor> =
+        let protocol: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(server_channel).iter().map(Into::into).collect();
         if client.connection_receiver.is_closed() {
             return Err(format_err!("connection receiver peer closed"));
         }
         client
             .connection_receiver
-            .connected(
-                &mut peer_id.into(),
-                bredr::Channel::try_from(channel).unwrap(),
-                &mut protocol.iter_mut(),
-            )
+            .connected(&mut peer_id.into(), bredr::Channel::try_from(channel).unwrap(), &protocol)
             .map_err(|e| format_err!("{e:?}"))
     }
 }

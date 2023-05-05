@@ -203,7 +203,7 @@ pub async fn setup_masquerade_nat_network<'a>(
         host_addr: _,
     } = &net2;
 
-    let mut updates = vec![fnetfilter::Nat {
+    let updates = &[fnetfilter::Nat {
         proto: *nat_proto,
         src_subnet: *nat_src_subnet,
         outgoing_nic: u32::try_from(match nat_outgoing_nic {
@@ -226,7 +226,7 @@ pub async fn setup_masquerade_nat_network<'a>(
         router_filter.get_nat_rules().await.transform_result().expect("failed to get NAT rules");
     assert_eq!(&rules, &[]);
     let () = router_filter
-        .update_nat_rules(&mut updates.iter_mut(), generation)
+        .update_nat_rules(updates, generation)
         .await
         .transform_result()
         .expect("failed to update NAT rules");

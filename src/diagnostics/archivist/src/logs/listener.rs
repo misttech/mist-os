@@ -147,7 +147,7 @@ impl Listener {
                 }
 
                 if batch_size + msg_size > fidl_fuchsia_logger::MAX_LOG_MANY_SIZE_BYTES as usize {
-                    self.send_filtered_logs(&mut filtered_batch).await;
+                    self.send_filtered_logs(&filtered_batch).await;
                     if !self.is_healthy() {
                         return;
                     }
@@ -161,18 +161,14 @@ impl Listener {
         }
 
         if !filtered_batch.is_empty() {
-            self.send_filtered_logs(&mut filtered_batch).await;
+            self.send_filtered_logs(&filtered_batch).await;
         }
     }
 
     /// Send a batch of pre-filtered log messages to this listener.
-    async fn send_filtered_logs(&mut self, log_messages: &mut [LogMessage]) {
+    async fn send_filtered_logs(&mut self, log_messages: &[LogMessage]) {
         trace!("Flushing batch.");
-        self.check_result({
-            let mut log_messages = log_messages.iter_mut();
-            let fut = self.listener.log_many(&mut log_messages);
-            fut.await
-        });
+        self.check_result(self.listener.log_many(log_messages).await);
     }
 
     /// Send a single log message if it should be sent according to this listener's filter settings.

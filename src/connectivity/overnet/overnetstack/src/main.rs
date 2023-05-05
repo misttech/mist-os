@@ -77,8 +77,8 @@ async fn run_service_consumer_server(
             async move {
                 match request {
                     ServiceConsumerRequest::ListPeers { responder, .. } => {
-                        let mut peers = list_peers_context.list_peers().await?;
-                        responder.send(&mut peers.iter_mut())?;
+                        let peers = list_peers_context.list_peers().await?;
+                        responder.send(&peers)?;
                         Ok(())
                     }
                     ServiceConsumerRequest::ConnectToService {

@@ -88,7 +88,7 @@ pub async fn start_session(
         .expect("open primary session");
     let task_handle = fuchsia_async::Task::spawn(task.map(|r| r.expect("session task failed")));
     session
-        .attach(port, vec![fidl_fuchsia_hardware_network::FrameType::Ethernet])
+        .attach(port, &[fidl_fuchsia_hardware_network::FrameType::Ethernet])
         .await
         .expect("attach port");
     (session, task_handle)

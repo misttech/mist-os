@@ -692,8 +692,7 @@ mod tests {
     fn setup_fake_controller_proxy() -> fho::Deferred<ControllerProxy> {
         fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
             tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
-                let mut categories = fake_known_categories();
-                responder.send(categories.iter_mut().by_ref()).expect("should respond");
+                responder.send(&fake_known_categories()).expect("should respond");
             }
             tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
                 responder.send(&fake_provider_infos()).expect("should respond");

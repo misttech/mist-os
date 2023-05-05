@@ -87,10 +87,10 @@ impl ConnectedProtocol for CobaltConnectedService {
     fn send_message<'a>(
         &'a mut self,
         protocol: &'a MetricEventLoggerProxy,
-        mut msg: MetricEvent,
+        msg: MetricEvent,
     ) -> future::BoxFuture<'a, Result<(), Error>> {
         async move {
-            let fut = protocol.log_metric_events(&mut std::iter::once(&mut msg));
+            let fut = protocol.log_metric_events(&[msg]);
             fut.await?.map_err(|e| format_err!("Failed to log metric {e:?}"))?;
             Ok(())
         }

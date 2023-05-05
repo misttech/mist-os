@@ -435,7 +435,7 @@ impl PortHandler {
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
         let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
             self;
-        session.attach(*port_id, [fhardware_network::FrameType::Ethernet]).await
+        session.attach(*port_id, &[fhardware_network::FrameType::Ethernet]).await
     }
 
     pub(crate) async fn detach(&self) -> Result<(), netdevice_client::Error> {

@@ -762,22 +762,13 @@ impl ProjectSampler {
 
     async fn log_events(&mut self, events: Vec<EventToLog>) -> Result<(), Error> {
         for (project_id, event) in events.into_iter() {
-            let mut metric_events = vec![event];
-            // Note: The MetricEvent vector can't be marked send because it
-            // is a dyn object stream and rust can't confirm that it doesn't have handles. This
-            // is fine because we don't actually need to "send" to make the API call. But if we
-            // chain the creation of the future with the await on the future, rust interperets all
-            // variables including the reference to the event vector as potentially being needed
-            // across the await. So we have to split the creation of the future out from the await
-            // on the future. :(
-            let log_future = self
-                .metric_loggers
+            self.metric_loggers
                 .get(&project_id)
                 .as_ref()
                 .unwrap()
-                .log_metric_events(&mut metric_events.iter_mut());
-
-            log_future.await?.map_err(|e| format_err!("error from cobalt: {:?}", e))?;
+                .log_metric_events(&[event])
+                .await?
+                .map_err(|e| format_err!("error from cobalt: {:?}", e))?;
             self.project_sampler_stats.cobalt_logs_sent.add(1);
         }
         Ok(())

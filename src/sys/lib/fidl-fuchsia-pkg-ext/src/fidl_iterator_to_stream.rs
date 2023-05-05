@@ -72,7 +72,7 @@ mod tests {
             let fpkg::BlobInfoIteratorRequest::Next { responder } =
                 self.reqs.next().await.unwrap().unwrap();
             match resp {
-                Some(mut resp) => responder.send(&mut resp.iter_mut()).unwrap(),
+                Some(resp) => responder.send(&resp).unwrap(),
                 None => responder.control_handle().shutdown_with_epitaph(Status::NO_RESOURCES),
             }
         }

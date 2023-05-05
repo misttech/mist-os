@@ -504,7 +504,7 @@ impl GattClientFacade {
             .ok_or(format_err!("Not connected to peer"))?
             .proxy
             .clone();
-        let watch_fut = client_proxy.watch_services(&mut Vec::new().into_iter());
+        let watch_fut = client_proxy.watch_services(&[]);
         let (updated, removed) =
             watch_fut.await.map_err(|_| format_err!("FIDL error calling WatchServices()"))?;
 

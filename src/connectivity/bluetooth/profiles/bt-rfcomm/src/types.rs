@@ -156,11 +156,9 @@ impl ServiceGroup {
         &self,
         mut peer_id: PeerId,
         channel: bredr::Channel,
-        mut protocol: Vec<bredr::ProtocolDescriptor>,
+        protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
-        self.receiver
-            .connected(&mut peer_id, channel, &mut protocol.iter_mut())
-            .map_err(|e| e.into())
+        self.receiver.connected(&mut peer_id, channel, &protocol).map_err(|e| e.into())
     }
 
     pub fn set_responder(&mut self, responder: bredr::ProfileAdvertiseResponder) {

@@ -91,10 +91,10 @@ impl fidl_contrib::protocol_connector::ConnectedProtocol for CobaltConnectedServ
     fn send_message<'a>(
         &'a mut self,
         protocol: &'a fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        mut msg: fidl_fuchsia_metrics::MetricEvent,
+        msg: fidl_fuchsia_metrics::MetricEvent,
     ) -> future::BoxFuture<'a, Result<(), Error>> {
         async move {
-            let fut = protocol.log_metric_events(&mut std::iter::once(&mut msg));
+            let fut = protocol.log_metric_events(&[msg]);
             fut.await?.map_err(|e| format_err!("Failed to log metric {e:?}"))?;
             Ok(())
         }

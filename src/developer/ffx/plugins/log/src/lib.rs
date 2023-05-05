@@ -711,7 +711,7 @@ async fn log_cmd<W: std::io::Write>(
     if !cmd.select.is_empty() {
         if let Some(log_settings) = log_settings {
             log_settings
-                .set_interest(&mut cmd.select.clone().iter_mut())
+                .set_interest(&cmd.select)
                 .await
                 .map_err(|e| anyhow!("failed to register log interest selector: {}", e))?;
         } else {

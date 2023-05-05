@@ -36,20 +36,19 @@ pub struct VirtualConsoleArgs {
 
 impl VirtualConsoleArgs {
     pub async fn new_with_proxy(boot_args: ArgumentsProxy) -> Result<VirtualConsoleArgs, Error> {
-        let mut bool_keys = [
+        let bool_keys = &[
             BoolPair { key: "virtcon.disable".to_string(), defaultval: false },
             BoolPair { key: "virtcon.keep-log-visible".to_string(), defaultval: false },
             BoolPair { key: "virtcon.keyrepeat".to_string(), defaultval: true },
             BoolPair { key: "virtcon.rounded_corners".to_string(), defaultval: false },
             BoolPair { key: "virtcon.boot_animation".to_string(), defaultval: false },
         ];
-        let bool_key_refs: Vec<_> = bool_keys.iter_mut().collect();
         let mut disable = false;
         let mut keep_log_visible = false;
         let mut keyrepeat = true;
         let mut rounded_corners = false;
         let mut boot_animation = false;
-        if let Ok(values) = boot_args.get_bools(&mut bool_key_refs.into_iter()).await {
+        if let Ok(values) = boot_args.get_bools(bool_keys).await {
             disable = values[0];
             keep_log_visible = values[1];
             keyrepeat = values[2];

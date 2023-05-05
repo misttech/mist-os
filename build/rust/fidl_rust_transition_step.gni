@@ -20,4 +20,4 @@
 #
 #   3. Clean up the other repos to leave /* new code */ only.
 #
-fidl_rust_transition_step = "migrate_vectors_of_tables"
+fidl_rust_transition_step = "migrate_all_vectors"

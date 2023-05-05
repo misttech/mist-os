@@ -27,15 +27,12 @@ impl BootArgs {
         let arguments_proxy = connect_to_protocol::<ArgumentsMarker>()
             .context("Failed to connect to Arguments protocol")?;
 
-        let mut defaults = vec![
+        let defaults = &[
             BoolPair { key: "netsvc.netboot".to_string(), defaultval: false },
             BoolPair { key: "zircon.system.filesystem-check".to_string(), defaultval: false },
             BoolPair { key: "zircon.system.disable-automount".to_string(), defaultval: false },
         ];
-        let ret = arguments_proxy
-            .get_bools(&mut defaults.iter_mut())
-            .await
-            .context("get_bools failed")?;
+        let ret = arguments_proxy.get_bools(defaults).await.context("get_bools failed")?;
 
         let netsvc_netboot = ret[0];
         let zircon_system_filesystem_check = ret[1];

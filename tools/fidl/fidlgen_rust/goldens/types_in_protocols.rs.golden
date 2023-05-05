@@ -1520,9 +1520,9 @@ pub trait ProtocolProxyInterface: Send + Sync {
     ) -> Self::TwoWayVectorBasicResponseFut;
     fn r#one_way_vector_compound(
         &self,
-        vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        vector_bits: &[Bits],
+        vector_enum: &[Enum],
+        vector_struct: &[Struct],
         vector_table: &[Table],
         vector_union: &[Union],
         vector_opt_struct: &[Option<Box<Struct>>],
@@ -1544,9 +1544,9 @@ pub trait ProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_vector_compound(
         &self,
-        vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        vector_bits: &[Bits],
+        vector_enum: &[Enum],
+        vector_struct: &[Struct],
         vector_table: &[Table],
         vector_union: &[Union],
         vector_opt_struct: &[Option<Box<Struct>>],
@@ -2057,9 +2057,9 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#one_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -2067,9 +2067,9 @@ impl ProtocolSynchronousProxy {
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorCompound, false>(
             (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,
@@ -2081,9 +2081,9 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#two_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -2103,9 +2103,9 @@ impl ProtocolSynchronousProxy {
     > {
         let _response = self.client.send_query::<VectorCompound, VectorCompound, false, true>(
             (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,
@@ -2697,9 +2697,9 @@ impl ProtocolProxy {
     }
     pub fn r#one_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -2718,9 +2718,9 @@ impl ProtocolProxy {
     }
     pub fn r#two_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -3416,9 +3416,9 @@ impl ProtocolProxyInterface for ProtocolProxy {
     }
     fn r#one_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -3426,9 +3426,9 @@ impl ProtocolProxyInterface for ProtocolProxy {
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorCompound, false>(
             (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,
@@ -3449,9 +3449,9 @@ impl ProtocolProxyInterface for ProtocolProxy {
     )>;
     fn r#two_way_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -3492,9 +3492,9 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Vec<Option<Box<Union>>>,
         ), false>(
             (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,
@@ -6342,9 +6342,9 @@ impl ProtocolControlHandle {
     }
     pub fn send_event_vector_compound(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -6352,9 +6352,9 @@ impl ProtocolControlHandle {
     ) -> Result<(), fidl::Error> {
         self.inner.send::<VectorCompound, false>(
             (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,
@@ -7143,9 +7143,9 @@ impl ProtocolTwoWayVectorCompoundResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -7171,9 +7171,9 @@ impl ProtocolTwoWayVectorCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -7194,9 +7194,9 @@ impl ProtocolTwoWayVectorCompoundResponder {
 
     fn send_raw(
         &self,
-        mut vector_bits: &mut dyn ExactSizeIterator<Item = Bits>,
-        mut vector_enum: &mut dyn ExactSizeIterator<Item = Enum>,
-        mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
+        mut vector_bits: &[Bits],
+        mut vector_enum: &[Enum],
+        mut vector_struct: &[Struct],
         mut vector_table: &[Table],
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
@@ -7209,9 +7209,9 @@ impl ProtocolTwoWayVectorCompoundResponder {
                 fidl::encoding::DynamicFlags::empty(),
             ),
             body: (
-                fidl::encoding::Iterator(vector_bits),
-                fidl::encoding::Iterator(vector_enum),
-                fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
+                vector_bits,
+                vector_enum,
+                vector_struct,
                 vector_table,
                 vector_union,
                 vector_opt_struct,

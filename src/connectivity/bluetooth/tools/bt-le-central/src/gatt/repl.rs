@@ -36,12 +36,8 @@ pub async fn start_gatt_loop<'a>(proxy: ClientProxy) -> Result<(), Error> {
 
     // TODO(fxbug.dev/109239): This only gets the list of initial services. We should watch for
     // future service updates as well.
-    let (services, _) = client
-        .read()
-        .proxy
-        .watch_services(&mut Vec::new().into_iter())
-        .await
-        .context("Failed to watch services")?;
+    let (services, _) =
+        client.read().proxy.watch_services(&[]).await.context("Failed to watch services")?;
     client.write().set_services(services);
 
     let (mut commands, mut acks) = cmd_stream();

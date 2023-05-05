@@ -288,8 +288,8 @@ impl Interaction {
         storage_unlock_proxy: StorageUnlockMechanismProxy,
         mut ipse: InteractionProtocolServerEnd,
     ) -> Result<AttemptedEvent, AccountManagerError> {
-        let mut enrollments_lock = enrollments.lock().await;
-        let fut = storage_unlock_proxy.authenticate(&mut ipse, &mut enrollments_lock.iter_mut());
+        let enrollments_lock = enrollments.lock().await;
+        let fut = storage_unlock_proxy.authenticate(&mut ipse, &enrollments_lock);
         let auth_attempt = fut.await.map_err(|err| {
             AccountManagerError::new(ApiError::Unknown)
                 .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
