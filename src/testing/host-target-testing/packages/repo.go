@@ -121,8 +121,8 @@ func (r *Repository) OpenBlob(ctx context.Context, merkle string) (*os.File, err
 	return r.BlobStore.OpenBlob(ctx, merkle)
 }
 
-func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string) (*Server, error) {
-	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName)
+func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string, repoPort int) (*Server, error) {
+	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName, repoPort)
 }
 
 func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (string, error) {

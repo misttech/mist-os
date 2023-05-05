@@ -40,6 +40,7 @@ type DeviceConfig struct {
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
 	deviceSshPort            int
+	repoPort                 int
 	sshPrivateKey            ssh.Signer
 	SerialSocketPath         string
 	connectTimeout           time.Duration
@@ -61,6 +62,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.DurationVar(&c.connectTimeout, "device-connect-timeout", 5*time.Second, "device connection timeout (default 5 seconds)")
 	fs.BoolVar(&c.WorkaroundBrokenTimeSkip, "workaround-broken-time-skip", false,
 		"whether to sleep for 15 seconds after pave and then reconnect, to work around a known networking bug, fxbug.dev/74861")
+	fs.IntVar(&c.repoPort, "repo-port", 0, "default port to serve the repository")
 
 	environmentSerialPath := os.Getenv(constants.SerialSocketEnvKey)
 	if c.SerialSocketPath == "" && environmentSerialPath != "" {
@@ -165,5 +167,5 @@ func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, err
 		}
 	}
 
-	return device.NewClient(ctx, c.deviceSshPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
+	return device.NewClient(ctx, c.deviceSshPort, c.repoPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
 }

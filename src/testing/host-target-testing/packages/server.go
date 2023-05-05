@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,8 +46,8 @@ func (f httpBlobStore) Open(path string) (fs.File, error) {
 	return f.blobStore.OpenBlob(f.ctx, strings.TrimPrefix(path, "blobs/"))
 }
 
-func newServer(ctx context.Context, dir string, blobStore BlobStore, localHostname string, repoName string) (*Server, error) {
-	listener, err := net.Listen("tcp", ":0")
+func newServer(ctx context.Context, dir string, blobStore BlobStore, localHostname string, repoName string, repoPort int) (*Server, error) {
+	listener, err := net.Listen("tcp", ":"+strconv.Itoa(repoPort))
 	if err != nil {
 		return nil, err
 	}

@@ -39,12 +39,14 @@ type Client struct {
 	initialMonotonicTime     time.Time
 	workaroundBrokenTimeSkip bool
 	bootCounter              *uint32
+	repoPort                 int
 }
 
 // NewClient creates a new Client.
 func NewClient(
 	ctx context.Context,
 	deviceSshPort int,
+	repoPort int,
 	deviceResolver DeviceResolver,
 	privateKey ssh.Signer,
 	sshConnectBackoff retry.Backoff,
@@ -90,6 +92,7 @@ func NewClient(
 		sshClient:                sshClient,
 		workaroundBrokenTimeSkip: workaroundBrokenTimeSkip,
 		bootCounter:              bootCounter,
+		repoPort:                 repoPort,
 	}
 
 	if err := c.postConnectSetup(ctx); err != nil {
@@ -574,7 +577,7 @@ func (c *Client) ServePackageRepository(
 	}
 
 	// Serve the repository before the test begins.
-	server, err := repo.Serve(ctx, localHostname, repoName)
+	server, err := repo.Serve(ctx, localHostname, repoName, c.repoPort)
 	if err != nil {
 		return nil, err
 	}
