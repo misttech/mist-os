@@ -1004,7 +1004,7 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     pub async fn pkg_resolver_inspect_hierarchy(&self) -> DiagnosticsHierarchy {
-        ArchiveReader::new()
+        let data = ArchiveReader::new()
             .add_selector(ComponentSelector::new(vec![
                 format!("realm_builder\\:{}", self.realm_instance.root.child_name()),
                 PKG_RESOLVER_CHILD_NAME.into(),
@@ -1014,9 +1014,13 @@ impl<B: Blobfs> TestEnv<B> {
             .expect("read inspect hierarchy")
             .into_iter()
             .next()
-            .expect("one result")
-            .payload
-            .expect("payload is not none")
+            .expect("one result");
+
+        if data.payload.is_none() {
+            tracing::error!(?data, "Unexpected empty payload");
+        }
+
+        data.payload.unwrap()
     }
 
     /// Wait until pkg-resolver inspect state satisfies `desired_state`.
