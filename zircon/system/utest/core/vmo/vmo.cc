@@ -1567,61 +1567,27 @@ TEST(VmoTestCase, CacheOpOutOfRange) {
                          UINT64_MAX - zx_system_get_page_size() + 1, 1, nullptr, 0));
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_CacheFlush DISABLED_CacheFlush
-#else
-#define MAYBE_CacheFlush CacheFlush
-#endif
-TEST(VmoTestCase, MAYBE_CacheFlush) {
-  //  return;
-  zx_handle_t vmo;
+TEST(VmoTestCase, CacheFlush) {
+  zx::vmo vmo;
   const size_t size = 0x8000;
 
-  EXPECT_OK(zx_vmo_create(size, 0, &vmo), "creation for cache op");
+  EXPECT_OK(zx::vmo::create(size, 0, &vmo), "creation for cache op");
 
   uintptr_t ptr_ro;
-  EXPECT_EQ(ZX_OK, zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &ptr_ro),
-            "map");
+  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, 0, size, &ptr_ro), "map");
   EXPECT_NE(ptr_ro, 0, "map address");
   void *pro = (void *)ptr_ro;
 
   uintptr_t ptr_rw;
-  EXPECT_EQ(ZX_OK,
-            zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size,
-                        &ptr_rw),
-            "map");
+  EXPECT_OK(
+      zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &ptr_rw),
+      "map");
   EXPECT_NE(ptr_rw, 0, "map address");
   void *prw = (void *)ptr_rw;
 
-  zx_vmo_op_range(vmo, ZX_VMO_OP_COMMIT, 0, size, NULL, 0);
+  EXPECT_OK(vmo.op_range(ZX_VMO_OP_COMMIT, 0, size, nullptr, 0));
 
-  EXPECT_OK(zx_cache_flush(prw, size, ZX_CACHE_FLUSH_INSN), "rw flush insn");
-  EXPECT_OK(zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA), "rw clean");
-  EXPECT_OK(zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
-            "rw clean w/ insn");
-  EXPECT_OK(zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
-            "rw clean/invalidate");
-  EXPECT_EQ(ZX_OK,
-            zx_cache_flush(prw, size,
-                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
-            "rw all");
-
-  EXPECT_OK(zx_cache_flush(pro, size, ZX_CACHE_FLUSH_INSN), "ro flush insn");
-  EXPECT_OK(zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA), "ro clean");
-  EXPECT_OK(zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
-            "ro clean w/ insn");
-  EXPECT_OK(zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
-            "ro clean/invalidate");
-  EXPECT_OK(zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
-            "ro clean/invalidate");
-  EXPECT_EQ(ZX_OK,
-            zx_cache_flush(pro, size,
-                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
-            "ro all");
-
-  // Above checks all valid options combinations; check that invalid
-  // combinations are handled correctly here.
+  // Check some invalid combinations.
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_cache_flush(pro, size, 0), "no args");
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_INVALIDATE),
             "invalidate requires data");
@@ -1631,9 +1597,40 @@ TEST(VmoTestCase, MAYBE_CacheFlush) {
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_cache_flush(pro, size, 1u << 3), "out of range a");
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_cache_flush(pro, size, ~0u), "out of range b");
 
-  zx_vmar_unmap(zx_vmar_root_self(), ptr_rw, size);
-  zx_vmar_unmap(zx_vmar_root_self(), ptr_ro, size);
-  EXPECT_OK(zx_handle_close(vmo), "close handle");
+  // Check all the valid the combinations.
+  //
+  // TODO(https://fxbug.dev/124333): zx_cache_flush is not yet implemented on riscv64.
+#if defined(__riscv)
+  constexpr zx_status_t expected = ZX_ERR_NOT_SUPPORTED;
+#else
+  constexpr zx_status_t expected = ZX_OK;
+#endif
+  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_INSN), "rw flush insn");
+  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA), "rw clean");
+  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
+            "rw clean w/ insn");
+  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
+            "rw clean/invalidate");
+  EXPECT_EQ(expected,
+            zx_cache_flush(prw, size,
+                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
+            "rw all");
+
+  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_INSN), "ro flush insn");
+  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA), "ro clean");
+  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
+            "ro clean w/ insn");
+  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
+            "ro clean/invalidate");
+  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
+            "ro clean/invalidate");
+  EXPECT_EQ(expected,
+            zx_cache_flush(pro, size,
+                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
+            "ro all");
+
+  EXPECT_OK(zx::vmar::root_self()->unmap(ptr_rw, size));
+  EXPECT_OK(zx::vmar::root_self()->unmap(ptr_ro, size));
 }
 
 TEST(VmoTestCase, DecommitMisaligned) {
