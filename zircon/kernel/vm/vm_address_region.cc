@@ -549,8 +549,20 @@ void VmAddressRegion::DumpLocked(uint depth, bool verbose) const {
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
-  printf("vmar %p [%#" PRIxPTR " %#" PRIxPTR "] sz %#zx ref %d state %d '%s'\n", this, base_,
-         base_ + (size_ - 1), size_, ref_count_debug(), (int)state_, name_);
+  size_t max_gap = 0;
+  vaddr_t min_first_byte = 0;
+  vaddr_t max_last_byte = 0;
+  if (auto root = subregions_.Root()) {
+    AssertHeld(root->lock_ref());
+    max_gap = root->subtree_state_locked().max_gap();
+    min_first_byte = root->subtree_state_locked().min_first_byte();
+    max_last_byte = root->subtree_state_locked().max_last_byte();
+  }
+  printf("vmar %p [%#" PRIxPTR " %#" PRIxPTR
+         "] sz %#zx ref %d state %d '%s' subregions %zu max_gap %#" PRIx64 " [%#" PRIxPTR
+         " %#" PRIxPTR "]\n",
+         this, base_, base_ + (size_ - 1), size_, ref_count_debug(), (int)state_, name_,
+         subregions_.size(), max_gap, min_first_byte, max_last_byte);
   for (const auto& child : subregions_) {
     AssertHeld(child.lock_ref());
     child.DumpLocked(depth + 1, verbose);
@@ -1018,6 +1030,8 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
 // or not.
 zx_status_t VmAddressRegion::AllocSpotLocked(size_t size, uint8_t align_pow2, uint arch_mmu_flags,
                                              vaddr_t* spot, vaddr_t upper_limit) {
+  LTRACEF("size=%zu align_pow2=%u arch_mmu_flags=%x upper_limit=%zx\n", size, align_pow2,
+          arch_mmu_flags, upper_limit);
   canary_.Assert();
   DEBUG_ASSERT(size > 0 && IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(spot);

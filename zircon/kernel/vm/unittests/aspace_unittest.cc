@@ -1650,12 +1650,16 @@ class TestRegion : public fbl::RefCounted<TestRegion>,
   Lock<CriticalMutex>* lock() const;
   Lock<CriticalMutex>& lock_ref() const;
 
+  VmAddressRegionSubtreeState& subtree_state_locked() { return subtree_state_; }
+  const VmAddressRegionSubtreeState& subtree_state_locked() const { return subtree_state_; }
+
  private:
   friend class TestRegionList;
   // Simulates aspace for templated code
   TestRegionList const& list_;
   vaddr_t base_;
   size_t size_;
+  VmAddressRegionSubtreeState subtree_state_;
 };
 
 class TestRegionList : public fbl::RefCounted<TestRegionList> {

@@ -19,8 +19,10 @@
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <ffl/saturating_arithmetic.h>
 #include <ktl/limits.h>
 #include <ktl/optional.h>
+#include <vm/vm_address_region_subtree_state.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page_list.h>
@@ -161,9 +163,16 @@ class VmAddressRegionOrMapping
     HIGH,
   };
 
+  // Subtree state for augmented binary search tree operations.
+  VmAddressRegionSubtreeState& subtree_state_locked() TA_REQ(lock()) { return subtree_state_; }
+  const VmAddressRegionSubtreeState& subtree_state_locked() const TA_REQ(lock()) {
+    return subtree_state_;
+  }
+
  private:
   fbl::Canary<fbl::magic("VMRM")> canary_;
   const bool is_mapping_;
+  VmAddressRegionSubtreeState subtree_state_ TA_GUARDED(lock());
 
  protected:
   // friend VmAddressRegion so it can access DestroyLocked
@@ -260,7 +269,15 @@ class VmAddressRegionOrMapping
 template <typename T = VmAddressRegionOrMapping>
 class RegionList final {
  public:
-  using ChildList = fbl::WAVLTree<vaddr_t, fbl::RefPtr<T>>;
+  using KeyType = vaddr_t;
+  using PtrType = fbl::RefPtr<T>;
+  using KeyTraits =
+      fbl::DefaultKeyedObjectTraits<vaddr_t,
+                                    typename fbl::internal::ContainerPtrTraits<PtrType>::ValueType>;
+  using TagType = fbl::DefaultObjectTag;
+  using NodeTraits = fbl::DefaultWAVLTreeTraits<PtrType, TagType>;
+  using Observer = VmAddressRegionSubtreeState::Observer<T>;
+  using ChildList = fbl::WAVLTree<KeyType, PtrType, KeyTraits, TagType, NodeTraits, Observer>;
 
   // Remove *region* from the list, returns the removed region.
   fbl::RefPtr<T> RemoveRegion(T* region) { return regions_.erase(*region); }
@@ -268,6 +285,7 @@ class RegionList final {
   // Request the region to the left or right of the given region.
   typename ChildList::iterator LeftOf(T* region) { return --regions_.make_iterator(*region); }
   typename ChildList::iterator RightOf(T* region) { return ++regions_.make_iterator(*region); }
+  typename ChildList::const_iterator Root() const { return regions_.root(); }
 
   // Insert *region* to the region list.
   void InsertRegion(fbl::RefPtr<T> region) { regions_.insert(region); }
@@ -358,103 +376,215 @@ class RegionList final {
     return true;
   }
 
+  // Returns the base address of an available spot in the address range that satisfies the given
+  // entropy, alignment, size, and upper limit requirements. If no spot is found that satisfies the
+  // given entropy (i.e. target_index), the number of candidate spots encountered is returned.
+  //
+  // See vm/vm_address_region_subtree_state.h for an explanation of the augmented state used by this
+  // method to perform efficient tree traversal.
+  struct FindSpotAtIndexFailed {
+    size_t candidate_spot_count;
+  };
+  fit::result<FindSpotAtIndexFailed, vaddr_t> FindSpotAtIndex(vaddr_t target_index,
+                                                              uint8_t align_pow2, size_t size,
+                                                              vaddr_t parent_base,
+                                                              size_t parent_size,
+                                                              vaddr_t upper_limit) const {
+    // Returns the number of addresses that satisfy the size and alignment in the given range,
+    // accounting for ranges that overlap the upper limit.
+    const auto spots_in_range = [align_pow2, size, upper_limit](vaddr_t aligned_base,
+                                                                size_t aligned_size) -> size_t {
+      DEBUG_ASSERT(aligned_base < upper_limit);
+
+      const size_t range_limit = ffl::SaturateAddAs<size_t>(aligned_base, aligned_size);
+      const size_t clamped_range_size =
+          range_limit < upper_limit ? aligned_size : aligned_size - (range_limit - upper_limit);
+
+      if (clamped_range_size >= size) {
+        return ((clamped_range_size - size) >> align_pow2) + 1;
+      }
+      return 0;
+    };
+
+    // Returns the given range with the base aligned and the size adjusted to maintain the same end
+    // address. If the aligned base address is greater than the end address, the returned size is
+    // zero.
+    struct AlignedRange {
+      vaddr_t base;
+      size_t size;
+    };
+    const auto align_range = [align_pow2](vaddr_t range_base, size_t range_size) -> AlignedRange {
+      const vaddr_t aligned_base = ALIGN(range_base, 1UL << align_pow2);
+      const size_t base_delta = aligned_base - range_base;
+      const size_t aligned_size = ffl::SaturateSubtractAs<size_t>(range_size, base_delta);
+      return {.base = aligned_base, .size = aligned_size};
+    };
+
+    // Track the number of candidate spots encountered.
+    size_t candidate_spot_count = 0;
+
+    // See if there is a suitable gap between the start of the parent region and the first
+    // subregion, or within the range of the parent region if there are no subregions.
+    {
+      const size_t gap_size =
+          regions_.is_empty() ? parent_size : Observer::MinFirstByte(regions_.root()) - parent_base;
+      const AlignedRange aligned_gap = align_range(parent_base, gap_size);
+      if (aligned_gap.base >= upper_limit) {
+        return fit::error(FindSpotAtIndexFailed{candidate_spot_count});
+      }
+      const size_t spot_count = spots_in_range(aligned_gap.base, aligned_gap.size);
+      candidate_spot_count += spot_count;
+      if (target_index < spot_count) {
+        return fit::ok(aligned_gap.base + (target_index << align_pow2));
+      }
+      target_index -= spot_count;
+    }
+
+    // Traverse the tree to the leftmost gap that satisfies the required entropy, alignment, size,
+    // and upper limit, skipping over gaps that are too small to consider. Keep track of the highest
+    // address already visited to prune paths during traversal.
+    vaddr_t already_visited = 0;
+    auto node = regions_.root();
+    while (node) {
+      // Consider this node if there is a suitable gap in the left or right subtrees, including the
+      // gaps between this node and its subtrees.
+      if (Observer::MaxGap(node) >= size) {
+        // First consider the left subtree, considering earlier addresses first to maximize page
+        // table compactness. When entropy is zero (i.e. target_index is 0) this results in a first
+        // fit search.
+        if (auto left = node.left(); left) {
+          //  Descend to the left subtree if it has a sufficient gap and its range has not been
+          //  visited.
+          if (Observer::MaxGap(left) >= size && Observer::MaxLastByte(left) > already_visited) {
+            node = left;
+            continue;
+          }
+
+          // The left subtree doesn't contain a sufficent gap. See if the gap between the current
+          // node and the end of the left subtree is sufficient.
+          const vaddr_t gap_base = Observer::MaxLastByte(left) + 1;
+          const size_t gap_size =
+              Observer::Gap(Observer::MaxLastByte(left), Observer::FirstByte(node));
+          const AlignedRange aligned_gap = align_range(gap_base, gap_size);
+          if (aligned_gap.base >= upper_limit) {
+            return fit::error(FindSpotAtIndexFailed{candidate_spot_count});
+          }
+          const size_t spot_count = spots_in_range(aligned_gap.base, aligned_gap.size);
+          candidate_spot_count += spot_count;
+          if (target_index < spot_count) {
+            return fit::ok(aligned_gap.base + (target_index << align_pow2));
+          }
+          target_index -= spot_count;
+        }
+
+        // If a sufficient gap is not found in the left subtree, consider the right subtree.
+        if (auto right = node.right(); right) {
+          // See if the gap between the current node and the start of the right subtree is
+          // sufficient.
+          const vaddr_t gap_base = Observer::LastByte(node) + 1;
+          const size_t gap_size =
+              Observer::Gap(Observer::LastByte(node), Observer::MinFirstByte(right));
+          const AlignedRange aligned_gap = align_range(gap_base, gap_size);
+          if (aligned_gap.base >= upper_limit) {
+            return fit::error(FindSpotAtIndexFailed{candidate_spot_count});
+          }
+          const size_t spot_count = spots_in_range(aligned_gap.base, aligned_gap.size);
+          candidate_spot_count += spot_count;
+          if (target_index < spot_count) {
+            return fit::ok(aligned_gap.base + (target_index << align_pow2));
+          }
+          target_index -= spot_count;
+
+          // The gap with the current node is not sufficient. Descend to the right if it has a
+          // sufficient gap and its range has not been visited.
+          if (Observer::MaxGap(right) >= size && Observer::MaxLastByte(right) > already_visited) {
+            node = right;
+            continue;
+          }
+        }
+      }
+
+      // This subtree has been fully visited. Set the partition point to the end of this subtree and
+      // ascend to the parent node to continue traversal. If this was the left child of the parent,
+      // only the right child will be considered. If this was the right child, visiting the parent
+      // is done and will proceed to its parent and so forth. If this node was the root, the
+      // traversal is complete and a spot at the target index was not found.
+      already_visited = Observer::MaxLastByte(node);
+      node = node.parent();
+    }
+
+    // See if there is a suitable gap between the end of the last subregion and the end of the
+    // parent.
+    if (auto root = regions_.root()) {
+      const vaddr_t gap_base = ffl::SaturateAddAs<vaddr_t>(Observer::MaxLastByte(root), 1);
+      const size_t gap_size = parent_size - (gap_base - parent_base);
+      const AlignedRange aligned_gap = align_range(gap_base, gap_size);
+      if (aligned_gap.base >= upper_limit) {
+        return fit::error(FindSpotAtIndexFailed{candidate_spot_count});
+      }
+      const size_t spot_count = spots_in_range(aligned_gap.base, aligned_gap.size);
+      candidate_spot_count += spot_count;
+      if (target_index < spot_count) {
+        return fit::ok(aligned_gap.base + (target_index << align_pow2));
+      }
+      target_index -= spot_count;
+    }
+
+    return fit::error(FindSpotAtIndexFailed{candidate_spot_count});
+  }
+
   // Get the allocation spot that is free and large enough for the aligned size.
   zx_status_t GetAllocSpot(vaddr_t* alloc_spot, uint8_t align_pow2, uint8_t entropy, size_t size,
                            vaddr_t parent_base, size_t parent_size, crypto::Prng* prng,
                            vaddr_t upper_limit = ktl::numeric_limits<vaddr_t>::max()) const {
     DEBUG_ASSERT(entropy < sizeof(size_t) * 8);
-    const vaddr_t align = 1UL << align_pow2;
-    // This is the maximum number of spaces we need to consider based on our desired entropy.
-    const size_t max_candidate_spaces = 1ul << entropy;
-    vaddr_t selected_index = 0;
-    if (prng != nullptr) {
-      // We first pick a index in [0, max_candidate_spaces] and hope to find the index.
-      // If the number of available spots is less than selected_index, alloc_spot_info.founds would
-      // be false. This means that selected_index is too large, we have to pick again in a smaller
-      // range and try again.
-      //
-      // Note that this is mathematically equal to randomly pick a spot within
-      // [0, candidate_spot_count] if selected_index <= candidate_spot_count.
-      //
-      // Prove as following:
-      // Define M = candidate_spot_count
-      // Define N = max_candidate_spaces (M < N, otherwise we can randomly allocate any spot from
-      // [0, max_candidate_spaces], thus allocate a specific slot has (1 / N) probability).
-      // Define slot X0 where X0 belongs to [1, M].
-      // Define event A: randomly pick a slot X in [1, N], N = X0.
-      // Define event B: randomly pick a slot X in [1, N], N belongs to [1, M].
-      // Define event C: randomly pick a slot X in [1, N], N = X0 when N belongs to [1, M].
-      // P(C) = P(A | B)
-      // Since when A happens, B definitely happens, so P(AB) = P(A)
-      // P(C) = P(A) / P(B) = (1 / N) / (M / N) = (1 / M)
-      // which is equal to the probability of picking a specific spot in [0, M].
-      selected_index = prng->RandInt(max_candidate_spaces);
-    }
 
-    AllocSpotInfo alloc_spot_info;
-    FindAllocSpotInGaps(size, align_pow2, selected_index, parent_base, parent_size,
-                        &alloc_spot_info, upper_limit);
-    size_t candidate_spot_count = alloc_spot_info.candidate_spot_count;
-    if (candidate_spot_count == 0) {
-      DEBUG_ASSERT(!alloc_spot_info.found);
-      return ZX_ERR_NO_RESOURCES;
-    }
-    if (!alloc_spot_info.found) {
-      if (candidate_spot_count > max_candidate_spaces) {
-        candidate_spot_count = max_candidate_spaces;
+    // The number of addresses to consider based on the configured entropy.
+    const size_t max_candidate_spaces = 1ul << entropy;
+
+    // We first pick an index in [0, max_candidate_spaces] and hope to find a spot there. If the
+    // number of available spots is less than the selected index, the attempt fails, returning the
+    // actual number of candidate spots found, and we try again in this smaller range.
+    //
+    // This is mathematically equivalent to randomly picking a spot within [0, candidate_spot_count]
+    // when selected_index <= candidate_spot_count.
+    //
+    // Prove as following:
+    // Define M = candidate_spot_count
+    // Define N = max_candidate_spaces (M < N, otherwise we can randomly allocate any spot from
+    // [0, max_candidate_spaces], thus allocate a specific slot has (1 / N) probability).
+    // Define slot X0 where X0 belongs to [1, M].
+    // Define event A: randomly pick a slot X in [1, N], N = X0.
+    // Define event B: randomly pick a slot X in [1, N], N belongs to [1, M].
+    // Define event C: randomly pick a slot X in [1, N], N = X0 when N belongs to [1, M].
+    // P(C) = P(A | B)
+    // Since when A happens, B definitely happens, so P(AB) = P(A)
+    // P(C) = P(A) / P(B) = (1 / N) / (M / N) = (1 / M)
+    // which is equal to the probability of picking a specific spot in [0, M].
+    vaddr_t selected_index = prng != nullptr ? prng->RandInt(max_candidate_spaces) : 0;
+
+    fit::result allocation_result =
+        FindSpotAtIndex(selected_index, align_pow2, size, parent_base, parent_size, upper_limit);
+    if (allocation_result.is_error()) {
+      const size_t candidate_spot_count = allocation_result.error_value().candidate_spot_count;
+      if (candidate_spot_count == 0) {
+        return ZX_ERR_NO_RESOURCES;
       }
-      // If the number of candidate spaces is less than the index we want, let's pick again from the
-      // range for available spaces.
+
+      // If the number of available spaces is smaller than the selected index, pick again from the
+      // available range.
+      DEBUG_ASSERT(candidate_spot_count < max_candidate_spaces);
       DEBUG_ASSERT(prng);
       selected_index = prng->RandInt(candidate_spot_count);
-      FindAllocSpotInGaps(size, align_pow2, selected_index, parent_base, parent_size,
-                          &alloc_spot_info, upper_limit);
+      allocation_result =
+          FindSpotAtIndex(selected_index, align_pow2, size, parent_base, parent_size, upper_limit);
     }
-    DEBUG_ASSERT(alloc_spot_info.found);
-    *alloc_spot = alloc_spot_info.alloc_spot;
-    ASSERT(IS_ALIGNED(*alloc_spot, align));
 
+    DEBUG_ASSERT(allocation_result.is_ok());
+    *alloc_spot = allocation_result.value();
+    ASSERT_MSG(IS_ALIGNED(*alloc_spot, 1UL << align_pow2), "size=%zu align_pow2=%u alloc_spot=%zx",
+               size, align_pow2, *alloc_spot);
     return ZX_OK;
-  }
-
-  // Utility for allocators for iterating over gaps between allocations.
-  // F should have a signature of bool func(vaddr_t gap_base, size_t gap_size).
-  // If func returns false, the iteration stops.  gap_base will be aligned in accordance with
-  // align_pow2.
-  template <typename F>
-  void ForEachGap(F func, uint8_t align_pow2, vaddr_t parent_base, size_t parent_size) const {
-    const vaddr_t align = 1UL << align_pow2;
-
-    // Scan the regions list to find the gap to the left of each region.  We
-    // round up the end of the previous region to the requested alignment, so
-    // all gaps reported will be for aligned ranges.
-    vaddr_t prev_region_end = ROUNDUP(parent_base, align);
-
-    auto region = regions_.begin();
-    if (region.IsValid()) {
-      AssertHeld(region->lock_ref());
-      for (; region != regions_.end(); region++) {
-        if (region->base_locked() > prev_region_end) {
-          const size_t gap = region->base_locked() - prev_region_end;
-          if (!func(prev_region_end, gap)) {
-            return;
-          }
-        }
-        if (add_overflow(region->base_locked(), region->size_locked(), &prev_region_end)) {
-          // This region is already the last region.
-          return;
-        }
-        prev_region_end = ROUNDUP(prev_region_end, align);
-      }
-    }
-
-    // Grab the gap to the right of the last region (note that if there are no
-    // regions, this handles reporting the VMAR's whole span as a gap).
-    if (parent_size > prev_region_end - parent_base) {
-      // This is equal to parent_base + parent_size - prev_region_end, but guarantee no overflow.
-      const size_t gap = parent_size - (prev_region_end - parent_base);
-      func(prev_region_end, gap);
-    }
   }
 
   // Returns whether the region list is empty.
@@ -475,78 +605,11 @@ class RegionList final {
 
   typename ChildList::const_iterator cend() const { return regions_.cend(); }
 
+  size_t size() const { return regions_.size(); }
+
  private:
   // list of memory regions, indexed by base address.
   ChildList regions_;
-
-  // A structure to contain allocated spot address or number of available slots.
-  struct AllocSpotInfo {
-    // candidate_spot_count is the number of available slot that we could allocate if we have not
-    // found the spot with index |selected_index| to allocate.
-    size_t candidate_spot_count = 0;
-    // Found indicates whether we have found the spot with index |selected_indexes|.
-    bool found = false;
-    // alloc_spot is the virtual start address of the spot to allocate if we find one.
-    vaddr_t alloc_spot = 0;
-  };
-
-  // Try to find the |selected_index| spot among all the gaps, alloc_spot_info contains the max
-  // candidate spots if |selected_index| is larger than candidate_spaces. In this case, we need to
-  // pick a smaller index and try again.
-  void FindAllocSpotInGaps(size_t size, uint8_t align_pow2, vaddr_t selected_index,
-                           vaddr_t parent_base, vaddr_t parent_size, AllocSpotInfo* alloc_spot_info,
-                           vaddr_t upper_limit = ktl::numeric_limits<vaddr_t>::max()) const {
-    const vaddr_t align = 1UL << align_pow2;
-    // candidate_spot_count is the number of available slot that we could allocate if we have not
-    // found the spot with index |selected_index| to allocate.
-    size_t candidate_spot_count = 0;
-    // Found indicates whether we have found the spot with index |selected_indexes|.
-    bool found = false;
-    // alloc_spot is the virtual start address of the spot to allocate if we find one.
-    vaddr_t alloc_spot = 0;
-    ForEachGap(
-        [align, align_pow2, size, upper_limit, &candidate_spot_count, &selected_index, &alloc_spot,
-         &found](vaddr_t gap_base, size_t gap_len) -> bool {
-          DEBUG_ASSERT(IS_ALIGNED(gap_base, align));
-          if (gap_len < size || gap_base + size > upper_limit) {
-            // Ignore gap that is too small or out of range.
-            return true;
-          }
-          const size_t clamped_len = ClampRange(gap_base, gap_len, upper_limit);
-          const size_t spots = AllocationSpotsInRange(clamped_len, size, align_pow2);
-          candidate_spot_count += spots;
-
-          if (selected_index < spots) {
-            // If we are able to find the spot with index |selected_indexes| in this gap, then we
-            // have found our pick.
-            found = true;
-            alloc_spot = gap_base + (selected_index << align_pow2);
-            return false;
-          }
-          selected_index -= spots;
-          return true;
-        },
-        align_pow2, parent_base, parent_size);
-    alloc_spot_info->found = found;
-    alloc_spot_info->alloc_spot = alloc_spot;
-    alloc_spot_info->candidate_spot_count = candidate_spot_count;
-    return;
-  }
-
-  // Compute the number of allocation spots that satisfy the alignment within the
-  // given range size, for a range that has a base that satisfies the alignment.
-  static constexpr size_t AllocationSpotsInRange(size_t range_size, size_t alloc_size,
-                                                 uint8_t align_pow2) {
-    return ((range_size - alloc_size) >> align_pow2) + 1;
-  }
-
-  // Returns the size of the given range clamped to the given upper limit. The base
-  // of the range must be within the upper limit.
-  static constexpr size_t ClampRange(vaddr_t range_base, size_t range_size, vaddr_t upper_limit) {
-    DEBUG_ASSERT(range_base <= upper_limit);
-    const size_t range_limit = range_base + range_size;
-    return range_limit <= upper_limit ? range_size : range_size - (range_limit - upper_limit);
-  }
 };
 
 // A representation of a contiguous range of virtual address space
@@ -1060,10 +1123,22 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // generation count. Requires both the aspace lock and the object lock to be held, since |size_|
   // can be read under either of those locks.
   void set_size_locked(size_t new_size) TA_REQ(lock()) TA_REQ(object_->lock()) {
+    // Mappings cannot be zero sized while the mapping is in the region list.
+    DEBUG_ASSERT(new_size > 0 || !in_subregion_tree());
     // Check that if we have additional protection regions that they have already been constrained
     // to the range of the new size.
     DEBUG_ASSERT(protection_ranges_.DebugNodesWithinRange(base_, new_size));
+
+    const bool size_changed = size_ != new_size;
     size_ = new_size;
+
+    // Restore the invalidated subtree invariants when the size changes while the node is in the
+    // subregion tree.
+    if (size_changed && in_subregion_tree()) {
+      auto iter = RegionList<>::ChildList::materialize_iterator(*this);
+      RegionList<>::Observer::RestoreInvariants(iter);
+    }
+
     IncrementMappingGenerationCountLocked();
   }
 
