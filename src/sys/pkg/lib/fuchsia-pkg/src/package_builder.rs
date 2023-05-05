@@ -431,11 +431,14 @@ impl PackageBuilder {
 
         Ok(if let Some(manifest_path) = manifest_path {
             if let RelativeTo::File = blob_sources_relative {
-                package_manifest.write_with_relative_paths(&manifest_path).with_context(|| {
+                let copy = package_manifest.clone();
+                copy.write_with_relative_paths(&manifest_path).with_context(|| {
                     format!(
                         "Failed to create package manifest with relative paths at: {manifest_path}"
                     )
-                })?
+                })?;
+
+                package_manifest
             } else {
                 // Write the package manifest to a file.
                 let package_manifest_file = std::fs::File::create(&manifest_path)
@@ -894,11 +897,13 @@ mod tests {
         // Build the package
         let manifest = builder.build(outdir, metafar_path).unwrap();
 
+        // Ensure that the loaded manifest has paths still relative to the working directory, even
+        // though serialized paths should be relative to the manifest itself.
         manifest
             .blobs()
             .iter()
-            .find(|b| b.source_path == "contents/data_file")
-            .expect("The manifest should have paths relative to itself");
+            .find(|b| b.source_path == blob_source_file_path)
+            .expect("The manifest should have paths relative to the working directory");
 
         // The written manifest is tested in [crate::package_manifest::host_tests]
     }
