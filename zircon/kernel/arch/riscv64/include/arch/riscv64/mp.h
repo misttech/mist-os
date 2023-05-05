@@ -110,5 +110,6 @@ inline cpu_num_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
 
 // TODO(travisg): implement
 inline void arch_set_restricted_flag(bool restricted) {}
+inline bool arch_get_restricted_flag() { return false; }
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_

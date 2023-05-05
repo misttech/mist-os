@@ -94,6 +94,13 @@ void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& stat
   state.cpsr = static_cast<uint32_t>(regs.spsr);
 }
 
+void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state,
+                                                    const iframe_t& frame) {
+  // On arm64, iframe_t and syscalls_regs_t are the same type.
+  static_assert(ktl::is_same_v<syscall_regs_t, iframe_t>);
+  RestrictedState::ArchSaveRestrictedSyscallState(state, frame);
+}
+
 [[noreturn]] void RestrictedState::ArchEnterFull(const ArchSavedNormalState& arch_state,
                                                  uintptr_t vector_table, uintptr_t context,
                                                  uint64_t code) {

@@ -472,10 +472,12 @@ typedef void (*thread_trampoline_routine)() __NO_RETURN;
 #define THREAD_FLAG_FREE_STRUCT              (1 << 1)
 #define THREAD_FLAG_IDLE                     (1 << 2)
 #define THREAD_FLAG_VCPU                     (1 << 3)
+#define THREAD_FLAG_RESTRICTED_KICK_PENDING  (1 << 4)
 
 #define THREAD_SIGNAL_KILL                   (1 << 0)
 #define THREAD_SIGNAL_SUSPEND                (1 << 1)
 #define THREAD_SIGNAL_POLICY_EXCEPTION       (1 << 2)
+#define THREAD_SIGNAL_RESTRICTED_KICK        (1 << 3)
 // clang-format on
 
 // thread priority
@@ -1091,6 +1093,7 @@ struct Thread {
   void Resume();
   zx_status_t Suspend();
   void Forget();
+  zx_status_t RestrictedKick();
   // Marks a thread as detached, in this state its memory will be released once
   // execution is done.
   zx_status_t Detach();
@@ -1255,6 +1258,11 @@ struct Thread {
     static MemoryAllocationState& memory_allocation_state() {
       return Thread::Current::Get()->memory_allocation_state_;
     }
+
+    // If a restricted kick is pending on this thread, clear it and return true.
+    // Otherwise return false.
+    // Must be called with interrupts disabled.
+    [[nodiscard]] static bool CheckForRestrictedKick();
 
     static RestrictedState* restricted_state() {
       return Thread::Current::Get()->restricted_state();
@@ -1560,6 +1568,18 @@ struct Thread {
   // Thread.
   bool CheckKillSignal() TA_REQ(thread_lock);
 
+  // These should only be accessed from the current thread.
+  bool restricted_kick_pending() const {
+    return (flags_ & THREAD_FLAG_RESTRICTED_KICK_PENDING) != 0;
+  }
+  void set_restricted_kick_pending(bool value) {
+    if (value) {
+      flags_ |= THREAD_FLAG_RESTRICTED_KICK_PENDING;
+    } else {
+      flags_ &= ~THREAD_FLAG_RESTRICTED_KICK_PENDING;
+    }
+  }
+
   __NO_RETURN void ExitLocked(int retcode) TA_REQ(thread_lock);
 
   static void DumpAllLocked(bool full) TA_REQ(thread_lock);
@@ -1581,6 +1601,7 @@ struct Thread {
   // These fields are among the most active in the thread. They are grouped
   // together near the front to improve cache locality.
   unsigned int flags_{};
+  // TODO(https://fxbug.dev/126338): Write down memory order requirements for accessing signals_.
   ktl::atomic<unsigned int> signals_{};
   SchedulerState scheduler_state_;
   WaitQueueCollection::ThreadState wait_queue_state_;

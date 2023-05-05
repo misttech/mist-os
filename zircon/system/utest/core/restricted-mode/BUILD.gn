@@ -1,9 +1,8 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 source_set("restricted-mode") {
-  testonly = true
   sources = [ "restricted-mode.cc" ]
   if (current_cpu == "x64") {
     sources += [ "x64.S" ]
@@ -11,6 +10,9 @@ source_set("restricted-mode") {
     sources += [ "arm64.S" ]
   }
   deps = [
+    "//zircon/system/ulib/pretty",
+    "//zircon/system/ulib/runtime",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

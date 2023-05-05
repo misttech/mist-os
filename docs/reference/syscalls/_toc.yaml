@@ -388,6 +388,8 @@ toc:
     path: /docs/reference/syscalls/restricted_enter.md
   - title: "zx_restricted_unbind_state"
     path: /docs/reference/syscalls/restricted_unbind_state.md
+  - title: "zx_restricted_kick"
+    path: /docs/reference/syscalls/restricted_kick.md
 - title: "Others"
   section:
   - title: "zx_ioports_release"

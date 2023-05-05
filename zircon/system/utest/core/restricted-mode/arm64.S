@@ -128,3 +128,24 @@ restricted_enter_wrapper:
   // if we got here it must have failed
   add  sp, sp, #(14*8) // pop the previous state on the stack
   ret
+
+
+// Stores 1 to *x0 in a loop.
+.globl store_one
+store_one:
+  add     x1, x1, #1
+  mov     w8, #1
+.store_one_loop:
+  str     w8, [x0]
+  b       .store_one_loop
+
+// Stores 1 to *x0, then loops until *x1 is nonzero and then issues a syscall.
+.globl wait_then_syscall
+wait_then_syscall:
+  mov     w8, #1
+  stlr    w8, [x0]
+.wait_then_syscall_loop:
+  ldar    w8, [x1]
+  cbz     w8, .wait_then_syscall_loop
+  svc     #0
+  brk     #0x1

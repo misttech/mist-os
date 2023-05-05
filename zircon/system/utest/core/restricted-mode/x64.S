@@ -100,3 +100,23 @@ restricted_enter_wrapper:
   // if we got here it must have failed
   add   $(8*8),%rsp // pop the previous state on the stack
   ret
+
+// Stores 1 to *rax in a loop.
+.globl store_one
+store_one:
+  inc %rbx
+.store_one_loop:
+  movl     $1, (%rax)
+  jmp     .store_one_loop
+
+// Stores 1 to *rdi, then loops until *rsi is nonzero and then issues a syscall.
+.globl wait_then_syscall
+wait_then_syscall:
+  movl    $1, %eax
+  xchgl   %eax, (%rdi)
+.wait_then_syscall_loop:
+  movl    (%rsi), %eax
+  testl   %eax, %eax
+  je      .wait_then_syscall_loop
+  syscall
+  ud2  // Should never be reached

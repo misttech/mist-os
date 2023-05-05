@@ -110,6 +110,12 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   zx_status_t Suspend();
   void Resume();
 
+  // Issues a restricted kick on the thread which will kick the thread out of restricted
+  // mode to normal mode if it's currently in restricted mode or remember the kick state for
+  // the next attempt to enter restricted state.
+  // Returns ZX_OK on success or ZX_ERR_BAD_STATE iff the thread is dying or dead.
+  zx_status_t RestrictedKick();
+
   // accessors
   ProcessDispatcher* process() const { return process_.get(); }
 

@@ -146,6 +146,8 @@ inline void arch_set_restricted_flag(bool restricted) {
   WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
 }
 
+inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
+
 #endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_MP_H_

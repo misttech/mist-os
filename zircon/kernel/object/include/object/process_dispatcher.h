@@ -39,7 +39,9 @@ class JobDispatcher;
 class VmoInfoWriter;
 
 // To allow this function to be friended by ProcessDispatcher.
-extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs);
+template <typename T>
+[[noreturn]] extern void RestrictedLeave(const T* restricted_state_source,
+                                         zx_restricted_reason_t reason);
 
 namespace internal {
 // Tag for a ProcessDispatcher's parent JobDispatcher's raw job list.
@@ -268,12 +270,6 @@ class ProcessDispatcher final
   TaskRuntimeStats GetAggregatedRuntime() const TA_EXCL(get_lock());
 
  private:
-  // Restricted mode is allowed to know about the internals of the aspaces.
-  friend zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr,
-                                     uintptr_t context);
-  friend void syscall_from_restricted(const syscall_regs_t* regs);
-  friend void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs);
-
   // Returns the "normal" address space for a process.
   //
   // Most processes only contain a normal address space. Processes that support running threads in
@@ -289,6 +285,13 @@ class ProcessDispatcher final
 
   // This is used by the restricted mode code where it's important to avoid refcount manipulation.
   VmAspace* normal_aspace_ptr() { return shareable_state_->aspace_ptr(); }
+
+  // Restricted mode is allowed to know about the internals of the aspaces.
+  friend zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr,
+                                     uintptr_t context);
+  friend void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs);
+  template <typename T>
+  friend void RestrictedLeave(const T* restricted_state_source, zx_restricted_reason_t reason);
 
   // Returns the "restricted" address space for a process, or nullptr if it does not have a
   // restricted address space.

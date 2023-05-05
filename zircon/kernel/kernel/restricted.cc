@@ -32,12 +32,11 @@ static_assert(offsetof(zx_restricted_exception_t, state) == 0);
 // called from a corresponding syscall. The rest are up called from architecturally specific
 // hardware traps, such as an exception or syscall when the cpu is in restricted mode.
 
-// Dispatched directly from arch-specific syscall handler. Called after saving state
-// on the stack, but before trying to dispatch as a zircon syscall.
-extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs) {
-  LTRACEF("regs %p\n", regs);
+template <typename T>
+[[noreturn]] void RestrictedLeave(const T* restricted_state_source, zx_restricted_reason_t reason) {
+  LTRACEF("regs %p\n", restricted_state_source);
 
-  DEBUG_ASSERT(regs);
+  DEBUG_ASSERT(restricted_state_source);
   DEBUG_ASSERT(arch_ints_disabled());
 
   RestrictedState* rs = Thread::Current::restricted_state();
@@ -55,7 +54,12 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
   zx_restricted_state_t* state = rs->state_ptr();
   DEBUG_ASSERT(state);
   static_assert(internal::is_copy_allowed<std::remove_reference_t<decltype((*state))>>::value);
-  RestrictedState::ArchSaveRestrictedSyscallState(*state, *regs);
+  if constexpr (ktl::is_same_v<T, syscall_regs_t>) {
+    RestrictedState::ArchSaveRestrictedSyscallState(*state, *restricted_state_source);
+  } else {
+    static_assert(ktl::is_same_v<T, iframe_t>);
+    RestrictedState::ArchSaveRestrictedIframeState(*state, *restricted_state_source);
+  }
 
   LTRACEF("returning to normal mode at vector %#lx, context %#lx\n", rs->vector_ptr(),
           rs->context());
@@ -64,9 +68,15 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
   vmm_set_active_aspace(up->normal_aspace_ptr());
 
   // bounce into normal mode
-  RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(),
-                                 ZX_RESTRICTED_REASON_SYSCALL);
+  RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(), reason);
 
+  __UNREACHABLE;
+}
+
+// Dispatched directly from arch-specific syscall handler. Called after saving state
+// on the stack, but before trying to dispatch as a zircon syscall.
+extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs) {
+  RestrictedLeaveSyscall(regs, ZX_RESTRICTED_REASON_SYSCALL);
   __UNREACHABLE;
 }
 
@@ -81,8 +91,8 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // has the state buffer been previously bound to this thread?
   RestrictedState* rs = Thread::Current::restricted_state();
+  // has the state buffer been previously bound to this thread?
   if (rs == nullptr) {
     return ZX_ERR_BAD_STATE;
   }
@@ -142,6 +152,19 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // get a chance to save some state before we enter normal mode
   RestrictedState::ArchSaveStatePreRestrictedEntry(rs->arch_normal_state());
 
+  // TODO(https://fxbug.dev/126200): We should process pending signals after disabling interrupts
+  // and before entering restricted or normal mode.
+
+  // Check if we've been kicked with interrupts disabled
+  if (Thread::Current::CheckForRestrictedKick()) {
+    vmm_set_active_aspace(up->normal_aspace_ptr());
+    arch_set_restricted_flag(false);
+    rs->set_in_restricted(false);
+    RestrictedState::ArchEnterFull(rs->arch_normal_state(), vector_table_ptr, context,
+                                   ZX_RESTRICTED_REASON_KICK);
+    __UNREACHABLE;
+  }
+
   // enter restricted mode
   RestrictedState::ArchEnterRestricted(state);
 
@@ -169,4 +192,17 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   arch_set_restricted_flag(false);
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   vmm_set_active_aspace(up->normal_aspace_ptr());
+}
+
+[[noreturn]] void RestrictedLeaveIframe(const iframe_t* iframe, zx_restricted_reason_t reason) {
+  RestrictedLeave(iframe, reason);
+
+  __UNREACHABLE;
+}
+
+[[noreturn]] void RestrictedLeaveSyscall(const syscall_regs_t* regs,
+                                         zx_restricted_reason_t reason) {
+  RestrictedLeave(regs, reason);
+
+  __UNREACHABLE;
 }

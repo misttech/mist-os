@@ -114,6 +114,7 @@ Symbols:
   - { Name: _zx_resource_create, Type: Func }
   - { Name: _zx_restricted_bind_state, Type: Func }
   - { Name: _zx_restricted_enter, Type: Func }
+  - { Name: _zx_restricted_kick, Type: Func }
   - { Name: _zx_restricted_unbind_state, Type: Func }
   - { Name: _zx_smc_call, Type: Func }
   - { Name: _zx_socket_create, Type: Func }
@@ -306,6 +307,7 @@ Symbols:
   - { Name: zx_resource_create, Type: Func, Weak: true }
   - { Name: zx_restricted_bind_state, Type: Func, Weak: true }
   - { Name: zx_restricted_enter, Type: Func, Weak: true }
+  - { Name: zx_restricted_kick, Type: Func, Weak: true }
   - { Name: zx_restricted_unbind_state, Type: Func, Weak: true }
   - { Name: zx_smc_call, Type: Func, Weak: true }
   - { Name: zx_socket_create, Type: Func, Weak: true }

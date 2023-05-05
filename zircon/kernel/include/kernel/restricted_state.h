@@ -78,6 +78,10 @@ class RestrictedState {
   static void ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
                                              const syscall_regs_t& regs);
 
+  // Having just exited from restricted mode via an interrupt, save the necessary restricted mode
+  // state from a pointer to the interrupt frame state saved by the exception handler.
+  static void ArchSaveRestrictedIframeState(zx_restricted_state_t& state, const iframe_t& frame);
+
   // Having exited from restricted mode via a synchronous exception, save the necessary
   // restricted mode state.
   static void ArchSaveRestrictedExceptionState(zx_restricted_state_t& state);
@@ -86,7 +90,6 @@ class RestrictedState {
   // mode to handle a restricted exception.
   static void ArchRedirectRestrictedExceptionToNormal(const ArchSavedNormalState& arch_state,
                                                       uintptr_t vector_table, uintptr_t context);
-
   // Enter normal mode at the address pointed to by vector_table with arguments code and context
   // in an architecturally specific register in an architecturally specific way.
   [[noreturn]] static void ArchEnterFull(const ArchSavedNormalState& arch_state,

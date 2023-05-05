@@ -267,8 +267,6 @@ void ThreadDispatcher::Resume() {
 
   Guard<CriticalMutex> guard{get_lock()};
 
-  LTRACEF("%p: state %s\n", this, ThreadLifecycleToString(state_.lifecycle()));
-
   DEBUG_ASSERT(suspend_count_ > 0);
   suspend_count_--;
 
@@ -290,6 +288,31 @@ void ThreadDispatcher::Resume() {
       // If it's dying or dead then bail.
       break;
   }
+}
+
+zx_status_t ThreadDispatcher::RestrictedKick() {
+  canary_.Assert();
+
+  LTRACE_ENTRY_OBJ;
+
+  Guard<CriticalMutex> guard{get_lock()};
+
+  switch (state_.lifecycle()) {
+    case ThreadState::Lifecycle::INITIAL:
+      // Unreachable, thread leaves INITIAL state before Create() returns.
+      DEBUG_ASSERT(false);
+      __UNREACHABLE;
+    case ThreadState::Lifecycle::INITIALIZED:
+    case ThreadState::Lifecycle::RUNNING:
+    case ThreadState::Lifecycle::SUSPENDED:
+      return core_thread_->RestrictedKick();
+    case ThreadState::Lifecycle::DYING:
+    case ThreadState::Lifecycle::DEAD:
+      return ZX_ERR_BAD_STATE;
+  }
+
+  DEBUG_ASSERT(false);
+  return ZX_ERR_BAD_STATE;
 }
 
 bool ThreadDispatcher::IsDyingOrDead() const {

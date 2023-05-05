@@ -46,6 +46,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/restricted.h>
 #include <kernel/scheduler.h>
 #include <kernel/stats.h>
 #include <kernel/thread.h>
@@ -83,6 +84,8 @@ KCOUNTER(thread_resume_count, "thread.resume")
 // counts the number of times a thread's timeslice extension was activated (see
 // |PreemptionState::SetTimesliceExtension|).
 KCOUNTER(thread_timeslice_extended, "thread.timeslice_extended")
+// counts the number of calls to restricted_kick() that succeeded.
+KCOUNTER(thread_restricted_kick_count, "thread.restricted_kick")
 
 // The global thread list. This is a lazy_init type, since initial thread code
 // manipulates the list before global constructors are run. This is initialized by
@@ -403,6 +406,35 @@ zx_status_t Thread::Suspend() {
   }
 
   kcounter_add(thread_suspend_count, 1);
+  return ZX_OK;
+}
+
+zx_status_t Thread::RestrictedKick() {
+  LTRACE_ENTRY;
+
+  canary_.Assert();
+  DEBUG_ASSERT(!IsIdle());
+
+  bool kicking_myself = (Thread::Current::Get() == this);
+
+  // Disable preemption to defer rescheduling until the end of this scope.
+  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+  if (state() == THREAD_DEATH) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  signals_.fetch_or(THREAD_SIGNAL_RESTRICTED_KICK, ktl::memory_order_relaxed);
+
+  if (state() == THREAD_RUNNING && !kicking_myself) {
+    // thread is running (on another cpu)
+    // Send an interrupt to make sure that the thread processes the new signals.
+    // If the thread executes a regular syscall or is rescheduled the signals will
+    // also be processed then, but there's no upper bound on how long that could take.
+    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
+  }
+
+  kcounter_add(thread_restricted_kick_count, 1);
   return ZX_OK;
 }
 
@@ -911,6 +943,11 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
 
   Thread* const current_thread = Thread::Current::Get();
 
+  // IF we're currently in restricted mode, we may decide to exit to normal mode instead as part
+  // of signal processing. Store this information in a local so that we can process all signals
+  // before actually exiting.
+  bool exit_to_normal_mode = false;
+
   // It's possible for certain signals to be asserted, processed, and then re-asserted during this
   // method so loop until there are no pending signals.
   unsigned int signals;
@@ -944,7 +981,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
     //
     if (signals & THREAD_SIGNAL_POLICY_EXCEPTION) {
       DEBUG_ASSERT(has_user_thread);
-      // TODO(maniscalco): Consider wrapping this up in a method
+      // TODO(https://fxbug.dev/126338): Consider wrapping this up in a method
       // (e.g. Thread::Current::ClearSignals) and think hard about whether relaxed is sufficient.
       current_thread->signals_.fetch_and(~THREAD_SIGNAL_POLICY_EXCEPTION,
                                          ktl::memory_order_relaxed);
@@ -1020,7 +1057,59 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
         arch_disable_ints();
       }
     }
+
+    // THREAD_SIGNAL_RESTRICTED_KICK
+    //
+    if (signals & THREAD_SIGNAL_RESTRICTED_KICK) {
+      current_thread->signals_.fetch_and(~THREAD_SIGNAL_RESTRICTED_KICK, ktl::memory_order_relaxed);
+      if (arch_get_restricted_flag()) {
+        exit_to_normal_mode = true;
+      } else {
+        // If we aren't currently in restricted mode,Remember that we have a restricted kick pending
+        // for the next time we try to enter restricted mode.
+        current_thread->set_restricted_kick_pending(true);
+      }
+    }
   }
+
+  // Interrupts must remain disabled for the remainder of this function. If for any reason we need
+  // to enable interrupts in handling we have to re-enter the loop above in order to process signals
+  // that may have been raised.
+
+  if (exit_to_normal_mode) {
+    switch (source) {
+      case GeneralRegsSource::Iframe: {
+        const iframe_t* iframe = reinterpret_cast<const iframe_t*>(gregs);
+        RestrictedLeaveIframe(iframe, ZX_RESTRICTED_REASON_KICK);
+
+        __UNREACHABLE;
+      }
+#if defined(__x86_64__)
+      case GeneralRegsSource::Syscall: {
+        const syscall_regs_t* syscall_regs = reinterpret_cast<const syscall_regs_t*>(gregs);
+        RestrictedLeaveSyscall(syscall_regs, ZX_RESTRICTED_REASON_KICK);
+
+        __UNREACHABLE;
+      }
+#endif  // defined(__x86_64__)
+      default:
+        DEBUG_ASSERT_MSG(false, "invalid source %u\n", static_cast<uint32_t>(source));
+    }
+  }
+}
+
+bool Thread::Current::CheckForRestrictedKick() {
+  LTRACE_ENTRY;
+
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  Thread* current_thread = Thread::Current::Get();
+  if (current_thread->restricted_kick_pending()) {
+    current_thread->set_restricted_kick_pending(false);
+    return true;
+  }
+
+  return false;
 }
 
 /**

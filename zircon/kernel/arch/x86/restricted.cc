@@ -233,6 +233,37 @@ void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& stat
   get_fsgsbase(&state.fs_base, &state.gs_base);
 }
 
+void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state,
+                                                    const iframe_t& frame) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // copy state iframe_t to zx_restricted_state
+  state.rdi = frame.rdi;
+  state.rsi = frame.rsi;
+  state.rbp = frame.rbp;
+  state.rbx = frame.rbx;
+  state.rdx = frame.rdx;
+  state.rcx = frame.rcx;
+  state.rax = frame.rax;
+  state.r8 = frame.r8;
+  state.r9 = frame.r9;
+  state.r10 = frame.r10;
+  state.r11 = frame.r11;
+  state.r12 = frame.r12;
+  state.r13 = frame.r13;
+  state.r14 = frame.r14;
+  state.r15 = frame.r15;
+
+  state.ip = frame.ip;
+  state.flags = frame.flags;
+  state.rsp = frame.user_sp;
+
+  // vector, err_code, cs, and user_ss are unused.
+
+  // read the fs/gs base out of the MSRs
+  get_fsgsbase(&state.fs_base, &state.gs_base);
+}
+
 [[noreturn]] void RestrictedState::ArchEnterFull(const ArchSavedNormalState& arch_state,
                                                  uintptr_t vector_table, uintptr_t context,
                                                  uint64_t code) {

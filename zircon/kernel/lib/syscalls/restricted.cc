@@ -121,3 +121,22 @@ zx_status_t sys_restricted_unbind_state(uint32_t options) {
 
   return ZX_OK;
 }
+
+// zx_restricted_kick
+zx_status_t sys_restricted_kick(zx_handle_t handle, uint32_t options) {
+  LTRACEF("options 0x%x\n", options);
+  if (options != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<ThreadDispatcher> thread;
+  // TODO(https://fxbug.dev/126688): Decide if this is the correct right for this operation.
+  zx_status_t status =
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_MANAGE_THREAD, &thread);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return thread->RestrictedKick();
+}

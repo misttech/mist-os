@@ -8,13 +8,16 @@
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
+#include <threads.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/testonly-syscalls.h>
+#include <zircon/threads.h>
 
 #include <thread>
 
+#include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
 #if defined(__x86_64__)
@@ -43,6 +46,8 @@ extern "C" void exception_bounce_exception_address();
 extern "C" void exception_bounce_exit();
 extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vector_table,
                                                 zx_restricted_reason_t* reason_code);
+extern "C" void store_one();
+extern "C" void wait_then_syscall();
 
 // The normal-mode view of restricted-mode state will change slightly depending on
 // if the exit to normal-mode was caused by a syscall or an exception.
@@ -618,6 +623,253 @@ TEST(RestrictedMode, EnterBadStateStruct) {
 #endif
 }
 
+TEST(RestrictedMode, KickBeforeEnter) {
+  zx::vmo vmo;
+  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+  // Configure the initial register state.
+  ArchRegisterState state;
+  state.InitializeRegisters();
+
+  // Set the PC to the syscall_bounce routine, as the PC is where zx_restricted_enter
+  // will jump to.
+  state.set_pc(reinterpret_cast<uint64_t>(syscall_bounce));
+
+  // Write the state to the state VMO.
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
+
+  // Issue a kick on ourselves which should apply to the next attempt to enter restricted mode.
+  uint32_t options = 0;
+  ASSERT_OK(zx_restricted_kick(current_thread->get(), options));
+
+  // Enter restricted mode with reasonable args, expect it to return due to kick and not run any
+  // restricted mode code.
+  uint64_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
+  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+
+  // Read the state out of the thread.
+  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  // Validate that the instruction pointer is still pointing at the entry point.
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(&syscall_bounce), state.pc());
+
+#if defined(__x86_64__)
+  // Validate that the state is unchanged
+  EXPECT_EQ(0x0101010101010101, state.restricted_state().rax);
+#elif defined(__aarch64__)  // defined(__x86_64__)
+  EXPECT_EQ(0x0202020202020202, state.restricted_state().x[1]);
+#endif                      // defined(__aarch64__)
+
+  // Check that the kicked state is cleared
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
+  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_SYSCALL);
+
+  // Read the state out of the thread.
+  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  // Validate that the instruction pointer is right after the syscall instruction.
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(&syscall_bounce_post_syscall), state.pc());
+
+  // Validate that the value in first general purpose register is incremented.
+  state.VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
+}
+
+TEST(RestrictedMode, KickWhileStartingAndExiting) {
+  struct ExceptionChannelRegistered {
+    std::condition_variable cv;
+    std::mutex m;
+    bool registered = false;
+  };
+  ExceptionChannelRegistered ec;
+
+  // Register a debugger exception channel so we can intercept thread lifecycle events
+  // and issue restricted kicks. This runs on a child thread so that we can process events
+  // while the main thread is blocked on the main thread starting and joining.
+  std::thread exception_thread([&ec]() {
+    zx::channel exception_channel;
+    ASSERT_OK(zx::process::self()->create_exception_channel(ZX_EXCEPTION_CHANNEL_DEBUGGER,
+                                                            &exception_channel));
+    // Notify the main thread that the exception channel is registered so it knows when to
+    // start the test thread.
+    {
+      std::lock_guard lock(ec.m);
+      ec.registered = true;
+      ec.cv.notify_one();
+    }
+    // Starting child_thread should generate a ZX_EXCP_THREAD_STARTING message on our exception
+    // channel.
+    zx_exception_info_t info;
+    zx::exception exception;
+    ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
+    ASSERT_OK(exception_channel.read(0, &info, exception.reset_and_get_address(), sizeof(info), 1,
+                                     nullptr, nullptr));
+    ASSERT_EQ(info.type, ZX_EXCP_THREAD_STARTING);
+
+    zx::thread thread;
+    ASSERT_OK(exception.get_thread(&thread));
+
+    uint32_t kick_options = 0;
+    ASSERT_OK(zx_restricted_kick(thread.get(), kick_options));
+    // Release the exception to let the thread start the rest of the way.
+    exception.reset();
+
+    // When the thread joins, we expect to receive a ZX_EXCP_THREAD_EXITING message on our exception
+    // channel.
+    ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
+    ASSERT_OK(exception_channel.read(0, &info, exception.reset_and_get_address(), sizeof(info), 1,
+                                     nullptr, nullptr));
+    ASSERT_EQ(info.type, ZX_EXCP_THREAD_EXITING);
+
+    ASSERT_OK(exception.get_thread(&thread));
+    // Since this thread is now in the DYING state, sending a restricted kick is expected to return
+    // ZX_ERR_BAD_STATE.
+    EXPECT_EQ(zx_restricted_kick(thread.get(), kick_options), ZX_ERR_BAD_STATE);
+  });
+
+  {
+    std::unique_lock lock(ec.m);
+    ec.cv.wait(lock, [&ec]() { return ec.registered; });
+  }
+
+  std::thread child_thread([]() {
+    zx::vmo vmo;
+    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+    auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+    ArchRegisterState state;
+    state.InitializeRegisters();
+    state.set_pc(0u);
+
+    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+    // Attempting to enter restricted mode should return immediately with a kick.
+    uint64_t reason_code = 99;
+    ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab,
+                                       &reason_code));
+    EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+  });
+
+  child_thread.join();
+  exception_thread.join();
+}
+
+TEST(RestrictedMode, KickWhileRunning) {
+  zx::vmo vmo;
+  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+  // Configure the initial register state.
+  ArchRegisterState state;
+  state.InitializeRegisters();
+  state.set_pc(reinterpret_cast<uintptr_t>(store_one));
+
+  std::atomic_int flag = 0;
+
+#if defined(__x86_64__)
+  state.restricted_state().rax = reinterpret_cast<uint64_t>(&flag);
+  state.restricted_state().rbx = 42;
+#elif defined(__aarch64__)  // defined(__x86_64__)
+  state.restricted_state().x[0] = reinterpret_cast<uint64_t>(&flag);
+  state.restricted_state().x[1] = 42;
+#endif                      // defined(__aarch64__)
+
+  // Write the state to the state VMO.
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
+
+  // Start up a thread that will enter kick this thread once it detects that 'flag' has been
+  // written to, indicating that r-mode code is running.
+  std::thread kicker([&flag, &current_thread] {
+    // Wait for the first thread to write to 'flag' so we know it's in restricted mode.
+    while (flag.load() == 0) {
+    }
+    // Kick it
+    uint32_t options = 0;
+    ASSERT_OK(zx_restricted_kick(current_thread->get(), options));
+  });
+
+  // Enter restricted mode and expect to tell us that it was kicked out.
+  uint64_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
+  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+
+  kicker.join();
+  EXPECT_EQ(flag.load(), 1);
+
+  // Read the state out of the thread.
+  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  // Expect to see second general purpose register incremented in the observed restricted state.
+#if defined(__x86_64__)
+  EXPECT_EQ(state.restricted_state().rbx, 43);
+#elif defined(__aarch64__)  // defined(__x86_64__)
+  EXPECT_EQ(state.restricted_state().x[1], 43);
+#endif                      // defined(__aarch64__)
+}
+
+TEST(RestrictedMode, KickJustBeforeSyscall) {
+  zx::vmo vmo;
+  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
+
+  // Configure the initial register state.
+  ArchRegisterState state;
+  state.InitializeRegisters();
+
+  state.set_pc(reinterpret_cast<uint64_t>(wait_then_syscall));
+
+  // Create atomic int 'signal' and 'wait_on'
+  std::atomic_int wait_on = 0;
+  std::atomic_int signal = 0;
+
+  // Set up state using these variables.
+#if defined(__x86_64__)
+  state.restricted_state().rdi = reinterpret_cast<uint64_t>(&wait_on);
+  state.restricted_state().rsi = reinterpret_cast<uint64_t>(&signal);
+#elif defined(__aarch64__)  // defined(__x86_64__)
+  state.restricted_state().x[0] = reinterpret_cast<uint64_t>(&wait_on);
+  state.restricted_state().x[1] = reinterpret_cast<uint64_t>(&signal);
+#endif                      // defined(__aarch64__)
+
+  // Write the state to the state VMO.
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+
+  zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
+
+  std::thread kicker([&wait_on, &signal, &current_thread] {
+    // Wait until the restricted mode thread is just about to issue a syscall.
+    while (wait_on.load() == 0) {
+    }
+    // Suspend the restricted mode thread before we kick it so we can ensure that it doesn't
+    // proceed before the kick is processed.
+    zx::suspend_token token;
+    ASSERT_OK(current_thread->suspend(&token));
+    ASSERT_OK(current_thread->wait_one(ZX_THREAD_SUSPENDED, zx::time::infinite(), nullptr));
+    // Issue a kick.
+    uint32_t kick_options = 0;
+    ASSERT_OK(zx_restricted_kick(current_thread->get(), kick_options));
+    // Unsuspend the thread.
+    token.reset();
+    // Store a signal to release the restricted mode thread so it could issue a syscall
+    // if it continues executing. We expect it to come out of thread suspend and process
+    // the kick instead of continuing.
+    signal.store(1);
+  });
+  uint64_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
+  EXPECT_EQ(ZX_RESTRICTED_REASON_KICK, reason_code);
+  kicker.join();
+}
+
 #else  // !ARCH_HAS_RESTRICTED_MODE
 
 // Restricted mode is not implemented so the syscalls should fail appropriately.
@@ -627,6 +879,8 @@ TEST(RestrictedMode, NotSupported) {
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_unbind_state(0));
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(0, 0, 0));
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, 0, 0));
+  zx_handle_t current_thread_handle = thrd_get_zx_handle(thrd_current());
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_kick(current_thread_handle, 0));
 }
 
 #endif  // ARCH_HAS_RESTRICTED_MODE

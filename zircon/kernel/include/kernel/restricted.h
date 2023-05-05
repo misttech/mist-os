@@ -10,6 +10,7 @@
 #include <lib/user_copy/user_ptr.h>
 
 #include <arch/exception.h>
+#include <arch/regs.h>
 #include <kernel/restricted_state.h>
 
 // Routines to support restricted mode.
@@ -31,5 +32,19 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
 // The caller must ensure that this is only called on a thread that is in
 // restricted mode.
 void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs);
+
+// Leave restricted mode on the current thread and return to normal mode.
+//
+// There are two variants of this function, one for each way a thread may have entered kernel mode
+// (interrupt or syscall).
+//
+// These routines do not return normally and instead enter userspace in normal mode. They also
+// cannot fail and require that interrupts be disabled before calling them.
+[[noreturn]] void RestrictedLeaveIframe(const iframe_t* iframe, zx_restricted_reason_t reason);
+[[noreturn]] void RestrictedLeaveSyscall(const syscall_regs_t* regs, zx_restricted_reason_t reason);
+
+// Dispatched directly from arch-specific syscall handler. Called after saving state
+// on the stack, but before trying to dispatch as a zircon syscall.
+extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs);
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_RESTRICTED_H_
