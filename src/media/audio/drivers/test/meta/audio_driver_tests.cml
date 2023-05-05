@@ -27,5 +27,10 @@
             rights: [ "r*" ],
             path: "/dev/class/audio-output",
         },
+        {
+            directory: "dev-dai",
+            rights: [ "r*" ],
+            path: "/dev/class/dai",
+        },
     ],
 }

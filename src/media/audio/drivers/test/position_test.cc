@@ -103,12 +103,12 @@ void PositionTest::ValidatePositionInfo() {
   zx::duration observed_timestamp = zx::clock::get_monotonic() - start_time();
 
   ASSERT_GT(position_notification_count_, 0u) << "No position notifications received";
-  ASSERT_GT(pcm_format().frame_rate, 0u) << "Frame rate cannot be zero";
+  ASSERT_GT(ring_buffer_pcm_format().frame_rate, 0u) << "Frame rate cannot be zero";
 
   // ns/notification = nsec/sec * sec/frames * frames/ring * ring/notification
-  auto ns_per_notification = TimelineRate::NsPerSecond / TimelineRate(pcm_format().frame_rate) *
-                             TimelineRate(ring_buffer_frames()) /
-                             TimelineRate(notifications_per_ring());
+  auto ns_per_notification =
+      TimelineRate::NsPerSecond / TimelineRate(ring_buffer_pcm_format().frame_rate) *
+      TimelineRate(ring_buffer_frames()) / TimelineRate(notifications_per_ring());
 
   // Upon enabling notifications, our first notification might arrive immediately. Thus, the average
   // number of notification periods elapsed is (position_notification_count_ - 0.5).
@@ -179,7 +179,8 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   // Request a 0.5-second ring-buffer.
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate / 2, kNotifsPerRingBuffer));
+  ASSERT_NO_FAILURE_OR_SKIP(
+      RequestBuffer(ring_buffer_pcm_format().frame_rate / 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -197,7 +198,8 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   // Request a 2-second ring-buffer.
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
+  ASSERT_NO_FAILURE_OR_SKIP(
+      RequestBuffer(ring_buffer_pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -207,8 +209,8 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   ValidatePositionInfo();
 
   // Wait longer than the default (100 ms), as notifications are less frequent than that.
-  zx::duration time_per_notif =
-      zx::sec(1) * ring_buffer_frames() / pcm_format().frame_rate / kNotifsPerRingBuffer;
+  zx::duration time_per_notif = zx::sec(1) * ring_buffer_frames() /
+                                ring_buffer_pcm_format().frame_rate / kNotifsPerRingBuffer;
   WaitForError(time_per_notif);
 });
 

@@ -23,6 +23,7 @@ static const struct {
 } kAudioDevNodes[] = {
     {.path = "/dev/class/audio-input", .device_type = DeviceType::Input},
     {.path = "/dev/class/audio-output", .device_type = DeviceType::Output},
+    {.path = "/dev/class/dai", .device_type = DeviceType::Dai},
 };
 
 namespace {

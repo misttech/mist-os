@@ -57,7 +57,9 @@ class AdminTest : public TestBase {
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer>& ring_buffer() { return ring_buffer_; }
   uint32_t ring_buffer_frames() const { return ring_buffer_frames_; }
-  fuchsia::hardware::audio::PcmFormat pcm_format() const { return pcm_format_; }
+  fuchsia::hardware::audio::PcmFormat ring_buffer_pcm_format() const {
+    return ring_buffer_pcm_format_;
+  }
 
   uint32_t notifications_per_ring() const { return notifications_per_ring_; }
   const zx::time& start_time() const { return start_time_; }
@@ -77,7 +79,10 @@ class AdminTest : public TestBase {
   fzl::VmoMapper ring_buffer_mapper_;
 
   zx::time start_time_;
-  fuchsia::hardware::audio::PcmFormat pcm_format_;
+  // Ring buffer PCM format.
+  fuchsia::hardware::audio::PcmFormat ring_buffer_pcm_format_;
+  // DAI interconnect format.
+  fuchsia::hardware::audio::DaiFormat dai_format_;
   uint16_t frame_size_ = 0;
 
   // Position notifications are hanging-gets. On receipt, should we register the next one or fail?

@@ -212,6 +212,7 @@
             directory: [
                 "dev-audio-input",
                 "dev-audio-output",
+                "dev-dai",
             ],
             from: "parent",
             to: [ "#system-tests" ],

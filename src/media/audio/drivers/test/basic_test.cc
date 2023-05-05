@@ -78,9 +78,9 @@ void BasicTest::RequestStreamProperties() {
 
 // Fail if the returned formats are not complete, unique and within ranges.
 void BasicTest::ValidateFormatCorrectness() {
-  for (size_t i = 0; i < pcm_formats().size(); ++i) {
-    SCOPED_TRACE(testing::Message() << "pcm_format[" << i << "]");
-    auto& format_set = pcm_formats()[i];
+  for (size_t i = 0; i < ring_buffer_pcm_formats().size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "ring_buffer_pcm_format[" << i << "]");
+    auto& format_set = ring_buffer_pcm_formats()[i];
 
     ASSERT_TRUE(format_set.has_channel_sets());
     ASSERT_TRUE(format_set.has_sample_formats());
@@ -192,9 +192,9 @@ void BasicTest::ValidateFormatCorrectness() {
 // Fail if the returned sample sizes, valid bits and rates are not listed in ascending order.
 // This is split into a separate check (and test case) because it is often overlooked.
 void BasicTest::ValidateFormatOrdering() {
-  for (size_t i = 0; i < pcm_formats().size(); ++i) {
-    SCOPED_TRACE(testing::Message() << "pcm_format[" << i << "]");
-    auto& format_set = pcm_formats()[i];
+  for (size_t i = 0; i < ring_buffer_pcm_formats().size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "ring_buffer_pcm_format[" << i << "]");
+    auto& format_set = ring_buffer_pcm_formats()[i];
 
     ASSERT_TRUE(format_set.has_bytes_per_sample());
     ASSERT_TRUE(format_set.has_valid_bits_per_sample());
@@ -405,14 +405,20 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   }
 
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
-  REGISTER_BASIC_TEST(StreamProperties, device_entry);
-  REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
-  REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
-  REGISTER_BASIC_TEST(SetGain, device_entry);
-  REGISTER_BASIC_TEST(FormatCorrectness, device_entry);
-  REGISTER_BASIC_TEST(FormatsListedInOrder, device_entry);
-  REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
-  REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
+  if (device_entry.isStreamConfig()) {
+    REGISTER_BASIC_TEST(StreamProperties, device_entry);
+    REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
+    REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
+    REGISTER_BASIC_TEST(SetGain, device_entry);
+    REGISTER_BASIC_TEST(FormatCorrectness, device_entry);
+    REGISTER_BASIC_TEST(FormatsListedInOrder, device_entry);
+    REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
+    REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
+  }
+  // TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
+  // GetProperties, GetDaiFormats, and GetRingBufferFormats).
+  // TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
+  // TODO(fxbug.dev/126733): Add testing for Health methods.
 }
 
 }  // namespace media::audio::drivers::test

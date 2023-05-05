@@ -31,7 +31,7 @@ namespace media::audio::drivers::test {
     }                                                      \
   } while (0)
 
-enum DeviceType : uint16_t { Input = 0, Output = 1 };
+enum DeviceType : uint16_t { Input = 0, Output = 1, Dai = 2 };
 
 struct DeviceEntry {
   // `index() == 0` means A2DP.
@@ -40,6 +40,10 @@ struct DeviceEntry {
   DeviceType dev_type;
 
   bool isA2DP() const { return dir.index() == 0; }
+  bool isStreamConfig() const {
+    return dev_type == DeviceType::Input || dev_type == DeviceType::Output;
+  }
+  bool isDai() const { return dev_type == DeviceType::Dai; }
 
   bool operator<(const DeviceEntry& rhs) const {
     return std::tie(dir, filename, dev_type) < std::tie(rhs.dir, rhs.filename, rhs.dev_type);
@@ -56,9 +60,14 @@ std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
   if (device_entry.isA2DP()) {
     return device_entry.filename;
   }
-
-  return std::string(device_entry.dev_type == DeviceType::Input ? "audio-input" : "audio-output") +
-         "/" + device_entry.filename;
+  switch (device_entry.dev_type) {
+    case DeviceType::Dai:
+      return std::string("dai/" + device_entry.filename);
+    case DeviceType::Input:
+      return std::string("audio-input/" + device_entry.filename);
+    case DeviceType::Output:
+      return std::string("audio-output/" + device_entry.filename);
+  }
 }
 std::string inline TestNameForEntry(const std::string& test_class_name,
                                     const DeviceEntry& device_entry) {
@@ -73,10 +82,12 @@ class TestBase : public media::audio::test::TestFixture {
   void SetUp() override;
   void TearDown() override;
 
-  void ConnectToDevice(const DeviceEntry& device_entry);
+  void ConnectToStreamConfigDevice(const DeviceEntry& device_entry);
+  void ConnectToDaiDevice(const DeviceEntry& device_entry);
   void ConnectToBluetoothDevice();
   void CreateStreamConfigFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);
+  void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
 
   const DeviceEntry& device_entry() const { return device_entry_; }
   void set_device_type(DeviceType device_type) {}
@@ -87,16 +98,34 @@ class TestBase : public media::audio::test::TestFixture {
   void RequestFormats();
 
   // TODO(fxbug.dev/83972): Consider a more functional style when validating formats
-  const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& pcm_formats() const {
-    return pcm_formats_;
+  const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats()
+      const {
+    return ring_buffer_pcm_formats_;
   }
 
   fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig>& stream_config() {
     return stream_config_;
   }
+  fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
 
-  const fuchsia::hardware::audio::PcmFormat& min_format() const { return min_format_; }
-  const fuchsia::hardware::audio::PcmFormat& max_format() const { return max_format_; }
+  const fuchsia::hardware::audio::PcmFormat& min_ring_buffer_format() const {
+    return min_ring_buffer_format_;
+  }
+  const fuchsia::hardware::audio::PcmFormat& max_ring_buffer_format() const {
+    return max_ring_buffer_format_;
+  }
+  void SetMinRingBufferFormat(fuchsia::hardware::audio::PcmFormat& pcm_format) const {
+    pcm_format = min_ring_buffer_format();
+  }
+  void SetMaxRingBufferFormat(fuchsia::hardware::audio::PcmFormat& pcm_format) const {
+    pcm_format = max_ring_buffer_format();
+  }
+  void SetMinDaiFormat(fuchsia::hardware::audio::DaiFormat& dai_format) const {
+    EXPECT_EQ(fuchsia::hardware::audio::Clone(min_dai_format_, &dai_format), ZX_OK);
+  }
+  void SetMaxDaiFormat(fuchsia::hardware::audio::DaiFormat& dai_format) const {
+    EXPECT_EQ(fuchsia::hardware::audio::Clone(max_dai_format_, &dai_format), ZX_OK);
+  }
   static void LogFormat(const fuchsia::hardware::audio::PcmFormat& format,
                         const std::string& tag = {});
 
@@ -108,6 +137,8 @@ class TestBase : public media::audio::test::TestFixture {
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
 
   void SetMinMaxFormats();
+  void SetMinMaxRingBufferFormats();
+  void SetMinMaxDaiFormats();
 
   std::optional<component_testing::RealmRoot> realm_;
   fuchsia::component::BinderPtr audio_binder_;
@@ -115,11 +146,15 @@ class TestBase : public media::audio::test::TestFixture {
   const DeviceEntry& device_entry_;
 
   fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig> stream_config_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::Dai> dai_;
 
-  std::vector<fuchsia::hardware::audio::PcmSupportedFormats> pcm_formats_;
+  std::vector<fuchsia::hardware::audio::PcmSupportedFormats> ring_buffer_pcm_formats_;
+  std::vector<fuchsia::hardware::audio::DaiSupportedFormats> dai_formats_;
 
-  fuchsia::hardware::audio::PcmFormat min_format_;
-  fuchsia::hardware::audio::PcmFormat max_format_;
+  fuchsia::hardware::audio::PcmFormat min_ring_buffer_format_;
+  fuchsia::hardware::audio::PcmFormat max_ring_buffer_format_;
+  fuchsia::hardware::audio::DaiFormat min_dai_format_;
+  fuchsia::hardware::audio::DaiFormat max_dai_format_;
 };
 
 }  // namespace media::audio::drivers::test

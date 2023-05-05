@@ -36,15 +36,26 @@ using component_testing::Route;
 void TestBase::SetUp() {
   media::audio::test::TestFixture::SetUp();
 
-  if (device_entry().isA2DP()) {
+  auto& entry = device_entry();
+  if (entry.isA2DP()) {
     ConnectToBluetoothDevice();
   } else {
-    ConnectToDevice(device_entry());
+    switch (entry.dev_type) {
+      case DeviceType::Dai:
+        ConnectToDaiDevice(device_entry());
+        break;
+      case DeviceType::Input:
+        [[fallthrough]];
+      case DeviceType::Output:
+        ConnectToStreamConfigDevice(device_entry());
+        break;
+    }
   }
 }
 
 void TestBase::TearDown() {
   stream_config_.Unbind();
+  dai_.Unbind();
 
   if (realm_.has_value()) {
     // We're about to shut down the realm; unbind to unhook the error handler.
@@ -107,15 +118,14 @@ void TestBase::ConnectToBluetoothDevice() {
   CreateStreamConfigFromChannel(audio_device_enumerator_impl_ptr->TakeChannel());
 }
 
-// Given this device_entry, open the device and set the FIDL config_channel
-void TestBase::ConnectToDevice(const DeviceEntry& device_entry) {
+// Given this device_entry, use its channel to open the StreamConfig device.
+void TestBase::ConnectToStreamConfigDevice(const DeviceEntry& device_entry) {
   fuchsia::hardware::audio::StreamConfigConnectorPtr device;
   ASSERT_EQ(device_entry.dir.index(), 1u);
   ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
                                     device_entry.filename.c_str(),
                                     device.NewRequest().TakeChannel().release()),
-            ZX_OK)
-      << "AudioDriver::TestBase failed to open device node at '" << device_entry.filename << "'";
+            ZX_OK);
 
   device.set_error_handler([this](zx_status_t status) {
     FAIL() << status << "Err " << status << ", failed to open channel to audio "
@@ -134,6 +144,28 @@ void TestBase::ConnectToDevice(const DeviceEntry& device_entry) {
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig>(std::move(channel)));
 }
 
+// Given this device_entry, use its channel to open the Dai device.
+void TestBase::ConnectToDaiDevice(const DeviceEntry& device_entry) {
+  fuchsia::hardware::audio::DaiConnectorPtr device;
+  ASSERT_EQ(device_entry.dir.index(), 1u);
+  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
+                                    device_entry.filename.c_str(),
+                                    device.NewRequest().TakeChannel().release()),
+            ZX_OK);
+
+  device.set_error_handler([](zx_status_t status) {
+    FAIL() << status << "Err " << status << ", failed to open channel to audio DAI";
+  });
+  fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> dai_client;
+  fidl::InterfaceRequest<fuchsia::hardware::audio::Dai> dai_server = dai_client.NewRequest();
+  device->Connect(std::move(dai_server));
+
+  auto channel = dai_client.TakeChannel();
+  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio DAI";
+
+  CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai>(std::move(channel)));
+}
+
 void TestBase::CreateStreamConfigFromChannel(
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) {
   stream_config_ = channel.Bind();
@@ -145,24 +177,58 @@ void TestBase::CreateStreamConfigFromChannel(
   AddErrorHandler(stream_config_, "StreamConfig");
 }
 
+void TestBase::CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel) {
+  dai_ = channel.Bind();
+
+  // If no device was enumerated, don't waste further time.
+  if (!dai_.is_bound()) {
+    FAIL() << "Failed to get DAI channel for this device";
+  }
+  AddErrorHandler(dai_, "DAI");
+}
+
 // Request that the driver return the format ranges that it supports.
 void TestBase::RequestFormats() {
-  bool received_formats = false;
-  stream_config()->GetSupportedFormats(
-      AddCallback("GetSupportedFormats",
-                  [this, &received_formats](
-                      std::vector<fuchsia::hardware::audio::SupportedFormats> supported_formats) {
-                    EXPECT_FALSE(supported_formats.empty());
+  if (device_entry().isDai()) {
+    dai()->GetRingBufferFormats(
+        AddCallback("GetRingBufferFormats",
+                    [this](fuchsia::hardware::audio::Dai_GetRingBufferFormats_Result result) {
+                      EXPECT_FALSE(result.is_err());
+                      auto& supported_rb_formats = result.response().ring_buffer_formats;
+                      EXPECT_FALSE(supported_rb_formats.empty());
 
-                    for (size_t i = 0; i < supported_formats.size(); ++i) {
-                      SCOPED_TRACE(testing::Message() << "supported_formats[" << i << "]");
-                      ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
-                      auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
-                      pcm_formats_.push_back(std::move(format_set));
-                    }
+                      for (size_t i = 0; i < supported_rb_formats.size(); ++i) {
+                        SCOPED_TRACE(testing::Message() << "DAI supported_rb_formats[" << i << "]");
+                        ASSERT_TRUE(supported_rb_formats[i].has_pcm_supported_formats());
+                        auto& format_set = *supported_rb_formats[i].mutable_pcm_supported_formats();
+                        ring_buffer_pcm_formats_.push_back(std::move(format_set));
+                      }
+                    }));
+    dai()->GetDaiFormats(AddCallback(
+        "GetDaiFormats", [this](fuchsia::hardware::audio::Dai_GetDaiFormats_Result result) {
+          EXPECT_FALSE(result.is_err());
+          auto& supported_dai_formats = result.response().dai_formats;
+          EXPECT_FALSE(supported_dai_formats.empty());
 
-                    received_formats = true;
-                  }));
+          for (size_t i = 0; i < supported_dai_formats.size(); ++i) {
+            SCOPED_TRACE(testing::Message() << "DAI supported_dai_formats[" << i << "]");
+            dai_formats_.push_back(std::move(supported_dai_formats[i]));
+          }
+        }));
+  } else {
+    stream_config()->GetSupportedFormats(AddCallback(
+        "GetSupportedFormats",
+        [this](std::vector<fuchsia::hardware::audio::SupportedFormats> supported_formats) {
+          EXPECT_FALSE(supported_formats.empty());
+
+          for (size_t i = 0; i < supported_formats.size(); ++i) {
+            SCOPED_TRACE(testing::Message() << "StreamConfig supported_formats[" << i << "]");
+            ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
+            auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
+            ring_buffer_pcm_formats_.push_back(std::move(format_set));
+          }
+        }));
+  }
   ExpectCallbacks();
   if (!HasFailure()) {
     SetMinMaxFormats();
@@ -178,14 +244,20 @@ void TestBase::LogFormat(const fuchsia::hardware::audio::PcmFormat& format,
 }
 
 void TestBase::SetMinMaxFormats() {
-  for (size_t i = 0; i < pcm_formats_.size(); ++i) {
-    SCOPED_TRACE(testing::Message() << "pcm_format[" << i << "]");
-    size_t min_chans, max_chans;
-    uint8_t min_bytes_per_sample, max_bytes_per_sample;
-    uint8_t min_valid_bits_per_sample, max_valid_bits_per_sample;
-    uint32_t min_frame_rate, max_frame_rate;
+  SetMinMaxRingBufferFormats();
+  SetMinMaxDaiFormats();
+}
 
-    auto& format_set = pcm_formats_[i];
+void TestBase::SetMinMaxRingBufferFormats() {
+  for (size_t i = 0; i < ring_buffer_pcm_formats_.size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "pcm_format[" << i << "]");
+    size_t min_chans = 0, max_chans = 0;
+    uint8_t min_bytes_per_sample = 0, max_bytes_per_sample = 0;
+    uint8_t min_valid_bits_per_sample = 0, max_valid_bits_per_sample = 0;
+    uint32_t min_frame_rate = 0, max_frame_rate = 0;
+
+    auto& format_set = ring_buffer_pcm_formats_[i];
+    EXPECT_GT(format_set.sample_formats().size(), 0u);
     fuchsia::hardware::audio::SampleFormat sample_format = format_set.sample_formats()[0];
 
     for (size_t j = 0; j < format_set.channel_sets().size(); ++j) {
@@ -233,11 +305,12 @@ void TestBase::SetMinMaxFormats() {
       }
     }
 
-    // save, if less than min
+    // Save, if less than min.
     auto bit_rate = min_chans * min_bytes_per_sample * min_frame_rate;
-    if (i == 0 || bit_rate < min_format_.number_of_channels * min_format_.bytes_per_sample *
-                                 min_format_.frame_rate) {
-      min_format_ = {
+    if (i == 0 || bit_rate < min_ring_buffer_format_.number_of_channels *
+                                 min_ring_buffer_format_.bytes_per_sample *
+                                 min_ring_buffer_format_.frame_rate) {
+      min_ring_buffer_format_ = {
           .number_of_channels = static_cast<uint8_t>(min_chans),
           .sample_format = sample_format,
           .bytes_per_sample = min_bytes_per_sample,
@@ -245,16 +318,111 @@ void TestBase::SetMinMaxFormats() {
           .frame_rate = min_frame_rate,
       };
     }
-    // save, if more than max
+
+    // Save, if more than max.
     bit_rate = max_chans * max_bytes_per_sample * max_frame_rate;
-    if (i == 0 || bit_rate > max_format_.number_of_channels * max_format_.bytes_per_sample *
-                                 max_format_.frame_rate) {
-      max_format_ = {
+    if (i == 0 || bit_rate > max_ring_buffer_format_.number_of_channels *
+                                 max_ring_buffer_format_.bytes_per_sample *
+                                 max_ring_buffer_format_.frame_rate) {
+      max_ring_buffer_format_ = {
           .number_of_channels = static_cast<uint8_t>(max_chans),
           .sample_format = sample_format,
           .bytes_per_sample = max_bytes_per_sample,
           .valid_bits_per_sample = max_valid_bits_per_sample,
           .frame_rate = max_frame_rate,
+      };
+    }
+  }
+}
+
+void TestBase::SetMinMaxDaiFormats() {
+  for (size_t i = 0; i < dai_formats_.size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "DAI format[" << i << "]");
+    uint32_t min_number_of_channels = 0, max_number_of_channels = 0;
+    uint8_t min_bits_per_slot = 0, max_bits_per_slot = 0;
+    uint8_t min_bits_per_sample = 0, max_bits_per_sample = 0;
+    uint32_t min_frame_rate = 0, max_frame_rate = 0;
+
+    auto& format_set = dai_formats_[i];
+    // Pick the first sample and frame format.
+    EXPECT_GT(format_set.sample_formats.size(), 0u);
+    fuchsia::hardware::audio::DaiSampleFormat sample_format = format_set.sample_formats[0];
+    fuchsia::hardware::audio::DaiFrameFormat frame_format;
+    EXPECT_GT(format_set.frame_formats.size(), 0u);
+    EXPECT_EQ(fuchsia::hardware::audio::Clone(format_set.frame_formats[0], &frame_format), ZX_OK);
+
+    for (size_t j = 0; j < format_set.number_of_channels.size(); ++j) {
+      SCOPED_TRACE(testing::Message() << "number_of_channels[" << j << "]");
+      EXPECT_GT(format_set.number_of_channels[j], 0u);
+
+      if (j == 0 || format_set.number_of_channels[j] < min_number_of_channels) {
+        min_number_of_channels = format_set.number_of_channels[j];
+      }
+      if (j == 0 || format_set.number_of_channels[j] > max_number_of_channels) {
+        max_number_of_channels = format_set.number_of_channels[j];
+      }
+    }
+
+    for (size_t j = 0; j < format_set.bits_per_slot.size(); ++j) {
+      SCOPED_TRACE(testing::Message() << "bits_per_slot[" << j << "]");
+      EXPECT_GT(format_set.bits_per_slot[j], 0u);
+
+      if (j == 0 || format_set.bits_per_slot[j] < min_bits_per_slot) {
+        min_bits_per_slot = format_set.bits_per_slot[j];
+      }
+      if (j == 0 || format_set.bits_per_slot[j] > max_bits_per_slot) {
+        max_bits_per_slot = format_set.bits_per_slot[j];
+      }
+    }
+
+    for (size_t j = 0; j < format_set.bits_per_sample.size(); ++j) {
+      SCOPED_TRACE(testing::Message() << "bits_per_sample[" << j << "]");
+      EXPECT_LE(format_set.bits_per_sample[j], max_bits_per_slot * 8);
+      EXPECT_GT(format_set.bits_per_sample[j], 0u);
+
+      if (j == 0 || format_set.bits_per_sample[j] < min_bits_per_sample) {
+        min_bits_per_sample = format_set.bits_per_sample[j];
+      }
+      if (j == 0 || format_set.bits_per_sample[j] > max_bits_per_sample) {
+        max_bits_per_sample = format_set.bits_per_sample[j];
+      }
+    }
+    EXPECT_LE(min_bits_per_sample, min_bits_per_slot);
+    EXPECT_LE(max_bits_per_sample, max_bits_per_slot);
+
+    for (size_t j = 0; j < format_set.frame_rates.size(); ++j) {
+      if (j == 0 || format_set.frame_rates[j] < min_frame_rate) {
+        min_frame_rate = format_set.frame_rates[j];
+      }
+      if (j == 0 || format_set.frame_rates[j] > max_frame_rate) {
+        max_frame_rate = format_set.frame_rates[j];
+      }
+    }
+
+    // Save, if less than min.
+    auto bit_rate = min_number_of_channels * min_bits_per_slot * min_frame_rate;
+    if (i == 0 || bit_rate < min_dai_format_.number_of_channels * min_dai_format_.bits_per_slot *
+                                 min_dai_format_.frame_rate) {
+      min_dai_format_ = fuchsia::hardware::audio::DaiFormat{
+          .number_of_channels = min_number_of_channels,
+          .sample_format = sample_format,
+          .frame_format = std::move(frame_format),
+          .frame_rate = min_frame_rate,
+          .bits_per_slot = min_bits_per_slot,
+          .bits_per_sample = min_bits_per_sample,
+      };
+    }
+    // Save, if more than max.
+    bit_rate = max_number_of_channels * max_bits_per_slot * max_frame_rate;
+    if (i == 0 || bit_rate > max_dai_format_.number_of_channels * max_dai_format_.bits_per_slot *
+                                 max_dai_format_.frame_rate) {
+      max_dai_format_ = fuchsia::hardware::audio::DaiFormat{
+          .number_of_channels = max_number_of_channels,
+          .sample_format = sample_format,
+          .frame_format = std::move(frame_format),
+          .frame_rate = max_frame_rate,
+          .bits_per_slot = max_bits_per_slot,
+          .bits_per_sample = max_bits_per_sample,
       };
     }
   }

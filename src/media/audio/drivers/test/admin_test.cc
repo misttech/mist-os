@@ -43,24 +43,31 @@ void AdminTest::DropRingBuffer() {
 // For the channelization and sample_format that we've set, determine the size of each frame.
 // This method assumes that SetFormat has already been sent to the driver.
 void AdminTest::CalculateFrameSize() {
-  EXPECT_LE(pcm_format_.valid_bits_per_sample, pcm_format_.bytes_per_sample * 8);
-  frame_size_ = pcm_format_.number_of_channels * pcm_format_.bytes_per_sample;
+  EXPECT_LE(ring_buffer_pcm_format_.valid_bits_per_sample,
+            ring_buffer_pcm_format_.bytes_per_sample * 8);
+  frame_size_ =
+      ring_buffer_pcm_format_.number_of_channels * ring_buffer_pcm_format_.bytes_per_sample;
 }
 
 void AdminTest::RequestRingBufferChannel() {
   fuchsia::hardware::audio::Format format = {};
-  format.set_pcm_format(pcm_format_);
+  format.set_pcm_format(ring_buffer_pcm_format_);
 
   fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_handle;
-  stream_config()->CreateRingBuffer(std::move(format), ring_buffer_handle.NewRequest());
-
+  if (device_entry().isDai()) {
+    fuchsia::hardware::audio::DaiFormat dai_format = {};
+    EXPECT_EQ(fuchsia::hardware::audio::Clone(dai_format_, &dai_format), ZX_OK);
+    dai()->CreateRingBuffer(std::move(dai_format), std::move(format),
+                            ring_buffer_handle.NewRequest());
+    EXPECT_TRUE(dai().is_bound()) << "Dai failed to get ring buffer channel";
+  } else {
+    stream_config()->CreateRingBuffer(std::move(format), ring_buffer_handle.NewRequest());
+    EXPECT_TRUE(stream_config().is_bound()) << "StreamConfig failed to get ring buffer channel";
+  }
   zx::channel channel = ring_buffer_handle.TakeChannel();
   ring_buffer_ =
       fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer>(std::move(channel)).Bind();
-
-  if (!stream_config().is_bound() || !ring_buffer_.is_bound()) {
-    FAIL() << "Failed to get ring buffer channel";
-  }
+  EXPECT_TRUE(ring_buffer_.is_bound()) << "Failed to get ring buffer channel";
 
   AddErrorHandler(ring_buffer_, "RingBuffer");
 
@@ -70,18 +77,20 @@ void AdminTest::RequestRingBufferChannel() {
 // Request that driver set format to the lowest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
 void AdminTest::RequestRingBufferChannelWithMinFormat() {
-  ASSERT_GT(pcm_formats().size(), 0u);
+  ASSERT_GT(ring_buffer_pcm_formats().size(), 0u);
 
-  pcm_format_ = min_format();
+  SetMinRingBufferFormat(ring_buffer_pcm_format_);
+  SetMinDaiFormat(dai_format_);
   RequestRingBufferChannel();
 }
 
 // Request that driver set the highest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
 void AdminTest::RequestRingBufferChannelWithMaxFormat() {
-  ASSERT_GT(pcm_formats().size(), 0u);
+  ASSERT_GT(ring_buffer_pcm_formats().size(), 0u);
 
-  pcm_format_ = max_format();
+  SetMaxRingBufferFormat(ring_buffer_pcm_format_);
+  SetMaxDaiFormat(dai_format_);
   RequestRingBufferChannel();
 }
 
@@ -345,7 +354,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannels, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
-  uint64_t all_channels = (1 << pcm_format().number_of_channels) - 1;
+  uint64_t all_channels = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
   ActivateChannelsAndExpectSuccess(all_channels);
   WaitForError();
 });
@@ -355,7 +364,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
-  auto channel_mask_too_high = (1 << pcm_format().number_of_channels);
+  auto channel_mask_too_high = (1 << ring_buffer_pcm_format().number_of_channels);
   ActivateChannelsAndExpectFailure(channel_mask_too_high);
 });
 
@@ -506,7 +515,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
   ASSERT_NO_FAILURE_OR_SKIP(
-      ActivateChannelsAndExpectSuccess((1 << pcm_format().number_of_channels) - 1));
+      ActivateChannelsAndExpectSuccess((1 << ring_buffer_pcm_format().number_of_channels) - 1));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
@@ -516,7 +525,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
   ASSERT_NO_FAILURE_OR_SKIP(
-      ActivateChannelsAndExpectSuccess((1 << pcm_format().number_of_channels) - 1));
+      ActivateChannelsAndExpectSuccess((1 << ring_buffer_pcm_format().number_of_channels) - 1));
 
   RequestStop();
   WaitForError();

@@ -1,10 +1,11 @@
 ## Audio driver tests
 
-The `audio_driver_tests` suite validates implementations of `fuchsia.hardware.audio.StreamConfig`
-and `fuchsia.hardware.audio.RingBuffer` interfaces. When the suite runs, it detects, initializes
-and tests all audio device drivers that are registered with devfs and thus appear under
-`/dev/class/audio-input` and `/dev/class/audio-output`. These drivers are tested non-hermetically,
-as system instances backed by actual audio hardware.
+The `audio_driver_tests` suite validates implementations of `fuchsia.hardware.audio.StreamConfig`,
+`fuchsia.hardware.audio.RingBuffer` and `fuchsia.hardware.audio.Dai` interfaces.
+When the suite runs, it detects, initializes and tests all audio device drivers that are
+registered with devfs and thus appear under `/dev/class/audio-input`, `/dev/class/audio-output`,
+and `/dev/class/dai`. These drivers are tested non-hermetically, as system instances may be backed
+by actual audio hardware.
 
 The suite also hermetically creates and tests an instance of the Bluetooth a2dp library (see
 `//src/connectivity/bluetooth/tests/audio-device-output-harness`); this can be disabled by
