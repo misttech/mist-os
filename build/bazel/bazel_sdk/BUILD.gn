@@ -40,6 +40,7 @@ action("bazel_sdk_tests") {
     "--target_cpu=${target_cpu}",
     "--bazel=" + rebase_path(inputs[0], root_build_dir),
     "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+    "--quiet",
   ]
   deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
   pool = "//:console"

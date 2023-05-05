@@ -36,6 +36,7 @@ main() {
   local verbose
   local output_base
   local output_user_root
+  local quiet
   local args=()
 
   while [[ -n "$1" ]]; do
@@ -78,6 +79,9 @@ main() {
       --clean)
           clean=true
           ;;
+      --quiet)
+          quiet=true
+          ;;
       --)
          # Extra args passed directly to bazel test
          args+=("$@")
@@ -111,6 +115,9 @@ Valid options:
 
   --verbose
      Print information before launching 'bazel test'.
+
+  --quiet
+    Do not print anything unless there is an error.
 
   --clean
      Perform a clean build by expunging the output base first.
@@ -277,6 +284,18 @@ EOF
     --override_repository=rules_java=${fuchsia_source_dir}/build/bazel/local_repositories/rules_java
   )
 
+  if [[ -n "${quiet}" ]]; then
+    bazel_common_args+=(
+      # Prevent Bazel from displaying too much information.
+      --noshow_loading_progress
+      --noshow_progress
+      --ui_event_filters=-info
+      --show_result=0
+      --test_output=errors
+      --test_summary=none
+    )
+  fi
+
   if [[ -n "${clean}" ]]; then
     (cd "${workspace_dir}" && "${bazel}" "${bazel_startup_args[@]}" clean --expunge)
   fi
@@ -317,6 +336,10 @@ EOF
 
     :tests "${args[@]}"
   )
+
+  if [[ -n "${quiet}" ]]; then
+    verbose=
+  fi
 
   if [[ -n "${verbose}" ]]; then
     echo
