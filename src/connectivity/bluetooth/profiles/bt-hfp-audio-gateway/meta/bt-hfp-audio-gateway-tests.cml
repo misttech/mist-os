@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/media/codec/factory/meta/include_codecfactory.shard.cml",
+        "//src/media/codec/factory/meta/include_codecfactory_testonly.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/client.shard.cml",
         "sys/testing/system-test.shard.cml",
@@ -24,8 +24,8 @@
             from: "#mock-a2dp-controller",
         },
 
-        // See `include_codecfactory.shard.cml` which defines `#codec-factory` which provides this
-        // capability.
+        // See `include_codecfactory_testonly.shard.cml` which defines `#codec-factory` which
+        // provides this capability.
         {
             protocol: [ "fuchsia.mediacodec.CodecFactory" ],
             from: "#codec-factory",
@@ -44,9 +44,4 @@
             to: [ "#mock-a2dp-controller" ],
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "codec_factory" ],
-        },
-    },
 }

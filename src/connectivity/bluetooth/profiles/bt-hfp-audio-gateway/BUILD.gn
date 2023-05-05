@@ -188,6 +188,7 @@ fuchsia_test_package("bt-hfp-audio-gateway-tests") {
     # The component mock for the `fuchsia.bluetooth.internal.a2dp.Controller` capability.
     "//src/connectivity/bluetooth/testing/mock-a2dp-controller:mock-a2dp-controller",
   ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
 }
 
 rustc_test("bt_hfp_a2dp_controller_bin") {
