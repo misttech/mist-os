@@ -559,17 +559,29 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
 
-        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id))?;
-        let output_message = device
-            .record(
-                format_utils::Format::from(&stream_type),
-                fasync::Socket::from_socket(stdout_local)?,
-                duration,
-                cancel_server,
-            )
-            .await?;
+        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
+
+        let result = match device {
+            Err(e) => Err(anyhow::anyhow!("Failed to connect to device with error: {e}")),
+            Ok(device) => {
+                device
+                    .record(
+                        format_utils::Format::from(&stream_type),
+                        fasync::Socket::from_socket(stdout_local)?,
+                        duration,
+                        cancel_server,
+                    )
+                    .await
+            }
+        };
 
         let mut stderr = fasync::Socket::from_socket(stderr_local)?;
+        let output_message = match result {
+            Ok(message) => message,
+            Err(e) => {
+                format!("Failed to record from device with error: {e}")
+            }
+        };
 
         stderr
             .write_all(output_message.as_bytes())

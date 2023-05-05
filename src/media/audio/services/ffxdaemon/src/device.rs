@@ -279,6 +279,8 @@ impl Device {
             ));
         }
 
+        let safe_bytes_in_rb = bytes_in_rb - producer_bytes;
+
         let mut late_wakeups = 0;
 
         // Running counter representing the next time we'll wake up and read from ring buffer.
@@ -298,14 +300,14 @@ impl Device {
         let packet_fut = async {
             loop {
                 timer.next().await;
-
-                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
-                    break;
-                }
                 // Check that we woke up on time. Approximate ring buffer pointer position based on
                 // the current time and the expected rate of how fast it moves.
                 // Ring buffer pointer should be ahead of last byte read.
                 let now = zx::Time::get_monotonic();
+
+                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
 
                 let elapsed_since_last_wakeup = now - last_wakeup;
                 let elapsed_since_start = now - t_zero;
@@ -313,9 +315,6 @@ impl Device {
                 let elapsed_frames_since_start = (frames_per_nanosecond
                     * elapsed_since_start.into_nanos() as f64)
                     .floor() as u64;
-
-                let expected_frames_since_last_wakeup =
-                    (wakeup_interval.into_nanos() as f64 * frames_per_nanosecond).floor() as u64;
 
                 let available_frames_to_read = elapsed_frames_since_start - last_frame_read;
                 let bytes_to_read = available_frames_to_read * format.bytes_per_frame() as u64;
@@ -328,27 +327,25 @@ impl Device {
                 // are the range of bytes that the driver will write to during that period,
                 // since we'd be reading stale data.
                 // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes since reads
-                // can take up to one period in the worst case. The remaining bytes in the ring buffer
-                // are safe to read from since the data will be up to date.
-                // If the difference in elapsed frames and what we expect to write is
-                // greater than the range of safe bytes, we've woken up too late and
-                // we will miss some of the audio signal.
+                // can take up to one period in the worst case. The remaining bytes in the ring
+                // buffer are safe to read from since the data will be up to date.
+                // The amount of bytes we can read from is the difference between the last position
+                // we read from and the current elapsed position. If that amount is greater than
+                // the amount of safe bytes, we've woken up too late and will miss some of the
+                // audio signal. In that case, we span the missed bytes with silence value.
 
-                let distance_bytes = (available_frames_to_read - expected_frames_since_last_wakeup)
-                    * format.bytes_per_frame() as u64;
-
-                let unsafe_bytes = producer_bytes + bytes_per_wakeup_interval;
-
-                let bytes_missed = if distance_bytes > bytes_in_rb - unsafe_bytes {
+                let bytes_missed = if bytes_to_read > safe_bytes_in_rb {
+                    (bytes_to_read - safe_bytes_in_rb) as usize
+                } else {
+                    0usize
+                };
+                if bytes_missed > 0 {
                     println!(
                         "Woke up {} ns late",
                         elapsed_since_last_wakeup.into_nanos() - wakeup_interval.into_nanos()
                     );
                     late_wakeups += 1;
-                    (distance_bytes + unsafe_bytes - bytes_in_rb) as usize
-                } else {
-                    0usize
-                };
+                }
 
                 buf[..bytes_missed].fill(format.silence_value());
                 let _ = ring_buffer_wrapper
