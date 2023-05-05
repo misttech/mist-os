@@ -8,7 +8,9 @@ use {
     event_queue::{EventQueue, Notify},
     fidl_fuchsia_update_installer::UpdateNotStartedReason,
     fidl_fuchsia_update_installer_ext::State,
-    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_inspect as inspect,
+    fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _},
+    fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         prelude::*,
@@ -54,11 +56,13 @@ async fn run<N, U, E>(
     let (monitor_queue_fut, mut monitor_queue) = EventQueue::new();
     let eq_task = fasync::Task::spawn(monitor_queue_fut);
 
+    let mut requests_node = BoundedListNode::new(node.create_child("requests"), 100);
+
     // Each iteration of this loop is one update attempt.
     loop {
         // There is no active update attempt, so let's wait for a start request.
         let StartRequestData { config, monitor, reboot_controller, responder } =
-            match handle_idle_control_request(&mut recv).await {
+            match handle_idle_control_request(&mut recv, &mut requests_node).await {
                 Some(start_data) => start_data,
                 None => {
                     // Ensure all monitors get the remaining state updates.
@@ -129,6 +133,7 @@ async fn run<N, U, E>(
             match op {
                 // We got a FIDL requests (via the mpsc::Receiver).
                 Op::Request(req) => {
+                    req.write_to_inspect(requests_node.create_entry());
                     handle_active_control_request(
                         req,
                         &mut monitor_queue,
@@ -167,6 +172,7 @@ async fn run<N, U, E>(
 /// from the FIDL server).
 async fn handle_idle_control_request<N>(
     recv: &mut mpsc::Receiver<ControlRequest<N>>,
+    requests_node: &mut BoundedListNode,
 ) -> Option<StartRequestData<N>>
 where
     N: Notify,
@@ -181,6 +187,7 @@ where
 
     // Right now we are in a state where there is no update running.
     while let Some(control_request) = recv.next().await {
+        control_request.write_to_inspect(requests_node.create_entry());
         match control_request {
             ControlRequest::Start(start_data) => {
                 return Some(start_data);
@@ -353,6 +360,31 @@ where
     Monitor(MonitorRequestData<N>),
     Suspend(oneshot::Sender<Result<(), SuspendError>>),
     Resume(oneshot::Sender<Result<(), ResumeError>>),
+}
+
+impl<N: Notify> ControlRequest<N> {
+    fn write_to_inspect(&self, node: &inspect::Node) {
+        node.record_time("time");
+
+        match self {
+            Self::Start(data) => {
+                node.record_string("request", "start");
+                node.record_string("config", format!("{:?}", data.config));
+            }
+            Self::Monitor(data) => {
+                node.record_string("request", "monitor");
+                if let Some(attempt_id) = &data.attempt_id {
+                    node.record_string("attempt id", attempt_id);
+                }
+            }
+            Self::Suspend(_) => {
+                node.record_string("request", "suspend");
+            }
+            Self::Resume(_) => {
+                node.record_string("request", "resume");
+            }
+        }
+    }
 }
 
 struct StartRequestData<N>
@@ -682,8 +714,12 @@ mod tests {
     #[test]
     fn suspend_resume_succeeds() {
         let mut exec = fasync::TestExecutor::new();
+        let inspector = Inspector::default();
         let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
-            exec.run_singlethreaded(start_install_manager_with_update_id("my-attempt"));
+            exec.run_singlethreaded(start_install_manager_with_update_id_and_node(
+                "my-attempt",
+                inspector.root().create_child("current_attempt"),
+            ));
         let (notifier, mut state_receiver) = FakeStateNotifier::new_callback_and_receiver();
 
         exec.run_singlethreaded(async {
@@ -714,6 +750,29 @@ mod tests {
             let () = send_fut.await.unwrap();
             assert_eq!(recv_fut.await, Some(State::FailPrepare(PrepareFailureReason::Internal)));
         });
+
+        assert_data_tree!(
+            inspector,
+            root: {
+                current_attempt: contains {
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                        "1": {
+                            request: "suspend",
+                            time: AnyProperty,
+                        },
+                        "2": {
+                            request: "resume",
+                            time: AnyProperty,
+                        },
+                    },
+                }
+            }
+        );
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -955,7 +1014,14 @@ mod tests {
                     start_timestamp_nanos: AnyProperty,
                     status: {
                         state: "prepare"
-                    }
+                    },
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
                 }
             }
         );
@@ -1007,7 +1073,14 @@ mod tests {
                             fraction_completed: 0.5,
                             bytes_downloaded: 50u64,
                         },
-                    }
+                    },
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
                 }
             }
         );
@@ -1040,7 +1113,14 @@ mod tests {
                     start_timestamp_nanos: AnyProperty,
                     status: {
                         state: "prepare"
-                    }
+                    },
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
                 }
             }
         );
@@ -1051,7 +1131,15 @@ mod tests {
         assert_data_tree!(
             inspector,
             root: {
-                current_attempt: {}
+                current_attempt: {
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
+                }
             }
         );
 
@@ -1076,7 +1164,19 @@ mod tests {
                     status: {
                         state: "fail_prepare",
                         reason: "Internal",
-                    }
+                    },
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                        "1": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
                 }
             }
         );
@@ -1125,6 +1225,13 @@ mod tests {
                 current_attempt: {
                     start_timestamp_nanos: AnyProperty,
                     status: {},
+                    requests: {
+                        "0": {
+                            request: "start",
+                            config: AnyProperty,
+                            time: AnyProperty,
+                        },
+                    },
                 }
             }
         );
