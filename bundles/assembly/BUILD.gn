@@ -734,7 +734,7 @@ assembly_input_bundle("testing_support") {
     "//src/sys/fuzzing:fuzz-manager",
     "//src/sys/fuzzing:fuzz-registry",
     "//src/sys/fuzzing/fuzzctl",
-    "//src/sys/run_test_suite:run_test_suite_pkg",
+    "//src/sys/run_test_suite",
   ]
   compiled_packages = [
     {

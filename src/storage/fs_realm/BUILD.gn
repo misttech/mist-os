@@ -37,27 +37,16 @@ rustc_binary("bin") {
   deps += [ "//build/validate:non_production_tag" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("core_shard_for_transition") {
-}
-
 fuchsia_component("component") {
   component_name = "fs_realm"
   manifest = "meta/fs_realm.cml"
   deps = [ ":bin" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("fs_realm") {
   deps = [ ":component" ]
+
   # This package is added by product assembly into eng builds only.
   # It should not be added manually anywhere else.
-  #
-  # This is temporarily relaxed for a transition
-  # visibility = [ "//bundles/assembly/*" ]
+  visibility = [ "//bundles/assembly/*" ]
 }

@@ -140,13 +140,6 @@ expect_includes("tmp_storage") {
   includes = [ "tmp_storage.shard.cml" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("test_runners") {
-  testonly = true
-  deps = []
-}
-
 group("tests") {
   testonly = true
   deps = [
@@ -164,12 +157,6 @@ group("tests") {
     "starnix:tests",
     "stress_test:tests",
   ]
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("legacy_tests") {
-  testonly = true
 }
 
 # Use this group to include fuchsia.process.Launcher in generated test manifests.

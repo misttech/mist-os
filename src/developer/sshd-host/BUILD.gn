@@ -43,11 +43,6 @@ executable("bin") {
   ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 icu_fuchsia_component("sshd-host-component") {
   component_name = "sshd-host"
   manifest = "meta/sshd-host.cml"
@@ -68,11 +63,6 @@ icu_fuchsia_component("sshd-host-component") {
 
 icu_fuchsia_package("sshd-host") {
   icu_deps = [ ":sshd-host-component" ]
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("core_shard") {
 }
 
 # Enabling a soft-transition, remove when complete

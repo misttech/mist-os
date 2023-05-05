@@ -61,11 +61,6 @@ fuchsia_package("go-test-runner") {
   deps = [ ":go_test_runner" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("gotests") {
-}
-
 fuchsia_unittest_component("test-component") {
   deps = [
     ":bin_test",

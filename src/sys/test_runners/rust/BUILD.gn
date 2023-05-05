@@ -79,11 +79,6 @@ fuchsia_package("rust-test-next-vdso-runner") {
   deps = [ ":rust_test_next_vdso_runner" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("rust") {
-}
-
 fuchsia_unittest_component("test-component") {
   deps = [
     ":bin_test",

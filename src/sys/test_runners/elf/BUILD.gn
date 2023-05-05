@@ -120,11 +120,6 @@ fuchsia_package("elf-test-create-raw-processes-ambient-exec-runner") {
   deps = [ ":elf-test-create-raw-processes-ambient-exec-runner-component" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("elf") {
-}
-
 group("tests") {
   testonly = true
   deps = [ "tests" ]

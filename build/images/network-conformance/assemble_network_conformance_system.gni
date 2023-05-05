@@ -18,12 +18,6 @@ import("//src/sys/core/build/core.gni")
 template("assemble_network_conformance_system") {
   core_realm_definition("core") {
     testonly = true
-
-    deps = [
-      # Need ssh to test the system
-      "//src/developer/sshd-host:core_shard",
-      "//src/sys/process-resolver:core_shard",
-    ]
   }
 
   product_assembly_configuration(target_name + ".product_assembly_config") {
@@ -39,7 +33,6 @@ template("assemble_network_conformance_system") {
     allow_eng_platform_bundle_use = true
 
     base_packages = [
-      "//src/developer/sshd-host:for_transition",
       "//src/developer/sshd-host:config-for_transition",
       "//src/connectivity/network",
       "//src/connectivity/network/mdns/bundles:config",

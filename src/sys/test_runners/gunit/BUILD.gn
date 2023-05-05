@@ -23,11 +23,6 @@ fuchsia_package("gunit-runner") {
   deps = [ ":gunit-runner-component" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("gunit") {
-}
-
 fuchsia_unittest_package("gunit-runner-tests") {
   deps = [
     "//src/sys/test_runners/gtest:gunit_bin_test",

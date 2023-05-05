@@ -11,4 +11,4 @@ product_bootfs_labels += [
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-product_bootfs_labels += [ "//bundles:diagnostics-eng" ]
+product_bootfs_labels += [ "//src/diagnostics/iquery" ]

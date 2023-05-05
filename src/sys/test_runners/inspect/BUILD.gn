@@ -61,11 +61,6 @@ fuchsia_package("inspect-test-runner") {
   deps = [ ":inspect_test_runner" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("inspect") {
-}
-
 fuchsia_unittest_component("test-component") {
   deps = [ ":bin_test" ]
 }

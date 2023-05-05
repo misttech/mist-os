@@ -64,11 +64,6 @@ fuchsia_package("pkg") {
   deps = [ ":component" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("driver-playground-core-shard") {
-}
-
 fuchsia_unittest_package("driver-playground-tests") {
   deps = [ ":unit_tests" ]
 }

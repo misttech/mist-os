@@ -57,9 +57,6 @@ group("workstation_host_tests") {
 group("workstation") {
   testonly = true
   deps = [
-    # CFv2 test framework.
-    "//src/sys/run_test_suite",
-
     # Used for Chromium tests
     "//src/testing/fidl/intl_property_manager",
 

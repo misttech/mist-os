@@ -28,13 +28,3 @@ fuchsia_package("tzdata_provider") {
     ":icu_tzdata_44_le_for_tzdata_provider",
   ]
 }
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("pkg") {
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("core-shard") {
-}

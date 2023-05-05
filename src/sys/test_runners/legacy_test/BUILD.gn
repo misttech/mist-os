@@ -51,8 +51,3 @@ fuchsia_package("legacy-test-runner") {
   ]
   deps = [ ":legacy_test_runner_cmp" ]
 }
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("legacy_tests") {
-}

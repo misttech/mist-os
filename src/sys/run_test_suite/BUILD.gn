@@ -119,9 +119,8 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("run_test_suite_pkg") {
+fuchsia_shell_package("run_test_suite") {
   testonly = true
-  package_name = "run_test_suite"
   deps = [ ":bin" ]
 }
 
@@ -153,11 +152,6 @@ fuchsia_test_package("run-test-suite-unit-tests") {
     ":no_realm_protocol_realm",
     ":test_realm",
   ]
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("run_test_suite") {
 }
 
 group("tests") {

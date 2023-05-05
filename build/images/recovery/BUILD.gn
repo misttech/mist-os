@@ -96,19 +96,11 @@ if (is_fuchsia) {
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
   ]
   core_realm_eng_aib_pkgs = [
-    # Dash launcher should be available in every engineering-mode product.
-    "//src/sys/tools/debug-dash-launcher:for_transition",
-
-    # The fs_realm component should be available in every engineering-mode product.
-    "//src/storage/fs_realm:for_transition",
-
     # Enable ffx support.
     "//src/connectivity/network/mdns/bundles:services",  # group for transition
 
     # Enable SSH (for engineering builds):
-    "//src/developer/sshd-host:for_transition",
     "//src/developer/sshd-host:config-for_transition",
-    "//src/sys/process-resolver:for_transition",
 
     # Basic command-line tools:
     "//bundles/assembly:third_party_sbase_for_transition",
@@ -119,11 +111,6 @@ if (is_fuchsia) {
 
     # Device side of zxdb & fidlcat:
     "//src/developer/debug/debug_agent:for_transition",
-  ]
-  core_realm_eng_aib_shards = [
-    "//src/sys/tools/debug-dash-launcher:core_shard_for_transition",
-    "//src/storage/fs_realm:core_shard_for_transition",
-    "//src/sys/process-resolver:core_shard",
   ]
   core_realm_testing_aib_pkgs = [
     # SL4F for infra testing
@@ -153,13 +140,11 @@ if (is_fuchsia) {
   core_realm_definition("core-eng") {
     # TODO(fxbug.dev/102390): deprecate appmgr from this product config
     deps =
-        _core_realm_deps + appmgr_core_shards + core_realm_eng_aib_shards +
-        core_realm_testing_aib_shards +
+        _core_realm_deps + appmgr_core_shards + core_realm_testing_aib_shards +
         [
           # required for SL4F
           "//src/developer:default-laboratory-env-core-shard",
           "//src/developer/memory/monitor:memory_monitor_core_shard",
-          "//src/developer/sshd-host:core_shard",
           "//src/factory/factory_store_providers:factory_store_providers_shard",
           "//src/recovery/system:system_recovery_core_shard",
           "//src/settings/service:setui_service_core_shard",

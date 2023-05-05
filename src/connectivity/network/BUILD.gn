@@ -117,13 +117,6 @@ fuchsia_package("netstack3") {
   ]
 }
 
-# TODO(https://fxbug.dev/85450): Remove this and move usages to select which
-# netstack package to use according to product assembly.
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("netstack") {
-}
-
 core_shard("virtualization-core-shard") {
   shard_file = "meta/virtualization.core_shard.cml"
 }

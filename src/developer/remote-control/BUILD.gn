@@ -161,17 +161,6 @@ fuchsia_package_archive("remote-control-archive") {
   package = ":remote-control-package"
 }
 
-# This group is cached in core. Only add dependencies to this
-# if they belong in core.
-group("runtime") {
-  deps = [
-    ":pkg-diagnostics-bridge",
-    ":remote-control-package",
-    "//build/validate:non_production_tag",
-    "//src/connectivity/overnet:runtime",
-  ]
-}
-
 # This shard enables ffx component laboratory functionality.
 # Note that the laboratory core shard requires the `laboratory-env`, so when
 # the laboratory shard is included in a product, a core shard must also be

@@ -108,11 +108,6 @@ fuchsia_package("gtest-runner") {
   deps = [ ":gtest-runner-component" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("gtest") {
-}
-
 fuchsia_unittest_package("gtest-runner-tests") {
   deps = [
     ":gtest_bin_test",

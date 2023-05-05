@@ -31,16 +31,6 @@ fuchsia_component("sysmem_connector_cmp") {
   deps = [ ":sysmem_connector_executable" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
-# Enabling a soft-transition, replace with actual target when complete
-# TODO(122864) Remove transitional labels
-group("sysmem_connector") {
-}
-
 fuchsia_package("pkg") {
   package_name = "sysmem_connector"
   deps = [ ":sysmem_connector_cmp" ]

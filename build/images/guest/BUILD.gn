@@ -60,7 +60,6 @@ if (labels.images == "//build/images/bringup") {
     deps = [
       "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
       "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-      "//src/sys/process-resolver:core_shard",
     ]
   }
 

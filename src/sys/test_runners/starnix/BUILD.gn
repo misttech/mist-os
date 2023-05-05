@@ -102,11 +102,6 @@ fuchsia_unittest_package("starnix-test-runner-tests") {
   }
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("starnix") {
-}
-
 group("tests") {
   testonly = true
   deps = [ ":starnix-test-runner-tests" ]

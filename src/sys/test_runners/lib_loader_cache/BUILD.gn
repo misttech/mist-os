@@ -56,11 +56,6 @@ fuchsia_package("lib_loader_runner_cache") {
   deps = [ ":lib_loader_runner_cache_cmp" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("lib_loader_cache") {
-}
-
 fuchsia_unittest_package("lib_loader_runner_cache_unit_tests") {
   deps = [
     ":bin_test",

@@ -71,9 +71,6 @@ legacy_cache_package_labels += [
   "//src/tests/end_to_end/bundles:end_to_end_deps",
   "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
 
-  # CFv2 test framework.
-  "//src/sys/run_test_suite",
-
   # Used by Chromium tests, such as //src/chromium:tests.
   # Although deps in the individual tests ensures these are available in Fuchsia
   # infrastructure, Chromium infrastructure runs such tests run on this image,

@@ -43,9 +43,6 @@ legacy_cache_package_labels += [
   # Used for Chromium e2e tests. See fxb/96503.
   "//src/experiences/session_shells/ermine/tools",
 
-  # CFv2 test framework.
-  "//src/sys/run_test_suite",
-
   # Used by Chromium tests, such as //src/chromium:tests.
   # In Chromium infra, these tests run on this image, so they must be in cache.
   # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.

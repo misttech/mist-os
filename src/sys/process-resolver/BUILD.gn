@@ -43,20 +43,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("process-resolver") {
   visibility = [
     ":*",
     "//bundles/assembly/*",
   ]
   deps = [ ":component" ]
-}
-
-group("core_shard") {
 }
 
 fuchsia_unittest_package("process-resolver-unittests") {

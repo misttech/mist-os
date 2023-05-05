@@ -65,11 +65,6 @@ group("debugging") {
   ]
 }
 
-# Diagnostics tools installed on the boot image.
-group("diagnostics-eng") {
-  deps = [ "//src/diagnostics/bundles:dev-tools" ]
-}
-
 # Group including all drivers in the fuchsia repo except for templates.
 group("drivers-not-templates") {
   testonly = true

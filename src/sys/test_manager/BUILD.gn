@@ -178,11 +178,8 @@ fuchsia_component("fxfs_backed_data_for_tests_cmp") {
   manifest = "meta/fxfs_backed_data_for_tests.cml"
 }
 
-# Enabling a soft-transition, remove when complete
+# Enabling a soft-transition, rename to 'test_manager' when complete.
 # TODO(122864) Remove transitional labels
-group("test_manager_pkg") {
-}
-
 fuchsia_package("pkg") {
   testonly = true
   package_name = "test_manager"
@@ -223,11 +220,6 @@ core_shard("test_manager_cmx_support_core_shard") {
 fuchsia_unittest_package("test-manager-unittests") {
   manifest = "meta/test_manager_lib_test.cml"
   deps = [ ":lib_test" ]
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("test_manager") {
 }
 
 group("tests") {

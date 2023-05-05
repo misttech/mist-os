@@ -70,11 +70,6 @@ fuchsia_unittest_package("debug-dash-launcher-unittests") {
   ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("debug-dash-launcher") {
   deps = [
     ":component",
@@ -94,13 +89,4 @@ group("tests") {
     ":debug-dash-launcher-unittests",
     "integration_test",
   ]
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("core_shard_for_transition") {
-}
-
-core_shard("core-shard") {
-  shard_file = "meta/debug_dash_launcher.core_shard.cml"
 }
