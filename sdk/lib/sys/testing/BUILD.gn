@@ -10,6 +10,7 @@ sdk_component_manifests("testing_sdk") {
     "coverage.shard.cml",
     "elf_test_runner.shard.cml",
     "gtest_runner.shard.cml",
+    "gunit_runner.shard.cml",
     "rust_test_runner.shard.cml",
     "system-test.shard.cml",
   ]

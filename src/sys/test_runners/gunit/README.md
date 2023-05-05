@@ -20,7 +20,7 @@ A test that needs additional capabilities can use a manifest like the following:
 ```
 {
     include: [
-        "//src/sys/test_runners/gunit/default.shard.cml",
+        "sys/testing/gunit_runner.shard.cml",
     ],
     program: {
         binary: "bin/my_component_test",
