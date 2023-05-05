@@ -19,6 +19,14 @@ import("//build/testing/host_test_data.gni")
 import("//src/security/bin/scrutiny_x_smoke_test/scrutiny_x_smoke_test.gni")
 import("//src/sys/core/build/core.gni")
 
+declare_args() {
+  # Create the package and archive for the legacy assembly input bundle.  This
+  # can be a time-consuming operation, which due to limits in GN and groups,
+  # ends up being a blocking step in the build, so only enable this if we know
+  # that we want the legacy AIB packaged and archived for a given product:
+  create_legacy_aib_archive = false
+}
+
 if (is_host) {
   host_test_data("fuchsia_zbi_for_host_tests") {
     sources = [ "$root_build_dir/fuchsia.zbi" ]
@@ -318,8 +326,8 @@ if (is_fuchsia) {
     output_dir = root_build_dir
     image_name = "fuchsia"
 
-    create_legacy_aib_package = !is_debug
-    create_legacy_aib_archive = !is_debug
+    create_legacy_aib_package = create_legacy_aib_archive
+    create_legacy_aib_archive = create_legacy_aib_archive
 
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
     must_exist_deps = must_exist
