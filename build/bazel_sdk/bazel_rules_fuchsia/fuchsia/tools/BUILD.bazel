@@ -150,3 +150,8 @@ py_binary(
     name = "convert_size_limits",
     srcs = ["convert_size_limits.py"],
 )
+
+py_binary(
+    name = "work_on_runner",
+    srcs = ["work_on_runner.py"],
+)
