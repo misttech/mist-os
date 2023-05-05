@@ -6,10 +6,11 @@
 #include <lib/async-loop/default.h>
 #include <lib/fake-i2c/fake-i2c.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/ssd1306/ssd1306.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace ssd1306 {
 
