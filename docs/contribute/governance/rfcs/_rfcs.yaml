@@ -2828,3 +2828,15 @@
   submitted: '2022-1-17'
   reviewed: '2023-04-20'
 
+- name: 'RFC-0217'
+  title: 'Open Package Tracking'
+  short_description: 'Use open package tracking instead of the dynamic index when protecting packages from garbage collection.'
+  authors: ['galbanum@google.com']
+  file: '0217_open_package_tracking.md'
+  area: ['Software Delivery']
+  issue: ['126807']
+  gerrit_change_id: ['839519']
+  status: 'Accepted'
+  reviewers: ['wittrock@google.com', 'geb@google.com', 'crjohns@google.com']
+  submitted: '2023-04-18'
+  reviewed: '2023-05-05'

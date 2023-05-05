@@ -448,3 +448,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0215_structured_config_parent_overrides.md
   - title: "RFC-0216: Fuchsia Hosted Repository Guidelines"
     path: /docs/contribute/governance/rfcs/0216_hosted_repositories.md
+  - title: "RFC-0217: Open package tracking"
+    path: /docs/contribute/governance/rfcs/0217_open_package_tracking.md
