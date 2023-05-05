@@ -34,6 +34,7 @@ bitflags! {
     /// flexible bits comment #1
     ///
     /// flexible bits comment #2
+    #[derive(Default)]
     pub struct MyFlexibleBits: u32 {
         /// MY_FIRST_BIT member comment #1
         ///
@@ -73,6 +74,7 @@ bitflags! {
     /// strict bits comment #1
     ///
     /// strict bits comment #2
+    #[derive(Default)]
     pub struct MyStrictBits: u32 {
         /// MY_FIRST_BIT member comment #1
         ///

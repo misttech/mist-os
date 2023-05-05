@@ -13,6 +13,7 @@ use fidl_test_external::{
 
 #[test]
 fn strict_bits() {
+    assert_eq!(StrictButtons::empty(), StrictButtons::default());
     assert_eq!(StrictButtons::from_bits(0b001), Some(StrictButtons::PLAY));
     assert_eq!(StrictButtons::from_bits(0b1100), None);
     assert_eq!(StrictButtons::from_bits_truncate(0b1010), StrictButtons::PAUSE);
@@ -31,6 +32,7 @@ fn strict_bits() {
 
 #[test]
 fn flexible_bits() {
+    assert_eq!(FlexibleButtons::empty(), FlexibleButtons::default());
     assert_eq!(FlexibleButtons::from_bits(0b001), Some(FlexibleButtons::PLAY));
     assert_eq!(FlexibleButtons::from_bits(0b1100), None);
     assert_eq!(

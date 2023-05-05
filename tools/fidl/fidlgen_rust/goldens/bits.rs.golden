@@ -30,6 +30,7 @@ use {
 };
 
 bitflags! {
+    #[derive(Default)]
     pub struct EmptyBits: u32 {
     }
 }
@@ -58,6 +59,7 @@ fidl_bits! {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct FlexibleBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;
@@ -88,6 +90,7 @@ fidl_bits! {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct MyBits: u32 {
         const MY_FIRST_BIT = 1;
         const MY_OTHER_BIT = 2;
@@ -116,6 +119,7 @@ fidl_bits! {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct StrictBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;

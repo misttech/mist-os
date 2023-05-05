@@ -30,6 +30,7 @@ use {
 };
 
 bitflags! {
+    #[derive(Default)]
     pub struct Bits: u32 {
         const B = 8;
     }
@@ -56,6 +57,7 @@ fidl_bits! {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub struct BitsType: u32 {
         const VALUE = 1;
         const SECOND_VALUE = UINT32;

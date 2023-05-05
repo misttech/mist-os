@@ -31,6 +31,7 @@ use {
 
 const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 bitflags! {
+    #[derive(Default)]
     pub struct Bits: u32 {
         const A = 1;
     }

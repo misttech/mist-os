@@ -30,6 +30,7 @@ use {
 };
 
 bitflags! {
+    #[derive(Default)]
     pub struct BitsType: u32 {
         const A = 1;
         const B = 128;

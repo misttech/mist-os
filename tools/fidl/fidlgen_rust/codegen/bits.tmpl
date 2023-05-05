@@ -9,6 +9,7 @@ bitflags! {
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
+    #[derive(Default)]
     pub struct {{ .Name }}: {{ .UnderlyingType }} {
         {{- range .Members }}
         {{- range .DocComments }}
