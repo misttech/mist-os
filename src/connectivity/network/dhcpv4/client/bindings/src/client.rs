@@ -259,26 +259,34 @@ impl Client {
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let clock = Clock;
         loop {
-            let Self { core, rng, config, stop_receiver, current_lease: _ } = self;
+            let Self { core, rng, config, stop_receiver, current_lease } = self;
             match core.run(config, packet_socket_provider, rng, &clock, stop_receiver).await {
                 Err(e) => return Err(Error::Core(e)),
                 Ok(step) => match step {
-                    dhcp_client_core::client::Step::NextState(next_core) => {
+                    dhcp_client_core::client::Step::NextState(transition) => {
+                        let (next_core, effect) = core.apply(transition);
                         *core = next_core;
+                        match effect {
+                            dhcp_client_core::client::TransitionEffect::DropLease => {
+                                // TODO(https://fxbug.dev/126747): Explicitly remove this address
+                                // and observe the OnAddressRemoved event to ensure we don't race
+                                // with netstack-side teardown if we end up re-adding the same
+                                // address later.
+                                assert!(current_lease.take().is_some());
+                            }
+                            dhcp_client_core::client::TransitionEffect::HandleNewLease(
+                                newly_acquired_lease,
+                            ) => {
+                                return self.handle_newly_acquired_lease(newly_acquired_lease);
+                            }
+                            dhcp_client_core::client::TransitionEffect::None => (),
+                        }
                     }
                     dhcp_client_core::client::Step::Exit(reason) => match reason {
                         dhcp_client_core::client::ExitReason::GracefulShutdown => {
                             return Err(Error::Exit(ClientExitReason::GracefulShutdown))
                         }
                     },
-                    dhcp_client_core::client::Step::NewLeaseAndNextState(
-                        newly_acquired_lease,
-                        next_core,
-                    ) => {
-                        *core = next_core;
-
-                        return self.handle_newly_acquired_lease(newly_acquired_lease);
-                    }
                 },
             };
         }

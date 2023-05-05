@@ -51,11 +51,27 @@ pub enum State<I> {
 /// The next step to take after running the core state machine for one step.
 pub enum Step<I> {
     /// Transition to another state.
-    NextState(State<I>),
-    /// Yield a newly-acquired lease, and transition to another state.
-    NewLeaseAndNextState(NewlyAcquiredLease<I>, State<I>),
+    NextState(Transition<I>),
     /// Exit the client.
     Exit(ExitReason),
+}
+
+/// A state-transition to execute.
+pub struct Transition<I> {
+    next_state: State<I>,
+    new_lease: Option<NewlyAcquiredLease<I>>,
+}
+
+/// A side-effect of a state transition.
+#[must_use]
+#[derive(Debug)]
+pub enum TransitionEffect<I> {
+    /// Drop the existing lease.
+    DropLease,
+    /// Handle a newly-acquired lease.
+    HandleNewLease(NewlyAcquiredLease<I>),
+    /// No effects need to be performed.
+    None,
 }
 
 impl<I: deps::Instant> State<I> {
@@ -69,15 +85,19 @@ impl<I: deps::Instant> State<I> {
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<Step<I>, Error> {
         match self {
-            State::Init(init) => Ok(Step::NextState(State::Selecting(init.do_init(rng, clock)))),
+            State::Init(init) => Ok(Step::NextState(Transition {
+                next_state: State::Selecting(init.do_init(rng, clock)),
+                new_lease: None,
+            })),
             State::Selecting(selecting) => match selecting
                 .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver)
                 .await?
             {
                 SelectingOutcome::GracefulShutdown => Ok(Step::Exit(ExitReason::GracefulShutdown)),
-                SelectingOutcome::Requesting(requesting) => {
-                    Ok(Step::NextState(State::Requesting(requesting)))
-                }
+                SelectingOutcome::Requesting(requesting) => Ok(Step::NextState(Transition {
+                    next_state: State::Requesting(requesting),
+                    new_lease: None,
+                })),
             },
             State::Requesting(requesting) => {
                 match requesting
@@ -88,7 +108,10 @@ impl<I: deps::Instant> State<I> {
                         tracing::info!(
                             "Returning to Init due to running out of DHCPREQUEST retransmits"
                         );
-                        Ok(Step::NextState(State::Init(Init::default())))
+                        Ok(Step::NextState(Transition {
+                            next_state: State::Init(Init::default()),
+                            new_lease: None,
+                        }))
                     }
                     RequestingOutcome::GracefulShutdown => {
                         Ok(Step::Exit(ExitReason::GracefulShutdown))
@@ -102,22 +125,25 @@ impl<I: deps::Instant> State<I> {
                             rebinding_time: _,
                             start_time,
                         } = &bound;
-                        Ok(Step::NewLeaseAndNextState(
-                            NewlyAcquiredLease {
+                        Ok(Step::NextState(Transition {
+                            new_lease: Some(NewlyAcquiredLease {
                                 ip_address: *yiaddr,
                                 start_time: *start_time,
                                 lease_time: *ip_address_lease_time,
                                 parameters,
-                            },
-                            State::Bound(bound),
-                        ))
+                            }),
+                            next_state: State::Bound(bound),
+                        }))
                     }
                     RequestingOutcome::Nak(nak) => {
                         // Per RFC 2131 section 3.1: "If the client receives a
                         // DHCPNAK message, the client restarts the
                         // configuration process."
                         tracing::warn!("Returning to Init due to DHCPNAK: {:?}", nak);
-                        Ok(Step::NextState(State::Init(Init::default())))
+                        Ok(Step::NextState(Transition {
+                            next_state: State::Init(Init::default()),
+                            new_lease: None,
+                        }))
                     }
                 }
             }
@@ -132,6 +158,34 @@ impl<I: deps::Instant> State<I> {
                 Ok(Step::Exit(ExitReason::GracefulShutdown))
             }
         }
+    }
+
+    fn has_lease(&self) -> bool {
+        match self {
+            State::Init(_) => false,
+            State::Selecting(_) => false,
+            State::Requesting(_) => false,
+            State::Bound(_) => true,
+        }
+    }
+
+    /// Applies a state-transition to `self`, returning the next state and
+    /// effects that need to be performed by bindings as a result of the transition.
+    pub fn apply(
+        &self,
+        Transition { next_state, new_lease }: Transition<I>,
+    ) -> (State<I>, TransitionEffect<I>) {
+        let effect = match new_lease {
+            Some(new_lease) => TransitionEffect::HandleNewLease(new_lease),
+            None => match (self.has_lease(), next_state.has_lease()) {
+                (true, false) => TransitionEffect::DropLease,
+                (false, true) => {
+                    unreachable!("should already have decided on TransitionEffect::HandleNewLease")
+                }
+                (false, false) | (true, true) => TransitionEffect::None,
+            },
+        };
+        (next_state, effect)
     }
 }
 
@@ -700,6 +754,7 @@ pub struct Bound<I> {
 }
 
 /// A newly-acquired DHCP lease.
+#[derive(Debug)]
 pub struct NewlyAcquiredLease<I> {
     /// The IP address acquired.
     pub ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
@@ -1609,5 +1664,56 @@ mod test {
         let requesting_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
 
         assert_matches!(requesting_result, Ok(outcome) => outcome)
+    }
+
+    fn build_test_bound_state() -> Bound<std::time::Duration> {
+        Bound {
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            ip_address_lease_time: Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            start_time: std::time::Duration::from_secs(0),
+            renewal_time: None,
+            rebinding_time: None,
+        }
+    }
+
+    fn build_test_newly_acquired_lease() -> NewlyAcquiredLease<Duration> {
+        NewlyAcquiredLease {
+            ip_address: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            start_time: std::time::Duration::from_secs(0),
+            lease_time: Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            parameters: Vec::new(),
+        }
+    }
+
+    #[test_case(
+        (
+            State::Init(Init::default()),
+            Transition {
+                next_state: State::Bound(build_test_bound_state()),
+                new_lease: Some(build_test_newly_acquired_lease())
+            }
+        ) => matches TransitionEffect::HandleNewLease(_);
+        "yields newly-acquired lease effect"
+    )]
+    #[test_case(
+        (
+            State::Bound(build_test_bound_state()),
+            Transition {
+                next_state: State::Init(Init::default()),
+                new_lease: None,
+            }
+        ) => matches TransitionEffect::DropLease;
+        "recognizes loss of lease"
+    )]
+    fn apply_transition(
+        (state, transition): (State<Duration>, Transition<Duration>),
+    ) -> TransitionEffect<Duration> {
+        let (_next_state, effect) = state.apply(transition);
+        effect
     }
 }
