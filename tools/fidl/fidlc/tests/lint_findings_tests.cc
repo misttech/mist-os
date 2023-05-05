@@ -949,7 +949,7 @@ library fidl.a;
 
 using zx as ${TEST};
 
-alias Unused = ${TEST}.handle;
+alias Unused = ${TEST}.Handle;
 )FIDL");
 
   test.substitute("TEST", "what_if_someone_does_this");

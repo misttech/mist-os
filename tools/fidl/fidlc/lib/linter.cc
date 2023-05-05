@@ -48,15 +48,6 @@ constexpr bool IsZirconLibrary(std::string_view name) {
   return name == kZirconLibraryZx || name == kZirconLibraryZbi;
 }
 
-// Whether the provided declarations should be exempt from an
-// invalid-case-for-decl-name check.
-//
-// TODO(fxbug.dev/109734): Burn these down.
-constexpr bool IsAliasCaseCheckExempt(std::string_view library_name, std::string_view declname) {
-  return library_name == kZirconLibraryZx &&
-         (declname == "status" || declname == "time" || declname == "duration");
-}
-
 // Convert the SourceElement (start- and end-tokens within the SourceFile)
 // to a std::string_view, spanning from the beginning of the start token, to the end
 // of the end token. The three methods support classes derived from
@@ -605,13 +596,9 @@ Linter::Linter()
   callbacks_.OnAliasDeclaration([&linter = *this]
                                 //
                                 (const raw::AliasDeclaration& element) {
-                                  // TODO(fxbug.dev/109734): Remove these exemptions.
-                                  std::string_view name = to_string_view(element.alias);
-                                  if (!IsAliasCaseCheckExempt(linter.library_prefix_, name)) {
-                                    linter.CheckCase("alias", element.alias,
-                                                     linter.invalid_case_for_decl_name(),
-                                                     linter.upper_camel_);
-                                  }
+                                  linter.CheckCase("alias", element.alias,
+                                                   linter.invalid_case_for_decl_name(),
+                                                   linter.upper_camel_);
                                 });
   callbacks_.OnLayout(
       [&linter = *this, explicit_flexible_modifier_check = explicit_flexible_modifier,

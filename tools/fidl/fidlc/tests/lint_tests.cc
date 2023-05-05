@@ -101,7 +101,7 @@ library fuchsia.a;
 
 using zx as bad_USING;
 
-alias Unused = bad_USING.handle;
+alias Unused = bad_USING.Handle;
 )FIDL");
   library.UseLibraryZx();
   ASSERT_COMPILED(library);
@@ -115,7 +115,7 @@ library fuchsia.a;
 
 using zx as good_using;
 
-alias Unused = good_using.handle;
+alias Unused = good_using.Handle;
 )FIDL");
   library.UseLibraryZx();
   ASSERT_COMPILED(library);
