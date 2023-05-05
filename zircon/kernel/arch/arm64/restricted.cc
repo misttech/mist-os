@@ -10,6 +10,7 @@
 #include <trace.h>
 
 #include <arch/arm64/registers.h>
+#include <arch/debugger.h>
 #include <arch/regs.h>
 #include <arch/vm.h>
 #include <kernel/restricted_state.h>
@@ -51,6 +52,7 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
 
   // Copy restricted state to an interrupt frame.
   iframe_t iframe{};
+  static_assert(sizeof(iframe.r) <= sizeof(state.x));
   memcpy(iframe.r, state.x, sizeof(iframe.r));
   iframe.lr = state.x[30];
   iframe.usp = state.sp;
@@ -70,11 +72,34 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
 
 void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
     const ArchSavedNormalState& arch_state, uintptr_t vector_table, uintptr_t context) {
-  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on arm.
+  zx_thread_state_general_regs_t regs = {};
+  regs.pc = vector_table;
+  regs.r[0] = context;
+  regs.r[1] = ZX_RESTRICTED_REASON_EXCEPTION;
+  regs.tpidr = arch_state.tpidr_el0;
+  [[maybe_unused]] zx_status_t status = arch_set_general_regs(Thread::Current().Get(), &regs);
+  // This will only fail if register state has not been saved, but this will always
+  // have happened by this stage of exception handling.
+  DEBUG_ASSERT(status == ZX_OK);
 }
 
 void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& state) {
-  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on arm.
+  zx_thread_state_general_regs_t regs = {};
+  [[maybe_unused]] zx_status_t status = arch_get_general_regs(Thread::Current().Get(), &regs);
+  // This will only fail if register state has not been saved, but this will always
+  // have happened by this stage of exception handling.
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // Save the registers from restricted mode.
+  static_assert(sizeof(regs.r) <= sizeof(state.x));
+  memcpy(state.x, regs.r, sizeof(regs.r));
+  state.x[30] = regs.lr;
+  state.sp = regs.sp;
+  state.pc = regs.pc;
+  state.cpsr = static_cast<uint32_t>(regs.cpsr);
+
+  // Save the thread local storage location in restricted mode.
+  state.tpidr_el0 = __arm_rsr64("tpidr_el0");
 }
 
 void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
@@ -82,6 +107,7 @@ void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& stat
   DEBUG_ASSERT(arch_ints_disabled());
 
   // Save the registers from restricted mode.
+  static_assert(sizeof(regs.r) <= sizeof(state.x));
   memcpy(state.x, regs.r, sizeof(regs.r));
   state.x[30] = regs.lr;
   state.sp = regs.usp;

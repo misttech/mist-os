@@ -20,12 +20,9 @@
 #include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 #define ARCH_HAS_RESTRICTED_MODE 1
 #define ARCH_HAS_IN_THREAD_EXCEPTIONS 1
-#elif defined(__aarch64__)
-#define ARCH_HAS_RESTRICTED_MODE 1
-#define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
 #else
 #define ARCH_HAS_RESTRICTED_MODE 0
 #define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
@@ -561,11 +558,15 @@ TEST(RestrictedMode, InThreadException) {
   EXPECT_EQ(ZX_EXCP_UNDEFINED_INSTRUCTION, exception_state.exception.header.type);
   EXPECT_EQ(0u, exception_state.exception.context.synth_code);
   EXPECT_EQ(0u, exception_state.exception.context.synth_data);
-#ifdef __x86_64__
+#if defined(__x86_64__)
   EXPECT_EQ(0u, exception_state.exception.context.arch.u.x86_64.err_code);
   EXPECT_EQ(0u, exception_state.exception.context.arch.u.x86_64.cr2);
   // 0x6 corresponds to the invalid opcode vector.
   EXPECT_EQ(0x6u, exception_state.exception.context.arch.u.x86_64.vector);
+#elif defined(__aarch64__)
+  constexpr uint32_t kEsrIlBit = 1ull << 25;
+  EXPECT_EQ(kEsrIlBit, exception_state.exception.context.arch.u.arm_64.esr);
+  EXPECT_EQ(0u, exception_state.exception.context.arch.u.arm_64.far);
 #endif
 }
 #endif  // ARCH_HAS_IN_THREAD_EXCEPTIONS
