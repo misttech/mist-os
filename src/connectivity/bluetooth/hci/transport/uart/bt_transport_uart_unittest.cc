@@ -41,6 +41,10 @@ class FakeSerialDevice : public ddk::SerialImplAsyncProtocol<FakeSerialDevice> {
     MaybeRespondToRead();
   }
 
+  void QueueWithoutSignaling(std::vector<uint8_t> buffer) {
+    read_rsp_queue_.emplace(std::move(buffer));
+  }
+
   const std::vector<std::vector<uint8_t>>& writes() const { return writes_; }
 
   bool canceled() const { return canceled_; }
@@ -75,7 +79,9 @@ class FakeSerialDevice : public ddk::SerialImplAsyncProtocol<FakeSerialDevice> {
       return;
     }
     read_req_.emplace(ReadRequest{callback, cookie});
-    async::PostTask(dispatcher_, fit::bind_member<&FakeSerialDevice::MaybeRespondToRead>(this));
+    // The real serial async handler will call the callback immediately if there is data
+    // available, do so here to simulate the recursive callstack there.
+    MaybeRespondToRead();
   }
 
   void SerialImplAsyncWriteAsync(const uint8_t* buf_buffer, size_t buf_size,
@@ -420,6 +426,45 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
 
   RunLoopUntilIdle();
   ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets));
+  for (const std::vector<uint8_t>& packet : snoop_packets()) {
+    EXPECT_EQ(packet, kSnoopAclBuffer);
+  }
+}
+
+TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
+  const std::vector<uint8_t> kSnoopAclBuffer = {
+      BT_HCI_SNOOP_TYPE_ACL | BT_HCI_SNOOP_FLAG_RECV,  // Snoop packet flag
+      0x00,
+      0x00,  // arbitrary header fields
+      0x02,
+      0x00,  // 2-byte length in little endian
+      0x01,
+      0x02,  // arbitrary payload
+  };
+  std::vector<uint8_t> kSerialAclBuffer = kSnoopAclBuffer;
+  kSerialAclBuffer[0] = BtHciPacketIndicator::kHciAclData;
+  const std::vector<uint8_t> kAclBuffer(kSnoopAclBuffer.begin() + 1, kSnoopAclBuffer.end());
+  // Split the packet length field in half to test corner case.
+  const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
+  const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
+
+  const int kNumPackets = 1000;
+  for (int i = 0; i < kNumPackets; i++) {
+    serial()->QueueWithoutSignaling(kPart1);
+    serial()->QueueWithoutSignaling(kPart2);
+  }
+  serial()->QueueReadValue(kPart1);
+  serial()->QueueReadValue(kPart2);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets + 1));
+  for (const std::vector<uint8_t>& packet : received_acl_packets()) {
+    EXPECT_EQ(packet.size(), kAclBuffer.size());
+    EXPECT_EQ(packet, kAclBuffer);
+  }
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets + 1));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
   }

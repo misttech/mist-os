@@ -22,6 +22,8 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
+#include "lib/async/cpp/task.h"
+
 namespace bt_transport_uart {
 
 BtTransportUart::BtTransportUart(zx_device_t* parent, async_dispatcher_t* dispatcher)
@@ -342,11 +344,7 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
 
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
-    serial_impl_async_read_async_callback read_cb = [](void* ctx, zx_status_t status,
-                                                       const uint8_t* buffer, size_t length) {
-      static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
-    };
-    serial_impl_async_read_async(&serial_, read_cb, this);
+    QueueUartRead();
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
     // queue a read job and start the process of shutting down.
@@ -518,6 +516,16 @@ zx_status_t BtTransportUart::DdkGetProtocol(uint32_t proto_id, void* out_proto) 
   return ZX_OK;
 }
 
+void BtTransportUart::QueueUartRead() {
+  serial_impl_async_read_async_callback read_cb = [](void* ctx, zx_status_t status,
+                                                     const uint8_t* buffer, size_t length) {
+    static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
+  };
+  async::PostTask(dispatcher_, [read_cb, this]() {
+    serial_impl_async_read_async(&serial_, read_cb, this);
+  });
+}
+
 zx_status_t BtTransportUart::Bind() {
   zxlogf(DEBUG, "Bind");
 
@@ -556,14 +564,6 @@ zx_status_t BtTransportUart::Bind() {
     return ZX_ERR_INTERNAL;
   }
 
-  serial_impl_async_enable(&serial, true);
-
-  serial_impl_async_read_async_callback read_cb = [](void* ctx, zx_status_t status,
-                                                     const uint8_t* buffer, size_t length) {
-    static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
-  };
-  serial_impl_async_read_async(&serial_, read_cb, this);
-
   // Spawn a new thread in production. In tests, use the test dispatcher provided in the
   // constructor.
   if (!dispatcher_) {
@@ -576,6 +576,9 @@ zx_status_t BtTransportUart::Bind() {
     }
     dispatcher_ = loop_->dispatcher();
   }
+
+  serial_impl_async_enable(&serial, true);
+  QueueUartRead();
 
   zxlogf(DEBUG, "Bind complete, adding device");
 

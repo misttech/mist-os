@@ -104,6 +104,8 @@ class BtTransportUart : public BtTransportUartType, public ddk::BtHciProtocol<Bt
 
   void HciHandleClientChannel(zx::channel* chan, zx_signals_t pending) __TA_EXCLUDES(mutex_);
 
+  // Queues a read callback for async serial on the dispatcher.
+  void QueueUartRead();
   void HciHandleUartReadEvents(const uint8_t* buf, size_t length) __TA_EXCLUDES(mutex_);
 
   // Reads the next packet chunk from |uart_src| into |buffer| and increments |buffer_offset| and
