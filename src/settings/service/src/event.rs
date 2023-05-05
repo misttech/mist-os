@@ -114,23 +114,16 @@ pub(crate) mod handler {
 }
 
 pub(crate) mod media_buttons {
-    use crate::input::{MediaButtons, VolumeGain};
+    use crate::input::MediaButtons;
 
     #[derive(PartialEq, Clone, Debug)]
     pub enum Event {
         OnButton(MediaButtons),
-        OnVolume(VolumeGain),
     }
 
     impl From<MediaButtons> for Event {
         fn from(button_types: MediaButtons) -> Self {
             Self::OnButton(button_types)
-        }
-    }
-
-    impl From<VolumeGain> for Event {
-        fn from(volume_gain: VolumeGain) -> Self {
-            Self::OnVolume(volume_gain)
         }
     }
 }

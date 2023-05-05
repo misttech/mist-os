@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use self::common::{MediaButtons, VolumeGain};
+pub use self::common::MediaButtons;
 pub mod common;
 pub mod input_controller;
 pub mod input_device_configuration;

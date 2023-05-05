@@ -7,7 +7,7 @@ use crate::agent::Invocation;
 use crate::agent::Lifespan;
 use crate::agent::{Context, Payload};
 use crate::event::{self, Event};
-use crate::input::{MediaButtons, VolumeGain};
+use crate::input::MediaButtons;
 use crate::message::base::{Audience, MessengerType};
 use crate::service;
 use crate::service_context::ServiceContext;
@@ -91,33 +91,19 @@ async fn test_media_buttons_proxied() {
 
     // Track the events to make sure they came in.
     let mut mic_mute_received = false;
-    let mut volume_received = false;
     while let Ok((event::Payload::Event(event), _)) =
         event_receptor.next_of::<event::Payload>().await
     {
-        if let Event::MediaButtons(event) = event {
-            match event {
-                event::media_buttons::Event::OnButton(MediaButtons {
-                    mic_mute: Some(true),
-                    ..
-                }) => {
-                    mic_mute_received = true;
-                    if volume_received {
-                        break;
-                    }
-                }
-                event::media_buttons::Event::OnVolume(VolumeGain::Up) => {
-                    volume_received = true;
-                    if mic_mute_received {
-                        break;
-                    }
-                }
-                _ => {}
-            }
+        if let Event::MediaButtons(event::media_buttons::Event::OnButton(MediaButtons {
+            mic_mute: Some(true),
+            ..
+        })) = event
+        {
+            mic_mute_received = true;
+            break;
         }
     }
 
     // Validate that we received all expected events.
     assert!(mic_mute_received);
-    assert!(volume_received);
 }

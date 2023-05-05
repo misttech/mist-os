@@ -7,7 +7,7 @@ use crate::agent::{AgentError, Context as AgentContext, Invocation, InvocationRe
 use crate::base::SettingType;
 use crate::event::{media_buttons, Event, Publisher};
 use crate::handler::base::{Payload as HandlerPayload, Request};
-use crate::input::{monitor_media_buttons, MediaButtons, VolumeGain};
+use crate::input::{monitor_media_buttons, MediaButtons};
 use crate::message::base::Audience;
 use crate::service;
 use crate::service_context::ServiceContext;
@@ -100,27 +100,10 @@ struct EventHandler {
 
 impl EventHandler {
     fn handle_event(&self, event: MediaButtonsEvent, id: ftrace::Id) {
-        if let Some(volume_gain) = event.volume {
-            self.handle_volume(volume_gain, id);
-        }
-
         if event.mic_mute.is_some() || event.camera_disable.is_some() {
             let media_buttons: MediaButtons = event.into();
             self.send_event(media_buttons, id);
         }
-    }
-
-    fn handle_volume(&self, volume_gain: i8, id: ftrace::Id) {
-        let volume_gain = match volume_gain {
-            -1 => VolumeGain::Down,
-            0 => VolumeGain::Neutral,
-            1 => VolumeGain::Up,
-            _ => {
-                tracing::error!("Invalid volume gain value: {}", volume_gain);
-                return;
-            }
-        };
-        self.send_event(volume_gain, id);
     }
 
     fn send_event<E>(&self, event: E, id: ftrace::Id)
@@ -238,11 +221,7 @@ mod tests {
 
         // Send the events.
         event_handler.handle_event(
-            MediaButtonsEventBuilder::new()
-                .set_volume(1)
-                .set_mic_mute(true)
-                .set_camera_disable(true)
-                .build(),
+            MediaButtonsEventBuilder::new().set_mic_mute(true).set_camera_disable(true).build(),
             0.into(),
         );
 
@@ -251,7 +230,7 @@ mod tests {
         service_message_hub.delete(handler_receptor.get_signature());
         service_message_hub.delete(event_receptor.get_signature());
 
-        let (mut agent_received_volume, mut agent_received_media_buttons) = (false, false);
+        let mut agent_received_media_buttons = false;
 
         let mut received_events: usize = 0;
 
@@ -275,10 +254,6 @@ mod tests {
                             ) => {
                                 agent_received_media_buttons = true;
                             }
-                            event::media_buttons::Event::OnVolume(state) => {
-                                assert_eq!(state, VolumeGain::Up);
-                                agent_received_volume = true;
-                            }
                         }
                     }
                 },
@@ -297,7 +272,6 @@ mod tests {
             }
         }
 
-        assert!(agent_received_volume);
         assert!(agent_received_media_buttons);
 
         // setting should have received one event for both mic and camera.
@@ -321,11 +295,7 @@ mod tests {
 
         // Send the events
         event_handler.handle_event(
-            MediaButtonsEventBuilder::new()
-                .set_volume(1)
-                .set_mic_mute(true)
-                .set_camera_disable(true)
-                .build(),
+            MediaButtonsEventBuilder::new().set_mic_mute(true).set_camera_disable(true).build(),
             0.into(),
         );
 

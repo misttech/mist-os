@@ -9,7 +9,7 @@ use crate::display::types::SetDisplayInfo;
 use crate::do_not_disturb::types::DoNotDisturbInfo;
 use crate::handler::setting_handler::ControllerError;
 use crate::input::types::InputDevice;
-use crate::input::{MediaButtons, VolumeGain};
+use crate::input::MediaButtons;
 use crate::intl::types::IntlInfo;
 use crate::keyboard::types::KeyboardInfo;
 use crate::light::types::LightState;
@@ -87,7 +87,6 @@ generate_inspect! {
 
         // Input events.
         OnButton(MediaButtons),
-        OnVolume(VolumeGain),
 
         // Accessibility requests.
         SetAccessibilityInfo(AccessibilityInfo),

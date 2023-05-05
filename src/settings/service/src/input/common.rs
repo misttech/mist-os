@@ -26,44 +26,32 @@ pub const CAMERA_WATCHER_TIMEOUT: i64 = 30_000;
 /// Builder to simplify construction of fidl_fuchsia_ui_input::MediaButtonsEvent.
 /// # Example usage:
 /// ```
-/// MediaButtonsEventBuilder::new().set_volume(1).set_mic_mute(true).build();
+/// MediaButtonsEventBuilder::new().set_mic_mute(true).build();
 /// ```
+#[cfg(test)]
 pub(crate) struct MediaButtonsEventBuilder {
-    volume: i8,
     mic_mute: bool,
-    pause: bool,
     camera_disable: bool,
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 impl MediaButtonsEventBuilder {
     pub(crate) fn new() -> Self {
         // Create with defaults.
-        Self { volume: 0, mic_mute: false, pause: false, camera_disable: false }
+        Self { mic_mute: false, camera_disable: false }
     }
 
     pub(crate) fn build(self) -> MediaButtonsEvent {
         MediaButtonsEvent {
-            volume: Some(self.volume),
             mic_mute: Some(self.mic_mute),
-            pause: Some(self.pause),
+            pause: Some(false),
             camera_disable: Some(self.camera_disable),
             ..Default::default()
         }
     }
 
-    pub(crate) fn set_volume(mut self, volume: i8) -> Self {
-        self.volume = volume;
-        self
-    }
-
     pub(crate) fn set_mic_mute(mut self, mic_mute: bool) -> Self {
         self.mic_mute = mic_mute;
-        self
-    }
-
-    pub(crate) fn set_pause(mut self, pause: bool) -> Self {
-        self.pause = pause;
         self
     }
 
@@ -110,23 +98,9 @@ impl From<MediaButtonsEvent> for MediaButtons {
     }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
-pub enum VolumeGain {
-    /// This is neither up nor down. It is equivalent to no gain.
-    Neutral,
-    Up,
-    Down,
-}
-
 impl From<MediaButtons> for Request {
     fn from(event: MediaButtons) -> Self {
         Request::OnButton(event)
-    }
-}
-
-impl From<VolumeGain> for Request {
-    fn from(volume_gain: VolumeGain) -> Self {
-        Request::OnVolume(volume_gain)
     }
 }
 
@@ -186,7 +160,6 @@ async fn connect_to_camera_watcher(
 }
 
 /// Retrieves the id of a camera device given the camera device watcher proxy.
-#[allow(dead_code)]
 async fn get_camera_id(
     camera_watcher_proxy: &ExternalServiceProxy<Camera3DeviceWatcherProxy>,
 ) -> Result<u64, Error> {

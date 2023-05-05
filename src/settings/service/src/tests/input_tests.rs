@@ -208,14 +208,13 @@ async fn set_device_muted(
 
 // Switch the hardware mic state to muted = [muted] for input.
 async fn switch_hardware_mic_mute(env: &TestInputEnvironment, muted: bool) {
-    let buttons_event = MediaButtonsEventBuilder::new().set_volume(1).set_mic_mute(muted).build();
+    let buttons_event = MediaButtonsEventBuilder::new().set_mic_mute(muted).build();
     env.input_button_service.lock().await.send_media_button_event(buttons_event.clone()).await;
 }
 
 // Switch the hardware camera disable to disabled = [disabled].
 async fn switch_hardware_camera_disable(env: &TestInputEnvironment, disabled: bool) {
-    let buttons_event =
-        MediaButtonsEventBuilder::new().set_volume(1).set_camera_disable(disabled).build();
+    let buttons_event = MediaButtonsEventBuilder::new().set_camera_disable(disabled).build();
     env.input_button_service.lock().await.send_media_button_event(buttons_event.clone()).await;
 }
 
@@ -755,7 +754,7 @@ async fn test_media_buttons() {
     let service_registry = ServiceRegistry::create();
     let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
 
-    let initial_event = MediaButtonsEventBuilder::new().set_volume(1).set_mic_mute(true).build();
+    let initial_event = MediaButtonsEventBuilder::new().set_mic_mute(true).build();
     input_device_registry_service.lock().await.send_media_button_event(initial_event.clone()).await;
 
     service_registry.lock().await.register_service(input_device_registry_service.clone());
@@ -772,8 +771,7 @@ async fn test_media_buttons() {
     }
 
     // Disable the camera.
-    let second_event =
-        MediaButtonsEventBuilder::new().set_volume(1).set_camera_disable(true).build();
+    let second_event = MediaButtonsEventBuilder::new().set_camera_disable(true).build();
     input_device_registry_service.lock().await.send_media_button_event(second_event.clone()).await;
 
     // Listener receives the camera disable event.
@@ -788,7 +786,7 @@ async fn test_device_listener_failure() {
     let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
     input_device_registry_service.lock().await.set_fail(true);
 
-    let initial_event = MediaButtonsEventBuilder::new().set_volume(1).set_mic_mute(true).build();
+    let initial_event = MediaButtonsEventBuilder::new().set_mic_mute(true).build();
 
     input_device_registry_service.lock().await.send_media_button_event(initial_event.clone()).await;
 

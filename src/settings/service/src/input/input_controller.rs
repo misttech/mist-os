@@ -455,13 +455,11 @@ impl controller::Handle for InputController {
                 if buttons.mic_mute.is_some()
                     && !self.has_input_device(InputDeviceType::MICROPHONE).await
                 {
-                    tracing::warn!("Device does not have a microphone, skipping");
                     buttons.set_mic_mute(None);
                 }
                 if buttons.camera_disable.is_some()
                     && !self.has_input_device(InputDeviceType::CAMERA).await
                 {
-                    tracing::warn!("Device does not have a camera, skipping");
                     buttons.set_camera_disable(None);
                 }
                 Some(self.inner.lock().await.set_hw_media_buttons_state(buttons).await)
