@@ -103,7 +103,6 @@ impl TestInputEnvironmentBuilder {
             // specified configuration. This generate_handler method is a copy-paste of
             // persist::controller::spawn from setting_handler.rs, with the innermost controller
             // create method replaced with our custom constructor from input controller.
-            // TODO(fxbug.dev/63832): See if we can reduce this rightward drift.
             let generate_handler: GenerateHandler = Box::new(move |context: Context| {
                 let config = config.clone();
                 Box::pin(async move {
