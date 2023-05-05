@@ -25,6 +25,13 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.update.config.OptOut",
+            from: "#system-update-configurator",
+            to: "#system-update-checker",
+            source_availability: "unknown",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.update.installer.Installer",
             from: "#system-updater",
             to: "#system-update-checker",

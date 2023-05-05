@@ -192,24 +192,6 @@ if (is_fuchsia) {
       }
     }
 
-    # Add the base package labels for the selected SWD policy.
-    extra_core_realm_shards = []
-    if (defined(policy_labels.update_checker)) {
-      foreach(policy, policies_update_checker) {
-        if (policy.name == policy_labels.update_checker) {
-          # TODO(fxbug.dev/93695) Remove the need for
-          # `if_board_supports_update_configurator` and
-          # `board_supports_update_configurator`, replacing them with an
-          # optional capability route when that feature is available.
-          if (board_supports_update_configurator) {
-            inner = policy.if_board_supports_update_configurator
-
-            extra_core_realm_shards += inner.core_realm_shards
-          }
-        }
-      }
-    }
-
     base_driver_packages = [
       "//:developer_base_driver_packages",
       "//:legacy_base_driver_packages",
@@ -265,8 +247,7 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core_realm") {
-    deps = core_realm_shards + board_core_realm_shards +
-           fuchsia_base.extra_core_realm_shards
+    deps = core_realm_shards + board_core_realm_shards
   }
 
   ##################################################

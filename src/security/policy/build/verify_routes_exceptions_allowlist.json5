@@ -420,23 +420,6 @@
                     },
                 },
                 {
-                    using_node: "/core/system-update-checker",
-                    capability: "fuchsia.update.config.OptOut",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    use_from_parent_not_found: {
-                                        moniker: "/core/system-update-checker",
-                                        capability_id: "fuchsia.update.config.OptOut",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`/core/system-update-checker` tried to use `fuchsia.update.config.OptOut` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent.",
-                    },
-                },
-                {
                     using_node: "/core/feedback",
                     capability: "fuchsia.feedback.DeviceIdProvider",
                     error: {

@@ -33,10 +33,14 @@
                 "fuchsia.pkg.Cup",
                 "fuchsia.stash.Store2",
                 "fuchsia.update.CommitStatusProvider",
-                "fuchsia.update.config.OptOut",
                 "fuchsia.update.installer.Installer",
             ],
             from: "parent",
+        },
+        {
+            protocol: [ "fuchsia.update.config.OptOut" ],
+            from: "parent",
+            availability: "optional",
         },
         {
             directory: "build-info",
