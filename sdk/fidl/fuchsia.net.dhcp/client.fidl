@@ -186,6 +186,14 @@ protocol Client {
 
             /// Graceful shutdown was performed.
             GRACEFUL_SHUTDOWN = 7;
+
+            /// An address acquired by this client was removed by a user.
+            ADDRESS_REMOVED_BY_USER = 8;
+
+            /// The `AddressStateProvider` for an address acquired by this
+            /// client exited with an error (or without providing a reason for
+            /// the address removal).
+            ADDRESS_STATE_PROVIDER_ERROR = 9;
         };
     });
 };

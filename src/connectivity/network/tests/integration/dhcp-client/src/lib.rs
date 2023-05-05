@@ -11,14 +11,21 @@ use fidl_fuchsia_net_dhcp::{
     self as fnet_dhcp, ClientEvent, ClientExitReason, ClientMarker, ClientProviderMarker,
     NewClientParams,
 };
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt as _};
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use futures::{join, FutureExt, TryStreamExt};
+use fnet_dhcp_ext::ClientExt;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
+use futures::{join, pin_mut, FutureExt, StreamExt, TryStreamExt};
+use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
-    dhcpv4 as dhcpv4_helper,
+    annotate, dhcpv4 as dhcpv4_helper,
     realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
+use test_case::test_case;
 
 const MAC: net_types::ethernet::Mac = net_declare::net_mac!("00:00:00:00:00:01");
 const SERVER_MAC: net_types::ethernet::Mac = net_declare::net_mac!("02:02:02:02:02:02");
@@ -325,39 +332,273 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
 
     let provider =
         client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
-    let (client, server_end) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
-    provider
-        .new_client(
-            client_iface.id(),
-            NewClientParams {
-                configuration_to_request: None,
-                request_ip_address: Some(true),
-                ..Default::default()
-            },
-            server_end,
-        )
-        .expect("creating new client should succeed");
 
-    let watch_response =
-        client.watch_configuration().await.expect("watch_configuration should succeed");
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
 
-    let fnet_dhcp::ClientWatchConfigurationResponse { address, dns_servers, routers, .. } =
-        watch_response;
+    let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+    pin_mut!(config_stream);
 
-    assert_eq!(dns_servers, None);
-    assert_eq!(routers, None);
+    let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
 
-    let fnet_dhcp::Address { address, .. } =
-        address.expect("address should be present in response");
+    assert_eq!(dns_servers, Vec::new());
+    assert_eq!(routers, Vec::new());
+
+    let fnet_dhcp_ext::Address {
+        address,
+        address_parameters: _,
+        address_state_provider: _address_state_provider,
+    } = address.expect("address should be present in response");
     assert_eq!(
         address,
-        Some(fnet::Ipv4AddressWithPrefix {
+        fnet::Ipv4AddressWithPrefix {
             addr: net_types::ip::Ipv4Addr::from(
                 dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
             )
             .into_ext(),
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
-        })
+        }
     );
+
+    // Shut down the client so it won't complain about us dropping the AddressStateProvider
+    // without sending a terminal event.
+    client.shutdown_ext(client.take_event_stream()).await.expect("shutdown should succeed");
+}
+
+const DEBUG_PRINT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
+
+#[netstack_test]
+async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) {
+    let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
+    let DhcpTestRealm {
+        client_realm,
+        client_iface,
+        server_realm,
+        server_iface: _server_iface,
+        _network,
+    } = create_test_realm::<N>(&sandbox, name).await;
+
+    let provider =
+        client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
+
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
+
+    let client_fut = async {
+        let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+        pin_mut!(config_stream);
+
+        let watch_config_result =
+            annotate(config_stream.try_next(), DEBUG_PRINT_INTERVAL, "watch_configuration").await;
+        assert_matches!(
+            watch_config_result,
+            Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: _
+            }))
+        );
+
+        let fnet_dhcp::ClientEvent::OnExit { reason } = client
+            .take_event_stream()
+            .try_next()
+            .await
+            .expect("event stream should not have FIDL error")
+            .expect("event stream should not have ended");
+        assert_eq!(reason, fnet_dhcp::ClientExitReason::InvalidInterface);
+    }
+    .fuse();
+
+    let sock = fasync::net::UdpSocket::bind_in_realm(
+        &server_realm,
+        std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+            std::net::Ipv4Addr::BROADCAST,
+            dhcp_protocol::SERVER_PORT.into(),
+        )),
+    )
+    .await
+    .expect("bind_in_realm should succeed");
+    sock.set_broadcast(true).expect("set_broadcast should succeed");
+
+    let interface_removal_fut = async move {
+        // Wait until we see one message from the client before removing the interface.
+        let mut buf = [0u8; 1500];
+        let (_, client_addr): (usize, std::net::SocketAddr) =
+            annotate(sock.recv_from(&mut buf), DEBUG_PRINT_INTERVAL, "recv_from")
+                .await
+                .expect("recv_from should succeed");
+
+        // The client message will be from the unspecified address.
+        assert_eq!(
+            client_addr,
+            std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+                std::net::Ipv4Addr::UNSPECIFIED,
+                dhcp_protocol::CLIENT_PORT.into()
+            ))
+        );
+
+        let _ = client_iface.remove_device();
+    }
+    .fuse();
+
+    pin_mut!(client_fut, interface_removal_fut);
+
+    let ((), ()) = join!(client_fut, interface_removal_fut);
+}
+
+#[netstack_test]
+#[test_case(
+    Some(fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned),
+    None;
+    "should decline and restart if already assigned"
+)]
+#[test_case(
+    Some(fnet_interfaces_admin::AddressRemovalReason::DadFailed),
+    None;
+    "should decline and restart if duplicate address detected"
+)]
+#[test_case(
+    Some(fnet_interfaces_admin::AddressRemovalReason::UserRemoved),
+    Some(fnet_dhcp::ClientExitReason::AddressRemovedByUser);
+    "should stop client if user removed"
+)]
+#[test_case(
+    Some(fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved),
+    Some(fnet_dhcp::ClientExitReason::InvalidInterface);
+    "should stop client if interface removed"
+)]
+#[test_case(
+    None,
+    Some(fnet_dhcp::ClientExitReason::AddressStateProviderError);
+    "should stop client if address removed with no terminal event"
+)]
+async fn client_handles_address_removal<N: Netstack>(
+    name: &str,
+    removal_reason: Option<fnet_interfaces_admin::AddressRemovalReason>,
+    expected_exit_reason: Option<fnet_dhcp::ClientExitReason>,
+) {
+    let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
+    let test_realm = create_test_realm::<N>(&sandbox, name).await;
+
+    test_realm.start_dhcp_server().await;
+
+    let DhcpTestRealm {
+        client_realm,
+        client_iface,
+        server_realm: _server_realm,
+        server_iface: _server_iface,
+        _network,
+    } = test_realm;
+
+    let provider =
+        client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
+
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
+
+    let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+    pin_mut!(config_stream);
+
+    let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
+
+    assert_eq!(dns_servers, Vec::new());
+    assert_eq!(routers, Vec::new());
+
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+        address.expect("address should be present in response");
+    assert_eq!(
+        address,
+        fnet::Ipv4AddressWithPrefix {
+            addr: net_types::ip::Ipv4Addr::from(
+                dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
+            )
+            .into_ext(),
+            prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
+        }
+    );
+
+    {
+        let (_asp_request_stream, asp_control_handle) = address_state_provider
+            .into_stream_and_control_handle()
+            .expect("into stream should succeed");
+        // NB: We're acting as the AddressStateProvider server_end.
+        // Send the removal reason and close the channel to indicate the address
+        // is being removed.
+        if let Some(removal_reason) = removal_reason {
+            asp_control_handle
+                .send_on_address_removed(removal_reason)
+                .expect("send removed event should succeed");
+
+            if removal_reason == fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved {
+                let _: (
+                    fnetemul_network::EndpointProxy,
+                    Option<fnet_interfaces_admin::DeviceControlProxy>,
+                ) = client_iface.remove().await.expect("interface removal should succeed");
+            }
+        }
+    }
+
+    if let Some(want_reason) = expected_exit_reason {
+        assert_matches!(
+            config_stream.try_next().await,
+            Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: _,
+            }))
+        );
+        let terminal_event = client
+            .take_event_stream()
+            .try_next()
+            .await
+            .expect("should not have error on event stream")
+            .expect("event stream should not have ended");
+        let got_reason = assert_matches!(
+            terminal_event,
+            fnet_dhcp::ClientEvent::OnExit {
+                reason
+            } => reason
+        );
+        assert_eq!(got_reason, want_reason);
+        return;
+    }
+
+    // After restarting, if the client has not stopped, we should get a new lease.
+    let fnet_dhcp_ext::Configuration { address, dns_servers: _, routers: _ } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
+
+    let fnet_dhcp_ext::Address {
+        address,
+        address_parameters: _,
+        address_state_provider: _address_state_provider,
+    } = address.expect("address should be present in response");
+    assert_eq!(
+        address,
+        fnet::Ipv4AddressWithPrefix {
+            addr: net_types::ip::Ipv4Addr::from(std::net::Ipv4Addr::from(
+                u32::from(dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start) + 1
+            ))
+            .into_ext(),
+            prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
+        }
+    );
+
+    // Shut down the client so it won't complain about us dropping the AddressStateProvider
+    // without sending a terminal event.
+    client.shutdown_ext(client.take_event_stream()).await.expect("shutdown should succeed");
 }

@@ -4,7 +4,7 @@
 
 //! Implements the DHCP client state machine.
 
-use crate::deps::{self, DatagramInfo, Instant as _};
+use crate::deps::{self, DatagramInfo, Instant as _, Socket as _};
 use crate::parse::{OptionCodeMap, OptionRequested};
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
@@ -33,6 +33,7 @@ pub enum ExitReason {
 /// [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
+#[derive(Debug)]
 pub enum State<I> {
     /// The default initial state of the state machine (no known
     /// currently-assigned IP address or DHCP server).
@@ -46,6 +47,8 @@ pub enum State<I> {
     /// The Bound state (we actively have a lease and are waiting to transition
     /// to Renewing).
     Bound(Bound<I>),
+    /// Waiting to restart the configuration process (via transitioning to Init).
+    WaitingToRestart(WaitingToRestart<I>),
 }
 
 /// The next step to take after running the core state machine for one step.
@@ -73,6 +76,21 @@ pub enum TransitionEffect<I> {
     /// No effects need to be performed.
     None,
 }
+
+/// Outcome of handling an address rejection.
+#[derive(Debug)]
+pub enum AddressRejectionOutcome<I> {
+    /// Observing an address rejection in this state should be impossible due to
+    /// not having an active lease.
+    ShouldBeImpossible,
+    /// Transition to a new state.
+    NextState(State<I>),
+}
+
+// Per RFC 2131 section 3.1, after sending a DHCPDECLINE message, "the client
+// SHOULD wait a minimum of ten seconds before restarting the configuration
+// process to avoid excessive network traffic in case of looping."
+const WAIT_TIME_BEFORE_RESTARTING_AFTER_ADDRESS_REJECTION: Duration = Duration::from_secs(10);
 
 impl<I: deps::Instant> State<I> {
     /// Run the client state machine for one "step".
@@ -118,6 +136,7 @@ impl<I: deps::Instant> State<I> {
                     }
                     RequestingOutcome::Bound(bound, parameters) => {
                         let Bound {
+                            discover_options: _,
                             yiaddr,
                             server_identifier: _,
                             ip_address_lease_time,
@@ -157,6 +176,99 @@ impl<I: deps::Instant> State<I> {
                 stop_receiver.select_next_some().await;
                 Ok(Step::Exit(ExitReason::GracefulShutdown))
             }
+            State::WaitingToRestart(waiting_to_restart) => {
+                match waiting_to_restart.do_waiting_to_restart(clock, stop_receiver).await {
+                    WaitingToRestartOutcome::GracefulShutdown => {
+                        Ok(Step::Exit(ExitReason::GracefulShutdown))
+                    }
+                    WaitingToRestartOutcome::Init(init) => Ok(Step::NextState(Transition {
+                        next_state: State::Init(init),
+                        new_lease: None,
+                    })),
+                }
+            }
+        }
+    }
+
+    /// Handles an acquired address being rejected.
+    pub async fn on_address_rejection<C: deps::Clock<Instant = I>>(
+        &self,
+        config: &ClientConfig,
+        packet_socket_provider: &impl deps::PacketSocketProvider,
+        clock: &C,
+        ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    ) -> Result<AddressRejectionOutcome<I>, Error> {
+        match self {
+            State::Init(_)
+            | State::Selecting(_)
+            | State::Requesting(_)
+            | State::WaitingToRestart(_) => {
+                tracing::warn!(
+                    "received address rejection in state {}; ignoring",
+                    self.state_name()
+                );
+                Ok(AddressRejectionOutcome::ShouldBeImpossible)
+            }
+            State::Bound(bound) => {
+                let Bound {
+                    discover_options,
+                    yiaddr,
+                    server_identifier,
+                    ip_address_lease_time: _,
+                    start_time: _,
+                    renewal_time: _,
+                    rebinding_time: _,
+                } = bound;
+
+                if *yiaddr != ip_address {
+                    tracing::warn!(
+                        "received rejection of address {} while bound to \
+                         different address {}; ignoring",
+                        *yiaddr,
+                        ip_address,
+                    );
+                    return Ok(AddressRejectionOutcome::ShouldBeImpossible);
+                }
+
+                let socket =
+                    packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
+
+                let message =
+                    build_decline(config, discover_options, ip_address, *server_identifier);
+
+                socket
+                    .send_to(
+                        crate::parse::serialize_dhcp_message_to_ip_packet(
+                            message,
+                            Ipv4Addr::UNSPECIFIED,
+                            CLIENT_PORT,
+                            Ipv4Addr::BROADCAST,
+                            SERVER_PORT,
+                        )
+                        .as_ref(),
+                        Mac::BROADCAST,
+                    )
+                    .await
+                    .map_err(Error::Socket)?;
+
+                tracing::info!("sent DHCPDECLINE for {}; waiting to restart", ip_address);
+
+                Ok(AddressRejectionOutcome::NextState(State::WaitingToRestart(WaitingToRestart {
+                    waiting_until: clock
+                        .now()
+                        .add(WAIT_TIME_BEFORE_RESTARTING_AFTER_ADDRESS_REJECTION),
+                })))
+            }
+        }
+    }
+
+    fn state_name(&self) -> &'static str {
+        match self {
+            State::Init(_) => "Init",
+            State::Selecting(_) => "Selecting",
+            State::Requesting(_) => "Requesting",
+            State::Bound(_) => "Bound",
+            State::WaitingToRestart(_) => "Waiting to Restart",
         }
     }
 
@@ -166,6 +278,7 @@ impl<I: deps::Instant> State<I> {
             State::Selecting(_) => false,
             State::Requesting(_) => false,
             State::Bound(_) => true,
+            State::WaitingToRestart(_) => false,
         }
     }
 
@@ -235,8 +348,8 @@ struct TransactionId(
 
 /// The initial state as depicted in the state-transition diagram in [RFC 2131].
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Default)]
-pub struct Init {}
+#[derive(Default, Debug, PartialEq)]
+pub struct Init;
 
 impl Init {
     /// Generates a random transaction ID, records the starting time, and
@@ -257,6 +370,61 @@ impl Init {
             start_time: clock.now(),
         }
     }
+}
+
+/// The state of waiting to restart the configuration process.
+#[derive(Debug)]
+pub struct WaitingToRestart<I> {
+    waiting_until: I,
+}
+
+#[derive(Debug, PartialEq)]
+enum WaitingToRestartOutcome {
+    GracefulShutdown,
+    Init(Init),
+}
+
+impl<I: deps::Instant> WaitingToRestart<I> {
+    async fn do_waiting_to_restart<C: deps::Clock<Instant = I>>(
+        &self,
+        clock: &C,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+    ) -> WaitingToRestartOutcome {
+        let Self { waiting_until } = self;
+        let wait_fut = clock.wait_until(*waiting_until).fuse();
+        pin_mut!(wait_fut);
+
+        select! {
+            () = wait_fut => WaitingToRestartOutcome::Init(Init::default()),
+            () = stop_receiver.select_next_some() => WaitingToRestartOutcome::GracefulShutdown,
+        }
+    }
+}
+
+fn build_decline(
+    ClientConfig {
+        client_hardware_address,
+        client_identifier,
+        requested_parameters: _,
+        preferred_lease_time_secs: _,
+        requested_ip_address: _,
+    }: &ClientConfig,
+    discover_options: &DiscoverOptions,
+    ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+) -> dhcp_protocol::Message {
+    build_outgoing_message_while_not_assigned_address(
+        *client_hardware_address,
+        client_identifier.clone(),
+        discover_options,
+        OutgoingOptions {
+            offered_ip_address_lease_time_secs: None,
+            offered_ip_address: Some(ip_address.get().into()),
+            server_identifier: Some(server_identifier.get().into()),
+            message_type: dhcp_protocol::MessageType::DHCPDECLINE,
+        },
+        Vec::new(),
+    )
 }
 
 async fn send_with_retransmits<T: Clone + Send>(
@@ -331,13 +499,13 @@ struct OutgoingOptions {
 // Populates fields that don't differ between outgoing client messages in the
 // same DHCP transaction while the client is not assigned an address.
 fn build_outgoing_message_while_not_assigned_address(
-    ClientConfig {
-        client_hardware_address,
-        client_identifier,
-        requested_parameters,
-        preferred_lease_time_secs,
-        requested_ip_address,
-    }: &ClientConfig,
+    client_hardware_address: Mac,
+    client_identifier: Option<
+        AtLeast<
+            { dhcp_protocol::CLIENT_IDENTIFIER_MINIMUM_LENGTH },
+            AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>,
+        >,
+    >,
     DiscoverOptions { xid: TransactionId(xid) }: &DiscoverOptions,
     OutgoingOptions {
         offered_ip_address_lease_time_secs,
@@ -345,6 +513,7 @@ fn build_outgoing_message_while_not_assigned_address(
         server_identifier,
         message_type,
     }: OutgoingOptions,
+    other_options: Vec<dhcp_protocol::DhcpOption>,
 ) -> dhcp_protocol::Message {
     use dhcp_protocol::DhcpOption;
     dhcp_protocol::Message {
@@ -367,44 +536,73 @@ fn build_outgoing_message_while_not_assigned_address(
         yiaddr: Ipv4Addr::UNSPECIFIED,
         siaddr: Ipv4Addr::UNSPECIFIED,
         giaddr: Ipv4Addr::UNSPECIFIED,
-        chaddr: *client_hardware_address,
+        chaddr: client_hardware_address,
         sname: String::new(),
         file: String::new(),
         options: [
-            offered_ip_address_lease_time_secs
-                .or(*preferred_lease_time_secs)
-                .map(|n| DhcpOption::IpAddressLeaseTime(n.get())),
-            offered_ip_address.or(*requested_ip_address).map(DhcpOption::RequestedIpAddress),
-            // TODO(https://fxbug.dev/122602): Avoid cloning
-            {
-                match AtLeast::try_from(requested_parameters.iter_keys().collect::<Vec<_>>()) {
-                    Ok(parameters) => Some(DhcpOption::ParameterRequestList(parameters)),
-                    Err((
-                        dhcp_protocol::SizeConstrainedError::SizeConstraintViolated,
-                        parameters,
-                    )) => {
-                        // This can only have happened because parameters is empty.
-                        assert_eq!(parameters, Vec::new());
-                        // Thus, we must omit the ParameterRequestList option.
-                        None
-                    }
-                }
-            },
-            client_identifier.clone().map(DhcpOption::ClientIdentifier),
+            offered_ip_address_lease_time_secs.map(|n| DhcpOption::IpAddressLeaseTime(n.get())),
+            offered_ip_address.map(DhcpOption::RequestedIpAddress),
+            client_identifier.map(DhcpOption::ClientIdentifier),
             server_identifier.map(DhcpOption::ServerIdentifier),
         ]
         .into_iter()
         .flatten()
+        .chain(other_options)
         .chain([DhcpOption::DhcpMessageType(message_type)])
         .collect(),
     }
+}
+
+// Populates fields that don't differ between outgoing client messages in the
+// same DHCP address acquisition transaction.
+fn build_outgoing_message_during_address_acquisition(
+    ClientConfig {
+        client_hardware_address,
+        client_identifier,
+        requested_parameters,
+        preferred_lease_time_secs,
+        requested_ip_address,
+    }: &ClientConfig,
+    discover_options: &DiscoverOptions,
+    OutgoingOptions {
+        offered_ip_address_lease_time_secs,
+        offered_ip_address,
+        server_identifier,
+        message_type,
+    }: OutgoingOptions,
+) -> dhcp_protocol::Message {
+    use dhcp_protocol::DhcpOption;
+    build_outgoing_message_while_not_assigned_address(
+        *client_hardware_address,
+        // TODO(https://fxbug.dev/122602): Avoid cloning
+        client_identifier.clone(),
+        discover_options,
+        OutgoingOptions {
+            offered_ip_address_lease_time_secs: offered_ip_address_lease_time_secs
+                .or((*preferred_lease_time_secs).map(Into::into)),
+            offered_ip_address: offered_ip_address.or(*requested_ip_address),
+            server_identifier,
+            message_type,
+        },
+        match AtLeast::try_from(requested_parameters.iter_keys().collect::<Vec<_>>()) {
+            Ok(parameters) => Some(DhcpOption::ParameterRequestList(parameters)),
+            Err((dhcp_protocol::SizeConstrainedError::SizeConstraintViolated, parameters)) => {
+                // This can only have happened because parameters is empty.
+                assert_eq!(parameters, Vec::new());
+                // Thus, we must omit the ParameterRequestList option.
+                None
+            }
+        }
+        .into_iter()
+        .collect(),
+    )
 }
 
 fn build_discover(
     client_config: &ClientConfig,
     discover_options: &DiscoverOptions,
 ) -> dhcp_protocol::Message {
-    build_outgoing_message_while_not_assigned_address(
+    build_outgoing_message_during_address_acquisition(
         client_config,
         discover_options,
         OutgoingOptions {
@@ -425,6 +623,7 @@ pub(crate) enum SelectingOutcome<I> {
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
+#[derive(Debug)]
 pub struct Selecting<I> {
     discover_options: DiscoverOptions,
     // The time at which the DHCP transaction was initiated (used as the offset
@@ -689,6 +888,7 @@ impl<I: deps::Instant> Requesting<I> {
                 } = ack;
                 Ok(RequestingOutcome::Bound(
                     Bound {
+                        discover_options: discover_options.clone(),
                         yiaddr,
                         server_identifier: server_identifier.unwrap_or({
                             let crate::parse::FieldsFromOfferToUseInRequest {
@@ -728,7 +928,7 @@ fn build_request(
         ip_address_to_request,
     }: &crate::parse::FieldsFromOfferToUseInRequest,
 ) -> dhcp_protocol::Message {
-    build_outgoing_message_while_not_assigned_address(
+    build_outgoing_message_during_address_acquisition(
         client_config,
         discover_options,
         OutgoingOptions {
@@ -745,6 +945,7 @@ fn build_request(
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4.1
 #[derive(Debug, PartialEq)]
 pub struct Bound<I> {
+    discover_options: DiscoverOptions,
     yiaddr: SpecifiedAddr<net_types::ip::Ipv4Addr>,
     server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
     ip_address_lease_time: Duration,
@@ -775,7 +976,7 @@ mod test {
         advance, run_until_next_timers_fire, FakeRngProvider, FakeSocket, FakeSocketProvider,
         FakeTimeController,
     };
-    use crate::deps::{Clock as _, DatagramInfo, Socket as _};
+    use crate::deps::{Clock as _, DatagramInfo};
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
@@ -853,11 +1054,11 @@ mod test {
         let Selecting {
             discover_options: DiscoverOptions { xid: xid_a },
             start_time: start_time_a,
-        } = Init {}.do_init(&mut rng, &time);
+        } = Init.do_init(&mut rng, &time);
         let Selecting {
             discover_options: DiscoverOptions { xid: xid_b },
             start_time: start_time_b,
-        } = Init {}.do_init(&mut rng, &time);
+        } = Init.do_init(&mut rng, &time);
         assert_ne!(xid_a, xid_b);
         assert_eq!(start_time_a, arbitrary_start_time);
         assert_eq!(start_time_b, arbitrary_start_time);
@@ -879,6 +1080,13 @@ mod test {
         }
     }
 
+    fn build_test_selecting_state() -> Selecting<Duration> {
+        Selecting {
+            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            start_time: std::time::Duration::from_secs(0),
+        }
+    }
+
     #[test]
     fn do_selecting_obeys_graceful_shutdown() {
         initialize_logging();
@@ -886,10 +1094,7 @@ mod test {
         let mut executor = fasync::TestExecutor::new();
         let time = FakeTimeController::new();
 
-        let selecting = Selecting {
-            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
-            start_time: std::time::Duration::from_secs(0),
-        };
+        let selecting = build_test_selecting_state();
         let mut rng = FakeRngProvider::new(0);
 
         let (_server_end, client_end) = FakeSocket::new_pair();
@@ -1121,7 +1326,7 @@ mod test {
         let arbitrary_start_time = std::time::Duration::from_secs(42);
         advance(&time, arbitrary_start_time);
 
-        let selecting = Init {}.do_init(&mut rng, &time);
+        let selecting = Init.do_init(&mut rng, &time);
         let TransactionId(xid) = selecting.discover_options.xid;
 
         let (server_end, client_end) = FakeSocket::<Mac>::new_pair();
@@ -1314,9 +1519,12 @@ mod test {
         );
     }
 
+    const TEST_XID: TransactionId = TransactionId(nonzero_ext::nonzero!(1u32));
+    const TEST_DISCOVER_OPTIONS: DiscoverOptions = DiscoverOptions { xid: TEST_XID };
+
     fn build_test_requesting_state() -> Requesting<std::time::Duration> {
         Requesting {
-            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            discover_options: TEST_DISCOVER_OPTIONS,
             start_time: std::time::Duration::from_secs(0),
             fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest {
                 server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
@@ -1433,6 +1641,7 @@ mod test {
                                 DEFAULT_LEASE_LENGTH_SECONDS,
                             ),
                             dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                             dhcp_protocol::DhcpOption::ParameterRequestList(
                                 test_requested_parameters()
                                     .iter_keys()
@@ -1440,7 +1649,6 @@ mod test {
                                     .try_into()
                                     .expect("should fit parameter request list size constraints"),
                             ),
-                            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                             dhcp_protocol::DhcpOption::DhcpMessageType(
                                 dhcp_protocol::MessageType::DHCPREQUEST,
                             ),
@@ -1514,6 +1722,7 @@ mod test {
         .chain(test_parameter_values())
         .collect(),
     } => RequestingOutcome::Bound(Bound {
+        discover_options: TEST_DISCOVER_OPTIONS,
         yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
             .try_into()
             .expect("should be specified"),
@@ -1614,6 +1823,7 @@ mod test {
                     options: vec![
                         dhcp_protocol::DhcpOption::IpAddressLeaseTime(DEFAULT_LEASE_LENGTH_SECONDS),
                         dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                        dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                         dhcp_protocol::DhcpOption::ParameterRequestList(
                             test_requested_parameters()
                                 .iter_keys()
@@ -1621,7 +1831,6 @@ mod test {
                                 .try_into()
                                 .expect("should fit parameter request list size constraints"),
                         ),
-                        dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                         dhcp_protocol::DhcpOption::DhcpMessageType(
                             dhcp_protocol::MessageType::DHCPREQUEST,
                         ),
@@ -1668,6 +1877,7 @@ mod test {
 
     fn build_test_bound_state() -> Bound<std::time::Duration> {
         Bound {
+            discover_options: TEST_DISCOVER_OPTIONS,
             yiaddr: net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
             server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                 .try_into()
@@ -1715,5 +1925,108 @@ mod test {
     ) -> TransitionEffect<Duration> {
         let (_next_state, effect) = state.apply(transition);
         effect
+    }
+
+    #[test_case(
+        State::Init(Init),
+        false;
+        "should not have lease during Init"
+    )]
+    #[test_case(
+        State::Selecting(build_test_selecting_state()),
+        false;
+        "should not have lease during Selecting"
+    )]
+    #[test_case(
+        State::Requesting(build_test_requesting_state()),
+        false;
+        "should not have lease during Requesting"
+    )]
+    #[test_case(
+        State::Bound(build_test_bound_state()),
+        true;
+        "should decline and restart during Bound"
+    )]
+    #[test_case(
+        State::WaitingToRestart(WaitingToRestart { waiting_until: WAIT_TIME_BEFORE_RESTARTING_AFTER_ADDRESS_REJECTION }),
+        false;
+        "should not have lease during WaitingToRestart"
+    )]
+    fn on_address_rejection(state: State<Duration>, expect_decline: bool) {
+        let config = &test_client_config();
+        let time = &FakeTimeController::new();
+        let (server_end, client_end) = FakeSocket::new_pair();
+        let packet_socket_provider = FakeSocketProvider::new(client_end);
+        let reject_fut = state
+            .on_address_rejection(
+                config,
+                &packet_socket_provider,
+                time,
+                net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
+            )
+            .fuse();
+        pin_mut!(reject_fut);
+
+        let mut executor = fasync::TestExecutor::new();
+        let reject_result = run_with_accelerated_time(&mut executor, time, &mut reject_fut);
+
+        if expect_decline {
+            let WaitingToRestart { waiting_until } = assert_matches!(
+                reject_result,
+                Ok(AddressRejectionOutcome::NextState(
+                    State::WaitingToRestart(waiting)
+                )) => waiting
+            );
+            assert_eq!(waiting_until, Duration::from_secs(10));
+
+            let mut buf = [0u8; BUFFER_SIZE];
+            let DatagramInfo { length, address } = server_end
+                .recv_from(&mut buf)
+                .now_or_never()
+                .expect("should be ready")
+                .expect("should succeed");
+            assert_eq!(address, Mac::BROADCAST);
+
+            let message =
+                crate::parse::parse_dhcp_message_from_ip_packet(&buf[..length], SERVER_PORT)
+                    .expect("should succeed");
+
+            use dhcp_protocol::DhcpOption;
+            assert_outgoing_message(
+                &message,
+                VaryingOutgoingMessageFields {
+                    xid: message.xid,
+                    options: vec![
+                        DhcpOption::RequestedIpAddress(YIADDR),
+                        DhcpOption::ServerIdentifier(SERVER_IP),
+                        DhcpOption::DhcpMessageType(dhcp_protocol::MessageType::DHCPDECLINE),
+                    ],
+                },
+            );
+        } else {
+            assert_matches!(reject_result, Ok(AddressRejectionOutcome::ShouldBeImpossible));
+        }
+    }
+
+    #[test]
+    fn waiting_to_restart() {
+        let time = &FakeTimeController::new();
+
+        const WAITING_UNTIL: Duration = Duration::from_secs(10);
+
+        // Set the start time to some arbitrary time below WAITING_UNTIL to show
+        // that `WaitingToRestart` waits until an absolute time rather than for
+        // a particular duration.
+        advance(time, Duration::from_secs(3));
+
+        let waiting = WaitingToRestart { waiting_until: WAITING_UNTIL };
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let main_fut = waiting.do_waiting_to_restart(time, &mut stop_receiver).fuse();
+        pin_mut!(main_fut);
+        let mut executor = fasync::TestExecutor::new();
+        let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
+        assert_eq!(outcome, WaitingToRestartOutcome::Init(Init));
+
+        assert_eq!(time.now(), WAITING_UNTIL);
     }
 }

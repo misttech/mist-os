@@ -35,7 +35,7 @@ pub fn default_new_client_params() -> fnet_dhcp::NewClientParams {
 }
 
 /// Configuration acquired by the DHCP client.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Configuration {
     /// The acquired address.
     pub address: Option<Address>,
@@ -188,6 +188,7 @@ impl TryFrom<fnet_dhcp::ClientWatchConfigurationResponse> for Configuration {
 }
 
 /// An IPv4 address acquired by the DHCP client.
+#[derive(Debug)]
 pub struct Address {
     /// The acquired address and discovered prefix length.
     pub address: fnet::Ipv4AddressWithPrefix,
@@ -279,6 +280,8 @@ impl ClientExt for fnet_dhcp::ClientProxy {
                     | fnet_dhcp::ClientExitReason::InvalidInterface
                     | fnet_dhcp::ClientExitReason::InvalidParams
                     | fnet_dhcp::ClientExitReason::NetworkUnreachable
+                    | fnet_dhcp::ClientExitReason::AddressRemovedByUser
+                    | fnet_dhcp::ClientExitReason::AddressStateProviderError
                     | fnet_dhcp::ClientExitReason::UnableToOpenSocket => {
                         return Err(Error::WrongExitReason(reason))
                     }

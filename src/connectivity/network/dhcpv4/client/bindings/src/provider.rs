@@ -134,25 +134,28 @@ pub(crate) async fn serve_client_provider(
                         }
                     };
 
-                    crate::client::serve_client(mac, provider, params, client_requests_stream)
-                        .await
-                        .unwrap_or_else(|error| match error {
-                            crate::client::Error::Exit(reason) => {
-                                tracing::info!("client exiting: {:?}", reason);
-                                control_handle.send_on_exit(reason).unwrap_or_else(|e| {
-                                    tracing::error!(
-                                        "FIDL error while sending on_exit event: {:?}",
-                                        e
-                                    );
-                                });
-                            }
-                            crate::client::Error::Fidl(e) => {
-                                tracing::error!("FIDL error while serving client: {:?}", e);
-                            }
-                            crate::client::Error::Core(e) => {
-                                tracing::error!("error while serving client: {:?}", e);
-                            }
-                        });
+                    crate::client::serve_client(
+                        mac,
+                        interface_id,
+                        provider,
+                        params,
+                        client_requests_stream,
+                    )
+                    .await
+                    .unwrap_or_else(|error| match error {
+                        crate::client::Error::Exit(reason) => {
+                            tracing::info!("client exiting: {:?}", reason);
+                            control_handle.send_on_exit(reason).unwrap_or_else(|e| {
+                                tracing::error!("FIDL error while sending on_exit event: {:?}", e);
+                            });
+                        }
+                        crate::client::Error::Fidl(e) => {
+                            tracing::error!("FIDL error while serving client: {:?}", e);
+                        }
+                        crate::client::Error::Core(e) => {
+                            tracing::error!("error while serving client: {:?}", e);
+                        }
+                    });
                     Ok(())
                 }
                 ClientProviderRequest::CheckPresence { responder } => {
