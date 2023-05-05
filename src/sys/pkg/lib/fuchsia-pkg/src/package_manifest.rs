@@ -583,7 +583,8 @@ impl PackageManifestV1 {
                     .into_iter()
                     .map(|subpackage| resolve_subpackage_manifest_path(subpackage, manifest_path))
                     .collect::<anyhow::Result<_>>()?;
-                Ok(PackageManifestV1 { blobs, subpackages, ..this })
+                let blob_sources_relative = RelativeTo::WorkingDir;
+                Ok(PackageManifestV1 { blobs, subpackages, blob_sources_relative, ..this })
             } else {
                 Ok(this)
             }
@@ -1108,20 +1109,28 @@ mod tests {
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
         let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
-        assert_eq!(loaded_manifest.name(), &"example".parse::<PackageName>().unwrap());
-
-        let (blobs, subpackages) = loaded_manifest.into_blobs_and_subpackages();
-
-        assert_eq!(blobs.len(), 1);
-        let blob = blobs.first().unwrap();
-        assert_eq!(blob.path, "data/p1");
-        let expected_blob_source_path = &env.data_dir.join("p1").to_string();
-        assert_eq!(&blob.source_path, expected_blob_source_path);
-
-        assert_eq!(subpackages.len(), 1);
-        let subpackage = subpackages.first().unwrap();
-        assert_eq!(subpackage.name, "subpackage0");
-        assert_eq!(&subpackage.manifest_path, &env.subpackage_path.to_string());
+        assert_eq!(
+            loaded_manifest,
+            PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+                package: PackageMetadata {
+                    name: "example".parse::<PackageName>().unwrap(),
+                    version: "0".parse().unwrap(),
+                },
+                blobs: vec![BlobInfo {
+                    source_path: env.data_dir.join("p1").to_string(),
+                    path: "data/p1".into(),
+                    merkle: zeros_hash(),
+                    size: 1,
+                }],
+                subpackages: vec![SubpackageInfo {
+                    manifest_path: env.subpackage_path.to_string(),
+                    name: "subpackage0".into(),
+                    merkle: zeros_hash(),
+                }],
+                repository: None,
+                blob_sources_relative: RelativeTo::WorkingDir,
+            }))
+        );
     }
 
     #[test]
