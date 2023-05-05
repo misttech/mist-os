@@ -483,6 +483,13 @@ pub async fn stage_oem_files<W: Write, F: FileResolver + Sync>(
     Ok(())
 }
 
+pub async fn set_slot_a_active(fastboot_proxy: &FastbootProxy) -> Result<()> {
+    if fastboot_proxy.erase("misc").await?.is_err() {
+        tracing::debug!("Could not erase misc partition");
+    }
+    fastboot_proxy.set_active("a").await?.map_err(|_| anyhow!("Could not set active slot"))
+}
+
 #[tracing::instrument(skip(writer, file_resolver, partitions))]
 pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
     writer: &mut W,
@@ -564,6 +571,7 @@ where
         && !cmd.no_bootloader_reboot
         && !is_userspace_fastboot(fastboot_proxy).await?
     {
+        set_slot_a_active(&fastboot_proxy).await?;
         reboot_bootloader(writer, &fastboot_proxy).await?;
     }
     Ok(())
@@ -611,10 +619,7 @@ where
 }
 
 pub async fn finish<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    if fastboot_proxy.erase("misc").await?.is_err() {
-        tracing::debug!("Could not erase misc partition");
-    }
-    fastboot_proxy.set_active("a").await?.map_err(|_| anyhow!("Could not set active slot"))?;
+    set_slot_a_active(&fastboot_proxy).await?;
     fastboot_proxy.continue_boot().await?.map_err(|_| anyhow!("Could not reboot device"))?;
     writeln!(writer, "Continuing to boot - this could take awhile")?;
     Ok(())
