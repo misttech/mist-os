@@ -78,7 +78,7 @@ template("license_data") {
     copy_spdx_target = "${target_name}_spdx_copy"
   }
 
-  txt_notices_output = "license_texts_grouped_by_project.txt.gz"
+  txt_notices_output = "license_texts_grouped_by_project_deduped.txt.gz"
 
   product_board = "${build_info_product}.${build_info_board}"
   path_prefix = "${build_info_version}/${product_board}"

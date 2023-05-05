@@ -46,6 +46,15 @@ func (t *Target) Clean(re *regexp.Regexp) error {
 	paths = append(paths, t.PublicConfigs...)
 	paths = append(paths, t.IncludeDirs...)
 
+	// "include_dirs" entries often have a trailing slash.
+	// That trailing slash can cause string matching to fail later on.
+	for _, d := range t.IncludeDirs {
+		prefix, found := strings.CutSuffix(d, "/")
+		if found {
+			paths = append(paths, prefix)
+		}
+	}
+
 	var err error
 	t.CleanNames, err = clean([]string{t.Name}, re)
 	if err != nil {

@@ -15,7 +15,8 @@
       "compliance.csv",
       "project_licenses.txt",
       "all_project_licenses.txt",
-      "license_texts_grouped_by_project.txt"
+      "license_texts_grouped_by_project.txt",
+      "license_texts_grouped_by_project_deduped.txt"
     ],
     "templates": [
       {
@@ -50,8 +51,6 @@
           "prebuilt/sdk-samples/fortune-teller": true,
           "prebuilt/starnix/android-image-amd64": true,
           "prebuilt/starnix/chromiumos-image-amd64": true,
-          "prebuilt/starnix/fuse-overlayfs-amd64": true,
-          "prebuilt/starnix/fuse-overlayfs-arm64": true,
           "prebuilt/starnix/internal/android-image-amd64": true,
           "prebuilt/starnix/internal/android-image-arm64": true,
           "prebuilt/starnix/tests/syscalls/linux-amd64": true,
@@ -207,18 +206,30 @@
           "third_party/rust_crates/ask2patch/same-file/COPYING": true,
           "third_party/rust_crates/ask2patch/termcolor/COPYING": true,
           "third_party/rust_crates/ask2patch/byteorder/COPYING": true,
+          "prebuilt/third_party/dart_paused/linux-x64/bin/resources/devtools/assets/NOTICES": true,
+          "prebuilt/third_party/llvm/linux-arm64/include/llvm/Support/LICENSE.TXT": true,
           "third_party/openthread/NOTICE": true,
           "third_party/network-conformance/orchestrator/dutscripts/tclfmt/LICENSE": true,
           "third_party/lz4/tests/COPYING": true,
           "third_party/lz4/programs/COPYING": true,
           "third_party/lz4/examples/COPYING": true,
           "third_party/android/platform/external/aac/NOTICE": true,
+          "third_party/android/device/generic/vulkan-cereal/third-party/stb/include/stb/LICENSE": true,
           "prebuilt/third_party/vulkansdk/linux/source/VulkanCapsViewer/LICENSE": true,
           "prebuilt/third_party/vulkansdk/linux/source/Vulkan-Profiles/LICENSE.md": true,
           "prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/LICENSE.TXT": true,
           "prebuilt/third_party/llvm/mac-x64/include/llvm/Support/LICENSE.TXT": true,
-          "prebuilt/starnix/fuse-overlayfs-ard64/LICENSE": true,
+          "prebuilt/starnix/fuse-overlayfs-arm64/LICENSE": true,
           "prebuilt/starnix/fuse-overlayfs-amd64/LICENSE": true,
+          "prebuilt/third_party/dart/linux-x64/bin/resources/devtools/assets/NOTICES": true,
+          "prebuilt/third_party/llvm/linux-x64/include/llvm/Support/LICENSE.TXT": true,
+          "third_party/github.com/google/emboss/src/license_header": true,
+          "prebuilt/third_party/cmake/linux-x64/doc/cmake-3.25/cmlibarchive/COPYING": true,
+          "prebuilt/third_party/cmake/linux-x64/doc/cmake-3.25/cmlibrhash/COPYING": true,
+          "third_party/openssh-portable/CREDITS": true,
+          "vendor/synaptics/as370/prebuilt/usbboot_as370_a0_m1_uboot_03152019/usbboot_host_tool/pthreads-win32-master/pthreads.2/COPYING.LIB": true,
+          "vendor/synaptics/as370/prebuilt/usbboot_as370_a0_m1_uboot_03152019/usbboot_host_tool/pthreads-win32-master/pthreads.2/COPYING": true,
+          "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/jdk/legal/java.base/LICENSE": true,
           "tools/debug/covargs/api/third_party/codecoverage": true
         }
       }

@@ -5,6 +5,7 @@
             {
                 "paths": [
                     "src/connectivity/telephony/lib/qmi-protocol/tests",
+                    "third_party/android/platform/system/tools/hidl/test",
                     "sdk/ctf/tests/pkg/fdio/test_bins/echo_arguments.sh",
                     "src/security/fcrypto/test/hmac-fuzzer.cc",
                     "src/sys/component_manager/testing/lib.rs",
@@ -159,6 +160,21 @@
             },
             {
                 "paths": [
+                    "third_party/openssh-portable/CREDITS",
+                    "prebuilt/third_party/python3/linux-x64/lib/python3.8/idlelib/CREDITS.txt",
+                    "prebuilt/third_party/vpython/3.8/lib/python3.8/idlelib/CREDITS.txt",
+                    "prebuilt/third_party/vpython/2.7/lib/python2.7/idlelib/CREDITS.txt",
+                    "third_party/libpcap/src/CREDITS",
+                    "third_party/grpc/src/php/ext/grpc/CREDITS",
+                    "third_party/tcpdump/src/CREDITS",
+                    "prebuilt/third_party/vpython/3.11/lib/python3.11/idlelib/CREDITS.txt"
+                ],
+                "notes": [
+                    "Credits files that don't actually contain licensing information"
+                ]
+            },
+            {
+                "paths": [
                     "third_party/rust_crates/compat/brotli",
                     "third_party/rust_crates/compat/ring"
                 ],
@@ -305,6 +321,15 @@
                 ],
                 "notes": [
                     "These files don't hold license texts. They're used to process license files."
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/bazel_rules_license/examples",
+                    "third_party/bazel_rules_license/tests"
+                ],
+                "notes": [
+                    "Skip bazel licensing example & test directories"
                 ]
             },
             {

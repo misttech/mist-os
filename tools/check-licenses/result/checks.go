@@ -90,7 +90,7 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 }
 
 func AllLicenseTextsMustBeRecognized() error {
-	name := "AllProjectsMustHaveALicense"
+	name := "AllLicenseTextsMustBeRecognized"
 
 	var foundUnrecognizedMatch bool
 	var b strings.Builder
@@ -111,6 +111,7 @@ func AllLicenseTextsMustBeRecognized() error {
 			continue
 		}
 
+		foundUnrecognizedMatch = true
 		b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
 		b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data())))
 	}

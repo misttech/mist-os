@@ -167,11 +167,12 @@ func IsPossibleLicenseFile(path string) bool {
 		return false
 	}
 
-	// In practice, all license files for project either have "copying"
-	// or "license" in their name.
+	// In practice, all license files for a project either have "copying"
+	// "license" or "credits.fuchsia" in their name.
 	if !(strings.Contains(lower, "licen") ||
 		strings.Contains(lower, "copying") ||
-		strings.Contains(lower, "notice")) {
+		strings.Contains(lower, "notice") ||
+		strings.Contains(lower, "credits.fuchsia")) {
 		return false
 	}
 

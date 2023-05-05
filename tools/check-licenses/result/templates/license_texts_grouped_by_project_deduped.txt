@@ -1,4 +1,4 @@
-{{ range $_, $licenseData := .LicenseData }}
+{{ range $_, $licenseData := .DedupedLicenseData }}
 ================================================================================
 {{ range $_, $libraryName := $licenseData.LibraryNames }}
 {{ $libraryName }}{{ end }}
