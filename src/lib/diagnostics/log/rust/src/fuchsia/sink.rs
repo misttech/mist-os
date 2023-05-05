@@ -9,7 +9,6 @@ use diagnostics_log_encoding::{
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use lazy_static::lazy_static;
 use std::{
     collections::HashSet,
     io::Cursor,
@@ -18,12 +17,9 @@ use std::{
 use tracing::{subscriber::Subscriber, Event};
 use tracing_subscriber::layer::{Context, Layer};
 
-lazy_static! {
-    static ref PROCESS_ID: zx::Koid =
-        rt::process_self().get_koid().expect("couldn't read our own process koid");
-}
-
 thread_local! {
+    static PROCESS_ID: zx::Koid =
+        rt::process_self().get_koid().expect("couldn't read our own process koid");
     static THREAD_ID: zx::Koid = rt::thread_self()
         .get_koid()
         .expect("couldn't read our own thread id");
@@ -89,7 +85,7 @@ impl Sink {
                 event: record,
                 tags: &self.tags,
                 metatags: std::iter::empty(),
-                pid: *PROCESS_ID,
+                pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
                 dropped: previously_dropped,
             })
@@ -104,7 +100,7 @@ impl<S: Subscriber> Layer<S> for Sink {
                 event: TracingEvent::from(event),
                 tags: &self.tags,
                 metatags: self.metatags.iter(),
-                pid: *PROCESS_ID,
+                pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
                 dropped: previously_dropped,
             })
@@ -140,7 +136,10 @@ mod tests {
 
     fn arg_prefix() -> Vec<Argument> {
         vec![
-            Argument { name: "pid".into(), value: Value::UnsignedInt(PROCESS_ID.raw_koid() as _) },
+            Argument {
+                name: "pid".into(),
+                value: Value::UnsignedInt(PROCESS_ID.with(|p| p.raw_koid()) as _),
+            },
             Argument {
                 name: "tid".into(),
                 value: Value::UnsignedInt(THREAD_ID.with(|t| t.raw_koid() as _)),
