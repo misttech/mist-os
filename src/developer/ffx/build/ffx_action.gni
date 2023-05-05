@@ -4,12 +4,6 @@
 
 import("//build/compiled_action.gni")
 
-# This file is created by '//src/developer/ffx/build:ffx_env_config'
-# and needs to be kept in sync with that.
-ffx_env_for_build_label =
-    "//src/developer/ffx/build:ffx_env_config($host_toolchain)"
-ffx_env_config = root_build_dir + "/.ffx.env"
-
 sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
 sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
                           "/sdk/manifest/host_tools.internal"
@@ -158,6 +152,18 @@ template("ffx_action") {
     }
   }
 
+  env_target_name = target_name + ".ffx_env"
+  env_file = "$target_out_dir/ffx.env." + target_name
+
+  # TODO(fxbug.dev/126769): We could avoid creating an extra file if ffx
+  # could have its env passed in on the command line.
+  generated_file(env_target_name) {
+    outputs = [ env_file ]
+    output_conversion = "json"
+    contents = {
+    }
+  }
+
   # Invoke the compiled_action template for the call to the ffx plugin.
   #
   # This uses the compiled_action() template instead of directly creating an
@@ -186,12 +192,12 @@ template("ffx_action") {
     # Use a builddir-specific environment, not the user's own environment.
     _ffx_config = [ "ffx.analytics.disabled=true" ]
 
-    deps = [ ffx_env_for_build_label ]
+    deps = [ ":" + env_target_name ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
 
-    inputs += [ ffx_env_config ]
+    inputs += [ env_file ]
 
     if (_needs_sdk) {
       deps += [ sdk_host_tools_label ]
@@ -207,7 +213,7 @@ template("ffx_action") {
     # config files which causes hermetic actions error if using a global ffx config file.
     args = [
              "--env",
-             rebase_path(ffx_env_config, root_build_dir),
+             rebase_path(env_file, root_build_dir),
              "--config",
              string_join(",", _ffx_config),
            ] + invoker.args

@@ -28,14 +28,3 @@ python_binary("gn_generate_protocols_macro") {
     "//third_party/markupsafe",
   ]
 }
-
-if (is_host) {
-  # This is the ffx environment used by ffx_action()
-  #
-  generated_file("ffx_env_config") {
-    outputs = [ ffx_env_config ]
-    output_conversion = "json"
-    contents = {
-    }
-  }
-}
