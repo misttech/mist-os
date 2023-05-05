@@ -54,7 +54,6 @@ board_zedboot_bootfs_labels += _bootfs_deps
 
 board_driver_package_labels += [
   "//bundles/packages/prod:drivers-system",
-  "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
   "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   "//src/devices/acpi:drivers",
   "//src/graphics/drivers/msd-intel-gen",
