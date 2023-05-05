@@ -5,13 +5,14 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/zbi-boot.h>
+#include <lib/arch/zbi.h>
 
 #include <phys/boot-zbi.h>
 
 #include "arch-phys-info.h"
 #include "riscv64.h"
 
-void BootZbi::ZbiBoot(zircon_kernel_t* kernel, void* arg) {
+void BootZbi::ZbiBoot(arch::ZbiKernelImage* kernel, void* arg) {
   arch::ZbiBoot(kernel, arg, gArchPhysInfo->boot_hart_id);
 }
 

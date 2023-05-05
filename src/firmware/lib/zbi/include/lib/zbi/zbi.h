@@ -23,11 +23,20 @@
 #ifndef SRC_FIRMWARE_LIB_ZBI_INCLUDE_LIB_ZBI_ZBI_H_
 #define SRC_FIRMWARE_LIB_ZBI_INCLUDE_LIB_ZBI_ZBI_H_
 
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <stddef.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
+
+// Represents (the headers of) a bootable ZBI, loaded into memory by the boot
+// loader.
+typedef struct {
+  zbi_header_t hdr_file;
+  zbi_header_t hdr_kernel;
+  zbi_kernel_t data_kernel;
+} zbi_kernel_image_t;
 
 typedef enum zbi_result {
   ZBI_RESULT_OK,

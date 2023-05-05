@@ -9,8 +9,6 @@
 
 #include "zbi.h"
 
-#define ZBI_IS_KERNEL_BOOTITEM(x) (((x)&ZBI_TYPE_KERNEL_MASK) == ZBI_TYPE_KERNEL_PREFIX)
-
 // The kernel image.  In a bootable ZBI this item must always be first,
 // immediately after the ZBI_TYPE_CONTAINER header.  The contiguous memory
 // image of the kernel is formed from the ZBI_TYPE_CONTAINER header, the
@@ -73,18 +71,10 @@
 typedef struct {
   // Entry-point address.  The interpretation of this differs by machine.
   uint64_t entry;
+
   // Minimum amount (in bytes) of scratch memory that the kernel requires
   // immediately after its load image.
   uint64_t reserve_memory_size;
 } zbi_kernel_t;
-
-// The whole contiguous image loaded into memory by the boot loader.
-typedef struct {
-  zbi_header_t hdr_file;
-  zbi_header_t hdr_kernel;
-  zbi_kernel_t data_kernel;
-  uint8_t contents[/*hdr_kernel.length - sizeof(zbi_kernel_t)*/];
-  // data_kernel.reserve_memory_size bytes in memory are free after contents.
-} zircon_kernel_t;
 
 #endif  // LIB_ZBI_FORMAT_KERNEL_H_

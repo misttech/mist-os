@@ -49,12 +49,12 @@ constexpr fit::error<BootZbi::Error> OutputError(
   }};
 }
 
-const zircon_kernel_t* GetZirconKernel(const ktl::byte* kernel_payload) {
-  return reinterpret_cast<const zircon_kernel_t*>(
+const arch::ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
+  return reinterpret_cast<const arch::ZbiKernelImage*>(
       // The payload is the kernel item contents, i.e. the zbi_kernel_t header
       // followed by the rest of the load image.  But the actual kernel load
       // image for purposes of address arithmetic is defined as being the whole
-      // ZBI container, i.e. the whole zircon_kernel_t enchilada that has the
+      // ZBI container, i.e. the whole arch::ZbiKernelImage enchilada that has the
       // ZBI file (container) zbi_header_t followed by the kernel item's
       // zbi_header_t followed by that payload.  In a proper bootable ZBI, the
       // kernel item must be first and so kernel_ could always just be set to
@@ -63,7 +63,7 @@ const zircon_kernel_t* GetZirconKernel(const ktl::byte* kernel_payload) {
       // code and hence the kernel item might not be the first item in the
       // container here. So, instead calculate the offset back from this
       // payload in memory to where the beginning of the whole container would
-      // be: thus the zircon_kernel_t pointer here finds the zbi_kernel_t
+      // be: thus the arch::ZbiKernelImage pointer here finds the zbi_kernel_t
       // payload in the right place in memory, and the kernel item zbi_header_t
       // before it.  Nothing in the kernel boot protocol actually cares about
       // looking at the container zbi_header_t (or the kernel item
@@ -72,7 +72,7 @@ const zircon_kernel_t* GetZirconKernel(const ktl::byte* kernel_payload) {
       // loading.  The later uses of kernel_ in Load() and elsewhere likewise
       // don't care about those headers, only about the zbi_kernel_t portion
       // and the aligned physical memory address that corresponds to the
-      // zircon_kernel_t pointer.  Unlike the formal ZBI boot protocol, the
+      // arch::ZbiKernelImage pointer.  Unlike the formal ZBI boot protocol, the
       // Load() code handles the case where this address is not properly
       // aligned for the kernel handoff; but in the likely event that this
       // initial address is actually aligned, Load() may be able to avoid
@@ -377,7 +377,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
       }};
     }
     memcpy(kernel_buffer_.get(), KernelImage(), KernelLoadSize());
-    kernel_ = reinterpret_cast<zircon_kernel_t*>(kernel_buffer_.get());
+    kernel_ = reinterpret_cast<arch::ZbiKernelImage*>(kernel_buffer_.get());
   }
 
   if (data_.storage().empty()) {
@@ -434,7 +434,7 @@ void BootZbi::Log() {
 
 [[noreturn]] void BootZbi::Boot(ktl::optional<void*> argument) {
   ZX_ASSERT_MSG(KernelCanLoadInPlace(), "Has Load() been called?");
-  auto kernel_hdr = const_cast<zircon_kernel_t*>(kernel_);
+  auto kernel_hdr = const_cast<arch::ZbiKernelImage*>(kernel_);
   ZbiBoot(kernel_hdr, argument.value_or(data_.storage().data()));
 }
 

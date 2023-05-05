@@ -24,6 +24,13 @@ inline std::string_view TypeExtension(const zbi_header_t& header) {
   return TypeExtension(header.type);
 }
 
+/// Returns true for any kernel item type.
+inline bool TypeIsKernel(uint32_t type) {
+  return (type & ZBI_TYPE_KERNEL_MASK) == ZBI_TYPE_KERNEL_PREFIX;
+}
+
+inline bool TypeIsKernel(const zbi_header_t& header) { return TypeIsKernel(header.type); }
+
 /// Returns true for any ZBI_TYPE_STORAGE_* type.
 /// These share a protocol for other header fields, compression, etc.
 bool TypeIsStorage(uint32_t);

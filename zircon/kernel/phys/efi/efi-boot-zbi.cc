@@ -82,7 +82,7 @@ fit::result<EfiBootZbi::Zbi::Error, EfiBootZbi::Zbi> EfiBootZbi::Load(
   // Set up the in-memory kernel item as the "input ZBI" like Init() would do.
   // But allocate enough extra space after it to guarantee "in-place" loading.
   const size_t kernel_load_size =
-      offsetof(zircon_kernel_t, data_kernel) + kernel_item->header->length;
+      offsetof(arch::ZbiKernelImage, data_kernel) + kernel_item->header->length;
   size_t kernel_alloc_size =
       kernel_load_size + kernel_header.reserve_memory_size + kKernelBootAllocReserve;
   if (auto result = zbi_copy(kernel_alloc_size, memalloc::Type::kKernel,

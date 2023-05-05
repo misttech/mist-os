@@ -7,11 +7,11 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_BOOT_SHIM_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_BOOT_SHIM_H_
 
-#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbi/zbi.h>
 
 // This symbol is defined in boot-shim.ld.
-extern zircon_kernel_t embedded_zbi;
+extern zbi_kernel_image_t embedded_zbi;
 
 // This type is tailored for the ARM64 C ABI returning to assembly code.
 typedef struct {

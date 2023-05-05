@@ -12,18 +12,7 @@ import("//build/zircon/zx_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":arm64-boot-shim-tests($host_toolchain)" ]
-}
-
-test("arm64-boot-shim-tests") {
-  sources = [
-    "zbi.c",
-    "zbi_test.cc",
-  ]
-  deps = [
-    "//sdk/lib/zbi-format",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps = []
 }
 
 # The boot shims need to be compiled in the special environment for running
@@ -36,10 +25,12 @@ if (toolchain_environment == "physmem") {
       "debug.c",
       "devicetree.c",
       "util.c",
-      "zbi.c",
     ]
     deps = [ "//zircon/kernel/lib/libc/string" ]
-    public_deps = [ "//sdk/lib/zbi-format" ]
+    public_deps = [
+      "//sdk/lib/zbi-format",
+      "//src/firmware/lib/zbi:in_tree",
+    ]
   }
 
   config("boot_shim_config") {

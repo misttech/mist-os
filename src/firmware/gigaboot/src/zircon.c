@@ -235,10 +235,10 @@ static void start_zircon(uint64_t entry, void* bootdata) {
 }
 
 size_t image_getsize(void* image, size_t sz) {
-  if (sz < sizeof(zircon_kernel_t)) {
+  if (sz < sizeof(zbi_kernel_image_t)) {
     return 0;
   }
-  zircon_kernel_t* kernel = image;
+  zbi_kernel_image_t* kernel = image;
   if ((kernel->hdr_file.type != ZBI_TYPE_CONTAINER) || (kernel->hdr_file.magic != ZBI_ITEM_MAGIC) ||
       (kernel->hdr_kernel.type != MY_ARCH_KERNEL_TYPE) ||
       (kernel->hdr_kernel.magic != ZBI_ITEM_MAGIC)) {
@@ -259,8 +259,8 @@ static int header_check(void* image, size_t sz, uint64_t* _entry, size_t* _flen,
     printf("boot: v1 bootdata kernel no longer supported\n");
     return -1;
   }
-  zircon_kernel_t* kernel = image;
-  if ((sz < sizeof(zircon_kernel_t)) || (kernel->hdr_kernel.type != MY_ARCH_KERNEL_TYPE) ||
+  zbi_kernel_image_t* kernel = image;
+  if ((sz < sizeof(zbi_kernel_image_t)) || (kernel->hdr_kernel.type != MY_ARCH_KERNEL_TYPE) ||
       ((kernel->hdr_kernel.flags & ZBI_FLAGS_VERSION) == 0)) {
     printf("boot: invalid zircon kernel header\n");
     return -1;
@@ -350,7 +350,7 @@ bool image_is_valid(void* image, size_t sz) {
       printf("image has invalid bootitem\n");
       return false;
     }
-    if (ZBI_IS_KERNEL_BOOTITEM(bd->type)) {
+    if ((bd->type & ZBI_TYPE_KERNEL_MASK) == ZBI_TYPE_KERNEL_PREFIX) {
       kernel = (empty && kernel == kKernelAbsent) ? kKernelFirst : kKernelLater;
     } else if (bd->type == ZBI_TYPE_STORAGE_BOOTFS) {
       bootfs = true;
@@ -745,7 +745,7 @@ int zbi_boot(efi_handle img, efi_system_table* sys, void* image, size_t sz) {
   size_t csz = cmdline_to_string(cmdline, sizeof(cmdline));
 
   // shrink original image header to include only the kernel
-  zircon_kernel_t* kernel = image;
+  zbi_kernel_image_t* kernel = image;
   kernel->hdr_file.length = sizeof(zbi_header_t) + klen;
 
   return boot_zircon(img, sys, image, roff, ramdisk, rsz, cmdline, csz);

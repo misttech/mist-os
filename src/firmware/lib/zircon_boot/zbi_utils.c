@@ -254,7 +254,7 @@ zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const 
 
 static bool GetKernelLength(const zbi_header_t* zbi, size_t* kernel_len,
                             size_t* kernel_and_scratch_memory_len) {
-  const zircon_kernel_t* kernel = (const zircon_kernel_t*)zbi;
+  const zbi_kernel_image_t* kernel = (const zbi_kernel_image_t*)zbi;
   zbi_result_t bootable_res = zbi_check_bootable(zbi, NULL);
   if (bootable_res != ZBI_RESULT_OK) {
     return false;
@@ -281,10 +281,10 @@ void* RelocateKernel(const zbi_header_t* zbi, void* relocate_addr, size_t* size)
     return NULL;
   }
 
-  const zircon_kernel_t* kernel = (const zircon_kernel_t*)zbi;
+  const zbi_kernel_image_t* kernel = (const zbi_kernel_image_t*)zbi;
   // Copy over the kernel
   memcpy(relocate_addr, kernel, kernel_len);
-  zircon_kernel_t* new_kernel = (zircon_kernel_t*)relocate_addr;
+  zbi_kernel_image_t* new_kernel = (zbi_kernel_image_t*)relocate_addr;
   new_kernel->hdr_file.length = (uint32_t)(kernel_len - sizeof(zbi_header_t));
   // Calculate the entry point.
   uintptr_t entry_point = (uintptr_t)relocate_addr + kernel->data_kernel.entry;

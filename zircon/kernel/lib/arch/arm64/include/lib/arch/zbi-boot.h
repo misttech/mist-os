@@ -8,7 +8,7 @@
 #define ZIRCON_KERNEL_LIB_ARCH_ARM64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 
 #include <lib/arch/cache.h>
-#include <lib/zbi-format/kernel.h>
+#include <lib/arch/zbi.h>
 
 #include <cstdint>
 
@@ -49,7 +49,7 @@ constexpr uintptr_t kZbiBootDataAlignment = 1 << 12;
 // must be aligned to 64K and the data ZBI to 4K, as per the ZBI spec.  This
 // can be called in physical address mode or with identity mapping that covers
 // at least the kernel plus its reserve_memory_size and the whole data ZBI.
-[[noreturn]] inline void ZbiBoot(zircon_kernel_t* kernel, void* arg) {
+[[noreturn]] inline void ZbiBoot(ZbiKernelImage* kernel, void* arg) {
   auto entry = reinterpret_cast<uintptr_t>(kernel) + kernel->data_kernel.entry;
   uintptr_t raw_entry = static_cast<uintptr_t>(entry);
   ZX_ASSERT(raw_entry == entry);

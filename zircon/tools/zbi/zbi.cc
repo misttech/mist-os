@@ -1518,7 +1518,7 @@ Extracted items use the file names shown below:\n\
       } else if (auto ext = TypeExtension(header_.type); ext != nullptr && !strcmp(ext, ".txt")) {
         writer.Key(key);
         EmitJsonCmdline(writer);
-      } else if (ZBI_IS_KERNEL_BOOTITEM(header_.type) && !payload_.empty() &&
+      } else if (zbitl::TypeIsKernel(header_.type) && !payload_.empty() &&
                  payload_.front().iov_len >= sizeof(zbi_kernel_t)) {
         zbi_kernel_t khdr;
         memcpy(&khdr, payload_.front().iov_base, sizeof(khdr));
@@ -2093,7 +2093,7 @@ const char* BootableImage(const ItemList& items, const uint32_t image_arch) {
     return "empty ZBI";
   }
 
-  if (!ZBI_IS_KERNEL_BOOTITEM(items.front()->type())) {
+  if (!zbitl::TypeIsKernel(items.front()->type())) {
     return "first item not KERNEL";
   }
 
@@ -2785,9 +2785,7 @@ int main(int argc, char** argv) {
   if (outfile && bootable != kImageArchUndefined) {
     // The only hard requirement is that the kernel be first.
     std::stable_sort(items.begin(), items.end(), [](const ItemPtr& a, const ItemPtr& b) {
-      constexpr auto item_rank = [](uint32_t type) {
-        return (ZBI_IS_KERNEL_BOOTITEM(type) ? 0 : 1);
-      };
+      constexpr auto item_rank = [](uint32_t type) { return (zbitl::TypeIsKernel(type) ? 0 : 1); };
       return item_rank(a->type()) < item_rank(b->type());
     });
   }

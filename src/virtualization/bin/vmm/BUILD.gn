@@ -129,6 +129,7 @@ source_set("lib") {
     "//src/lib/fsl",
     "//src/lib/zbitl",
     "//src/virtualization/third_party/fdt",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]

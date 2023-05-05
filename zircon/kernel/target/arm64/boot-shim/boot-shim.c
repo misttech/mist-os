@@ -12,6 +12,7 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/memory.h>
+#include <lib/zbi/zbi.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -20,7 +21,6 @@
 #include "debug.h"
 #include "devicetree.h"
 #include "util.h"
-#include "zbi.h"
 
 // used in boot-shim-config.h and in this file below
 static void append_boot_item(zbi_header_t* container, uint32_t type, uint32_t extra,
@@ -327,7 +327,7 @@ static void list_zbi(zbi_header_t* zbi) {
 boot_shim_return_t boot_shim(void* device_tree) {
   uart_puts("boot_shim: hi there!\n");
 
-  zircon_kernel_t* kernel = NULL;
+  zbi_kernel_image_t* kernel = NULL;
 
   // Check the ZBI from device tree.
   device_tree_context_t ctx;
@@ -337,7 +337,7 @@ boot_shim_return_t boot_shim(void* device_tree) {
     zbi_result_t check = zbi_check(zbi, &bad_hdr);
     if (check == ZBI_RESULT_OK && zbi->length > sizeof(zbi_header_t) &&
         zbi[1].type == ZBI_TYPE_KERNEL_ARM64) {
-      kernel = (zircon_kernel_t*)zbi;
+      kernel = (zbi_kernel_image_t*)zbi;
     } else {
       // No valid ZBI in device tree.
       // We will look in embedded_zbi instead.
@@ -451,7 +451,7 @@ boot_shim_return_t boot_shim(void* device_tree) {
       *zbi = header;
 #else
       // Just mark the original kernel item as to be ignored.
-      ((zircon_kernel_t*)zbi)->hdr_kernel.type = ZBI_TYPE_DISCARD;
+      ((zbi_kernel_image_t*)zbi)->hdr_kernel.type = ZBI_TYPE_DISCARD;
 #endif
 
 #if RELOCATE_KERNEL

@@ -225,7 +225,7 @@ zbi_result_t zbi_create_entry(void* base, size_t capacity, uint32_t type, uint32
   }
 
   // Update the container header, always keeping the length aligned.
-  hdr->length += sizeof(*new_header) + new_header->length;
+  hdr->length += (uint32_t)sizeof(*new_header) + new_header->length;
   if (hdr->length % ZBI_ALIGNMENT != 0) {
     // It was already verified that the capacity can fit the aligned length.
     uint32_t aligned_length = ZBI_ALIGN(hdr->length);
@@ -268,7 +268,7 @@ zbi_result_t zbi_get_next_entry_payload(void* base, size_t capacity, void** payl
 
   // The next payload starts after the current container + the next header.
   *payload = (uint8_t*)(hdr + 2) + hdr->length;
-  *max_payload_length = available - sizeof(*hdr);
+  *max_payload_length = (uint32_t)(available - sizeof(*hdr));
   return ZBI_RESULT_OK;
 }
 
