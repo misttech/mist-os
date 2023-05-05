@@ -42,7 +42,7 @@ pub fn merge(
     }
 
     let json_str = if files.iter().all(|f| f.to_str().unwrap().ends_with(".cml")) {
-        let mut document = util::read_cml(&files.pop().unwrap())?;
+        let mut document = util::read_cml(&files.remove(0))?;
         for file in &files {
             let mut include_document = util::read_cml(&file)?;
             document.merge_from(&mut include_document, &file)?;
@@ -271,10 +271,10 @@ mod tests {
         let expected_json = json!({
             "use": [
                 {
-                    "protocol": "foo"
+                    "protocol": "bar"
                 },
                 {
-                    "protocol": "bar"
+                    "protocol": "foo"
                 }
             ]
         });

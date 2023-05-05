@@ -582,23 +582,24 @@ instance or a [child collection][doc-collections].
 - `event_stream`: (_optional `string or array of strings`_) (`event_stream` only) the name(s) of the event streams being offered.
 - `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
     components defined in the scope.
-- `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
-    of:
+- `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. Affects
+    build-time CML validation and runtime error reporting. One of:
     - `required` (default): a required dependency, the source must exist and provide it. Use
         this when the target of this offer requires this capability to function properly.
-    - `optional`: an optional dependency. Use this when the target of this will function
-        properly if it does or does not not receive this capability. If the target consumes
-        this capability, the target must do so as `optional`. The source of this capability
-        may be `void`, and therefore not provide it.
+    - `optional`: an optional dependency. Use this when the target of the offer can function
+        with or without this capability. The target must `use` the capability with
+        `availability` set to `optional`. The source of this offer must _terminate_ with either
+        `void` or an actual component.
     - `same_as_target`: the availability expectations of this capability will match the
         target's. If the target requires the capability, then this field is set to `required`.
         If the target has an optional dependency on the capability, then the field is set to
         `optional`.
-    - `transitional`: the source may omit the route completely without even having to route
-        from `void`. Used for soft transitions that introduce new capabilities.
-- `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. If set to `unknown`, the source of this
-    offer will be rewritten to `void` if the source does not exist (i.e. is not defined in this
-    manifest). Defaults to `required`.
+    - `transitional`: like `optional`, but will tolerate a missing source. Use this
+        only to avoid validation errors during transitional periods of multi-step code changes.
+- `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. One of:
+    - `required` (default): the source (`from`) must be defined in this manifest.
+    - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)
+        is not defined in this manifest after includes are processed.
 
 Example:
 

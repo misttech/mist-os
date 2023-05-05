@@ -1133,6 +1133,8 @@ impl Document {
         self.merge_facets(other, include_path)?;
         self.merge_config(other, include_path)?;
 
+        self.dedup_uses();
+
         Ok(())
     }
 
@@ -1316,6 +1318,36 @@ impl Document {
             }
         }
         Ok(())
+    }
+
+    fn dedup_uses(&mut self) {
+        // List of allowed promotions in `use` availability clauses as (from, to). Example: when a duplicate
+        // `use` differs only because on has availability "optional" and the other is "required",
+        // remove the "optional" variant.
+        let allowed_promotions = [
+            (Availability::Optional, Availability::Required),
+            (Availability::Transitional, Availability::Required),
+            (Availability::Transitional, Availability::Optional),
+        ];
+
+        // Synthesize the less restrictive variants of every `use` in the list above
+        // if the more restrictive variant is present, and blindly remove those less restrictive
+        // variants from `self.use`.
+        if let Some(uses) = &mut self.r#use {
+            let mut dedup_candidates = vec![];
+            for u in uses.iter() {
+                let current_val = u.availability.as_ref().unwrap_or(&Availability::Required);
+                for (from_val, to_val) in allowed_promotions.iter() {
+                    if to_val == current_val {
+                        let mut candidate = u.clone();
+                        candidate.availability = Some(from_val.clone());
+                        dedup_candidates.push(candidate);
+                    }
+                }
+            }
+
+            uses.retain(|u| !dedup_candidates.contains(u));
+        }
     }
 
     pub fn includes(&self) -> Vec<String> {
@@ -2265,26 +2297,27 @@ pub struct Offer {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
 
-    /// `availability` _(optional)_: The expectations around this capability's availability. One
-    /// of:
+    /// `availability` _(optional)_: The expectations around this capability's availability. Affects
+    /// build-time CML validation and runtime error reporting. One of:
     /// - `required` (default): a required dependency, the source must exist and provide it. Use
     ///     this when the target of this offer requires this capability to function properly.
-    /// - `optional`: an optional dependency. Use this when the target of this will function
-    ///     properly if it does or does not not receive this capability. If the target consumes
-    ///     this capability, the target must do so as `optional`. The source of this capability
-    ///     may be `void`, and therefore not provide it.
+    /// - `optional`: an optional dependency. Use this when the target of the offer can function
+    ///     with or without this capability. The target must `use` the capability with
+    ///     `availability` set to `optional`. The source of this offer must _terminate_ with either
+    ///     `void` or an actual component.
     /// - `same_as_target`: the availability expectations of this capability will match the
     ///     target's. If the target requires the capability, then this field is set to `required`.
     ///     If the target has an optional dependency on the capability, then the field is set to
     ///     `optional`.
-    /// - `transitional`: the source may omit the route completely without even having to route
-    ///     from `void`. Used for soft transitions that introduce new capabilities.
+    /// - `transitional`: like `optional`, but will tolerate a missing source. Use this
+    ///     only to avoid validation errors during transitional periods of multi-step code changes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
-    /// Whether or not the source of this offer must exist. If set to `unknown`, the source of this
-    /// offer will be rewritten to `void` if the source does not exist (i.e. is not defined in this
-    /// manifest). Defaults to `required`.
+    /// Whether or not the source of this offer must exist. One of:
+    /// - `required` (default): the source (`from`) must be defined in this manifest.
+    /// - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)
+    ///     is not defined in this manifest after includes are processed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_availability: Option<SourceAvailability>,
 }
@@ -3483,6 +3516,32 @@ mod tests {
             uses[1].protocol.as_ref().unwrap(),
             &OneOrMany::One("bar".parse::<Name>().unwrap())
         );
+    }
+
+    #[test]
+    fn test_merge_upgraded_uses() {
+        let mut some =
+            document(json!({ "use": [{ "protocol": "foo", "availability": "optional" }] }));
+        let mut other1 = document(json!({ "use": [{ "protocol": "foo" }] }));
+        let mut other2 =
+            document(json!({ "use": [{ "protocol": "foo", "availability": "transitional" }] }));
+        let mut other3 =
+            document(json!({ "use": [{ "protocol": "foo", "availability": "same_as_target" }] }));
+        some.merge_from(&mut other1, &Path::new("some/path")).unwrap();
+        some.merge_from(&mut other2, &Path::new("some/path")).unwrap();
+        some.merge_from(&mut other3, &Path::new("some/path")).unwrap();
+        let uses = some.r#use.as_ref().unwrap();
+        assert_eq!(uses.len(), 2);
+        assert_eq!(
+            uses[0].protocol.as_ref().unwrap(),
+            &OneOrMany::One("foo".parse::<Name>().unwrap())
+        );
+        assert!(uses[0].availability.is_none());
+        assert_eq!(
+            uses[1].protocol.as_ref().unwrap(),
+            &OneOrMany::One("foo".parse::<Name>().unwrap())
+        );
+        assert_eq!(uses[1].availability.as_ref().unwrap(), &Availability::SameAsTarget,);
     }
 
     #[test]
