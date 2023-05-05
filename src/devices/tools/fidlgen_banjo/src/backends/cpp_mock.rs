@@ -371,7 +371,7 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
             .iter()
             .map(|m| {
                 let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
-                let in_params = get_in_params_cpp(&m, true, false, ir)?;
+                let in_params = get_in_params(&m, true, false, ir)?;
 
                 let params = in_params.into_iter().chain(out_params).collect::<Vec<_>>().join(", ");
 

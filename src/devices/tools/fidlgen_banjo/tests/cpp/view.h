@@ -12,7 +12,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -50,11 +49,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class ViewProtocol : public Base {
 public:
     ViewProtocol() {
-        view_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckViewProtocolSubclass<D>();
         view_protocol_ops_.move_to = ViewMoveTo;
 
@@ -67,23 +65,12 @@ public:
         }
     }
 
-    const void* view_protocol_server_driver() const {
-        return view_protocol_server_driver_;
-    }
-
 protected:
     view_protocol_ops_t view_protocol_ops_ = {};
-    const void* view_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->view_protocol_server_driver();
-    }
-
     static void ViewMoveTo(void* ctx, const point_t* p) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ViewMoveTo(p);
-        fdf_env_register_driver_exit();
     }
 };
 

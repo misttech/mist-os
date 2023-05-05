@@ -39,11 +39,6 @@ public:
 
     const synchronous_handle_protocol_t* GetProto() const { return &proto_; }
 
-    const void* synchronous_handle_protocol_server_driver() const {
-        return synchronous_handle_protocol_server_driver_;
-    }
-
-
     virtual MockSynchronousHandle& ExpectHandle(const zx::handle& h, zx::handle out_h, zx::handle out_h2) {
         mock_handle_.ExpectCall({std::move(out_h), std::move(out_h2)}, h.get());
         return *this;
@@ -317,11 +312,6 @@ public:
 
     const async_handle_protocol_t* GetProto() const { return &proto_; }
 
-    const void* async_handle_protocol_server_driver() const {
-        return async_handle_protocol_server_driver_;
-    }
-
-
     virtual MockAsyncHandle& ExpectHandle(const zx::handle& h, zx::handle out_h, zx::handle out_h2) {
         mock_handle_.ExpectCall({std::move(out_h), std::move(out_h2)}, h.get());
         return *this;
@@ -577,11 +567,6 @@ public:
     virtual ~MockAnotherSynchronousHandle() {}
 
     const another_synchronous_handle_protocol_t* GetProto() const { return &proto_; }
-
-    const void* another_synchronous_handle_protocol_server_driver() const {
-        return another_synchronous_handle_protocol_server_driver_;
-    }
-
 
     virtual MockAnotherSynchronousHandle& ExpectHandle(const zx::handle& h, zx::handle out_h, zx::handle out_h2) {
         mock_handle_.ExpectCall({std::move(out_h), std::move(out_h2)}, h.get());

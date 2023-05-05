@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -51,11 +50,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class ActionProtocolProtocol : public Base {
 public:
     ActionProtocolProtocol() {
-        action_protocol_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckActionProtocolProtocolSubclass<D>();
         action_protocol_protocol_ops_.register_callback = ActionProtocolRegisterCallback;
         action_protocol_protocol_ops_.get_callback = ActionProtocolGetCallback;
@@ -69,29 +67,16 @@ public:
         }
     }
 
-    const void* action_protocol_protocol_server_driver() const {
-        return action_protocol_protocol_server_driver_;
-    }
-
 protected:
     action_protocol_protocol_ops_t action_protocol_protocol_ops_ = {};
-    const void* action_protocol_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->action_protocol_protocol_server_driver();
-    }
-
     static zx_status_t ActionProtocolRegisterCallback(void* ctx, uint32_t id, const action_notify_t* cb) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->ActionProtocolRegisterCallback(id, cb);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t ActionProtocolGetCallback(void* ctx, uint32_t id, action_notify_t* out_cb) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->ActionProtocolGetCallback(id, out_cb);
-        fdf_env_register_driver_exit();
         return ret;
     }
 };

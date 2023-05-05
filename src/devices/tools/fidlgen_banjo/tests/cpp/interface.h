@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -54,93 +53,33 @@
 namespace ddk {
 // An interface for a device that's able to create and deliver cookies!
 
-template <typename D, bool runtime_enforce_no_reentrancy = false>
+template <typename D>
 class CookieMakerProtocol : public internal::base_mixin {
 public:
     CookieMakerProtocol() {
-        cookie_maker_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckCookieMakerProtocolSubclass<D>();
         cookie_maker_protocol_ops_.prep = CookieMakerPrep;
         cookie_maker_protocol_ops_.bake = CookieMakerBake;
         cookie_maker_protocol_ops_.deliver = CookieMakerDeliver;
     }
 
-    const void* cookie_maker_protocol_server_driver() const {
-        return cookie_maker_protocol_server_driver_;
-    }
-
 protected:
     cookie_maker_protocol_ops_t cookie_maker_protocol_ops_ = {};
-    const void* cookie_maker_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->cookie_maker_protocol_server_driver();
-    }
-
     // Asynchonously preps a cookie.
     static void CookieMakerPrep(void* ctx, cookie_kind_t cookie, cookie_maker_prep_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                cookie_maker_prep_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, uint64_t token) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, token);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->CookieMakerPrep(cookie, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     // Asynchonously bakes a cookie.
     // Must only be called after preping finishes.
     static void CookieMakerBake(void* ctx, uint64_t token, zx_time_t time, cookie_maker_bake_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                cookie_maker_bake_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_status_t s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->CookieMakerBake(token, time, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     // Synchronously deliver a cookie.
     // Must be called only after Bake finishes.
     static zx_status_t CookieMakerDeliver(void* ctx, uint64_t token) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->CookieMakerDeliver(token);
-        fdf_env_register_driver_exit();
         return ret;
     }
 };
@@ -187,40 +126,26 @@ private:
 };
 // An interface for storing cookies.
 
-template <typename D, bool runtime_enforce_no_reentrancy = false>
+template <typename D>
 class CookieJarrerProtocol : public internal::base_mixin {
 public:
     CookieJarrerProtocol() {
-        cookie_jarrer_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckCookieJarrerProtocolSubclass<D>();
         cookie_jarrer_protocol_ops_.place = CookieJarrerPlace;
         cookie_jarrer_protocol_ops_.take = CookieJarrerTake;
     }
 
-    const void* cookie_jarrer_protocol_server_driver() const {
-        return cookie_jarrer_protocol_server_driver_;
-    }
-
 protected:
     cookie_jarrer_protocol_ops_t cookie_jarrer_protocol_ops_ = {};
-    const void* cookie_jarrer_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->cookie_jarrer_protocol_server_driver();
-    }
-
     // Place a cookie in the named jar. If no jar with the supplied name exists, one is created.
     static void CookieJarrerPlace(void* ctx, const char* name) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->CookieJarrerPlace(name);
-        fdf_env_register_driver_exit();
     }
     // Who took a cookie from the cookie jar?
     static cookie_kind_t CookieJarrerTake(void* ctx, const char* name) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->CookieJarrerTake(name);
-        fdf_env_register_driver_exit();
         return ret;
     }
 };
@@ -260,11 +185,10 @@ private:
 };
 // Protocol for a baker who outsources all of it's baking duties to others.
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class BakerProtocol : public Base {
 public:
     BakerProtocol() {
-        baker_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckBakerProtocolSubclass<D>();
         baker_protocol_ops_.register = BakerRegister;
         baker_protocol_ops_.change = BakerChange;
@@ -279,37 +203,22 @@ public:
         }
     }
 
-    const void* baker_protocol_server_driver() const {
-        return baker_protocol_server_driver_;
-    }
-
 protected:
     baker_protocol_ops_t baker_protocol_ops_ = {};
-    const void* baker_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->baker_protocol_server_driver();
-    }
-
     // Registers a cookie maker device which the baker can use, and a cookie jar into
     // which they can place their completed cookies.
     static void BakerRegister(void* ctx, const cookie_maker_protocol_t* intf, const cookie_jarrer_protocol_t* jar) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->BakerRegister(intf, jar);
-        fdf_env_register_driver_exit();
     }
     // Swap out the maker or jarrer for a different one.
     static void BakerChange(void* ctx, const change_args_t* payload, change_args_t* out_payload) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->BakerChange(payload, out_payload);
-        fdf_env_register_driver_exit();
     }
     // De-registers a cookie maker device when it's no longer available.
     static void BakerDeRegister(void* ctx) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->BakerDeRegister();
-        fdf_env_register_driver_exit();
     }
 };
 

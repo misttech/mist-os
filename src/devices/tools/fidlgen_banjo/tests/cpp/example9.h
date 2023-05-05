@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/handle.h>
 #include <zircon/assert.h>
@@ -63,11 +62,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class EchoProtocol : public Base {
 public:
     EchoProtocol() {
-        echo_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckEchoProtocolSubclass<D>();
         echo_protocol_ops_.echo32 = EchoEcho32;
         echo_protocol_ops_.echo64 = EchoEcho64;
@@ -86,60 +84,37 @@ public:
         }
     }
 
-    const void* echo_protocol_server_driver() const {
-        return echo_protocol_server_driver_;
-    }
-
 protected:
     echo_protocol_ops_t echo_protocol_ops_ = {};
-    const void* echo_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->echo_protocol_server_driver();
-    }
-
     static uint32_t EchoEcho32(void* ctx, uint32_t uint32) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->EchoEcho32(uint32);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint64_t EchoEcho64(void* ctx, uint64_t uint64) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->EchoEcho64(uint64);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static echo_me_t EchoEchoEnum(void* ctx, echo_me_t req) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->EchoEchoEnum(req);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static void EchoEchoHandle(void* ctx, zx_handle_t req, zx_handle_t* out_response) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::handle out_response2;
         static_cast<D*>(ctx)->EchoEchoHandle(zx::handle(req), &out_response2);
         *out_response = out_response2.release();
-        fdf_env_register_driver_exit();
     }
     static void EchoEchoChannel(void* ctx, zx_handle_t req, zx_handle_t* out_response) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::channel out_response2;
         static_cast<D*>(ctx)->EchoEchoChannel(zx::channel(req), &out_response2);
         *out_response = out_response2.release();
-        fdf_env_register_driver_exit();
     }
     static void EchoEchoStruct(void* ctx, const echo_more_t* req, echo_more_t* out_response) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->EchoEchoStruct(req, out_response);
-        fdf_env_register_driver_exit();
     }
     static void EchoEchoEmpty(void* ctx, echo_echo_empty_result_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->EchoEchoEmpty(out_result);
-        fdf_env_register_driver_exit();
     }
 };
 

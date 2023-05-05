@@ -40,11 +40,6 @@ public:
 
     const vector_of_vectors_protocol_t* GetProto() const { return &proto_; }
 
-    const void* vector_of_vectors_protocol_server_driver() const {
-        return vector_of_vectors_protocol_server_driver_;
-    }
-
-
     virtual MockVectorOfVectors& ExpectBool(std::vector<bool> b, std::vector<bool> out_b) {
         mock_bool_.ExpectCall({std::move(out_b)}, std::move(b));
         return *this;
@@ -248,11 +243,6 @@ public:
 
     const vector_protocol_t* GetProto() const { return &proto_; }
 
-    const void* vector_protocol_server_driver() const {
-        return vector_protocol_server_driver_;
-    }
-
-
     virtual MockVector& ExpectBool(std::vector<bool> b, std::vector<bool> out_b) {
         mock_bool_.ExpectCall({std::move(out_b)}, std::move(b));
         return *this;
@@ -455,11 +445,6 @@ public:
     virtual ~MockVector2() {}
 
     const vector2_protocol_t* GetProto() const { return &proto_; }
-
-    const void* vector2_protocol_server_driver() const {
-        return vector2_protocol_server_driver_;
-    }
-
 
     virtual MockVector2& ExpectBool(std::vector<bool> b, std::vector<bool> out_b) {
         mock_bool_.ExpectCall({std::move(out_b)}, std::move(b));

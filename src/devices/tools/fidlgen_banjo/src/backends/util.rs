@@ -336,135 +336,6 @@ pub fn name_size(maybe_attributes: &Option<Vec<Attribute>>) -> &'static str {
     }
 }
 
-pub fn type_to_c_str(ty: &Type, ir: &FidlIr) -> Result<String, Error> {
-    match ty {
-        Type::Array { ref element_type, .. } => type_to_c_str(element_type, ir),
-        Type::Vector { ref element_type, .. } => type_to_c_str(element_type, ir),
-        Type::Str { .. } => Ok(String::from("char*")),
-        Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
-        Type::Identifier { identifier, .. } => match ir
-            .get_declaration(identifier)
-            .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
-        {
-            Declaration::Struct
-            | Declaration::Table
-            | Declaration::Union
-            | Declaration::Enum
-            | Declaration::Bits => Ok(format!("{}_t", to_c_name(&identifier.get_name()))),
-            Declaration::Protocol => {
-                let c_name = to_c_name(&identifier.get_name());
-                if not_callback(identifier, ir)? {
-                    return Ok(format!("{}_protocol_t", c_name));
-                } else {
-                    return Ok(format!("{}_t", c_name));
-                }
-            }
-            _ => Err(anyhow!("Identifier type not handled: {:?}", identifier)),
-        },
-        Type::Handle { .. } => Ok(String::from("zx_handle_t")),
-        _ => Err(anyhow!("Type not handled: {:?}", ty)),
-    }
-}
-
-pub fn protocol_to_ops_c_str(id: &CompoundIdentifier, ir: &FidlIr) -> Result<String, Error> {
-    if ir.is_protocol(id) {
-        return Ok(to_c_name(id.get_name()) + "_protocol_ops_t");
-    }
-    Err(anyhow!("Identifier does not represent a protocol: {:?}", id))
-}
-
-pub fn get_in_params_c(m: &Method, transform: bool, ir: &FidlIr) -> Result<Vec<String>, Error> {
-    m.request_parameters(ir)?
-        .as_ref()
-        .unwrap()
-        .iter()
-        .map(|param| {
-            let c_name = to_c_name(&param.name.0);
-            if let Some(arg_type) = get_base_type_from_alias(
-                &param.experimental_maybe_from_alias.as_ref().map(|t| &t.name),
-            ) {
-                return Ok(format!("{} {}", arg_type, c_name));
-            }
-            let ty_name = type_to_c_str(&param._type, ir)?;
-            match &param._type {
-                Type::Identifier { identifier, .. } => {
-                    if identifier.is_base_type() {
-                        return Ok(format!("{} {}", ty_name, c_name));
-                    }
-                    match ir.get_declaration(identifier).unwrap() {
-                        Declaration::Protocol => {
-                            if transform && not_callback(identifier, ir)? {
-                                let ty_name = protocol_to_ops_c_str(identifier, ir).unwrap();
-                                Ok(format!(
-                                    "void* {name}_ctx, const {ty_name}* {name}_ops",
-                                    ty_name = ty_name,
-                                    name = c_name
-                                ))
-                            } else {
-                                Ok(format!("const {}* {}", ty_name, c_name))
-                            }
-                        }
-                        Declaration::Struct | Declaration::Table | Declaration::Union => {
-                            let prefix = if param.maybe_attributes.has("InOut")
-                                || param.maybe_attributes.has("Mutable")
-                            {
-                                ""
-                            } else {
-                                "const "
-                            };
-                            Ok(format!("{}{}* {}", prefix, ty_name, c_name))
-                        }
-                        Declaration::Bits | Declaration::Enum => {
-                            Ok(format!("{} {}", ty_name, c_name))
-                        }
-                        decl => Err(anyhow!("Unsupported declaration: {:?}", decl)),
-                    }
-                }
-                Type::Str { .. } => Ok(format!("const {} {}", ty_name, c_name)),
-                Type::Array { .. } => {
-                    let bounds = array_bounds(&param._type).unwrap();
-                    Ok(format!(
-                        "const {ty} {name}{bounds}",
-                        bounds = bounds,
-                        ty = ty_name,
-                        name = c_name
-                    ))
-                }
-                Type::Vector { .. } => {
-                    let ptr = if param.maybe_attributes.has("InnerPointer") { "*" } else { "" };
-                    Ok(format!(
-                        "const {ty}{ptr}* {name}_{buffer}, size_t {name}_{size}",
-                        buffer = name_buffer(&param.maybe_attributes),
-                        size = name_size(&param.maybe_attributes),
-                        ty = ty_name,
-                        ptr = ptr,
-                        name = c_name
-                    ))
-                }
-                _ => Ok(format!("{} {}", ty_name, c_name)),
-            }
-        })
-        .collect()
-}
-
-pub fn get_in_args_c(m: &Method, _ir: &FidlIr) -> Result<Vec<String>, Error> {
-    if let Some(request) = &m.request_parameters(_ir)? {
-        return request
-            .iter()
-            .map(|param| match &param._type {
-                Type::Vector { .. } => Ok(format!(
-                    "{name}_{buffer}, {name}_{size}",
-                    buffer = name_buffer(&param.maybe_attributes),
-                    size = name_size(&param.maybe_attributes),
-                    name = to_c_name(&param.name.0)
-                )),
-                _ => Ok(format!("{}", to_c_name(&param.name.0))),
-            })
-            .collect();
-    }
-    Ok(Vec::new())
-}
-
 //--------------------------------------------
 // Utilities shared by the three C++ backends.
 
@@ -575,7 +446,7 @@ pub fn get_first_param(method: &Method, ir: &FidlIr) -> Result<(bool, String), E
     Ok((false, "void".to_string()))
 }
 
-pub fn get_in_params_cpp(
+pub fn get_in_params(
     m: &Method,
     wrappers: bool,
     transform: bool,

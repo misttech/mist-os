@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -49,11 +48,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class SomeMethodsProtocol : public Base {
 public:
     SomeMethodsProtocol() {
-        some_methods_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckSomeMethodsProtocolSubclass<D>();
         some_methods_protocol_ops_.do_something = SomeMethodsDoSomething;
 
@@ -66,23 +64,12 @@ public:
         }
     }
 
-    const void* some_methods_protocol_server_driver() const {
-        return some_methods_protocol_server_driver_;
-    }
-
 protected:
     some_methods_protocol_ops_t some_methods_protocol_ops_ = {};
-    const void* some_methods_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->some_methods_protocol_server_driver();
-    }
-
     static void SomeMethodsDoSomething(void* ctx, const uint8_t* input_buffer, size_t input_size) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->SomeMethodsDoSomething(input_buffer, input_size);
-        fdf_env_register_driver_exit();
     }
 };
 

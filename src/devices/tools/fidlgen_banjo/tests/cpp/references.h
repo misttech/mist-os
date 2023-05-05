@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -53,11 +52,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class InOutProtocolProtocol : public Base {
 public:
     InOutProtocolProtocol() {
-        in_out_protocol_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckInOutProtocolProtocolSubclass<D>();
         in_out_protocol_protocol_ops_.do_something = InOutProtocolDoSomething;
         in_out_protocol_protocol_ops_.do_some_other_thing = InOutProtocolDoSomeOtherThing;
@@ -72,33 +70,18 @@ public:
         }
     }
 
-    const void* in_out_protocol_protocol_server_driver() const {
-        return in_out_protocol_protocol_server_driver_;
-    }
-
 protected:
     in_out_protocol_protocol_ops_t in_out_protocol_protocol_ops_ = {};
-    const void* in_out_protocol_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->in_out_protocol_protocol_server_driver();
-    }
-
     static void InOutProtocolDoSomething(void* ctx, some_type_t* param) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InOutProtocolDoSomething(param);
-        fdf_env_register_driver_exit();
     }
     static void InOutProtocolDoSomeOtherThing(void* ctx, const some_type_t* param) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InOutProtocolDoSomeOtherThing(param);
-        fdf_env_register_driver_exit();
     }
     static void InOutProtocolDoSomeDefaultThing(void* ctx, const some_type_t* param) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InOutProtocolDoSomeDefaultThing(param);
-        fdf_env_register_driver_exit();
     }
 };
 

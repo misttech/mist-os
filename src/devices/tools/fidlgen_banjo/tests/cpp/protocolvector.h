@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -167,11 +166,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class VectorOfVectorsProtocol : public Base {
 public:
     VectorOfVectorsProtocol() {
-        vector_of_vectors_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckVectorOfVectorsProtocolSubclass<D>();
         vector_of_vectors_protocol_ops_.bool = VectorOfVectorsBool;
         vector_of_vectors_protocol_ops_.int8 = VectorOfVectorsInt8;
@@ -195,78 +193,45 @@ public:
         }
     }
 
-    const void* vector_of_vectors_protocol_server_driver() const {
-        return vector_of_vectors_protocol_server_driver_;
-    }
-
 protected:
     vector_of_vectors_protocol_ops_t vector_of_vectors_protocol_ops_ = {};
-    const void* vector_of_vectors_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->vector_of_vectors_protocol_server_driver();
-    }
-
     static void VectorOfVectorsBool(void* ctx, const bool* b_list, size_t b_count, bool* out_b_list, size_t b_count, size_t* out_b_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsBool(b_list, b_count, out_b_list, b_count, out_b_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsInt8(void* ctx, const int8_t* i8_list, size_t i8_count, int8_t* out_i8_list, size_t i8_count, size_t* out_i8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsInt8(i8_list, i8_count, out_i8_list, i8_count, out_i8_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsInt16(void* ctx, const int16_t* i16_list, size_t i16_count, int16_t* out_i16_list, size_t i16_count, size_t* out_i16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsInt16(i16_list, i16_count, out_i16_list, i16_count, out_i16_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsInt32(void* ctx, const int32_t* i32_list, size_t i32_count, int32_t* out_i32_list, size_t i32_count, size_t* out_i32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsInt32(i32_list, i32_count, out_i32_list, i32_count, out_i32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsInt64(void* ctx, const int64_t* i64_list, size_t i64_count, int64_t* out_i64_list, size_t i64_count, size_t* out_i64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsInt64(i64_list, i64_count, out_i64_list, i64_count, out_i64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsUint8(void* ctx, const uint8_t* u8_list, size_t u8_count, uint8_t* out_u8_list, size_t u8_count, size_t* out_u8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsUint8(u8_list, u8_count, out_u8_list, u8_count, out_u8_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsUint16(void* ctx, const uint16_t* u16_list, size_t u16_count, uint16_t* out_u16_list, size_t u16_count, size_t* out_u16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsUint16(u16_list, u16_count, out_u16_list, u16_count, out_u16_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsUint32(void* ctx, const uint32_t* u32_list, size_t u32_count, uint32_t* out_u32_list, size_t u32_count, size_t* out_u32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsUint32(u32_list, u32_count, out_u32_list, u32_count, out_u32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsUint64(void* ctx, const uint64_t* u64_list, size_t u64_count, uint64_t* out_u64_list, size_t u64_count, size_t* out_u64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsUint64(u64_list, u64_count, out_u64_list, u64_count, out_u64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsFloat32(void* ctx, const float* f32_list, size_t f32_count, float* out_f32_list, size_t f32_count, size_t* out_f32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsFloat32(f32_list, f32_count, out_f32_list, f32_count, out_f32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsFloat64(void* ctx, const double* u64_list, size_t u64_count, double* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsFloat64(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorOfVectorsHandle(void* ctx, const zx_handle_t* u64_list, size_t u64_count, zx_handle_t* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorOfVectorsHandle(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -394,11 +359,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class VectorProtocol : public Base {
 public:
     VectorProtocol() {
-        vector_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckVectorProtocolSubclass<D>();
         vector_protocol_ops_.bool = VectorBool;
         vector_protocol_ops_.int8 = VectorInt8;
@@ -422,78 +386,45 @@ public:
         }
     }
 
-    const void* vector_protocol_server_driver() const {
-        return vector_protocol_server_driver_;
-    }
-
 protected:
     vector_protocol_ops_t vector_protocol_ops_ = {};
-    const void* vector_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->vector_protocol_server_driver();
-    }
-
     static void VectorBool(void* ctx, const bool* b_list, size_t b_count, bool* out_b_list, size_t b_count, size_t* out_b_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorBool(b_list, b_count, out_b_list, b_count, out_b_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorInt8(void* ctx, const int8_t* i8_list, size_t i8_count, int8_t* out_i8_list, size_t i8_count, size_t* out_i8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorInt8(i8_list, i8_count, out_i8_list, i8_count, out_i8_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorInt16(void* ctx, const int16_t* i16_list, size_t i16_count, int16_t* out_i16_list, size_t i16_count, size_t* out_i16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorInt16(i16_list, i16_count, out_i16_list, i16_count, out_i16_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorInt32(void* ctx, const int32_t* i32_list, size_t i32_count, int32_t* out_i32_list, size_t i32_count, size_t* out_i32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorInt32(i32_list, i32_count, out_i32_list, i32_count, out_i32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorInt64(void* ctx, const int64_t* i64_list, size_t i64_count, int64_t* out_i64_list, size_t i64_count, size_t* out_i64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorInt64(i64_list, i64_count, out_i64_list, i64_count, out_i64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorUint8(void* ctx, const uint8_t* u8_list, size_t u8_count, uint8_t* out_u8_list, size_t u8_count, size_t* out_u8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorUint8(u8_list, u8_count, out_u8_list, u8_count, out_u8_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorUint16(void* ctx, const uint16_t* u16_list, size_t u16_count, uint16_t* out_u16_list, size_t u16_count, size_t* out_u16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorUint16(u16_list, u16_count, out_u16_list, u16_count, out_u16_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorUint32(void* ctx, const uint32_t* u32_list, size_t u32_count, uint32_t* out_u32_list, size_t u32_count, size_t* out_u32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorUint32(u32_list, u32_count, out_u32_list, u32_count, out_u32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorUint64(void* ctx, const uint64_t* u64_list, size_t u64_count, uint64_t* out_u64_list, size_t u64_count, size_t* out_u64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorUint64(u64_list, u64_count, out_u64_list, u64_count, out_u64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorFloat32(void* ctx, const float* f32_list, size_t f32_count, float* out_f32_list, size_t f32_count, size_t* out_f32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorFloat32(f32_list, f32_count, out_f32_list, f32_count, out_f32_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorFloat64(void* ctx, const double* u64_list, size_t u64_count, double* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorFloat64(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
     static void VectorHandle(void* ctx, const zx_handle_t* u64_list, size_t u64_count, zx_handle_t* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->VectorHandle(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -621,11 +552,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class Vector2Protocol : public Base {
 public:
     Vector2Protocol() {
-        vector2_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckVector2ProtocolSubclass<D>();
         vector2_protocol_ops_.bool = Vector2Bool;
         vector2_protocol_ops_.int8 = Vector2Int8;
@@ -649,78 +579,45 @@ public:
         }
     }
 
-    const void* vector2_protocol_server_driver() const {
-        return vector2_protocol_server_driver_;
-    }
-
 protected:
     vector2_protocol_ops_t vector2_protocol_ops_ = {};
-    const void* vector2_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->vector2_protocol_server_driver();
-    }
-
     static void Vector2Bool(void* ctx, const bool* b_list, size_t b_count, bool* out_b_list, size_t b_count, size_t* out_b_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Bool(b_list, b_count, out_b_list, b_count, out_b_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Int8(void* ctx, const int8_t* i8_list, size_t i8_count, int8_t* out_i8_list, size_t i8_count, size_t* out_i8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Int8(i8_list, i8_count, out_i8_list, i8_count, out_i8_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Int16(void* ctx, const int16_t* i16_list, size_t i16_count, int16_t* out_i16_list, size_t i16_count, size_t* out_i16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Int16(i16_list, i16_count, out_i16_list, i16_count, out_i16_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Int32(void* ctx, const int32_t* i32_list, size_t i32_count, int32_t* out_i32_list, size_t i32_count, size_t* out_i32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Int32(i32_list, i32_count, out_i32_list, i32_count, out_i32_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Int64(void* ctx, const int64_t* i64_list, size_t i64_count, int64_t* out_i64_list, size_t i64_count, size_t* out_i64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Int64(i64_list, i64_count, out_i64_list, i64_count, out_i64_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Uint8(void* ctx, const uint8_t* u8_list, size_t u8_count, uint8_t* out_u8_list, size_t u8_count, size_t* out_u8_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Uint8(u8_list, u8_count, out_u8_list, u8_count, out_u8_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Uint16(void* ctx, const uint16_t* u16_list, size_t u16_count, uint16_t* out_u16_list, size_t u16_count, size_t* out_u16_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Uint16(u16_list, u16_count, out_u16_list, u16_count, out_u16_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Uint32(void* ctx, const uint32_t* u32_list, size_t u32_count, uint32_t* out_u32_list, size_t u32_count, size_t* out_u32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Uint32(u32_list, u32_count, out_u32_list, u32_count, out_u32_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Uint64(void* ctx, const uint64_t* u64_list, size_t u64_count, uint64_t* out_u64_list, size_t u64_count, size_t* out_u64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Uint64(u64_list, u64_count, out_u64_list, u64_count, out_u64_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Float32(void* ctx, const float* f32_list, size_t f32_count, float* out_f32_list, size_t f32_count, size_t* out_f32_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Float32(f32_list, f32_count, out_f32_list, f32_count, out_f32_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Float64(void* ctx, const double* u64_list, size_t u64_count, double* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Float64(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
     static void Vector2Handle(void* ctx, const zx_handle_t* u64_list, size_t u64_count, zx_handle_t* out_f64_list, size_t f64_count, size_t* out_f64_actual) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Vector2Handle(u64_list, u64_count, out_f64_list, f64_count, out_f64_actual);
-        fdf_env_register_driver_exit();
     }
 };
 

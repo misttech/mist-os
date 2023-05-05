@@ -39,11 +39,6 @@ public:
 
     const baker_protocol_t* GetProto() const { return &proto_; }
 
-    const void* baker_protocol_server_driver() const {
-        return baker_protocol_server_driver_;
-    }
-
-
     virtual MockBaker& ExpectRegister(cookie_maker_protocol_t intf, cookie_jarrer_protocol_t jar) {
         mock_register_.ExpectCall(intf, jar);
         return *this;

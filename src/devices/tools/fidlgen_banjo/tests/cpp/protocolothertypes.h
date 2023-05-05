@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -201,11 +200,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class OtherTypesReferenceProtocol : public Base {
 public:
     OtherTypesReferenceProtocol() {
-        other_types_reference_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckOtherTypesReferenceProtocolSubclass<D>();
         other_types_reference_protocol_ops_.struct = OtherTypesReferenceStruct;
         other_types_reference_protocol_ops_.union = OtherTypesReferenceUnion;
@@ -222,43 +220,24 @@ public:
         }
     }
 
-    const void* other_types_reference_protocol_server_driver() const {
-        return other_types_reference_protocol_server_driver_;
-    }
-
 protected:
     other_types_reference_protocol_ops_t other_types_reference_protocol_ops_ = {};
-    const void* other_types_reference_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->other_types_reference_protocol_server_driver();
-    }
-
     static void OtherTypesReferenceStruct(void* ctx, const this_is_astruct_t* s, this_is_astruct_t** out_s) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesReferenceStruct(s, out_s);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesReferenceUnion(void* ctx, const this_is_aunion_t* u, this_is_aunion_t** out_u) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesReferenceUnion(u, out_u);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesReferenceString(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesReferenceString(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesReferenceStringSized(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesReferenceStringSized(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesReferenceStringSized2(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesReferenceStringSized2(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -358,11 +337,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class OtherTypesProtocol : public Base {
 public:
     OtherTypesProtocol() {
-        other_types_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckOtherTypesProtocolSubclass<D>();
         other_types_protocol_ops_.struct = OtherTypesStruct;
         other_types_protocol_ops_.union = OtherTypesUnion;
@@ -382,60 +360,35 @@ public:
         }
     }
 
-    const void* other_types_protocol_server_driver() const {
-        return other_types_protocol_server_driver_;
-    }
-
 protected:
     other_types_protocol_ops_t other_types_protocol_ops_ = {};
-    const void* other_types_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->other_types_protocol_server_driver();
-    }
-
     static void OtherTypesStruct(void* ctx, const this_is_astruct_t* s, this_is_astruct_t* out_s) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesStruct(s, out_s);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesUnion(void* ctx, const this_is_aunion_t* u, this_is_aunion_t* out_u) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesUnion(u, out_u);
-        fdf_env_register_driver_exit();
     }
     static this_is_an_enum_t OtherTypesEnum(void* ctx, this_is_an_enum_t e) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->OtherTypesEnum(e);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static this_is_abits_t OtherTypesBits(void* ctx, this_is_abits_t e) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->OtherTypesBits(e);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static void OtherTypesString(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesString(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesStringSized(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesStringSized(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesStringSized2(void* ctx, const char* s, char* out_s, size_t s_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesStringSized2(s, out_s, s_capacity);
-        fdf_env_register_driver_exit();
     }
     static uint32_t OtherTypesInlineTable(void* ctx, uint32_t request_member) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->OtherTypesInlineTable(request_member);
-        fdf_env_register_driver_exit();
         return ret;
     }
 };
@@ -548,11 +501,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class OtherTypesAsyncProtocol : public Base {
 public:
     OtherTypesAsyncProtocol() {
-        other_types_async_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckOtherTypesAsyncProtocolSubclass<D>();
         other_types_async_protocol_ops_.struct = OtherTypesAsyncStruct;
         other_types_async_protocol_ops_.union = OtherTypesAsyncUnion;
@@ -571,207 +523,30 @@ public:
         }
     }
 
-    const void* other_types_async_protocol_server_driver() const {
-        return other_types_async_protocol_server_driver_;
-    }
-
 protected:
     other_types_async_protocol_ops_t other_types_async_protocol_ops_ = {};
-    const void* other_types_async_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->other_types_async_protocol_server_driver();
-    }
-
     static void OtherTypesAsyncStruct(void* ctx, const this_is_astruct_t* s, other_types_async_struct_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_struct_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const this_is_astruct_t* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncStruct(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncUnion(void* ctx, const this_is_aunion_t* u, other_types_async_union_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_union_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const this_is_aunion_t* u) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncUnion(u, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncEnum(void* ctx, this_is_an_enum_t e, other_types_async_enum_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_enum_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, this_is_an_enum_t e) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, e);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncEnum(e, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncBits(void* ctx, this_is_abits_t e, other_types_async_bits_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_bits_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, this_is_abits_t e) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, e);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncBits(e, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncString(void* ctx, const char* s, other_types_async_string_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_string_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncString(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncStringSized(void* ctx, const char* s, other_types_async_string_sized_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_string_sized_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncStringSized(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncStringSized2(void* ctx, const char* s, other_types_async_string_sized2_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_string_sized2_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncStringSized2(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -879,11 +654,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class OtherTypesAsyncReferenceProtocol : public Base {
 public:
     OtherTypesAsyncReferenceProtocol() {
-        other_types_async_reference_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckOtherTypesAsyncReferenceProtocolSubclass<D>();
         other_types_async_reference_protocol_ops_.struct = OtherTypesAsyncReferenceStruct;
         other_types_async_reference_protocol_ops_.union = OtherTypesAsyncReferenceUnion;
@@ -900,153 +674,24 @@ public:
         }
     }
 
-    const void* other_types_async_reference_protocol_server_driver() const {
-        return other_types_async_reference_protocol_server_driver_;
-    }
-
 protected:
     other_types_async_reference_protocol_ops_t other_types_async_reference_protocol_ops_ = {};
-    const void* other_types_async_reference_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->other_types_async_reference_protocol_server_driver();
-    }
-
     static void OtherTypesAsyncReferenceStruct(void* ctx, const this_is_astruct_t* s, other_types_async_reference_struct_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_reference_struct_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const this_is_astruct_t* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncReferenceStruct(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncReferenceUnion(void* ctx, const this_is_aunion_t* u, other_types_async_reference_union_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_reference_union_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const this_is_aunion_t* u) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncReferenceUnion(u, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncReferenceString(void* ctx, const char* s, other_types_async_reference_string_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_reference_string_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncReferenceString(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncReferenceStringSized(void* ctx, const char* s, other_types_async_reference_string_sized_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_reference_string_sized_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncReferenceStringSized(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void OtherTypesAsyncReferenceStringSized2(void* ctx, const char* s, other_types_async_reference_string_sized2_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                other_types_async_reference_string_sized2_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, const char* s) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, s);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->OtherTypesAsyncReferenceStringSized2(s, callback, cookie);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -1146,11 +791,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class InterfaceProtocol : public Base {
 public:
     InterfaceProtocol() {
-        interface_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckInterfaceProtocolSubclass<D>();
         interface_protocol_ops_.value = InterfaceValue;
         interface_protocol_ops_.reference = InterfaceReference;
@@ -1166,82 +810,21 @@ public:
         }
     }
 
-    const void* interface_protocol_server_driver() const {
-        return interface_protocol_server_driver_;
-    }
-
 protected:
     interface_protocol_ops_t interface_protocol_ops_ = {};
-    const void* interface_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->interface_protocol_server_driver();
-    }
-
     static void InterfaceValue(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t* out_intf) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InterfaceValue(intf, out_intf);
-        fdf_env_register_driver_exit();
     }
     static void InterfaceReference(void* ctx, const other_types_protocol_t* intf, other_types_protocol_t** out_intf) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InterfaceReference(intf, out_intf);
-        fdf_env_register_driver_exit();
     }
     static void InterfaceAsync(void* ctx, const other_types_protocol_t* intf, interface_async_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                interface_async_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, void* intf_ctx, const other_types_protocol_ops_t* intf_ops) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, intf);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InterfaceAsync(intf, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void InterfaceAsyncRefernce(void* ctx, const other_types_protocol_t* intf, interface_async_refernce_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                interface_async_refernce_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, void* intf_ctx, const other_types_protocol_ops_t* intf_ops) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, intf);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->InterfaceAsyncRefernce(intf, callback, cookie);
-        fdf_env_register_driver_exit();
     }
 };
 

@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <lib/zx/handle.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -116,11 +115,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class ApiProtocol : public Base {
 public:
     ApiProtocol() {
-        api_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckApiProtocolSubclass<D>();
         api_protocol_ops_.bool = Apibool;
         api_protocol_ops_.int8 = Apiint8;
@@ -166,220 +164,143 @@ public:
         }
     }
 
-    const void* api_protocol_server_driver() const {
-        return api_protocol_server_driver_;
-    }
-
 protected:
     api_protocol_ops_t api_protocol_ops_ = {};
-    const void* api_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->api_protocol_server_driver();
-    }
-
     static zx_status_t Apibool(void* ctx, zx_handle_t handle, bool data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apibool(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiint8(void* ctx, zx_handle_t handle, int8_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiint8(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiint16(void* ctx, zx_handle_t handle, int16_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiint16(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiint32(void* ctx, zx_handle_t handle, int32_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiint32(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiint64(void* ctx, zx_handle_t handle, int64_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiint64(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiuint8(void* ctx, zx_handle_t handle, uint8_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiuint8(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiuint16(void* ctx, zx_handle_t handle, uint16_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiuint16(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiuint32(void* ctx, zx_handle_t handle, uint32_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiuint32(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiuint64(void* ctx, zx_handle_t handle, uint64_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiuint64(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apifloat32(void* ctx, zx_handle_t handle, float data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apifloat32(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apifloat64(void* ctx, zx_handle_t handle, double data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apifloat64(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apiduration(void* ctx, zx_handle_t handle, zx_duration_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apiduration(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apikoid(void* ctx, zx_handle_t handle, zx_koid_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apikoid(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apitime(void* ctx, zx_handle_t handle, zx_time_t data) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apitime(zx::handle(handle), data);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_bool(void* ctx, zx_handle_t handle, bool* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_bool(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_int8(void* ctx, zx_handle_t handle, int8_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_int8(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_int16(void* ctx, zx_handle_t handle, int16_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_int16(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_int32(void* ctx, zx_handle_t handle, int32_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_int32(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_int64(void* ctx, zx_handle_t handle, int64_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_int64(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_uint8(void* ctx, zx_handle_t handle, uint8_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_uint8(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_uint16(void* ctx, zx_handle_t handle, uint16_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_uint16(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_uint32(void* ctx, zx_handle_t handle, uint32_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_uint32(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_uint64(void* ctx, zx_handle_t handle, uint64_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_uint64(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_float32(void* ctx, zx_handle_t handle, float* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_float32(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_float64(void* ctx, zx_handle_t handle, double* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_float64(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_duration(void* ctx, zx_handle_t handle, zx_duration_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_duration(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_koid(void* ctx, zx_handle_t handle, zx_koid_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_koid(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t Apioutput_time(void* ctx, zx_handle_t handle, zx_time_t* out_result) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apioutput_time(zx::handle(handle), out_result);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static void Apireturn_void(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Apireturn_void(zx::handle(handle));
-        fdf_env_register_driver_exit();
     }
     static zx_status_t Apireturn_status(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apireturn_status(zx::handle(handle));
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_ticks_t Apireturn_ticks(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apireturn_ticks(zx::handle(handle));
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_time_t Apireturn_time(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apireturn_time(zx::handle(handle));
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint32_t Apireturn_uint32(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apireturn_uint32(zx::handle(handle));
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint64_t Apireturn_uint64(void* ctx, zx_handle_t handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->Apireturn_uint64(zx::handle(handle));
-        fdf_env_register_driver_exit();
         return ret;
     }
 };

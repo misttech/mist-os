@@ -6,9 +6,8 @@ use {
     super::{
         util::{
             array_bounds, for_banjo_transport, get_base_type_from_alias, get_declarations,
-            get_doc_comment, get_in_args_c, get_in_params_c, is_derive_debug, is_namespaced,
-            name_buffer, name_size, not_callback, primitive_type_to_c_str, to_c_name,
-            type_to_c_str, Decl, ProtocolType,
+            get_doc_comment, is_derive_debug, is_namespaced, name_buffer, name_size, not_callback,
+            primitive_type_to_c_str, to_c_name, Decl, ProtocolType,
         },
         Backend,
     },
@@ -32,6 +31,43 @@ impl<'a, W: io::Write> CBackend<'a, W> {
 
 fn integer_type_to_c_str(ty: &IntegerType) -> Result<String, Error> {
     primitive_type_to_c_str(&ty.to_primitive())
+}
+
+fn type_to_c_str(ty: &Type, ir: &FidlIr) -> Result<String, Error> {
+    match ty {
+        Type::Array { ref element_type, .. } => type_to_c_str(element_type, ir),
+        Type::Vector { ref element_type, .. } => type_to_c_str(element_type, ir),
+        Type::Str { .. } => Ok(String::from("char*")),
+        Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
+        Type::Identifier { identifier, .. } => match ir
+            .get_declaration(identifier)
+            .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
+        {
+            Declaration::Struct
+            | Declaration::Table
+            | Declaration::Union
+            | Declaration::Enum
+            | Declaration::Bits => Ok(format!("{}_t", to_c_name(&identifier.get_name()))),
+            Declaration::Protocol => {
+                let c_name = to_c_name(&identifier.get_name());
+                if not_callback(identifier, ir)? {
+                    return Ok(format!("{}_protocol_t", c_name));
+                } else {
+                    return Ok(format!("{}_t", c_name));
+                }
+            }
+            _ => Err(anyhow!("Identifier type not handled: {:?}", identifier)),
+        },
+        Type::Handle { .. } => Ok(String::from("zx_handle_t")),
+        _ => Err(anyhow!("Type not handled: {:?}", ty)),
+    }
+}
+
+fn protocol_to_ops_c_str(id: &CompoundIdentifier, ir: &FidlIr) -> Result<String, Error> {
+    if ir.is_protocol(id) {
+        return Ok(to_c_name(id.get_name()) + "_protocol_ops_t");
+    }
+    Err(anyhow!("Identifier does not represent a protocol: {:?}", id))
 }
 
 fn integer_constant_to_c_str(
@@ -206,6 +242,80 @@ fn get_first_param(method: &Method, ir: &FidlIr) -> Result<(bool, String), Error
     Ok((false, "void".to_string()))
 }
 
+fn get_in_params(m: &Method, transform: bool, ir: &FidlIr) -> Result<Vec<String>, Error> {
+    m.request_parameters(ir)?
+        .as_ref()
+        .unwrap()
+        .iter()
+        .map(|param| {
+            let c_name = to_c_name(&param.name.0);
+            if let Some(arg_type) = get_base_type_from_alias(
+                &param.experimental_maybe_from_alias.as_ref().map(|t| &t.name),
+            ) {
+                return Ok(format!("{} {}", arg_type, c_name));
+            }
+            let ty_name = type_to_c_str(&param._type, ir)?;
+            match &param._type {
+                Type::Identifier { identifier, .. } => {
+                    if identifier.is_base_type() {
+                        return Ok(format!("{} {}", ty_name, c_name));
+                    }
+                    match ir.get_declaration(identifier).unwrap() {
+                        Declaration::Protocol => {
+                            if transform && not_callback(identifier, ir)? {
+                                let ty_name = protocol_to_ops_c_str(identifier, ir).unwrap();
+                                Ok(format!(
+                                    "void* {name}_ctx, const {ty_name}* {name}_ops",
+                                    ty_name = ty_name,
+                                    name = c_name
+                                ))
+                            } else {
+                                Ok(format!("const {}* {}", ty_name, c_name))
+                            }
+                        }
+                        Declaration::Struct | Declaration::Table | Declaration::Union => {
+                            let prefix = if param.maybe_attributes.has("InOut")
+                                || param.maybe_attributes.has("Mutable")
+                            {
+                                ""
+                            } else {
+                                "const "
+                            };
+                            Ok(format!("{}{}* {}", prefix, ty_name, c_name))
+                        }
+                        Declaration::Bits | Declaration::Enum => {
+                            Ok(format!("{} {}", ty_name, c_name))
+                        }
+                        decl => Err(anyhow!("Unsupported declaration: {:?}", decl)),
+                    }
+                }
+                Type::Str { .. } => Ok(format!("const {} {}", ty_name, c_name)),
+                Type::Array { .. } => {
+                    let bounds = array_bounds(&param._type).unwrap();
+                    Ok(format!(
+                        "const {ty} {name}{bounds}",
+                        bounds = bounds,
+                        ty = ty_name,
+                        name = c_name
+                    ))
+                }
+                Type::Vector { .. } => {
+                    let ptr = if param.maybe_attributes.has("InnerPointer") { "*" } else { "" };
+                    Ok(format!(
+                        "const {ty}{ptr}* {name}_{buffer}, size_t {name}_{size}",
+                        buffer = name_buffer(&param.maybe_attributes),
+                        size = name_size(&param.maybe_attributes),
+                        ty = ty_name,
+                        ptr = ptr,
+                        name = c_name
+                    ))
+                }
+                _ => Ok(format!("{} {}", ty_name, c_name)),
+            }
+        })
+        .collect()
+}
+
 fn get_out_params(name: &str, m: &Method, ir: &FidlIr) -> Result<(Vec<String>, String), Error> {
     let protocol_name = to_c_name(name);
     let method_name = to_c_name(&m.name.0);
@@ -278,6 +388,24 @@ fn get_out_params(name: &str, m: &Method, ir: &FidlIr) -> Result<(Vec<String>, S
                     }
                 }).collect()
             }), return_param))
+}
+
+fn get_in_args(m: &Method, _ir: &FidlIr) -> Result<Vec<String>, Error> {
+    if let Some(request) = &m.request_parameters(_ir)? {
+        return request
+            .iter()
+            .map(|param| match &param._type {
+                Type::Vector { .. } => Ok(format!(
+                    "{name}_{buffer}, {name}_{size}",
+                    buffer = name_buffer(&param.maybe_attributes),
+                    size = name_size(&param.maybe_attributes),
+                    name = to_c_name(&param.name.0)
+                )),
+                _ => Ok(format!("{}", to_c_name(&param.name.0))),
+            })
+            .collect();
+    }
+    Ok(Vec::new())
 }
 
 fn get_out_args(m: &Method, ir: &FidlIr) -> Result<(Vec<String>, bool), Error> {
@@ -619,7 +747,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
             .iter()
             .map(|m| {
                 let (out_params, return_param) = get_out_params(name, &m, ir)?;
-                let in_params = get_in_params_c(&m, false, ir)?;
+                let in_params = get_in_params(&m, false, ir)?;
 
                 let params = iter::once("void* ctx".to_string())
                     .chain(in_params)
@@ -652,7 +780,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
                 accum.push_str(get_doc_comment(&m.maybe_attributes, 0).as_str());
 
                 let (out_params, return_param) = get_out_params(name, &m, ir)?;
-                let in_params = get_in_params_c(&m, true, ir)?;
+                let in_params = get_in_params(&m, true, ir)?;
 
                 let first_param = format!("const {}_protocol_t* proto", to_c_name(name));
 
@@ -674,7 +802,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
                 );
 
                 let (out_args, skip) = get_out_args(&m, ir)?;
-                let in_args = get_in_args_c(&m, ir)?;
+                let in_args = get_in_args(&m, ir)?;
 
                 if let Some(request) = &m.request_parameters(ir)? {
                     let proto_args = request
@@ -741,7 +869,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
             ProtocolType::Callback => {
                 let m = data.methods.get(0).ok_or(anyhow!("callback has no methods"))?;
                 let (out_params, return_param) = get_out_params(name, &m, ir)?;
-                let in_params = get_in_params_c(&m, false, ir)?;
+                let in_params = get_in_params(&m, false, ir)?;
 
                 let params = iter::once("void* ctx".to_string())
                     .chain(in_params)
@@ -776,7 +904,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
                 let mut temp_method = method.clone();
                 temp_method.maybe_request_payload = method.maybe_response_payload.clone();
                 temp_method.maybe_response_payload = None;
-                let in_params = get_in_params_c(&temp_method, true, ir)?;
+                let in_params = get_in_params(&temp_method, true, ir)?;
                 let params = iter::once("void* ctx".to_string())
                     .chain(in_params)
                     .collect::<Vec<_>>()

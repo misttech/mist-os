@@ -21,7 +21,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
     }
 }
 
-fn get_in_args_cpp(m: &Method, wrappers: bool, ir: &FidlIr) -> Result<Vec<String>, Error> {
+fn get_in_args(m: &Method, wrappers: bool, ir: &FidlIr) -> Result<Vec<String>, Error> {
     Ok(m.request_parameters(ir)?
         .as_ref()
         .unwrap_or(&Vec::new())
@@ -168,7 +168,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
             accum.push_str(get_doc_comment(&m.maybe_attributes, 1).as_str());
 
             let (out_params, return_param) = get_out_params(&m, name, false, ir)?;
-            let in_params = get_in_params_cpp(&m, false, false, ir)?;
+            let in_params = get_in_params(&m, false, false, ir)?;
 
             let params = iter::once("void* ctx".to_string()).chain(in_params)
                                                             .chain(out_params)
@@ -182,7 +182,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                                    function_name = to_cpp_name(&m.name.0)).as_str());
 
             let (out_args, skip) = get_out_args(&m, false, ir)?;
-            let in_args = get_in_args_cpp(&m, true, ir)?;
+            let in_args = get_in_args(&m, true, ir)?;
 
             let handle_args = if m.maybe_attributes.has("Async") {
                 vec![]
@@ -195,34 +195,6 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                     }
                 }).collect::<Vec<_>>()
             };
-
-            if m.maybe_attributes.has("Async") {
-                let mut temp_method = m.clone();
-                temp_method.maybe_request_payload = m.maybe_response_payload.clone();
-                temp_method.maybe_response_payload = None;
-
-                let in_params = get_in_params_c(&temp_method, true, ir)?;
-                let params = iter::once("void* ctx".to_string())
-                    .chain(in_params)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-
-                let in_args = get_in_args_c(&temp_method, ir)?;
-                let args = iter::once("wrapper->cookie".to_string())
-                        .chain(in_args)
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                accum.push_str(format!(
-                    include_str!("templates/cpp/fdf_env_setup_async.h"),
-                    protocol_c_name = to_c_name(name),
-                    method_c_name = to_c_name(&m.name.0),
-                    params = params,
-                    args = args).as_str());
-            }
-
-            accum.push_str(format!("        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);\n").as_str());
-
             for (name, ty) in handle_args.iter() {
                 accum.push_str(format!("        {ty} out_{name}2;\n", ty = ty, name = name).as_str());
             }
@@ -240,9 +212,6 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
             for (name, _) in handle_args {
                 accum.push_str(format!("        *out_{name} = out_{name}2.release();\n", name = name).as_str());
             }
-
-            accum.push_str(format!("        fdf_env_register_driver_exit();\n").as_str());
-
             if skip {
                 accum.push_str("        return ret;\n");
             }
@@ -265,7 +234,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                 accum.push_str(get_doc_comment(&m.maybe_attributes, 1).as_str());
 
                 let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
-                let in_params = get_in_params_cpp(&m, true, true, ir)?;
+                let in_params = get_in_params(&m, true, true, ir)?;
 
                 let params = in_params.into_iter().chain(out_params).collect::<Vec<_>>().join(", ");
 
@@ -280,7 +249,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                 );
 
                 let (out_args, skip) = get_out_args(&m, true, ir)?;
-                let in_args = get_in_args_cpp(&m, false, ir)?;
+                let in_args = get_in_args(&m, false, ir)?;
 
                 let proto_args = m
                     .request_parameters(ir)?
@@ -402,7 +371,6 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
         let mut includes = vec![
             "lib/ddk/device".to_string(),
             "lib/ddk/driver".to_string(),
-            "lib/fdf/env".to_string(),
             "ddktl/device-internal".to_string(),
             "zircon/assert".to_string(),
             "zircon/compiler".to_string(),
@@ -482,7 +450,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                     .iter()
                     .map(|m| {
                         let (out_params, return_param) = get_out_params(&m, name, true, ir)?;
-                        let in_params = get_in_params_cpp(&m, true, false, ir)?;
+                        let in_params = get_in_params(&m, true, false, ir)?;
 
                         let params =
                             in_params.into_iter().chain(out_params).collect::<Vec<_>>().join(", ");

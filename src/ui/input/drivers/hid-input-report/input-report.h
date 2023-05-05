@@ -24,7 +24,7 @@ namespace hid_input_report_dev {
 
 class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
                     public InputReportBase,
-                    public ddk::HidReportListenerProtocol<InputReport> {
+                    ddk::HidReportListenerProtocol<InputReport> {
  public:
   explicit InputReport(ddk::HidDeviceProtocolClient hiddev) : hiddev_(hiddev) {}
   virtual ~InputReport() = default;

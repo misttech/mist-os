@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/eventpair.h>
@@ -182,11 +181,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class SynchronousHandleProtocol : public Base {
 public:
     SynchronousHandleProtocol() {
-        synchronous_handle_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckSynchronousHandleProtocolSubclass<D>();
         synchronous_handle_protocol_ops_.handle = SynchronousHandleHandle;
         synchronous_handle_protocol_ops_.process = SynchronousHandleProcess;
@@ -215,171 +213,128 @@ public:
         }
     }
 
-    const void* synchronous_handle_protocol_server_driver() const {
-        return synchronous_handle_protocol_server_driver_;
-    }
-
 protected:
     synchronous_handle_protocol_ops_t synchronous_handle_protocol_ops_ = {};
-    const void* synchronous_handle_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->synchronous_handle_protocol_server_driver();
-    }
-
     static void SynchronousHandleHandle(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::handle out_h2;
         zx::handle out_h22;
         static_cast<D*>(ctx)->SynchronousHandleHandle(zx::handle(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleProcess(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::process out_h2;
         zx::process out_h22;
         static_cast<D*>(ctx)->SynchronousHandleProcess(zx::process(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleThread(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::thread out_h2;
         zx::thread out_h22;
         static_cast<D*>(ctx)->SynchronousHandleThread(zx::thread(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleVmo(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::vmo out_h2;
         zx::vmo out_h22;
         static_cast<D*>(ctx)->SynchronousHandleVmo(zx::vmo(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleChannel(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::channel out_h2;
         zx::channel out_h22;
         static_cast<D*>(ctx)->SynchronousHandleChannel(zx::channel(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleEvent(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::event out_h2;
         zx::event out_h22;
         static_cast<D*>(ctx)->SynchronousHandleEvent(zx::event(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandlePort(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::port out_h2;
         zx::port out_h22;
         static_cast<D*>(ctx)->SynchronousHandlePort(zx::port(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleInterrupt(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::interrupt out_h2;
         zx::interrupt out_h22;
         static_cast<D*>(ctx)->SynchronousHandleInterrupt(zx::interrupt(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleSocket(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::socket out_h2;
         zx::socket out_h22;
         static_cast<D*>(ctx)->SynchronousHandleSocket(zx::socket(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleResource(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::resource out_h2;
         zx::resource out_h22;
         static_cast<D*>(ctx)->SynchronousHandleResource(zx::resource(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleEventPair(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::eventpair out_h2;
         zx::eventpair out_h22;
         static_cast<D*>(ctx)->SynchronousHandleEventPair(zx::eventpair(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleJob(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::job out_h2;
         zx::job out_h22;
         static_cast<D*>(ctx)->SynchronousHandleJob(zx::job(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleVmar(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::vmar out_h2;
         zx::vmar out_h22;
         static_cast<D*>(ctx)->SynchronousHandleVmar(zx::vmar(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleFifo(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::fifo out_h2;
         zx::fifo out_h22;
         static_cast<D*>(ctx)->SynchronousHandleFifo(zx::fifo(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleGuest(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::guest out_h2;
         zx::guest out_h22;
         static_cast<D*>(ctx)->SynchronousHandleGuest(zx::guest(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleTimer(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::timer out_h2;
         zx::timer out_h22;
         static_cast<D*>(ctx)->SynchronousHandleTimer(zx::timer(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
     static void SynchronousHandleProfile(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::profile out_h2;
         zx::profile out_h22;
         static_cast<D*>(ctx)->SynchronousHandleProfile(zx::profile(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -527,11 +482,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class AsyncHandleProtocol : public Base {
 public:
     AsyncHandleProtocol() {
-        async_handle_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckAsyncHandleProtocolSubclass<D>();
         async_handle_protocol_ops_.handle = AsyncHandleHandle;
         async_handle_protocol_ops_.process = AsyncHandleProcess;
@@ -560,477 +514,60 @@ public:
         }
     }
 
-    const void* async_handle_protocol_server_driver() const {
-        return async_handle_protocol_server_driver_;
-    }
-
 protected:
     async_handle_protocol_ops_t async_handle_protocol_ops_ = {};
-    const void* async_handle_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->async_handle_protocol_server_driver();
-    }
-
     static void AsyncHandleHandle(void* ctx, zx_handle_t h, async_handle_handle_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_handle_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleHandle(zx::handle(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleProcess(void* ctx, zx_handle_t h, async_handle_process_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_process_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleProcess(zx::process(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleThread(void* ctx, zx_handle_t h, async_handle_thread_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_thread_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleThread(zx::thread(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleVmo(void* ctx, zx_handle_t h, async_handle_vmo_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_vmo_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleVmo(zx::vmo(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleChannel(void* ctx, zx_handle_t h, async_handle_channel_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_channel_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleChannel(zx::channel(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleEvent(void* ctx, zx_handle_t h, async_handle_event_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_event_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleEvent(zx::event(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandlePort(void* ctx, zx_handle_t h, async_handle_port_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_port_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandlePort(zx::port(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleInterrupt(void* ctx, zx_handle_t h, async_handle_interrupt_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_interrupt_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleInterrupt(zx::interrupt(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleSocket(void* ctx, zx_handle_t h, async_handle_socket_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_socket_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleSocket(zx::socket(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleResource(void* ctx, zx_handle_t h, async_handle_resource_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_resource_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleResource(zx::resource(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleEventPair(void* ctx, zx_handle_t h, async_handle_event_pair_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_event_pair_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleEventPair(zx::eventpair(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleJob(void* ctx, zx_handle_t h, async_handle_job_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_job_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleJob(zx::job(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleVmar(void* ctx, zx_handle_t h, async_handle_vmar_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_vmar_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleVmar(zx::vmar(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleFifo(void* ctx, zx_handle_t h, async_handle_fifo_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_fifo_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleFifo(zx::fifo(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleGuest(void* ctx, zx_handle_t h, async_handle_guest_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_guest_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleGuest(zx::guest(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleTimer(void* ctx, zx_handle_t h, async_handle_timer_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_timer_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleTimer(zx::timer(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncHandleProfile(void* ctx, zx_handle_t h, async_handle_profile_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_handle_profile_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, zx_handle_t h, zx_handle_t h2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, h, h2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncHandleProfile(zx::profile(h), callback, cookie);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -1178,11 +715,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class AnotherSynchronousHandleProtocol : public Base {
 public:
     AnotherSynchronousHandleProtocol() {
-        another_synchronous_handle_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckAnotherSynchronousHandleProtocolSubclass<D>();
         another_synchronous_handle_protocol_ops_.handle = AnotherSynchronousHandleHandle;
 
@@ -1195,27 +731,16 @@ public:
         }
     }
 
-    const void* another_synchronous_handle_protocol_server_driver() const {
-        return another_synchronous_handle_protocol_server_driver_;
-    }
-
 protected:
     another_synchronous_handle_protocol_ops_t another_synchronous_handle_protocol_ops_ = {};
-    const void* another_synchronous_handle_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->another_synchronous_handle_protocol_server_driver();
-    }
-
     static void AnotherSynchronousHandleHandle(void* ctx, zx_handle_t h, zx_handle_t* out_h, zx_handle_t* out_h2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         zx::handle out_h2;
         zx::handle out_h22;
         static_cast<D*>(ctx)->AnotherSynchronousHandleHandle(zx::handle(h), &out_h2, &out_h22);
         *out_h = out_h2.release();
         *out_h2 = out_h22.release();
-        fdf_env_register_driver_exit();
     }
 };
 

@@ -39,11 +39,6 @@ public:
 
     const action_protocol_protocol_t* GetProto() const { return &proto_; }
 
-    const void* action_protocol_protocol_server_driver() const {
-        return action_protocol_protocol_server_driver_;
-    }
-
-
     virtual MockActionProtocol& ExpectRegisterCallback(zx_status_t out_s, uint32_t id, action_notify_t cb) {
         mock_register_callback_.ExpectCall({out_s}, id, cb);
         return *this;

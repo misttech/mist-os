@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -52,11 +51,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class DoerProtocol : public Base {
 public:
     DoerProtocol() {
-        doer_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckDoerProtocolSubclass<D>();
         doer_protocol_ops_.do_something = DoerDoSomething;
         doer_protocol_ops_.do_something_else = DoerDoSomethingElse;
@@ -70,28 +68,15 @@ public:
         }
     }
 
-    const void* doer_protocol_server_driver() const {
-        return doer_protocol_server_driver_;
-    }
-
 protected:
     doer_protocol_ops_t doer_protocol_ops_ = {};
-    const void* doer_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->doer_protocol_server_driver();
-    }
-
     static void DoerDoSomething(void* ctx, zx_handle_t the_handle) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DoerDoSomething(zx::channel(the_handle));
-        fdf_env_register_driver_exit();
     }
     static void DoerDoSomethingElse(void* ctx, zx_handle_t the_handle_too) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DoerDoSomethingElse(zx::channel(the_handle_too));
-        fdf_env_register_driver_exit();
     }
 };
 

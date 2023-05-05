@@ -25,8 +25,8 @@
 #include "src/virtualization/bin/vmm/device/virtio_net/src/cpp/completion_queue.h"
 
 class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
-                      public ddk::MacAddrProtocol<GuestEthernet>,
-                      public ddk::NetworkPortProtocol<GuestEthernet> {
+                      ddk::MacAddrProtocol<GuestEthernet>,
+                      ddk::NetworkPortProtocol<GuestEthernet> {
  public:
   GuestEthernet()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),

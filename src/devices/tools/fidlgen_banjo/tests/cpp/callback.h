@@ -12,7 +12,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -61,11 +60,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class DrawingProtocol : public Base {
 public:
     DrawingProtocol() {
-        drawing_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckDrawingProtocolSubclass<D>();
         drawing_protocol_ops_.register_callback = DrawingRegisterCallback;
         drawing_protocol_ops_.deregister_callback = DrawingDeregisterCallback;
@@ -83,50 +81,29 @@ public:
         }
     }
 
-    const void* drawing_protocol_server_driver() const {
-        return drawing_protocol_server_driver_;
-    }
-
 protected:
     drawing_protocol_ops_t drawing_protocol_ops_ = {};
-    const void* drawing_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->drawing_protocol_server_driver();
-    }
-
     static void DrawingRegisterCallback(void* ctx, const draw_t* cb) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DrawingRegisterCallback(cb);
-        fdf_env_register_driver_exit();
     }
     static void DrawingDeregisterCallback(void* ctx) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DrawingDeregisterCallback();
-        fdf_env_register_driver_exit();
     }
     static void DrawingRegisterCallback2(void* ctx, const draw_callback_t* cb) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DrawingRegisterCallback2(cb);
-        fdf_env_register_driver_exit();
     }
     static int32_t DrawingDrawLots(void* ctx, zx_handle_t commands, point_t* out_p) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->DrawingDrawLots(zx::vmo(commands), out_p);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static zx_status_t DrawingDrawArray(void* ctx, const point_t points[4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->DrawingDrawArray(points);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static void DrawingDescribe(void* ctx, const char* one, char* out_two, size_t two_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->DrawingDescribe(one, out_two, two_capacity);
-        fdf_env_register_driver_exit();
     }
 };
 

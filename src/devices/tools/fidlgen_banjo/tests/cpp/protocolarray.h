@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -167,11 +166,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class ArrayofArraysProtocol : public Base {
 public:
     ArrayofArraysProtocol() {
-        arrayof_arrays_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckArrayofArraysProtocolSubclass<D>();
         arrayof_arrays_protocol_ops_.bool = ArrayofArraysBool;
         arrayof_arrays_protocol_ops_.int8 = ArrayofArraysInt8;
@@ -195,78 +193,45 @@ public:
         }
     }
 
-    const void* arrayof_arrays_protocol_server_driver() const {
-        return arrayof_arrays_protocol_server_driver_;
-    }
-
 protected:
     arrayof_arrays_protocol_ops_t arrayof_arrays_protocol_ops_ = {};
-    const void* arrayof_arrays_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->arrayof_arrays_protocol_server_driver();
-    }
-
     static void ArrayofArraysBool(void* ctx, const bool b[32][4], bool out_b[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysBool(b, out_b);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysInt8(void* ctx, const int8_t i8[32][4], int8_t out_i8[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysInt8(i8, out_i8);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysInt16(void* ctx, const int16_t i16[32][4], int16_t out_i16[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysInt16(i16, out_i16);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysInt32(void* ctx, const int32_t i32[32][4], int32_t out_i32[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysInt32(i32, out_i32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysInt64(void* ctx, const int64_t i64[32][4], int64_t out_i64[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysInt64(i64, out_i64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysUint8(void* ctx, const uint8_t u8[32][4], uint8_t out_u8[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysUint8(u8, out_u8);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysUint16(void* ctx, const uint16_t u16[32][4], uint16_t out_u16[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysUint16(u16, out_u16);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysUint32(void* ctx, const uint32_t u32[32][4], uint32_t out_u32[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysUint32(u32, out_u32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysUint64(void* ctx, const uint64_t u64[32][4], uint64_t out_u64[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysUint64(u64, out_u64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysFloat32(void* ctx, const float f32[32][4], float out_f32[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysFloat32(f32, out_f32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysFloat64(void* ctx, const double u64[32][4], double out_f64[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysFloat64(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayofArraysHandle(void* ctx, const zx_handle_t u64[32][4], zx_handle_t out_f64[32][4]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayofArraysHandle(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -394,11 +359,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class ArrayProtocol : public Base {
 public:
     ArrayProtocol() {
-        array_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckArrayProtocolSubclass<D>();
         array_protocol_ops_.bool = ArrayBool;
         array_protocol_ops_.int8 = ArrayInt8;
@@ -422,78 +386,45 @@ public:
         }
     }
 
-    const void* array_protocol_server_driver() const {
-        return array_protocol_server_driver_;
-    }
-
 protected:
     array_protocol_ops_t array_protocol_ops_ = {};
-    const void* array_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->array_protocol_server_driver();
-    }
-
     static void ArrayBool(void* ctx, const bool b[1], bool out_b[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayBool(b, out_b);
-        fdf_env_register_driver_exit();
     }
     static void ArrayInt8(void* ctx, const int8_t i8[1], int8_t out_i8[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayInt8(i8, out_i8);
-        fdf_env_register_driver_exit();
     }
     static void ArrayInt16(void* ctx, const int16_t i16[1], int16_t out_i16[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayInt16(i16, out_i16);
-        fdf_env_register_driver_exit();
     }
     static void ArrayInt32(void* ctx, const int32_t i32[1], int32_t out_i32[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayInt32(i32, out_i32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayInt64(void* ctx, const int64_t i64[1], int64_t out_i64[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayInt64(i64, out_i64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayUint8(void* ctx, const uint8_t u8[1], uint8_t out_u8[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayUint8(u8, out_u8);
-        fdf_env_register_driver_exit();
     }
     static void ArrayUint16(void* ctx, const uint16_t u16[1], uint16_t out_u16[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayUint16(u16, out_u16);
-        fdf_env_register_driver_exit();
     }
     static void ArrayUint32(void* ctx, const uint32_t u32[1], uint32_t out_u32[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayUint32(u32, out_u32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayUint64(void* ctx, const uint64_t u64[1], uint64_t out_u64[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayUint64(u64, out_u64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayFloat32(void* ctx, const float f32[1], float out_f32[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayFloat32(f32, out_f32);
-        fdf_env_register_driver_exit();
     }
     static void ArrayFloat64(void* ctx, const double u64[1], double out_f64[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayFloat64(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
     static void ArrayHandle(void* ctx, const zx_handle_t u64[1], zx_handle_t out_f64[1]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->ArrayHandle(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
 };
 
@@ -621,11 +552,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class Array2Protocol : public Base {
 public:
     Array2Protocol() {
-        array2_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckArray2ProtocolSubclass<D>();
         array2_protocol_ops_.bool = Array2Bool;
         array2_protocol_ops_.int8 = Array2Int8;
@@ -649,78 +579,45 @@ public:
         }
     }
 
-    const void* array2_protocol_server_driver() const {
-        return array2_protocol_server_driver_;
-    }
-
 protected:
     array2_protocol_ops_t array2_protocol_ops_ = {};
-    const void* array2_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->array2_protocol_server_driver();
-    }
-
     static void Array2Bool(void* ctx, const bool b[32], bool out_b[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Bool(b, out_b);
-        fdf_env_register_driver_exit();
     }
     static void Array2Int8(void* ctx, const int8_t i8[32], int8_t out_i8[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Int8(i8, out_i8);
-        fdf_env_register_driver_exit();
     }
     static void Array2Int16(void* ctx, const int16_t i16[32], int16_t out_i16[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Int16(i16, out_i16);
-        fdf_env_register_driver_exit();
     }
     static void Array2Int32(void* ctx, const int32_t i32[32], int32_t out_i32[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Int32(i32, out_i32);
-        fdf_env_register_driver_exit();
     }
     static void Array2Int64(void* ctx, const int64_t i64[32], int64_t out_i64[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Int64(i64, out_i64);
-        fdf_env_register_driver_exit();
     }
     static void Array2Uint8(void* ctx, const uint8_t u8[32], uint8_t out_u8[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Uint8(u8, out_u8);
-        fdf_env_register_driver_exit();
     }
     static void Array2Uint16(void* ctx, const uint16_t u16[32], uint16_t out_u16[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Uint16(u16, out_u16);
-        fdf_env_register_driver_exit();
     }
     static void Array2Uint32(void* ctx, const uint32_t u32[32], uint32_t out_u32[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Uint32(u32, out_u32);
-        fdf_env_register_driver_exit();
     }
     static void Array2Uint64(void* ctx, const uint64_t u64[32], uint64_t out_u64[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Uint64(u64, out_u64);
-        fdf_env_register_driver_exit();
     }
     static void Array2Float32(void* ctx, const float f32[32], float out_f32[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Float32(f32, out_f32);
-        fdf_env_register_driver_exit();
     }
     static void Array2Float64(void* ctx, const double u64[32], double out_f64[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Float64(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
     static void Array2Handle(void* ctx, const zx_handle_t u64[32], zx_handle_t out_f64[32]) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->Array2Handle(u64, out_f64);
-        fdf_env_register_driver_exit();
     }
 };
 

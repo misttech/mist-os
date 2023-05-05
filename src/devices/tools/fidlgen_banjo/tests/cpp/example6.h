@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -49,11 +48,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class HelloProtocol : public Base {
 public:
     HelloProtocol() {
-        hello_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckHelloProtocolSubclass<D>();
         hello_protocol_ops_.say = HelloSay;
 
@@ -66,23 +64,12 @@ public:
         }
     }
 
-    const void* hello_protocol_server_driver() const {
-        return hello_protocol_server_driver_;
-    }
-
 protected:
     hello_protocol_ops_t hello_protocol_ops_ = {};
-    const void* hello_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->hello_protocol_server_driver();
-    }
-
     static void HelloSay(void* ctx, const char* req, char* out_response, size_t response_capacity) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->HelloSay(req, out_response, response_capacity);
-        fdf_env_register_driver_exit();
     }
 };
 

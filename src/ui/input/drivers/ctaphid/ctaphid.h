@@ -69,7 +69,7 @@ using CtapHidDriverDeviceType =
                 ddk::Messageable<fuchsia_fido_report::SecurityKeyDevice>::Mixin>;
 class CtapHidDriver : public CtapHidDriverDeviceType,
                       public ddk::EmptyProtocol<ZX_PROTOCOL_CTAP>,
-                      public ddk::HidReportListenerProtocol<CtapHidDriver> {
+                      ddk::HidReportListenerProtocol<CtapHidDriver> {
  public:
   CtapHidDriver(zx_device_t* parent, ddk::HidDeviceProtocolClient hiddev)
       : CtapHidDriverDeviceType(parent), hiddev_(hiddev) {}

@@ -63,7 +63,6 @@ rustc_library("lib") {
     "src/backends/templates/c/struct.h",
     "src/backends/templates/cpp/base_protocol.h",
     "src/backends/templates/cpp/example.h",
-    "src/backends/templates/cpp/fdf_env_setup_async.h",
     "src/backends/templates/cpp/footer.h",
     "src/backends/templates/cpp/header.h",
     "src/backends/templates/cpp/interface.h",

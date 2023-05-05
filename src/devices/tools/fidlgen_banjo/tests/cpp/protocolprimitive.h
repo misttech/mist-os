@@ -11,7 +11,6 @@
 #include <ddktl/device-internal.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fdf/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -115,11 +114,10 @@
 
 namespace ddk {
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class SynchronousPrimitiveProtocol : public Base {
 public:
     SynchronousPrimitiveProtocol() {
-        synchronous_primitive_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckSynchronousPrimitiveProtocolSubclass<D>();
         synchronous_primitive_protocol_ops_.bool = SynchronousPrimitiveBool;
         synchronous_primitive_protocol_ops_.int8 = SynchronousPrimitiveInt8;
@@ -142,83 +140,52 @@ public:
         }
     }
 
-    const void* synchronous_primitive_protocol_server_driver() const {
-        return synchronous_primitive_protocol_server_driver_;
-    }
-
 protected:
     synchronous_primitive_protocol_ops_t synchronous_primitive_protocol_ops_ = {};
-    const void* synchronous_primitive_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->synchronous_primitive_protocol_server_driver();
-    }
-
     static bool SynchronousPrimitiveBool(void* ctx, bool b, bool* out_b_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveBool(b, out_b_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static int8_t SynchronousPrimitiveInt8(void* ctx, int8_t i8, int8_t* out_i8_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveInt8(i8, out_i8_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static int16_t SynchronousPrimitiveInt16(void* ctx, int16_t i16, int16_t* out_i16_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveInt16(i16, out_i16_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static int32_t SynchronousPrimitiveInt32(void* ctx, int32_t i32, int32_t* out_i32_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveInt32(i32, out_i32_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static int64_t SynchronousPrimitiveInt64(void* ctx, int64_t i64, int64_t* out_i64_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveInt64(i64, out_i64_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint8_t SynchronousPrimitiveUint8(void* ctx, uint8_t u8, uint8_t* out_u8_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveUint8(u8, out_u8_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint16_t SynchronousPrimitiveUint16(void* ctx, uint16_t u16, uint16_t* out_u16_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveUint16(u16, out_u16_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint32_t SynchronousPrimitiveUint32(void* ctx, uint32_t u32, uint32_t* out_u32_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveUint32(u32, out_u32_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static uint64_t SynchronousPrimitiveUint64(void* ctx, uint64_t u64, uint64_t* out_u64_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveUint64(u64, out_u64_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static float SynchronousPrimitiveFloat32(void* ctx, float f32, float* out_f32_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveFloat32(f32, out_f32_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
     static double SynchronousPrimitiveFloat64(void* ctx, double u64, double* out_f64_2) {
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         auto ret = static_cast<D*>(ctx)->SynchronousPrimitiveFloat64(u64, out_f64_2);
-        fdf_env_register_driver_exit();
         return ret;
     }
 };
@@ -343,11 +310,10 @@ private:
     void* ctx_;
 };
 
-template <typename D, typename Base = internal::base_mixin, bool runtime_enforce_no_reentrancy = false>
+template <typename D, typename Base = internal::base_mixin>
 class AsyncPrimitiveProtocol : public Base {
 public:
     AsyncPrimitiveProtocol() {
-        async_primitive_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::CheckAsyncPrimitiveProtocolSubclass<D>();
         async_primitive_protocol_ops_.bool = AsyncPrimitiveBool;
         async_primitive_protocol_ops_.int8 = AsyncPrimitiveInt8;
@@ -370,315 +336,42 @@ public:
         }
     }
 
-    const void* async_primitive_protocol_server_driver() const {
-        return async_primitive_protocol_server_driver_;
-    }
-
 protected:
     async_primitive_protocol_ops_t async_primitive_protocol_ops_ = {};
-    const void* async_primitive_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {
-        return static_cast<D*>(ctx)->async_primitive_protocol_server_driver();
-    }
-
     static void AsyncPrimitiveBool(void* ctx, bool b, async_primitive_bool_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_bool_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, bool b, bool b_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, b, b_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveBool(b, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveInt8(void* ctx, int8_t i8, async_primitive_int8_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_int8_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, int8_t i8, int8_t i8_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, i8, i8_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveInt8(i8, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveInt16(void* ctx, int16_t i16, async_primitive_int16_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_int16_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, int16_t i16, int16_t i16_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, i16, i16_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveInt16(i16, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveInt32(void* ctx, int32_t i32, async_primitive_int32_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_int32_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, int32_t i32, int32_t i32_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, i32, i32_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveInt32(i32, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveInt64(void* ctx, int64_t i64, async_primitive_int64_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_int64_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, int64_t i64, int64_t i64_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, i64, i64_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveInt64(i64, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveUint8(void* ctx, uint8_t u8, async_primitive_uint8_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_uint8_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, uint8_t u8, uint8_t u8_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u8, u8_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveUint8(u8, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveUint16(void* ctx, uint16_t u16, async_primitive_uint16_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_uint16_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, uint16_t u16, uint16_t u16_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u16, u16_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveUint16(u16, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveUint32(void* ctx, uint32_t u32, async_primitive_uint32_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_uint32_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, uint32_t u32, uint32_t u32_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u32, u32_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveUint32(u32, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveUint64(void* ctx, uint64_t u64, async_primitive_uint64_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_uint64_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, uint64_t u64, uint64_t u64_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, u64, u64_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveUint64(u64, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveFloat32(void* ctx, float f32, async_primitive_float32_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_float32_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, float f32, float f32_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, f32, f32_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveFloat32(f32, callback, cookie);
-        fdf_env_register_driver_exit();
     }
     static void AsyncPrimitiveFloat64(void* ctx, double u64, async_primitive_float64_callback callback, void* cookie) {
-        if (callback && cookie) {
-            struct AsyncCallbackWrapper {
-                const void* driver;
-                async_primitive_float64_callback callback;
-                void* cookie;
-            };
-
-            AsyncCallbackWrapper* wrapper = new AsyncCallbackWrapper {
-                fdf_env_get_current_driver(),
-                callback,
-                cookie,
-            };
-
-            cookie = wrapper;
-            callback = [](void* ctx, double f64, double f64_2) {
-                AsyncCallbackWrapper* wrapper = static_cast<AsyncCallbackWrapper*>(ctx);
-                fdf_env_register_driver_entry(wrapper->driver, runtime_enforce_no_reentrancy);
-                wrapper->callback(wrapper->cookie, f64, f64_2);
-                fdf_env_register_driver_exit();
-                delete wrapper;
-            };
-        }
-        fdf_env_register_driver_entry(GetServerDriver(ctx), runtime_enforce_no_reentrancy);
         static_cast<D*>(ctx)->AsyncPrimitiveFloat64(u64, callback, cookie);
-        fdf_env_register_driver_exit();
     }
 };
 

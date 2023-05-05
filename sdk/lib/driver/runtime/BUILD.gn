@@ -63,6 +63,15 @@ sdk_source_set("driver_runtime_env") {
   category = "partner"
   sdk_name = "driver_runtime_env"
   sources = [ "include/lib/fdf/env.h" ]
+  visibility = [
+    "//build/sdk:sdk_versioned_source_sets",
+    "//sdk/lib/driver/runtime/*",
+    "//src/devices/bin/driver_host/*",
+    "//src/devices/bin/driver_host2/*",
+    "//src/devices/bin/driver_runtime/*",
+    "//src/devices/tee/drivers/optee:optee-controller-test-bin",
+    "//src/devices/testing/driver-runtime-main/*",
+  ]
   public_deps = [
     ":driver_runtime",
     "//zircon/system/ulib/zx",

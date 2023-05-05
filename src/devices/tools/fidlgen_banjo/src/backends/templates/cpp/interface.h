@@ -1,26 +1,16 @@
 {protocol_docs}
-template <typename D, bool runtime_enforce_no_reentrancy = false>
+template <typename D>
 class {protocol_name}Protocol : public internal::base_mixin {{
 public:
     {protocol_name}Protocol() {{
-        {protocol_name_snake}_protocol_server_driver_ = fdf_env_get_current_driver();
         internal::Check{protocol_name}ProtocolSubclass<D>();
 {constructor_definition}
     }}
 
-    const void* {protocol_name_snake}_protocol_server_driver() const {{
-        return {protocol_name_snake}_protocol_server_driver_;
-    }}
-
 protected:
     {protocol_name_snake}_protocol_ops_t {protocol_name_snake}_protocol_ops_ = {{}};
-    const void* {protocol_name_snake}_protocol_server_driver_;
 
 private:
-    static const void* GetServerDriver(void* ctx) {{
-        return static_cast<D*>(ctx)->{protocol_name_snake}_protocol_server_driver();
-    }}
-
 {protocol_definitions}
 }};
 

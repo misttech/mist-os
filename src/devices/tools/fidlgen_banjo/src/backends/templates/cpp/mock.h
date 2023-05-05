@@ -23,11 +23,6 @@ public:
     virtual ~Mock{protocol_name}() {{}}
 
     const {protocol_name_snake}_protocol_t* GetProto() const {{ return &proto_; }}
-
-    const void* {protocol_name_snake}_protocol_server_driver() const {{
-        return {protocol_name_snake}_protocol_server_driver_;
-    }}
-
 {mock_expects}
     void VerifyAndClear() {{
 {mock_verify}

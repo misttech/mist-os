@@ -222,7 +222,6 @@ template("_fidl_banjo_cpp") {
 
     public_deps = [
       ":$c_target_name",
-      "//sdk/lib/driver/runtime:driver_runtime_env",
 
       # The generated headers #include <ddk/*.h> and #include <ddktl/*.h>
       # files from the libraries (that aren't generated).
@@ -230,10 +229,6 @@ template("_fidl_banjo_cpp") {
       "//src/lib/ddktl",
       "//zircon/system/ulib/zx",
     ]
-
-    if (is_fuchsia) {
-      public_deps += [ "//src/devices/bin/driver_runtime" ]
-    }
 
     if (defined(invoker.public_deps)) {
       foreach(dep, invoker.public_deps) {
