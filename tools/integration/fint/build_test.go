@@ -150,12 +150,12 @@ func TestBuild(t *testing.T) {
 				FailureSummary: unrecognizedFailureMsg + "\n",
 				DebugFiles: []*fintpb.DebugFile{
 					{
-						Path:       filepath.Join(buildDir, "clang-crashreports", "foo.sh"),
-						UploadDest: "clang-crashreports/foo.sh",
+						Path:       filepath.Join(buildDir, "clang-crashreports", "foo.tar"),
+						UploadDest: "clang-crashreports/foo.tar",
 					},
 					{
-						Path:       filepath.Join(buildDir, "clang-crashreports", "bar.sh"),
-						UploadDest: "clang-crashreports/bar.sh",
+						Path:       filepath.Join(buildDir, "clang-crashreports", "bar.tar"),
+						UploadDest: "clang-crashreports/bar.tar",
 					},
 				},
 			},

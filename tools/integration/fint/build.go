@@ -5,6 +5,7 @@
 package fint
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -326,7 +327,44 @@ func collectClangCrashReports(buildDir string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		outputs = append(outputs, files...)
+
+		tarball, err := os.Create(noExt + ".tar")
+		if err != nil {
+			return nil, err
+		}
+		defer tarball.Close()
+
+		tw := tar.NewWriter(tarball)
+		defer tw.Close()
+
+		for _, file := range files {
+			f, err := os.Open(file)
+			if err != nil {
+				return nil, err
+			}
+			defer f.Close()
+
+			info, err := f.Stat()
+			if err != nil {
+				return nil, err
+			}
+
+			header, err := tar.FileInfoHeader(info, info.Name())
+			if err != nil {
+				return nil, err
+			}
+
+			err = tw.WriteHeader(header)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = io.Copy(tw, f)
+			if err != nil {
+				return nil, err
+			}
+		}
+		outputs = append(outputs, noExt+".tar")
 	}
 
 	return outputs, nil
