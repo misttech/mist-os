@@ -11,9 +11,7 @@ Usage:
 """
 
 import argparse
-import enum
 import os
-import shlex
 import subprocess
 import sys
 
@@ -164,7 +162,7 @@ class CxxRemoteAction(object):
             check_missing_remote_tools(self.compiler_type, self.exec_root_rel))
         if missing_required_tools:
             raise Exception(
-                f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563565 for how to fetch the needed packages."
+                f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563535 for how to fetch the needed packages."
             )
 
     @property

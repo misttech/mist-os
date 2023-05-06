@@ -16,6 +16,7 @@ group("tests") {
     ":dlwrap_test($host_toolchain)",
     ":fuchsia_test($host_toolchain)",
     ":output_leak_scanner_test($host_toolchain)",
+    ":prebuilt_tool_remote_wrapper_test($host_toolchain)",
     ":relativize_args_test($host_toolchain)",
     ":remote_action_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
@@ -46,6 +47,9 @@ if (is_host) {
   _rustc_remote_wrapper_sources =
       [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +
       _fuchsia_sources + _cl_utils_sources
+  _prebuilt_tool_remote_wrapper_sources =
+      [ "prebuilt_tool_remote_wrapper.py" ] + _fuchsia_sources +
+      _cl_utils_sources + _remote_action_sources
 
   python_library("cl_utils") {
     sources = _cl_utils_sources
@@ -101,6 +105,14 @@ if (is_host) {
   python_host_test("output_leak_scanner_test") {
     main_source = "output_leak_scanner_test.py"
     sources = _output_leak_scanner_sources
+  }
+
+  python_library("prebuilt_tool_remote_wrapper") {
+    sources = _prebuilt_tool_remote_wrapper_sources
+  }
+  python_host_test("prebuilt_tool_remote_wrapper_test") {
+    main_source = "prebuilt_tool_remote_wrapper_test.py"
+    sources = _prebuilt_tool_remote_wrapper_sources
   }
 
   python_library("relativize_args") {

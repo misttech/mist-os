@@ -28,7 +28,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
         return tuple(Path(i) for i in items)
 
     t = type(items)
-    raise TypeError("Unhandled sequence type: {t}")
+    raise TypeError(f"Unhandled sequence type: {t}")
 
 
 class RustActionTests(unittest.TestCase):
