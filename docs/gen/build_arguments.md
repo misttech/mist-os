@@ -2772,12 +2772,6 @@ Enables the tracing feature of mdns, which can be turned on using
 
 From //src/connectivity/network/mdns/service/BUILD.gn:13
 
-### enable_msd_arm_mali_dfv2
-
-**Current value (from the default):** `false`
-
-From //src/graphics/drivers/msd-arm-mali/BUILD.gn:10
-
 ### enable_netboot
 
 Whether to build the netboot zbi by default.
@@ -2820,7 +2814,7 @@ binary, don't enable this by default.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:315
+From //third_party/perfetto/gn/perfetto.gni:316
 
 ### enable_perfetto_heapprofd
 
@@ -2844,7 +2838,7 @@ From //third_party/perfetto/gn/perfetto.gni:150
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:309
+From //third_party/perfetto/gn/perfetto.gni:310
 
 ### enable_perfetto_platform_services
 
@@ -2861,7 +2855,7 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:332
+From //third_party/perfetto/gn/perfetto.gni:333
 
 ### enable_perfetto_stderr_crash_dump
 
@@ -2921,7 +2915,7 @@ From //third_party/perfetto/gn/perfetto.gni:275
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:321
+From //third_party/perfetto/gn/perfetto.gni:322
 
 ### enable_perfetto_traced_perf
 
@@ -2947,7 +2941,7 @@ From //third_party/perfetto/gn/perfetto.gni:267
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:325
+From //third_party/perfetto/gn/perfetto.gni:326
 
 ### enable_perfetto_unittests
 
@@ -2977,7 +2971,7 @@ From //third_party/perfetto/gn/perfetto.gni:243
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:302
+From //third_party/perfetto/gn/perfetto.gni:303
 
 ### enable_power_manager_debug
 
@@ -5765,7 +5759,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:339
+From //third_party/perfetto/gn/perfetto.gni:340
 
 ### perfetto_use_system_sqlite
 
@@ -5774,13 +5768,13 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:343
+From //third_party/perfetto/gn/perfetto.gni:344
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:345
+From //third_party/perfetto/gn/perfetto.gni:346
 
 ### perfetto_verbose_logs_enabled
 
@@ -5877,7 +5871,7 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:24
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -5885,7 +5879,7 @@ From //products/bringup.gni:14
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
 From //products/bringup.gni:14
 
@@ -7521,7 +7515,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"P2sGuOyCtGWigRBHnT9HTUSaLZ6YKF4HkAsd34pOvuAC"`
+**Current value (from the default):** `"dPuK81TMCNKPKvF3kQtHZ06EajzWNB2C7IeuF1TAa2YC"`
 
 From //build/rust/config.gni:32
 
@@ -7860,7 +7854,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:335
+From //third_party/perfetto/gn/perfetto.gni:336
 
 ### smp_max_cpus
 
