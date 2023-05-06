@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_
 
-#include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <lib/fdf/cpp/channel.h>
 
 #include <chrono>
 #include <memory>
@@ -23,8 +23,6 @@ class ParentDevice {
  public:
   virtual ~ParentDevice() { DLOG("ParentDevice dtor"); }
 
-  msd::DeviceHandle* ToDeviceHandle() { return reinterpret_cast<msd::DeviceHandle*>(this); }
-
   virtual zx::bti GetBusTransactionInitiator() = 0;
 
   virtual bool SetThreadRole(const char* role_name) = 0;
@@ -36,8 +34,11 @@ class ParentDevice {
   // Register an interrupt listed at |index| in the platform device.
   virtual std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) = 0;
 
-  virtual zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
-  ConnectToMaliRuntimeProtocol() = 0;
+  virtual zx_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                             fdf::Channel server_end) = 0;
+
+  // Ownership of |device_handle| is *not* transferred to the ParentDevice.
+  static std::unique_ptr<ParentDevice> Create(msd::DeviceHandle* device_handle);
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_

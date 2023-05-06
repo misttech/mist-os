@@ -191,19 +191,16 @@ void MsdArmDevice::Destroy() {
 
 bool MsdArmDevice::Init(msd::DeviceHandle* device_handle) {
   DLOG("Init");
-  auto platform_device = reinterpret_cast<ParentDevice*>(device_handle);
+  auto platform_device = ParentDevice::Create(device_handle);
   if (!platform_device)
-    return DRETF(false, "Null device_handle");
-  zx::bti bti = platform_device->GetBusTransactionInitiator();
-  if (!bti)
-    return DRETF(false, "Failed to get bus transaction initiator");
-  auto bus_mapper = magma::PlatformBusMapper::Create(std::move(bti));
+    return DRETF(false, "Failed to initialize device");
+  auto bus_mapper = magma::PlatformBusMapper::Create(platform_device->GetBusTransactionInitiator());
   if (!bus_mapper)
     return DRETF(false, "Failed to create bus mapper");
   return Init(std::move(platform_device), std::move(bus_mapper));
 }
 
-bool MsdArmDevice::Init(ParentDevice* platform_device,
+bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
                         std::unique_ptr<magma::PlatformBusMapper> bus_mapper) {
   DLOG("Init platform_device");
   zx_status_t status = loop_.StartThread("device-loop-thread");
@@ -238,18 +235,23 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
 #endif
 
   {
-    auto result = parent_device_->ConnectToMaliRuntimeProtocol();
-    if (result.is_error()) {
+    auto endpoints =
+        fdf::CreateEndpoints<fuchsia_hardware_gpu_mali::Service::ArmMali::ProtocolType>();
+
+    zx_status_t status = parent_device_->ConnectRuntimeProtocol(
+        fuchsia_hardware_gpu_mali::Service::ArmMali::ServiceName,
+        fuchsia_hardware_gpu_mali::Service::ArmMali::Name, endpoints->server.TakeChannel());
+    if (status != ZX_OK) {
       // Not a fatal error, since very simple parent drivers may not need to support the arm mali
       // service.
-      MAGMA_LOG(INFO, "ConnectToMaliRuntimeProtocol failed: %s", result.status_string());
+      MAGMA_LOG(INFO, "DdkConnectRuntimeProtocol failed: %s", zx_status_get_string(status));
     } else {
-      mali_protocol_client_ = fdf::WireSyncClient(std::move(*result));
+      mali_protocol_client_ = fdf::WireSyncClient(std::move(endpoints->client));
       fdf::Arena arena('MALI');
       auto result = mali_protocol_client_.buffer(arena)->GetProperties();
       if (!result.ok()) {
-        // This is not a fatal error, since this can happen if the "mali" fragment doesn't exist.
-        MAGMA_LOG(INFO, "Error retrieving mali properties: %s", result.lossy_description());
+        MAGMA_LOG(ERROR, "Error retrieving mali properties: %s", result.lossy_description());
+        return false;
       } else {
         auto& properties = result->properties;
         mali_properties_.supports_protected_mode =

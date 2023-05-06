@@ -338,7 +338,6 @@
 //src/graphics/drivers/misc/goldfish_address_space:address_space_driver-driver
 //src/graphics/drivers/misc/goldfish_control:control_driver-driver
 //src/graphics/drivers/misc/goldfish_sync:goldfish_sync_driver-driver
-//src/graphics/drivers/msd-arm-mali:msd_arm-dfv2-driver
 //src/graphics/drivers/msd-arm-mali:msd_arm-driver
 //src/graphics/drivers/msd-arm-mali:msd_arm_test-driver
 //src/graphics/drivers/msd-intel-gen:msd_intel-driver

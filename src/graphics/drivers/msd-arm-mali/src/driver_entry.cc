@@ -11,7 +11,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fit/thread_safety.h>
-#include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -32,7 +31,7 @@
 #include "sys_driver_cpp/magma_system_device.h"
 
 #if MAGMA_TEST_DRIVER
-zx_status_t magma_indriver_test(ParentDevice* device);
+zx_status_t magma_indriver_test(zx_device_t* device);
 #endif
 
 class GpuDevice;
@@ -52,12 +51,10 @@ class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GP
 
  private:
   zx_status_t MagmaStart() FIT_REQUIRES(magma_mutex());
-
-  std::unique_ptr<ParentDeviceDFv1> parent_device_;
 };
 
 zx_status_t GpuDevice::MagmaStart() {
-  set_magma_system_device(magma_driver()->CreateDevice(parent_device_->ToDeviceHandle()));
+  set_magma_system_device(magma_driver()->CreateDevice(ZxDeviceToDeviceHandle(parent())));
   if (!magma_system_device())
     return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
   InitSystemDevice();
@@ -84,15 +81,10 @@ void GpuDevice::DdkRelease() {
 
 zx_status_t GpuDevice::Init() {
   std::lock_guard<std::mutex> lock(magma_mutex());
-  parent_device_ = ParentDeviceDFv1::Create(parent());
-  if (!parent_device_) {
-    MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv1");
-    return ZX_ERR_INTERNAL;
-  }
   set_magma_driver(MagmaDriver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
-  set_unit_test_status(magma_indriver_test(parent_device_.get()));
+  set_unit_test_status(magma_indriver_test(parent()));
 #endif
 
   zx_status_t status = MagmaStart();

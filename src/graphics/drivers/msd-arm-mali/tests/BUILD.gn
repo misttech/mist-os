@@ -15,10 +15,7 @@ group("tests") {
 
 group("nonhardware_tests") {
   testonly = true
-  deps = [
-    ":msd_arm_mali_dfv2_tests",
-    ":msd_arm_mali_nonhardware_tests",
-  ]
+  deps = [ ":msd_arm_mali_nonhardware_tests" ]
 }
 
 group("integration") {
@@ -29,15 +26,6 @@ group("integration") {
 fuchsia_unittest_package("msd_arm_mali_nonhardware_tests") {
   deps = [ "unit_tests:msd_arm_mali_nonhardware_tests" ]
   manifest = "meta/msd_arm_mali_nonhardware_tests.cml"
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {
-  deps = [ "unit_tests:msd_arm_mali_dfv2_tests" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

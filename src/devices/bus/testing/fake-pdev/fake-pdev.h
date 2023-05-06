@@ -49,12 +49,10 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
 
   FakePDevFidl() = default;
 
-  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
-      async_dispatcher_t* dispatcher = nullptr) {
+  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_platform_device::Service::InstanceHandler({
-        .device = binding_group_.CreateHandler(
-            this, dispatcher ? dispatcher : async_get_default_dispatcher(),
-            fidl::kIgnoreBindingClosure),
+        .device = binding_group_.CreateHandler(this, async_get_default_dispatcher(),
+                                               fidl::kIgnoreBindingClosure),
     });
   }
 

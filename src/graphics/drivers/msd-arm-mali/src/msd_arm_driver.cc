@@ -53,12 +53,13 @@ magma_status_t MsdArmDriver::ImportSemaphore(zx::event handle, uint64_t client_i
 }
 
 std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDeviceForTesting(
-    ParentDevice* parent_device, std::unique_ptr<magma::PlatformBusMapper> bus_mapper) {
+    std::unique_ptr<ParentDevice> parent_device,
+    std::unique_ptr<magma::PlatformBusMapper> bus_mapper) {
   auto device = std::make_unique<MsdArmDevice>();
   device->set_inspect(root_node_.CreateChild("device"));
   device->set_assume_reset_happened(true);
 
-  if (!device->Init(parent_device, std::move(bus_mapper)))
+  if (!device->Init(std::move(parent_device), std::move(bus_mapper)))
     return DRETF(nullptr, "Failed to create device");
   return device;
 }

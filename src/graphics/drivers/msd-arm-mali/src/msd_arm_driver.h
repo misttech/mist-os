@@ -35,7 +35,8 @@ class MsdArmDriver : public msd::Driver {
   inspect::Node& root_node() { return root_node_; }
 
   std::unique_ptr<MsdArmDevice> CreateDeviceForTesting(
-      ParentDevice* parent_device, std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
+      std::unique_ptr<ParentDevice> parent_device,
+      std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
  private:
   static const uint32_t kMagic = 0x64726976;  //"driv"

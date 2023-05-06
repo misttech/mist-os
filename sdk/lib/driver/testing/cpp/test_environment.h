@@ -33,12 +33,7 @@ class AsyncTestEnvironment {
   explicit AsyncTestEnvironment(async_dispatcher_t* dispatcher = nullptr);
 
   // Get the component::OutgoingDirectory that backs the driver's incoming namespace.
-  const component::OutgoingDirectory& incoming_directory() const {
-    std::lock_guard guard(checker_);
-    return incoming_directory_server_;
-  }
-
-  component::OutgoingDirectory& incoming_directory() {
+  const component::OutgoingDirectory& incoming_directory() {
     std::lock_guard guard(checker_);
     return incoming_directory_server_;
   }
@@ -83,12 +78,7 @@ class TestEnvironment {
   explicit TestEnvironment(fdf_dispatcher_t* dispatcher = nullptr);
 
   // Get the component::OutgoingDirectory that backs the driver's incoming namespace.
-  fdf::OutgoingDirectory& incoming_directory() {
-    std::lock_guard guard(checker_);
-    return incoming_directory_server_;
-  }
-
-  const fdf::OutgoingDirectory& incoming_directory() const {
+  const fdf::OutgoingDirectory& incoming_directory() {
     std::lock_guard guard(checker_);
     return incoming_directory_server_;
   }
