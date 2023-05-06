@@ -471,7 +471,7 @@ where
             .await
             .with_context(|| format!("reading package manifest list {path}"))?;
 
-        let package_list_manifest = PackageManifestList::from_reader(&contents[..])
+        let package_list_manifest = PackageManifestList::from_reader(&path, &contents[..])
             .with_context(|| format!("reading package manifest list {path}"))?;
 
         self.deps.insert(path.clone());

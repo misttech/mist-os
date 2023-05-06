@@ -1267,9 +1267,11 @@ mod tests {
         let manifest_dir = dir.join("manifests");
         let package_manifest_list_path = manifest_dir.join("package_manifests.list");
 
-        let package_manifest_list =
-            PackageManifestList::from_reader(File::open(package_manifest_list_path).unwrap())
-                .unwrap();
+        let package_manifest_list = PackageManifestList::from_reader(
+            &package_manifest_list_path,
+            File::open(&package_manifest_list_path).unwrap(),
+        )
+        .unwrap();
 
         assert_eq!(
             package_manifest_list,

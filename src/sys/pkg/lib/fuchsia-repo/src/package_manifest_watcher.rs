@@ -545,7 +545,7 @@ fn read_package_manifest_list(path: &Utf8Path) -> Result<HashSet<Utf8PathBuf>> {
         }
     };
 
-    let list = match PackageManifestList::from_reader(file) {
+    let list = match PackageManifestList::from_reader(path, file) {
         Ok(list) => list,
         Err(_) => {
             return Ok(HashSet::new());
