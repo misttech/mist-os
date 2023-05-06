@@ -173,6 +173,8 @@ pub enum ElfArchitecture {
     X86_64 = 62,
     /// EM_AARCH64
     AARCH64 = 183,
+    /// EM_RISCV
+    RISCV = 243,
 }
 
 pub const ELF_MAGIC: [u8; 4] = *b"\x7fELF";
@@ -186,6 +188,8 @@ pub const NATIVE_ENCODING: ElfDataEncoding = ElfDataEncoding::BigEndian;
 pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::X86_64;
 #[cfg(target_arch = "aarch64")]
 pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::AARCH64;
+#[cfg(target_arch = "riscv64")]
+pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::RISCV;
 
 impl Elf64FileHeader {
     pub fn elf_type(&self) -> Result<ElfType, u16> {
