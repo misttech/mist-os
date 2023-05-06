@@ -320,6 +320,15 @@ pub fn system_get_physmem() -> u64 {
     unsafe { sys::zx_system_get_physmem() }
 }
 
+/// Get number of logical processors on the system.
+///
+/// Wraps the
+/// [zx_system_get_num_cpus](https://fuchsia.dev/fuchsia-src/reference/syscalls/system_get_num_cpus)
+/// syscall.
+pub fn system_get_num_cpus() -> u32 {
+    unsafe { sys::zx_system_get_num_cpus() }
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]

@@ -13,7 +13,7 @@ use crate::auth::{Credentials, SecureBits};
 use crate::execution::*;
 use crate::fs::*;
 use crate::lock::RwLock;
-use crate::logging::{log_info, log_trace};
+use crate::logging::{log_error, log_info, log_trace};
 use crate::mm::*;
 use crate::syscalls::*;
 use crate::task::*;
@@ -484,33 +484,67 @@ pub fn sys_sched_setscheduler(
     Ok(())
 }
 
+type CpuAffinityMask = u64;
+const CPU_AFFINITY_MASK_SIZE: u32 = std::mem::size_of::<CpuAffinityMask>() as u32;
+const NUM_CPUS_MAX: u32 = CPU_AFFINITY_MASK_SIZE * 8;
+
+fn get_default_cpumask() -> CpuAffinityMask {
+    match fuchsia_zircon::system_get_num_cpus() {
+        num_cpus if num_cpus > NUM_CPUS_MAX => {
+            log_error!("num_cpus={}, greater than the {} max supported.", num_cpus, NUM_CPUS_MAX);
+            CpuAffinityMask::MAX
+        }
+        NUM_CPUS_MAX => CpuAffinityMask::MAX,
+        num_cpus => (1 << num_cpus) - 1,
+    }
+}
+
 pub fn sys_sched_getaffinity(
     current_task: &CurrentTask,
-    _pid: pid_t,
+    pid: pid_t,
     cpusetsize: u32,
     user_mask: UserAddress,
-) -> Result<(), Errno> {
-    let mask: u64 = u64::MAX;
-    if cpusetsize < (std::mem::size_of_val(&mask) as u32) {
+) -> Result<usize, Errno> {
+    if pid < 0 {
+        return error!(EINVAL);
+    }
+    if cpusetsize < CPU_AFFINITY_MASK_SIZE
+        || cpusetsize % (std::mem::size_of::<usize>() as u32) != 0
+    {
         return error!(EINVAL);
     }
 
+    let _task = get_task_or_current(current_task, pid)?;
+
+    // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
+    let mask = get_default_cpumask();
     current_task.mm.write_memory(user_mask, &mask.to_ne_bytes())?;
-    Ok(())
+    Ok(CPU_AFFINITY_MASK_SIZE as usize)
 }
 
 pub fn sys_sched_setaffinity(
     current_task: &CurrentTask,
-    _pid: pid_t,
+    pid: pid_t,
     cpusetsize: u32,
     user_mask: UserAddress,
 ) -> Result<(), Errno> {
-    let mut mask: u64 = 0;
-    if cpusetsize < (std::mem::size_of_val(&mask) as u32) {
+    if pid < 0 {
+        return error!(EINVAL);
+    }
+    let _task = get_task_or_current(current_task, pid)?;
+
+    if cpusetsize < CPU_AFFINITY_MASK_SIZE {
         return error!(EINVAL);
     }
 
+    let mut mask: CpuAffinityMask = 0;
     current_task.mm.read_memory(user_mask, mask.as_bytes_mut())?;
+
+    // Specified mask must include at least one valid CPU.
+    if mask & get_default_cpumask() == 0 {
+        return error!(EINVAL);
+    }
+
     // Currently, we ignore the mask and act as if the system reset the mask
     // immediately to allowing all CPUs.
     Ok(())
@@ -1303,16 +1337,23 @@ mod tests {
     fn test_get_affinity_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        assert_eq!(sys_sched_getaffinity(&current_task, 1, u32::MAX, mapped_address), Ok(()));
-        assert_eq!(sys_sched_getaffinity(&current_task, 1, 1, mapped_address), error!(EINVAL));
+        let pid = current_task.get_pid();
+        assert_eq!(
+            sys_sched_getaffinity(&current_task, pid, 16, mapped_address),
+            Ok(std::mem::size_of::<u64>())
+        );
+        assert_eq!(sys_sched_getaffinity(&current_task, pid, 1, mapped_address), error!(EINVAL));
+        assert_eq!(sys_sched_getaffinity(&current_task, pid, 9, mapped_address), error!(EINVAL));
     }
 
     #[::fuchsia::test]
     fn test_set_affinity_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        assert_eq!(sys_sched_setaffinity(&current_task, 1, u32::MAX, mapped_address), Ok(()));
-        assert_eq!(sys_sched_setaffinity(&current_task, 1, 1, mapped_address), error!(EINVAL));
+        current_task.mm.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
+        let pid = current_task.get_pid();
+        assert_eq!(sys_sched_setaffinity(&current_task, pid, u32::MAX, mapped_address), Ok(()));
+        assert_eq!(sys_sched_setaffinity(&current_task, pid, 1, mapped_address), error!(EINVAL));
     }
 
     #[::fuchsia::test]

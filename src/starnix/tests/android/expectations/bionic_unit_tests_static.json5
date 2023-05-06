@@ -26,6 +26,7 @@
                 "sys_personality.current_persona",
                 "sys_prctl.pr_cap_ambient",
                 "sys_ptrace.watchpoint_imprecise",
+                "sys_ptrace.watchpoint_stress",
                 "sys_ptrace.hardware_breakpoint",
                 "sys_sem.smoke",
                 "sys_sendfile.sendfile",

@@ -13,12 +13,8 @@
             type: "expect_failure",
             matchers: [
                 // affinity_test
-                "AffinityTest.SchedSetAffinityInvalidPID",
-                "AffinityTest.SchedSetAffinityZeroMask",
-                "AffinityTest.SchedSetAffinityNonexistentCPUDropped",
                 "AffinityTest.LargeCpuMask",
                 "AffinityTest.NewThread",
-                "AffinityTest.SchedGetAffinityInvalidPID",
                 "AffinityTest.ConsistentWithProcCpuInfo",
                 "AffinityTest.ConsistentWithProcStat",
                 "AffinityTest.Sanity",
@@ -153,6 +149,7 @@
                 "FcntlLockTest.GetLockRespectsPIDNamespace",
 
                 // fork_test
+                "ForkTest.Affinity",
                 "ForkTest.Alarm",
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
@@ -1238,7 +1235,6 @@
                 "MremapDeathTest.SharedAnon",
 
                 // These tests cause fatal signals that crash the test suite.
-                "AffinityTest.SchedSetAffinityInvalidSize",
                 "ExecveatTest.UnshareFiles",
                 "FaultTest.InRange",
                 "FPSigTest.Fork",
