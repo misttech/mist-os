@@ -15,7 +15,7 @@ from typing import Any, List, Optional, Set, Type
 from honeydew import device_classes
 from honeydew.device_classes import generic_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.utils import ffx_cli
+from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 # List all the public methods in alphabetical order
 def create_device(
         device_name: str,
-        ssh_private_key: str,
+        ssh_private_key: Optional[str] = None,
         ssh_user: Optional[str] = None) -> fuchsia_device.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -176,7 +176,8 @@ def _get_device_class(device_name: str) -> Type[fuchsia_device.FuchsiaDevice]:
     Returns:
         Device class type.
     """
-    product_type: str = ffx_cli.get_target_type(device_name)
+    ffx: ffx_transport.FFX = ffx_transport.FFX(target=device_name)
+    product_type: str = ffx.get_target_type()
 
     for device_class in _get_all_register_device_classes():
         if product_type.lower() == device_class.__name__.lower():

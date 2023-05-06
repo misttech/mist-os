@@ -34,10 +34,10 @@ python_library("honeydew") {
     "mobly_controller/__init__.py",
     "mobly_controller/fuchsia_device.py",
     "transports/__init__.py",
+    "transports/ffx.py",
     "transports/sl4f.py",
     "transports/ssh.py",
     "utils/__init__.py",
-    "utils/ffx_cli.py",
     "utils/http_utils.py",
     "utils/properties.py",
   ]

@@ -11,7 +11,6 @@ from unittest import mock
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.transports import sl4f
-from honeydew.transports import ssh
 from parameterized import parameterized
 
 # pylint: disable=protected-access
@@ -97,10 +96,7 @@ class Sl4fTests(unittest.TestCase):
     def setUp(self, mock_sl4f_start_server) -> None:
         super().setUp()
 
-        self.ssh_obj = mock.MagicMock(spec=ssh.SSH)
-
-        self.sl4f_obj = sl4f.SL4F(
-            device_name=_INPUT_ARGS["device_name"], ssh=self.ssh_obj)
+        self.sl4f_obj = sl4f.SL4F(device_name=_INPUT_ARGS["device_name"])
 
         mock_sl4f_start_server.assert_called()
 
@@ -277,11 +273,25 @@ class Sl4fTests(unittest.TestCase):
         mock_send_http_request.assert_called_once()
 
     @mock.patch.object(sl4f.SL4F, "check_connection", autospec=True)
-    def test_start_server(self, mock_check_connection) -> None:
+    @mock.patch.object(sl4f.ffx_transport.FFX, "run", autospec=True)
+    def test_start_server(self, mock_ffx_run, mock_check_connection) -> None:
         """Testcase for SL4F.start_server()"""
         self.sl4f_obj.start_server()
 
+        mock_ffx_run.assert_called()
         mock_check_connection.assert_called()
+
+    @mock.patch.object(
+        sl4f.ffx_transport.FFX,
+        "run",
+        side_effect=errors.FfxCommandError("error"),
+        autospec=True)
+    def test_start_server_exception(self, mock_ffx_run) -> None:
+        """Testcase for SL4F.start_server() raising exception"""
+        with self.assertRaises(errors.Sl4fError):
+            self.sl4f_obj.start_server()
+
+        mock_ffx_run.assert_called()
 
     @parameterized.expand(
         [
@@ -314,7 +324,8 @@ class Sl4fTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    @mock.patch.object(sl4f.ffx_cli, "get_target_ssh_address", autospec=True)
+    @mock.patch.object(
+        sl4f.ffx_transport.FFX, "get_target_ssh_address", autospec=True)
     def test_get_sl4f_server_address(
             self, parameterized_dict, mock_get_target_ssh_address) -> None:
         """Testcase for SL4F._get_sl4f_server_address()"""

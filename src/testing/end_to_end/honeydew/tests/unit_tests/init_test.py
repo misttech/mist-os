@@ -32,6 +32,10 @@ class InitTests(unittest.TestCase):
 
     # List all the tests related to public methods in alphabetical order
     @mock.patch.object(
+        honeydew.generic_fuchsia_device.fuchsia_device_base.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
         honeydew.generic_fuchsia_device.fuchsia_device_base.sl4f_transport.SL4F,
         "check_connection",
         autospec=True)
@@ -49,7 +53,8 @@ class InitTests(unittest.TestCase):
         autospec=True)
     def test_create_device_return_default_device(
             self, mock_get_device_class, mock_ssh_check_connection,
-            mock_sl4f_start_server, mock_sl4f_check_connection) -> None:
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns default
         fuchsia device object."""
         device_name = "fuchsia-emulator"
@@ -63,7 +68,12 @@ class InitTests(unittest.TestCase):
         mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
 
+    @mock.patch.object(
+        honeydew.generic_fuchsia_device.fuchsia_device_base.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
     @mock.patch.object(
         honeydew.generic_fuchsia_device.fuchsia_device_base.sl4f_transport.SL4F,
         "check_connection",
@@ -80,7 +90,8 @@ class InitTests(unittest.TestCase):
         "honeydew._get_device_class", return_value=x64.X64, autospec=True)
     def test_create_device_return_specific_device(
             self, mock_get_device_class, mock_ssh_check_connection,
-            mock_sl4f_start_server, mock_sl4f_check_connection) -> None:
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns a specific
         fuchsia device object."""
         device_name = "fuchsia-1234"
@@ -92,6 +103,7 @@ class InitTests(unittest.TestCase):
         mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
 
     @mock.patch(
         "honeydew._get_device_class",
@@ -149,7 +161,7 @@ class InitTests(unittest.TestCase):
 
     # List all the tests related to private methods in alphabetical order
     @mock.patch.object(
-        honeydew.ffx_cli,
+        honeydew.ffx_transport.FFX,
         "get_target_type",
         return_value="qemu-x64",
         autospec=True)
@@ -164,7 +176,7 @@ class InitTests(unittest.TestCase):
             honeydew._get_device_class(device_name=device_name),
             expected_device_class)
 
-        mock_get_target_type.assert_called_once_with(device_name)
+        mock_get_target_type.assert_called()
 
     @mock.patch(
         "honeydew.get_device_classes", return_value={x64.X64}, autospec=True)
@@ -179,7 +191,10 @@ class InitTests(unittest.TestCase):
         return_value={x64.X64},
         autospec=True)
     @mock.patch.object(
-        honeydew.ffx_cli, "get_target_type", return_value="x64", autospec=True)
+        honeydew.ffx_transport.FFX,
+        "get_target_type",
+        return_value="x64",
+        autospec=True)
     def test_get_device_class_return_specific_device(
             self, mock_get_target_type,
             mock_get_all_register_device_classes) -> None:
@@ -192,7 +207,7 @@ class InitTests(unittest.TestCase):
             honeydew._get_device_class(device_name=device_name),
             expected_device_class)
 
-        mock_get_target_type.assert_called_once_with(device_name)
+        mock_get_target_type.assert_called()
         mock_get_all_register_device_classes.assert_called_once()
 
 

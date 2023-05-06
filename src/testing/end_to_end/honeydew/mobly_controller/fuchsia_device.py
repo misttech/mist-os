@@ -47,7 +47,7 @@ def create(
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
-                ssh_private_key=device_config["ssh_private_key"],
+                ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user")))
     return fuchsia_devices
 
@@ -133,9 +133,12 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         config)
 
     device_config: Dict[str, Any] = {
-        "name": "",
-        "ssh_private_key": "",
-        "ssh_user": config.get("ssh_user"),
+        "name":
+            "",
+        "ssh_private_key":
+            config.get("ssh_private_key") or config.get("ssh_key"),
+        "ssh_user":
+            config.get("ssh_user"),
     }
 
     # Sample testbed file format for FuchsiaDevice controller used in infra...
@@ -153,13 +156,6 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         device_config["name"] = config["nodename"]
     else:
         raise RuntimeError("Missing fuchsia device name in the config")
-
-    if config.get("ssh_private_key"):
-        device_config["ssh_private_key"] = config["ssh_private_key"]
-    elif config.get("ssh_key"):
-        device_config["ssh_private_key"] = config["ssh_key"]
-    else:
-        raise RuntimeError("Missing SSH private key in the config")
 
     _LOGGER.debug(
         "Updated FuchsiaDevice controller config after the validation is '%s'",

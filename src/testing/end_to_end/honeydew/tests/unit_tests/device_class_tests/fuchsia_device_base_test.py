@@ -41,6 +41,10 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     """Unit tests for honeydew.device_classes.fuchsia_device_base.py."""
 
     @mock.patch.object(
+        fuchsia_device_base.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
         fuchsia_device_base.sl4f_transport.SL4F,
         "check_connection",
         autospec=True)
@@ -52,7 +56,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def setUp(
             self, mock_ssh_check_connection, mock_sl4f_start_server,
-            mock_sl4f_check_connection) -> None:
+            mock_sl4f_check_connection, mock_ffx_check_connection) -> None:
         super().setUp()
 
         self.fd_obj = fuchsia_device_base.FuchsiaDeviceBase(
@@ -62,6 +66,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
 
     # List all the tests related to __init__ in alphabetical order
     @parameterized.expand(
@@ -91,6 +96,10 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     @mock.patch.object(
+        fuchsia_device_base.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
         fuchsia_device_base.sl4f_transport.SL4F,
         "check_connection",
         autospec=True)
@@ -102,7 +111,8 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_fuchsia_device_base_init(
             self, parameterized_dict, mock_ssh_check_connection,
-            mock_sl4f_start_server, mock_sl4f_check_connection) -> None:
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ffx_check_connection) -> None:
         """Verify FuchsiaDeviceBase class instantiation"""
         optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
@@ -120,17 +130,18 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(
-        fuchsia_device_base.ffx_cli,
+        fuchsia_device_base.ffx_transport.FFX,
         "get_target_type",
         return_value=_MOCK_ARGS["device_type"],
         autospec=True)
-    def test_device_type(self, mock_ffx_cli_get_target_type) -> None:
+    def test_device_type(self, mock_ffx_get_target_type) -> None:
         """Testcase for FuchsiaDeviceBase.device_type property"""
         self.assertEqual(self.fd_obj.device_type, _MOCK_ARGS["device_type"])
-        mock_ffx_cli_get_target_type.assert_called_once_with(self.fd_obj.name)
+        mock_ffx_get_target_type.assert_called()
 
     @mock.patch.object(
         fuchsia_device_base.sl4f_transport.SL4F,
@@ -376,6 +387,10 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     @mock.patch.object(
         fuchsia_device_base.sl4f_transport.SL4F, "start_server", autospec=True)
     @mock.patch.object(
+        fuchsia_device_base.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
         fuchsia_device_base.ssh_transport.SSH,
         "check_connection",
         autospec=True)
@@ -385,70 +400,71 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_wait_for_bootup_complete(
             self, mock_wait_for_online, mock_ssh_check_connection,
-            mock_sl4f_start_server, mock_device_type,
+            mock_ffx_check_connection, mock_sl4f_start_server, mock_device_type,
             mock_bluetooth_sys_init) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_bootup_complete()"""
         self.fd_obj._wait_for_bootup_complete(timeout=10)
 
         mock_wait_for_online.assert_called()
         mock_ssh_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_device_type.assert_called()
         mock_bluetooth_sys_init.assert_called()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
-        fuchsia_device_base.ffx_cli,
-        "check_ffx_connection",
+        fuchsia_device_base.ffx_transport.FFX,
+        "is_target_connected",
         side_effect=[True, False],
         autospec=True)
     def test_wait_for_offline_success(
-            self, mock_check_ffx_connection, mock_sleep) -> None:
+            self, mock_ffx_is_target_connected, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_offline() success case"""
         self.fd_obj._wait_for_offline()
 
-        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+        mock_ffx_is_target_connected.assert_called()
         mock_sleep.assert_called()
 
     @mock.patch.object(
-        fuchsia_device_base.ffx_cli,
-        "check_ffx_connection",
+        fuchsia_device_base.ffx_transport.FFX,
+        "is_target_connected",
         return_value=True,
         autospec=True)
-    def test_wait_for_offline_fail(self, mock_check_ffx_connection) -> None:
+    def test_wait_for_offline_fail(self, mock_ffx_is_target_connected) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_offline() failure case"""
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     "failed to go offline"):
             self.fd_obj._wait_for_offline(timeout=2)
 
-        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+        mock_ffx_is_target_connected.assert_called()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
-        fuchsia_device_base.ffx_cli,
-        "check_ffx_connection",
+        fuchsia_device_base.ffx_transport.FFX,
+        "is_target_connected",
         side_effect=[False, True],
         autospec=True)
     def test_wait_for_online_success(
-            self, mock_check_ffx_connection, mock_sleep) -> None:
+            self, mock_ffx_is_target_connected, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_online() success case"""
         self.fd_obj._wait_for_online()
 
-        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+        mock_ffx_is_target_connected.assert_called()
         mock_sleep.assert_called()
 
     @mock.patch.object(
-        fuchsia_device_base.ffx_cli,
-        "check_ffx_connection",
+        fuchsia_device_base.ffx_transport.FFX,
+        "is_target_connected",
         return_value=False,
         autospec=True)
-    def test_wait_for_online_fail(self, mock_check_ffx_connection) -> None:
+    def test_wait_for_online_fail(self, mock_ffx_is_target_connected) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_online() failure case"""
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     "failed to go online"):
             self.fd_obj._wait_for_online(timeout=2)
 
-        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+        mock_ffx_is_target_connected.assert_called()
 
 
 if __name__ == "__main__":

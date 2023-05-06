@@ -67,7 +67,7 @@ class SshTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True)
     @mock.patch.object(
-        ssh.ffx_cli,
+        ssh.ffx_transport.FFX,
         "get_target_ssh_address",
         return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True)
@@ -88,7 +88,7 @@ class SshTests(unittest.TestCase):
             returncode=1, cmd="ssh fuchsia@12.34.56.78:ls"),
         autospec=True)
     @mock.patch.object(
-        ssh.ffx_cli,
+        ssh.ffx_transport.FFX,
         "get_target_ssh_address",
         return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True)

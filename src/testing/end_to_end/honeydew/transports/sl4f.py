@@ -8,12 +8,11 @@ import ipaddress
 import logging
 import sys
 import time
-from typing import Any, Dict, Iterable, Optional, Type
+from typing import Any, Dict, Iterable, List, Optional, Type
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.transports import ssh as ssh_transport
-from honeydew.utils import ffx_cli
+from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import http_utils
 from honeydew.utils import properties
 
@@ -26,8 +25,8 @@ _DEFAULTS: Dict[str, int] = {
     "INTERVAL": 3,
 }
 
-_SSH_CMDS: Dict[str, str] = {
-    "START_SL4F": "start_sl4f",
+_FFX_CMDS: Dict[str, List[str]] = {
+    "START_SL4F": ["target", "ssh", "start_sl4f"],
 }
 
 _SL4F_PORT: Dict[str, int] = {
@@ -48,15 +47,15 @@ class SL4F:
     """Provides methods for Host-(Fuchsia)Target interactions via SL4F.
 
     Args:
-        name: Fuchsia device name.
+        device_name: Fuchsia device name.
 
     Raises:
         errors.Sl4fError: Failed to instantiate.
     """
 
-    def __init__(self, device_name: str, ssh: ssh_transport.SSH) -> None:
+    def __init__(self, device_name: str) -> None:
         self._name: str = device_name
-        self._ssh: ssh_transport.SSH = ssh
+        self._ffx = ffx_transport.FFX(target=self._name)
 
         self.start_server()
 
@@ -71,7 +70,8 @@ class SL4F:
         Raises:
             errors.Sl4fError: On failure.
         """
-        sl4f_server_address = self._get_sl4f_server_address()
+        sl4f_server_address: custom_types.Sl4fServerAddress = \
+            self._get_sl4f_server_address()
 
         if self._get_ip_version(sl4f_server_address.ip) == 6:
             return \
@@ -176,7 +176,11 @@ class SL4F:
             errors.Sl4fError: Failed to start the SL4F server.
         """
         _LOGGER.info("Starting SL4F server on %s...", self._name)
-        self._ssh.run(command=_SSH_CMDS["START_SL4F"])
+
+        try:
+            self._ffx.run(cmd=_FFX_CMDS["START_SL4F"])
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.Sl4fError(err) from err
 
         # verify the device is responsive to SL4F requests
         self.check_connection()
@@ -192,7 +196,7 @@ class SL4F:
             errors.Sl4fError: In case of failure.
             errors.FfxCommandError: If failed to get the SL4F server address.
         """
-        sl4f_server_ip: str = ffx_cli.get_target_ssh_address(self._name).ip
+        sl4f_server_ip: str = self._ffx.get_target_ssh_address().ip
 
         # Device addr is localhost, assume that means that ports were forwarded
         # from a remote workstation/laptop with a device attached.

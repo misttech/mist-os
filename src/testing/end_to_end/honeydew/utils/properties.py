@@ -40,3 +40,11 @@ class Affordance(property):
     def __init__(self, fget: Callable[[Any], Any]) -> None:
         super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
         self.name: str = fget.__name__
+
+
+class Transport(property):
+    """A property that represents an transport."""
+
+    def __init__(self, fget: Callable[[Any], Any]) -> None:
+        super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
+        self.name: str = fget.__name__

@@ -5,6 +5,16 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("ffx_test") {
+    main_source = "ffx_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("ssh_test") {
     main_source = "ssh_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
@@ -26,6 +36,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
+    ":ffx_test($host_toolchain)",
     ":sl4f_test($host_toolchain)",
     ":ssh_test($host_toolchain)",
   ]

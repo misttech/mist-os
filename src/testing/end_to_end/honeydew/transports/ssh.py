@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.utils import ffx_cli
+from honeydew.transports import ffx as ffx_transport
 
 _DEFAULTS: Dict[str, Any] = {
     "USERNAME": "fuchsia",
@@ -74,7 +74,7 @@ class SSH:
         start_time: float = time.time()
         end_time: float = start_time + timeout
 
-        _LOGGER.info("Waiting for %s to allow ssh connection...", self._name)
+        _LOGGER.debug("Waiting for %s to allow ssh connection...", self._name)
         while time.time() < end_time:
             try:
                 self.run(command=_CMDS["ECHO"])
@@ -84,7 +84,7 @@ class SSH:
         else:
             raise errors.SSHCommandError(
                 f"Failed to connect to '{self._name}' via SSH.")
-        _LOGGER.info("%s is available via ssh.", self._name)
+        _LOGGER.debug("%s is available via ssh.", self._name)
 
     def run(
             self,
@@ -103,8 +103,9 @@ class SSH:
             errors.SSHCommandError: On failure.
             errors.FfxCommandError: If failed to get the target SSH address.
         """
+        ffx = ffx_transport.FFX(target=self._name)
         target_ssh_address: custom_types.TargetSshAddress = \
-            ffx_cli.get_target_ssh_address(self._name)
+            ffx.get_target_ssh_address()
 
         ssh_command: str = _SSH_COMMAND.format(
             options=_OPTIONS,

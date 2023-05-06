@@ -24,11 +24,11 @@ from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import bluetooth_capable_device
 from honeydew.interfaces.device_classes import component_capable_device
-from honeydew.interfaces.device_classes import tracing_capable_device
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.interfaces.device_classes import tracing_capable_device
+from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
-from honeydew.utils import ffx_cli
 from honeydew.utils import properties
 
 _SL4F_METHODS: Dict[str, str] = {
@@ -80,18 +80,16 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
     def __init__(
             self,
             device_name: str,
-            ssh_private_key: str,
+            ssh_private_key: Optional[str],
             ssh_user: Optional[str] = None) -> None:
         self.name: str = device_name
 
-        self.ssh: ssh_transport.SSH = ssh_transport.SSH(
-            device_name=self.name,
-            username=ssh_user,
-            private_key=ssh_private_key)
-        self.ssh.check_connection()
+        self._ssh_private_key: Optional[str] = ssh_private_key
+        self._ssh_user: Optional[str] = ssh_user
 
-        self.sl4f: sl4f_transport.SL4F = sl4f_transport.SL4F(
-            device_name=self.name, ssh=self.ssh)
+        if self._ssh_private_key:
+            self.ssh.check_connection()
+        self.ffx.check_connection()
         self.sl4f.check_connection()
 
     # List all the persistent properties in alphabetical order
@@ -105,7 +103,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        return ffx_cli.get_target_type(self.name)
+        return self.ffx.get_target_type()
 
     @properties.PersistentProperty
     def manufacturer(self) -> str:
@@ -171,6 +169,53 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         get_version_resp: Dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["GetVersion"])
         return get_version_resp["result"]
+
+    # List all the transports in alphabetical order
+    @properties.Transport
+    def ffx(self) -> ffx_transport.FFX:
+        """Returns the FFX transport object.
+
+        Returns:
+            FFX object.
+
+        Raises:
+            errors.Sl4fError: Failed to instantiate.
+        """
+        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(target=self.name)
+        return ffx_obj
+
+    @properties.Transport
+    def sl4f(self) -> sl4f_transport.SL4F:
+        """Returns the SL4F transport object.
+
+        Returns:
+            SL4F object.
+
+        Raises:
+            errors.Sl4fError: Failed to instantiate.
+        """
+        sl4f_obj: sl4f_transport.SL4F = sl4f_transport.SL4F(
+            device_name=self.name)
+        return sl4f_obj
+
+    @properties.Transport
+    def ssh(self) -> ssh_transport.SSH:
+        """Returns the SSH transport object.
+
+        Returns:
+            SSH object.
+        """
+        if not self._ssh_private_key:
+            raise errors.SSHCommandError(
+                "ssh_private_key argument need to be passed during device " \
+                "init in-order to SSH into the device"
+            )
+
+        ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
+            device_name=self.name,
+            username=self._ssh_user,
+            private_key=self._ssh_private_key)
+        return ssh_obj
 
     # List all the affordances in alphabetical order
     # TODO(fxbug.dev/123944): Remove this after fxbug.dev/123944 is fixed
@@ -341,16 +386,14 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: If bootup operation(s) fail.
         """
-        end_time: float = time.time() + timeout
-
-        # wait until device is responsive to FFX
+        # wait until device is online
         self._wait_for_online(timeout)
 
-        # wait until device to allow ssh connection
-        remaining_timeout = max(0, end_time - time.time())
-        self.ssh.check_connection(timeout=remaining_timeout)
-
-        # Restart SL4F server on the device
+        # Restart SL4F server on the device and check other transports are
+        # available
+        if self._ssh_private_key:
+            self.ssh.check_connection()
+        self.ffx.check_connection()
         self.sl4f.start_server()
 
         # If applicable, initialize bluetooth stack
@@ -370,7 +413,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         start_time: float = time.time()
         end_time: float = start_time + timeout
         while time.time() < end_time:
-            if not ffx_cli.check_ffx_connection(self.name):
+            if not self.ffx.is_target_connected():
                 _LOGGER.info("%s is offline.", self.name)
                 break
             time.sleep(.5)
@@ -391,7 +434,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         start_time: float = time.time()
         end_time: float = start_time + timeout
         while time.time() < end_time:
-            if ffx_cli.check_ffx_connection(self.name):
+            if self.ffx.is_target_connected():
                 _LOGGER.info("%s is online.", self.name)
                 break
             time.sleep(.5)
