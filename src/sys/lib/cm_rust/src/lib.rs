@@ -963,6 +963,10 @@ pub enum ConfigValueSource {
 pub struct ConfigField {
     pub key: String,
     pub type_: ConfigValueType,
+
+    // This field will not be present in compiled manifests which predate F12.
+    #[fidl_decl(default)]
+    pub mutability: ConfigMutability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -1124,6 +1128,30 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
             _ => (vec![], vec![]),
         };
         fdecl::ConfigType { layout, constraints, parameters: Some(parameters) }
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+    // TODO(https://fxbug.dev/124335) uncomment once bitflags is updated
+    // pub struct ConfigMutability: <fdecl::ConfigMutability as bitflags::BitFlags>::Bits {
+    pub struct ConfigMutability: u32 {
+        const PARENT = fdecl::ConfigMutability::PARENT.bits();
+    }
+}
+
+impl NativeIntoFidl<fdecl::ConfigMutability> for ConfigMutability {
+    fn native_into_fidl(self) -> fdecl::ConfigMutability {
+        fdecl::ConfigMutability::from_bits_allow_unknown(self.bits())
+    }
+}
+
+impl FidlIntoNative<ConfigMutability> for fdecl::ConfigMutability {
+    fn fidl_into_native(self) -> ConfigMutability {
+        // TODO(https://fxbug.dev/124335) remove unsafe once bitflags is updated
+        // SAFETY: this called from_bits_retain in newer versions of bitflags and is safe
+        unsafe { ConfigMutability::from_bits_unchecked(self.bits()) }
     }
 }
 
@@ -2915,6 +2943,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![],
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         }
                     ]),
@@ -3241,7 +3270,8 @@ mod tests {
                         fields: vec![
                             ConfigField {
                                 key: "enable_logging".to_string(),
-                                type_: ConfigValueType::Bool
+                                type_: ConfigValueType::Bool,
+                                mutability: ConfigMutability::default(),
                             }
                         ],
                         checksum: ConfigChecksum::Sha256([

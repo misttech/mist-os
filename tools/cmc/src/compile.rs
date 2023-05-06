@@ -754,7 +754,11 @@ mod tests {
                     "test1": {
                         "type": "string",
                         "max_size": 50
-                    }
+                    },
+                    "test_mutable_by_parent": {
+                        "type": "bool",
+                        "mutability": ["parent"]
+                    },
                 }
             }),
             output = fdecl::Component {
@@ -767,6 +771,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(50)]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -782,6 +787,7 @@ mod tests {
                                 )]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(100)]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -791,6 +797,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -800,6 +807,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -809,6 +817,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -818,6 +827,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
                         fdecl::ConfigField {
@@ -827,6 +837,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
+                            mutability: Some(Default::default()),
                             ..Default::default()
                         },
 
@@ -843,12 +854,23 @@ mod tests {
                                 )]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(100)]
                             }),
+                            mutability: Some(Default::default()),
+                            ..Default::default()
+                        },
+                        fdecl::ConfigField {
+                            key: Some("test_mutable_by_parent".to_string()),
+                            type_: Some(fdecl::ConfigType {
+                                layout: fdecl::ConfigTypeLayout::Bool,
+                                parameters: Some(vec![]),
+                                constraints: vec![]
+                            }),
+                            mutability: Some(fdecl::ConfigMutability::PARENT),
                             ..Default::default()
                         },
                     ]),
                     checksum: Some(fdecl::ConfigChecksum::Sha256([
-                        123, 17, 189, 232, 119, 7, 252, 236, 147, 55, 78, 138, 209, 232, 241, 225,
-                        91, 155, 38, 197, 126, 10, 71, 100, 157, 39, 114, 195, 190, 132, 83, 65
+                        252, 234, 115, 44, 165, 222, 210, 109, 67, 231, 20, 151, 150, 45, 191, 36,
+                        245, 50, 72, 140, 14, 188, 24, 192, 80, 161, 38, 18, 85, 151, 99, 115,
                     ])),
                     value_source: Some(fdecl::ConfigValueSource::PackagePath("test.cvf".to_string())),
                     ..Default::default()

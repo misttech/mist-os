@@ -44,6 +44,10 @@ type ConfigField = table {
     /// (Required) The type of config values. Config values are verified
     /// against this layout at build time and run time.
     2: type ConfigType;
+
+    /// Allowed sources for runtime overrides of this field's value.
+    @available(added=12)
+    3: mutability ConfigMutability;
 };
 
 // The type of a config value
@@ -82,6 +86,13 @@ type LayoutConstraint = flexible union {
     // For strings, this is the maximum number of bytes allowed.
     // For vectors, this is the maximum number of elements allowed.
     1: max_size uint32;
+};
+
+/// Allowed sources for runtime overrides of a config field's value.
+@available(added=12)
+type ConfigMutability = flexible bits {
+    /// Allow parent components to provide overrides for the configuration field.
+    PARENT = 1;
 };
 
 /// A configuration value which can be provided to a component.

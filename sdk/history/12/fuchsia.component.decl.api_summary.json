@@ -293,6 +293,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ConfigField.mutability",
+        "ordinal": "3",
+        "type": "fuchsia.component.decl/ConfigMutability"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ConfigField.type",
         "ordinal": "2",
         "type": "fuchsia.component.decl/ConfigType"
@@ -300,6 +306,17 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/ConfigField"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.component.decl/ConfigMutability.PARENT",
+        "value": "1"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.component.decl/ConfigMutability",
+        "strictness": "flexible",
+        "type": "uint32"
     },
     {
         "kind": "table/member",

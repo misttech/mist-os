@@ -1639,39 +1639,70 @@ impl<'de> de::Deserialize<'de> for ConfigKey {
 }
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum ConfigRuntimeSource {
+    Parent,
+}
+
+#[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigValueType {
-    Bool {},
-    Uint8 {},
-    Uint16 {},
-    Uint32 {},
-    Uint64 {},
-    Int8 {},
-    Int16 {},
-    Int32 {},
-    Int64 {},
-    String { max_size: NonZeroU32 },
-    Vector { max_count: NonZeroU32, element: ConfigNestedValueType },
+    Bool {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Uint8 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Uint16 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Uint32 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Uint64 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Int8 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Int16 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Int32 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Int64 {
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    String {
+        max_size: NonZeroU32,
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
+    Vector {
+        max_count: NonZeroU32,
+        element: ConfigNestedValueType,
+        mutability: Option<Vec<ConfigRuntimeSource>>,
+    },
 }
 
 impl ConfigValueType {
     /// Update the hasher by digesting the ConfigValueType enum value
     pub fn update_digest(&self, hasher: &mut impl sha2::Digest) {
         let val = match self {
-            ConfigValueType::Bool {} => 0u8,
-            ConfigValueType::Uint8 {} => 1u8,
-            ConfigValueType::Uint16 {} => 2u8,
-            ConfigValueType::Uint32 {} => 3u8,
-            ConfigValueType::Uint64 {} => 4u8,
-            ConfigValueType::Int8 {} => 5u8,
-            ConfigValueType::Int16 {} => 6u8,
-            ConfigValueType::Int32 {} => 7u8,
-            ConfigValueType::Int64 {} => 8u8,
-            ConfigValueType::String { max_size } => {
+            ConfigValueType::Bool { .. } => 0u8,
+            ConfigValueType::Uint8 { .. } => 1u8,
+            ConfigValueType::Uint16 { .. } => 2u8,
+            ConfigValueType::Uint32 { .. } => 3u8,
+            ConfigValueType::Uint64 { .. } => 4u8,
+            ConfigValueType::Int8 { .. } => 5u8,
+            ConfigValueType::Int16 { .. } => 6u8,
+            ConfigValueType::Int32 { .. } => 7u8,
+            ConfigValueType::Int64 { .. } => 8u8,
+            ConfigValueType::String { max_size, .. } => {
                 hasher.update(max_size.get().to_le_bytes());
                 9u8
             }
-            ConfigValueType::Vector { max_count, element } => {
+            ConfigValueType::Vector { max_count, element, .. } => {
                 hasher.update(max_count.get().to_le_bytes());
                 element.update_digest(hasher);
                 10u8

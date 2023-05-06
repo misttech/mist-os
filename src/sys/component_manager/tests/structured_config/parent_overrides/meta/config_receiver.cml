@@ -20,9 +20,7 @@
         parent_provided: {
             type: "string",
             max_size: 1024,
-
-            // TODO(https://fxbug.dev/96254) uncomment
-            // mutable_by: [ "parent" ],
+            mutability: [ "parent" ],
         },
     },
 }

@@ -827,7 +827,11 @@ mod tests {
         ]);
 
         let config = ConfigDecl {
-            fields: vec![ConfigField { key: "my_field".to_string(), type_: ConfigValueType::Bool }],
+            fields: vec![ConfigField {
+                key: "my_field".to_string(),
+                type_: ConfigValueType::Bool,
+                mutability: Default::default(),
+            }],
             checksum: checksum.clone(),
             value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
         };

@@ -565,8 +565,11 @@ mod tests {
         ($test_name:ident: { $($ty_toks:tt)* }, $valid_spec:pat) => {
             #[test]
             fn $test_name() {
-                let type_ = fidl_fuchsia_component_config_ext::config_ty!($($ty_toks)*);
-                let decl = ConfigFieldDecl { key: "test_key".to_string(), type_ };
+                let decl = ConfigFieldDecl {
+                    key: "test_key".to_string(),
+                    type_: fidl_fuchsia_component_config_ext::config_ty!($($ty_toks)*),
+                    mutability: Default::default(),
+                };
                 for value in [
                     // one value of each type
                     Single(Bool(true)),

@@ -20,6 +20,7 @@ rustc_library("cm_rust") {
     "//src/lib/from-enum",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_types",
+    "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:thiserror",
   ]

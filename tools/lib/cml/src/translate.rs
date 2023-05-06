@@ -5,11 +5,11 @@
 use {
     crate::{
         error::Error, offer_to_all_would_duplicate, AnyRef, AsClause, Availability, Capability,
-        CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigValueType,
-        DebugRegistration, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
-        Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OfferToRef, OneOrMany,
-        Path, PathClause, Program, ResolverRegistration, RightsClause, RunnerRegistration,
-        SourceAvailability, Use, UseFromRef,
+        CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigRuntimeSource,
+        ConfigValueType, DebugRegistration, Document, Environment, EnvironmentExtends,
+        EnvironmentRef, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer,
+        OfferFromRef, OfferToRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
+        RightsClause, RunnerRegistration, SourceAvailability, Use, UseFromRef,
     },
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -846,25 +846,27 @@ fn translate_nested_value_type(nested_type: &ConfigNestedValueType) -> fdecl::Co
 }
 
 /// Translates a value type to a [`fuchsia.sys2.ConfigType`]
-fn translate_value_type(value_type: &ConfigValueType) -> fdecl::ConfigType {
-    let layout = match value_type {
-        ConfigValueType::Bool {} => fdecl::ConfigTypeLayout::Bool,
-        ConfigValueType::Uint8 {} => fdecl::ConfigTypeLayout::Uint8,
-        ConfigValueType::Uint16 {} => fdecl::ConfigTypeLayout::Uint16,
-        ConfigValueType::Uint32 {} => fdecl::ConfigTypeLayout::Uint32,
-        ConfigValueType::Uint64 {} => fdecl::ConfigTypeLayout::Uint64,
-        ConfigValueType::Int8 {} => fdecl::ConfigTypeLayout::Int8,
-        ConfigValueType::Int16 {} => fdecl::ConfigTypeLayout::Int16,
-        ConfigValueType::Int32 {} => fdecl::ConfigTypeLayout::Int32,
-        ConfigValueType::Int64 {} => fdecl::ConfigTypeLayout::Int64,
-        ConfigValueType::String { .. } => fdecl::ConfigTypeLayout::String,
-        ConfigValueType::Vector { .. } => fdecl::ConfigTypeLayout::Vector,
+fn translate_value_type(
+    value_type: &ConfigValueType,
+) -> (fdecl::ConfigType, fdecl::ConfigMutability) {
+    let (layout, source_mutability) = match value_type {
+        ConfigValueType::Bool { mutability } => (fdecl::ConfigTypeLayout::Bool, mutability),
+        ConfigValueType::Uint8 { mutability } => (fdecl::ConfigTypeLayout::Uint8, mutability),
+        ConfigValueType::Uint16 { mutability } => (fdecl::ConfigTypeLayout::Uint16, mutability),
+        ConfigValueType::Uint32 { mutability } => (fdecl::ConfigTypeLayout::Uint32, mutability),
+        ConfigValueType::Uint64 { mutability } => (fdecl::ConfigTypeLayout::Uint64, mutability),
+        ConfigValueType::Int8 { mutability } => (fdecl::ConfigTypeLayout::Int8, mutability),
+        ConfigValueType::Int16 { mutability } => (fdecl::ConfigTypeLayout::Int16, mutability),
+        ConfigValueType::Int32 { mutability } => (fdecl::ConfigTypeLayout::Int32, mutability),
+        ConfigValueType::Int64 { mutability } => (fdecl::ConfigTypeLayout::Int64, mutability),
+        ConfigValueType::String { mutability, .. } => (fdecl::ConfigTypeLayout::String, mutability),
+        ConfigValueType::Vector { mutability, .. } => (fdecl::ConfigTypeLayout::Vector, mutability),
     };
     let (constraints, parameters) = match value_type {
-        ConfigValueType::String { max_size } => {
+        ConfigValueType::String { max_size, .. } => {
             (vec![fdecl::LayoutConstraint::MaxSize(max_size.get())], vec![])
         }
-        ConfigValueType::Vector { max_count, element } => {
+        ConfigValueType::Vector { max_count, element, .. } => {
             let nested_type = translate_nested_value_type(element);
             (
                 vec![fdecl::LayoutConstraint::MaxSize(max_count.get())],
@@ -873,14 +875,25 @@ fn translate_value_type(value_type: &ConfigValueType) -> fdecl::ConfigType {
         }
         _ => (vec![], vec![]),
     };
-    fdecl::ConfigType {
-        layout,
-        constraints,
-        // This optional is not necessary, but without it,
-        // FIDL compilation complains because of a possible include-cycle.
-        // Bug: http://fxbug.dev/66350
-        parameters: Some(parameters),
+    let mut mutability = fdecl::ConfigMutability::empty();
+    if let Some(source_mutability) = source_mutability {
+        for source in source_mutability {
+            match source {
+                ConfigRuntimeSource::Parent => mutability |= fdecl::ConfigMutability::PARENT,
+            }
+        }
     }
+    (
+        fdecl::ConfigType {
+            layout,
+            constraints,
+            // This optional is not necessary, but without it,
+            // FIDL compilation complains because of a possible include-cycle.
+            // Bug: http://fxbug.dev/66350
+            parameters: Some(parameters),
+        },
+        mutability,
+    )
 }
 
 /// Translates a map of [`String`] -> [`ConfigValueType`] to a [`fuchsia.sys2.Config`]
@@ -894,9 +907,12 @@ fn translate_config(
     let mut hasher = Sha256::new();
 
     for (key, value) in fields {
+        let (type_, mutability) = translate_value_type(value);
+
         fidl_fields.push(fdecl::ConfigField {
             key: Some(key.to_string()),
-            type_: Some(translate_value_type(value)),
+            type_: Some(type_),
+            mutability: Some(mutability),
             ..Default::default()
         });
 

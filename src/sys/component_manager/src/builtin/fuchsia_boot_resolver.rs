@@ -526,6 +526,7 @@ mod tests {
                     fields: vec![cm_rust::ConfigField {
                         key: "foo".to_string(),
                         type_: cm_rust::ConfigValueType::String { max_size: 100 },
+                        mutability: Default::default(),
                     }],
                     checksum: fake_checksum.clone(),
                 }
@@ -598,6 +599,7 @@ mod tests {
                     fields: vec![cm_rust::ConfigField {
                         key: "foo".to_string(),
                         type_: cm_rust::ConfigValueType::String { max_size: 100 },
+                        mutability: Default::default(),
                     }],
                     checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
                 }
