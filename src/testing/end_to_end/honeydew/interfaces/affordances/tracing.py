@@ -56,8 +56,8 @@ class Tracing(abc.ABC):
         """
 
     @abc.abstractmethod
-    def terminate_and_download(self, directory: str,
-                               trace_file: Optional[str] = None) -> str:
+    def terminate_and_download(
+            self, directory: str, trace_file: Optional[str] = None) -> str:
         """ Terminates the trace session and downloads the trace data to the
             specified directory.
 

@@ -12,8 +12,8 @@
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/directory.h>
 #include <lib/sys/cpp/component_context.h>
-#include <fbl/unique_fd.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"

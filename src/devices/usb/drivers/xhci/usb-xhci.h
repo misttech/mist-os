@@ -85,8 +85,7 @@ class UsbXhci : public UsbXhciType,
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
         ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()),
         dispatcher_(dispatcher),
-        outgoing_(dispatcher) {
-  }
+        outgoing_(dispatcher) {}
 
   // Constructor for unit testing (to allow interception of MMIO read/write)
   explicit UsbXhci(zx_device_t* parent, fdf::MmioBuffer buffer, async_dispatcher_t* dispatcher)

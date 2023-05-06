@@ -111,7 +111,6 @@ class TracingDefaultTests(unittest.TestCase):
                     "label": "when_session_is_initialized",
                     "session_initialized": True,
                     "tracing_active": True
-
                 },),
         ],
         name_func=_custom_test_name_func)
@@ -136,11 +135,10 @@ class TracingDefaultTests(unittest.TestCase):
                     "label": "when_session_is_not_initialized",
                     "session_initialized": False
                 },),
-            (
-                {
-                    "label": "with_no_download",
-                    "session_initialized": True,
-                },),
+            ({
+                "label": "with_no_download",
+                "session_initialized": True,
+            },),
         ],
         name_func=_custom_test_name_func)
     def test_terminate(self, parameterized_dict) -> None:
@@ -154,7 +152,6 @@ class TracingDefaultTests(unittest.TestCase):
             self.tracing_obj.initialize()
             self.tracing_obj.terminate()
             self.sl4f_obj.run.assert_called()
-
 
     @parameterized.expand(
         [
