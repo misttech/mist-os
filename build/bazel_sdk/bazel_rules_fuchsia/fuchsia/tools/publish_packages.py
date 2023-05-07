@@ -138,7 +138,7 @@ class FuchsiaTaskPublish(FuchsiaTask):
         existing_repo = (
             [repo for repo in existing_repos if repo['name'] == args.repo_name]
             or [None])[0]
-        existing_repo_path = existing_repo['spec'] and (
+        existing_repo_path = existing_repo and existing_repo['spec'] and (
             Path(existing_repo['spec']['metadata_repo_path']).parent
             if 'metadata_repo_path' in existing_repo['spec'] else Path(
                 existing_repo['spec']['path']))
