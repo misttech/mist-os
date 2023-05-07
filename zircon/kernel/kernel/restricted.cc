@@ -37,6 +37,12 @@ template <typename T>
   LTRACEF("regs %p\n", restricted_state_source);
 
   DEBUG_ASSERT(restricted_state_source);
+
+  // Interrupts are disabled and must remain disabled throughout this function.  Because syscall
+  // instructions issued from Restricted Mode do not follow the typical path through the kernel, we
+  // must keep interrupts disabled to ensure that we don't "drop" a thread signal.  If a thread
+  // signal is currently pending, then the IPI that was sent when it was asserted will fire once we
+  // return to user mode.
   DEBUG_ASSERT(arch_ints_disabled());
 
   RestrictedState* rs = Thread::Current::restricted_state();
@@ -91,8 +97,9 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return ZX_ERR_INVALID_ARGS;
   }
 
-  RestrictedState* rs = Thread::Current::restricted_state();
   // has the state buffer been previously bound to this thread?
+  Thread* const current_thread = Thread::Current::Get();
+  RestrictedState* rs = current_thread->restricted_state();
   if (rs == nullptr) {
     return ZX_ERR_BAD_STATE;
   }
@@ -124,13 +131,44 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return status;
   }
 
-  // from now on out we're committed, disable interrupts so we can do this
-  // without being interrupted as we save/restore state
+  // We need to check for pending signals "manually" because in the non-error-return path this
+  // syscall doesn't actually return and unwind the callstack.  Instead, it effectively jumps into
+  // (restricted) user mode, bypassing the code in the syscall wrapper / kernel entrypoint that
+  // calls Thread::Current::ProcessPendingSignals.
+  //
+  // As usual, we must disable interrupts prior to checking for pending signals.
   arch_disable_ints();
+  if (current_thread->IsSignaled()) {
+    // TODO(https://fxbug.dev/126791): Ideally, we'd call Thread::Current::ProcessPendingSignals
+    // here, however, we don't have a pointer to the user register state that was pushed on the
+    // stack when we entered the kernel.  Instead, we return the special RETRY error so that unwind
+    // the call stack and call Thread::Current::ProcessPendingSignals in the usual spot.  We'll
+    // return to (normal) user mode and the vDSO will automatically retry the syscall, all
+    // transparent to the vDSO caller.  It's OK to enable interrupts here because we're committed to
+    // a path that will call Thread::Current::ProcessPendingSignals before returning to user mode.
+    arch_enable_ints();
+    return ZX_ERR_INTERNAL_INTR_RETRY;
+  }
 
-  // no more errors or interrupts, so we can switch the active aspace
-  // without worrying about ending up in a situation where the thread is
-  // set to normal with the restricted aspace active.
+  // Save any arch-specific normal mode state before we enter restricted mode.
+  RestrictedState::ArchSaveStatePreRestrictedEntry(rs->arch_normal_state());
+
+  // Save the context and vector table pointer for return from restricted mode.
+  rs->set_vector_ptr(vector_table_ptr);
+  rs->set_context(context);
+
+  // Now that the normal mode state has been saved, we can decide if we're going to continue on with
+  // the mode switch or simply vector-return to normal mode because of a pending kick.
+  if (Thread::Current::CheckForRestrictedKick()) {
+    RestrictedState::ArchEnterFull(rs->arch_normal_state(), vector_table_ptr, context,
+                                   ZX_RESTRICTED_REASON_KICK);
+    __UNREACHABLE;
+  }
+
+  // We're committed.  Once we've started the switch to restricted mode, we need to finish and enter
+  // user mode to ensure the thread's active aspace and "in restricted mode" flags are consistent
+  // with the thread being in restricted mode.  No error returns from here on out.  Interrupts must
+  // remain disabled.
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   VmAspace* restricted_aspace = up->restricted_aspace();
   // This check can be removed once the restricted mode tests can and do run with a restricted
@@ -138,37 +176,10 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   if (restricted_aspace) {
     vmm_set_active_aspace(restricted_aspace);
   }
-
-  // save the vector table pointer for return from restricted mode
-  rs->set_vector_ptr(vector_table_ptr);
-
-  // save the context ptr for return from restricted mode
-  rs->set_context(context);
-
-  // set our state to restricted enabled at the thread and arch level
   rs->set_in_restricted(true);
   arch_set_restricted_flag(true);
-
-  // get a chance to save some state before we enter normal mode
-  RestrictedState::ArchSaveStatePreRestrictedEntry(rs->arch_normal_state());
-
-  // TODO(https://fxbug.dev/126200): We should process pending signals after disabling interrupts
-  // and before entering restricted or normal mode.
-
-  // Check if we've been kicked with interrupts disabled
-  if (Thread::Current::CheckForRestrictedKick()) {
-    vmm_set_active_aspace(up->normal_aspace_ptr());
-    arch_set_restricted_flag(false);
-    rs->set_in_restricted(false);
-    RestrictedState::ArchEnterFull(rs->arch_normal_state(), vector_table_ptr, context,
-                                   ZX_RESTRICTED_REASON_KICK);
-    __UNREACHABLE;
-  }
-
-  // enter restricted mode
   RestrictedState::ArchEnterRestricted(state);
 
-  // does not return
   __UNREACHABLE;
 }
 

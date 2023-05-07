@@ -91,6 +91,11 @@ protocol Restricted {
     /// [`zx_process_create_shared()`]: process_create_shared.md
     /// [address spaces]: /docs/concepts/memory/address_spaces.md
     @next
+    // TODO(https://fxbug.dev/126791): This is not a blocking syscall in the
+    // normal sense of the word.  We've annotated this as blocking so that we
+    // can use ZX_ERR_INTERNAL_INTR_RETRY and the vDSO retry logic.  See
+    // https://fxbug.dev/126200 for details.
+    @blocking
     Enter(struct {
         options uint32;
         vector_table_ptr uintptr64;
