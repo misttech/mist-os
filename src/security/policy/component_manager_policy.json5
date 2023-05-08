@@ -143,6 +143,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:**",
+                    "/bootstrap/pkg-drivers:**",
+                    "/bootstrap/full-pkg-drivers:**",
                     "/core",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -155,6 +158,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:dev",
                     "/core",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -167,6 +171,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:dev",
                     "/core",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -224,6 +229,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:dev",
                     "/core",
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
@@ -253,6 +259,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:dev",
                     "/core",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
