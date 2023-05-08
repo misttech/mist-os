@@ -156,11 +156,15 @@ class WatchForTarget(Step):
         repository_registered = False
         target_name = ctx.target
         while True:
-            found_targets = json.loads(
-                ctx.ffx().run("--machine", "JSON", "target", "list"))
+            try:
+                found_targets = json.loads(
+                    ctx.ffx().run("--machine", "JSON", "target", "list"))
+            except subprocess.CalledProcessError:
+                found_targets = []
             target_up = False
             for target in found_targets:
-                if target['nodename'] == target_name:
+                if target['nodename'] == target_name and target[
+                        'target_state'] == 'Product':
                     target_up = True
                     break
 
