@@ -55,6 +55,10 @@ zx_status_t set_hw_breakpoint(zx_handle_t thread_handle) {
                                sizeof(debug_regs));
 }
 
+#elif defined(__riscv)
+
+zx_status_t set_hw_breakpoint(zx_handle_t thread_handle) { return ZX_ERR_NOT_SUPPORTED; }
+
 #else
 #error Unsupported arch.
 #endif
