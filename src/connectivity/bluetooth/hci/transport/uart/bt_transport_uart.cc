@@ -22,8 +22,6 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
-#include "lib/async/cpp/task.h"
-
 namespace bt_transport_uart {
 
 BtTransportUart::BtTransportUart(zx_device_t* parent, async_dispatcher_t* dispatcher)
@@ -344,7 +342,7 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
 
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
-    QueueUartRead();
+    queue_read_task_.Post(dispatcher_);
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
     // queue a read job and start the process of shutting down.
@@ -521,9 +519,7 @@ void BtTransportUart::QueueUartRead() {
                                                      const uint8_t* buffer, size_t length) {
     static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
   };
-  async::PostTask(dispatcher_, [read_cb, this]() {
-    serial_impl_async_read_async(&serial_, read_cb, this);
-  });
+  serial_impl_async_read_async(&serial_, read_cb, this);
 }
 
 zx_status_t BtTransportUart::Bind() {
@@ -578,7 +574,7 @@ zx_status_t BtTransportUart::Bind() {
   }
 
   serial_impl_async_enable(&serial, true);
-  QueueUartRead();
+  queue_read_task_.Post(dispatcher_);
 
   zxlogf(DEBUG, "Bind complete, adding device");
 

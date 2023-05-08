@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/zx/event.h>
@@ -204,6 +205,9 @@ class BtTransportUart : public BtTransportUartType, public ddk::BtHciProtocol<Bt
   std::optional<async::Loop> loop_;
   // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
+
+  // The task which runs to queue a uart read.
+  async::TaskClosureMethod<BtTransportUart, &BtTransportUart::QueueUartRead> queue_read_task_{this};
 };
 
 }  // namespace bt_transport_uart
