@@ -34,7 +34,7 @@
   full_description: "Keys corresponding to specific actions, such as \"display
   brightness increment\", \"display brightness decrement\" etc, which are
   specifically named in the USB HID usage tables."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -282,11 +282,10 @@
 - term: "Character key"
   short_description: "A key that sends characters to the computer."
   full_description: "A key that sends characters to the computer.
-
   This definition does not specifically account for the effect of key
   composition and dead keys, which are present on certain keyboard layouts,
   but is operational enough for effective use."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1029,7 +1028,7 @@
 - term: "Function key"
   short_description: "The common name for the keys F1, F2, F3, ..."
   full_description: "The common name for the keys F1, F2, F3, ..."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1273,7 +1272,6 @@
   full_description: "A switch that can be pressed or released. Usually,
   <a href=\"https://shop.daskeyboard.com/collections/all-mechanical-keyboards/products/das-keyboard-4-ultimate?variant=594321629\">but not always</a>,
   it has a keycap with one or more symbols written on it.
-
   It is traditionally a mechanical, or electromechanical device, but modern
   input modes have seen purely software key implementations, as a
   user-interface element coupled with a touch-screen, or a computer mouse for
@@ -1292,7 +1290,6 @@
   general, since while each press is an actuation, not every key actuation
   has to be a key press. Some keys may be actuated by a tap, or a throw switch,
   or a twist etc.
-
   It's OK to use \"key press\" when talking about pressable keys in the narrow
   sense - such as on a standard PC keyboard. Prefer \"key actuation\" in formal
   contexts, or where precision is important."
@@ -1313,7 +1310,6 @@
   full_description: "A message reporting a state change associated with a
   single key. \"Key 'A' has just been pressed\" is a representation of a key
   event.
-
   On Fuchsia, a key event can only ever be delivered to a View that is in
   focus. This feature ensures that potentially sensitive keyboard input is
   always delivered only to the View that is permitted to receive it."
@@ -1324,13 +1320,11 @@
 - term: "Key chord"
   short_description: "One or more simultaneous key actuations."
   full_description: "One or more key actuations that happen at the same time.
-
   It may be impossible to actuate a specific key chord without actuating other
   key chords first. For example, on mechanical keyboards, \"Ctrl+Alt+Del\" can
   not be actuated until at least one of \"Ctrl\", or \"Alt\" or \"Del\" is
   actuated first, as it is physically impossible to press all the three keys
   at the same time.
-
   This is not a universal definition, so expect variations across time periods,
   operating systems, and schools of thought. For example, KDE uses the term
   \"chord\" to mean \"key sequence\". But this usage seems unusual and not
