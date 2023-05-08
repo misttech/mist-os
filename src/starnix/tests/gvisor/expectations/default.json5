@@ -1279,6 +1279,11 @@
                 // partial_bad_buffer_test
                 // Passes in debian image, remove.
                 "PartialBadBufferTest*",
+
+                // pty_test
+                //TODO(fxbug.dev/126724): Re-enable once flake is resolved.
+                "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
+                "JobControlTest.SetForegroundProcessGroupDifferentSession",
             ],
         },
     ],
