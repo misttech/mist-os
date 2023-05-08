@@ -2,52 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        runner: "elf",
-        binary: "bin/system_updater",
-    },
-    capabilities: [
-        { protocol: "fuchsia.update.installer.Installer" },
-    ],
+    include: [ "//src/sys/pkg/bin/system-updater/meta/system-updater-common.shard.cml" ],
     use: [
-        {
-            protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.paver.Paver",
-                "fuchsia.pkg.PackageCache",
-                "fuchsia.pkg.PackageResolver",
-                "fuchsia.pkg.RetainedPackages",
-                "fuchsia.space.Manager",
-            ],
-        },
         {
             storage: "data",
             path: "/data",
         },
-        {
-            directory: "pkgfs-system",
-            rights: [ "r*" ],
-            path: "/pkgfs/system",
-        },
-        {
-            directory: "build-info",
-            rights: [ "r*" ],
-            path: "/config/build-info",
-        },
     ],
-    expose: [
-        {
-            protocol: "fuchsia.update.installer.Installer",
-            from: "self",
-        },
-    ],
-    config: {
-        // The maximum number of outstanding package resolution requests.
-        concurrent_package_resolves: { type: "uint16" },
-    },
 }

@@ -4,30 +4,8 @@
 // This file can be removed once mockable storage is supported by the
 // TestRealmBuilder.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        runner: "elf",
-        binary: "bin/system_updater",
-    },
-    capabilities: [
-        { protocol: "fuchsia.update.installer.Installer" },
-    ],
+    include: [ "//src/sys/pkg/bin/system-updater/meta/system-updater-common.shard.cml" ],
     use: [
-        {
-            protocol: [
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.paver.Paver",
-                "fuchsia.pkg.PackageCache",
-                "fuchsia.pkg.PackageResolver",
-                "fuchsia.pkg.RetainedPackages",
-                "fuchsia.space.Manager",
-            ],
-        },
-
         // Storage is not currently mockable with the RealmBuilder. Instead
         // a directory is injected for tests.
         {
@@ -35,25 +13,5 @@
             rights: [ "rw*" ],
             path: "/data",
         },
-        {
-            directory: "pkgfs-system",
-            rights: [ "r*" ],
-            path: "/pkgfs/system",
-        },
-        {
-            directory: "build-info",
-            rights: [ "r*" ],
-            path: "/config/build-info",
-        },
     ],
-    expose: [
-        {
-            protocol: "fuchsia.update.installer.Installer",
-            from: "self",
-        },
-    ],
-    config: {
-        // The maximum number of outstanding package resolution requests.
-        concurrent_package_resolves: { type: "uint16" },
-    },
 }
