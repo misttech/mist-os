@@ -623,7 +623,7 @@ BoardInformation file for use with Product Assembly
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:104
+From //build/board.gni:101
 
 ### board_is_emu
 
@@ -637,7 +637,7 @@ From //boards/arm64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:109
+From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -645,7 +645,7 @@ From //boards/x64.gni:88
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:109
+From //build/board.gni:106
 
 ### board_is_phys
 
@@ -655,11 +655,11 @@ From //boards/arm64.gni:30
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:110
+From //build/board.gni:107
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:110
+From //build/board.gni:107
 
 ### board_name
 
@@ -761,14 +761,6 @@ board definition rather than the product definition.
 **Current value (from the default):** `[]`
 
 From //build/board.gni:51
-
-### board_supports_update_configurator
-
-Whether or not the board pulls in the system-update-configurator component.
-
-**Current value (from the default):** `false`
-
-From //build/board.gni:101
 
 ### board_system_image_deps
 
@@ -2772,6 +2764,12 @@ Enables the tracing feature of mdns, which can be turned on using
 
 From //src/connectivity/network/mdns/service/BUILD.gn:13
 
+### enable_msd_arm_mali_dfv2
+
+**Current value (from the default):** `false`
+
+From //src/graphics/drivers/msd-arm-mali/BUILD.gn:10
+
 ### enable_netboot
 
 Whether to build the netboot zbi by default.
@@ -4164,7 +4162,7 @@ From //boards/arm64.gni:41
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:113
+From //build/board.gni:110
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
 
@@ -4172,7 +4170,7 @@ From //boards/x64.gni:90
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:113
+From //build/board.gni:110
 
 ### include_account_in_fvm
 
@@ -5679,7 +5677,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:132
+From //build/board.gni:129
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5687,7 +5685,7 @@ From //boards/x64.gni:93
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:132
+From //build/board.gni:129
 
 ### partitions_config_label
 
@@ -5700,7 +5698,7 @@ From //boards/arm64.gni:43
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:131
+From //build/board.gni:128
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5708,7 +5706,7 @@ From //boards/x64.gni:92
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:131
+From //build/board.gni:128
 
 ### perfetto_build_with_android
 
@@ -7115,7 +7113,7 @@ fully migrate assembly to Bazel.
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:126
+From //build/board.gni:123
 
 ### recovery_label
 
@@ -7151,7 +7149,7 @@ From //build/images/args.gni:19
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:127
+From //build/board.gni:124
 
 ### recovery_route_sources_config
 
@@ -8865,7 +8863,7 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:116
+From //build/board.gni:113
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:zedboot_default"`
 
@@ -8873,7 +8871,7 @@ From //boards/x64.gni:91
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:116
+From //build/board.gni:113
 
 ### zircon_a_partition
 
