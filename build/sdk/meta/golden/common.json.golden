@@ -104,6 +104,7 @@
             "description": "Target architecture",
             "enum": [
                 "arm64",
+                "riscv64",
                 "x64"
             ],
             "type": "string"
