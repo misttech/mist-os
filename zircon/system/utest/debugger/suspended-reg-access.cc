@@ -39,6 +39,9 @@ namespace {
 #elif defined(__aarch64__)
 #define REG_ACCESS_TEST_REG r[28]
 #define REG_ACCESS_TEST_REG_NAME "x28"
+#elif defined(__riscv)
+#define REG_ACCESS_TEST_REG s1
+#define REG_ACCESS_TEST_REG_NAME "s1"
 #endif
 
 // Note: Neither of these can be zero.
@@ -105,6 +108,23 @@ int reg_access_thread_func(void* arg_) {
       "\n\
         b.eq 1b\n\
         mov %[result], " REG_ACCESS_TEST_REG_NAME
+      : [result] "=r"(result), [pc] "=&r"(pc), [sp] "=&r"(sp)
+      : [initial_value] "r"(initial_value)
+      : REG_ACCESS_TEST_REG_NAME);
+#endif
+
+#ifdef __riscv
+  __asm__(
+      "\
+        lla %[pc], .\n\
+        mv %[sp], sp\n\
+        mv " REG_ACCESS_TEST_REG_NAME
+      ", %[initial_value]\n\
+      1:\n\
+        pause\n\
+        beq %[initial_value], " REG_ACCESS_TEST_REG_NAME
+      ", 1b\n\
+        mv %[result], " REG_ACCESS_TEST_REG_NAME
       : [result] "=r"(result), [pc] "=&r"(pc), [sp] "=&r"(sp)
       : [initial_value] "r"(initial_value)
       : REG_ACCESS_TEST_REG_NAME);
@@ -247,6 +267,9 @@ void* suspended_in_syscall_reg_access_thread_func(void* arg_) {
       "\
         mov %[sp], sp"
       : [sp] "=r"(sp));
+#endif
+#ifdef __riscv
+  __asm__("mv %[sp], sp" : [sp] "=r"(sp));
 #endif
   arg->sp.store(sp);
 

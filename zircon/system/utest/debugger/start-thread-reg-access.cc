@@ -76,6 +76,12 @@ __asm__(
     "  jne 0f\n"
     "  jmp *%rdx\n"
     "0:ud2\n"
+#elif defined(__riscv)
+    "  li a0, " MAGIC_REGISTER_VALUE_ASM
+    "\n"
+    "  bne a0, a1, 0f\n"
+    "  jr a2\n"
+    "0:unimp\n"
 #else
 #error "what machine?"
 #endif
@@ -132,6 +138,11 @@ void test_thread_start_register_access(reg_access_test_state_t* test_state, zx_h
   expected_regs.sp = regs.sp;
   expected_regs.r[0] = regs.r[0];
   expected_regs.r[1] = regs.r[1];
+#elif defined(__riscv)
+  expected_regs.pc = regs.pc;
+  expected_regs.sp = regs.sp;
+  expected_regs.a0 = regs.a0;
+  expected_regs.a1 = regs.a1;
 #endif
 
   // These values we know with certainty.
@@ -169,6 +180,10 @@ void test_thread_start_register_access(reg_access_test_state_t* test_state, zx_h
     regs.r[2] = regs.pc;
     regs.pc = raw_thread_func_addr;
     regs.r[3] = kMagicRegisterValue;
+#elif defined(__riscv)
+    regs.a2 = regs.pc;
+    regs.pc = raw_thread_func_addr;
+    regs.a1 = kMagicRegisterValue;
 #endif
   }
 
