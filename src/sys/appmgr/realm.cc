@@ -484,14 +484,8 @@ zx::job Realm::DuplicateJobForHub() const {
   zx::job duplicate_job;
   // As this only goes inside /hub, it is fine to give destoy rights
   auto flags = ZX_RIGHTS_BASIC | ZX_RIGHT_DESTROY | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_ENUMERATE |
-               ZX_RIGHT_READ;
-  zx_status_t status = job_.duplicate(flags | ZX_RIGHT_WRITE, &duplicate_job);
-  if (status == ZX_ERR_INVALID_ARGS) {
-    // In the process of removing WRITE for processes; if duplicate with WRITE
-    // failed, try the new rights. TODO(fxbug.dev/32803): Once the transition is
-    // complete, only duplicate with MANAGE_PROCESS.
-    status = job_.duplicate(flags | ZX_RIGHT_MANAGE_PROCESS, &duplicate_job);
-  }
+               ZX_RIGHT_READ | ZX_RIGHT_MANAGE_PROCESS;
+  zx_status_t status = job_.duplicate(flags, &duplicate_job);
   if (status != ZX_OK) {
     return zx::job();
   }

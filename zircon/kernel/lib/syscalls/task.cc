@@ -256,12 +256,7 @@ zx_status_t sys_process_create(zx_handle_t job_handle, user_in_ptr<const char> _
   auto status =
       up->handle_table().GetDispatcherWithRights(*up, job_handle, ZX_RIGHT_MANAGE_PROCESS, &job);
   if (status != ZX_OK) {
-    // Try again, but with the WRITE right.
-    // TODO(fxbug.dev/32803) Remove this when all callers are using MANAGE_PROCESS.
-    status = up->handle_table().GetDispatcherWithRights(*up, job_handle, ZX_RIGHT_WRITE, &job);
-    if (status != ZX_OK) {
-      return status;
-    }
+    return status;
   }
 
   // create a new process dispatcher
@@ -580,12 +575,7 @@ zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, user_out_ha
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, parent_job, ZX_RIGHT_MANAGE_JOB, &parent);
   if (status != ZX_OK) {
-    // Try again, but with the WRITE right.
-    // TODO(kulakowski) Remove this when all callers are using MANAGE_JOB.
-    status = up->handle_table().GetDispatcherWithRights(*up, parent_job, ZX_RIGHT_WRITE, &parent);
-    if (status != ZX_OK) {
-      return status;
-    }
+    return status;
   }
 
   KernelHandle<JobDispatcher> handle;

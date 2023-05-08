@@ -47,7 +47,6 @@ protocol Process {
         retcode int64;
     });
 
-    // TODO(fxbug.dev/32803): job with ZX_RIGHT_WRITE is also accepted.
     /// ## Summary
     ///
     /// Create a new process.

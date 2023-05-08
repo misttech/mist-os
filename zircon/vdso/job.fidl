@@ -5,7 +5,6 @@ library zx;
 
 @transport("Syscall")
 protocol Job {
-    // TODO(fxbug.dev/32803): parent_job with ZX_RIGHT_WRITE is also accepted.
     /// ## Summary
     ///
     /// Create a new job.

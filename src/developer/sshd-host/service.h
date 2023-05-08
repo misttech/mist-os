@@ -18,7 +18,7 @@
 namespace sshd_host {
 
 constexpr zx_rights_t kChildJobRights =
-    ZX_RIGHTS_BASIC | ZX_RIGHTS_IO | ZX_RIGHT_DESTROY | ZX_RIGHT_MANAGE_JOB;
+    ZX_RIGHTS_BASIC | ZX_RIGHT_DESTROY | ZX_RIGHT_MANAGE_PROCESS | ZX_RIGHT_MANAGE_JOB;
 
 constexpr char kSshDirectory[] = "/data/ssh";
 constexpr char kAuthorizedKeysPath[] = "/data/ssh/authorized_keys";
