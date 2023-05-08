@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("syn_clk_bind") {
   rules = "syn_clk.bind"
-  header_output = "syn_clk_bind.h"
   bind_output = "syn_clk.bindbc"
   tests = "bind_tests.json"
   deps = [

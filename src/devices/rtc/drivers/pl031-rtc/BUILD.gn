@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("pl031_rtc_bind") {
   rules = "pl031_rtc.bind"
-  header_output = "pl031_rtc_bind.h"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }

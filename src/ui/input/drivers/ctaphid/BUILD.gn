@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ctaphid_bind") {
   rules = "ctaphid.bind"
-  header_output = "ctaphid_bind.h"
   bind_output = "ctaphid.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.hid" ]

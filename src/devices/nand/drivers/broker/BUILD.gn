@@ -11,7 +11,6 @@ group("broker") {
 
 driver_bind_rules("nand-broker-bind") {
   rules = "nand-broker.bind"
-  header_output = "nand-broker-bind.h"
   bind_output = "nand-broker.bindbc"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.nand" ]

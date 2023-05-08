@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("vim3_usb_phy_bind") {
   rules = "vim3_usb_phy.bind"
-  header_output = "vim3_usb_phy_bind.h"
   bind_output = "vim3-usb-phy.bindbc"
   tests = "test_bind.json"
   deps = [

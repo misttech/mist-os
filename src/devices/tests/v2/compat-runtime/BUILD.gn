@@ -59,7 +59,6 @@ fuchsia_driver_component("root") {
 driver_bind_rules("compat-runtime-v1-bind") {
   rules = "v1.bind"
   bind_output = "v1.bindbc"
-  header_output = "v1.bind.h"
   tests = "v1.bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

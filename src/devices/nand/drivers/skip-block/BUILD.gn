@@ -24,7 +24,6 @@ fuchsia_driver_component("skip-block") {
 
 driver_bind_rules("skip-block-bind") {
   rules = "skip-block.bind"
-  header_output = "skip-block-bind.h"
   bind_output = "skip-block.bindbc"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.nand" ]

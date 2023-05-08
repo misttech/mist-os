@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ti-lp8556-bind") {
   rules = "ti-lp8556.bind"
-  header_output = "ti-lp8556-bind.h"
   bind_output = "ti-lp8556.bindbc"
   tests = "ti-lp8556-bind-test.json"
   deps = [

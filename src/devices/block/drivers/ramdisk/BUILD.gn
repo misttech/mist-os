@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ramdisk_bind") {
   rules = "ramdisk.bind"
-  header_output = "ramdisk_bind.h"
   bind_output = "ramdisk.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]

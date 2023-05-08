@@ -17,7 +17,6 @@ group("tests") {
 
 driver_bind_rules("usb_video_bind") {
   rules = "usb_video.bind"
-  header_output = "bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",

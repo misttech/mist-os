@@ -4,6 +4,7 @@
 
 #include "src/camera/drivers/controller/controller_device.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -12,7 +13,6 @@
 
 #include <ddktl/fidl.h>
 
-#include "src/camera/drivers/controller/bind.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace camera {

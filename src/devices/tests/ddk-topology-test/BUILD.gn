@@ -15,7 +15,6 @@ group("tests") {
 }
 
 driver_bind_rules("ddk-topology-test-bind") {
-  header_output = "test-driver-bind.h"
   bind_output = "test-driver-bind.bindbc"
   rules = "test-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]

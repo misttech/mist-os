@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("serial_bind") {
   rules = "serial.bind"
-  header_output = "serial_bind.h"
   bind_output = "serial.bindbc"
   tests = "tests/tests.json"
   deps = [ "//src/devices/bind/fuchsia.serial" ]

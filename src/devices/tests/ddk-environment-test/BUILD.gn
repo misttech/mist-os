@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("test-environment-bind") {
   rules = "test-environment.bind"
-  header_output = "test-environment-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 

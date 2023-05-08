@@ -4,6 +4,7 @@
 
 #include "src/camera/drivers/hw_accel/gdc/gdc.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
@@ -19,7 +20,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "src/camera/drivers/hw_accel/gdc/bind.h"
 #include "src/camera/drivers/hw_accel/gdc/gdc_regs.h"
 
 namespace gdc {

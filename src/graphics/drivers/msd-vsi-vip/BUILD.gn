@@ -71,7 +71,6 @@ fuchsia_driver_component("msd_vsi_test") {
 
 driver_bind_rules("msd_vsi_bind") {
   rules = "msd_vsi.bind"
-  header_output = "bind.h"
   tests = "tests/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.platform",
@@ -81,7 +80,6 @@ driver_bind_rules("msd_vsi_bind") {
 
 driver_bind_rules("msd_vsi_test_bind") {
   rules = "msd_vsi_test.bind"
-  header_output = "test_bind.h"
   disable_autobind = true
   deps = [
     "//src/devices/bind/fuchsia.platform",

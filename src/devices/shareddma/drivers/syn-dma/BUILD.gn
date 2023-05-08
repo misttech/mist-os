@@ -8,7 +8,6 @@ import("//build/test.gni")
 
 driver_bind_rules("syn_dhub_bind") {
   rules = "syn_dhub.bind"
-  header_output = "syn_dhub_bind.h"
   bind_output = "syn_dhub.bindc"
   tests = "bind_tests.json"
   deps = [

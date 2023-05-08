@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.examples.gizmo/cpp/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 
 #include <ddktl/device.h>
-
-#include "examples/drivers/transport/zircon/v1/child-driver-bind.h"
-
 namespace zircon_transport {
 
 class ZirconClientDevice;

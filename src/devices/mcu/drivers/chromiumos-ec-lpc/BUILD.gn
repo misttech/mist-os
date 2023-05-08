@@ -14,7 +14,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "chromiumos_ec_lpc.bind"
-  header_output = "chromiumos_ec_lpc_bind.h"
   bind_output = "chromiumos_ec_lpc.bindbc"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }

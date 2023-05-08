@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("abr-shim-bind") {
   rules = "abr-shim.bind"
-  header_output = "abr-shim-bind.h"
   tests = "abr-shim-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.block",

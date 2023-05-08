@@ -18,7 +18,6 @@ group("tests") {
 driver_bind_rules("mbr_bind") {
   disable_autobind = true
   rules = "mbr.bind"
-  header_output = "mbr_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
 }

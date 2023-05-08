@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("igc_bind") {
   rules = "igc.bind"
-  header_output = "igc_bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",

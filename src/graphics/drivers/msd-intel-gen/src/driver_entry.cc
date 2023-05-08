@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/channel.h>
@@ -29,12 +30,6 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
 #include "sys_driver_cpp/magma_driver.h"
-
-#if MAGMA_TEST_DRIVER
-#include <lib/ddk/binding_driver.h>  //nogncheck
-#else
-#include "bind.h"  //nogncheck
-#endif
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);

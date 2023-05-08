@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-pwm-bind") {
   rules = "aml-pwm.bind"
-  header_output = "aml-pwm-bind.h"
   bind_output = "aml-pwm.bindbc"
   tests = "bind-tests.json"
   deps = [

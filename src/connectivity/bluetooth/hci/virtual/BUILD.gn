@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("bt-hci-virtual-bind") {
   rules = "bt-hci-virtual.bind"
-  header_output = "bt-hci-virtual-bind.h"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }

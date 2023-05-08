@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("as370-gpio-bind") {
   rules = "as370-gpio.bind"
-  header_output = "as370-gpio-bind.h"
   bind_output = "as370-gpio.bindbc"
   tests = "as370-gpio-bind-test.json"
   deps = [

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("a1_usb_phy_bind") {
   rules = "a1_usb_phy.bind"
-  header_output = "a1_usb_phy_bind.h"
   bind_output = "a1-usb-phy.bindbc"
   tests = "test_bind.json"
   deps = [

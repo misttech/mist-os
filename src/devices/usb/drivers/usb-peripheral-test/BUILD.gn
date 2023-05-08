@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("usb_peripheral_test-bind") {
   rules = "usb_peripheral_test.bind"
-  header_output = "usb_peripheral_test-bind.h"
   tests = "tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.usb",

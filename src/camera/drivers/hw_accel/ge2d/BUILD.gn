@@ -16,7 +16,6 @@ group("tests") {
 
 driver_bind_rules("ge2d_bind") {
   rules = "ge2d.bind"
-  header_output = "bind.h"
   tests = "bind_tests.json"
 
   # TODO(fxb/115757): Remove this once we no longer need to generate

@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("usb-virtual-bus-bind") {
   rules = "usb-virtual-bus.bind"
-  header_output = "usb-virtual-bus-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -61,7 +60,6 @@ bind_library("fuchsia.usb.test") {
 
 driver_bind_rules("usb-virtual-bus-tester-bind") {
   rules = "usb-virtual-bus-tester.bind"
-  header_output = "usb-virtual-bus-tester-bind.h"
   deps = [
     ":fuchsia.usb.test",
     "//src/devices/bind/fuchsia.usb",
@@ -104,7 +102,6 @@ fuchsia_driver_component("virtual-bus-tester") {
 
 driver_bind_rules("usb-virtual-bus-tester-function-bind") {
   rules = "usb-virtual-bus-tester-function.bind"
-  header_output = "usb-virtual-bus-tester-function-bind.h"
   deps = [
     ":fuchsia.usb.test",
     "//src/devices/bind/fuchsia.usb",

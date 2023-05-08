@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ddk-fidl-bind") {
   rules = "ddk-fidl.bind"
-  header_output = "ddk-fidl-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -42,7 +41,6 @@ fuchsia_driver_component("fidl-llcpp-driver") {
 
 driver_bind_rules("ddk-fidl-async-bind") {
   rules = "ddk-fidl-async.bind"
-  header_output = "ddk-fidl-async-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 

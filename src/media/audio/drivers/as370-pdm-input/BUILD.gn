@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("as370_audio_in_bind") {
   rules = "as370_audio_in.bind"
-  header_output = "as370_audio_in_bind.h"
   bind_output = "as370_audio_in.bindc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]

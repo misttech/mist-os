@@ -8,7 +8,6 @@ import("//build/fidl/fidl.gni")
 
 driver_bind_rules("mock-device-bind") {
   rules = "mock-device.bind"
-  header_output = "mock-device-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 

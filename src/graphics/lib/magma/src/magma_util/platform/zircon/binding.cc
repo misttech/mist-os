@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
-
-#ifndef TEST
-#include "bind.h"  //nogncheck
-#else
-#include <lib/ddk/binding_driver.h>  //nogncheck
-#endif
 
 extern struct zx_driver_ops msd_driver_ops;
 

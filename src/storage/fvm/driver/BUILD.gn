@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("fvm_bind") {
   rules = "fvm.bind"
-  header_output = "fvm_bind.h"
   bind_output = "fvm.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]

@@ -16,7 +16,6 @@ group("tests") {
 
 driver_bind_rules("camera_controller_bind") {
   rules = "camera_controller.bind"
-  header_output = "bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.gdc",

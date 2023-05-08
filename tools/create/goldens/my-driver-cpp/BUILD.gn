@@ -28,7 +28,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "my_driver_cpp.bind"
-  header_output = "my_driver_cpp-bind.h"
   bind_output = "my_driver_cpp.bindbc"
 }
 

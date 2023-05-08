@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("dwc2_bind") {
   rules = "dwc2.bind"
-  header_output = "dwc2_bind.h"
   bind_output = "dwc2.bindbc"
   tests = "tests.json"
   deps = [

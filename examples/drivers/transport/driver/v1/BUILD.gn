@@ -6,7 +6,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("parent_bind") {
   rules = "parent-driver.bind"
-  header_output = "parent-driver-bind.h"
   bind_output = "parent-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -35,7 +34,6 @@ fuchsia_driver_component("parent_component") {
 
 driver_bind_rules("child_bind") {
   rules = "child-driver.bind"
-  header_output = "child-driver-bind.h"
   bind_output = "child-driver.bindbc"
   deps =
       [ "//examples/drivers/transport/driver:fuchsia.examples.gizmo_bindlib" ]

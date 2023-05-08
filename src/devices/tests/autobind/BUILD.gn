@@ -19,7 +19,6 @@ group("drivers") {
 
 driver_bind_rules("bind") {
   rules = "autobind.bind"
-  header_output = "autobind-bind.h"
   bind_output = "autobind.bindbc"
   deps = [
     "//src/devices/bind/fuchsia.pci",

@@ -44,7 +44,6 @@ fuchsia_unittest_package("bind-test-v2") {
 
 driver_bind_rules("bind-v2") {
   rules = "bind-test-v2.bind"
-  header_output = "bind-test-v2-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 

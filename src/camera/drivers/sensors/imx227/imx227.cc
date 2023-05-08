@@ -6,6 +6,7 @@
 
 #include <endian.h>
 #include <fuchsia/hardware/camera/sensor/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver-unit-test/utils.h>
@@ -18,7 +19,6 @@
 #include <fbl/auto_lock.h>
 #include <safemath/safe_conversions.h>
 
-#include "src/camera/drivers/sensors/imx227/bind.h"
 #include "src/camera/drivers/sensors/imx227/constants.h"
 #include "src/camera/drivers/sensors/imx227/imx227_modes.h"
 #include "src/camera/drivers/sensors/imx227/imx227_seq.h"

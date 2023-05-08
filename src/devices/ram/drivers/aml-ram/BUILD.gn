@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml_ram_bind") {
   rules = "aml_ram.bind"
-  header_output = "aml_ram_bind.h"
   bind_output = "aml-ram.bindbc"
   tests = "bind_tests.json"
   deps = [

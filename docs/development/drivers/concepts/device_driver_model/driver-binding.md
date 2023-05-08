@@ -217,7 +217,6 @@ To declare bind rules within the Fuchsia build system, use the following build t
 ```gn
 driver_bind_rules("bind") {
   rules = <bind rules filename>
-  header_output = <generated header filename>
   bind_output = <generated bind binary filename>
   deps = [ <list of bind library targets> ]
 }
@@ -314,7 +313,6 @@ would generate `example_bind_test`.
 ```
 driver_bind_rules("example_bind") {
   rules = "gizmo.bind"
-  header_output = “gizmo_bind.h”
   bind_output = “gizmo.bindbc”
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]

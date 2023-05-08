@@ -14,7 +14,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "acpi_battery.bind"
-  header_output = "acpi_battery-bind.h"
   bind_output = "acpi_battery.bindbc"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }

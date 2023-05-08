@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("tcs3400_light_bind") {
   rules = "tcs3400_light.bind"
-  header_output = "tcs3400_light_bind.h"
   bind_output = "ams-light.bindbc"
   tests = "bind_tests.json"
 

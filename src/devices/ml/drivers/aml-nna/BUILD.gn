@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml_nna_bind") {
   rules = "aml_nna.bind"
-  header_output = "aml_nna_bind.h"
   bind_output = "aml-nna.bindbc"
   tests = "bind_tests.json"
 

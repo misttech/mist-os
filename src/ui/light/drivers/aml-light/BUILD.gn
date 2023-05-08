@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml_light_bind") {
   rules = "aml_light.bind"
-  header_output = "aml_light_bind.h"
   bind_output = "aml-light.bindbc"
   tests = "bind_tests.json"
 

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-cpu-legacy-bind") {
   rules = "aml-cpu-legacy.bind"
-  header_output = "aml-cpu-legacy-bind.h"
   bind_output = "aml-cpu-legacy.bindbc"
   tests = "bind-tests.json"
   deps = [

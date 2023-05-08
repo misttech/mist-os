@@ -77,7 +77,6 @@ fuchsia_driver("driver") {
 }
 
 driver_bind_rules("v1_test_bind") {
-  header_output = "v1_test_bind.h"
   disable_autobind = true
 }
 

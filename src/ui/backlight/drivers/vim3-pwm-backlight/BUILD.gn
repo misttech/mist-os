@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("vim3-pwm-backlight-bind") {
   rules = "vim3-pwm-backlight.bind"
-  header_output = "vim3-pwm-backlight-bind.h"
   bind_output = "vim3-pwm-backlight.bindbc"
   tests = "vim3-pwm-backlight-bind-test.json"
 

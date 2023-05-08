@@ -78,7 +78,6 @@ fuchsia_driver_component("zxcrypt") {
 
 driver_bind_rules("bind") {
   rules = "zxcrypt.bind"
-  header_output = "zxcrypt-bind.h"
   bind_output = "zxcrypt.bindbc"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
 }

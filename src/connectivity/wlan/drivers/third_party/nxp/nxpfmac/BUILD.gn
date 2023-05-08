@@ -95,7 +95,6 @@ bind_library("fuchsia.nxpfmac") {
 
 driver_bind_rules("nxpfmac_sdio_bind") {
   rules = "nxpfmac_sdio.bind"
-  header_output = "nxpfmac_sdio_bind.h"
   bind_output = "nxpfmac_sdio.bindbc"
   deps = [ "//src/devices/bind/fuchsia.nxp.platform" ]
 }

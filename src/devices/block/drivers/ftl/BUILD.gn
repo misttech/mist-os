@@ -15,7 +15,6 @@ group("tests") {
 
 driver_bind_rules("ftl_bind") {
   rules = "ftl.bind"
-  header_output = "ftl_bind.h"
   bind_output = "ftl.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.nand" ]

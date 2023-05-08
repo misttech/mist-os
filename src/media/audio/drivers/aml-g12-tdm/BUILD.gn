@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml-g12-tdm-bind") {
   rules = "aml_tdm.bind"
-  header_output = "aml_tdm-bind.h"
   bind_output = "aml-g12-tdm.bindbc"
   tests = "tests-stream.json"
 
@@ -67,7 +66,6 @@ fuchsia_driver_component("aml-g12-tdm") {
 
 driver_bind_rules("aml-g12-tdm-dai-bind") {
   rules = "aml_tdm_dai.bind"
-  header_output = "aml_tdm_dai_bind.h"
   bind_output = "aml-g12-tdm-dai.bindbc"
   tests = "tests-dai.json"
   deps = [

@@ -13,7 +13,6 @@ config("wlansoftmac_config") {
 
 driver_bind_rules("wlansoftmac_bind") {
   rules = "wlansoftmac.bind"
-  header_output = "wlansoftmac_bind.h"
   tests = "bind_tests.json"
   bind_output = "wlansoftmac.bindbc"
   deps = [ "//src/devices/bind/fuchsia.wlan" ]

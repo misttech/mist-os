@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("imx8m-i2c-bind") {
   rules = "imx8m-i2c.bind"
-  header_output = "imx8m-i2c-bind.h"
   bind_output = "imx8m-i2c.bindbc"
   tests = "imx8m-i2c-bind-test.json"
   deps = [

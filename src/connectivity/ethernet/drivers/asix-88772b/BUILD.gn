@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ethernet_ax88772b_bind") {
   rules = "ethernet_ax88772b.bind"
-  header_output = "ethernet_ax88772b-bind.h"
   bind_output = "asix-88772b.bindbc"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]

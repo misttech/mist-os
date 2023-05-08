@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("parent_driver_bind") {
   rules = "parent_driver.bind"
-  header_output = "parent_driver-bind.h"
   bind_output = "parent_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

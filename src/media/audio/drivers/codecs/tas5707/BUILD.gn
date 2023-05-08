@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ti_tas5707-bind") {
   rules = "ti_tas5707.bind"
-  header_output = "ti_tas5707-bind.h"
   bind_output = "tas5707.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.ti.platform" ]

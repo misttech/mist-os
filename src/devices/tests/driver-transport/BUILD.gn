@@ -43,7 +43,6 @@ fuchsia_unittest_package("driver-transport-test") {
 
 driver_bind_rules("parent-driver-bind") {
   rules = "parent-driver.bind"
-  header_output = "parent-driver-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -73,7 +72,6 @@ fuchsia_driver_component("parent") {
 
 driver_bind_rules("child-driver-bind") {
   rules = "child-driver.bind"
-  header_output = "child-driver-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 

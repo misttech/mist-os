@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml_rtc_bind") {
   rules = "aml_rtc.bind"
-  header_output = "aml_rtc_bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",

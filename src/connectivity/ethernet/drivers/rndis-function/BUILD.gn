@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("rndis_function_bind") {
   rules = "rndis_function.bind"
-  header_output = "rndis_function_bind.h"
   bind_output = "rndis-function.bindbc"
   tests = "bind-tests.json"
   deps = [

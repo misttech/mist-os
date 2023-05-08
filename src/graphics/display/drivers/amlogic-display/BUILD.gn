@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
-  header_output = "amlogic-display-bind.h"
   bind_output = "amlogic-display.bindbc"
   tests = "bind_tests.json"
 

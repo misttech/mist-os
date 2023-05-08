@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ufs_bind") {
   rules = "ufs.bind"
-  header_output = "ufs_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",

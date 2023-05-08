@@ -15,7 +15,6 @@ fidl("fuchsia.rebind.test") {
 
 driver_bind_rules("child_bind") {
   rules = "rebind_child.bind"
-  header_output = "rebind_child_bind.h"
   bind_output = "rebind_child.bindbc"
 }
 
@@ -43,7 +42,6 @@ fuchsia_driver_component("child_driver_component") {
 
 driver_bind_rules("parent_bind") {
   rules = "rebind_parent.bind"
-  header_output = "rebind_parent_bind.h"
   bind_output = "rebind_parent.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("bcm_hci_bind") {
   rules = "bcm_hci.bind"
-  header_output = "bcm_hci_bind.h"
   bind_output = "bt-hci-broadcom.bindbc"
   tests = "bind_tests.json"
   deps = [

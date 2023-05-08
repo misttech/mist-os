@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ftdi_bind") {
   rules = "ftdi.bind"
-  header_output = "ftdi_bind.h"
   bind_output = "ftdi.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
@@ -59,7 +58,6 @@ fuchsia_driver_component("ftdi") {
 
 driver_bind_rules("ftdi_function_bind") {
   rules = "ftdi_function.bind"
-  header_output = "ftdi_function_bind.h"
   tests = "ftdi_function_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",

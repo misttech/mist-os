@@ -22,7 +22,6 @@ fuchsia_driver_component("aml-spinand") {
 
 driver_bind_rules("aml-spinand-bind") {
   rules = "aml-spinand.bind"
-  header_output = "aml-spinand-bind.h"
   bind_output = "aml-spinand.bindbc"
   tests = "bind-tests.json"
   deps = [

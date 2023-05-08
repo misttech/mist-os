@@ -7,7 +7,6 @@ import("config.gni")
 
 driver_bind_rules("ot_radio_bind") {
   rules = "ot_radio.bind"
-  header_output = "ot_radio_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }

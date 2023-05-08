@@ -28,7 +28,6 @@ test("platform-bus") {
 
 driver_bind_rules("test-board-bind") {
   rules = "test-board.bind"
-  header_output = "test-board-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.hardware.platform.bus",
     "//src/devices/bind/fuchsia.test.platform",
@@ -81,7 +80,6 @@ fuchsia_driver_component("test-board") {
 
 driver_bind_rules("test-gpio-bind") {
   rules = "test/test-gpio.bind"
-  header_output = "test-gpio-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -116,7 +114,6 @@ fuchsia_driver_component("test-gpio") {
 
 driver_bind_rules("test-power-bind") {
   rules = "test/test-power.bind"
-  header_output = "test-power-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -150,7 +147,6 @@ fuchsia_driver_component("test-power") {
 
 driver_bind_rules("test-clock-bind") {
   rules = "test/test-clock.bind"
-  header_output = "test-clock-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -185,7 +181,6 @@ fuchsia_driver_component("test-clock") {
 
 driver_bind_rules("test-i2c-bind") {
   rules = "test/test-i2c.bind"
-  header_output = "test-i2c-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -218,7 +213,6 @@ fuchsia_driver_component("test-i2c") {
 
 driver_bind_rules("test-spi-bind") {
   rules = "test/test-spi.bind"
-  header_output = "test-spi-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -252,7 +246,6 @@ fuchsia_driver_component("test-spi") {
 
 driver_bind_rules("test-pwm-bind") {
   rules = "test/test-pwm.bind"
-  header_output = "test-pwm-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
@@ -285,7 +278,6 @@ fuchsia_driver_component("test-pwm") {
 
 driver_bind_rules("test-composite-node-spec-bind") {
   rules = "test/test-composite-node-spec.bind"
-  header_output = "test-composite-node-spec-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test",
@@ -315,7 +307,6 @@ fuchsia_driver_component("test-composite-node-spec") {
 
 driver_bind_rules("test-composite-bind") {
   rules = "test/test-composite.bind"
-  header_output = "test-composite-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -349,7 +340,6 @@ fuchsia_driver_component("test-composite") {
 }
 
 driver_bind_rules("test-child-2.proxy-bind") {
-  header_output = "test-child-2.proxy-bind.h"
   disable_autobind = true
 }
 
@@ -381,7 +371,6 @@ simple_drivers = [
 foreach(driver, simple_drivers) {
   driver_bind_rules("test-${driver}-bind") {
     rules = "test/test-${driver}.bind"
-    header_output = "test-${driver}-bind.h"
     deps = [ "//src/devices/bind/fuchsia.test.platform" ]
   }
 
@@ -441,7 +430,6 @@ fidl("fuchsia.hardware.btitest") {
 
 driver_bind_rules("test-bti-board-bind") {
   rules = "test-bti-board.bind"
-  header_output = "test-bti-board-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.hardware.platform.bus",
     "//src/devices/bind/fuchsia.test.platform",
@@ -475,7 +463,6 @@ fuchsia_driver_component("test-bti-board") {
 
 driver_bind_rules("test-bti-bind") {
   rules = "test-bti.bind"
-  header_output = "test-bti-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 fuchsia_driver("test-bti-driver") {

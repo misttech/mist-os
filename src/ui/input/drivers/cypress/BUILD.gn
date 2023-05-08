@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("cypress_cy8cmbr3108-bind") {
   rules = "cypress_cy8cmbr3108.bind"
-  header_output = "cypress_cy8cmbr3108-bind.h"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]
 }

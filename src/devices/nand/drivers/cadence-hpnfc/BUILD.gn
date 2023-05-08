@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("cadence-hpnfc-bind") {
   rules = "cadence-hpnfc.bind"
-  header_output = "cadence-hpnfc-bind.h"
   bind_output = "cadence-hpnfc.bindbc"
   tests = "cadence-hpnfc-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]

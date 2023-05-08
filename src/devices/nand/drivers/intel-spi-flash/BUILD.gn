@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("intel_spi_flash_bind") {
   rules = "intel-spi-flash.bind"
-  header_output = "intel_spi_flash_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",

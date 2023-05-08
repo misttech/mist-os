@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("nvme_bind") {
   rules = "nvme.bind"
-  header_output = "nvme_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",

@@ -17,7 +17,6 @@ group("tests") {
 
 driver_bind_rules("gpt_bind") {
   rules = "gpt.bind"
-  header_output = "gpt_bind.h"
   bind_output = "gpt.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]

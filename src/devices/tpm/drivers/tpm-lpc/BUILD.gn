@@ -22,7 +22,6 @@ group("tests") {
 
 driver_bind_rules("tpm-lpc_bind") {
   rules = "tpm-lpc.bind"
-  header_output = "tpm-lpc-bind.h"
   bind_output = "tpm-lpc.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]

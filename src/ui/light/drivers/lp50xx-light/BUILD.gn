@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("lp50xx_light-bind") {
   rules = "lp50xx_light.bind"
-  header_output = "lp50xx_light-bind.h"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.ti.platform" ]
 }

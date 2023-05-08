@@ -14,7 +14,6 @@ fidl("fuchsia.hardware.sample") {
 
 driver_bind_rules("bind") {
   rules = "sample_driver.bind"
-  header_output = "sample_driver-bind.h"
   bind_output = "sample_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

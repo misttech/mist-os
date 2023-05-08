@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml-thermistor-bind") {
   rules = "thermistor.bind"
-  header_output = "aml-thermistor-bind.h"
   bind_output = "astro-thermistor.bindbc"
   tests = "bind-tests.json"
   deps = [

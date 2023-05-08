@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("alc5514_bind") {
   rules = "alc5514.bind"
-  header_output = "alc5514_bind.h"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }

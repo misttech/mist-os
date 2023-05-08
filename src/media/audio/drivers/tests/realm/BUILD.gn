@@ -13,26 +13,22 @@ bind_library("fuchsia.test.audio") {
 
 driver_bind_rules("codec_test-bind") {
   rules = "test-codec.bind"
-  header_output = "codec_test-bind.h"
   bind_output = "codec_test.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("codec_test2-bind") {
   rules = "test-codec2.bind"
-  header_output = "codec_test2-bind.h"
   bind_output = "codec_test2.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("dai_test-bind") {
   rules = "test-dai.bind"
-  header_output = "dai_test-bind.h"
   bind_output = "dai_test.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 
 driver_bind_rules("root_test-bind") {
   rules = "test-root.bind"
-  header_output = "test_root-bind.h"
   deps = [ ":fuchsia.test.audio" ]
 }
 

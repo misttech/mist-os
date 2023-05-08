@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml_dsp_bind") {
   rules = "aml_dsp.bind"
-  header_output = "aml_dsp_bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",

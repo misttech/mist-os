@@ -28,7 +28,6 @@ bind_library("composite.test.lib") {
 
 driver_bind_rules("root-driver-bind") {
   rules = "root-driver.bind"
-  header_output = "root-driver-bind.h"
   bind_output = "root-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -58,7 +57,6 @@ fuchsia_driver_component("root") {
 
 driver_bind_rules("leaf-driver-bind") {
   rules = "leaf-driver.bind"
-  header_output = "leaf-driver-bind.h"
   bind_output = "leaf-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -88,7 +86,6 @@ fuchsia_driver_component("leaf") {
 
 driver_bind_rules("composite-bind") {
   rules = "composite-driver.bind"
-  header_output = "composite-driver-bind.h"
   bind_output = "composite-driver.bindbc"
   deps = [ ":composite.test.lib" ]
 }

@@ -10,7 +10,6 @@ import("//build/test.gni")
 driver_bind_rules("bootpart_bind") {
   disable_autobind = true
   rules = "bootpart.bind"
-  header_output = "bootpart_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
 }

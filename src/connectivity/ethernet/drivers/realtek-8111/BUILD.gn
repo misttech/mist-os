@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("realtek_rtl8111_bind") {
   rules = "realtek_rtl8111.bind"
-  header_output = "realtek_rtl8111-bind.h"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }

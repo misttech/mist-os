@@ -4,11 +4,10 @@
 
 #include <fidl/fuchsia.examples.gizmo/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 
 #include <ddktl/device.h>
-
-#include "examples/drivers/transport/zircon/v1/parent-driver-bind.h"
 
 namespace zircon_transport {
 

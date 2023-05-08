@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("bind-fail-test-bind") {
   rules = "bind-fail.bind"
-  header_output = "bind-fail-test-bind.h"
 }
 
 fuchsia_driver("fuchsia_driver") {

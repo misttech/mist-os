@@ -33,7 +33,6 @@ source_set("common") {
 
 driver_bind_rules("as370_audio_out_bind") {
   rules = "as370_audio_out.bind"
-  header_output = "as370_audio_out_bind.h"
   bind_output = "as370_audio_out.bindc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]

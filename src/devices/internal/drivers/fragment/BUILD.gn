@@ -6,7 +6,6 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("fragment-bind") {
-  header_output = "fragment-bind.h"
   bind_output = "fragment.bindbc"
   disable_autobind = true
 }
@@ -77,7 +76,6 @@ group("fragment") {
 }
 
 driver_bind_rules("fragment-proxy-bind") {
-  header_output = "fragment-proxy-bind.h"
   bind_output = "fragment-proxy.bindbc"
   disable_autobind = true
 }

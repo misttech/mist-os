@@ -43,7 +43,6 @@ if (target_cpu == "arm64") {
 
   driver_bind_rules("amlogic_video_bind") {
     rules = "amlogic_video.bind"
-    header_output = "amlogic_video_bind.h"
     tests = "bind_tests.json"
     deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
   }
@@ -52,7 +51,6 @@ if (target_cpu == "arm64") {
   # `diasable_autobind = true`, and tests are omitted.
   driver_bind_rules("amlogic_video_test_bind") {
     rules = "amlogic_video.bind"
-    header_output = "amlogic_video_test_bind.h"
     disable_autobind = true
     deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
   }
@@ -176,7 +174,6 @@ if (target_cpu == "arm64") {
       "local_codec_factory.h",
     ]
     public_deps = [
-      ":amlogic_video_test_bind_header",
       "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",

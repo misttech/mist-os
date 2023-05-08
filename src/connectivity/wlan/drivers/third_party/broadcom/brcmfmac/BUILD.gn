@@ -215,7 +215,6 @@ bind_library("fuchsia.brcmfmac") {
 
 driver_bind_rules("brcmfmac_sdio_bind") {
   rules = "brcmfmac_sdio.bind"
-  header_output = "brcmfmac_sdio_bind.h"
   bind_output = "brcmfmac_sdio.bindbc"
   deps = [ "//src/devices/bind/fuchsia.broadcom.platform" ]
 }
@@ -225,7 +224,6 @@ fuchsia_driver("fuchsia_driver-driver") {
   output_name = "brcmfmac"
   sources = [ "binding.cc" ]
   deps = [
-    ":brcmfmac_sdio_bind_header",
     ":core",
     ":driver_sources",
     "//src/connectivity/wlan/lib/common/cpp:common",

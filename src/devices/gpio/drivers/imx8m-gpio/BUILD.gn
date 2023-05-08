@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("imx8m-gpio-bind") {
   rules = "imx8m-gpio.bind"
-  header_output = "imx8m-gpio-bind.h"
   bind_output = "imx8m-gpio.bindbc"
   tests = "imx8m-gpio-bind-test.json"
   deps = [

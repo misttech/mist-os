@@ -72,7 +72,6 @@ group("common") {
 
 driver_bind_rules("gt6853-bind") {
   rules = "gt6853.bind"
-  header_output = "gt6853-bind.h"
   tests = "gt6853-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.goodix.platform" ]
 }

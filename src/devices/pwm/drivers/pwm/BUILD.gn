@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("pwm-bind") {
   rules = "pwm.bind"
-  header_output = "pwm-bind.h"
   bind_output = "pwm.bindbc"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.pwm" ]

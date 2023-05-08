@@ -23,7 +23,6 @@ source_set("dma-descriptor-builder") {
 
 driver_bind_rules("sdhci-bind") {
   rules = "sdhci.bind"
-  header_output = "sdhci-bind.h"
   tests = "sdhci-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.sdmmc" ]
 }

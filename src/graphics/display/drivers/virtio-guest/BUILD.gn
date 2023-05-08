@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("virtio_gpu_bind") {
   rules = "virtio_gpu.bind"
-  header_output = "virtio_gpu_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }

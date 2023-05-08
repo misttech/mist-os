@@ -13,7 +13,6 @@ group("drivers") {
 
 driver_bind_rules("i2c_hid_bind") {
   rules = "i2c_hid.bind"
-  header_output = "i2c_hid_bind.h"
   tests = "tests.json"
   deps = [
     "//src/devices/bind/fuchsia.acpi",

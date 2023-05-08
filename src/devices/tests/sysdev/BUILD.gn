@@ -6,7 +6,6 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("sysdev-bind") {
-  header_output = "sysdev-bind.h"
   disable_autobind = true
 }
 

@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("coordinator_bind") {
   rules = "coordinator.bind"
-  header_output = "coordinator-bind.h"
   bind_output = "display-coordinator.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.display" ]

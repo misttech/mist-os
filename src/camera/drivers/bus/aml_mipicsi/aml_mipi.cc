@@ -4,6 +4,7 @@
 
 #include "src/camera/drivers/bus/aml_mipicsi/aml_mipi.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <stdint.h>
 #include <threads.h>
@@ -12,7 +13,6 @@
 #include <memory>
 
 #include "src/camera/drivers/bus/aml_mipicsi/aml_mipi_regs.h"
-#include "src/camera/drivers/bus/aml_mipicsi/bind.h"
 
 // NOTE: A lot of magic numbers, they come from vendor
 //       source code.

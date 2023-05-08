@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.examples.gizmo/cpp/driver/wire.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
 #include <bind/fuchsia/examples/gizmo/cpp/bind.h>
 #include <ddktl/device.h>
-
-#include "examples/drivers/transport/driver/v1/parent-driver-bind.h"
 
 namespace driver_transport {
 

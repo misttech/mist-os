@@ -13,7 +13,6 @@ import("//build/test.gni")
 
 driver_bind_rules("bind") {
   rules = "leaf.bind"
-  header_output = "leaf-bind.h"
   bind_output = "leaf.bindbc"
   deps = [ "//src/devices/tests/v2/compat/bind:fuchsia.compat" ]
 }

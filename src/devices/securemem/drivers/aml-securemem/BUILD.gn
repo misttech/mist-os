@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-securemem-bind") {
   rules = "aml-securemem.bind"
-  header_output = "aml-securemem-bind.h"
   bind_output = "aml-securemem.bindbc"
   tests = "aml-securemem-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]

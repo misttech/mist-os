@@ -101,7 +101,6 @@ corresponding to the "using" statements in the bind file.
 ```
 driver_bind_rules("bind") {
     rules = "ahci.bind"
-    header_output = "ahci-bind.h"
     bind_output = "ahci.bindbc"
     deps = [
         "//src/devices/bind/fuchsia.pci",

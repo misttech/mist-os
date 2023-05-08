@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("hid_bind") {
   rules = "hid.bind"
-  header_output = "hid_bind.h"
   bind_output = "hid.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.hid" ]

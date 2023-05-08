@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("fusb302-bind") {
   rules = "fusb302.bind"
-  header_output = "fusb302-bind.h"
   tests = "bind-tests.json"
 
   # TODO(fxb/115757): Remove this once we no longer need to generate

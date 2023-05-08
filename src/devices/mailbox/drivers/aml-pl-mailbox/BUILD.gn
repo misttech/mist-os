@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml_pl_mailbox_bind") {
   rules = "aml_pl_mailbox.bind"
-  header_output = "aml_pl_mailbox_bind.h"
   bind_output = "aml-pl-mailbox.bindbc"
   tests = "bind-tests.json"
   deps = [

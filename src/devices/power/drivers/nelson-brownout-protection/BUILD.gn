@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("nelson-brownout-protection-bind") {
   rules = "nelson-brownout-protection.bind"
-  header_output = "nelson-brownout-protection-bind.h"
   tests = "nelson-brownout-protection-bind-test.json"
 
   # TODO(fxb/115757): Remove this once we no longer need to generate

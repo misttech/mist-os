@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("as370_nna_bind") {
   rules = "as370_nna.bind"
-  header_output = "as370_nna_bind.h"
   bind_output = "as370-nna.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]

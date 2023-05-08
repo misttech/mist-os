@@ -26,6 +26,7 @@
  * SUCH DAMAGE.
  */
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
@@ -35,7 +36,6 @@
 
 #include "e1000_api.h"
 #include "src/lib/listnode/listnode.h"
-#include "zircon/third_party/dev/ethernet/e1000/e1000_bind.h"
 
 typedef enum {
   ETH_RUNNING = 0,

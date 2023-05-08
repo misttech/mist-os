@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("pci-sdhci-bind") {
   rules = "pci-sdhci.bind"
-  header_output = "pci-sdhci-bind.h"
   tests = "pci-sdhci-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",
@@ -23,7 +22,6 @@ fuchsia_driver("pci-sdhci-driver") {
   ]
   sources = [ "pci-sdhci.cc" ]
   deps = [
-    ":pci-sdhci-bind_header",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/lib/driver",

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ti_tas5720-bind") {
   rules = "ti_tas5720.bind"
-  header_output = "ti_tas5720-bind.h"
   bind_output = "tas5720.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.ti.platform" ]

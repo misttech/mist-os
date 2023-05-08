@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("imx8m-sdmmc-bind") {
   rules = "imx8m-sdmmc.bind"
-  header_output = "imx8m-sdmmc-bind.h"
   bind_output = "imx8m-sdmmc.bindbc"
   tests = "imx8m-sdmmc-bind-test.json"
   deps = [

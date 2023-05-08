@@ -20,7 +20,6 @@ group("drivers") {
 
 driver_bind_rules("bind") {
   rules = "init-test.bind"
-  header_output = "init-test-bind.h"
   bind_output = "init-test.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

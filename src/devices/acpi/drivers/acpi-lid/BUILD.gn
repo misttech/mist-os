@@ -14,7 +14,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "acpi_lid.bind"
-  header_output = "acpi_lid-bind.h"
   bind_output = "acpi_lid.bindbc"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }

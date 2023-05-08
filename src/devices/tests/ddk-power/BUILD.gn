@@ -15,7 +15,6 @@ fidl("fuchsia.device.power.test") {
 
 driver_bind_rules("test-power-bind") {
   rules = "test-power.bind"
-  header_output = "test-power-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -46,7 +45,6 @@ fuchsia_driver_component("ddk-power-test") {
 
 driver_bind_rules("test-power-child-bind") {
   rules = "test-power-child.bind"
-  header_output = "test-power-child-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 

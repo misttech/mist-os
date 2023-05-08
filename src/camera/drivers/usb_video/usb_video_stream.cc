@@ -5,6 +5,7 @@
 #include "src/camera/drivers/usb_video/usb_video_stream.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -21,7 +22,6 @@
 #include <fbl/auto_lock.h>
 #include <usb/usb-request.h>
 
-#include "src/camera/drivers/usb_video/bind.h"
 #include "src/camera/drivers/usb_video/descriptors.h"
 namespace camera::usb_video {
 

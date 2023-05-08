@@ -25,7 +25,6 @@ fidl("fuchsia.inspect.test") {
 
 driver_bind_rules("bind") {
   rules = "root.bind"
-  header_output = "root-bind.h"
   bind_output = "root.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

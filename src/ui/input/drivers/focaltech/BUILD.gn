@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("focaltech_touch_bind") {
   rules = "focaltech_touch.bind"
-  header_output = "focaltech_touch_bind.h"
   bind_output = "focaltech.bindbc"
   tests = "bind_tests.json"
 

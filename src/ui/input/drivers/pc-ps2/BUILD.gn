@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("i8042_bind") {
   rules = "i8042.bind"
-  header_output = "i8042_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.acpi",
@@ -26,7 +25,6 @@ group("tests") {
 }
 
 common_deps = [
-  ":i8042_bind_header",
   "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp_wire",
   "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
   "//sdk/lib/input_report_reader",

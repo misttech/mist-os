@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("test-bind") {
   rules = "test-driver.bind"
-  header_output = "test-driver-bind.h"
 
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

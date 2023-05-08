@@ -11,7 +11,6 @@ driver_bind_rules("intel-i915-bind") {
   rules = "intel-i915.bind"
   tests = "bind_tests.json"
 
-  header_output = "intel-i915-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",
     "//src/devices/bind/fuchsia.pci",

@@ -18,7 +18,6 @@ group("tests") {
 
 driver_bind_rules("sysmem_bind") {
   rules = "sysmem.bind"
-  header_output = "sysmem-bind.h"
   bind_output = "sysmem.bindbc"
   tests = "bind_tests.json"
   deps = [

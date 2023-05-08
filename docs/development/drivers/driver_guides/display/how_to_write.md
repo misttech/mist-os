@@ -68,7 +68,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("fancy-display-bind") {
   rules = "fancy-display.bind"
-  header_output = "fancy-display-bind.h"
   bind_output = "fancy-display.bindbc"
   tests = "bind_tests.json"
   deps = [

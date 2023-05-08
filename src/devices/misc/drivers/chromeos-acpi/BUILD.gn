@@ -21,7 +21,6 @@ group("tests") {
 
 driver_bind_rules("chromeos_acpi_bind") {
   rules = "chromeos_acpi.bind"
-  header_output = "chromeos_acpi-bind.h"
   bind_output = "chromeos_acpi.bindbc"
   tests = "bind-tests.json"
   deps = [

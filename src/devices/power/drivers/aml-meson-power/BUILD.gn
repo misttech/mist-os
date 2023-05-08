@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-meson-power-bind") {
   rules = "aml-power.bind"
-  header_output = "aml-meson-power-bind.h"
   bind_output = "aml-meson-power.bindbc"
   tests = "bind-tests.json"
   deps = [

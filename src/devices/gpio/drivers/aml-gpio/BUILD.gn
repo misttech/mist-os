@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-gpio-bind") {
   rules = "aml-gpio.bind"
-  header_output = "aml-gpio-bind.h"
   bind_output = "aml-gpio.bindbc"
   tests = "bind-tests.json"
   deps = [

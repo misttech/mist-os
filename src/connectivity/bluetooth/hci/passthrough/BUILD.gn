@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("bt_hci_passthrough_bind") {
   rules = "bt_hci_passthrough.bind"
-  header_output = "bt_hci_passthrough_bind.h"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.bluetooth" ]
 }

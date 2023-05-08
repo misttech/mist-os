@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml-g12-tdm-dsp-bind") {
   rules = "aml_tdm.bind"
-  header_output = "aml_tdm-bind.h"
   bind_output = "aml-g12-tdm-dsp.bindbc"
   tests = "tests-stream.json"
   deps = [

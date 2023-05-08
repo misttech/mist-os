@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-thermal-bind") {
   rules = "aml-thermal.bind"
-  header_output = "aml-thermal-bind.h"
   bind_output = "aml-thermal.bindbc"
   tests = "bind-tests.json"
   deps = [

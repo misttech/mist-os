@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("usb_xhci_bind") {
   rules = "usb_xhci.bind"
-  header_output = "usb_xhci_bind.h"
   bind_output = "xhci.bindbc"
   tests = "tests.json"
   deps = [
@@ -38,7 +37,6 @@ fuchsia_driver("xhci-driver") {
     "xhci-transfer-ring.cc",
   ]
   deps = [
-    ":usb_xhci_bind_header",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.bus:fuchsia.hardware.usb.bus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_banjo_cpp",

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml_spi_bind") {
   rules = "aml_spi.bind"
-  header_output = "aml_spi_bind.h"
   bind_output = "aml-spi.bindbc"
   tests = "bind_tests.json"
   deps = [

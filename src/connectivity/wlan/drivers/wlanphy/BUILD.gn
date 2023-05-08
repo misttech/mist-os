@@ -35,7 +35,6 @@ wlanphy_deps = [
 
 driver_bind_rules("wlanphy_bind") {
   rules = "wlanphy.bind"
-  header_output = "wlanphy-bind.h"
   bind_output = "wlanphy.bindbc"
   tests = "wlanphy_bind_test.json"
   deps = [ "//src/devices/bind/fuchsia.wlan" ]

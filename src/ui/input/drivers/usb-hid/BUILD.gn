@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("usb_hid_bind") {
   rules = "usb_hid.bind"
-  header_output = "usb_hid-bind.h"
   bind_output = "usb-hid.bindbc"
   tests = "usb_hid_bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
@@ -17,7 +16,6 @@ driver_bind_rules("usb_hid_bind") {
 
 driver_bind_rules("one_endpoint_hid_bind") {
   rules = "function/one_endpoint_hid.bind"
-  header_output = "function/one_endpoint_hid-bind.h"
   tests = "function/one_endpoint_hid_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
@@ -27,7 +25,6 @@ driver_bind_rules("one_endpoint_hid_bind") {
 
 driver_bind_rules("two_endpoint_hid_bind") {
   rules = "function/two_endpoint_hid.bind"
-  header_output = "function/two_endpoint_hid-bind.h"
   tests = "function/two_endpoint_hid_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",

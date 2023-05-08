@@ -24,7 +24,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "{{snake_case PROJECT_NAME}}.bind"
-  header_output = "{{snake_case PROJECT_NAME}}-bind.h"
   bind_output = "{{snake_case PROJECT_NAME}}.bindbc"
 }
 

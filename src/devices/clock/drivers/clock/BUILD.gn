@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("clock-bind") {
   rules = "clock.bind"
-  header_output = "clock-bind.h"
   bind_output = "clock.bindbc"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.clockimpl" ]

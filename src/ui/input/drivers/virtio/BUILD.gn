@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("virtio_input_bind") {
   rules = "virtio_input.bind"
-  header_output = "virtio_input_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("crg_udc_bind") {
   rules = "crg_udc.bind"
-  header_output = "crg_udc_bind.h"
   bind_output = "crg_udc.bindbc"
   tests = "tests.json"
   deps = [

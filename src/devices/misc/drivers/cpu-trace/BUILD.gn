@@ -37,7 +37,6 @@ source_set("perf-mon") {
 
 driver_bind_rules("cpu_trace_bind") {
   rules = "cpu_trace.bind"
-  header_output = "cpu_trace_bind.h"
   bind_output = "cpu-trace.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]

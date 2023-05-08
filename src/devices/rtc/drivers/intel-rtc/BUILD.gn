@@ -11,7 +11,6 @@ assert(current_cpu == "x64")
 
 driver_bind_rules("intel_rtc_bind") {
   rules = "intel_rtc.bind"
-  header_output = "intel_rtc_bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.acpi",

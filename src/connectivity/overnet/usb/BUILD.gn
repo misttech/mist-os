@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("overnet_usb_bind") {
   rules = "overnet_usb.bind"
-  header_output = "overnet_usb_bind.h"
   bind_output = "overnet-usb.bindbc"
   tests = "bind-tests.json"
   deps = [

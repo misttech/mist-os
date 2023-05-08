@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("tpm_bind") {
   rules = "tpm.bind"
-  header_output = "tpm_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.tpm" ]
 }

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("bind") {
   rules = "usb-hub.bind"
-  header_output = "usb_hub_bind.h"
   bind_output = "usb-hub.bindbc"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }

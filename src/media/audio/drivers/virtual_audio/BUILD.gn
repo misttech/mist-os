@@ -12,7 +12,6 @@ fuchsia_driver_package("virtual_audio") {
 
 driver_bind_rules("virtual_audio_bind") {
   rules = "virtual_audio.bind"
-  header_output = "virtual_audio_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }

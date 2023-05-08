@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("virtio_block_bind") {
   rules = "virtio_block.bind"
-  header_output = "virtio_block_bind.h"
   tests = "block_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",
@@ -26,7 +25,6 @@ fuchsia_driver("virtio_block-driver") {
   sources = [ "block_driver.cc" ]
   deps = [
     ":block_lib",
-    ":virtio_block_bind_header",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/driver",
@@ -69,7 +67,6 @@ source_set("scsi_lib") {
 
 driver_bind_rules("virtio_scsi_bind") {
   rules = "virtio_scsi.bind"
-  header_output = "virtio_scsi_bind.h"
   tests = "scsi_bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.pci" ]
 }

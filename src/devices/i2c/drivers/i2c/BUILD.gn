@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("i2c_bind") {
   rules = "i2c.bind"
-  header_output = "i2c_bind.h"
   bind_output = "i2c.bindbc"
   tests = "tests.json"
   deps = [ "//src/devices/bind/fuchsia.i2c" ]

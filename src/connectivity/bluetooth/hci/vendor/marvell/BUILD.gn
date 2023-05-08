@@ -10,7 +10,6 @@ import("//third_party/pigweed/src/third_party/emboss/build_defs.gni")
 
 driver_bind_rules("bt_hci_marvell_bind") {
   rules = "bt_hci_marvell.bind"
-  header_output = "bt_hci_marvell_bind.h"
   tests = "bind_tests.json"
   deps = [
     ":fuchsia.bt.vendor.marvell",

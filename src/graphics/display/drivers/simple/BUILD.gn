@@ -78,7 +78,6 @@ template("simple_fuchsia_driver") {
     rules = "simple-${driver_name}.bind"
     tests = "${driver_name}_bind_tests.json"
 
-    header_output = "simple-${driver_name}-bind.h"
     deps = [
       "//src/devices/bind/fuchsia.hardware.sysmem",
       "//src/devices/bind/fuchsia.pci",

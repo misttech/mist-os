@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("pcf8563_rtc_bind") {
   rules = "pcf8563_rtc.bind"
-  header_output = "pcf8563_rtc_bind.h"
   tests = "bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.nxp.platform" ]
 }

@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("as370-thermal-bind") {
   rules = "as370-thermal.bind"
-  header_output = "as370-thermal-bind.h"
   bind_output = "as370-thermal.bindbc"
   tests = "as370-thermal-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]

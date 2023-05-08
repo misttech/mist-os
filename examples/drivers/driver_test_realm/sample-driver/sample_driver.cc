@@ -4,7 +4,7 @@
 
 #include "examples/drivers/driver_test_realm/sample-driver/sample_driver.h"
 
-#include "examples/drivers/driver_test_realm/sample-driver/sample_driver-bind.h"
+#include <lib/ddk/binding_driver.h>
 
 namespace sample_driver {
 

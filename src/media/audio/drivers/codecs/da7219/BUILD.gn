@@ -26,7 +26,6 @@ group("tests") {
 
 driver_bind_rules("bind") {
   rules = "da7219.bind"
-  header_output = "da7219-bind.h"
   bind_output = "da7219.bindbc"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }

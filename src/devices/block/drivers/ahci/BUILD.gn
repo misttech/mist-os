@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ahci_bind") {
   rules = "ahci.bind"
-  header_output = "ahci_bind.h"
   tests = "tests.json"
   deps = [
     "//src/devices/bind/fuchsia.pci",

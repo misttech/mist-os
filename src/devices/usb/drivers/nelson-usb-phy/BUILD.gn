@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("nelson_usb_phy_bind") {
   rules = "nelson_usb_phy.bind"
-  header_output = "nelson_usb_phy_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",

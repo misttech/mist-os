@@ -10,7 +10,6 @@ import("//build/test.gni")
 
 driver_bind_rules("metadata-test-bind") {
   rules = "metadata-test.bind"
-  header_output = "metadata-test-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 

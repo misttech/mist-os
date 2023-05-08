@@ -7,7 +7,6 @@ import("//build/dist/renamed_binary.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("test-parent-bind") {
-  header_output = "test-parent-bind.h"
   disable_autobind = true
 }
 

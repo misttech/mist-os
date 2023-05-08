@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ihda_codecs_qemu_bind") {
   rules = "qemu_ihda_codec.bind"
-  header_output = "qemu_ihda_codec-bind.h"
   deps = [ "//src/devices/bind/fuchsia.intelhda" ]
   tests = "bind_test.json"
 }

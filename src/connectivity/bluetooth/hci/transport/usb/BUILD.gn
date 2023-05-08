@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("bt_transport_usb_bind") {
   rules = "bt_transport_usb.bind"
-  header_output = "bt_transport_usb_bind.h"
   bind_output = "bt-transport-usb.bindbc"
   tests = "bind_tests.json"
   deps = [

@@ -7,7 +7,6 @@ import("//build/drivers.gni")
 
 driver_bind_rules("as370-sdhci-bind") {
   rules = "as370-sdhci.bind"
-  header_output = "as370-sdhci-bind.h"
   bind_output = "as370-sdhci.bindbc"
   tests = "as370-sdhci-bind-test.json"
   deps = [

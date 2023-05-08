@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 #include <fuchsia/examples/gizmo/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 
 #include <ddktl/device.h>
-
-#include "examples/drivers/transport/banjo/child-driver-bind.h"
 
 namespace banjo_transport {
 

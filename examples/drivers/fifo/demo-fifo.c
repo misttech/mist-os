@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <stdio.h>
@@ -10,8 +11,6 @@
 #include <threads.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
-
-#include "examples/drivers/fifo/demo-fifo-bind.h"
 
 // fifo must be a power of 2 for the math to work
 #define FIFOSIZE 32768

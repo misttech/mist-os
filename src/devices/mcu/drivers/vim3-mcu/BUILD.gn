@@ -20,7 +20,6 @@ declare_args() {
 
 driver_bind_rules("vim3_mcu_bind") {
   rules = "vim3_mcu.bind"
-  header_output = "vim3_mcu_bind.h"
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.i2c",

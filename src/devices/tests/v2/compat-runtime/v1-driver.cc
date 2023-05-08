@@ -4,13 +4,12 @@
 
 #include <fidl/fuchsia.compat.runtime.test/cpp/driver/fidl.h>
 #include <fidl/fuchsia.compat.runtime.test/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <ddktl/device.h>
-
-#include "src/devices/tests/v2/compat-runtime/v1.bind.h"
 
 namespace ft = fuchsia_compat_runtime_test;
 

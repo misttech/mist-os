@@ -53,7 +53,6 @@ fidl("driver.multiname.test") {
 
 driver_bind_rules("parent_device_bind") {
   rules = "parent_device.bind"
-  header_output = "parent_device-bind.h"
   bind_output = "parent_device.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }

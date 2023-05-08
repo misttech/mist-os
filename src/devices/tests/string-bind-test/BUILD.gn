@@ -48,7 +48,6 @@ bind_library("stringbind.lib") {
 
 driver_bind_rules("parent-driver-bind") {
   rules = "parent-driver.bind"
-  header_output = "parent-driver-bind.h"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -75,7 +74,6 @@ fuchsia_driver_component("parent-driver") {
 
 driver_bind_rules("child-driver-bind") {
   rules = "child-driver.bind"
-  header_output = "child-driver-bind.h"
   deps = [
     ":stringbind.lib",
     "//src/devices/bind/fuchsia.test",

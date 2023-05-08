@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("ti_tas27xx-bind") {
   rules = "ti_tas27xx.bind"
-  header_output = "ti_tas27xx-bind.h"
   bind_output = "tas27xx.bindbc"
   tests = "tests.json"
 

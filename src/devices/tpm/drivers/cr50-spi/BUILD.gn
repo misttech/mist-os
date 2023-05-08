@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("cr50-spi_bind") {
   rules = "cr50-spi.bind"
-  header_output = "cr50-spi_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }
