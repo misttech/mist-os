@@ -21,9 +21,8 @@ protocol CrashReporter {
     /// an error if the program name is blank. By F12, FileReport should be
     /// used instead. FileReport will provide a useful status once the report
     /// has been successfully or unsuccessfully filed.
-    // TODO(fxbug.dev/122422): remove File once all clients are migrated to
-    // FileReport.
-    @available(deprecated=11, note="use FileReport")
+    // TODO(fxbug.dev/122422): delete File once F12 is out of support window.
+    @available(deprecated=11, removed=12, legacy=true, note="use FileReport")
     File(resource struct {
         report CrashReport;
     }) -> () error zx.Status;
