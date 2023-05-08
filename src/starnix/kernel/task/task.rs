@@ -19,7 +19,7 @@ use crate::execution::*;
 use crate::fs::*;
 use crate::loader::*;
 use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::{log_warn, not_implemented, set_zx_name};
+use crate::logging::*;
 use crate::mm::{MemoryAccessorExt, MemoryManager};
 use crate::signals::{send_signal, types::*, SignalInfo};
 use crate::syscalls::{decls::Syscall, SyscallResult};
@@ -1546,6 +1546,24 @@ impl CurrentTask {
         let arch_val = AUDIT_ARCH_X86_64;
         #[cfg(target_arch = "aarch64")]
         let arch_val = AUDIT_ARCH_AARCH64;
+
+        // VDSO calls can't be caught by seccomp, so most seccomp filters forget to declare them.
+        // But our VDSO implementation is incomplete, and most of the calls forward to the actual
+        // syscalls. So seccomp should ignore them until they're implemented correctly in the VDSO.
+        #[cfg(target_arch = "x86_64")] // The set of VDSO calls is arch dependent.
+        #[allow(non_upper_case_globals)]
+        if let __NR_clock_gettime | __NR_getcpu | __NR_gettimeofday | __NR_time =
+            syscall.decl.number as u32
+        {
+            return None;
+        }
+        #[cfg(target_arch = "aarch64")]
+        #[allow(non_upper_case_globals)]
+        if let __NR_clock_gettime | __NR_clock_getres | __NR_gettimeofday =
+            syscall.decl.number as u32
+        {
+            return None;
+        }
 
         let mut data = seccomp_data {
             nr: syscall.decl.number as i32,
