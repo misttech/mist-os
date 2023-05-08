@@ -82,7 +82,7 @@ void ktrace_add_probe(const fxt::InternedString& interned_string) { interned_str
 void ktrace_report_probes() {
   for (const fxt::InternedString& interned_string : fxt::InternedString::IterateList) {
     fxt_string_record(interned_string.id, interned_string.string,
-                      strnlen(interned_string.string, ZX_MAX_NAME_LEN - 1));
+                      strnlen(interned_string.string, fxt::InternedString::kMaxStringLength));
   }
 }
 
