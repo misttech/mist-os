@@ -98,6 +98,7 @@ class VmCowPages final : public VmHierarchyBase,
   // This should only be used to report to user mode whether a VMO is user-pager backed, not for any
   // other purpose.
   bool is_root_source_user_pager_backed_locked() const TA_REQ(lock()) {
+    canary_.Assert();
     auto root = GetRootLocked();
     // The root will never be null. It will either point to a valid parent, or |this| if there's no
     // parent.
@@ -106,6 +107,7 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool is_private_pager_copy_supported() const TA_REQ(lock()) {
+    canary_.Assert();
     auto root = GetRootLocked();
     // The root will never be null. It will either point to a valid parent, or |this| if there's no
     // parent.
@@ -116,6 +118,7 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool can_evict() const {
+    canary_.Assert();
     bool result = page_source_ && page_source_->properties().is_preserving_page_content;
     DEBUG_ASSERT(result == debug_is_user_pager_backed());
     return result;
@@ -134,6 +137,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Returns whether this cow pages node is dirty tracked.
   bool is_dirty_tracked_locked() const TA_REQ(lock()) {
+    canary_.Assert();
     // Pager-backed VMOs require dirty tracking either if:
     // 1. They are directly backed by the pager, i.e. the root VMO.
     // OR
@@ -292,6 +296,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Query pager VMO |stats|, and reset them too if |reset| is set to true.
   zx_status_t QueryPagerVmoStatsLocked(bool reset, zx_pager_vmo_stats_t* stats) TA_REQ(lock()) {
+    canary_.Assert();
     DEBUG_ASSERT(stats);
     // The modified state should only be set for VMOs directly backed by a pager.
     DEBUG_ASSERT(!pager_stats_modified_ || is_source_preserving_page_content());

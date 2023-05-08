@@ -1239,6 +1239,8 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
 }
 
 uint32_t VmCowPages::DebugLookupDepthLocked() const {
+  canary_.Assert();
+
   // Count the number of parents we need to traverse to find the root, and call this our lookup
   // depth. Slices don't need to be explicitly handled as they are just a parent.
   uint32_t depth = 0;
@@ -3080,6 +3082,8 @@ zx_status_t VmCowPages::UnmapAndRemovePagesLocked(uint64_t offset, uint64_t len,
 }
 
 bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
+  canary_.Assert();
+
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_offset));
   DEBUG_ASSERT(page_offset < size_);
   const VmPageOrMarker* slot = page_list_.Lookup(page_offset);
@@ -3937,6 +3941,8 @@ int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
 }
 
 void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
+  canary_.Assert();
+
   VmCowPages* cur = this;
   AssertHeld(cur->lock_ref());
   // Any change to or from zero requires updating a count in the parent, so we need to walk up the
@@ -5539,6 +5545,8 @@ const VmCowPages* VmCowPages::GetRootLocked() const {
 }
 
 fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
+  canary_.Assert();
+
   Guard<CriticalMutex> guard{lock()};
   return parent_;
 }
@@ -5552,6 +5560,8 @@ fbl::RefPtr<PageSource> VmCowPages::GetRootPageSourceLocked() const {
 }
 
 void VmCowPages::DetachSourceLocked() {
+  canary_.Assert();
+
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
 
@@ -5707,6 +5717,8 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
 // we know that ~VmCowPagesContainer won't run until after this call is over because the caller
 // holds a refcount tally on the container.
 bool VmCowPages::RemovePageForEviction(vm_page_t* page, uint64_t offset) {
+  canary_.Assert();
+
   Guard<CriticalMutex> guard{lock()};
 
   // Check this page is still a part of this VMO.
@@ -5891,6 +5903,8 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
 
 bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
                              VmCompressor* compressor) {
+  canary_.Assert();
+
   Guard<CriticalMutex> guard{lock()};
   // Check this page is still a part of this VMO.
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
@@ -5966,6 +5980,8 @@ void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t*
 zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_t len,
                                                         LazyPageRequest* page_request,
                                                         uint64_t* non_loaned_len) {
+  canary_.Assert();
+
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
   DEBUG_ASSERT(InRange(offset, len, size_));
@@ -6038,6 +6054,8 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_
 }
 
 zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t offset) {
+  canary_.Assert();
+
   Guard<CriticalMutex> guard{lock()};
   return ReplacePageLocked(before_page, offset, true, nullptr, nullptr);
 }
@@ -6110,6 +6128,8 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
 }
 
 bool VmCowPages::DebugValidatePageSplitsHierarchyLocked() const {
+  canary_.Assert();
+
   const VmCowPages* cur = this;
   AssertHeld(cur->lock_ref());
   const VmCowPages* parent_most = cur;
@@ -6408,13 +6428,13 @@ bool VmCowPages::DebugValidateBacklinksLocked() const {
 
 bool VmCowPages::DebugValidateVmoPageBorrowingLocked() const {
   DEBUG_ASSERT(this);
+  canary_.Assert();
   // Skip checking larger VMOs to avoid slowing things down too much, since the things being
   // verified will typically assert from incorrect behavior on smaller VMOs (and we can always
   // remove this filter if we suspect otherwise).
   if (size_ >= 2 * 1024 * 1024) {
     return true;
   }
-  canary_.Assert();
   bool result = true;
   page_list_.ForEveryPage([this, &result](const auto* p, uint64_t offset) {
     AssertHeld(lock_ref());
@@ -6457,6 +6477,7 @@ bool VmCowPages::DebugValidateVmoPageBorrowingLocked() const {
 }
 
 bool VmCowPages::DebugValidateZeroIntervalsLocked() const {
+  canary_.Assert();
   bool in_interval = false;
   auto dirty_state = VmPageOrMarker::IntervalDirtyState::Untracked;
   zx_status_t status = page_list_.ForEveryPage(
@@ -6581,6 +6602,7 @@ zx_status_t VmCowPages::UnlockRangeLocked(uint64_t offset, uint64_t len) {
 }
 
 uint64_t VmCowPages::DebugGetPageCountLocked() const {
+  canary_.Assert();
   uint64_t page_count = 0;
   zx_status_t status = page_list_.ForEveryPage([&page_count](auto* p, uint64_t offset) {
     if (!p->IsPageOrRef()) {
@@ -6595,6 +6617,7 @@ uint64_t VmCowPages::DebugGetPageCountLocked() const {
 }
 
 bool VmCowPages::DebugIsPage(uint64_t offset) const {
+  canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
@@ -6602,6 +6625,7 @@ bool VmCowPages::DebugIsPage(uint64_t offset) const {
 }
 
 bool VmCowPages::DebugIsMarker(uint64_t offset) const {
+  canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
@@ -6609,6 +6633,7 @@ bool VmCowPages::DebugIsMarker(uint64_t offset) const {
 }
 
 bool VmCowPages::DebugIsEmpty(uint64_t offset) const {
+  canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
@@ -6616,11 +6641,13 @@ bool VmCowPages::DebugIsEmpty(uint64_t offset) const {
 }
 
 vm_page_t* VmCowPages::DebugGetPage(uint64_t offset) const {
+  canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
   return DebugGetPageLocked(offset);
 }
 
 vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
+  canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   if (p && p->IsPage()) {
@@ -6630,6 +6657,7 @@ vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
 }
 
 bool VmCowPages::DebugIsHighMemoryPriority() const {
+  canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
   DEBUG_ASSERT(high_priority_count_ >= 0);
   return high_priority_count_ != 0;
@@ -6735,6 +6763,7 @@ void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* sr
 }
 
 VmCowPagesContainer* VmCowPages::raw_container() {
+  canary_.Assert();
   DEBUG_ASSERT(container_);
   return container_.get();
 }
