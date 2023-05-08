@@ -150,6 +150,15 @@ source_set("mmio_header") {
   sources = [ "platform_mmio.h" ]
 }
 
+source_set("logger_for_dfv2") {
+  public_deps = [ ":logger_header" ]
+  if (is_fuchsia) {
+    deps = [ "zircon:logger_for_dfv2" ]
+  } else {
+    deps = [ ":logger" ]
+  }
+}
+
 source_set("device_header") {
   public_configs = [ ":platform_include_config" ]
 

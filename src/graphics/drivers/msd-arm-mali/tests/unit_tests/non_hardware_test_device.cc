@@ -22,13 +22,6 @@
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
-// static
-std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle*) {
-  // This shouldn't be called with no hardware device.
-  DASSERT(false);
-  return nullptr;
-}
-
 namespace {
 class MaliMockMmioBase : public magma::PlatformMmio {
  public:
@@ -95,9 +88,9 @@ class FakeParentDevice : public ParentDevice {
   std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) override {
     return std::make_unique<FakePlatformInterrupt>();
   }
-  magma_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
-                                        fdf::Channel server_end) override {
-    return MAGMA_STATUS_INTERNAL_ERROR;
+  zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>> ConnectToMaliRuntimeProtocol()
+      override {
+    return zx::error(ZX_ERR_INTERNAL);
   }
 };
 
@@ -137,15 +130,16 @@ class FakeParentDeviceWithProtocol : public FakeParentDevice {
   explicit FakeParentDeviceWithProtocol(fdf_dispatcher_t* dispatcher, ArmMaliServer* server)
       : dispatcher_(dispatcher), server_(server) {}
 
-  magma_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
-                                        fdf::Channel server_end) override {
-    EXPECT_EQ(std::string("fuchsia.hardware.gpu.mali.Service"), service_name);
-    EXPECT_EQ(std::string("arm_mali"), name);
+  zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>> ConnectToMaliRuntimeProtocol()
+      override {
+    auto endpoints =
+        fdf::CreateEndpoints<fuchsia_hardware_gpu_mali::Service::ArmMali::ProtocolType>();
+    if (!endpoints.is_ok()) {
+      return endpoints.take_error();
+    }
 
-    fdf::BindServer(dispatcher_,
-                    fdf::ServerEnd<fuchsia_hardware_gpu_mali::ArmMali>(std::move(server_end)),
-                    server_);
-    return MAGMA_STATUS_OK;
+    fdf::BindServer(dispatcher_, std::move(endpoints->server), server_);
+    return zx::ok(std::move(endpoints->client));
   }
 
  private:
@@ -160,10 +154,12 @@ class FakeParentDeviceWithProtocol : public FakeParentDevice {
 // and with no hardware backing it.
 class TestNonHardwareMsdArmDevice {
  public:
-  std::unique_ptr<MsdArmDevice> MakeTestDevice() {
+  static std::tuple<std::unique_ptr<MsdArmDevice>, std::unique_ptr<FakeParentDevice>>
+  MakeTestDevice() {
     auto device = std::make_unique<MsdArmDevice>();
-    device->Init(std::make_unique<FakeParentDevice>(), std::make_unique<MockBusMapper>());
-    return device;
+    auto parent = std::make_unique<FakeParentDevice>();
+    device->Init(parent.get(), std::make_unique<MockBusMapper>());
+    return {std::move(device), std::move(parent)};
   }
 
   void MockDump() {
@@ -213,7 +209,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProcessRequest() {
-    auto device = MakeTestDevice();
+    auto [device, parent] = MakeTestDevice();
     ASSERT_NE(device, nullptr);
 
     class TestRequest : public DeviceRequest {
@@ -243,7 +239,7 @@ class TestNonHardwareMsdArmDevice {
   // descheduled for a long time for some reason that it doesn't immediately
   // think the GPU's hung before processing the request.
   void HangTimerRequest() {
-    auto device = MakeTestDevice();
+    auto [device, parent] = MakeTestDevice();
 
     ASSERT_NE(device, nullptr);
 
@@ -332,7 +328,7 @@ class TestNonHardwareMsdArmDevice {
 
     auto processing_complete = std::make_shared<std::atomic_bool>(false);
 
-    std::thread device_thread([&device]() { device->DeviceThreadLoop(); });
+    std::thread device_thread([&device = device]() { device->DeviceThreadLoop(); });
     auto request = std::make_unique<TestRequest>(processing_complete);
     device->EnqueueDeviceRequest(std::move(request));
     while (!*processing_complete)
@@ -346,7 +342,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MockExecuteAtom() {
-    auto device = MakeTestDevice();
+    auto [device, parent] = MakeTestDevice();
     EXPECT_NE(device, nullptr);
     auto reg_io = device->register_io_.get();
     auto connection = MsdArmConnection::Create(0, device.get());
@@ -414,8 +410,8 @@ class TestNonHardwareMsdArmDevice {
 
   void Inspect() {
     auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
-                                                 std::make_unique<MockBusMapper>());
+    auto parent = std::make_unique<FakeParentDevice>();
+    auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
     constexpr uint64_t kClientId = 123456;
@@ -448,8 +444,9 @@ class TestNonHardwareMsdArmDevice {
     ASSERT_EQ(ZX_OK,
               fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
                 auto driver = MsdArmDriver::Create();
-                auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
-                                                             std::make_unique<MockBusMapper>());
+                auto parent = std::make_unique<FakeParentDevice>();
+                auto device =
+                    driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
                 ASSERT_TRUE(device);
                 EXPECT_FALSE(device->IsProtectedModeSupported());
 
@@ -459,19 +456,21 @@ class TestNonHardwareMsdArmDevice {
                     {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
                 ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
 
-                device = driver->CreateDeviceForTesting(
-                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server),
-                    std::make_unique<MockBusMapper>());
+                auto parent_with_protocol =
+                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
+                device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
+                                                        std::make_unique<MockBusMapper>());
                 EXPECT_TRUE(device->IsProtectedModeSupported());
                 dispatcher->ShutdownAsync();
                 server_completion.Wait();
+                device.reset();
               }).status_value());
   }
 
   void ResetOnStart() {
     auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
-                                                 std::make_unique<MockBusMapper>());
+    auto parent = std::make_unique<FakeParentDevice>();
+    auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
     EXPECT_EQ(registers::GpuCommand::kCmdSoftReset,
@@ -494,9 +493,10 @@ class TestNonHardwareMsdArmDevice {
                     {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
                 ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
 
-                auto device = driver->CreateDeviceForTesting(
-                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server),
-                    std::make_unique<MockBusMapper>());
+                auto parent_with_protocol =
+                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
+                auto device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
+                                                             std::make_unique<MockBusMapper>());
                 ASSERT_TRUE(device);
                 EXPECT_TRUE(device->IsProtectedModeSupported());
                 EXPECT_TRUE(server.got_start_exit_protected_mode_);
@@ -512,7 +512,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void DevicePropertiesQuery() {
-    auto device = MakeTestDevice();
+    auto [device, parent] = MakeTestDevice();
     uint32_t handle;
     auto result = device->QueryReturnsBuffer(kMsdArmVendorQueryDeviceProperties, &handle);
     EXPECT_EQ(MAGMA_STATUS_OK, result);

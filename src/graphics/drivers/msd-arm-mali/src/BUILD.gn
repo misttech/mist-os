@@ -127,3 +127,23 @@ source_set("parent_device_dfv1") {
     "//src/devices/bus/lib/device-protocol-pdev",
   ]
 }
+
+source_set("parent_device_dfv2") {
+  sources = [
+    "parent_device_dfv2.cc",
+    "parent_device_dfv2.h",
+  ]
+
+  deps = [
+    "//src/graphics/lib/magma/src/magma_util/platform:mmio_header",
+    "//src/graphics/lib/magma/src/magma_util/platform:thread",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
+  ]
+  public_deps = [
+    ":src",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+  ]
+}

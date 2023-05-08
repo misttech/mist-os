@@ -66,18 +66,28 @@ std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv1::RegisterInterrupt(un
   return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(interrupt.release()));
 }
 
-zx_status_t ParentDeviceDFv1::ConnectRuntimeProtocol(const char* service_name, const char* name,
-                                                     fdf::Channel server_end) {
-  return device_connect_fragment_runtime_protocol(parent_, "mali", service_name, name,
-                                                  server_end.release());
+zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
+ParentDeviceDFv1::ConnectToMaliRuntimeProtocol() {
+  auto endpoints =
+      fdf::CreateEndpoints<fuchsia_hardware_gpu_mali::Service::ArmMali::ProtocolType>();
+  if (!endpoints.is_ok()) {
+    return endpoints.take_error();
+  }
+  zx_status_t status = device_connect_fragment_runtime_protocol(
+      parent_, "mali", fuchsia_hardware_gpu_mali::Service::ArmMali::ServiceName,
+      fuchsia_hardware_gpu_mali::Service::ArmMali::Name, endpoints->server.TakeChannel().release());
+
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(endpoints->client));
 }
 
 // static
-std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_handle) {
-  if (!device_handle)
+std::unique_ptr<ParentDeviceDFv1> ParentDeviceDFv1::Create(zx_device_t* zx_device) {
+  if (!zx_device)
     return DRETP(nullptr, "device_handle is null, cannot create PlatformDevice");
-
-  zx_device_t* zx_device = reinterpret_cast<zx_device_t*>(device_handle);
 
   auto pdev = ddk::PDevFidl::Create(zx_device, "pdev");
   if (pdev.is_error()) {

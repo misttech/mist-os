@@ -357,6 +357,19 @@ source_set("logger_for_system_drivers") {
   deps = [ "//src/lib/ddk" ]
 }
 
+source_set("logger_for_dfv2") {
+  public_deps = [ "..:logger_header" ]
+
+  sources = [
+    "zircon_platform_logger_dfv2.cc",
+    "zircon_platform_logger_dfv2.h",
+  ]
+  deps = [
+    "$magma_build_root/src/magma_util:macros",
+    "//sdk/lib/driver/logging/cpp",
+  ]
+}
+
 source_set("object") {
   configs += [ "..:platform_include_config" ]
 

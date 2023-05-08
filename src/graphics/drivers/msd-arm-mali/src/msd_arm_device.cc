@@ -46,6 +46,10 @@ enum InterruptIndex {
   kInterruptIndexGpu = 2,
 };
 
+// This is overridden in some unit tests that need to be able to install hooks to mock out the
+// device.
+__attribute__((weak)) void InstallMaliRegisterIoHook(magma::RegisterIo* register_io) {}
+
 class MsdArmDevice::DumpRequest : public DeviceRequest {
  public:
   DumpRequest() {}
@@ -191,16 +195,19 @@ void MsdArmDevice::Destroy() {
 
 bool MsdArmDevice::Init(msd::DeviceHandle* device_handle) {
   DLOG("Init");
-  auto platform_device = ParentDevice::Create(device_handle);
+  auto platform_device = reinterpret_cast<ParentDevice*>(device_handle);
   if (!platform_device)
-    return DRETF(false, "Failed to initialize device");
-  auto bus_mapper = magma::PlatformBusMapper::Create(platform_device->GetBusTransactionInitiator());
+    return DRETF(false, "Null device_handle");
+  zx::bti bti = platform_device->GetBusTransactionInitiator();
+  if (!bti)
+    return DRETF(false, "Failed to get bus transaction initiator");
+  auto bus_mapper = magma::PlatformBusMapper::Create(std::move(bti));
   if (!bus_mapper)
     return DRETF(false, "Failed to create bus mapper");
   return Init(std::move(platform_device), std::move(bus_mapper));
 }
 
-bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
+bool MsdArmDevice::Init(ParentDevice* platform_device,
                         std::unique_ptr<magma::PlatformBusMapper> bus_mapper) {
   DLOG("Init platform_device");
   zx_status_t status = loop_.StartThread("device-loop-thread");
@@ -222,6 +229,8 @@ bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
 
   register_io_ = std::make_unique<mali::RegisterIo>(std::move(mmio));
 
+  InstallMaliRegisterIoHook(register_io_.get());
+
   gpu_features_.ReadFrom(register_io_.get());
   gpu_features_.InitializeInspect(&inspect_);
   MAGMA_LOG(INFO, "ARM mali ID %x", gpu_features_.gpu_id.reg_value());
@@ -235,23 +244,18 @@ bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
 #endif
 
   {
-    auto endpoints =
-        fdf::CreateEndpoints<fuchsia_hardware_gpu_mali::Service::ArmMali::ProtocolType>();
-
-    zx_status_t status = parent_device_->ConnectRuntimeProtocol(
-        fuchsia_hardware_gpu_mali::Service::ArmMali::ServiceName,
-        fuchsia_hardware_gpu_mali::Service::ArmMali::Name, endpoints->server.TakeChannel());
-    if (status != ZX_OK) {
+    auto result = parent_device_->ConnectToMaliRuntimeProtocol();
+    if (result.is_error()) {
       // Not a fatal error, since very simple parent drivers may not need to support the arm mali
       // service.
-      MAGMA_LOG(INFO, "DdkConnectRuntimeProtocol failed: %s", zx_status_get_string(status));
+      MAGMA_LOG(INFO, "ConnectToMaliRuntimeProtocol failed: %s", result.status_string());
     } else {
-      mali_protocol_client_ = fdf::WireSyncClient(std::move(endpoints->client));
+      mali_protocol_client_ = fdf::WireSyncClient(std::move(*result));
       fdf::Arena arena('MALI');
       auto result = mali_protocol_client_.buffer(arena)->GetProperties();
       if (!result.ok()) {
-        MAGMA_LOG(ERROR, "Error retrieving mali properties: %s", result.lossy_description());
-        return false;
+        // This is not a fatal error, since this can happen if the "mali" fragment doesn't exist.
+        MAGMA_LOG(INFO, "Error retrieving mali properties: %s", result.lossy_description());
       } else {
         auto& properties = result->properties;
         mali_properties_.supports_protected_mode =

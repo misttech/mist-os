@@ -4,23 +4,20 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
-#include <lib/ddk/device.h>
-
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
 #include "parent_device.h"
-#include "parent_device_dfv1.h"
 #include "platform_logger.h"
 
 namespace {
-zx_device_t* test_device_s;
+ParentDevice* test_device_s;
 }  // namespace
 
-msd::DeviceHandle* GetTestDeviceHandle() { return ZxDeviceToDeviceHandle(test_device_s); }
+msd::DeviceHandle* GetTestDeviceHandle() { return test_device_s->ToDeviceHandle(); }
 
-zx_status_t magma_indriver_test(zx_device_t* device) {
+zx_status_t magma_indriver_test(ParentDevice* device) {
   DLOG("running magma unit tests");
   test_device_s = device;
   const int kArgc = 1;
