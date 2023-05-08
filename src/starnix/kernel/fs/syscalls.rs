@@ -842,9 +842,7 @@ pub fn sys_fchown(
     group: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get_unless_opath(fd)?;
-    // TODO(security): Needs permission check
-    file.name.entry.node.chown(maybe_uid(owner), maybe_uid(group));
-    Ok(())
+    file.name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
 }
 
 pub fn sys_fchownat(
@@ -857,8 +855,7 @@ pub fn sys_fchownat(
 ) -> Result<(), Errno> {
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    name.entry.node.chown(maybe_uid(owner), maybe_uid(group));
-    Ok(())
+    name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
 }
 
 fn read_xattr_name<'a>(

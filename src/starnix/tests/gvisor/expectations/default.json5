@@ -40,7 +40,6 @@
                 "ChrootTest.ProcMountsMountinfoNoEscape",
 
                 // chown_test
-                "ChownKinds/ChownParamTest.ChownFilePermissionDenied/*",
                 "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
 
                 // clock_nanosleep_test

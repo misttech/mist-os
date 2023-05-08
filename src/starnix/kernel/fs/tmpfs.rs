@@ -89,11 +89,11 @@ impl TmpFs {
         }
         if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
             let uid = fs_args::parse::<uid_t>(uid)?;
-            root_node.chown(Some(uid), None);
+            root_node.info_write().uid = uid;
         }
         if let Some(gid) = mount_options.remove(b"gid" as &FsStr) {
             let gid = fs_args::parse::<uid_t>(gid)?;
-            root_node.chown(None, Some(gid));
+            root_node.info_write().gid = gid;
         }
         if !mount_options.is_empty() {
             not_implemented!(

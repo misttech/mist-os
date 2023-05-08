@@ -84,6 +84,28 @@ pub struct FsNodeInfo {
     pub rdev: DeviceType,
 }
 
+impl FsNodeInfo {
+    fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
+        if let Some(owner) = owner {
+            self.uid = owner;
+        }
+        if let Some(group) = group {
+            self.gid = group;
+        }
+        // Clear the setuid and setgid bits if the file is executable and a regular file.
+        if self.mode.is_reg() {
+            if self.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
+                self.mode &= !FileMode::ISUID;
+            }
+            // If the group execute bit is not set, the setgid bit actually indicates mandatory
+            // locking and should not be cleared.
+            if self.mode.intersects(FileMode::IXGRP) {
+                self.mode &= !FileMode::ISGID;
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 struct FlockInfo {
     /// Whether the node is currently locked. The meaning of the different values are:
@@ -831,26 +853,31 @@ impl FsNode {
     }
 
     /// Sets the owner and/or group on this FsNode.
-    pub fn chown(&self, owner: Option<uid_t>, group: Option<gid_t>) {
-        // TODO(qsr, security): Check permissions.
+    pub fn chown(
+        &self,
+        current_task: &CurrentTask,
+        owner: Option<uid_t>,
+        group: Option<gid_t>,
+    ) -> Result<(), Errno> {
         let mut info = self.info_write();
-        if let Some(owner) = owner {
-            info.uid = owner;
-        }
-        if let Some(group) = group {
-            info.gid = group;
-        }
-        // Clear the setuid and setgid bits if the file is executable and a regular file.
-        if info.mode.is_reg() {
-            if info.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
-                info.mode &= !FileMode::ISUID;
+        if !current_task.creds().has_capability(CAP_CHOWN) {
+            let creds = current_task.creds();
+            if info.uid != creds.euid {
+                return error!(EPERM);
             }
-            // If the group execute bit is not set, the setgid bit actually indicates mandatory
-            // locking and should not be cleared.
-            if info.mode.intersects(FileMode::IXGRP) {
-                info.mode &= !FileMode::ISGID;
+            if let Some(uid) = owner {
+                if info.uid != uid {
+                    return error!(EPERM);
+                }
+            }
+            if let Some(gid) = group {
+                if !creds.is_in_group(gid) {
+                    return error!(EPERM);
+                }
             }
         }
+        info.chown(owner, group);
+        Ok(())
     }
 
     /// Whether this node is a regular file.

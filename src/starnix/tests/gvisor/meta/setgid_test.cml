@@ -5,7 +5,10 @@
     include: [ "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/setgid_test",
-        capabilities: [ "SETGID" ],
+        capabilities: [
+            "SETGID",
+            "CHOWN",
+        ],
         environ: [ "TEST_ON_GVISOR=1" ],
     },
 }
