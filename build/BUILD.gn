@@ -348,7 +348,6 @@ group("config_data_template_allowlist") {
     "//build/images/*",
     "//src/cast:cast_runner_config",
     "//src/chromium:*",
-    "//src/chromium/web_engine/config:chromebook",
     "//src/cobalt/bin/app:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:config-default",
     "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
