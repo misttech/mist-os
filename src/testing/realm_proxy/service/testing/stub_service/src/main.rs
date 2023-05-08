@@ -24,8 +24,6 @@ enum IncomingService {
 async fn main() -> Result<(), Error> {
     info!("starting");
 
-    let mut server = Server::new();
-
     let mut fs = ServiceFs::new();
     fs.dir("svc")
         .add_fidl_service(IncomingService::Exposed)
@@ -33,15 +31,13 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(IncomingService::NotExposed);
 
     fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(None, |service| {
-        futures::executor::block_on(
-            server.serve(service).unwrap_or_else(move |e| error!("run_server error: {:?}", e)),
-        );
-        futures::future::ready(())
+    fs.for_each_concurrent(None, |service| async {
+        let mut server = Server::new();
+        server.serve(service).unwrap_or_else(move |e| error!("run_server error: {:?}", e)).await;
+        info!("received event pairs {:?}", server.event_pairs);
     })
     .await;
 
-    info!("received event pairs {:?}", server.event_pairs);
     Ok(())
 }
 
@@ -78,7 +74,6 @@ impl Server {
                 }
             };
         }
-
         Ok(())
     }
 
