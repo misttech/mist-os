@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::object_store::Timestamp,
+    crate::object_store::{PosixAttributes, Timestamp},
     anyhow::{bail, Error},
     async_trait::async_trait,
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
@@ -49,6 +49,8 @@ pub struct ObjectProperties {
     pub modification_time: Timestamp,
     /// The number of sub-directories.
     pub sub_dirs: u64,
+    // The POSIX attributes: mode, uid, gid, rdev
+    pub posix_attributes: Option<PosixAttributes>,
 }
 
 #[async_trait]

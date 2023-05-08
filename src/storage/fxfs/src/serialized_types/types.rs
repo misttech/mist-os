@@ -6,10 +6,11 @@ use crate::{
     lsm_tree::LayerInfo,
     object_store::{
         allocator::AllocatorInfoV18,
-        transaction::{Mutation, MutationV20},
+        transaction::{Mutation, MutationV20, MutationV25},
         AllocatorInfo, AllocatorKey, AllocatorValue, EncryptedMutations, JournalRecord,
-        JournalRecordV20, ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV5, StoreInfo,
-        SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5,
+        JournalRecordV20, JournalRecordV25, ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV25,
+        ObjectValueV5, StoreInfo, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25,
+        SuperBlockRecordV5,
     },
     serialized_types::{versioned_type, Version, Versioned, VersionedLatest},
 };
@@ -23,7 +24,7 @@ use crate::{
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 28, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 29, minor: 0 };
 
 /// The version where the journal block size changed.
 pub const JOURNAL_BLOCK_SIZE_CHANGE_VERSION: Version = Version { major: 26, minor: 0 };
@@ -54,14 +55,16 @@ versioned_type! {
     5.. => EncryptedMutations,
 }
 versioned_type! {
-    25.. => JournalRecord,
+    29.. => JournalRecord,
+    25.. => JournalRecordV25,
     20.. => JournalRecordV20,
 }
 versioned_type! {
     1.. => LayerInfo,
 }
 versioned_type! {
-    25.. =>Mutation,
+    29.. => Mutation,
+    25.. => MutationV25,
     20.. => MutationV20,
 }
 versioned_type! {
@@ -69,7 +72,8 @@ versioned_type! {
     5.. => ObjectKeyV5,
 }
 versioned_type! {
-    25.. => ObjectValue,
+    29.. => ObjectValue,
+    25.. => ObjectValueV25,
     5.. => ObjectValueV5,
 }
 versioned_type! {
@@ -79,7 +83,8 @@ versioned_type! {
     21.. => SuperBlockHeader,
 }
 versioned_type! {
-    25.. => SuperBlockRecord,
+    29.. => SuperBlockRecord,
+    25.. => SuperBlockRecordV25,
     5.. => SuperBlockRecordV5,
 }
 
@@ -103,13 +108,13 @@ fn type_hashes() {
     success &= assert_type_hash::<AllocatorKey>(0xe1f0c79ca78a2314);
     success &= assert_type_hash::<AllocatorValue>(0x3c75b908c6b1d289);
     success &= assert_type_hash::<EncryptedMutations>(0x960347c6c0713e58);
-    success &= assert_type_hash::<JournalRecord>(0xceca34027f86056a);
+    success &= assert_type_hash::<JournalRecord>(0xbea1d9eaf9d1bb5d);
     success &= assert_type_hash::<LayerInfo>(0x265c7729385ff919);
-    success &= assert_type_hash::<Mutation>(0x90e150eb7d29ebef);
+    success &= assert_type_hash::<Mutation>(0x0598aec52b4267ec);
     success &= assert_type_hash::<ObjectKey>(0x9af0f50c1c257ef7);
-    success &= assert_type_hash::<ObjectValue>(0xf340b66ef4109ccc);
+    success &= assert_type_hash::<ObjectValue>(0xdf98aedede77bfff);
     success &= assert_type_hash::<StoreInfo>(0xa6fecf8e27518741);
     success &= assert_type_hash::<SuperBlockHeader>(0x5eb9b7ec2c8201e1);
-    success &= assert_type_hash::<SuperBlockRecord>(0xc8a3d160e63efc09);
+    success &= assert_type_hash::<SuperBlockRecord>(0xb92b05ecdab548e0);
     assert!(success, "One or more versioned types have different TypeHash signatures.");
 }

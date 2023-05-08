@@ -1365,7 +1365,8 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjec
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::File { refs, allocated_size, .. },
-                attributes: ObjectAttributes { creation_time, modification_time, .. },
+                attributes:
+                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size,
@@ -1373,6 +1374,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjec
                 creation_time,
                 modification_time,
                 sub_dirs: 0,
+                posix_attributes,
             }),
             _ => bail!(FxfsError::NotFile),
         }

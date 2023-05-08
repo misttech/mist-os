@@ -7,7 +7,7 @@ use {
         drop_event::DropEvent,
         lsm_tree::merge,
         object_handle::ReadObjectHandle,
-        object_store::{ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV5},
+        object_store::{ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV25, ObjectValueV5},
         serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::Error,
@@ -106,8 +106,14 @@ pub struct Item<K, V> {
     pub sequence: u64,
 }
 
-impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKey, ObjectValue> {
+impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKey, ObjectValueV25> {
     fn from(item: Item<ObjectKeyV5, ObjectValueV5>) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
+
+impl From<Item<ObjectKey, ObjectValueV25>> for Item<ObjectKey, ObjectValue> {
+    fn from(item: Item<ObjectKey, ObjectValueV25>) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
     }
 }

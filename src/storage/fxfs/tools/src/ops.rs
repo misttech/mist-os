@@ -221,7 +221,7 @@ pub async fn mkdir(
     if let Some(_) = dir.lookup(filename).await? {
         bail!("{} already exists", filename);
     }
-    dir.create_child_dir(&mut transaction, &filename).await?;
+    dir.create_child_dir(&mut transaction, &filename, None).await?;
     transaction.commit().await?;
     Ok(())
 }

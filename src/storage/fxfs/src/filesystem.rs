@@ -340,8 +340,9 @@ impl FxFilesystem {
                 transaction::Options::default(),
             )
             .await?;
-        let volume_directory =
-            root_directory.create_child_dir(&mut transaction, VOLUMES_DIRECTORY).await?;
+        let volume_directory = root_directory
+            .create_child_dir(&mut transaction, VOLUMES_DIRECTORY, Default::default())
+            .await?;
         transaction.commit().await?;
 
         objects.set_volume_directory(volume_directory);

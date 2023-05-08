@@ -170,6 +170,10 @@ impl TestFixture {
     pub fn fs(&self) -> &FxFilesystem {
         &self.state.as_ref().unwrap().filesystem
     }
+
+    pub fn volume(&self) -> &FxVolumeAndRoot {
+        &self.state.as_ref().unwrap().volume
+    }
 }
 
 impl Drop for TestFixture {

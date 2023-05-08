@@ -78,7 +78,8 @@ impl FuseFs {
                 )
                 .await?;
 
-            let child_dir = dir.create_child_dir(&mut transaction, name.osstr_to_str()?).await?;
+            let child_dir =
+                dir.create_child_dir(&mut transaction, name.osstr_to_str()?, None).await?;
             transaction.commit().await?;
 
             Ok(ReplyEntry {
@@ -333,7 +334,7 @@ impl FuseFs {
                 )
                 .await?;
             let dir = self.open_dir(inode).await?;
-            dir.update_attributes(&mut transaction, ctime, mtime, 0).await?;
+            dir.update_attributes(&mut transaction, ctime, mtime, 0, None).await?;
             transaction.commit().await?;
         }
 

@@ -44,8 +44,8 @@ use {
             object_manager::ObjectManager,
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
-                AllocatorMutation, Mutation, MutationV20, ObjectStoreMutation, Options,
-                Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+                AllocatorMutation, Mutation, MutationV20, MutationV25, ObjectStoreMutation,
+                Options, Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
             },
             HandleOptions, Item, ItemRef, LastObjectId, LockState, NewChildStoreOptions,
             ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
@@ -79,7 +79,9 @@ use {
 };
 
 // Exposed for serialized_types.
-pub use super_block::{SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5};
+pub use super_block::{
+    SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV5,
+};
 
 // The journal file is written to in blocks of this size.
 pub const BLOCK_SIZE: u64 = 4096;
@@ -143,10 +145,34 @@ pub enum JournalRecord {
     DidFlushDevice(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Serialize, Versioned)]
 pub enum JournalRecordV20 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV20 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
+}
+
+// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
+impl From<JournalRecordV20> for JournalRecordV25 {
+    fn from(old: JournalRecordV20) -> Self {
+        match old {
+            JournalRecordV20::EndBlock => JournalRecordV25::EndBlock,
+            JournalRecordV20::Mutation { object_id, mutation } => {
+                JournalRecordV25::Mutation { object_id, mutation: mutation.into() }
+            }
+            JournalRecordV20::Commit => JournalRecordV25::Commit,
+            JournalRecordV20::Discard(offset) => JournalRecordV25::Discard(offset),
+            JournalRecordV20::DidFlushDevice(offset) => JournalRecordV25::DidFlushDevice(offset),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum JournalRecordV25 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV25 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),

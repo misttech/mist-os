@@ -710,7 +710,7 @@ async fn test_too_many_object_refs() {
             .await
             .expect("create_child_file failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "child_dir")
+            .create_child_dir(&mut transaction, "child_dir", Default::default())
             .await
             .expect("create_child_directory failed");
 
@@ -970,7 +970,7 @@ async fn test_multiple_links_to_directory() {
             .await
             .expect("new_transaction failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "a")
+            .create_child_dir(&mut transaction, "a", Default::default())
             .await
             .expect("create_child_dir failed");
         root_directory
@@ -1010,7 +1010,7 @@ async fn test_conflicting_link_types() {
             .await
             .expect("new_transaction failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "a")
+            .create_child_dir(&mut transaction, "a", Default::default())
             .await
             .expect("create_child_dir failed");
         root_directory
@@ -1280,11 +1280,13 @@ async fn test_link_cycle() {
             .await
             .expect("new_transaction failed");
         let parent = root_directory
-            .create_child_dir(&mut transaction, "a")
+            .create_child_dir(&mut transaction, "a", Default::default())
             .await
             .expect("Create child failed");
-        let child =
-            parent.create_child_dir(&mut transaction, "b").await.expect("Create child failed");
+        let child = parent
+            .create_child_dir(&mut transaction, "b", Default::default())
+            .await
+            .expect("Create child failed");
         child
             .insert_child(&mut transaction, "c", parent.object_id(), ObjectDescriptor::Directory)
             .await
@@ -1324,8 +1326,12 @@ async fn test_orphaned_link_cycle() {
             .await
             .expect("new_transaction failed");
 
-        let dir1 = Directory::create(&mut transaction, &store).await.expect("create failed");
-        let dir2 = Directory::create(&mut transaction, &store).await.expect("create failed");
+        let dir1 = Directory::create(&mut transaction, &store, Default::default())
+            .await
+            .expect("create failed");
+        let dir2 = Directory::create(&mut transaction, &store, Default::default())
+            .await
+            .expect("create failed");
 
         dir1.insert_child(&mut transaction, "dir2", dir2.object_id(), ObjectDescriptor::Directory)
             .await
@@ -1403,6 +1409,7 @@ async fn test_file_length_mismatch() {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),
                         project_id: 0,
+                        ..Default::default()
                     },
                 },
             ),

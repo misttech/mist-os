@@ -65,7 +65,8 @@ impl FxNode for FxSymlink {
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::Symlink { refs, .. },
-                attributes: ObjectAttributes { creation_time, modification_time, .. },
+                attributes:
+                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size: 0,
@@ -73,6 +74,7 @@ impl FxNode for FxSymlink {
                 creation_time,
                 modification_time,
                 sub_dirs: 0,
+                posix_attributes,
             }),
             _ => bail!(FxfsError::NotFile),
         }

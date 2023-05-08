@@ -13,7 +13,7 @@ use {
         object_store::{
             object_record::{
                 ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
-                Timestamp,
+                PosixAttributes, Timestamp,
             },
             transaction::{
                 LockKey, Mutation, ObjectStoreMutation, Operation, Options, Transaction,
@@ -71,6 +71,7 @@ impl<S: HandleOwner> Directory<S> {
     pub async fn create(
         transaction: &mut Transaction<'_>,
         owner: &Arc<S>,
+        posix_attributes: Option<PosixAttributes>,
     ) -> Result<Directory<S>, Error> {
         let store = owner.as_ref().as_ref();
         let object_id = store.get_next_object_id().await?;
@@ -85,6 +86,7 @@ impl<S: HandleOwner> Directory<S> {
                         creation_time: now.clone(),
                         modification_time: now,
                         project_id: 0,
+                        posix_attributes,
                     },
                 },
             ),
@@ -202,9 +204,10 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'_>,
         name: &str,
+        posix_attributes: Option<PosixAttributes>,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = Directory::create(transaction, &self.owner).await?;
+        let handle = Directory::create(transaction, &self.owner, posix_attributes).await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
@@ -212,7 +215,8 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), 1).await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 1, posix_attributes)
+            .await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)
     }
@@ -231,7 +235,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0, None).await?;
         Ok(())
     }
 
@@ -321,7 +325,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0, None).await?;
         Ok(symlink_id)
     }
 
@@ -339,7 +343,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(store_object_id, ObjectDescriptor::Volume),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0, None).await
     }
 
     pub async fn delete_child_volume<'a>(
@@ -383,7 +387,8 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(object_id, descriptor),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), sub_dirs_delta).await
+        self.update_attributes(transaction, None, Some(Timestamp::now()), sub_dirs_delta, None)
+            .await
     }
 
     /// Updates attributes for the directory.
@@ -393,6 +398,7 @@ impl<S: HandleOwner> Directory<S> {
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
         sub_dirs_delta: i64,
+        posix_attributes: Option<PosixAttributes>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let (mut item, op) = if let Some(ObjectStoreMutation { item, op }) = transaction
@@ -418,6 +424,7 @@ impl<S: HandleOwner> Directory<S> {
             if let Some(time) = mtime {
                 attributes.modification_time = time;
             }
+            attributes.posix_attributes = posix_attributes;
             *sub_dirs = sub_dirs.saturating_add_signed(sub_dirs_delta);
         } else {
             bail!(anyhow!(FxfsError::Inconsistent)
@@ -440,7 +447,8 @@ impl<S: HandleOwner> Directory<S> {
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::Directory { sub_dirs },
-                attributes: ObjectAttributes { creation_time, modification_time, .. },
+                attributes:
+                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
             } => Ok(ObjectProperties {
                 refs: 1,
                 allocated_size: 0,
@@ -448,6 +456,7 @@ impl<S: HandleOwner> Directory<S> {
                 creation_time,
                 modification_time,
                 sub_dirs,
+                posix_attributes,
             }),
             _ => {
                 bail!(anyhow!(FxfsError::Inconsistent)
@@ -581,7 +590,7 @@ pub async fn replace_child<'a, S: HandleOwner>(
         if src_dir.object_id() != dst.0.object_id() {
             sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
             src_dir
-                .update_attributes(transaction, None, Some(now.clone()), -sub_dirs_delta)
+                .update_attributes(transaction, None, Some(now.clone()), -sub_dirs_delta, None)
                 .await?;
         }
         Some((id, descriptor))
@@ -653,7 +662,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
         store_id,
         Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id, dst.1), new_value),
     );
-    dst.0.update_attributes(transaction, None, Some(timestamp), sub_dirs_delta).await?;
+    dst.0.update_attributes(transaction, None, Some(timestamp), sub_dirs_delta, None).await?;
     Ok(result)
 }
 
@@ -695,11 +704,12 @@ mod tests {
                 .new_transaction(&[], Options::default())
                 .await
                 .expect("new_transaction failed");
-            let dir =
-                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+            let dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+                .await
+                .expect("create failed");
 
             let child_dir = dir
-                .create_child_dir(&mut transaction, "foo")
+                .create_child_dir(&mut transaction, "foo", Default::default())
                 .await
                 .expect("create_child_dir failed");
             let _child_dir_file = child_dir
@@ -773,7 +783,9 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -809,10 +821,14 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
-        child =
-            dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
+        child = dir
+            .create_child_dir(&mut transaction, "foo", Default::default())
+            .await
+            .expect("create_child_dir failed");
         child.create_child_file(&mut transaction, "bar").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
@@ -882,7 +898,9 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -929,8 +947,9 @@ mod tests {
                 .new_transaction(&[], Options::default())
                 .await
                 .expect("new_transaction failed");
-            dir =
-                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+            dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+                .await
+                .expect("create failed");
 
             dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -977,12 +996,18 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
-        child_dir1 =
-            dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        child_dir2 =
-            dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
+        child_dir1 = dir
+            .create_child_dir(&mut transaction, "dir1", Default::default())
+            .await
+            .expect("create_child_dir failed");
+        child_dir2 = dir
+            .create_child_dir(&mut transaction, "dir2", Default::default())
+            .await
+            .expect("create_child_dir failed");
         child_dir1
             .create_child_file(&mut transaction, "foo")
             .await
@@ -1025,12 +1050,18 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
-        child_dir1 =
-            dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        child_dir2 =
-            dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
+        child_dir1 = dir
+            .create_child_dir(&mut transaction, "dir1", Default::default())
+            .await
+            .expect("create_child_dir failed");
+        child_dir2 = dir
+            .create_child_dir(&mut transaction, "dir2", Default::default())
+            .await
+            .expect("create_child_dir failed");
         let foo = child_dir1
             .create_child_file(&mut transaction, "foo")
             .await
@@ -1097,18 +1128,24 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
 
-        child_dir1 =
-            dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        child_dir2 =
-            dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
+        child_dir1 = dir
+            .create_child_dir(&mut transaction, "dir1", Default::default())
+            .await
+            .expect("create_child_dir failed");
+        child_dir2 = dir
+            .create_child_dir(&mut transaction, "dir2", Default::default())
+            .await
+            .expect("create_child_dir failed");
         child_dir1
             .create_child_file(&mut transaction, "foo")
             .await
             .expect("create_child_file failed");
         let nested_child = child_dir2
-            .create_child_dir(&mut transaction, "bar")
+            .create_child_dir(&mut transaction, "bar", Default::default())
             .await
             .expect("create_child_file failed");
         nested_child
@@ -1149,7 +1186,9 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
@@ -1184,7 +1223,9 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
         let _cat =
             dir.create_child_file(&mut transaction, "cat").await.expect("create_child_file failed");
         let _ball = dir
@@ -1233,9 +1274,13 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
-        child_dir =
-            dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
+        child_dir = dir
+            .create_child_dir(&mut transaction, "foo", Default::default())
+            .await
+            .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
         assert_eq!(dir.get_properties().await.expect("get_properties failed").sub_dirs, 1);
 
@@ -1266,7 +1311,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let second_child = child_dir
-            .create_child_dir(&mut transaction, "baz")
+            .create_child_dir(&mut transaction, "baz", Default::default())
             .await
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
@@ -1340,10 +1385,16 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
-        let child =
-            dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
-        dir.create_child_dir(&mut transaction, "bar").await.expect("create_child_dir failed");
+        dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+            .await
+            .expect("create failed");
+        let child = dir
+            .create_child_dir(&mut transaction, "foo", Default::default())
+            .await
+            .expect("create_child_dir failed");
+        dir.create_child_dir(&mut transaction, "bar", Default::default())
+            .await
+            .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
 
         // Flush the tree so that we end up with records in different layers.
@@ -1402,14 +1453,16 @@ mod tests {
                 panic!();
             }
         };
-        assert_access_denied(dir.create_child_dir(&mut transaction, "baz").await.map(|_| {}));
+        assert_access_denied(
+            dir.create_child_dir(&mut transaction, "baz", Default::default()).await.map(|_| {}),
+        );
         assert_access_denied(dir.create_child_file(&mut transaction, "baz").await.map(|_| {}));
         assert_access_denied(dir.add_child_volume(&mut transaction, "baz", 1).await);
         assert_access_denied(
             dir.insert_child(&mut transaction, "baz", 1, ObjectDescriptor::File).await,
         );
         assert_access_denied(
-            dir.update_attributes(&mut transaction, Some(Timestamp::zero()), None, 0).await,
+            dir.update_attributes(&mut transaction, Some(Timestamp::zero()), None, 0, None).await,
         );
         let layer_set = dir.store().tree().layer_set();
         let mut merger = layer_set.merger();
@@ -1426,8 +1479,9 @@ mod tests {
                 .new_transaction(&[], Options::default())
                 .await
                 .expect("new_transaction failed");
-            let dir =
-                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+            let dir = Directory::create(&mut transaction, &fs.root_store(), Default::default())
+                .await
+                .expect("create failed");
 
             let symlink_id = dir
                 .create_symlink(&mut transaction, b"link", "foo")
@@ -1462,7 +1516,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        let dir = Directory::create(&mut transaction, &store).await.expect("create failed");
+        let dir = Directory::create(&mut transaction, &store, Default::default())
+            .await
+            .expect("create failed");
 
         let symlink_id = dir
             .create_symlink(&mut transaction, b"link", "foo")
@@ -1486,7 +1542,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        dir = Directory::create(&mut transaction, &store).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &store, Default::default())
+            .await
+            .expect("create failed");
 
         let symlink_id = dir
             .create_symlink(&mut transaction, b"link", "foo")

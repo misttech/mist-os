@@ -14,6 +14,7 @@ use {
     fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
     std::convert::From,
+    std::default::Default,
     std::time::{Duration, SystemTime, UNIX_EPOCH},
     type_hash::TypeHash,
 };
@@ -355,6 +356,20 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
         })
     }
 }
+/// This consists of POSIX attributes that are not used in Fxfs but it may be meaningful to some
+/// clients to have the ability to to set and retrieve these values.
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, PartialEq, TypeHash)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct PosixAttributes {
+    /// The mode bits associated with this object
+    pub mode: u32,
+    /// User ID of owner
+    pub uid: u32,
+    /// Group ID of owner
+    pub gid: u32,
+    /// Device ID
+    pub rdev: u64,
+}
 
 /// Object-level attributes.  Note that these are not the same as "attributes" in the
 /// ObjectValue::Attribute sense, which refers to an arbitrary data payload associated with an
@@ -368,12 +383,32 @@ pub struct ObjectAttributes {
     pub modification_time: Timestamp,
     /// The project id to associate this object's resource usage with. Zero means none.
     pub project_id: u64,
+    /// Mode, uid, gid, and rdev
+    pub posix_attributes: Option<PosixAttributes>,
 }
 
-#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ObjectAttributesV5 {
     creation_time: Timestamp,
     modification_time: Timestamp,
+}
+
+// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
+impl From<ObjectAttributesV5> for ObjectAttributesV25 {
+    fn from(old: ObjectAttributesV5) -> Self {
+        Self {
+            creation_time: old.creation_time.into(),
+            modification_time: old.modification_time.into(),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+pub struct ObjectAttributesV25 {
+    creation_time: Timestamp,
+    modification_time: Timestamp,
+    project_id: u64,
 }
 
 /// ObjectValue is the value of an item in the object store.
@@ -408,11 +443,47 @@ pub enum ObjectValue {
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Serialize, Versioned)]
 pub enum ObjectValueV5 {
     None,
     Some,
     Object { kind: ObjectKind, attributes: ObjectAttributesV5 },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValue),
+    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+}
+
+// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
+impl From<ObjectValueV5> for ObjectValueV25 {
+    fn from(old: ObjectValueV5) -> Self {
+        match old {
+            ObjectValueV5::None => ObjectValueV25::None,
+            ObjectValueV5::Some => ObjectValueV25::Some,
+            ObjectValueV5::Object { kind, attributes } => {
+                ObjectValueV25::Object { kind, attributes: attributes.into() }
+            }
+            ObjectValueV5::Keys(keys) => ObjectValueV25::Keys(keys),
+            ObjectValueV5::Attribute { size } => ObjectValueV25::Attribute { size },
+            ObjectValueV5::Extent(e) => ObjectValueV25::Extent(e),
+            ObjectValueV5::Child { object_id, object_descriptor } => {
+                ObjectValueV25::Child { object_id, object_descriptor }
+            }
+            ObjectValueV5::Trim => ObjectValueV25::Trim,
+            ObjectValueV5::BytesAndNodes { bytes, nodes } => {
+                ObjectValueV25::BytesAndNodes { bytes, nodes }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum ObjectValueV25 {
+    None,
+    Some,
+    Object { kind: ObjectKind, attributes: ObjectAttributesV25 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
@@ -432,7 +503,12 @@ impl ObjectValue {
     ) -> ObjectValue {
         ObjectValue::Object {
             kind: ObjectKind::File { refs, allocated_size },
-            attributes: ObjectAttributes { creation_time, modification_time, project_id },
+            attributes: ObjectAttributes {
+                creation_time,
+                modification_time,
+                project_id,
+                ..Default::default()
+            },
         }
     }
     pub fn keys(keys: EncryptionKeys) -> ObjectValue {
@@ -467,12 +543,18 @@ impl ObjectValue {
     ) -> ObjectValue {
         ObjectValue::Object {
             kind: ObjectKind::Symlink { refs: 1, link: link.into() },
-            attributes: ObjectAttributes { creation_time, modification_time, project_id },
+            attributes: ObjectAttributes {
+                creation_time,
+                modification_time,
+                project_id,
+                ..Default::default()
+            },
         }
     }
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
+pub type ObjectItemV25 = Item<ObjectKey, ObjectValueV25>;
 pub type ObjectItemV5 = Item<ObjectKeyV5, ObjectValueV5>;
 
 impl ObjectItem {

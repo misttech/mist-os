@@ -38,7 +38,7 @@ use {
                 writer::JournalWriter,
                 JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
             },
-            object_record::{ObjectItem, ObjectItemV5},
+            object_record::{ObjectItem, ObjectItemV25, ObjectItemV5},
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
             HandleOptions, Mutation, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
@@ -209,10 +209,28 @@ pub enum SuperBlockRecord {
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Serialize, Versioned)]
 pub enum SuperBlockRecordV5 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV5),
+    End,
+}
+
+// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
+impl From<SuperBlockRecordV5> for SuperBlockRecordV25 {
+    fn from(old: SuperBlockRecordV5) -> Self {
+        match old {
+            SuperBlockRecordV5::Extent(r) => SuperBlockRecordV25::Extent(r),
+            SuperBlockRecordV5::ObjectItem(obj) => SuperBlockRecordV25::ObjectItem(obj.into()),
+            SuperBlockRecordV5::End => SuperBlockRecordV25::End,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum SuperBlockRecordV25 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV25),
     End,
 }
 

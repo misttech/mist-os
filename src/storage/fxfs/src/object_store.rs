@@ -23,7 +23,7 @@ pub mod writeback_cache;
 
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
-pub use object_record::{ObjectDescriptor, Timestamp};
+pub use object_record::{ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{DirectWriter, StoreObjectHandle};
 
 use {
@@ -85,11 +85,13 @@ pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
 };
 pub use journal::{
-    JournalRecord, JournalRecordV20, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5,
+    JournalRecord, JournalRecordV20, JournalRecordV25, SuperBlockHeader, SuperBlockRecord,
+    SuperBlockRecordV25, SuperBlockRecordV5,
 };
 pub use object_record::{
     AttributeKey, EncryptionKeys, ObjectAttributes, ObjectAttributesV5, ObjectKey, ObjectKeyData,
-    ObjectKeyDataV5, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV5, ProjectProperty,
+    ObjectKeyDataV5, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV25, ObjectValueV5,
+    ProjectProperty,
 };
 pub use transaction::Mutation;
 
@@ -633,7 +635,7 @@ impl ObjectStore {
         let buf = {
             // Create a root directory and graveyard directory.
             let graveyard_directory_object_id = Graveyard::create(transaction, &self);
-            let root_directory = Directory::create(transaction, &self).await?;
+            let root_directory = Directory::create(transaction, &self, Default::default()).await?;
 
             let mut store_info = self.store_info.lock().unwrap();
             let store_info = store_info.info_mut().unwrap();
