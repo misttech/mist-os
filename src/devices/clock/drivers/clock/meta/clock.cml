@@ -15,5 +15,14 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.clock.Service" },
+    ],
     use: [],
+    expose: [
+        {
+            service: "fuchsia.hardware.clock.Service",
+            from: "self",
+        },
+    ],
 }
