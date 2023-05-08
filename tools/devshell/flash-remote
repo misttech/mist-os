@@ -129,7 +129,8 @@ if [[ -n "${flash_manifest}" ]]; then
   fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" flash "${build}"
   fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${flash_manifest}"
 else
-  fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${product_bundle}"
+  # TODO(fxb/125962): This should be handled better. Right now this is an enumeration of the necessary artifacts for flashing.
+  fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${product_bundle}/system_a" "${product_bundle}/partitions" "${product_bundle}/product_bundle.json"
 fi
 
 if "${flash}"; then
