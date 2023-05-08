@@ -50,6 +50,7 @@ const char* PartitionName(Partition partition, PartitionScheme scheme);
 enum class Arch {
   kX64,
   kArm64,
+  kRiscv64,
 };
 
 constexpr char kOpaqueVolumeContentType[] = "opauqe_volume";
@@ -213,6 +214,8 @@ inline constexpr Arch GetCurrentArch() {
   return Arch::kX64;
 #elif defined(__aarch64__)
   return Arch::kArm64;
+#elif defined(__riscv)
+  return Arch::kRiscv64;
 #else
 #error "Unknown arch"
 #endif
