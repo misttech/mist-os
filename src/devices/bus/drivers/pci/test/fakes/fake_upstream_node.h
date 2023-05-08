@@ -1,6 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_FAKE_UPSTREAM_NODE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_FAKE_UPSTREAM_NODE_H_
 
@@ -18,7 +19,7 @@ class FakeUpstreamNode : public UpstreamNode {
         mmio_alloc_(PCI_ADDRESS_SPACE_MEMORY),
 #ifdef __x86_64__
         pio_alloc_(PCI_ADDRESS_SPACE_IO)
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
         pio_alloc_(PCI_ADDRESS_SPACE_MEMORY)
 #endif
   {
