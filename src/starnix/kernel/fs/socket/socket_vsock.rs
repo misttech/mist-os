@@ -110,44 +110,6 @@ impl SocketOps for VsockSocket {
         Ok(socket)
     }
 
-    fn remote_connection(
-        &self,
-        socket: &Socket,
-        current_task: &CurrentTask,
-        file: FileHandle,
-    ) -> Result<(), Errno> {
-        // we only allow non-blocking files here, so that
-        // read and write on file can return EAGAIN.
-        assert!(file.flags().contains(OpenFlags::NONBLOCK));
-        if socket.socket_type != SocketType::Stream {
-            return error!(ENOTSUP);
-        }
-        if socket.domain != SocketDomain::Vsock {
-            return error!(EINVAL);
-        }
-
-        let mut inner = self.lock();
-        match &mut inner.state {
-            VsockSocketState::Listening(queue) => {
-                if queue.sockets.len() >= queue.backlog {
-                    return error!(EAGAIN);
-                }
-                let remote_socket = Socket::new(
-                    current_task.kernel(),
-                    SocketDomain::Vsock,
-                    SocketType::Stream,
-                    SocketProtocol::default(),
-                )?;
-                downcast_socket_to_vsock(&remote_socket).lock().state =
-                    VsockSocketState::Connected(file);
-                queue.sockets.push_back(remote_socket);
-                inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                Ok(())
-            }
-            _ => error!(EINVAL),
-        }
-    }
-
     fn bind(
         &self,
         _socket: &Socket,
@@ -260,6 +222,46 @@ impl SocketOps for VsockSocket {
     }
 }
 
+impl VsockSocket {
+    pub fn remote_connection(
+        &self,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        file: FileHandle,
+    ) -> Result<(), Errno> {
+        // we only allow non-blocking files here, so that
+        // read and write on file can return EAGAIN.
+        assert!(file.flags().contains(OpenFlags::NONBLOCK));
+        if socket.socket_type != SocketType::Stream {
+            return error!(ENOTSUP);
+        }
+        if socket.domain != SocketDomain::Vsock {
+            return error!(EINVAL);
+        }
+
+        let mut inner = self.lock();
+        match &mut inner.state {
+            VsockSocketState::Listening(queue) => {
+                if queue.sockets.len() >= queue.backlog {
+                    return error!(EAGAIN);
+                }
+                let remote_socket = Socket::new(
+                    current_task.kernel(),
+                    SocketDomain::Vsock,
+                    SocketType::Stream,
+                    SocketProtocol::default(),
+                )?;
+                downcast_socket_to_vsock(&remote_socket).lock().state =
+                    VsockSocketState::Connected(file);
+                queue.sockets.push_back(remote_socket);
+                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                Ok(())
+            }
+            _ => error!(EINVAL),
+        }
+    }
+}
+
 impl VsockSocketInner {
     fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
         match &self.state {
@@ -314,7 +316,11 @@ mod tests {
             .expect("Failed to look up listening socket.");
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
-        listen_socket.remote_connection(&current_task, remote).unwrap();
+        listen_socket
+            .downcast_socket::<VsockSocket>()
+            .unwrap()
+            .remote_connection(&listen_socket, &current_task, remote)
+            .unwrap();
 
         let server_socket = listen_socket.accept().unwrap();
 

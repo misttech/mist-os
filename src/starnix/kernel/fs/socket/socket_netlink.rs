@@ -363,15 +363,6 @@ impl SocketOps for BaseNetlinkSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn remote_connection(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        _file: FileHandle,
-    ) -> Result<(), Errno> {
-        error!(EOPNOTSUPP)
-    }
-
     fn bind(
         &self,
         _socket: &Socket,
@@ -560,15 +551,6 @@ impl SocketOps for UEventNetlinkSocket {
     }
 
     fn accept(&self, _socket: &Socket) -> Result<SocketHandle, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn remote_connection(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        _file: FileHandle,
-    ) -> Result<(), Errno> {
         error!(EOPNOTSUPP)
     }
 

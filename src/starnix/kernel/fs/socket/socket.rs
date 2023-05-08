@@ -38,21 +38,6 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// listening socket. Returns EAGAIN if the queue is empty.
     fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno>;
 
-    /// Used for connecting Zircon-based objects, such as RemotePipeObject
-    /// to listening sockets. This differs from connect, in that the `socket`
-    /// handed to `connect` is retained by the caller and used for communicating
-    ///
-    /// # Parameters
-    ///
-    /// - `socket`: A listening socket (for streams) or a datagram socket
-    /// - `local_handle`: our side of a remote socket connection
-    fn remote_connection(
-        &self,
-        socket: &Socket,
-        current_task: &CurrentTask,
-        local_handle: FileHandle,
-    ) -> Result<(), Errno>;
-
     /// Binds this socket to a `socket_address`.
     ///
     /// Returns an error if the socket could not be bound.
@@ -388,15 +373,6 @@ impl Socket {
 
     pub fn accept(&self) -> Result<SocketHandle, Errno> {
         self.ops.accept(self)
-    }
-
-    #[allow(dead_code)]
-    pub fn remote_connection(
-        &self,
-        current_task: &CurrentTask,
-        file: FileHandle,
-    ) -> Result<(), Errno> {
-        self.ops.remote_connection(self, current_task, file)
     }
 
     pub fn read(

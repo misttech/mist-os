@@ -443,15 +443,6 @@ impl SocketOps for UnixSocket {
         queue.sockets.pop_front().ok_or_else(|| errno!(EAGAIN))
     }
 
-    fn remote_connection(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        _file: FileHandle,
-    ) -> Result<(), Errno> {
-        error!(EOPNOTSUPP)
-    }
-
     fn bind(
         &self,
         _socket: &Socket,

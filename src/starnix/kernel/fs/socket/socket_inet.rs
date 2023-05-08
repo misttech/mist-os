@@ -143,15 +143,6 @@ impl SocketOps for InetSocket {
         ))
     }
 
-    fn remote_connection(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        _file: FileHandle,
-    ) -> Result<(), Errno> {
-        error!(EOPNOTSUPP)
-    }
-
     fn bind(
         &self,
         _socket: &Socket,

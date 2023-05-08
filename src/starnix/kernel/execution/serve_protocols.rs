@@ -19,6 +19,7 @@ use crate::execution::{execute_task, Container};
 use crate::fs::buffers::*;
 use crate::fs::devpts::create_main_and_replica;
 use crate::fs::fuchsia::create_fuchsia_pipe;
+use crate::fs::socket::VsockSocket;
 use crate::fs::*;
 use crate::logging::log_error;
 use crate::task::*;
@@ -180,7 +181,11 @@ async fn connect_to_vsock(
         bridge_socket,
         OpenFlags::RDWR | OpenFlags::NONBLOCK,
     )?;
-    socket.remote_connection(&container.system_task, pipe)?;
+    socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
+        &socket,
+        &container.system_task,
+        pipe,
+    )?;
 
     Ok(())
 }
