@@ -12,6 +12,7 @@ group("tests") {
   deps = [
     ":fxtest_tests($host_toolchain)",
     ":test_runner_test($host_toolchain)",
+    "scripts:tests",
   ]
 }
 
@@ -67,6 +68,8 @@ dart_tool("fxtest") {
     "//third_party/dart-pkg/pub/path",
     "//third_party/dart-pkg/pub/pedantic",
   ]
+
+  non_dart_deps = [ "scripts:fuzzy_matcher($host_toolchain)" ]
 }
 
 ## Tests
