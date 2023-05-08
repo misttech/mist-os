@@ -562,6 +562,9 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
        * saved addend since the inline one was clobbered. */
       if (head == &ldso)
         saved_addends[save_slot] = *reloc_addr;
+      if (save_slot >= ADDEND_LIMIT) {
+        CRASH_WITH_UNIQUE_BACKTRACE();
+      }
       addend = saved_addends[save_slot++];
     } else {
       addend = *reloc_addr;
@@ -1627,6 +1630,7 @@ LIBC_NO_SAFESTACK static void update_tls_size(void) {
  * replaced later due to copy relocations in the main program. */
 
 static dl_start_return_t __dls3(void* start_arg);
+static dl_start_return_t __dls2tail(void* start_arg);
 
 LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return_t __dls2(
     void* start_arg, void* vdso_map) {
@@ -1689,9 +1693,18 @@ LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_ret
   }
   if (addend_rel_cnt >= ADDEND_LIMIT)
     CRASH_WITH_UNIQUE_BACKTRACE();
-  size_t addends[addend_rel_cnt];
-  saved_addends = addends;
 
+  if (addend_rel_cnt > 0) {
+    // This array must live through __dls3.
+    size_t addends[addend_rel_cnt];
+    saved_addends = addends;
+    return __dls2tail(start_arg);
+  }
+
+  return __dls2tail(start_arg);
+}
+
+static LIBC_NO_SAFESTACK NO_ASAN dl_start_return_t __dls2tail(void* start_arg) {
   head = &ldso;
   reloc_all(&ldso);
 
