@@ -103,8 +103,7 @@ int invalid(volatile unsigned int* unused) {
   // add xzr, xzr, xzr
   __asm__ volatile(".inst 0xff031f8b" ::: "memory");
 #elif defined(__riscv)
-  // ecall is 0x00000073; ebreak is 0x00100073; 0x00200073 should be invalid.
-  __asm__ volatile(".inst 0x00200073");
+  __asm__ volatile("unimp");
 #else
 #error What arch?
 #endif
