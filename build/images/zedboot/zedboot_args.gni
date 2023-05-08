@@ -3,6 +3,6 @@
 # found in the LICENSE file.
 
 declare_args() {
-  # List of arguments to populate /boot/config/devmgr in the Zedboot image.
-  zedboot_devmgr_config = []
+  # List of arguments to populate /boot/config/additional_boot_args in the Zedboot image.
+  zedboot_additional_boot_args = []
 }

@@ -120,7 +120,11 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [list of labels] The objects installed in the system image.
 #
 #   devmgr_config (default: [])
-#     [list of strings] List of arguments to add to /boot/config/devmgr.
+#     [list of strings] List of arguments to add to /boot/config/additional_boot_args.
+#     DEPRECATED: Use additional_boot_args instead.
+#
+#   additional_boot_args (default: [])
+#     [list of strings] List of arguments to add to /boot/config/additional_boot_args.
 #     These arguments come after synthesized arguments to configure blobfs.
 #
 #   fshost_config (default: {})
@@ -431,7 +435,7 @@ template("assembled_system") {
     regenerated_image_assembly_config = "${outdir}/image_assembly.json"
 
     bootfs_files = "${gendir}/bootfs_files.list"
-    devmgr_config = "${gendir}/devmgr_config.txt"
+    additional_boot_args = "${gendir}/additional_boot_args.txt"
     zbi = "${outdir}/${image_name}.zbi"
     zbi_signed = "${zbi}.signed"
     vbmeta = "${outdir}/${image_name}.vbmeta"
@@ -536,9 +540,14 @@ template("assembled_system") {
         (invoker.ramdisk_in_zbi && _supports_blobs) || ramdisk_in_zbi
   }
 
-  devmgr_config = []
+  additional_boot_args = []
+  if (defined(invoker.additional_boot_args)) {
+    additional_boot_args = invoker.additional_boot_args
+  }
+
+  # TODO(http://fxbug.dev/91451): Remove after migration.
   if (defined(invoker.devmgr_config)) {
-    devmgr_config = invoker.devmgr_config
+    additional_boot_args += invoker.devmgr_config
   }
 
   use_assembly_fshost =
@@ -639,7 +648,7 @@ template("assembled_system") {
 
     config_data_packages = _base_packages + _universe_packages + _cache_packages
 
-    boot_args = devmgr_config
+    boot_args = additional_boot_args
 
     # Search for BootFS packages in these targets.
     bootfs_package_labels = []
@@ -1056,7 +1065,7 @@ template("assembled_system") {
 
     outputs = [
       files.bootfs_files,
-      files.devmgr_config,
+      files.additional_boot_args,
       files.zbi,
       files.zbi_manifest,
       files.packages,

@@ -89,7 +89,8 @@ pub async fn verify(
         .param("capability_types", query.capability_types.join(" "))
         .param("response_level", query.response_level)
         .build();
-    let plugins = vec!["DevmgrConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
+    let plugins =
+        vec!["AdditionalBootConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
     let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
     config.runtime.model.component_tree_config_path = query.component_tree_config_path;
     config.runtime.model.tmp_dir_path = query.tmp_dir_path;

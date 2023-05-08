@@ -14,11 +14,11 @@ use {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]
-pub enum DevmgrConfigError {
+pub enum AdditionalBootConfigError {
     #[error("Failed to open blobfs using build path {build_path} and blobfs archive paths {blobfs_paths:?}\n{blobfs_error}")]
     FailedToOpenBlobfs { build_path: PathBuf, blobfs_paths: Vec<PathBuf>, blobfs_error: String },
-    #[error("Failed to parse zbi config path {devmgr_config_path}")]
-    FailedToParseDevmgrConfigPath { devmgr_config_path: PathBuf },
+    #[error("Failed to parse zbi config path {additional_boot_args_path}")]
+    FailedToParseAdditionalBootConfigPath { additional_boot_args_path: PathBuf },
     #[error("Failed to open ZBI from update package at {update_package_path}\n{io_error}")]
     FailedToOpenUpdatePackage { update_package_path: PathBuf, io_error: String },
     #[error("Failed to read ZBI from update package at {update_package_path}\n{io_error}")]
@@ -27,30 +27,33 @@ pub enum DevmgrConfigError {
     FailedToParseZbi { update_package_path: PathBuf, zbi_error: String },
     #[error("Failed to parse bootfs from ZBI from update package at {update_package_path}\n{bootfs_error}")]
     FailedToParseBootfs { update_package_path: PathBuf, bootfs_error: String },
-    #[error("Failed to parse UTF8 string from devmgr config at bootfs:{devmgr_config_path} in ZBI from update package at {update_package_path}\n{utf8_error}")]
-    FailedToParseUtf8DevmgrConfig {
+    #[error("Failed to parse UTF8 string from additional boot config at bootfs:{additional_boot_args_path} in ZBI from update package at {update_package_path}\n{utf8_error}")]
+    FailedToParseUtf8AdditionalBootConfig {
         update_package_path: PathBuf,
-        devmgr_config_path: PathBuf,
+        additional_boot_args_path: PathBuf,
         utf8_error: String,
     },
-    #[error("Failed to parse devmgr config format from devmgr config at bootfs:{devmgr_config_path} in ZBI from update package at {update_package_path}\n{parse_error}")]
-    FailedToParseDevmgrConfigFormat {
+    #[error("Failed to parse additional boot config format from additional boot config at bootfs:{additional_boot_args_path} in ZBI from update package at {update_package_path}\n{parse_error}")]
+    FailedToParseAdditionalBootConfigFormat {
         update_package_path: PathBuf,
-        devmgr_config_path: PathBuf,
-        parse_error: DevmgrConfigParseError,
+        additional_boot_args_path: PathBuf,
+        parse_error: AdditionalBootConfigParseError,
     },
     #[error(
-        "Failed to locate devmgr config file at bootfs:{devmgr_config_path} in ZBI from update package at {update_package_path}"
+        "Failed to locate additional boot config file at bootfs:{additional_boot_args_path} in ZBI from update package at {update_package_path}"
     )]
-    FailedToLocateDevmgrConfig { update_package_path: PathBuf, devmgr_config_path: PathBuf },
+    FailedToLocateAdditionalBootConfig {
+        update_package_path: PathBuf,
+        additional_boot_args_path: PathBuf,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]
-pub enum DevmgrConfigParseError {
-    #[error("Failed to parse [unique-key]=[values] from devmgr config on line {line_no}:\n{line_contents}")]
+pub enum AdditionalBootConfigParseError {
+    #[error("Failed to parse [unique-key]=[values] from additional boot config on line {line_no}:\n{line_contents}")]
     FailedToParseKeyValue { line_no: usize, line_contents: String },
-    #[error("Devmgr config contains repeated key in [unique-key]=[values] on line {line_no}:\n{line_contents}\nPreviously declared on line {previous_line_no}:\n{previous_line_contents}")]
+    #[error("AdditionalBoot config contains repeated key in [unique-key]=[values] on line {line_no}:\n{line_contents}\nPreviously declared on line {previous_line_no}:\n{previous_line_contents}")]
     RepeatedKey {
         line_no: usize,
         line_contents: String,
@@ -59,22 +62,22 @@ pub enum DevmgrConfigParseError {
     },
 }
 
-/// Devmgr config file contains lines of the form:
+/// AdditionalBoot config file contains lines of the form:
 /// [unique-key]=[[value-1]+[value-2]+[...]+[value-n]].
-pub type DevmgrConfigContents = HashMap<String, Vec<String>>;
+pub type AdditionalBootConfigContents = HashMap<String, Vec<String>>;
 
 #[derive(Deserialize, Serialize)]
-pub struct DevmgrConfigCollection {
+pub struct AdditionalBootConfigCollection {
     pub deps: HashSet<PathBuf>,
-    pub devmgr_config: Option<DevmgrConfigContents>,
-    pub errors: Vec<DevmgrConfigError>,
+    pub additional_boot_args: Option<AdditionalBootConfigContents>,
+    pub errors: Vec<AdditionalBootConfigError>,
 }
 
-impl DataCollection for DevmgrConfigCollection {
+impl DataCollection for AdditionalBootConfigCollection {
     fn collection_name() -> String {
-        "Devmgr Config Collection".to_string()
+        "Additional Boot Config Collection".to_string()
     }
     fn collection_description() -> String {
-        "Contains [key] => [[values]] entries loaded from a devmgr config file".to_string()
+        "Contains [key] => [[values]] entries loaded from a additional boot config file".to_string()
     }
 }

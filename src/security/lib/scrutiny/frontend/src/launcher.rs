@@ -7,7 +7,7 @@ use {
     anyhow::Result,
     scrutiny_config::{Config, ConfigBuilder, ModelConfig},
     scrutiny_plugins::{
-        core::CorePlugin, devmgr_config::DevmgrConfigPlugin, engine::EnginePlugin,
+        additional_boot_args::AdditionalBootConfigPlugin, core::CorePlugin, engine::EnginePlugin,
         search::SearchPlugin, static_pkgs::StaticPkgsPlugin, sys::SysRealmPlugin,
         toolkit::ToolkitPlugin, verify::VerifyPlugin, zbi::ZbiPlugin,
     },
@@ -30,7 +30,7 @@ pub fn launch_from_config(config: Config) -> Result<String> {
     // These plugins only apply when the model contains valid paths, because the blobs and update
     // package must be present.
     if !model_is_empty {
-        scrutiny.plugin(DevmgrConfigPlugin::new())?;
+        scrutiny.plugin(AdditionalBootConfigPlugin::new())?;
         scrutiny.plugin(StaticPkgsPlugin::new())?;
         scrutiny.plugin(CorePlugin::new())?;
         scrutiny.plugin(VerifyPlugin::new())?;

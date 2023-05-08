@@ -39,7 +39,7 @@ import("//build/zbi/kernel_cmdline.gni")
 #     Package.
 #
 #   boot_args (optional)
-#     [list of strings] Boot arguments to add to the devmgr_config.
+#     [list of strings] Boot arguments to add to the additional_boot_args.
 #
 #   cmdline (optional)
 #     [list of strings] Kernel command line arguments to add to the ZBI.
@@ -236,7 +236,7 @@ template("generated_image_assembly_config") {
     deps = base_packages
   }
 
-  # Create a list of boot arguments to add to devmgr_config.
+  # Create a list of boot arguments to add to additional_boot_args.
   generated_file(labels.boot_args) {
     forward_variables_from(invoker,
                            [

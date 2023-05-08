@@ -23,5 +23,5 @@ plugin!(
             "/static/pkgs" => ExtractStaticPkgsController::default(),
         }
     ),
-    vec![PluginDescriptor::new("DevmgrConfigPlugin")]
+    vec![PluginDescriptor::new("AdditionalBootConfigPlugin")]
 );

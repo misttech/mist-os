@@ -288,7 +288,7 @@ mod tests {
         let bootfs_files = std::fs::read_to_string(&zbi_args[bootfs_file_index]).unwrap();
 
         let expected_bootfs_files_regex = Regex::new(
-            r"blob/0000000000000000000000000000000000000000000000000000000000000000=path/to/archivist/meta\.far\nblob/1111111111111111111111111111111111111111111111111111111111111111=/.*/archivist_data\.txt\nconfig/devmgr=/.*/devmgr_config\.txt\ndata/bootfs_packages=/.*/data/bootfs_packages.*"
+            r"blob/0000000000000000000000000000000000000000000000000000000000000000=path/to/archivist/meta\.far\nblob/1111111111111111111111111111111111111111111111111111111111111111=/.*/archivist_data\.txt\nconfig/additional_boot_args=/.*/additional_boot_args\.txt\ndata/bootfs_packages=/.*/data/bootfs_packages.*"
         ).unwrap();
 
         assert!(

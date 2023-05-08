@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        devmgr_config::{DevmgrConfigCollection, DevmgrConfigContents},
+        additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigContents},
         static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError},
     },
     anyhow::{Context, Result},
@@ -28,7 +28,7 @@ use {
     },
 };
 
-static PKGFS_CMD_DEVMGR_CONFIG_KEY: &str = "zircon.system.pkgfs.cmd";
+static PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY: &str = "zircon.system.pkgfs.cmd";
 static PKGFS_BINARY_PATH: &str = "bin/pkgsvr";
 static META_FAR_CONTENTS_LISTING_PATH: &str = "meta/contents";
 static STATIC_PKGS_LISTING_PATH: &str = "data/static_packages";
@@ -46,14 +46,16 @@ struct ErrorWithDeps {
 }
 
 fn collect_static_pkgs(
-    devmgr_config: DevmgrConfigContents,
+    additional_boot_args: AdditionalBootConfigContents,
     mut artifact_reader: Box<dyn ArtifactReader>,
 ) -> Result<StaticPkgsData, ErrorWithDeps> {
     // Get system image path from ["bin/pkgsvr", <system-image-hash>] cmd.
     let pkgfs_cmd =
-        devmgr_config.get(PKGFS_CMD_DEVMGR_CONFIG_KEY).ok_or_else(|| ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::MissingPkgfsCmdEntry,
+        additional_boot_args.get(PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY).ok_or_else(|| {
+            ErrorWithDeps {
+                deps: artifact_reader.get_deps(),
+                error: StaticPkgsError::MissingPkgfsCmdEntry,
+            }
         })?;
 
     if pkgfs_cmd.len() != 2 {
@@ -259,29 +261,29 @@ pub struct StaticPkgsCollector;
 impl DataCollector for StaticPkgsCollector {
     fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
-        let devmgr_config_data: Result<Arc<DevmgrConfigCollection>> = model.get();
-        if let Err(err) = devmgr_config_data {
+        let additional_boot_args_data: Result<Arc<AdditionalBootConfigCollection>> = model.get();
+        if let Err(err) = additional_boot_args_data {
             model
                 .set(StaticPkgsCollection {
                     static_pkgs: None,
                     deps: hashset! {},
-                    errors: vec![StaticPkgsError::FailedToReadDevmgrConfigData {
+                    errors: vec![StaticPkgsError::FailedToReadAdditionalBootConfigData {
                         model_error: err.to_string(),
                     }],
                 })
                 .context("Static packages collector failed to store errors in model")?;
             return Ok(());
         }
-        let devmgr_config_data = devmgr_config_data.unwrap();
-        let mut deps = devmgr_config_data.deps.clone();
+        let additional_boot_args_data = additional_boot_args_data.unwrap();
+        let mut deps = additional_boot_args_data.deps.clone();
 
         let mut errors: Vec<StaticPkgsError> = Vec::new();
-        if devmgr_config_data.devmgr_config.is_none() {
-            errors.push(StaticPkgsError::MissingDevmgrConfigData);
+        if additional_boot_args_data.additional_boot_args.is_none() {
+            errors.push(StaticPkgsError::MissingAdditionalBootConfigData);
         }
-        if devmgr_config_data.errors.len() > 0 {
-            errors.push(StaticPkgsError::DevmgrConfigDataContainsErrors {
-                devmgr_config_data_errors: devmgr_config_data.errors.clone(),
+        if additional_boot_args_data.errors.len() > 0 {
+            errors.push(StaticPkgsError::AdditionalBootConfigDataContainsErrors {
+                additional_boot_args_data_errors: additional_boot_args_data.errors.clone(),
             });
         }
         if errors.len() > 0 {
@@ -290,11 +292,11 @@ impl DataCollector for StaticPkgsCollector {
                 .context("Static packages collector failed to store errors in model")?;
             return Ok(());
         }
-        let devmgr_config = devmgr_config_data.devmgr_config.clone().unwrap();
+        let additional_boot_args = additional_boot_args_data.additional_boot_args.clone().unwrap();
         let artifact_reader =
             FileArtifactReader::new(&PathBuf::new(), &model_config.blobs_directory());
         let data: StaticPkgsCollection =
-            match collect_static_pkgs(devmgr_config, Box::new(artifact_reader)) {
+            match collect_static_pkgs(additional_boot_args, Box::new(artifact_reader)) {
                 Ok(static_pkgs_data) => {
                     deps.extend(static_pkgs_data.deps.into_iter());
                     StaticPkgsCollection {
@@ -319,11 +321,11 @@ mod tests {
     use {
         super::{
             collect_static_pkgs, ErrorWithDeps, StaticPkgsCollector,
-            META_FAR_CONTENTS_LISTING_PATH, PKGFS_BINARY_PATH, PKGFS_CMD_DEVMGR_CONFIG_KEY,
-            STATIC_PKGS_LISTING_PATH,
+            META_FAR_CONTENTS_LISTING_PATH, PKGFS_BINARY_PATH,
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY, STATIC_PKGS_LISTING_PATH,
         },
         crate::{
-            devmgr_config::{DevmgrConfigCollection, DevmgrConfigError},
+            additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigError},
             static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError},
         },
         anyhow::{anyhow, Context, Result},
@@ -379,7 +381,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_missing_all_data() -> Result<()> {
-        // Model contains no data (in particular, no devmgr config data).
+        // Model contains no data (in particular, no additional boot config data).
         let model = fake_data_model();
         let collector = StaticPkgsCollector::default();
         collector
@@ -390,7 +392,7 @@ mod tests {
         assert!(result.static_pkgs.is_none());
         assert_eq!(result.errors.len(), 1);
         match &result.errors[0] {
-            StaticPkgsError::FailedToReadDevmgrConfigData { .. } => Ok(()),
+            StaticPkgsError::FailedToReadAdditionalBootConfigData { .. } => Ok(()),
             err => Err(anyhow!("Unexpected error: {}", err.to_string())),
         }
     }
@@ -398,10 +400,16 @@ mod tests {
     #[fuchsia::test]
     fn test_missing_config_data() -> Result<()> {
         let model = fake_data_model();
-        // Result from devmgr config contains no config.
-        let devmgr_config_result =
-            DevmgrConfigCollection { deps: hashset! {}, devmgr_config: None, errors: vec![] };
-        model.clone().set(devmgr_config_result).context("Failed to store devmgr config result")?;
+        // Result from additional boot config contains no config.
+        let additional_boot_args_result = AdditionalBootConfigCollection {
+            deps: hashset! {},
+            additional_boot_args: None,
+            errors: vec![],
+        };
+        model
+            .clone()
+            .set(additional_boot_args_result)
+            .context("Failed to store additional boot config result")?;
         let collector = StaticPkgsCollector::default();
         collector
             .collect(model.clone())
@@ -411,24 +419,27 @@ mod tests {
         assert!(result.static_pkgs.is_none());
         assert_eq!(result.errors.len(), 1);
         match &result.errors[0] {
-            StaticPkgsError::MissingDevmgrConfigData => Ok(()),
+            StaticPkgsError::MissingAdditionalBootConfigData => Ok(()),
             err => Err(anyhow!("Unexpected error: {}", err.to_string())),
         }
     }
 
     #[fuchsia::test]
-    fn test_err_from_devmgr_config() -> Result<()> {
+    fn test_err_from_additional_boot_args() -> Result<()> {
         let model = fake_data_model();
-        // Result from devmgr config contains no config and an error.
-        let devmgr_config_result = DevmgrConfigCollection {
+        // Result from additional boot config contains no config and an error.
+        let additional_boot_args_result = AdditionalBootConfigCollection {
             deps: hashset! {},
-            devmgr_config: None,
-            errors: vec![DevmgrConfigError::FailedToReadZbi {
+            additional_boot_args: None,
+            errors: vec![AdditionalBootConfigError::FailedToReadZbi {
                 update_package_path: "update.far".into(),
                 io_error: "Failed to read file at update.far".to_string(),
             }],
         };
-        model.clone().set(devmgr_config_result).context("Failed to store devmgr config result")?;
+        model
+            .clone()
+            .set(additional_boot_args_result)
+            .context("Failed to store additional boot config result")?;
         let collector = StaticPkgsCollector::default();
         collector
             .collect(model.clone())
@@ -439,12 +450,12 @@ mod tests {
         assert_eq!(result.errors.len(), 2);
         match (&result.errors[0], &result.errors[1]) {
             (
-                StaticPkgsError::MissingDevmgrConfigData,
-                StaticPkgsError::DevmgrConfigDataContainsErrors { .. },
+                StaticPkgsError::MissingAdditionalBootConfigData,
+                StaticPkgsError::AdditionalBootConfigDataContainsErrors { .. },
             )
             | (
-                StaticPkgsError::DevmgrConfigDataContainsErrors { .. },
-                StaticPkgsError::MissingDevmgrConfigData,
+                StaticPkgsError::AdditionalBootConfigDataContainsErrors { .. },
+                StaticPkgsError::MissingAdditionalBootConfigData,
             ) => Ok(()),
             (err1, err2) => {
                 Err(anyhow!("Unexpected errors: {} and {}", err1.to_string(), err2.to_string()))
@@ -455,8 +466,8 @@ mod tests {
     #[fuchsia::test]
     fn test_missing_pkgfs_cmd_entry() {
         let mock_artifact_reader = MockArtifactReader::new();
-        let devmgr_config = hashmap! {};
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let additional_boot_args = hashmap! {};
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps { error: StaticPkgsError::MissingPkgfsCmdEntry { .. }, .. }) => {
                 return
@@ -468,10 +479,10 @@ mod tests {
     #[fuchsia::test]
     fn test_pkgfs_cmd_too_short() {
         let mock_artifact_reader = MockArtifactReader::new();
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![PKGFS_BINARY_PATH.to_string()],
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![PKGFS_BINARY_PATH.to_string()],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps { error: StaticPkgsError::UnexpectedPkgfsCmdLen { .. }, .. }) => {
                 return
@@ -483,14 +494,14 @@ mod tests {
     #[fuchsia::test]
     fn test_pkgfs_cmd_too_long() {
         let mock_artifact_reader = MockArtifactReader::new();
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 "param1".to_string(),
                 "param2".to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps { error: StaticPkgsError::UnexpectedPkgfsCmdLen { .. }, .. }) => {
                 return
@@ -503,13 +514,13 @@ mod tests {
     fn test_bad_pkgfs_cmd() {
         let mock_artifact_reader = MockArtifactReader::new();
         let bad_cmd_name = "unexpected/pkgsvr/path";
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 bad_cmd_name.to_string(),
                 Hash::from([0; HASH_SIZE]).to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps { error: StaticPkgsError::UnexpectedPkgfsCmd { .. }, .. }) => return,
             _ => panic!("Unexpected result: {:?}", result),
@@ -520,13 +531,13 @@ mod tests {
     fn test_invalid_system_image_merkle() {
         let mock_artifact_reader = MockArtifactReader::new();
         let bad_merkle_root = "I am not a merkle root";
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 bad_merkle_root.to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps {
                 error: StaticPkgsError::MalformedSystemImageHash { .. }, ..
@@ -539,13 +550,13 @@ mod tests {
     fn test_missing_system_image() {
         let mock_artifact_reader = MockArtifactReader::new();
         let designated_system_image_hash = Hash::from([0; HASH_SIZE]);
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 designated_system_image_hash.to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps {
                 error: StaticPkgsError::FailedToReadSystemImage { .. }, ..
@@ -574,13 +585,13 @@ mod tests {
             system_image_contents,
         );
 
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 designated_system_image_hash.to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps {
                 error: StaticPkgsError::FailedToVerifySystemImage { .. }, ..
@@ -601,13 +612,13 @@ mod tests {
         mock_artifact_reader
             .append_artifact(&PathBuf::from(system_image_hash.to_string()), system_image_contents);
 
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 system_image_hash.to_string(),
                 ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps {
                 error: StaticPkgsError::MissingStaticPkgsEntry { .. }, ..
@@ -637,7 +648,7 @@ mod tests {
 
         let result = collect_static_pkgs(
             hashmap! {
-                PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+                PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                     PKGFS_BINARY_PATH.to_string(),
                     system_image_hash.to_string(),
                 ],
@@ -681,13 +692,13 @@ mod tests {
         mock_artifact_reader
             .append_artifact(&PathBuf::from(system_image_hash.to_string()), system_image_contents);
 
-        let devmgr_config = hashmap! {
-            PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                 PKGFS_BINARY_PATH.to_string(),
                 system_image_hash.to_string(),
             ],
         };
-        let result = collect_static_pkgs(devmgr_config, Box::new(mock_artifact_reader));
+        let result = collect_static_pkgs(additional_boot_args, Box::new(mock_artifact_reader));
         match result {
             Err(ErrorWithDeps {
                 error: StaticPkgsError::FailedToVerifyStaticPkgs { .. }, ..
@@ -716,7 +727,7 @@ mod tests {
 
         let result = collect_static_pkgs(
             hashmap! {
-                PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+                PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                     PKGFS_BINARY_PATH.to_string(),
                     system_image_hash.to_string(),
                 ],
@@ -753,7 +764,7 @@ mod tests {
 
         let result = collect_static_pkgs(
             hashmap! {
-                PKGFS_CMD_DEVMGR_CONFIG_KEY.to_string() => vec![
+                PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
                     PKGFS_BINARY_PATH.to_string(),
                     system_image_hash.to_string(),
                 ],

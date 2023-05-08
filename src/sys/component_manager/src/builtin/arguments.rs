@@ -27,8 +27,7 @@ lazy_static! {
     static ref BOOT_ARGS_CAPABILITY_NAME: CapabilityName = "fuchsia.boot.Arguments".into();
 }
 
-// TODO(fxb/91451): Rename this file.
-const BOOT_CONFIG_FILE: &str = "/boot/config/devmgr";
+const BOOT_CONFIG_FILE: &str = "/boot/config/additional_boot_args";
 
 struct Env {
     vars: HashMap<String, String>,

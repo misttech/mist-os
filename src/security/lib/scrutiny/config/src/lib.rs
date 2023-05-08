@@ -157,9 +157,9 @@ pub struct ModelConfig {
     pub blobs_directory: PathBuf,
     /// The URL of the Fuchsia config-data package.
     pub config_data_package_url: AbsolutePackageUrl,
-    /// The path to the device manager configuration inside bootfs inside the
+    /// The path to the additional boot args configuration inside bootfs inside the
     /// ZBI.
-    pub devmgr_config_path: PathBuf,
+    pub additional_boot_args_path: PathBuf,
     /// Optional path to a component tree configuration used for customizing
     /// component tree data collection.
     pub component_tree_config_path: Option<PathBuf>,
@@ -185,7 +185,7 @@ impl ModelConfig {
             update_package_path: "".into(),
             blobs_directory: "".into(),
             config_data_package_url: from_package_name("config-data").unwrap(),
-            devmgr_config_path: "config/devmgr".into(),
+            additional_boot_args_path: "config/additional_boot_args".into(),
             component_tree_config_path: None,
             tmp_dir_path: None,
             is_empty: true,
@@ -232,7 +232,7 @@ impl ModelConfig {
             update_package_path,
             blobs_directory,
             config_data_package_url: from_package_name("config-data").unwrap(),
-            devmgr_config_path: "config/devmgr".into(),
+            additional_boot_args_path: "config/additional_boot_args".into(),
             component_tree_config_path: None,
             tmp_dir_path: None,
             is_empty: false,
@@ -260,8 +260,8 @@ impl ModelConfig {
         self.config_data_package_url.clone()
     }
     /// The path to the device manager configuration file in bootfs.
-    pub fn devmgr_config_path(&self) -> PathBuf {
-        self.devmgr_config_path.clone()
+    pub fn additional_boot_args_path(&self) -> PathBuf {
+        self.additional_boot_args_path.clone()
     }
     /// A path to a directory for temporary files.
     pub fn tmp_dir_path(&self) -> Option<PathBuf> {
@@ -290,7 +290,7 @@ impl PluginConfig {
     pub fn default() -> PluginConfig {
         PluginConfig {
             plugins: vec![
-                "DevmgrConfigPlugin".to_string(),
+                "AdditionalBootConfigPlugin".to_string(),
                 "StaticPkgsPlugin".to_string(),
                 "CorePlugin".to_string(),
                 "SearchPlugin".to_string(),

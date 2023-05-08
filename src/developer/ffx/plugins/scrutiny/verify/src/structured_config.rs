@@ -16,7 +16,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .build();
     let plugins = vec![
         "CorePlugin".to_string(),
-        "DevmgrConfigPlugin".to_string(),
+        "AdditionalBootConfigPlugin".to_string(),
         "StaticPkgsPlugin".to_string(),
         "VerifyPlugin".to_string(),
     ];

@@ -18,9 +18,9 @@ declare_args() {
   # assembly work until that's been addressed.
   recovery_only = false
 
-  # List of arguments to add to /boot/config/devmgr.
+  # List of arguments to add to /boot/config/additional_boot_args.
   # These come after synthesized arguments to configure blobfs and pkgfs.
-  devmgr_config = []
+  additional_boot_args = []
 
   # Build the gigaboot bootloader.
   use_gigaboot = false

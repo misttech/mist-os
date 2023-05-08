@@ -105,20 +105,20 @@ impl ZbiBuilder {
 
     /// Build the ZBI.
     pub fn build(&self, gendir: impl AsRef<Utf8Path>, output: impl AsRef<Utf8Path>) -> Result<()> {
-        // Create the devmgr_config.
+        // Create the additional_boot_args.
         // TODO(fxbug.dev/77387): Switch to the boot args file once we are no longer
         // comparing to the GN build.
-        let devmgr_config_path = gendir.as_ref().join("devmgr_config.txt");
-        let mut devmgr_config = File::create(&devmgr_config_path)
-            .map_err(|e| Error::new(e).context("failed to create the devmgr config"))?;
-        self.write_boot_args(&mut devmgr_config)?;
+        let additional_boot_args_path = gendir.as_ref().join("additional_boot_args.txt");
+        let mut additional_boot_args = File::create(&additional_boot_args_path)
+            .map_err(|e| Error::new(e).context("failed to create the additional boot args"))?;
+        self.write_boot_args(&mut additional_boot_args)?;
 
         // Create the BootFS manifest file that lists all the files to insert
         // into BootFS.
         let bootfs_manifest_path = gendir.as_ref().join("bootfs_files.list");
         let mut bootfs_manifest = File::create(&bootfs_manifest_path)
             .map_err(|e| Error::new(e).context("failed to create the bootfs manifest"))?;
-        self.write_bootfs_manifest(devmgr_config_path, &mut bootfs_manifest)?;
+        self.write_bootfs_manifest(additional_boot_args_path, &mut bootfs_manifest)?;
 
         // Run the zbi tool to construct the ZBI.
         let zbi_args = self.build_zbi_args(&bootfs_manifest_path, None::<Utf8PathBuf>, output)?;
@@ -129,11 +129,12 @@ impl ZbiBuilder {
 
     fn write_bootfs_manifest(
         &self,
-        devmgr_config_path: impl Into<Utf8PathBuf>,
+        additional_boot_args_path: impl Into<Utf8PathBuf>,
         out: &mut impl Write,
     ) -> Result<()> {
         let mut bootfs_files = self.bootfs_files.clone();
-        bootfs_files.insert("config/devmgr".to_string(), devmgr_config_path.into());
+        bootfs_files
+            .insert("config/additional_boot_args".to_string(), additional_boot_args_path.into());
         for (destination, source) in bootfs_files {
             write!(out, "{}", destination)?;
             write!(out, "=")?;
@@ -176,7 +177,7 @@ impl ZbiBuilder {
         args.push("--files".to_string());
         args.push(bootfs_manifest_path.as_ref().to_string());
 
-        // Instead of supplying the devmgr_config.txt file, we could use boot args. This is disabled
+        // Instead of supplying the additional_boot_args.txt file, we could use boot args. This is disabled
         // by default, in order to allow for binary diffing the ZBI to the in-tree built ZBI.
         if let Some(boot_args_path) = boot_args_path {
             let boot_args_path = boot_args_path.as_ref().to_string();
@@ -219,24 +220,27 @@ mod tests {
     use assembly_tool::ToolProvider;
 
     #[test]
-    fn bootfs_manifest_devmgr_only() {
+    fn bootfs_manifest_additional_boot_args_only() {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
         let mut builder = ZbiBuilder::new(zbi_tool);
         let mut output: Vec<u8> = Vec::new();
 
-        builder.write_bootfs_manifest("devmgr_config.txt", &mut output).unwrap();
+        builder.write_bootfs_manifest("additional_boot_args.txt", &mut output).unwrap();
         let output_str = String::from_utf8(output).unwrap();
-        assert_eq!(output_str, "config/devmgr=devmgr_config.txt\n".to_string());
+        assert_eq!(
+            output_str,
+            "config/additional_boot_args=additional_boot_args.txt\n".to_string()
+        );
 
         let mut output: Vec<u8> = Vec::new();
         builder.add_bootfs_file("path/to/file2", "bin/file2");
         builder.add_bootfs_file("path/to/file1", "lib/file1");
-        builder.write_bootfs_manifest("devmgr_config.txt", &mut output).unwrap();
+        builder.write_bootfs_manifest("additional_boot_args.txt", &mut output).unwrap();
         let output_str = String::from_utf8(output).unwrap();
         assert_eq!(
             output_str,
-            "bin/file2=path/to/file2\nconfig/devmgr=devmgr_config.txt\nlib/file1=path/to/file1\n"
+            "bin/file2=path/to/file2\nconfig/additional_boot_args=additional_boot_args.txt\nlib/file1=path/to/file1\n"
                 .to_string()
         );
     }
@@ -251,10 +255,10 @@ mod tests {
         builder.add_bootfs_file("path/to/file2", "bin/file2");
         builder.add_bootfs_file("path/to/file1", "lib/file1");
         builder.add_bootfs_blob("path/to/file1", "my_merkle");
-        builder.write_bootfs_manifest("devmgr_config.txt", &mut output).unwrap();
+        builder.write_bootfs_manifest("additional_boot_args.txt", &mut output).unwrap();
         assert_eq!(
             output,
-            b"bin/file2=path/to/file2\nblob/my_merkle=path/to/file1\nconfig/devmgr=devmgr_config.txt\nlib/file1=path/to/file1\n"
+            b"bin/file2=path/to/file2\nblob/my_merkle=path/to/file1\nconfig/additional_boot_args=additional_boot_args.txt\nlib/file1=path/to/file1\n"
         );
     }
 

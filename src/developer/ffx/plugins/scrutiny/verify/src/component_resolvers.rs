@@ -74,7 +74,8 @@ impl QueryComponentResolvers for ScrutinyQueryComponentResolvers {
             .param("moniker", request.moniker.to_string())
             .param("protocol", &request.protocol)
             .build();
-        let plugins = vec!["DevmgrConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
+        let plugins =
+            vec!["AdditionalBootConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
         let model = if self.recovery {
             ModelConfig::from_product_bundle_recovery(self.product_bundle.clone())
         } else {

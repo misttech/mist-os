@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::devmgr_config::DevmgrConfigError,
+    crate::additional_boot_args::AdditionalBootConfigError,
     fuchsia_merkle::Hash,
     scrutiny::prelude::DataCollection,
     scrutiny_utils::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents},
@@ -17,13 +17,15 @@ use {
 pub enum StaticPkgsError {
     #[error("Failed to construct blobfs artifact reader with build path {build_path} and blobfs archives {blobfs_paths:?} for static packages collector: {blobfs_error}")]
     FailedToLoadBlobfs { build_path: PathBuf, blobfs_paths: Vec<PathBuf>, blobfs_error: String },
-    #[error("Failed to read ZBI devmgr config data from model: {model_error}")]
-    FailedToReadDevmgrConfigData { model_error: String },
-    #[error("Data model does not contain ZBI devmgr config data")]
-    MissingDevmgrConfigData,
-    #[error("Data model for devmgr config data contains errors")]
-    DevmgrConfigDataContainsErrors { devmgr_config_data_errors: Vec<DevmgrConfigError> },
-    #[error("devmgr config is missing the pkgfs cmd entry")]
+    #[error("Failed to read ZBI additional boot config data from model: {model_error}")]
+    FailedToReadAdditionalBootConfigData { model_error: String },
+    #[error("Data model does not contain ZBI additional boot config data")]
+    MissingAdditionalBootConfigData,
+    #[error("Data model for additional boot config data contains errors")]
+    AdditionalBootConfigDataContainsErrors {
+        additional_boot_args_data_errors: Vec<AdditionalBootConfigError>,
+    },
+    #[error("additional boot config is missing the pkgfs cmd entry")]
     MissingPkgfsCmdEntry,
     #[error("Unexpected number of pkgfs cmd entry arguments: expected {expected_len}; actual: {actual_len}")]
     UnexpectedPkgfsCmdLen { expected_len: usize, actual_len: usize },

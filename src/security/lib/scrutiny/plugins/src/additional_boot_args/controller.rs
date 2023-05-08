@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::devmgr_config::collection::DevmgrConfigCollection,
+    crate::additional_boot_args::collection::AdditionalBootConfigCollection,
     anyhow::{Context, Result},
     scrutiny::{model::controller::DataController, model::model::*},
     scrutiny_utils::usage::UsageBuilder,
@@ -13,28 +13,28 @@ use {
 };
 
 #[derive(Deserialize, Serialize)]
-pub struct ExtractDevmgrConfigRequest;
+pub struct ExtractAdditionalBootConfigRequest;
 
 #[derive(Default)]
-pub struct ExtractDevmgrConfigController;
+pub struct ExtractAdditionalBootConfigController;
 
-impl DataController for ExtractDevmgrConfigController {
+impl DataController for ExtractAdditionalBootConfigController {
     fn query(&self, model: Arc<DataModel>, _: Value) -> Result<Value> {
-        Ok(json!(&*model.get::<DevmgrConfigCollection>().context(
-            "Failed to read data modeled data from ZBI-extract-devmgr-config collector"
+        Ok(json!(&*model.get::<AdditionalBootConfigCollection>().context(
+            "Failed to read data modeled data from ZBI-extract-additional-boot-config collector"
         )?))
     }
 
     fn description(&self) -> String {
-        "Extracts the devmgr config from a ZBI".to_string()
+        "Extracts the additional boot config from a ZBI".to_string()
     }
 
     fn usage(&self) -> String {
         UsageBuilder::new()
-            .name("devmgr.config - Extracts devmgr config ")
-            .summary("devmgr.config")
+            .name("additional_boot.config - Extracts additional boot config ")
+            .summary("additional_boot.config")
             .description(
-                "Extracts zircon boot images and retrieves the devmgr config.
+                "Extracts zircon boot images and retrieves the additional boot config.
   Note: Path to ZBI file is loaded from model configuration (not as a
   controller parameter) because ZBI is loaded by a collector.",
             )

@@ -26,7 +26,7 @@ struct Query {
 
 fn verify_static_pkgs(query: &Query, golden_file_path: PathBuf) -> Result<HashSet<PathBuf>> {
     let command = CommandBuilder::new("static.pkgs").build();
-    let plugins = vec!["DevmgrConfigPlugin".to_string(), "StaticPkgsPlugin".to_string()];
+    let plugins = vec!["AdditionalBootConfigPlugin".to_string(), "StaticPkgsPlugin".to_string()];
     let model = if query.recovery {
         ModelConfig::from_product_bundle_recovery(query.product_bundle.clone())
     } else {

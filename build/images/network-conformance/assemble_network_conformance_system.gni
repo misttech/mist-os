@@ -55,7 +55,8 @@ template("assemble_network_conformance_system") {
     ramdisk_in_zbi = true
 
     include_component_id_index = true
-    devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config
+    additional_boot_args =
+        [ "virtcon.disable=true" ] + zedboot_additional_boot_args
     cmdline = [ "kernel.halt-on-panic=true" ]
 
     bootfs_labels = [

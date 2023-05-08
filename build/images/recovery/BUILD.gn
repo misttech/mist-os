@@ -42,7 +42,8 @@ if (is_fuchsia) {
     ramdisk_in_zbi = true
 
     include_component_id_index = true
-    devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config
+    additional_boot_args =
+        [ "virtcon.disable=true" ] + zedboot_additional_boot_args
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
@@ -352,7 +353,7 @@ if (is_fuchsia) {
 
     include_component_id_index = true
 
-    devmgr_config = [ "virtcon.disable=true" ]
+    additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = []
 
     product_assembly_config_label = ":for-fdr"

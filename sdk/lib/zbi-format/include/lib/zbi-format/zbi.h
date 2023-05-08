@@ -305,7 +305,8 @@ typedef struct {
 // The image arguments, data is a trivial text format of one "key=value" per line
 // with leading whitespace stripped and "#" comment lines and blank lines ignored.
 // It is processed by bootsvc and parsed args are shared to others via Arguments service.
-// TODO: the format can be streamlined after the /config/devmgr compat support is removed.
+// TODO: the format can be streamlined after the /config/additional_boot_args compat support is
+// removed.
 #define ZBI_TYPE_IMAGE_ARGS (0x47524149)  // IARG
 
 // A copy of the boot version stored within the sysconfig

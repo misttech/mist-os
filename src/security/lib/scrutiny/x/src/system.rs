@@ -29,7 +29,7 @@ impl<Blob: api::Blob, Package: api::Package> api::System for System<Blob, Packag
     type Zbi = todo::Zbi;
     type KernelFlags = todo::KernelFlags;
     type VbMeta = todo::VbMeta;
-    type DevMgrConfiguration = todo::DevMgrConfiguration;
+    type AdditionalBootConfiguration = todo::AdditionalBootConfiguration;
     type ComponentManagerConfiguration = todo::ComponentManagerConfiguration;
 
     fn build_dir(&self) -> Self::DataSourcePath {
@@ -52,8 +52,8 @@ impl<Blob: api::Blob, Package: api::Package> api::System for System<Blob, Packag
         todo!("TODO(fxbug.dev/111251): Implement vb_meta()");
     }
 
-    fn devmgr_configuration(&self) -> Self::DevMgrConfiguration {
-        todo!("TODO(fxbug.dev/111251): Implement devmgr_configuration()");
+    fn additional_boot_configuration(&self) -> Self::AdditionalBootConfiguration {
+        todo!("TODO(fxbug.dev/111251): Implement additional_boot_configuration()");
     }
 
     fn component_manager_configuration(&self) -> Self::ComponentManagerConfiguration {
@@ -83,7 +83,7 @@ pub mod fake {
         type Package = Package;
         type KernelFlags = KernelFlags;
         type VbMeta = VbMeta;
-        type DevMgrConfiguration = DevMgrConfiguration;
+        type AdditionalBootConfiguration = AdditionalBootConfiguration;
         type ComponentManagerConfiguration = ComponentManagerConfiguration;
 
         fn build_dir(&self) -> Self::DataSourcePath {
@@ -106,8 +106,8 @@ pub mod fake {
             VbMeta::default()
         }
 
-        fn devmgr_configuration(&self) -> Self::DevMgrConfiguration {
-            DevMgrConfiguration::default()
+        fn additional_boot_configuration(&self) -> Self::AdditionalBootConfiguration {
+            AdditionalBootConfiguration::default()
         }
 
         fn component_manager_configuration(&self) -> Self::ComponentManagerConfiguration {
@@ -150,9 +150,9 @@ pub mod fake {
 
     /// TODO(fxbug.dev/111251): Implement for production System API.
     #[derive(Default)]
-    pub(crate) struct DevMgrConfiguration;
+    pub(crate) struct AdditionalBootConfiguration;
 
-    impl api::DevMgrConfiguration for DevMgrConfiguration {
+    impl api::AdditionalBootConfiguration for AdditionalBootConfiguration {
         fn get(&self, _key: &str) -> Option<&str> {
             None
         }

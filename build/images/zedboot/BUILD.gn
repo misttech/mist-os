@@ -32,10 +32,10 @@ assembled_system("zedboot_assembly") {
 
   base_packages = []
 
-  devmgr_config = [
-                    "netsvc.all-features=true",
-                    "netsvc.netboot=true",
-                  ] + zedboot_devmgr_config
+  additional_boot_args = [
+                           "netsvc.all-features=true",
+                           "netsvc.netboot=true",
+                         ] + zedboot_additional_boot_args
 
   cmdline = [
     "virtcon.colorscheme=special",

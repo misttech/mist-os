@@ -111,8 +111,8 @@ pub trait System {
     /// Concrete type used for accessing the system's Verified Boot Metadata (vbmeta).
     type VbMeta: VbMeta;
 
-    /// Concrete type for accessing the system's device configuration file.
-    type DevMgrConfiguration: DevMgrConfiguration;
+    /// Concrete type for accessing the system's additional boot configuration file.
+    type AdditionalBootConfiguration: AdditionalBootConfiguration;
 
     /// Concrete type for the system's component manager configuration.
     type ComponentManagerConfiguration: ComponentManagerConfiguration;
@@ -132,8 +132,8 @@ pub trait System {
     /// Accessor for the system's Verified Boot Metadata (vbmeta).
     fn vb_meta(&self) -> Self::VbMeta;
 
-    /// Accessor for the system's device configuration file.
-    fn devmgr_configuration(&self) -> Self::DevMgrConfiguration;
+    /// Accessor for the system's additional boot configuration file.
+    fn additional_boot_configuration(&self) -> Self::AdditionalBootConfiguration;
 
     /// Accessor for the system's component manager configuration.
     fn component_manager_configuration(&self) -> Self::ComponentManagerConfiguration;
@@ -176,7 +176,7 @@ pub trait VbMeta {}
 /// device manager during early boot, and is combined with configuration set in [`KernelFlags`] and
 /// [`VbMeta`] to determine various configuration parameters for booting the Fuchsia system on the
 /// device.
-pub trait DevMgrConfiguration {
+pub trait AdditionalBootConfiguration {
     /// Get the value associated with `key`, or `None` if the key does not exist in in the
     /// underlying device configuration file.
     fn get(&self, key: &str) -> Option<&str>;

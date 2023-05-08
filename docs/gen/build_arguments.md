@@ -1721,9 +1721,9 @@ List of strings to append to the zedboot kernel command line.
 
 From //build/dev.gni:29
 
-### devmgr_config
+### additional_boot_args
 
-List of arguments to add to /boot/config/devmgr.
+List of arguments to add to /boot/config/additional_boot_args.
 These come after synthesized arguments to configure blobfs and pkgfs.
 
 **Current value (from the default):** `[]`
@@ -8845,9 +8845,9 @@ where `LEVEL` can be an integer or "max".
 
 From //build/zbi/zbi.gni:12
 
-### zedboot_devmgr_config
+### zedboot_additional_boot_args
 
-List of arguments to populate /boot/config/devmgr in the Zedboot image.
+List of arguments to populate /boot/config/additional_boot_args in the Zedboot image.
 
 **Current value (from the default):** `[]`
 

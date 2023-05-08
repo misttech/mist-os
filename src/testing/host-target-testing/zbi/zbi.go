@@ -124,13 +124,13 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
 	}
 
 	// Overwrite system image merkle
-	devMgrPath := filepath.Join(pathToBootfs, "config", "devmgr")
+	devMgrPath := filepath.Join(pathToBootfs, "config", "additional_boot_args")
 	content, err := os.ReadFile(devMgrPath)
 	if err != nil {
 		return err
 	}
 
-	logger.Infof(ctx, "updating the devmgr config with new system_image_merkle %q", systemImageMerkle)
+	logger.Infof(ctx, "updating the additional boot args config with new system_image_merkle %q", systemImageMerkle)
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "zircon.system.pkgfs.cmd") {
@@ -140,7 +140,7 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
 
 	output := strings.Join(lines, "\n")
 	if err := os.WriteFile(devMgrPath, []byte(output), 0644); err != nil {
-		return fmt.Errorf("failed to update devmgr: %q", err)
+		return fmt.Errorf("failed to update additional boot args: %q", err)
 	}
 
 	// Create new zbi manifest file to generate new zbi

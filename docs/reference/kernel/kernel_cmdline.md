@@ -1,7 +1,7 @@
 # Zircon Kernel Command Line Options
 
-See [//docs/gen/boot-options.md](/docs/gen/boot-options.md) is now the
-source of truth.
+See [//docs/gen/boot-options.md](/docs/gen/boot-options.md) is now the source of
+truth.
 
 The Zircon kernel receives a textual command line from the bootloader, which can
 be used to alter some behaviours of the system. Kernel command line parameters
@@ -19,10 +19,11 @@ userspace processes, not the kernel itself.
 If keys are repeated, the last value takes precedence, that is, later settings
 override earlier ones.
 
-The devmgr reads the file /boot/config/devmgr (if it exists) at startup and
-imports name=value lines into its environment, augmenting or overriding the
-values from the kernel command line. Leading whitespace is ignored and lines
-starting with # are ignored. Whitespace is not allowed in names.
+Component Manager reads the file `/boot/config/additional_boot_args` (if it
+exists) at startup and imports name=value lines into its environment, augmenting
+or overriding the values from the kernel command line. Leading whitespace is
+ignored and lines starting with # are ignored. Whitespace is not allowed in
+names.
 
 In order to specify options in the build, see
 [this guide](/docs/development/kernel/build.md#options).
@@ -156,6 +157,7 @@ problem arise.
 
 This option (disabled by default) allows the system to use a hardware IOMMU if
 present.
+
 ### x64 specific values
 
 On x64, some additional values are supported for configuring 8250-like UARTs:
@@ -225,8 +227,8 @@ first `+`. The dynamic linker (`PT_INTERP`) and shared library (`DT_NEEDED`)
 name strings sent to the loader service are prefixed with `lib/` to produce a
 *path*. Each such *path* is resolved to a blob ID (i.e. merkleroot in ASCII hex)
 using the `zircon.system.pkgfs.file.`*path* command line argument. In this way,
-`/boot/config/devmgr` contains a fixed manifest of files used to start the
-process.
+`/boot/config/additional_boot_args` contains a fixed manifest of files used to
+start the process.
 
 The new process receives a `PA_USER0` channel handle at startup that will be
 used as the client filesystem handle mounted at `/pkgfs`. `/pkgfs/system` will
@@ -382,9 +384,9 @@ that it should update the ABR metadata.
 
 ## console.device_topological_suffix=\<path>
 
-If this is set then console launcher will connect to the console device whose topological
-path matches this suffix. If not specified then console launcher will connect to `/svc/console`.
-Only has effect if kernel.shell=false.
+If this is set then console launcher will connect to the console device whose
+topological path matches this suffix. If not specified then console launcher
+will connect to `/svc/console`. Only has effect if kernel.shell=false.
 
 # Additional Gigaboot Command Line Options
 

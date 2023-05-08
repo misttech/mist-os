@@ -212,7 +212,7 @@ function diff_file_relpath() {
     *.json.formatted) expect=ignore ;;  # This is remant from an earlier diff.
 
     # recovery things
-    recovery-eng_devmgr_config.txt) expect=diff; diff_text "$left" "$right" ;;  # hashes
+    recovery-eng_additional_boot_args.txt) expect=diff; diff_text "$left" "$right" ;;  # hashes
     recovery-eng_pkgsvr_index) expect=diff; diff_text "$left" "$right" ;;  # hashes
 
     update_packages.manifest) expect=diff; diff_text "$left" "$right" ;;  # hashes

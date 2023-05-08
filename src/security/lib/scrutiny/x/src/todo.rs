@@ -158,9 +158,9 @@ pub struct VbMeta;
 
 impl api::VbMeta for VbMeta {}
 
-pub struct DevMgrConfiguration;
+pub struct AdditionalBootConfiguration;
 
-impl api::DevMgrConfiguration for DevMgrConfiguration {
+impl api::AdditionalBootConfiguration for AdditionalBootConfiguration {
     fn get(&self, _key: &str) -> Option<&str> {
         todo!("TODO(fxbug.dev/111251): Integrate with production system API");
     }

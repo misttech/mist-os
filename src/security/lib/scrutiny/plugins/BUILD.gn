@@ -180,6 +180,10 @@ if (is_host) {
     ]
 
     sources = [
+      "src/additional_boot_args/collection.rs",
+      "src/additional_boot_args/collector.rs",
+      "src/additional_boot_args/controller.rs",
+      "src/additional_boot_args/mod.rs",
       "src/core/collection.rs",
       "src/core/controller/blob.rs",
       "src/core/controller/component.rs",
@@ -197,10 +201,6 @@ if (is_host) {
       "src/core/util/jsons.rs",
       "src/core/util/mod.rs",
       "src/core/util/types.rs",
-      "src/devmgr_config/collection.rs",
-      "src/devmgr_config/collector.rs",
-      "src/devmgr_config/controller.rs",
-      "src/devmgr_config/mod.rs",
       "src/engine/controller/collector.rs",
       "src/engine/controller/controller.rs",
       "src/engine/controller/health.rs",

@@ -100,7 +100,7 @@ digraph {
     f_gendir [label="files.gendir"]
 
     outdir [label="files.outdir"]
-    devmgr [label="files.devmgr_config"]
+    devmgr [label="files.additional_boot_args"]
     bpacman [label="files.base_package_manifest"]
     genfvm -> paf -> {devmgr, bpacman} [style=invis]
   }

@@ -26,7 +26,7 @@ pub fn fake_model_config() -> ModelConfig {
             PackageName::from_str("config-data").unwrap(),
             None,
         )),
-        devmgr_config_path: "config/devmgr".into(),
+        additional_boot_args_path: "config/additional_boot_args".into(),
         component_tree_config_path: None,
         tmp_dir_path: None,
         is_empty: false,
