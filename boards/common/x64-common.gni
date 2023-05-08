@@ -57,7 +57,6 @@ board_driver_package_labels += [
   "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   "//src/devices/acpi:drivers",
   "//src/graphics/drivers/msd-intel-gen",
-  "//src/media/audio/bundles:virtual_audio_driver",
 ]
 
 board_package_labels += [

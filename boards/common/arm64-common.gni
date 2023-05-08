@@ -26,10 +26,7 @@ board_bootfs_labels += _bootfs_deps
 board_zedboot_bootfs_labels += _bootfs_deps
 board_recovery_bootfs_labels += _bootfs_deps
 
-board_driver_package_labels += [
-  "//bundles/packages/prod:drivers-system",
-  "//src/media/audio/bundles:virtual_audio_driver",
-]
+board_driver_package_labels += [ "//bundles/packages/prod:drivers-system" ]
 
 board_package_labels += [
   "//src/hwinfo:default_board_config",

@@ -77,3 +77,7 @@ legacy_cache_package_labels += [
   "//src/dart:dart_aot",
   "//src/flutter:flutter_aot",
 ]
+
+# Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
+base_driver_package_labels +=
+    [ "//src/media/audio/bundles:virtual_audio_driver" ]

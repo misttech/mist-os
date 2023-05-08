@@ -105,6 +105,10 @@ legacy_base_package_labels += [
   "//src/ui/tools/tiles",
 ]
 
+# Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
+base_driver_package_labels +=
+    [ "//src/media/audio/bundles:virtual_audio_driver" ]
+
 legacy_universe_package_labels += [
   # E2E Product Tests. They don't produce fuchsia packages, but host
   # executables, and must just be included somewhere in the build configuration
