@@ -65,7 +65,7 @@ fuchsia_test_component("isolated-swd-tests-component") {
 isolated_swd_components = [
   "//src/sys/pkg/bin/pkg-cache:ignore-system-image-component-and-config",
   "//src/sys/pkg/bin/pkg-resolver:production-component-and-config",
-  "//src/sys/pkg/bin/system-updater:component",
+  "//src/sys/pkg/bin/system-updater:production-component-and-config",
   "//src/sys/pkg/bin/fake-system-update-committer",
 ]
 

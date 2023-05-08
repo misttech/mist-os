@@ -12,8 +12,6 @@ use {
     update_package::{UpdateImagePackage, UpdatePackage},
 };
 
-const CONCURRENT_PACKAGE_RESOLVES: usize = 5;
-
 /// Error encountered while resolving a package.
 #[derive(Debug, Error)]
 pub enum ResolveError {
@@ -42,19 +40,21 @@ pub(super) async fn resolve_update_package(
 pub(super) fn resolve_packages<'a, I>(
     pkg_resolver: &'a PackageResolverProxy,
     urls: I,
+    concurrent_package_resolves: usize,
 ) -> impl Stream<Item = Result<fio::DirectoryProxy, ResolveError>> + 'a
 where
     I: 'a + Iterator<Item = &'a AbsolutePackageUrl>,
 {
     stream::iter(urls)
         .map(move |url| resolve_package(pkg_resolver, url))
-        .buffer_unordered(CONCURRENT_PACKAGE_RESOLVES)
+        .buffer_unordered(concurrent_package_resolves)
 }
 
 /// Resolves each package URL through the package resolver with some concurrency, returning a mapping of the package urls to the resolved image package directories.
 pub(super) async fn resolve_image_packages<'a, I>(
     pkg_resolver: &'a PackageResolverProxy,
     urls: I,
+    concurrent_package_resolves: usize,
 ) -> Result<HashMap<AbsolutePackageUrl, UpdateImagePackage>, ResolveError>
 where
     I: 'a + Iterator<Item = &'a AbsolutePackageUrl>,
@@ -66,7 +66,7 @@ where
                 UpdateImagePackage::new(resolve_package(pkg_resolver, url).await?),
             ))
         })
-        .buffer_unordered(CONCURRENT_PACKAGE_RESOLVES)
+        .buffer_unordered(concurrent_package_resolves)
         .try_collect()
         .await
 }

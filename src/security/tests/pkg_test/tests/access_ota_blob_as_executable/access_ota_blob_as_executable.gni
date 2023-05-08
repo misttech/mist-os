@@ -133,7 +133,7 @@ template("access_ota_blob_as_executable") {
       "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
       "//src/sys/pkg/bin/pkg-resolver:production-component-and-config",
       "//src/sys/pkg/bin/system-update-committer:component",
-      "//src/sys/pkg/bin/system-updater:component",
+      "//src/sys/pkg/bin/system-updater:production-component-and-config",
 
       # Production network components for OTA update.
       "//src/connectivity/network/netstack:component",

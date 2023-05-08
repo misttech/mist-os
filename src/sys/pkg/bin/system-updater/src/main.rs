@@ -26,6 +26,7 @@ pub(crate) mod update;
 #[fuchsia::main(logging_tags = ["system-updater"])]
 async fn main() {
     info!("starting system updater");
+    let structured_config = system_updater_config::Config::take_from_startup_handle();
 
     let inspector = fuchsia_inspect::Inspector::default();
     let history_node = inspector.root().create_child("history");
@@ -45,7 +46,7 @@ async fn main() {
 
     // The install manager task will run the update attempt task,
     // listen for FIDL events, and notify monitors of update attempt progress.
-    let updater = RealUpdater::new(Arc::clone(&history));
+    let updater = RealUpdater::new(Arc::clone(&history), structured_config);
     let attempt_node = inspector.root().create_child("current_attempt");
     let (install_manager_ch, install_manager_fut) = start_install_manager::<
         UpdateStateNotifier,

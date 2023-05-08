@@ -82,7 +82,7 @@ fuchsia_test_package("omaha-client-integration-tests") {
     "//src/sys/pkg/bin/omaha-client:component",
     "//src/sys/pkg/bin/omaha-client:omaha-client-structured-config",
     "//src/sys/pkg/bin/system-update-committer:component",
-    "//src/sys/pkg/bin/system-updater:component",
+    "//src/sys/pkg/bin/system-updater:production-component-and-config",
     "//src/sys/stash:stash2_v2",
   ]
 

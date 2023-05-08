@@ -22,6 +22,7 @@ rustc_binary("bin") {
   rustenv = [ "EPOCH_PATH=$rebased_epoch_file" ]
 
   deps = [
+    ":config_lib",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
@@ -97,14 +98,41 @@ rustc_binary("bin") {
   inputs = [ base_epoch_file ]
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "system-updater"
   manifest = "meta/system-updater.cml"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
+group("production-component-and-config") {
+  public_deps = [
+    ":component",
+    ":config_values_from_gn",
+  ]
+}
+
 fuchsia_package("system-updater") {
-  deps = [ ":component" ]
+  deps = [ ":production-component-and-config" ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  cm_label = ":manifest"
+  name = "system_updater_config"
+  visibility = [ ":*" ]
+}
+
+structured_config_values = {
+  concurrent_package_resolves = 5
+}
+
+fuchsia_structured_config_values("config_values_from_gn") {
+  cm_label = ":manifest"
+
+  values = structured_config_values
 }
 
 fuchsia_unittest_package("system-updater-tests") {
@@ -117,10 +145,23 @@ fuchsia_unittest_package("system-updater-tests") {
   deps = [ ":bin_test" ]
 }
 
-fuchsia_component("isolated-v2") {
+fuchsia_component_manifest("isolated-manifest") {
   component_name = "system-updater-isolated"
   manifest = "meta/system-updater-isolated.cml"
-  deps = [ ":bin" ]
+}
+
+fuchsia_component("isolated-v2") {
+  cm_label = ":isolated-manifest"
+  deps = [
+    ":bin",
+    ":config_values_from_gn_isolated",
+  ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn_isolated") {
+  cm_label = ":isolated-manifest"
+
+  values = structured_config_values
 }
 
 core_shard("system-updater-core-shard") {

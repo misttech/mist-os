@@ -46,4 +46,8 @@
             from: "self",
         },
     ],
+    config: {
+        // The maximum number of outstanding package resolution requests.
+        concurrent_package_resolves: { type: "uint16" },
+    },
 }

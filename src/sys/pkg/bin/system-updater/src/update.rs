@@ -206,11 +206,15 @@ pub trait Updater {
 
 pub struct RealUpdater {
     history: Arc<Mutex<UpdateHistory>>,
+    structured_config: system_updater_config::Config,
 }
 
 impl RealUpdater {
-    pub fn new(history: Arc<Mutex<UpdateHistory>>) -> Self {
-        Self { history }
+    pub fn new(
+        history: Arc<Mutex<UpdateHistory>>,
+        structured_config: system_updater_config::Config,
+    ) -> Self {
+        Self { history, structured_config }
     }
 }
 
@@ -224,8 +228,14 @@ impl Updater for RealUpdater {
         env: Environment,
         reboot_controller: RebootController,
     ) -> (String, Self::UpdateStream) {
-        let (attempt_id, attempt) =
-            update(config, env, Arc::clone(&self.history), reboot_controller).await;
+        let (attempt_id, attempt) = update(
+            config,
+            env,
+            Arc::clone(&self.history),
+            reboot_controller,
+            self.structured_config.concurrent_package_resolves.into(),
+        )
+        .await;
         (attempt_id, Box::pin(attempt))
     }
 }
@@ -244,6 +254,7 @@ async fn update(
     env: Environment,
     history: Arc<Mutex<UpdateHistory>>,
     reboot_controller: RebootController,
+    concurrent_package_resolves: usize,
 ) -> (String, impl FusedStream<Item = State>) {
     let attempt_fut = history.lock().start_update_attempt(
         Options {
@@ -279,7 +290,7 @@ async fn update(
 
         let mut target_version = history::Version::default();
 
-        let attempt_res = Attempt { config: &config, env: &env }
+        let attempt_res = Attempt { config: &config, env: &env, concurrent_package_resolves }
             .run(&mut co, &mut phase, &mut target_version)
             .await;
 
@@ -433,12 +444,17 @@ impl ImagesToWrite {
         pkg_resolver: &PackageResolverProxy,
         desired_config: paver::NonCurrentConfiguration,
         data_sink: &DataSinkProxy,
+        concurrent_package_resolves: usize,
     ) -> Result<(), StageError> {
         let package_urls = self.get_urls();
 
-        let url_directory_map = resolver::resolve_image_packages(pkg_resolver, package_urls.iter())
-            .await
-            .map_err(StageError::Resolve)?;
+        let url_directory_map = resolver::resolve_image_packages(
+            pkg_resolver,
+            package_urls.iter(),
+            concurrent_package_resolves,
+        )
+        .await
+        .map_err(StageError::Resolve)?;
 
         for (filename, absolute_component_url) in &self.firmware {
             let package_url = absolute_component_url.package_url();
@@ -553,6 +569,7 @@ impl BootSlot {
 struct Attempt<'a> {
     config: &'a Config,
     env: &'a Environment,
+    concurrent_package_resolves: usize,
 }
 
 impl<'a> Attempt<'a> {
@@ -898,6 +915,7 @@ impl<'a> Attempt<'a> {
                 self.config.update_url.hash(),
                 &self.env.retained_packages,
                 &self.env.space_manager,
+                self.concurrent_package_resolves,
             )
             .await?;
 
@@ -978,8 +996,11 @@ impl<'a> Attempt<'a> {
 
         let mut packages = Vec::with_capacity(packages_to_fetch.len());
 
-        let package_dir_futs =
-            resolver::resolve_packages(&self.env.pkg_resolver, packages_to_fetch.iter());
+        let package_dir_futs = resolver::resolve_packages(
+            &self.env.pkg_resolver,
+            packages_to_fetch.iter(),
+            self.concurrent_package_resolves,
+        );
         futures::pin_mut!(package_dir_futs);
 
         while let Some(package_dir) =
@@ -1241,6 +1262,7 @@ async fn gc(space_manager: &SpaceManagerProxy) -> Result<(), Error> {
 
 // Resolve and write the image packages to their appropriate partitions,
 // incorporating an increasingly aggressive GC and retry strategy.
+#[allow(clippy::too_many_arguments)]
 async fn write_image_packages(
     images_to_write: ImagesToWrite,
     pkg_resolver: &PackageResolverProxy,
@@ -1249,8 +1271,12 @@ async fn write_image_packages(
     update_pkg_hash: Option<Hash>,
     retained_packages: &RetainedPackagesProxy,
     space_manager: &SpaceManagerProxy,
+    concurrent_package_resolves: usize,
 ) -> Result<(), StageError> {
-    match images_to_write.write(pkg_resolver, desired_config, data_sink).await {
+    match images_to_write
+        .write(pkg_resolver, desired_config, data_sink, concurrent_package_resolves)
+        .await
+    {
         Ok(()) => return Ok(()),
         Err(StageError::Resolve(ResolveError::Error(
             fidl_fuchsia_pkg_ext::ResolveError::NoSpace,
@@ -1278,7 +1304,9 @@ async fn write_image_packages(
         );
     }
 
-    images_to_write.write(pkg_resolver, desired_config, data_sink).await
+    images_to_write
+        .write(pkg_resolver, desired_config, data_sink, concurrent_package_resolves)
+        .await
 }
 
 /// Resolve the update package, incorporating an increasingly aggressive GC and retry strategy.
