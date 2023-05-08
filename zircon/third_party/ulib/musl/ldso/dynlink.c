@@ -554,7 +554,12 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
 
     if (stride > 2) {
       addend = rel[2];
-    } else if (type == REL_GOT || type == REL_PLT || type == REL_COPY) {
+    } else if ((type == REL_GOT &&
+                // When there is a dedicated GOT type, it ignores the addend.
+                // When the GOT type is just the same as the general-purpose
+                // data reference type, then it doesn't ignore the addend.
+                REL_GOT != REL_SYMBOLIC) ||
+               type == REL_PLT || type == REL_COPY) {
       addend = 0;
     } else if (reuse_addends) {
       /* Save original addend in stage 2 where the dso
@@ -1683,7 +1688,9 @@ LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_ret
       // processed in phase 1 and are just skipped now.  Note this must
       // match the logic in do_relocs so that the indices always match up.
       case REL_RELATIVE:
+#if REL_GOT != REL_SYMBOLIC
       case REL_GOT:
+#endif
       case REL_PLT:
       case REL_COPY:
         break;
