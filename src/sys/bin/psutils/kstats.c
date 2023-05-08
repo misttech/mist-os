@@ -28,7 +28,7 @@
 #define MAX_CPUS 32
 
 static zx_status_t gueststats(zx_handle_t root_resource, zx_duration_t delay) {
-  static zx_info_guest_stats_t old_stats[MAX_CPUS];
+  __UNUSED static zx_info_guest_stats_t old_stats[MAX_CPUS];
   zx_info_guest_stats_t stats[MAX_CPUS];
 
   size_t actual, avail;
@@ -78,7 +78,7 @@ static zx_status_t gueststats(zx_handle_t root_resource, zx_duration_t delay) {
 
     old_stats[i] = stats[i];
   }
-#else
+#elif defined(__x86_64__)
   printf(
       "cpu   "
       " vm_entry"
