@@ -156,13 +156,7 @@ impl EpollFileObject {
     }
 
     /// Checks if this EpollFileObject monitors the `epoll_file_object` at `epoll_file_handle`.
-    #[allow(clippy::only_used_in_recursion)]
-    fn monitors(
-        &self,
-        epoll_file_handle: &FileHandle,
-        epoll_file_object: &EpollFileObject,
-        depth_left: u32,
-    ) -> Result<bool, Errno> {
+    fn monitors(&self, epoll_file_handle: &FileHandle, depth_left: u32) -> Result<bool, Errno> {
         if depth_left == 0 {
             return Ok(true);
         }
@@ -172,7 +166,7 @@ impl EpollFileObject {
             match nested_object.target()?.downcast_file::<EpollFileObject>() {
                 None => continue,
                 Some(target) => {
-                    if target.monitors(epoll_file_handle, epoll_file_object, depth_left - 1)?
+                    if target.monitors(epoll_file_handle, depth_left - 1)?
                         || Arc::ptr_eq(&nested_object.target()?, epoll_file_handle)
                     {
                         return Ok(true);
@@ -197,7 +191,7 @@ impl EpollFileObject {
 
         // Check if adding this file would cause a cycle at a max depth of 5.
         if let Some(epoll_to_add) = file.downcast_file::<EpollFileObject>() {
-            if epoll_to_add.monitors(epoll_file_handle, self, MAX_NESTED_DEPTH)? {
+            if epoll_to_add.monitors(epoll_file_handle, MAX_NESTED_DEPTH)? {
                 return error!(ELOOP);
             }
         }
