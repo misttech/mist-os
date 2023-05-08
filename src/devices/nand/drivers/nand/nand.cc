@@ -399,7 +399,7 @@ zx_status_t NandDevice::Init() {
   // need to set deadline profiles for all threads that the blobfs-pager-thread interacts with in
   // order to service page requests.
   const char* role_name = "fuchsia.devices.nand.drivers.nand.device";
-  status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(worker_thread_), role_name,
+  status = device_set_profile_by_role(this->parent(), thrd_get_zx_handle(worker_thread_), role_name,
                                       strlen(role_name));
   if (status != ZX_OK) {
     zxlogf(WARNING, "nand: failed to apply role to worker: %d\n", status);
