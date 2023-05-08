@@ -97,9 +97,6 @@ declare_args() {
   # any kind of stable contract for users of the archive.
   board_tools = []
 
-  # Whether or not the board pulls in the system-update-configurator component.
-  board_supports_update_configurator = false
-
   # BoardInformation file for use with Product Assembly
   board_information_for_assembly = false
 
