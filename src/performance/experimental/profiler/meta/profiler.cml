@@ -1,0 +1,33 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/profiler",
+    },
+    capabilities: [
+        {
+            protocol: [ "fuchsia.cpu.profiler.Session" ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.kernel.RootJob",
+                "fuchsia.logger.Log",
+            ],
+        },
+        {
+            storage: "tmp",
+            path: "/tmp",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.cpu.profiler.Session",
+            from: "self",
+        },
+    ],
+}

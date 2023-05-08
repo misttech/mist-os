@@ -1,0 +1,48 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+executable("bin") {
+  testonly = true
+  output_name = "profiler"
+
+  sources = [
+    "main.cc",
+    "profiler_controller_impl.cc",
+    "sampler.cc",
+    "taskfinder.cc",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/unwinder",
+    "//src/lib/zxdump",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/elf-search",
+    "//zircon/system/ulib/inspector",
+    "//zircon/system/ulib/task-utils",
+  ]
+}
+
+fuchsia_component("profiler_component") {
+  testonly = true
+  component_name = "profiler"
+  manifest = "meta/profiler.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("profiler") {
+  testonly = true
+  deps = [ ":profiler_component" ]
+}
+
+core_shard("profiler_core_shard") {
+  shard_file = "meta/profiler.core_shard.cml"
+}
