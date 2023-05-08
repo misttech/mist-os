@@ -790,6 +790,7 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
+        self.node().clear_suid_and_sgid_bits(current_task);
         let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
             let _guard = self.node().append_lock.write();
             self.ops().write(self, current_task, data)?
@@ -797,7 +798,6 @@ impl FileObject {
             let _guard = self.node().append_lock.read();
             self.ops().write(self, current_task, data)?
         };
-
         self.node().update_ctime_mtime();
         Ok(bytes_written)
     }
@@ -811,8 +811,13 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
-        let _guard = self.node().append_lock.read();
-        self.ops().write_at(self, current_task, offset, data)
+        self.node().clear_suid_and_sgid_bits(current_task);
+        let bytes_written = {
+            let _guard = self.node().append_lock.read();
+            self.ops().write_at(self, current_task, offset, data)?
+        };
+        self.node().update_ctime_mtime();
+        Ok(bytes_written)
     }
 
     pub fn seek(

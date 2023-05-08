@@ -97,13 +97,22 @@ impl FsNodeInfo {
             if self.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
                 self.mode &= !FileMode::ISUID;
             }
-            // If the group execute bit is not set, the setgid bit actually indicates mandatory
-            // locking and should not be cleared.
-            if self.mode.intersects(FileMode::IXGRP) {
-                self.mode &= !FileMode::ISGID;
-            }
+            self.clear_sgid_bit();
         }
         self.time_status_change = fuchsia_runtime::utc_time();
+    }
+
+    fn clear_sgid_bit(&mut self) {
+        // If the group execute bit is not set, the setgid bit actually indicates mandatory
+        // locking and should not be cleared.
+        if self.mode.intersects(FileMode::IXGRP) {
+            self.mode &= !FileMode::ISGID;
+        }
+    }
+
+    fn clear_suid_and_sgid_bits(&mut self) {
+        self.mode &= !FileMode::ISUID;
+        self.clear_sgid_bit();
     }
 }
 
@@ -751,6 +760,7 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
+        self.clear_suid_and_sgid_bits(current_task);
         self.ops().truncate(self, length)?;
         self.update_ctime_mtime();
         Ok(())
@@ -786,6 +796,7 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
+        self.clear_suid_and_sgid_bits(current_task);
         self.ops().truncate(self, length)?;
         self.update_ctime_mtime();
         Ok(())
@@ -1057,17 +1068,25 @@ impl FsNode {
         self.info.write()
     }
 
-    // Update the ctime and mtime of a file to now.
+    /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
+    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) {
+        if !current_task.creds().has_capability(CAP_FSETID) {
+            let mut info = self.info_write();
+            info.clear_suid_and_sgid_bits();
+        }
+    }
+
+    /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) {
-        let mut info = self.info.write();
+        let mut info = self.info_write();
         let now = fuchsia_runtime::utc_time();
         info.time_status_change = now;
         info.time_modify = now;
     }
 
-    // Update the ctime of a file to now.
+    /// Update the ctime of a file to now.
     pub fn update_ctime(&self) {
-        let mut info = self.info.write();
+        let mut info = self.info_write();
         let now = fuchsia_runtime::utc_time();
         info.time_status_change = now;
     }

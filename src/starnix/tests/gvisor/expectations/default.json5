@@ -715,16 +715,6 @@
                 "SendFileTest.SendAndUpdateGivenOffset",
                 "SendFileTest.SendFileToSelf",
 
-                // setgid_test
-                "FileModes/FileModeTest.TruncateFile/1",
-                "FileModes/FileModeTest.TruncateFile/2",
-                "FileModes/FileModeTest.TruncateFile/3",
-                "FileModes/FileModeTest.TruncateFile/5",
-                "FileModes/FileModeTest.WriteToFile/1",
-                "FileModes/FileModeTest.WriteToFile/2",
-                "FileModes/FileModeTest.WriteToFile/3",
-                "FileModes/FileModeTest.WriteToFile/5",
-
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
 
