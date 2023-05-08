@@ -162,7 +162,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 // trapped back out of restricted mode, so the restricted state contains the
                 // information about which system call to dispatch.
             }
-            _ => return Err(format_err!("failed to restricted_enter: {:?}", state)),
+            _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
 
         if reason_code != zx::sys::ZX_RESTRICTED_REASON_SYSCALL {
