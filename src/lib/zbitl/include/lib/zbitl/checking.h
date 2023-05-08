@@ -42,6 +42,8 @@ template <typename Zbi>
 fit::result<std::string_view> CheckBootable(Zbi&& zbi, uint32_t kernel_type
 #ifdef __aarch64__
                                                        = ZBI_TYPE_KERNEL_ARM64
+#elif defined(__riscv)
+                                                       = ZBI_TYPE_KERNEL_RISCV64
 #elif defined(__x86_64__)
                                                        = ZBI_TYPE_KERNEL_X64
 
