@@ -319,8 +319,10 @@ fn zxio_write(
     _current_task: &CurrentTask,
     data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let bytes = data.read_all()?;
-    zxio.write(&bytes).map_err(|status| from_status_like_fdio!(status))
+    let bytes = data.peek_all()?;
+    let actual = zxio.write(&bytes).map_err(|status| from_status_like_fdio!(status))?;
+    data.advance(actual)?;
+    Ok(actual)
 }
 
 fn zxio_write_at(
@@ -329,8 +331,11 @@ fn zxio_write_at(
     offset: usize,
     data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let bytes = data.read_all()?;
-    zxio.write_at(offset as u64, &bytes).map_err(|status| from_status_like_fdio!(status))
+    let bytes = data.peek_all()?;
+    let actual =
+        zxio.write_at(offset as u64, &bytes).map_err(|status| from_status_like_fdio!(status))?;
+    data.advance(actual)?;
+    Ok(actual)
 }
 
 pub fn zxio_wait_async(
