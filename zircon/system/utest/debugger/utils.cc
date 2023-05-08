@@ -30,15 +30,17 @@ const char* g_program_path;
 uint64_t extract_pc_reg(const zx_thread_state_general_regs_t* regs) {
 #if defined(__x86_64__)
   return regs->rip;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
   return regs->pc;
+#else
+#error "what machine?"
 #endif
 }
 
 uint64_t extract_sp_reg(const zx_thread_state_general_regs_t* regs) {
 #if defined(__x86_64__)
   return regs->rsp;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
   return regs->sp;
 #endif
 }

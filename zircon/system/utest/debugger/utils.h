@@ -65,6 +65,8 @@ static inline void undefined_insn() {
   // An instruction not supported at this privilege level will do.
   // ARM calls these "unallocated instructions".
   __asm__("mrs x0, elr_el1");
+#elif defined(__riscv)
+  __asm__("unimp");
 #else
 #error "unsupported architecture"
 #endif
