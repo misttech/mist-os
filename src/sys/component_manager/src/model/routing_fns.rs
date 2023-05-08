@@ -5,27 +5,30 @@
 use {
     crate::model::{
         component::WeakComponentInstance,
-        routing::{
-            self, route_and_open_namespace_capability,
-            route_and_open_namespace_capability_from_expose,
-        },
+        routing::{self, OpenOptions, RouteRequest},
     },
     ::routing::capability_source::ComponentCapability,
-    cm_rust::{ExposeDecl, UseDecl},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     tracing::error,
     vfs::{execution_scope::ExecutionScope, path::Path, remote::RoutingFn},
 };
 
-pub fn route_use_fn(component: WeakComponentInstance, use_: UseDecl) -> RoutingFn {
+// TODO(fxbug.dev/126770): `cap` is used only for debug output. This would be simpler if we
+// removed the `cap` argument and used `request` for the debug output instead.
+pub fn route_fn(
+    component: WeakComponentInstance,
+    cap: ComponentCapability,
+    request: RouteRequest,
+) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             let component = component.clone();
-            let use_ = use_.clone();
+            let cap = cap.clone();
+            let request = request.clone();
             scope.spawn(async move {
                 let component = match component.upgrade() {
                     Ok(component) => component,
@@ -33,75 +36,25 @@ pub fn route_use_fn(component: WeakComponentInstance, use_: UseDecl) -> RoutingF
                         // This can happen if the component instance tree topology changes such
                         // that the captured `component` no longer exists.
                         error!(
-                            "failed to upgrade WeakComponentInstance while routing use \
-                            decl `{:?}`: {:?}",
-                            &use_, e
+                            "failed to upgrade WeakComponentInstance while routing {} `{}`: {:?}",
+                            cap.type_name(),
+                            cap.source_id(),
+                            e
                         );
                         return;
                     }
                 };
-                let mut server_end = server_end.into_channel();
-                let res = route_and_open_namespace_capability(
-                    flags,
-                    path.into_string(),
-                    use_.clone(),
-                    &component,
-                    &mut server_end,
-                )
-                .await;
-                if let Err(e) = res {
-                    routing::report_routing_failure(
-                        &component,
-                        &ComponentCapability::Use(use_),
-                        e.into(),
-                        server_end,
-                    )
-                    .await;
-                }
-            });
-        },
-    )
-}
+                let mut server_chan = server_end.into_channel();
 
-pub fn route_expose_fn(component: WeakComponentInstance, expose: ExposeDecl) -> RoutingFn {
-    Box::new(
-        move |scope: ExecutionScope,
-              flags: fio::OpenFlags,
-              path: Path,
-              server_end: ServerEnd<fio::NodeMarker>| {
-            let component = component.clone();
-            let expose = expose.clone();
-            scope.spawn(async move {
-                let component = match component.upgrade() {
-                    Ok(component) => component,
-                    Err(e) => {
-                        // This can happen if the component instance tree topology changes such
-                        // that the captured `component` no longer exists.
-                        error!(
-                            "failed to upgrade WeakComponentInstance while routing expose \
-                            decl `{:?}`: {:?}",
-                            &expose, e
-                        );
-                        return;
-                    }
-                };
-                let mut server_end = server_end.into_channel();
-                let res = route_and_open_namespace_capability_from_expose(
+                let open_options = OpenOptions {
                     flags,
-                    path.into_string(),
-                    expose.clone(),
-                    &component,
-                    &mut server_end,
-                )
-                .await;
+                    relative_path: path.into_string(),
+                    server_chan: &mut server_chan,
+                };
+                let res =
+                    routing::route_and_open_capability(request, &component, open_options).await;
                 if let Err(e) = res {
-                    routing::report_routing_failure(
-                        &component,
-                        &ComponentCapability::Expose(expose),
-                        e.into(),
-                        server_end,
-                    )
-                    .await;
+                    routing::report_routing_failure(&component, &cap, e.into(), server_chan).await;
                 }
             });
         },

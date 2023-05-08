@@ -460,7 +460,7 @@ impl ComponentCapability {
         }
     }
 
-    /// Returns the source path or name of the capability as a string, useful for debugging.
+    /// Returns the path or name of the capability as a string, useful for debugging.
     pub fn source_id(&self) -> String {
         self.source_name()
             .map(|p| format!("{}", p))

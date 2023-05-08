@@ -4,20 +4,25 @@
 
 use {
     crate::model::{
-        component::WeakComponentInstance, error::VfsError, mutable_directory::MutableDirectory,
+        component::WeakComponentInstance,
+        error::VfsError,
+        mutable_directory::MutableDirectory,
+        routing::{self, RouteRequest},
     },
-    cm_rust::{CapabilityPath, ComponentDecl, ExposeDecl, UseDecl},
+    ::routing::capability_source::ComponentCapability,
+    cm_rust::{CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl, UseDecl},
+    fidl_fuchsia_io as fio,
     std::collections::HashMap,
     std::sync::Arc,
     vfs::directory::immutable::simple as pfs,
-    vfs::remote::{remote_boxed, RoutingFn},
+    vfs::remote::{self, RoutingFn},
 };
 
 /// Represents the directory hierarchy of the exposed directory, not including the nodes for the
 /// capabilities themselves.
 pub struct DirTree {
     directory_nodes: HashMap<String, Box<DirTree>>,
-    broker_nodes: HashMap<String, RoutingFn>,
+    broker_nodes: HashMap<String, (RoutingFn, fio::DirentType)>,
 }
 
 impl DirTree {
@@ -25,7 +30,7 @@ impl DirTree {
     /// `routing_factory` is a closure that generates the routing function that will be called
     /// when a leaf node is opened.
     pub fn build_from_uses(
-        routing_factory: impl Fn(WeakComponentInstance, UseDecl) -> RoutingFn,
+        routing_factory: impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
         decl: &ComponentDecl,
     ) -> Self {
@@ -40,13 +45,16 @@ impl DirTree {
     /// `routing_factory` is a closure that generates the routing function that will be called
     /// when a leaf node is opened.
     pub fn build_from_exposes(
-        routing_factory: impl Fn(WeakComponentInstance, ExposeDecl) -> RoutingFn,
+        routing_factory: impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
         decl: &ComponentDecl,
     ) -> Self {
         let mut tree = DirTree { directory_nodes: HashMap::new(), broker_nodes: HashMap::new() };
-        for expose in &decl.exposes {
-            tree.add_expose_capability(&routing_factory, component.clone(), expose);
+        // Group exposes by target name because some capabilities (services) support aggregation,
+        // where multiple declarations represent one aggregated capability route.
+        let exposes_by_target_name = routing::aggregate_exposes(&decl.exposes);
+        for (target_name, exposes) in exposes_by_target_name {
+            tree.add_expose_capability(&routing_factory, component.clone(), target_name, exposes);
         }
         tree
     }
@@ -58,8 +66,9 @@ impl DirTree {
             subtree.install(&mut subdir)?;
             root_dir.add_node(&name, subdir)?;
         }
-        for (name, route_fn) in self.broker_nodes {
-            let node = remote_boxed(route_fn);
+        for (name, value) in self.broker_nodes {
+            let (route_fn, dirent_type) = value;
+            let node = remote::remote_boxed_with_type(route_fn, dirent_type);
             root_dir.add_node(&name, node)?;
         }
         Ok(())
@@ -67,56 +76,62 @@ impl DirTree {
 
     fn add_use_capability(
         &mut self,
-        routing_factory: &impl Fn(WeakComponentInstance, UseDecl) -> RoutingFn,
+        routing_factory: &impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
         use_: &UseDecl,
     ) {
-        // Event and EventStream capabilities are used by the framework itself and not given to
-        // components directly.
-        match use_ {
-            // TODO(fxbug.dev/81980): Add the event stream protocol to the directory tree.
-            cm_rust::UseDecl::EventStream(_) => return,
-            _ => {}
-        }
-
+        let cap = ComponentCapability::Use(use_.clone());
+        let request = match routing::request_for_namespace_capability_use(use_.clone()) {
+            Some(r) => r,
+            None => return,
+        };
         let path = match use_.path() {
             Some(path) => path.clone(),
             None => return,
         };
-        let routing_fn = routing_factory(component, use_.clone());
-        self.add_capability(path, routing_fn);
+        let type_name = cap.type_name();
+        let routing_fn = routing_factory(component, cap, request);
+        self.add_capability(path, type_name, routing_fn);
     }
 
     fn add_expose_capability(
         &mut self,
-        routing_factory: &impl Fn(WeakComponentInstance, ExposeDecl) -> RoutingFn,
+        routing_factory: &impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
-        expose: &ExposeDecl,
+        target_name: &str,
+        exposes: Vec<&ExposeDecl>,
     ) {
-        let path: CapabilityPath = match expose {
-            cm_rust::ExposeDecl::Service(d) => {
-                format!("/{}", d.target_name).parse().expect("couldn't parse name as path")
-            }
-            cm_rust::ExposeDecl::Protocol(d) => {
-                format!("/{}", d.target_name).parse().expect("couldn't parse name as path")
-            }
-            cm_rust::ExposeDecl::Directory(d) => {
-                format!("/{}", d.target_name).parse().expect("couldn't parse name as path")
-            }
-            cm_rust::ExposeDecl::Runner(_)
-            | cm_rust::ExposeDecl::Resolver(_)
-            | cm_rust::ExposeDecl::EventStream(_) => {
-                // Runners, resolvers, and event streams do not add directory entries.
-                return;
-            }
+        let path: CapabilityPath =
+            format!("/{}", target_name).parse().expect("couldn't parse name as path");
+        // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
+        // for debug info.
+        //
+        // TODO(fxbug.dev/4776): This could lead to incomplete debug output because the source name
+        // is what's printed, so if the exposes have different source names only one of them will
+        // appear in the output. However, in practice routing is unlikely to fail for an aggregate
+        // because the algorithm typically terminates once an aggregate is found. Find a more robust
+        // solution, such as including all exposes or switching to the target name.
+        let first_expose = *exposes.first().expect("empty exposes is impossible");
+        let cap = ComponentCapability::Expose(first_expose.clone());
+        let type_name = cap.type_name();
+        let request = match routing::request_for_namespace_capability_expose(exposes) {
+            Some(r) => r,
+            None => return,
         };
-        let routing_fn = routing_factory(component, expose.clone());
-        self.add_capability(path, routing_fn);
+        let routing_fn = routing_factory(component, cap, request);
+        self.add_capability(path, type_name, routing_fn);
     }
 
-    fn add_capability(&mut self, path: CapabilityPath, routing_fn: RoutingFn) {
+    fn add_capability(
+        &mut self,
+        path: CapabilityPath,
+        _type_name: CapabilityTypeName,
+        routing_fn: RoutingFn,
+    ) {
+        // TODO(fxbug.dev/126066): Don't set this to Unknown, set it based on the type_name.
+        let dirent_type = fio::DirentType::Unknown;
         let tree = self.to_directory_node(&path);
-        tree.broker_nodes.insert(path.basename.to_string(), routing_fn);
+        tree.broker_nodes.insert(path.basename.to_string(), (routing_fn, dirent_type));
     }
 
     fn to_directory_node(&mut self, path: &CapabilityPath) -> &mut DirTree {
@@ -146,8 +161,9 @@ mod tests {
         ::routing::component_instance::ComponentInstanceInterface,
         cm_rust::{
             Availability, CapabilityName, CapabilityPath, DependencyType, ExposeDecl,
-            ExposeDirectoryDecl, ExposeProtocolDecl, ExposeRunnerDecl, ExposeSource, ExposeTarget,
-            UseDecl, UseDirectoryDecl, UseProtocolDecl, UseSource, UseStorageDecl,
+            ExposeDirectoryDecl, ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl,
+            ExposeSource, ExposeTarget, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseSource,
+            UseStorageDecl,
         },
         fidl::endpoints::{ClientEnd, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -162,7 +178,7 @@ mod tests {
     async fn read_only_storage() {
         // Call `build_from_uses` with a routing factory that routes to a mock directory or service,
         // and a `ComponentDecl` with `use` declarations.
-        let routing_factory = mocks::proxy_use_routing_factory();
+        let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Use);
         let decl = ComponentDecl {
             uses: vec![UseDecl::Storage(UseStorageDecl {
                 source_name: "data".into(),
@@ -210,7 +226,7 @@ mod tests {
     async fn build_from_uses() {
         // Call `build_from_uses` with a routing factory that routes to a mock directory or service,
         // and a `ComponentDecl` with `use` declarations.
-        let routing_factory = mocks::proxy_use_routing_factory();
+        let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Use);
         let decl = ComponentDecl {
             uses: vec![
                 UseDecl::Directory(UseDirectoryDecl {
@@ -279,15 +295,15 @@ mod tests {
         assert_eq!("friend", test_helpers::read_file(&in_dir_proxy, "in/data/cache/hello").await);
         assert_eq!(
             "hippos".to_string(),
-            test_helpers::call_echo(&in_dir_proxy, "in/svc/hippo").await
+            test_helpers::call_echo(&in_dir_proxy, "in/svc/hippo", "hippos").await
         );
     }
 
     #[fuchsia::test]
     async fn build_from_exposes() {
         // Call `build_from_exposes` with a routing factory that routes to a mock directory or
-        // service, and a `ComponentDecl` with `expose` declarations.
-        let routing_factory = mocks::proxy_expose_routing_factory();
+        // protocol, and a `ComponentDecl` with `expose` declarations.
+        let routing_factory = mocks::proxy_routing_factory(mocks::DeclType::Expose);
         let decl = ComponentDecl {
             exposes: vec![
                 ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -310,8 +326,23 @@ mod tests {
                 }),
                 ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
-                    source_name: "baz-svc".into(),
-                    target_name: "hippo-svc".into(),
+                    source_name: "baz-proto".into(),
+                    target_name: "hippo-proto".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }),
+                // Aggregated service from two declarations.
+                ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo-svc".into(),
+                    target_name: "whale-svc".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }),
+                ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "bar-svc".into(),
+                    target_name: "whale-svc".into(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }),
@@ -348,7 +379,7 @@ mod tests {
             .into_proxy()
             .expect("failed to create directory proxy");
         assert_eq!(
-            vec!["bar-dir", "hippo-dir", "hippo-svc"],
+            vec!["bar-dir", "hippo-dir", "hippo-proto", "whale-svc"],
             test_helpers::list_directory_recursive(&expose_dir_proxy).await
         );
 
@@ -357,7 +388,11 @@ mod tests {
         assert_eq!("friend", test_helpers::read_file(&expose_dir_proxy, "hippo-dir/hello").await);
         assert_eq!(
             "hippos".to_string(),
-            test_helpers::call_echo(&expose_dir_proxy, "hippo-svc").await
+            test_helpers::call_echo(&expose_dir_proxy, "hippo-proto", "hippos").await
+        );
+        assert_eq!(
+            "whales".to_string(),
+            test_helpers::call_echo(&expose_dir_proxy, "whale-svc/default/echo", "whales").await
         );
     }
 }

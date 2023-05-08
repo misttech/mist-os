@@ -11,7 +11,7 @@ use {
             error::{CapabilityProviderError, HubError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration, RuntimeInfo},
             mutable_directory::MutableDirectory,
-            routing_fns::{route_expose_fn, route_use_fn},
+            routing_fns::route_fn,
         },
     },
     ::routing::capability_source::InternalCapability,
@@ -250,7 +250,7 @@ impl Hub {
         assert!(!instance.is_resolved);
 
         // Add the `namespace` directory
-        let tree = DirTree::build_from_uses(route_use_fn, target.clone(), &component_decl);
+        let tree = DirTree::build_from_uses(route_fn, target.clone(), &component_decl);
         let mut ns_dir = pfs::simple();
         tree.install(&mut ns_dir)
             .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
@@ -265,7 +265,7 @@ impl Hub {
             .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
 
         // Add the `exposed` directory
-        let tree = DirTree::build_from_exposes(route_expose_fn, target.clone(), &component_decl);
+        let tree = DirTree::build_from_exposes(route_fn, target.clone(), &component_decl);
         let mut expose_dir = pfs::simple();
         tree.install(&mut expose_dir)
             .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;

@@ -8,14 +8,20 @@ use {
         model::{
             component::{ComponentInstance, WeakComponentInstance},
             resolver::Resolver,
+            routing::RouteRequest,
         },
     },
-    ::routing::policy::ScopedPolicyChecker,
-    ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
+    ::routing::{
+        capability_source::ComponentCapability,
+        policy::ScopedPolicyChecker,
+        resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
+        router::RouteBundle,
+    },
     anyhow::format_err,
+    assert_matches::assert_matches,
     async_trait::async_trait,
     cm_runner::Runner,
-    cm_rust::{ComponentDecl, ConfigValuesData, ExposeDecl, UseDecl},
+    cm_rust::{CapabilityTypeName, ComponentDecl, ConfigValuesData},
     fidl::prelude::*,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -44,92 +50,113 @@ use {
     version_history,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
-        path::Path, pseudo_directory, remote::RoutingFn,
+        path::Path, pseudo_directory, remote::RoutingFn, service,
     },
 };
 
-/// Creates a routing function factory for `UseDecl` that does the following:
+#[derive(Clone, Copy)]
+pub enum DeclType {
+    Use,
+    Expose,
+}
+
+/// Creates a routing function that does the following:
 /// - Redirects all directory capabilities to a directory with the file "hello".
 /// - Redirects all service capabilities to the echo service.
-pub fn proxy_use_routing_factory() -> impl Fn(WeakComponentInstance, UseDecl) -> RoutingFn {
-    move |_component: WeakComponentInstance, use_decl: UseDecl| {
-        new_proxy_routing_fn(use_decl.into())
+pub fn proxy_routing_factory(
+    decl_type: DeclType,
+) -> impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn {
+    move |_component: WeakComponentInstance, cap: ComponentCapability, request: RouteRequest| {
+        new_proxy_routing_fn(decl_type, cap.type_name(), request)
     }
 }
 
-/// Creates a routing function factory for `ExposeDecl` that does the following:
-/// - Redirects all directory capabilities to a directory with the file "hello".
-/// - Redirects all service capabilities to the echo service.
-pub fn proxy_expose_routing_factory() -> impl Fn(WeakComponentInstance, ExposeDecl) -> RoutingFn {
-    move |_component: WeakComponentInstance, expose_decl: ExposeDecl| {
-        new_proxy_routing_fn(expose_decl.into())
+async fn echo_protocol_fn(mut stream: EchoRequestStream) {
+    while let Some(EchoRequest::EchoString { value, responder }) = stream.try_next().await.unwrap()
+    {
+        responder.send(value.as_ref().map(|s| &**s)).unwrap();
     }
 }
 
-enum CapabilityType {
-    Service,
-    Protocol,
-    Directory,
-    Storage,
-    Runner,
-    Resolver,
-    EventStream,
-}
-
-impl From<UseDecl> for CapabilityType {
-    fn from(use_: UseDecl) -> Self {
-        match use_ {
-            UseDecl::Service(_) => CapabilityType::Service,
-            UseDecl::Protocol(_) => CapabilityType::Protocol,
-            UseDecl::Directory(_) => CapabilityType::Directory,
-            UseDecl::Storage(_) => CapabilityType::Storage,
-            UseDecl::EventStream(_) => CapabilityType::EventStream,
-        }
-    }
-}
-
-impl From<ExposeDecl> for CapabilityType {
-    fn from(expose: ExposeDecl) -> Self {
-        match expose {
-            ExposeDecl::Service(_) => CapabilityType::Service,
-            ExposeDecl::Protocol(_) => CapabilityType::Protocol,
-            ExposeDecl::Directory(_) => CapabilityType::Directory,
-            ExposeDecl::Runner(_) => CapabilityType::Runner,
-            ExposeDecl::Resolver(_) => CapabilityType::Resolver,
-            ExposeDecl::EventStream(_) => CapabilityType::EventStream,
-        }
-    }
-}
-
-fn new_proxy_routing_fn(ty: CapabilityType) -> RoutingFn {
+fn new_proxy_routing_fn(
+    decl_type: DeclType,
+    ty: CapabilityTypeName,
+    request: RouteRequest,
+) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             match ty {
-                CapabilityType::Protocol => {
+                CapabilityTypeName::Protocol => {
+                    match decl_type {
+                        DeclType::Use => {
+                            assert_matches!(request, RouteRequest::UseProtocol(_));
+                        }
+                        DeclType::Expose => {
+                            assert_matches!(request, RouteRequest::ExposeProtocol(_));
+                        }
+                    }
                     scope.spawn(async move {
                         let server_end: ServerEnd<EchoMarker> =
                             ServerEnd::new(server_end.into_channel());
-                        let mut stream: EchoRequestStream = server_end.into_stream().unwrap();
-                        while let Some(EchoRequest::EchoString { value, responder }) =
-                            stream.try_next().await.unwrap()
-                        {
-                            responder.send(value.as_ref().map(|s| &**s)).unwrap();
-                        }
+                        let stream: EchoRequestStream = server_end.into_stream().unwrap();
+                        echo_protocol_fn(stream).await;
                     });
                 }
-                CapabilityType::Directory | CapabilityType::Storage => {
+                CapabilityTypeName::Service => {
+                    match decl_type {
+                        DeclType::Use => {
+                            assert_matches!(request, RouteRequest::UseService(_));
+                        }
+                        DeclType::Expose => {
+                            assert_matches!(
+                                &request,
+                                RouteRequest::ExposeService(RouteBundle::Aggregate(v))
+                                if v.len() == 2
+                            );
+                        }
+                    }
+                    let svc_host = service::host(echo_protocol_fn);
+                    let sub_dir = pseudo_directory!(
+                        "default" => pseudo_directory!(
+                            "echo" => svc_host
+                        )
+                    );
+                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
+                }
+                CapabilityTypeName::Directory => {
+                    match decl_type {
+                        DeclType::Use => {
+                            assert_matches!(request, RouteRequest::UseDirectory(_));
+                        }
+                        DeclType::Expose => {
+                            assert_matches!(request, RouteRequest::ExposeDirectory(_));
+                        }
+                    }
                     let sub_dir = pseudo_directory!(
                         "hello" => read_only(b"friend"),
                     );
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
-                CapabilityType::Service => panic!("service capability unsupported"),
-                CapabilityType::Runner => panic!("runner capability unsupported"),
-                CapabilityType::Resolver => panic!("resolver capability unsupported"),
-                CapabilityType::EventStream => panic!("event stream capability unsupported"),
+                CapabilityTypeName::Storage => {
+                    match decl_type {
+                        DeclType::Use => {
+                            assert_matches!(request, RouteRequest::UseStorage(_));
+                        }
+                        DeclType::Expose => {
+                            panic!("can't expose storage");
+                        }
+                    }
+                    let sub_dir = pseudo_directory!(
+                        "hello" => read_only(b"friend"),
+                    );
+                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
+                }
+                CapabilityTypeName::Runner => panic!("runner capability unsupported"),
+                CapabilityTypeName::Resolver => panic!("resolver capability unsupported"),
+                CapabilityTypeName::EventStream => panic!("event stream capability unsupported"),
             }
         },
     )

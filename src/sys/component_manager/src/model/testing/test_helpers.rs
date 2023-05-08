@@ -240,10 +240,14 @@ pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, 
         .expect("Write failed");
 }
 
-pub async fn call_echo<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
+pub async fn call_echo<'a>(
+    root_proxy: &'a fio::DirectoryProxy,
+    path: &'a str,
+    input: &str,
+) -> String {
     let echo_proxy = connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&root_proxy, path)
         .expect("failed to open echo service");
-    let res = echo_proxy.echo_string(Some("hippos")).await;
+    let res = echo_proxy.echo_string(Some(input)).await;
     res.expect("failed to use echo service").expect("no result from echo")
 }
 

@@ -24,11 +24,11 @@ use {
     },
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
-    cm_rust::{ExposeDecl, UseDecl, UseStorageDecl},
+    cm_rust::{CapabilityTypeName, ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     moniker::RelativeMonikerBase,
-    std::sync::Arc,
+    std::{collections::BTreeMap, sync::Arc},
     tracing::{debug, info, warn},
 };
 
@@ -134,54 +134,6 @@ pub(super) async fn route_and_open_capability(
     }
 }
 
-/// Routes a capability from `target` to its source, starting from a `use_decl`.
-///
-/// If the capability is allowed to be routed to the `target`, per the
-/// [`crate::model::policy::GlobalPolicyChecker`], the capability is then opened at its source
-/// triggering a `CapabilityRouted` event.
-///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
-/// and `server_chan` parameters are used in the open call.
-///
-/// Only capabilities that can be installed in a namespace are supported: Protocol, Service,
-/// Directory, and Storage.
-pub(super) async fn route_and_open_namespace_capability(
-    flags: fio::OpenFlags,
-    relative_path: String,
-    use_decl: UseDecl,
-    target: &Arc<ComponentInstance>,
-    server_chan: &mut zx::Channel,
-) -> Result<(), RouteAndOpenCapabilityError> {
-    let route_request = request_for_namespace_capability_use(use_decl)
-        .ok_or(RouteAndOpenCapabilityError::NotNamespaceCapability)?;
-    let open_options = OpenOptions { flags, relative_path, server_chan };
-    route_and_open_capability(route_request, target, open_options).await
-}
-
-/// Routes a capability from `target` to its source, starting from an `expose_decl`.
-///
-/// If the capability is allowed to be routed to the `target`, per the
-/// [`crate::model::policy::GlobalPolicyChecker`], the capability is then opened at its source
-/// triggering a `CapabilityRouted` event.
-///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
-/// and `server_chan` parameters are used in the open call.
-///
-/// Only capabilities that can both be opened from a VFS and be exposed to their parent
-/// are supported: Protocol, Service, and Directory.
-pub(super) async fn route_and_open_namespace_capability_from_expose(
-    flags: fio::OpenFlags,
-    relative_path: String,
-    expose_decl: ExposeDecl,
-    target: &Arc<ComponentInstance>,
-    server_chan: &mut zx::Channel,
-) -> Result<(), RouteAndOpenCapabilityError> {
-    let route_request = request_for_namespace_capability_expose(expose_decl)
-        .ok_or(RouteAndOpenCapabilityError::NotNamespaceCapability)?;
-    let open_options = OpenOptions { flags, relative_path, server_chan };
-    route_and_open_capability(route_request, target, open_options).await
-}
-
 /// Create a new `RouteRequest` from a `UseDecl`, checking that the capability type can
 /// be installed in a namespace.
 pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRequest> {
@@ -196,14 +148,48 @@ pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRe
 
 /// Create a new `RouteRequest` from an `ExposeDecl`, checking that the capability type can
 /// be installed in a namespace.
-pub fn request_for_namespace_capability_expose(expose_decl: ExposeDecl) -> Option<RouteRequest> {
-    match expose_decl {
-        ExposeDecl::Directory(decl) => Some(RouteRequest::ExposeDirectory(decl)),
-        ExposeDecl::Protocol(decl) => Some(RouteRequest::ExposeProtocol(decl)),
-        ExposeDecl::Service(decl) => {
-            Some(RouteRequest::ExposeService(RouteBundle::from_expose(decl)))
+///
+/// REQUIRES: `exposes` is nonempty.
+/// REQUIRES: `exposes` share the same type and target name.
+/// REQUIRES: `exposes.len() > 1` only if it is a service.
+pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Option<RouteRequest> {
+    let first_expose = exposes.first().expect("invalid empty expose list");
+    let first_type_name = CapabilityTypeName::from(*first_expose);
+    assert!(
+        exposes.iter().all(|e| {
+            let type_name: CapabilityTypeName = CapabilityTypeName::from(*e);
+            first_type_name == type_name && first_expose.target_name() == e.target_name()
+        }),
+        "invalid expose input: {:?}",
+        exposes
+    );
+    match first_expose {
+        cm_rust::ExposeDecl::Protocol(e) => {
+            assert!(exposes.len() == 1, "multiple exposes");
+            Some(RouteRequest::ExposeProtocol(e.clone()))
         }
-        _ => None,
+        cm_rust::ExposeDecl::Service(_) => {
+            // Gather the exposes into a bundle. Services can aggregate, in which case
+            // multiple expose declarations map to one expose directory entry.
+            let exposes: Vec<_> = exposes
+                .into_iter()
+                .filter_map(|e| match e {
+                    cm_rust::ExposeDecl::Service(e) => Some(e.clone()),
+                    _ => None,
+                })
+                .collect();
+            Some(RouteRequest::ExposeService(RouteBundle::from_exposes(exposes)))
+        }
+        cm_rust::ExposeDecl::Directory(e) => {
+            assert!(exposes.len() == 1, "multiple exposes");
+            Some(RouteRequest::ExposeDirectory(e.clone()))
+        }
+        cm_rust::ExposeDecl::Runner(_)
+        | cm_rust::ExposeDecl::Resolver(_)
+        | cm_rust::ExposeDecl::EventStream(_) => {
+            // Runners, resolvers, and event streams do not add directory entries.
+            None
+        }
     }
 }
 
@@ -323,4 +309,14 @@ pub async fn report_routing_failure(
             }
         })
         .await
+}
+
+/// Group exposes by `target_name`. This will group all exposes that form an aggregate capability
+/// together.
+pub fn aggregate_exposes(exposes: &Vec<ExposeDecl>) -> BTreeMap<&str, Vec<&ExposeDecl>> {
+    let mut out: BTreeMap<&str, Vec<&ExposeDecl>> = BTreeMap::new();
+    for expose in exposes {
+        out.entry(expose.target_name().str()).or_insert(vec![]).push(expose);
+    }
+    out
 }

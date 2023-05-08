@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::WeakComponentInstance, dir_tree::DirTree, error::ResolveActionError,
-        routing_fns::route_expose_fn,
+        routing_fns::route_fn,
     },
     cm_rust::ComponentDecl,
     fidl::endpoints::ServerEnd,
@@ -35,7 +35,7 @@ impl ExposedDir {
         decl: &ComponentDecl,
     ) -> Result<Self, ResolveActionError> {
         let mut dir = pfs::simple();
-        let tree = DirTree::build_from_exposes(route_expose_fn, component.clone(), decl);
+        let tree = DirTree::build_from_exposes(route_fn, component.clone(), decl);
         tree.install(&mut dir).map_err(|err| ResolveActionError::ExposeDirError {
             moniker: component.abs_moniker.clone(),
             err,

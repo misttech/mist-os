@@ -14,7 +14,7 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, ExposeDecl, ExposeDeclCommon, SourceName, UseDecl},
+    cm_rust::{CapabilityName, ExposeDecl, SourceName, UseDecl},
     cm_task_scope::TaskScope,
     cm_util::channel,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
@@ -183,12 +183,14 @@ impl RouteValidator {
                     .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
                 Ok((target, request))
             });
-            let expose_requests = resolved.decl().exposes.iter().map(|expose| {
+
+            let exposes = routing::aggregate_exposes(&resolved.decl().exposes);
+            let expose_requests = exposes.into_iter().map(|(target_name, e)| {
                 let target = fsys::RouteTarget {
-                    name: expose.target_name().str().into(),
+                    name: target_name.into(),
                     decl_type: fsys::DeclType::Expose,
                 };
-                let request = routing::request_for_namespace_capability_expose(expose.clone())
+                let request = routing::request_for_namespace_capability_expose(e)
                     .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
                 Ok((target, request))
             });
@@ -233,23 +235,21 @@ impl RouteValidator {
                         matching_requests.into_iter()
                     }
                     fsys::DeclType::Expose => {
-                        let matching_requests: Vec<_> = resolved
-                            .decl()
-                            .exposes
-                            .iter()
-                            .filter_map(|e| {
-                                if !e.target_name().str().contains(&target.name) {
+                        let exposes = routing::aggregate_exposes(&resolved.decl().exposes);
+                        let matching_requests: Vec<_> = exposes
+                            .into_iter()
+                            .filter_map(|(target_name, e)| {
+                                if !target_name.contains(&target.name) {
                                     return None;
                                 }
                                 // This could be a fuzzy match so update the capability name.
                                 let target = fsys::RouteTarget {
-                                    name: e.target_name().to_string(),
+                                    name: target_name.into(),
                                     decl_type: target.decl_type,
                                 };
-                                let res =
-                                    routing::request_for_namespace_capability_expose(e.clone())
-                                        .ok_or(fsys::RouteValidatorError::InvalidArguments)
-                                        .map(|request| (target, request));
+                                let res = routing::request_for_namespace_capability_expose(e)
+                                    .ok_or(fsys::RouteValidatorError::InvalidArguments)
+                                    .map(|request| (target, request));
                                 Some(res)
                             })
                             .collect();
@@ -456,10 +456,12 @@ async fn validate_exposes(
     instance: &Arc<ComponentInstance>,
 ) -> Vec<fsys::RouteReport> {
     let mut reports = vec![];
-    for expose in exposes {
-        let capability = Some(expose.target_name().to_string());
+
+    let exposes = routing::aggregate_exposes(&exposes);
+    for (target_name, e) in exposes {
+        let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        if let Some(route_request) = routing::request_for_namespace_capability_expose(expose) {
+        if let Some(route_request) = routing::request_for_namespace_capability_expose(e) {
             let error = if let Err(e) = route_request.route(instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
             } else {
@@ -1144,7 +1146,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.buz" && m == "./my_child"
+            } if s == "foo.biz" && m == "./my_child"
         );
 
         let report = results.remove(0);
@@ -1156,7 +1158,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.biz" && m == "./my_child"
+            } if s == "foo.buz" && m == "./my_child"
         );
     }
 
