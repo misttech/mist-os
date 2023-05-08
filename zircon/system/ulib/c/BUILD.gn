@@ -251,6 +251,23 @@ if (zircon_toolchain == false) {
 
     # Don't link against the shared libc++.
     configs += [ "//build/config/zircon:static-libc++" ]
+
+    if (!is_gcc && current_cpu == "riscv64" &&
+        toolchain_variant.tags + [ "instrumentation-runtime" ] -
+        [ "instrumentation-runtime" ] != toolchain_variant.tags) {
+      # TODO(fxbug.dev/121817): There is no R_RISCV_GLOB_DAT and instead
+      # R_RISCV_64 is used for all GOT relocs; this means that they all must be
+      # presumed to have potentially nonzero addends that matter.  The ld.so
+      # bootstrap hack of saving the in-place DT_REL addends on the stack
+      # depends on the total number of addend-using relocs in ld.so being
+      # fairly small.  Luckily, it normally is even with all its plain GOT
+      # slots requiring addends (though in practice they're probably all zero
+      # anyway).  However, with instrumentation that makes runtime outcalls
+      # that number can increase quite a lot.  So when building with such
+      # instrumentation, stick to DT_RELA format where the addend-saving hack
+      # is not required at all.
+      ldflags = [ "-Wl,-z,rela" ]
+    }
   }
 }
 
