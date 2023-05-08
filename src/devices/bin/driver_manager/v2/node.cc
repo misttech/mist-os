@@ -386,7 +386,8 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 
     for (auto& parent_offer : parent_offers) {
       auto offer = CreateCompositeOffer(composite->arena_, parent_offer,
-                                        composite->parents_names_[parent_index], parent_index == 0);
+                                        composite->parents_names_[parent_index],
+                                        parent_index == primary_index);
       if (offer) {
         node_offers.push_back(*offer);
       }
