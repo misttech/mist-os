@@ -168,9 +168,10 @@ const BLOCK_OP_CLOSE_VMO uint32 = 0x00000005;
 
 const BLOCK_OP_MASK uint32 = 0x000000FF;
 
-/// Mark this operation as "Force Unit Access" (FUA), indicating that
-/// it should not complete until the data is written to the non-volatile
-/// medium (write), and that reads should bypass any on-device caches.
+/// Mark this operation as "Force Unit Access" (FUA). For writes, this indicates that the data will
+/// be written to the non-volatile medium, only after which the operation will complete. For reads,
+/// any updated version of the requested data in the volatile cache will be written to the
+/// non-volatile medium, and then read from the non-volatile medium.
 const BLOCK_FL_FORCE_ACCESS uint32 = 0x00001000;
 
 /// The pre-flush flag generates a flush operation before running this operation
