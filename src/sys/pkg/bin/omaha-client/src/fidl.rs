@@ -125,9 +125,7 @@ impl Notify for StateNotifier {
             |res| res.map_err(|_| ClosedClient);
 
         match state.into() {
-            Some(mut state) => {
-                self.proxy.on_state(&mut state).map(map_fidl_err_to_closed).left_future()
-            }
+            Some(state) => self.proxy.on_state(&state).map(map_fidl_err_to_closed).left_future(),
             None => future::ready(Ok(())).right_future(),
         }
     }

@@ -250,7 +250,7 @@ impl MockUpdateManagerService {
 
     async fn send_states(monitor: fidl_update::MonitorProxy, states: Vec<State>) {
         for state in states {
-            monitor.on_state(&mut state.into()).await.unwrap();
+            monitor.on_state(&state.into()).await.unwrap();
         }
     }
 }

@@ -152,7 +152,7 @@ impl Interaction {
     /// Create a HangingGet broker with the provided `initial_state`.
     fn create_hanging_get_broker(initial_state: InteractionWatchStateResponse) -> StateHangingGet {
         let notify_fn: NotifyFn = Box::new(|state, responder| {
-            if responder.send(&mut state.to_owned()).is_err() {
+            if responder.send(state).is_err() {
                 warn!(
                     "Failed to send \
                     fuchsia.identity.authentication.Interaction.WatchState response."
@@ -286,10 +286,10 @@ impl Interaction {
     async fn start_authentication(
         enrollments: Arc<Mutex<Vec<Enrollment>>>,
         storage_unlock_proxy: StorageUnlockMechanismProxy,
-        mut ipse: InteractionProtocolServerEnd,
+        ipse: InteractionProtocolServerEnd,
     ) -> Result<AttemptedEvent, AccountManagerError> {
         let enrollments_lock = enrollments.lock().await;
-        let fut = storage_unlock_proxy.authenticate(&mut ipse, &enrollments_lock);
+        let fut = storage_unlock_proxy.authenticate(ipse, &enrollments_lock);
         let auth_attempt = fut.await.map_err(|err| {
             AccountManagerError::new(ApiError::Unknown)
                 .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
@@ -300,10 +300,10 @@ impl Interaction {
 
     async fn start_enrollment(
         storage_unlock_proxy: StorageUnlockMechanismProxy,
-        mut ipse: InteractionProtocolServerEnd,
+        ipse: InteractionProtocolServerEnd,
     ) -> Result<(EnrollmentData, PrekeyMaterial), AccountManagerError> {
         let (data, prekey_material) = storage_unlock_proxy
-            .enroll(&mut ipse)
+            .enroll(ipse)
             .await
             .map_err(|err| {
                 AccountManagerError::new(ApiError::Unknown)

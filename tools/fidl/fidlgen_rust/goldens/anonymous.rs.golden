@@ -586,7 +586,7 @@ pub trait SomeProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#some_method(
         &self,
-        union_member: &mut UnionMember,
+        union_member: &UnionMember,
         table_member: TableMember,
     ) -> Self::SomeMethodResponseFut;
 }
@@ -615,7 +615,7 @@ impl SomeProtocolSynchronousProxy {
     }
     pub fn r#some_method(
         &self,
-        mut union_member: &mut UnionMember,
+        mut union_member: &UnionMember,
         mut table_member: TableMember,
         ___deadline: zx::Time,
     ) -> Result<SomeProtocolSomeMethodResult, fidl::Error> {
@@ -624,7 +624,7 @@ impl SomeProtocolSynchronousProxy {
                 SomeProtocolSomeMethodResponse,
                 SomeProtocolSomeMethodError,
             >, false, false>(
-                (&*union_member, &table_member),
+                (union_member, &table_member),
                 0x22ea52ec7a5146d8,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -671,7 +671,7 @@ impl SomeProtocolProxy {
     }
     pub fn r#some_method(
         &self,
-        mut union_member: &mut UnionMember,
+        mut union_member: &UnionMember,
         mut table_member: TableMember,
     ) -> fidl::client::QueryResponseFut<SomeProtocolSomeMethodResult> {
         SomeProtocolProxyInterface::r#some_method(self, union_member, table_member)
@@ -682,7 +682,7 @@ impl SomeProtocolProxyInterface for SomeProtocolProxy {
     type SomeMethodResponseFut = fidl::client::QueryResponseFut<SomeProtocolSomeMethodResult>;
     fn r#some_method(
         &self,
-        mut union_member: &mut UnionMember,
+        mut union_member: &UnionMember,
         mut table_member: TableMember,
     ) -> Self::SomeMethodResponseFut {
         fn _decode(
@@ -702,7 +702,7 @@ impl SomeProtocolProxyInterface for SomeProtocolProxy {
             SomeProtocolSomeMethodResult,
             false,
         >(
-            (&*union_member, &table_member,),
+            (union_member, &table_member,),
             0x22ea52ec7a5146d8,
             fidl::encoding::DynamicFlags::empty(),
             _decode,

@@ -170,7 +170,7 @@ impl MockUpdateInstallerService {
 
     async fn send_state(state: State, monitor: &MonitorProxy) {
         let is_reboot = state.id() == StateId::Reboot;
-        let result = monitor.on_state(&mut state.into()).await;
+        let result = monitor.on_state(&state.into()).await;
         if is_reboot {
             assert_matches!(result, Err(_));
         } else {

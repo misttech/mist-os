@@ -1935,7 +1935,7 @@ impl TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut xu: &mut StrictBoundedUnion) -> Result<(), fidl::Error> {
+    pub fn send(self, mut xu: &StrictBoundedUnion) -> Result<(), fidl::Error> {
         let r = self.send_raw(xu);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1946,23 +1946,20 @@ impl TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(
-        self,
-        mut xu: &mut StrictBoundedUnion,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut xu: &StrictBoundedUnion) -> Result<(), fidl::Error> {
         let r = self.send_raw(xu);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut xu: &mut StrictBoundedUnion) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut xu: &StrictBoundedUnion) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (&*xu,),
+            body: (xu,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -2019,7 +2016,7 @@ impl TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut xu: &mut OlderSimpleUnion) -> Result<(), fidl::Error> {
+    pub fn send(self, mut xu: &OlderSimpleUnion) -> Result<(), fidl::Error> {
         let r = self.send_raw(xu);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -2030,20 +2027,20 @@ impl TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(self, mut xu: &mut OlderSimpleUnion) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut xu: &OlderSimpleUnion) -> Result<(), fidl::Error> {
         let r = self.send_raw(xu);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut xu: &mut OlderSimpleUnion) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut xu: &OlderSimpleUnion) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (&*xu,),
+            body: (xu,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

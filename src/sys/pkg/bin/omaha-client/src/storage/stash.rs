@@ -76,9 +76,9 @@ impl Stash {
     /// the Stash set_value() fn doesn't return any error from the service itself (but will receive
     /// a synchronous Error in case the channel is closed.  Any errors in storing the values happen
     /// during the call to commit().
-    fn set_value<'a>(&'a self, key: &'a str, mut value: Value) -> Result<()> {
+    fn set_value<'a>(&'a self, key: &'a str, value: Value) -> Result<()> {
         let proxy = self.proxy.as_ref().ok_or(StashError::NotAvailable)?;
-        match proxy.set_value(key, &mut value) {
+        match proxy.set_value(key, value) {
             Ok(_) => Ok(()),
             Err(e) => {
                 error!("Unable to write to stash for key: {}; {}", key, e);

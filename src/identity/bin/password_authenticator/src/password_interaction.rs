@@ -94,7 +94,7 @@ impl<T> PasswordInteractionHandler<T> {
         let state_machine_for_notify = Rc::clone(state_machine);
         let notify_fn: NotifyFn = Box::new(move |state, responder| {
             let sending_error_state = state.is_error();
-            if let Err(err) = responder.send(&mut (*state).into()) {
+            if let Err(err) = responder.send(&(*state).into()) {
                 warn!("Failed to send password interaction state: {:?}", err);
                 return false;
             }

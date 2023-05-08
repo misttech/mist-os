@@ -218,7 +218,7 @@ pub mod hooks {
                 // Ignore errors from peers closing the channel early
                 let _ = match request {
                     paver::DataSinkRequest::WriteFirmware { responder, .. } => {
-                        responder.send(&mut paver::WriteFirmwareResult::Status(status.into_raw()))
+                        responder.send(&paver::WriteFirmwareResult::Status(status.into_raw()))
                     }
                     paver::DataSinkRequest::ReadAsset { responder, .. } => {
                         responder.send(&mut Err(status.into_raw()))
@@ -305,10 +305,9 @@ pub mod hooks {
                     payload,
                     responder,
                 } => {
-                    let mut result =
-                        (self.0)(configuration, firmware_type, read_mem_buffer(&payload));
+                    let result = (self.0)(configuration, firmware_type, read_mem_buffer(&payload));
                     // Ignore errors from peers closing the channel early
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(&result);
                     None
                 }
                 request => Some(request),
@@ -590,7 +589,7 @@ impl MockPaverService {
                 }
                 paver::DataSinkRequest::WriteFirmware { mut payload, responder, .. } => {
                     verify_buffer(&mut payload);
-                    responder.send(&mut paver::WriteFirmwareResult::Status(Status::OK.into_raw()))
+                    responder.send(&paver::WriteFirmwareResult::Status(Status::OK.into_raw()))
                 }
                 paver::DataSinkRequest::Flush { responder } => {
                     responder.send(Status::OK.into_raw())

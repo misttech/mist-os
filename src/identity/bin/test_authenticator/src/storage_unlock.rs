@@ -188,15 +188,15 @@ mod test {
     async fn no_set_success_authentication_enroll_and_authenticate() {
         run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
+                proxy.enroll(create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
             assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
-            let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
+            let (test_proxy, test_ipse) = create_test_interaction_proxy_and_server_end();
             std::mem::drop(test_proxy); // Drop test_proxy without calling SetSuccess().
 
-            let auth_result = proxy.authenticate(&mut test_ipse, &[enrollment]).await?;
+            let auth_result = proxy.authenticate(test_ipse, &[enrollment]).await?;
 
             // Should return "Aborted" since we closed the channel without
             // calling SetSuccess().
@@ -213,15 +213,15 @@ mod test {
         // server handler will keep waiting and will not return.
         run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
+                proxy.enroll(create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
             assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
-            let (_test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
+            let (_test_proxy, test_ipse) = create_test_interaction_proxy_and_server_end();
 
             let mut auth_fut = proxy
-                .authenticate(&mut test_ipse, &[enrollment])
+                .authenticate(test_ipse, &[enrollment])
                 .on_timeout(TEST_TIMEOUT.after_now(), || {
                     Err(fidl::Error::ServerRequestRead(zx::Status::TIMED_OUT))
                 });
@@ -241,14 +241,14 @@ mod test {
     async fn interection_enroll_and_successfully_authenticate_produce_same_prekey() {
         run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
+                proxy.enroll(create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
+            let (test_proxy, test_ipse) = create_test_interaction_proxy_and_server_end();
             test_proxy.set_success()?;
 
             let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy.authenticate(&mut test_ipse, &[enrollment]).await?.unwrap();
+                proxy.authenticate(test_ipse, &[enrollment]).await?.unwrap();
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
@@ -263,11 +263,11 @@ mod test {
         run_proxy_test(|proxy| async move {
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: vec![3] };
             let enrollment_2 = Enrollment { id: TEST_ENROLLMENT_ID_2, data: vec![12] };
-            let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
+            let (test_proxy, test_ipse) = create_test_interaction_proxy_and_server_end();
             test_proxy.set_success()?;
 
             let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy.authenticate(&mut test_ipse, &[enrollment, enrollment_2]).await?.unwrap();
+                proxy.authenticate(test_ipse, &[enrollment, enrollment_2]).await?.unwrap();
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
@@ -282,21 +282,19 @@ mod test {
         run_proxy_test(|proxy| async move {
             // Fail Enrollment since it only supports Test IPSE.
             assert_eq!(
-                proxy.enroll(&mut create_password_interaction_protocol()).await?,
+                proxy.enroll(create_password_interaction_protocol()).await?,
                 Err(ApiError::InvalidRequest)
             );
 
             let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
+                proxy.enroll(create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
             assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
             // Fail authentication since it only supports Test IPSE.
             assert_eq!(
-                proxy
-                    .authenticate(&mut create_password_interaction_protocol(), &[enrollment])
-                    .await?,
+                proxy.authenticate(create_password_interaction_protocol(), &[enrollment]).await?,
                 Err(ApiError::InvalidRequest)
             );
 

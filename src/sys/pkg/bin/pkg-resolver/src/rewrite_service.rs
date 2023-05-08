@@ -396,7 +396,7 @@ mod tests {
         client2.reset_all().unwrap();
 
         let rule = rule!("fuchsia.com" => "fuchsia.com", "/foo" => "/foo");
-        assert_yields_result!(client1.add(&mut rule.clone().into()), Ok(()));
+        assert_yields_result!(client1.add(&rule.clone().into()), Ok(()));
 
         assert_yields_result!(client1.commit(), Ok(()));
         assert_yields_result!(client2.commit(), Err(Status::UNAVAILABLE));
@@ -437,7 +437,7 @@ mod tests {
 
         let rule = rule!("fuchsia.com" => "devhost.fuchsia.com", "/" => "/");
 
-        assert_yields_result!(edit_client.add(&mut rule.clone().into()), Ok(()));
+        assert_yields_result!(edit_client.add(&rule.clone().into()), Ok(()));
 
         assert_eq!(list_rules(state.clone()).await, vec![]);
 
@@ -525,7 +525,7 @@ mod tests {
         let replacement_rule = rule!("fuchsia.com" => "fuchsia.com", "/a" => "/c");
 
         edit_client.reset_all().unwrap();
-        assert_yields_result!(edit_client.add(&mut replacement_rule.into()), Ok(()));
+        assert_yields_result!(edit_client.add(&replacement_rule.into()), Ok(()));
 
         // Pending transaction does not affect apply call.
         assert_eq!(
@@ -565,7 +565,7 @@ mod tests {
             rule!("fuchsia.com" => "wrong-replacement.fuchsia.com", "/" => "/bar/"),
         ];
         for rule in rules.into_iter().rev() {
-            assert_yields_result!(client.add(&mut rule.into()), Ok(()));
+            assert_yields_result!(client.add(&rule.into()), Ok(()));
         }
         assert_yields_result!(client.commit(), Ok(()));
 
@@ -573,14 +573,14 @@ mod tests {
         let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
         service.serve_edit_transaction(request_stream).await;
         let rule = rule!("fuchsia.com" => "correct.fuchsia.com", "/" => "/");
-        assert_yields_result!(client.add(&mut rule.into()), Ok(()));
+        assert_yields_result!(client.add(&rule.into()), Ok(()));
         assert_yields_result!(client.commit(), Ok(()));
 
         // Adding a different entry with higher priority enables the new source.
         let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
         service.serve_edit_transaction(request_stream).await;
         let rule = rule!("fuchsia.com" => "correcter.fuchsia.com", "/" => "/");
-        assert_yields_result!(client.add(&mut rule.into()), Ok(()));
+        assert_yields_result!(client.add(&rule.into()), Ok(()));
         assert_yields_result!(client.commit(), Ok(()));
     }
 

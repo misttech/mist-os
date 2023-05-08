@@ -261,13 +261,13 @@ pub trait ProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#request_strict_response_flexible(
         &self,
-        s: &mut StrictFoo,
+        s: &StrictFoo,
     ) -> Self::RequestStrictResponseFlexibleResponseFut;
     type RequestFlexibleResponseStrictResponseFut: std::future::Future<Output = Result<StrictFoo, fidl::Error>>
         + Send;
     fn r#request_flexible_response_strict(
         &self,
-        s: &mut FlexibleFoo,
+        s: &FlexibleFoo,
     ) -> Self::RequestFlexibleResponseStrictResponseFut;
 }
 
@@ -295,13 +295,13 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#request_strict_response_flexible(
         &self,
-        mut s: &mut StrictFoo,
+        mut s: &StrictFoo,
         ___deadline: zx::Time,
     ) -> Result<FlexibleFoo, fidl::Error> {
         let _response = self.client.send_query::<
                 ProtocolRequestStrictResponseFlexibleRequest,
                 ProtocolRequestStrictResponseFlexibleResponse,false,true>(
-                (&*s,),
+                (s,),
                 0x9b8c7d3d118df13,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -311,13 +311,13 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#request_flexible_response_strict(
         &self,
-        mut s: &mut FlexibleFoo,
+        mut s: &FlexibleFoo,
         ___deadline: zx::Time,
     ) -> Result<StrictFoo, fidl::Error> {
         let _response = self.client.send_query::<
                 ProtocolRequestFlexibleResponseStrictRequest,
                 ProtocolRequestFlexibleResponseStrictResponse,false,true>(
-                (&*s,),
+                (s,),
                 0x480c77690533acb7,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -365,13 +365,13 @@ impl ProtocolProxy {
     }
     pub fn r#request_strict_response_flexible(
         &self,
-        mut s: &mut StrictFoo,
+        mut s: &StrictFoo,
     ) -> fidl::client::QueryResponseFut<FlexibleFoo> {
         ProtocolProxyInterface::r#request_strict_response_flexible(self, s)
     }
     pub fn r#request_flexible_response_strict(
         &self,
-        mut s: &mut FlexibleFoo,
+        mut s: &FlexibleFoo,
     ) -> fidl::client::QueryResponseFut<StrictFoo> {
         ProtocolProxyInterface::r#request_flexible_response_strict(self, s)
     }
@@ -381,7 +381,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
     type RequestStrictResponseFlexibleResponseFut = fidl::client::QueryResponseFut<FlexibleFoo>;
     fn r#request_strict_response_flexible(
         &self,
-        mut s: &mut StrictFoo,
+        mut s: &StrictFoo,
     ) -> Self::RequestStrictResponseFlexibleResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -397,7 +397,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             FlexibleFoo,
             false,
         >(
-            (&*s,),
+            (s,),
             0x9b8c7d3d118df13,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -406,7 +406,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
     type RequestFlexibleResponseStrictResponseFut = fidl::client::QueryResponseFut<StrictFoo>;
     fn r#request_flexible_response_strict(
         &self,
-        mut s: &mut FlexibleFoo,
+        mut s: &FlexibleFoo,
     ) -> Self::RequestFlexibleResponseStrictResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -422,7 +422,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             StrictFoo,
             false,
         >(
-            (&*s,),
+            (s,),
             0x480c77690533acb7,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -709,7 +709,7 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut f: &mut FlexibleFoo) -> Result<(), fidl::Error> {
+    pub fn send(self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
         let r = self.send_raw(f);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -720,20 +720,20 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(self, mut f: &mut FlexibleFoo) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
         let r = self.send_raw(f);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut f: &mut FlexibleFoo) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (&*f,),
+            body: (f,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -788,7 +788,7 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut f: &mut StrictFoo) -> Result<(), fidl::Error> {
+    pub fn send(self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
         let r = self.send_raw(f);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -799,20 +799,20 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(self, mut f: &mut StrictFoo) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
         let r = self.send_raw(f);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut f: &mut StrictFoo) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (&*f,),
+            body: (f,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

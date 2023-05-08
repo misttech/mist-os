@@ -3555,7 +3555,7 @@ impl fidl::endpoints::ProtocolMarker for MethodWithUnionMarker {
 pub trait MethodWithUnionProxyInterface: Send + Sync {
     type UnionMethodResponseFut: std::future::Future<Output = Result<Option<Box<TheUnion>>, fidl::Error>>
         + Send;
-    fn r#union_method(&self, u: &mut TheUnion) -> Self::UnionMethodResponseFut;
+    fn r#union_method(&self, u: &TheUnion) -> Self::UnionMethodResponseFut;
 }
 
 #[derive(Debug)]
@@ -3582,13 +3582,13 @@ impl MethodWithUnionSynchronousProxy {
     }
     pub fn r#union_method(
         &self,
-        mut u: &mut TheUnion,
+        mut u: &TheUnion,
         ___deadline: zx::Time,
     ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
         let _response = self.client.send_query::<
                 MethodWithUnionUnionMethodRequest,
                 MethodWithUnionUnionMethodResponse,false,true>(
-                (&*u,),
+                (u,),
                 0x393e7f5b2b821218,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -3636,7 +3636,7 @@ impl MethodWithUnionProxy {
     }
     pub fn r#union_method(
         &self,
-        mut u: &mut TheUnion,
+        mut u: &TheUnion,
     ) -> fidl::client::QueryResponseFut<Option<Box<TheUnion>>> {
         MethodWithUnionProxyInterface::r#union_method(self, u)
     }
@@ -3644,7 +3644,7 @@ impl MethodWithUnionProxy {
 
 impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
     type UnionMethodResponseFut = fidl::client::QueryResponseFut<Option<Box<TheUnion>>>;
-    fn r#union_method(&self, mut u: &mut TheUnion) -> Self::UnionMethodResponseFut {
+    fn r#union_method(&self, mut u: &TheUnion) -> Self::UnionMethodResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
@@ -3659,7 +3659,7 @@ impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
             Option<Box<TheUnion>>,
             false,
         >(
-            (&*u,),
+            (u,),
             0x393e7f5b2b821218,
             fidl::encoding::DynamicFlags::empty(),
             _decode,

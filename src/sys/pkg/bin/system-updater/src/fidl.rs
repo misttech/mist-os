@@ -45,7 +45,7 @@ impl Notify for UpdateStateNotifier {
     >;
 
     fn notify(&self, state: State) -> Self::NotifyFuture {
-        self.proxy.on_state(&mut state.into()).map(|result| result.map_err(|_| ClosedClient))
+        self.proxy.on_state(&state.into()).map(|result| result.map_err(|_| ClosedClient))
     }
 }
 

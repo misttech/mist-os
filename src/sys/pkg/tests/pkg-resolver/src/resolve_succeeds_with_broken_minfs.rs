@@ -307,9 +307,9 @@ impl FailingWriteFileStreamHandler {
                             .send_on_open_(s, node_info)
                             .expect("send on open to fake file");
                     }
-                    fio::FileEvent::OnRepresentation { mut payload } => {
+                    fio::FileEvent::OnRepresentation { payload } => {
                         control_handle
-                            .send_on_representation(&mut payload)
+                            .send_on_representation(payload)
                             .expect("send on open to fake file");
                     }
                 }

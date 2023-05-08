@@ -94,8 +94,8 @@ impl StashNode {
         Ok(())
     }
 
-    fn write_val(&mut self, field: &str, mut value: fidl_stash::Value) -> Result<(), Error> {
-        self.stash.set_value(&format!("{}{}", self.key, field), &mut value)?;
+    fn write_val(&mut self, field: &str, value: fidl_stash::Value) -> Result<(), Error> {
+        self.stash.set_value(&format!("{}{}", self.key, field), value)?;
         Ok(())
     }
     pub fn write_str(&mut self, field: &str, s: String) -> Result<(), Error> {

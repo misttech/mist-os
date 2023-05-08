@@ -112,11 +112,11 @@ impl Stash {
     where
         T: serde::Serialize + std::fmt::Debug + ?Sized,
     {
-        let mut v = fidl_fuchsia_stash::Value::Stringval(
+        let v = fidl_fuchsia_stash::Value::Stringval(
             serde_json::to_string(v)
                 .map_err(|e| StashError::JsonSerialization(key.to_string(), e))?,
         );
-        let () = self.proxy.set_value(key, &mut v)?;
+        let () = self.proxy.set_value(key, v)?;
         let () = self.proxy.commit()?;
         Ok(())
     }
@@ -396,9 +396,9 @@ mod tests {
         let serialized_client =
             serde_json::to_string(&client_record).expect("serialization failed");
         let client_key = stash.client_key(&client_id);
-        let mut client_val = fidl_fuchsia_stash::Value::Stringval(serialized_client);
+        let client_val = fidl_fuchsia_stash::Value::Stringval(serialized_client);
         let () = accessor
-            .set_value(&client_key, &mut client_val)
+            .set_value(&client_key, client_val)
             .unwrap_or_else(|err| panic!("failed to set value in {}: {:?}", id, err));
         let () = accessor.commit().unwrap_or_else(|err| {
             panic!("failed to commit stash state change in {}: {:?}", id, err)
@@ -428,7 +428,7 @@ mod tests {
         let () = accessor
             .set_value(
                 &OPTIONS_KEY.to_string(),
-                &mut fidl_fuchsia_stash::Value::Stringval(serialized_opts),
+                fidl_fuchsia_stash::Value::Stringval(serialized_opts),
             )
             .unwrap_or_else(|err| {
                 panic!("failed to set value in stash for key={}: {:?}", OPTIONS_KEY, err)
@@ -473,7 +473,7 @@ mod tests {
         let () = accessor
             .set_value(
                 &PARAMETERS_KEY.to_string(),
-                &mut fidl_fuchsia_stash::Value::Stringval(serialized_params),
+                fidl_fuchsia_stash::Value::Stringval(serialized_params),
             )
             .unwrap_or_else(|err| {
                 panic!("failed to set value in stash for key={}: {:?}", OPTIONS_KEY, err)
@@ -508,13 +508,13 @@ mod tests {
         let serialized_client =
             serde_json::to_string(&client_record).expect("serialization failed");
         let invalid_key = "invalid_key";
-        let mut client_stringval = fidl_fuchsia_stash::Value::Stringval(serialized_client);
-        let () = accessor.set_value(invalid_key, &mut client_stringval).unwrap_or_else(|err| {
+        let client_stringval = fidl_fuchsia_stash::Value::Stringval(serialized_client);
+        let () = accessor.set_value(invalid_key, client_stringval).unwrap_or_else(|err| {
             panic!("failed to set value in stash for key={}: {:?}", OPTIONS_KEY, err)
         });
         let client_key = stash.client_key(&client_id);
-        let mut client_intval = fidl_fuchsia_stash::Value::Intval(42);
-        let () = accessor.set_value(&client_key, &mut client_intval).unwrap_or_else(|err| {
+        let client_intval = fidl_fuchsia_stash::Value::Intval(42);
+        let () = accessor.set_value(&client_key, client_intval).unwrap_or_else(|err| {
             panic!("failed to set value in stash for key={}: {:?}", OPTIONS_KEY, err)
         });
         let () = accessor.commit().unwrap_or_else(|err| {
@@ -573,8 +573,8 @@ mod tests {
         let serialized_client =
             serde_json::to_string(&client_record).expect("serialization failed");
         let client_key = stash.client_key(&client_mac);
-        let mut client_val = fidl_fuchsia_stash::Value::Stringval(serialized_client);
-        let () = accessor.set_value(&client_key, &mut client_val).unwrap_or_else(|err| {
+        let client_val = fidl_fuchsia_stash::Value::Stringval(serialized_client);
+        let () = accessor.set_value(&client_key, client_val).unwrap_or_else(|err| {
             panic!("failed to set value in stash for key={}: {:?}", OPTIONS_KEY, err)
         });
         let () = accessor.commit().unwrap_or_else(|err| {

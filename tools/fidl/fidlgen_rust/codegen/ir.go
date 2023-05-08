@@ -881,7 +881,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		case fidlgen.UnionDeclType:
 			t.Fidl = name
 			t.Owned = name
-			t.Param = "&mut " + name
+			if declInfo.IsResourceType() {
+				t.Param = name
+			} else {
+				t.Param = "&" + name
+			}
 			if val.Nullable {
 				t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
 				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
@@ -944,7 +948,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
 			return v
-		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
+		case fidlgen.StructDeclType:
 			if t.Nullable {
 				if t.IsResourceType() {
 					return v + ".as_mut()"
@@ -966,6 +970,17 @@ func convertParamToEncodeExpr(v string, t Type) string {
 				return v + ".as_ref()"
 			}
 			return "&" + v
+		case fidlgen.UnionDeclType:
+			if t.Nullable {
+				if t.IsResourceType() {
+					return v + ".as_mut()"
+				}
+				return v
+			}
+			if t.IsResourceType() {
+				return "&mut " + v
+			}
+			return v
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
 		}

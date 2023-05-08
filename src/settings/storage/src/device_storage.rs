@@ -341,9 +341,9 @@ impl DeviceStorage {
         };
 
         Ok(if cached_value != Some(&new_value) {
-            let mut serialized = Value::Stringval(new_value);
+            let serialized = Value::Stringval(new_value);
             let key = prefixed(key);
-            cached_storage.stash_proxy.set_value(&key, &mut serialized)?;
+            cached_storage.stash_proxy.set_value(&key, serialized)?;
             if !self.debounce_writes {
                 // Not debouncing writes for testing, just flush immediately.
                 DeviceStorage::stash_flush(
@@ -393,8 +393,7 @@ impl DeviceStorage {
         let typed_storage =
             self.typed_storage_map.get(key).expect("Did not request an initialized key");
         let cached_storage = typed_storage.cached_storage.lock().await;
-        let mut value = Value::Stringval(value);
-        cached_storage.stash_proxy.set_value(&prefixed(key), &mut value)?;
+        cached_storage.stash_proxy.set_value(&prefixed(key), Value::Stringval(value))?;
         typed_storage.flush_sender.unbounded_send(()).unwrap();
         Ok(())
     }

@@ -417,7 +417,7 @@ pub trait MainProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_anon_composed(
         &self,
-        payload: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
+        payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
     ) -> Self::TwoWayAnonComposedResponseFut;
     type TwoWayAnonComposedWithErrorResponseFut: std::future::Future<Output = Result<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error>> + Send;
     fn r#two_way_anon_composed_with_error(
@@ -433,7 +433,7 @@ pub trait MainProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_named_composed(
         &self,
-        payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Self::TwoWayNamedComposedResponseFut;
     type TwoWayNamedComposedWithErrorResponseFut: std::future::Future<Output = Result<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error>> + Send;
     fn r#two_way_named_composed_with_error(
@@ -449,7 +449,7 @@ pub trait MainProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_import(
         &self,
-        payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Self::TwoWayImportResponseFut;
     type TwoWayImportWithErrorResponseFut: std::future::Future<Output = Result<MainProtocolTwoWayImportWithErrorResult, fidl::Error>>
         + Send;
@@ -460,7 +460,7 @@ pub trait MainProtocolProxyInterface: Send + Sync {
     fn r#one_way_local(&self, payload: LocalTablePayload) -> Result<(), fidl::Error>;
     type TwoWayLocalResponseFut: std::future::Future<Output = Result<LocalTablePayload, fidl::Error>>
         + Send;
-    fn r#two_way_local(&self, payload: &mut LocalUnionPayload) -> Self::TwoWayLocalResponseFut;
+    fn r#two_way_local(&self, payload: &LocalUnionPayload) -> Self::TwoWayLocalResponseFut;
     type TwoWayLocalWithErrorResponseFut: std::future::Future<Output = Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error>>
         + Send;
     fn r#two_way_local_with_error(
@@ -472,7 +472,7 @@ pub trait MainProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#two_way_anon(
         &self,
-        payload: &mut MainProtocolTwoWayAnonRequest,
+        payload: &MainProtocolTwoWayAnonRequest,
     ) -> Self::TwoWayAnonResponseFut;
     type TwoWayAnonWithErrorResponseFut: std::future::Future<Output = Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error>>
         + Send;
@@ -516,7 +516,7 @@ impl MainProtocolSynchronousProxy {
     }
     pub fn r#two_way_anon_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
+        mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
         ___deadline: zx::Time,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
@@ -525,7 +525,7 @@ impl MainProtocolSynchronousProxy {
         let _response = self.client.send_query::<
                 fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
                 fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,false,true>(
-                &*payload,
+                payload,
                 0x16afa17ea70d3370,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -564,13 +564,13 @@ impl MainProtocolSynchronousProxy {
     }
     pub fn r#two_way_named_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
         ___deadline: zx::Time,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl_test_protocollayouts_imported::ImportUnionPayload,
                 fidl_test_protocollayouts_imported::ImportTablePayload,false,true>(
-                &*payload,
+                payload,
                 0xf67f27cae663810,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -609,13 +609,13 @@ impl MainProtocolSynchronousProxy {
     }
     pub fn r#two_way_import(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
         ___deadline: zx::Time,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
                 fidl_test_protocollayouts_imported::ImportUnionPayload,
                 fidl_test_protocollayouts_imported::ImportTablePayload,false,true>(
-                &*payload,
+                payload,
                 0x2bf680c8f0d40604,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -648,12 +648,12 @@ impl MainProtocolSynchronousProxy {
     }
     pub fn r#two_way_local(
         &self,
-        mut payload: &mut LocalUnionPayload,
+        mut payload: &LocalUnionPayload,
         ___deadline: zx::Time,
     ) -> Result<LocalTablePayload, fidl::Error> {
         let _response =
             self.client.send_query::<LocalUnionPayload, LocalTablePayload, false, true>(
-                &*payload,
+                payload,
                 0x6bbeeb18f39c539b,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -688,13 +688,13 @@ impl MainProtocolSynchronousProxy {
     }
     pub fn r#two_way_anon(
         &self,
-        mut payload: &mut MainProtocolTwoWayAnonRequest,
+        mut payload: &MainProtocolTwoWayAnonRequest,
         ___deadline: zx::Time,
     ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
         let _response = self.client.send_query::<
                 MainProtocolTwoWayAnonRequest,
                 MainProtocolTwoWayAnonResponse,false,true>(
-                &*payload,
+                payload,
                 0x672eb5e71efdabcf,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -764,7 +764,7 @@ impl MainProtocolProxy {
     }
     pub fn r#two_way_anon_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
+        mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
     ) -> fidl::client::QueryResponseFut<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
     > {
@@ -786,7 +786,7 @@ impl MainProtocolProxy {
     }
     pub fn r#two_way_named_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>
     {
         MainProtocolProxyInterface::r#two_way_named_composed(self, payload)
@@ -807,7 +807,7 @@ impl MainProtocolProxy {
     }
     pub fn r#two_way_import(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>
     {
         MainProtocolProxyInterface::r#two_way_import(self, payload)
@@ -823,7 +823,7 @@ impl MainProtocolProxy {
     }
     pub fn r#two_way_local(
         &self,
-        mut payload: &mut LocalUnionPayload,
+        mut payload: &LocalUnionPayload,
     ) -> fidl::client::QueryResponseFut<LocalTablePayload> {
         MainProtocolProxyInterface::r#two_way_local(self, payload)
     }
@@ -841,7 +841,7 @@ impl MainProtocolProxy {
     }
     pub fn r#two_way_anon(
         &self,
-        mut payload: &mut MainProtocolTwoWayAnonRequest,
+        mut payload: &MainProtocolTwoWayAnonRequest,
     ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse> {
         MainProtocolProxyInterface::r#two_way_anon(self, payload)
     }
@@ -869,7 +869,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
     >;
     fn r#two_way_anon_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
+        mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
     ) -> Self::TwoWayAnonComposedResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -888,7 +888,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
             false,
         >(
-            &*payload,
+            payload,
             0x16afa17ea70d3370,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -938,7 +938,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>;
     fn r#two_way_named_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Self::TwoWayNamedComposedResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -954,7 +954,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl_test_protocollayouts_imported::ImportTablePayload,
             false,
         >(
-            &*payload,
+            payload,
             0xf67f27cae663810,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -1007,7 +1007,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fidl::client::QueryResponseFut<fidl_test_protocollayouts_imported::ImportTablePayload>;
     fn r#two_way_import(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Self::TwoWayImportResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -1023,7 +1023,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl_test_protocollayouts_imported::ImportTablePayload,
             false,
         >(
-            &*payload,
+            payload,
             0x2bf680c8f0d40604,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -1066,7 +1066,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
     type TwoWayLocalResponseFut = fidl::client::QueryResponseFut<LocalTablePayload>;
-    fn r#two_way_local(&self, mut payload: &mut LocalUnionPayload) -> Self::TwoWayLocalResponseFut {
+    fn r#two_way_local(&self, mut payload: &LocalUnionPayload) -> Self::TwoWayLocalResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<LocalTablePayload, fidl::Error> {
@@ -1075,7 +1075,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             Ok(_response)
         }
         self.client.send_query_and_decode::<LocalUnionPayload, LocalTablePayload, false>(
-            &*payload,
+            payload,
             0x6bbeeb18f39c539b,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -1120,7 +1120,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
     type TwoWayAnonResponseFut = fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse>;
     fn r#two_way_anon(
         &self,
-        mut payload: &mut MainProtocolTwoWayAnonRequest,
+        mut payload: &MainProtocolTwoWayAnonRequest,
     ) -> Self::TwoWayAnonResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -1136,7 +1136,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             MainProtocolTwoWayAnonResponse,
             false,
         >(
-            &*payload,
+            payload,
             0x672eb5e71efdabcf,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -2114,10 +2114,10 @@ impl fidl::endpoints::ControlHandle for MainProtocolControlHandle {
 impl MainProtocolControlHandle {
     pub fn send_on_anon_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest,
+        mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest, false>(
-            &*payload,
+            payload,
             0,
             0x7fa8a0bf08128a0b,
             fidl::encoding::DynamicFlags::empty()
@@ -2139,10 +2139,10 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_named_composed(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl_test_protocollayouts_imported::ImportUnionPayload, false>(
-            &*payload,
+            payload,
             0,
             0x5e68f92a5b28cdea,
             fidl::encoding::DynamicFlags::empty(),
@@ -2164,10 +2164,10 @@ impl MainProtocolControlHandle {
     }
     pub fn send_on_import(
         &self,
-        mut payload: &mut fidl_test_protocollayouts_imported::ImportUnionPayload,
+        mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<fidl_test_protocollayouts_imported::ImportUnionPayload, false>(
-            &*payload,
+            payload,
             0,
             0x5b61e3156b09acd0,
             fidl::encoding::DynamicFlags::empty(),
@@ -2187,9 +2187,9 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    pub fn send_on_local(&self, mut payload: &mut LocalUnionPayload) -> Result<(), fidl::Error> {
+    pub fn send_on_local(&self, mut payload: &LocalUnionPayload) -> Result<(), fidl::Error> {
         self.inner.send::<LocalUnionPayload, false>(
-            &*payload,
+            payload,
             0,
             0x3a46c48153f0437c,
             fidl::encoding::DynamicFlags::empty(),
@@ -2206,12 +2206,9 @@ impl MainProtocolControlHandle {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    pub fn send_on_anon(
-        &self,
-        mut payload: &mut MainProtocolOnAnonRequest,
-    ) -> Result<(), fidl::Error> {
+    pub fn send_on_anon(&self, mut payload: &MainProtocolOnAnonRequest) -> Result<(), fidl::Error> {
         self.inner.send::<MainProtocolOnAnonRequest, false>(
-            &*payload,
+            payload,
             0,
             0x64f7b1ec1ba0810b,
             fidl::encoding::DynamicFlags::empty(),

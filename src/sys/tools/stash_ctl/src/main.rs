@@ -58,8 +58,8 @@ fn main() -> Result<(), Error> {
             });
             executor.run_singlethreaded(fut);
         }
-        StashOperation::Set(k, mut v) => {
-            acc.set_value(&k, &mut v)?;
+        StashOperation::Set(k, v) => {
+            acc.set_value(&k, v)?;
             acc.commit()?;
             println!("{} set successfully", k);
         }

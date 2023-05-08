@@ -263,7 +263,7 @@ impl StashInner {
             // Persist the serialized blob.
             let serialized = serde_json::to_string(&BondingDataSerializer::new(&bond))?;
             self.proxy
-                .set_value(&bonding_data_key(bond.identifier), &mut Value::Stringval(serialized))?;
+                .set_value(&bonding_data_key(bond.identifier), Value::Stringval(serialized))?;
         }
         self.proxy.flush().await?.map_err(|e| format_err!("Failed to flush to stash: {:?}", e))?;
 
@@ -309,7 +309,7 @@ impl StashInner {
 
         // Persist the serialized blob.
         let serialized = serde_json::to_string(&HostDataSerializer(&data.clone().into()))?;
-        self.proxy.set_value(&host_data_key(local_addr), &mut Value::Stringval(serialized))?;
+        self.proxy.set_value(&host_data_key(local_addr), Value::Stringval(serialized))?;
         self.proxy.flush().await?.map_err(|e| format_err!("Failed to flush to stash: {:?}", e))?;
 
         // Update the in memory cache.
@@ -504,7 +504,7 @@ mod tests {
 
         // Set a key/value that contains a non-string value.
         accessor
-            .set_value("bonding-data:test1234", &mut Value::Intval(5))
+            .set_value("bonding-data:test1234", Value::Intval(5))
             .expect("failed to set a bonding data value");
         accessor
             .flush()
@@ -527,7 +527,7 @@ mod tests {
 
         // Set a vector that contains a malformed JSON value
         accessor
-            .set_value("bonding-data:test1234", &mut Value::Stringval("{0}".to_string()))
+            .set_value("bonding-data:test1234", Value::Stringval("{0}".to_string()))
             .expect("failed to set a bonding data value");
         accessor
             .flush()
@@ -758,9 +758,9 @@ mod tests {
             .expect("failed to create StashAccessor");
 
         // Insert values into stash that contain bonding data for several devices.
-        accessor.set_value("bonding-data:1", &mut bond_entry_1()).expect("failed to set value");
-        accessor.set_value("bonding-data:2", &mut bond_entry_2()).expect("failed to set value");
-        accessor.set_value("bonding-data:3", &mut bond_entry_3()).expect("failed to set value");
+        accessor.set_value("bonding-data:1", bond_entry_1()).expect("failed to set value");
+        accessor.set_value("bonding-data:2", bond_entry_2()).expect("failed to set value");
+        accessor.set_value("bonding-data:3", bond_entry_3()).expect("failed to set value");
         accessor
             .flush()
             .await
@@ -811,8 +811,8 @@ mod tests {
             bonding_data_key(bond_data_3().identifier),
             bonding_data_key(bond_data_4_dupes_3().identifier),
         );
-        accessor.set_value(&id_3_key, &mut bond_entry_3()).expect("failed to set value");
-        accessor.set_value(&id_4_key, &mut bond_entry_4_dupes_3()).expect("failed to set value");
+        accessor.set_value(&id_3_key, bond_entry_3()).expect("failed to set value");
+        accessor.set_value(&id_4_key, bond_entry_4_dupes_3()).expect("failed to set value");
         accessor
             .flush()
             .await
@@ -868,9 +868,9 @@ mod tests {
             .await
             .expect("failed to create StashAccessor");
 
-        accessor.set_value("bonding-data:3", &mut bond_entry_3()).expect("failed to set value");
+        accessor.set_value("bonding-data:3", bond_entry_3()).expect("failed to set value");
         accessor
-            .set_value(&"bonding-data:5", &mut bond_entry_5_same_addrs_3())
+            .set_value(&"bonding-data:5", bond_entry_5_same_addrs_3())
             .expect("failed to set value");
         accessor
             .flush()
@@ -1002,8 +1002,8 @@ mod tests {
         let accessor = create_stash_accessor(name).await.expect("failed to create StashAccessor");
 
         // Insert initial bonding data values into stash
-        for (id, mut entry) in entries {
-            accessor.set_value(id, &mut entry).expect("failed to set value");
+        for (id, entry) in entries {
+            accessor.set_value(id, entry).expect("failed to set value");
         }
         accessor
             .flush()

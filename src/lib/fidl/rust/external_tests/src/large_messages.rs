@@ -89,7 +89,7 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                     assert_eq!(&payload.str.unwrap().as_str(), &expected_str);
 
                     control_handle
-                        .send_on_one_way_reply_event(&mut LargeMessageUnion::Str(
+                        .send_on_one_way_reply_event(LargeMessageUnion::Str(
                             expected_str.to_string(),
                         ))
                         .unwrap();
@@ -143,10 +143,7 @@ where
 fn overflowing_two_way_request_only_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         client
-            .two_way_request_only(
-                &mut LargeMessageUnion::Str(LARGE_STR.to_string()),
-                Time::INFINITE,
-            )
+            .two_way_request_only(LargeMessageUnion::Str(LARGE_STR.to_string()), Time::INFINITE)
             .unwrap();
     })
 }
@@ -155,10 +152,7 @@ fn overflowing_two_way_request_only_large_sync() {
 fn overflowing_two_way_request_only_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         client
-            .two_way_request_only(
-                &mut LargeMessageUnion::Str(SMALL_STR.to_string()),
-                Time::INFINITE,
-            )
+            .two_way_request_only(LargeMessageUnion::Str(SMALL_STR.to_string()), Time::INFINITE)
             .unwrap();
     })
 }
@@ -166,10 +160,7 @@ fn overflowing_two_way_request_only_small_sync() {
 #[fasync::run_singlethreaded(test)]
 async fn overflowing_two_way_request_only_large_async() {
     run_client_async(LARGE_STR, |client| async move {
-        client
-            .two_way_request_only(&mut LargeMessageUnion::Str(LARGE_STR.to_string()))
-            .await
-            .unwrap();
+        client.two_way_request_only(LargeMessageUnion::Str(LARGE_STR.to_string())).await.unwrap();
     })
     .await
 }
@@ -177,10 +168,7 @@ async fn overflowing_two_way_request_only_large_async() {
 #[fasync::run_singlethreaded(test)]
 async fn overflowing_two_way_request_only_small_async() {
     run_client_async(SMALL_STR, |client| async move {
-        client
-            .two_way_request_only(&mut LargeMessageUnion::Str(SMALL_STR.to_string()))
-            .await
-            .unwrap();
+        client.two_way_request_only(LargeMessageUnion::Str(SMALL_STR.to_string())).await.unwrap();
     })
     .await
 }

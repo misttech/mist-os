@@ -145,12 +145,10 @@ impl StreamVolumeControl {
             )
         })?;
         let stream_type = self.stored_stream.stream_type;
-        let mut usage = Usage::RenderUsage(AudioRenderUsage::from(stream_type));
+        let usage = Usage::RenderUsage(AudioRenderUsage::from(stream_type));
 
         let guard = trace_guard!(id, "bind usage volume control");
-        if let Err(e) =
-            call!(self.audio_service => bind_usage_volume_control(&mut usage, server_end))
-        {
+        if let Err(e) = call!(self.audio_service => bind_usage_volume_control(&usage, server_end)) {
             return Err(ControllerError::ExternalFailure(
                 SettingType::Audio,
                 CONTROLLER_ERROR_DEPENDENCY.into(),

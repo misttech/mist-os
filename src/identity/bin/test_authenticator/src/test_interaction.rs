@@ -57,7 +57,7 @@ impl TestInteraction {
         initial_state: TestInteractionWatchStateResponse,
     ) -> StateHangingGet {
         let notify_fn: NotifyFn = Box::new(|state, responder| {
-            match responder.send(&mut state.to_owned()) {
+            match responder.send(state) {
                 Ok(()) => true, // indicates that the client was successfully updated with the new state
                 Err(err) => {
                     warn!(

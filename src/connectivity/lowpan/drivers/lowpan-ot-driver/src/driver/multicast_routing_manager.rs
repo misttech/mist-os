@@ -266,11 +266,11 @@ mod test {
             unicast_source: UNICAST_SOURCE_ADDR_FIDL,
             multicast_destination: MULTICAST_DEST_ADDR1_FIDL,
         };
-        let mut event = fnet_mcast::RoutingEvent::MissingRoute(fnet_mcast::Empty {});
+        let event = fnet_mcast::RoutingEvent::MissingRoute(fnet_mcast::Empty {});
 
         // Send the missing route event.
         responder
-            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &mut event)
+            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &event)
             .expect("Responding should succeed");
 
         // Now ensure that 'add_route' request has been successfully made.
@@ -340,11 +340,11 @@ mod test {
             unicast_source: UNICAST_SOURCE_ADDR_FIDL,
             multicast_destination: MULTICAST_DEST_ADDR2_FIDL,
         };
-        let mut event = fnet_mcast::RoutingEvent::MissingRoute(fnet_mcast::Empty {});
+        let event = fnet_mcast::RoutingEvent::MissingRoute(fnet_mcast::Empty {});
 
         // Send the missing route event.
         responder
-            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &mut event)
+            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &event)
             .expect("Responding should succeed");
 
         // We should not see any AddRoute or any other request, and should directly see another

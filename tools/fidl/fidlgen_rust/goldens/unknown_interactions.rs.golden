@@ -3588,10 +3588,10 @@ impl UnknownInteractionsAjarProtocolControlHandle {
     }
     pub fn send_strict_event_union(
         &self,
-        mut payload: &mut UnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        mut payload: &UnknownInteractionsAjarProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsAjarProtocolStrictEventUnionRequest, false>(
-            &*payload,
+            payload,
             0,
             0x57794b4cc91f816f,
             fidl::encoding::DynamicFlags::empty(),
@@ -3679,10 +3679,10 @@ impl UnknownInteractionsAjarProtocolControlHandle {
     }
     pub fn send_flexible_event_union(
         &self,
-        mut payload: &mut UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+        mut payload: &UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, false>(
-            &*payload,
+            payload,
             0,
             0x7c3823f47ce0fcad,
             fidl::encoding::DynamicFlags::FLEXIBLE,
@@ -3949,7 +3949,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut payload: &mut UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
@@ -3963,7 +3963,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
@@ -3972,7 +3972,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
 
     fn send_raw(
         &self,
-        mut payload: &mut UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -3980,7 +3980,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &*payload,
+            body: payload,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -5644,10 +5644,10 @@ impl UnknownInteractionsClosedProtocolControlHandle {
     }
     pub fn send_strict_event_union(
         &self,
-        mut payload: &mut UnknownInteractionsClosedProtocolStrictEventUnionRequest,
+        mut payload: &UnknownInteractionsClosedProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsClosedProtocolStrictEventUnionRequest, false>(
-            &*payload,
+            payload,
             0,
             0x3b8475deeb4a9d64,
             fidl::encoding::DynamicFlags::empty(),
@@ -5914,7 +5914,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut payload: &mut UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
@@ -5928,7 +5928,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
@@ -5937,7 +5937,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
 
     fn send_raw(
         &self,
-        mut payload: &mut UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -5945,7 +5945,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &*payload,
+            body: payload,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8615,10 +8615,10 @@ impl UnknownInteractionsProtocolControlHandle {
     }
     pub fn send_strict_event_union(
         &self,
-        mut payload: &mut UnknownInteractionsProtocolStrictEventUnionRequest,
+        mut payload: &UnknownInteractionsProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsProtocolStrictEventUnionRequest, false>(
-            &*payload,
+            payload,
             0,
             0x3663b5197598cbda,
             fidl::encoding::DynamicFlags::empty(),
@@ -8706,10 +8706,10 @@ impl UnknownInteractionsProtocolControlHandle {
     }
     pub fn send_flexible_event_union(
         &self,
-        mut payload: &mut UnknownInteractionsProtocolFlexibleEventUnionRequest,
+        mut payload: &UnknownInteractionsProtocolFlexibleEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<UnknownInteractionsProtocolFlexibleEventUnionRequest, false>(
-            &*payload,
+            payload,
             0,
             0x22afd161ca71e467,
             fidl::encoding::DynamicFlags::FLEXIBLE,
@@ -8976,7 +8976,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut payload: &mut UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
@@ -8990,7 +8990,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
@@ -8999,7 +8999,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
 
     fn send_raw(
         &self,
-        mut payload: &mut UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -9007,7 +9007,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &*payload,
+            body: payload,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -9673,7 +9673,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut payload: &mut UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
@@ -9687,7 +9687,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
@@ -9696,7 +9696,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
 
     fn send_raw(
         &self,
-        mut payload: &mut UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -9704,7 +9704,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::FLEXIBLE,
             ),
-            body: fidl::encoding::Flexible::new(&*payload),
+            body: fidl::encoding::Flexible::new(payload),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

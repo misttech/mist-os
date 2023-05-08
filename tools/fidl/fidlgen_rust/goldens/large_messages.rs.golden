@@ -349,11 +349,11 @@ pub trait OverflowingProxyInterface: Send + Sync {
     fn r#decode_bounded_maybe_large(&self, bytes: &[u8]) -> Result<(), fidl::Error>;
     fn r#decode_semi_bounded_believed_to_be_small(
         &self,
-        payload: &mut SemiBoundedBelievedToBeSmall,
+        payload: &SemiBoundedBelievedToBeSmall,
     ) -> Result<(), fidl::Error>;
     fn r#decode_semi_bounded_maybe_large(
         &self,
-        payload: &mut SemiBoundedMaybeLarge,
+        payload: &SemiBoundedMaybeLarge,
     ) -> Result<(), fidl::Error>;
     fn r#decode_unbounded_maybe_large_value(&self, bytes: &[u8]) -> Result<(), fidl::Error>;
     fn r#decode_unbounded_maybe_large_resource(
@@ -376,13 +376,13 @@ pub trait OverflowingProxyInterface: Send + Sync {
         + Send;
     fn r#encode_semi_bounded_believed_to_be_small(
         &self,
-        payload: &mut SemiBoundedBelievedToBeSmall,
+        payload: &SemiBoundedBelievedToBeSmall,
     ) -> Self::EncodeSemiBoundedBelievedToBeSmallResponseFut;
     type EncodeSemiBoundedMaybeLargeResponseFut: std::future::Future<Output = Result<SemiBoundedMaybeLarge, fidl::Error>>
         + Send;
     fn r#encode_semi_bounded_maybe_large(
         &self,
-        payload: &mut SemiBoundedMaybeLarge,
+        payload: &SemiBoundedMaybeLarge,
     ) -> Self::EncodeSemiBoundedMaybeLargeResponseFut;
     type EncodeUnboundedMaybeLargeValueResponseFut: std::future::Future<Output = Result<Vec<u8>, fidl::Error>>
         + Send;
@@ -436,20 +436,20 @@ impl OverflowingSynchronousProxy {
     }
     pub fn r#decode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> Result<(), fidl::Error> {
         self.client.send::<SemiBoundedBelievedToBeSmall, false>(
-            &*payload,
+            payload,
             0x7d5d85c6a0ddd4d0,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     pub fn r#decode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> Result<(), fidl::Error> {
         self.client.send::<SemiBoundedMaybeLarge, true>(
-            &*payload,
+            payload,
             0x28bb2002323ecc60,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -504,13 +504,13 @@ impl OverflowingSynchronousProxy {
     }
     pub fn r#encode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
         ___deadline: zx::Time,
     ) -> Result<SemiBoundedBelievedToBeSmall, fidl::Error> {
         let _response = self
             .client
             .send_query::<SemiBoundedBelievedToBeSmall, SemiBoundedBelievedToBeSmall, false, true>(
-                &*payload,
+                payload,
                 0x3b1167d912bf6bf1,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -519,12 +519,12 @@ impl OverflowingSynchronousProxy {
     }
     pub fn r#encode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
         ___deadline: zx::Time,
     ) -> Result<SemiBoundedMaybeLarge, fidl::Error> {
         let _response =
             self.client.send_query::<SemiBoundedMaybeLarge, SemiBoundedMaybeLarge, true, true>(
-                &*payload,
+                payload,
                 0x1f7994e5062e246f,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -607,13 +607,13 @@ impl OverflowingProxy {
     }
     pub fn r#decode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> Result<(), fidl::Error> {
         OverflowingProxyInterface::r#decode_semi_bounded_believed_to_be_small(self, payload)
     }
     pub fn r#decode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> Result<(), fidl::Error> {
         OverflowingProxyInterface::r#decode_semi_bounded_maybe_large(self, payload)
     }
@@ -643,13 +643,13 @@ impl OverflowingProxy {
     }
     pub fn r#encode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> fidl::client::QueryResponseFut<SemiBoundedBelievedToBeSmall> {
         OverflowingProxyInterface::r#encode_semi_bounded_believed_to_be_small(self, payload)
     }
     pub fn r#encode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> fidl::client::QueryResponseFut<SemiBoundedMaybeLarge> {
         OverflowingProxyInterface::r#encode_semi_bounded_maybe_large(self, payload)
     }
@@ -684,20 +684,20 @@ impl OverflowingProxyInterface for OverflowingProxy {
     }
     fn r#decode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> Result<(), fidl::Error> {
         self.client.send::<SemiBoundedBelievedToBeSmall, false>(
-            &*payload,
+            payload,
             0x7d5d85c6a0ddd4d0,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     fn r#decode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> Result<(), fidl::Error> {
         self.client.send::<SemiBoundedMaybeLarge, true>(
-            &*payload,
+            payload,
             0x28bb2002323ecc60,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -761,7 +761,7 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fidl::client::QueryResponseFut<SemiBoundedBelievedToBeSmall>;
     fn r#encode_semi_bounded_believed_to_be_small(
         &self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> Self::EncodeSemiBoundedBelievedToBeSmallResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -775,7 +775,7 @@ impl OverflowingProxyInterface for OverflowingProxy {
             SemiBoundedBelievedToBeSmall,
             false,
         >(
-            &*payload,
+            payload,
             0x3b1167d912bf6bf1,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -785,7 +785,7 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fidl::client::QueryResponseFut<SemiBoundedMaybeLarge>;
     fn r#encode_semi_bounded_maybe_large(
         &self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> Self::EncodeSemiBoundedMaybeLargeResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -795,7 +795,7 @@ impl OverflowingProxyInterface for OverflowingProxy {
             Ok(_response)
         }
         self.client.send_query_and_decode::<SemiBoundedMaybeLarge, SemiBoundedMaybeLarge, true>(
-            &*payload,
+            payload,
             0x1f7994e5062e246f,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -1750,7 +1750,7 @@ impl OverflowingEncodeSemiBoundedBelievedToBeSmallResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut payload: &mut SemiBoundedBelievedToBeSmall) -> Result<(), fidl::Error> {
+    pub fn send(self, mut payload: &SemiBoundedBelievedToBeSmall) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1763,21 +1763,21 @@ impl OverflowingEncodeSemiBoundedBelievedToBeSmallResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut SemiBoundedBelievedToBeSmall,
+        mut payload: &SemiBoundedBelievedToBeSmall,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut payload: &mut SemiBoundedBelievedToBeSmall) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut payload: &SemiBoundedBelievedToBeSmall) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &*payload,
+            body: payload,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -1830,7 +1830,7 @@ impl OverflowingEncodeSemiBoundedMaybeLargeResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut payload: &mut SemiBoundedMaybeLarge) -> Result<(), fidl::Error> {
+    pub fn send(self, mut payload: &SemiBoundedMaybeLarge) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -1843,21 +1843,21 @@ impl OverflowingEncodeSemiBoundedMaybeLargeResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut payload: &mut SemiBoundedMaybeLarge,
+        mut payload: &SemiBoundedMaybeLarge,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(payload);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut payload: &mut SemiBoundedMaybeLarge) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut payload: &SemiBoundedMaybeLarge) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &*payload,
+            body: payload,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

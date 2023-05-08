@@ -210,9 +210,9 @@ mod tests {
 
         async fn send_raw_state_and_recv_ack(
             &mut self,
-            mut state: fidl_fuchsia_update_installer::State,
+            state: fidl_fuchsia_update_installer::State,
         ) {
-            let () = self.proxy.on_state(&mut state).await.unwrap();
+            let () = self.proxy.on_state(&state).await.unwrap();
         }
     }
 
