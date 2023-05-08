@@ -145,6 +145,8 @@ tables_generator_tests_*.txt
 /third_party/chromiumos-xorg-conf/src
 !/third_party/ubpf
 /third_party/ubpf/src
+!/third_party/github.com/google/cppdap
+/third_party/github.com/google/cppdap/src
 
 /tmp/
 /vendor/
