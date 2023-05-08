@@ -357,21 +357,24 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
 }
 
 void OvernetUsb::SendMagicReply(usb::Request<> request) {
-  pending_requests_++;
-
   ssize_t result = request.CopyTo(kOvernetMagic, kOvernetMagicSize, 0);
   if (result < 0) {
     zxlogf(ERROR, "Failed to copy reply magic data: %zd", result);
     free_write_pool_.Add(std::move(request));
-    pending_requests_--;
     ResetState();
     return;
   }
+
+  pending_requests_++;
   request.request()->header.length = kOvernetMagicSize;
 
   function_.RequestQueue(request.take(), &write_request_complete_);
 
   auto& state = std::get<Running>(state_);
+
+  // We have to count MagicSent as a pending request to keep ourselves from being
+  // free'd out from under the task it spawns, so we increment again.
+  pending_requests_++;
 
   state.MagicSent();
   ProcessReadsFromSocket();
@@ -380,9 +383,23 @@ void OvernetUsb::SendMagicReply(usb::Request<> request) {
 
 void OvernetUsb::Running::MagicSent() {
   socket_is_new_ = false;
+
   async::PostTask(owner_->loop_.dispatcher(), [this]() {
     fbl::AutoLock lock(&owner_->lock_);
-    if (this->read_waiter_->is_pending()) {
+    if (std::get_if<Running>(&owner_->state_) != this) {
+      return;
+    }
+    owner_->pending_requests_--;
+
+    if (std::holds_alternative<ShuttingDown>(owner_->state_)) {
+      if (owner_->pending_requests_ == 0) {
+        lock.release();
+        owner_->ShutdownComplete();
+      }
+      return;
+    }
+
+    if (read_waiter_->is_pending()) {
       read_waiter_->Cancel();
     }
     read_waiter_->set_object(socket()->get());
