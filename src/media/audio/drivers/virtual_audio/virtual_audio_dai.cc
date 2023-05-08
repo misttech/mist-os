@@ -138,7 +138,8 @@ void VirtualAudioDai::GetProperties(
     fidl::Server<fuchsia_hardware_audio::RingBuffer>::GetPropertiesCompleter::Sync& completer) {
   fidl::Arena arena;
   fuchsia_hardware_audio::RingBufferProperties properties;
-  properties.needs_cache_flush_or_invalidate(false).driver_transfer_bytes(config_.fifo_depth_bytes);
+  properties.needs_cache_flush_or_invalidate(false).driver_transfer_bytes(
+      config_.driver_transfer_bytes);
   completer.Reply(std::move(properties));
 }
 

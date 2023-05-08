@@ -52,7 +52,7 @@ zx_status_t VirtualAudioStream::Init() {
     supported_formats_.push_back(std::move(format));
   }
 
-  driver_transfer_bytes_ = config_.fifo_depth_bytes;
+  driver_transfer_bytes_ = config_.driver_transfer_bytes;
   external_delay_nsec_ = config_.external_delay.to_nsecs();
 
   clock_domain_ = config_.clock.domain;

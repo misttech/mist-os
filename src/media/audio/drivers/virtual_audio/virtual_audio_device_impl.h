@@ -44,7 +44,7 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
     std::string product_name;
     std::array<uint8_t, 16> unique_id;
 
-    uint32_t fifo_depth_bytes;
+    uint32_t driver_transfer_bytes;
     zx::duration internal_delay;
     zx::duration external_delay;
     std::vector<audio_stream_format_range_t> supported_formats;

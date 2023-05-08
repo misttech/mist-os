@@ -115,7 +115,7 @@ VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
   config.unique_id = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0};
 
   // Default FIFO is 250 usec, at 48k stereo 16
-  config.fifo_depth_bytes = 48;
+  config.driver_transfer_bytes = 48;
   config.internal_delay = zx::nsec(0);
   config.external_delay = zx::nsec(0);
 
@@ -190,8 +190,8 @@ zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
   if (fidl.has_unique_id()) {
     memmove(config.unique_id.data(), fidl.unique_id().data(), sizeof(config.unique_id));
   }
-  if (fidl.has_fifo_depth_bytes()) {
-    config.fifo_depth_bytes = fidl.fifo_depth_bytes();
+  if (fidl.has_driver_transfer_bytes()) {
+    config.driver_transfer_bytes = fidl.driver_transfer_bytes();
   }
   if (fidl.has_external_delay()) {
     config.external_delay = zx::nsec(fidl.external_delay());

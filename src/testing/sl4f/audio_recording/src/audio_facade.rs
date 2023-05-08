@@ -359,7 +359,7 @@ impl VirtualOutput {
             device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
             is_input: Some(false),
             unique_id: Some(AUDIO_OUTPUT_ID),
-            fifo_depth_bytes: Some(0),
+            driver_transfer_bytes: Some(0),
             external_delay: Some(0),
             supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
                 sample_format_flags: get_zircon_sample_format(self.sample_format),
@@ -752,7 +752,7 @@ impl VirtualInput {
         let config = fidl_fuchsia_virtualaudio::Configuration {
             device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
             is_input: Some(true),
-            fifo_depth_bytes: Some(0),
+            driver_transfer_bytes: Some(0),
             external_delay: Some(0),
             supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
                 sample_format_flags: get_zircon_sample_format(self.sample_format),

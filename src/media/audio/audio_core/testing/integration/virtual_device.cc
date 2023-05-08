@@ -50,7 +50,7 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
       .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
   });
 
-  config.set_fifo_depth_bytes(kFifoDepthBytes);
+  config.set_driver_transfer_bytes(kDriverTransferBytes);
   config.set_external_delay(kExternalDelay.to_nsecs());
 
   *config.mutable_ring_buffer_constraints() = {

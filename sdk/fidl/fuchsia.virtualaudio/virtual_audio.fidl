@@ -53,12 +53,12 @@ type Configuration = table {
     /// If not specified, a default ID is used.
     4: unique_id array<uint8, 16>;
 
-    /// FIFO depth in bytes.
+    /// Driver transfer bytes.
     /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
     /// If it is specified for another device_type, the AddDevice call will
     /// fail with `INVALID_ARGS`.
-    /// If not specified, defaults to an arbitrary amount.
-    5: fifo_depth_bytes uint32;
+    /// If not specified for `STREAM_CONFIG` or `DAI`, a default value is used.
+    5: driver_transfer_bytes uint32;
 
     /// External delay.
     /// If not specified, defaults to an arbitrary duration.

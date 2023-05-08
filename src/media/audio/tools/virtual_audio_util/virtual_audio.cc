@@ -840,7 +840,7 @@ bool VirtualAudioUtil::ClearFormatRanges() {
 }
 
 bool VirtualAudioUtil::SetFifoDepth(const std::string& fifo_str) {
-  config()->set_fifo_depth_bytes(
+  config()->set_driver_transfer_bytes(
       (fifo_str.empty() ? kDefaultFifoDepth : fxl::StringToNumber<uint32_t>(fifo_str)));
   return true;
 }

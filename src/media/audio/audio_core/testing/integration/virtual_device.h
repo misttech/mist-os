@@ -26,7 +26,7 @@ namespace media::audio::test {
 class VirtualDevice {
  public:
   static constexpr uint32_t kNotifyMs = 10;
-  static constexpr uint32_t kFifoDepthBytes = 0;
+  static constexpr uint32_t kDriverTransferBytes = 0;
   static constexpr auto kExternalDelay = zx::msec(0);
 
   struct PlugProperties {

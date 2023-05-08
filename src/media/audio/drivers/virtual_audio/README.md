@@ -121,7 +121,7 @@ These features may eventually be added to the virtualaudio driver/service:
 
 * On-the-fly (post-device-creation) configurability of the following:
   - supported_formats (?),
-  - fifo_depth (triggered on format change),
+  - driver_transfer_bytes (triggered on format change),
   - external_delay_nsec (triggered on format change?),
   - ring_buffer size (triggered on format change?),
   - gain_state,
