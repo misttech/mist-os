@@ -20,7 +20,7 @@ use {argh::FromArgs, ffx_audio_sub_command::SubCommand, ffx_core::ffx_command};
     List available audio devices on target: \n\
     \t$ ffx audio list-devices --output text\n\n\
     Print information about a specific audio device on target: \n\
-    \t$ ffx audio device --id 000 info --type input \n\n\
+    \t$ ffx audio device --id 000 info --direction input \n\n\
     Play a wav file directly to device hardware: \n\
     \t$ cat ~/sine.wav | ffx audio device --id 000 play \n",
     note = "Format parameters: \

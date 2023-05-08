@@ -7,7 +7,7 @@ use {
     async_trait::async_trait,
     blocking::Unblock,
     errors::ffx_bail,
-    ffx_audio_device_args::{DeviceCommand, DeviceType, SubCommand},
+    ffx_audio_device_args::{DeviceCommand, DeviceDirection, SubCommand},
     fho::{selector, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
@@ -50,7 +50,7 @@ impl FfxMain for DeviceTool {
                 let mut request_info = DeviceGainStateRequest {
                     audio_proxy: self.audio_proxy,
                     device_id: self.cmd.id,
-                    device_type: self.cmd.device_type,
+                    device_direction: self.cmd.device_direction,
                     gain_db: None,
                     agc_enabled: None,
                     muted: None,
@@ -121,25 +121,22 @@ pub struct JsonPcmFormats {
 }
 
 async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
-    let device_type =
-        cmd.device_type.ok_or(anyhow::anyhow!("Device type not passed to info request."))?;
+    let device_direction = cmd
+        .device_direction
+        .ok_or(anyhow::anyhow!("Device direction not passed to info request."))?;
     let info_cmd = match cmd.subcommand {
         SubCommand::Info(cmd) => cmd,
         _ => panic!("Unreachable."),
     };
 
-    let (device_path, is_input) = match device_type {
-        ffx_audio_device_args::DeviceType::Input => {
-            (format!("/dev/class/audio-input/{}", cmd.id), true)
-        }
-        ffx_audio_device_args::DeviceType::Output => {
-            (format!("/dev/class/audio-output/{}", cmd.id), false)
-        }
+    let (device_path, is_input) = match device_direction {
+        DeviceDirection::Input => (format!("/dev/class/audio-input/{}", cmd.id), true),
+        DeviceDirection::Output => (format!("/dev/class/audio-output/{}", cmd.id), false),
     };
 
     let request = AudioDaemonDeviceInfoRequest {
         device: Some(DeviceSelector {
-            is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
+            is_input: Some(DeviceDirection::Input == device_direction),
             id: Some(cmd.id.clone()),
             ..Default::default()
         }),
@@ -481,19 +478,19 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
 struct DeviceGainStateRequest {
     audio_proxy: AudioDaemonProxy,
     device_id: String,
-    device_type: Option<DeviceType>,
+    device_direction: Option<DeviceDirection>,
     muted: Option<bool>,
     gain_db: Option<f32>,
     agc_enabled: Option<bool>,
 }
 
 async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
-    let Some(device_type) = request.device_type else {
-        return Err(anyhow::anyhow!("Device type missing"));
+    let Some(device_direction) = request.device_direction else {
+        return Err(anyhow::anyhow!("Device direction missing"));
     };
 
     let dev_selector = DeviceSelector {
-        is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
+        is_input: Some(DeviceDirection::Input == device_direction),
         id: Some(request.device_id),
         ..Default::default()
     };

@@ -14,17 +14,17 @@ use {
     description = "Interact directly with device hardware.",
     example = "\
     To print information about a specific device: \n\
-    \t$ ffx audio device --id 000 --type input info \n\n\
+    \t$ ffx audio device --id 000 --direction input info \n\n\
     Play a wav file directly to device hardware: \n\
     \t$ cat ~/sine.wav | ffx audio device --id 000 play \n\n
     Record a wav file directly from device hardware: \n\
     \t$ ffx audio device --id 000 record --format 48000,uint8,1ch --duration 1s \n\n
     Mute the stream of the output device: \n
-    \t$ ffx audio device --id 000 --type output mute \n\n
+    \t$ ffx audio device --id 000 --direction output mute \n\n
     Set the gain of the output device to -20 dB: \n
-    \t$ ffx audio device --id 000 --type output gain -20 \n\n
+    \t$ ffx audio device --id 000 --direction output gain -20 \n\n
     Turn agc on for the input device: \n
-    \t$ ffx audio device --id 000 --type input agc on"
+    \t$ ffx audio device --id 000 --direction input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -38,11 +38,11 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        long = "type",
-        description = "device type. Accepted values: input, output. \
+        long = "direction",
+        description = "device direction. Accepted values: input, output. \
         Play and record will use output and input respectively by default."
     )]
-    pub device_type: Option<DeviceType>,
+    pub device_direction: Option<DeviceDirection>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -151,17 +151,17 @@ impl FromStr for InfoOutputFormat {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum DeviceType {
+pub enum DeviceDirection {
     Input,
     Output,
 }
 
-impl FromStr for DeviceType {
+impl FromStr for DeviceDirection {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         match s.to_lowercase().as_str() {
-            "input" => Ok(DeviceType::Input),
-            "output" => Ok(DeviceType::Output),
+            "input" => Ok(DeviceDirection::Input),
+            "output" => Ok(DeviceDirection::Output),
             _ => Err(anyhow::anyhow!("invalid device type, {}. Expected one of: input, output", s)),
         }
     }

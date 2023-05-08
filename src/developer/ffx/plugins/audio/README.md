@@ -29,7 +29,7 @@ See what devices are connected. The device ID field is used for other device com
 
 Print additional information about a specific device.
 
-`ffx audio device --id {} --type {input/output} info`
+`ffx audio device --id {} --direction {input/output} info`
 
 Play or record audio signal from hardware ring buffer. Note: core build required (audio_core
 must not be present)
