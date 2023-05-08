@@ -1,0 +1,3 @@
+# Fuchsia Rust Crates
+
+This will be the rustdoc index page once some recipe changes land...

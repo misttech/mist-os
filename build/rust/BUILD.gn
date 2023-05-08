@@ -215,5 +215,9 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  deps = [ "tests" ]
+  deps = [
+    "docs:rustdoc-index",
+    "docs:rustdoc-index(//build/toolchain:host_x64)",
+    "tests",
+  ]
 }
