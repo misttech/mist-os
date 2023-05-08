@@ -24,6 +24,8 @@ group("core") {
     # select the environments that they can run on.
     #
     # "//tools:e2e_tests",
+
+    ":cuckoo_tests",
   ]
 
   # Ensure paths to known e2e test libs are always up-to-date.
@@ -73,4 +75,11 @@ group("no_e2e_dep") {
     "//src:tests_no_e2e",
     "//tools:tests_no_e2e",
   ]
+}
+
+group("cuckoo_tests") {
+  testonly = true
+  if (current_toolchain == default_toolchain) {
+    deps = [ "//zircon/kernel/lib/userabi/userboot/tests:cuckoo-build-only" ]
+  }
 }

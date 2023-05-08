@@ -11,21 +11,11 @@ cuckoo_kernel_zbi_test_params = {
   # packages, core realm shards, etc.
   input_groups = [
     "bootstrap",
-    "debugging",
-    "bootfs-package-support",
-    "telemetry",
-    "diagnostics",
-    "build-info",
-    "time-service",
-    "package-resolver",
-    "package-updates",
-    "session-manager",
-    "ffx",
-    "fx",
+    "legacy",
     "network",
-    "test-manager",
-    "test_realm",
-    "forensics",
+    "ssh",
+    "debug",
+    "test",
     "swd_policy.unrestricted",
   ]
 }
@@ -65,8 +55,7 @@ template("cuckoo_kernel_zbi_test") {
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name
     bootfs_labels = board_bootfs_labels
-    base_packages = board_package_labels
-    base_driver_packages = board_driver_package_labels
+    base_packages = board_package_labels + board_driver_package_labels
     cmdline_deps = []
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
@@ -74,6 +63,8 @@ template("cuckoo_kernel_zbi_test") {
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
     allow_eng_platform_bundle_use = true
+    generate_fvm = !fxfs_blob
+    generate_fxfs = fxfs_blob
   }
 
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {

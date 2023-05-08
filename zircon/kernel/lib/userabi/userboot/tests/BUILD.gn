@@ -59,27 +59,39 @@ if (is_fuchsia) {
   }
 }
 
-kernel_zbi_test("early-boot-single-process-test") {
-  deps = [ ":early-boot-single-process-test-bin" ]
-  device_types = [
-    "AEMU",
-    "Astro",
-    "QEMU",
-    "Intel NUC Kit NUC7i5DNHE",
-    "Sherlock",
-  ]
-}
+if (current_toolchain == default_toolchain) {
+  kernel_zbi_test("early-boot-single-process-test") {
+    deps = [ ":early-boot-single-process-test-bin" ]
+    device_types = [
+      "AEMU",
+      "Astro",
+      "QEMU",
+      "Intel NUC Kit NUC7i5DNHE",
+      "Sherlock",
+    ]
+  }
 
-kernel_zbi_test("early-boot-multiple-process-test") {
-  deps = [
-    ":early-boot-multiple-process-test-bin",
-    "data-publisher:early-boot-data-publisher-bin",
-  ]
-  device_types = [
-    "AEMU",
-    "Astro",
-    "QEMU",
-    "Intel NUC Kit NUC7i5DNHE",
-    "Sherlock",
-  ]
+  kernel_zbi_test("early-boot-multiple-process-test") {
+    deps = [
+      ":early-boot-multiple-process-test-bin",
+      "data-publisher:early-boot-data-publisher-bin",
+    ]
+    device_types = [
+      "AEMU",
+      "Astro",
+      "QEMU",
+      "Intel NUC Kit NUC7i5DNHE",
+      "Sherlock",
+    ]
+  }
+
+  kernel_zbi_test("cuckoo-build-only-zbi") {
+    deps = [ "data-publisher:early-boot-data-publisher-bin" ]
+    device_types = []
+  }
+
+  cuckoo_kernel_zbi_test("cuckoo-build-only") {
+    kernel_zbi = ":cuckoo-build-only-zbi"
+    kernel_image_name = "cuckoo-build-only-zbi"
+  }
 }

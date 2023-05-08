@@ -151,6 +151,8 @@ group("non_hermetic_deps") {
   # can potentially touch every file in the repository. Remove this entry when license
   # management becomes a hermetic process.
   visibility += [ "//tools/check-licenses/util/cmd/gn/*" ]
+
+  visibility += [ "//zircon/kernel/lib/userabi/userboot/tests:*" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates
@@ -445,5 +447,6 @@ group("config_data_template_allowlist") {
     "//third_party/network-conformance/*",
     "//vendor/google/*",
     "//vendor/third_party/cobalt_registry:cobalt_registry",
+    "//zircon/kernel/lib/userabi/userboot/tests:*",
   ]
 }

@@ -19,7 +19,7 @@ core_realm_definition("cuckoo-core-realm") {
 product_assembly_configuration("cuckoo-product-configuration") {
   testonly = true
   platform = {
-    feature_set_level = "bootstrap"
+    #feature_set_level = "minimal"
     build_type = "eng"
   }
   product = {
