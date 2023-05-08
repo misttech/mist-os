@@ -59,7 +59,12 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
 
   void InitPll(fdf::MmioBuffer* mmio);
   zx_status_t InitPhy();
+  zx_status_t InitPhy3();
   zx_status_t InitOtg();
+
+  zx_status_t CrBusAddr(uint32_t addr);
+  uint32_t CrBusRead(uint32_t addr);
+  zx_status_t CrBusWrite(uint32_t addr, uint32_t data);
 
   // Called when |SetMode| completes.
   using SetModeCompletion = fit::callback<void(void)>;
@@ -78,6 +83,7 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy20_mmio_;
   std::optional<fdf::MmioBuffer> usbphy21_mmio_;
+  std::optional<fdf::MmioBuffer> usbphy3_mmio_;
 
   zx::interrupt irq_;
   thrd_t irq_thread_;

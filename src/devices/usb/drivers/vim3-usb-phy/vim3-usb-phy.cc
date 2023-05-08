@@ -12,6 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -62,6 +63,139 @@ void Vim3UsbPhy::InitPll(fdf::MmioBuffer* mmio) {
 
   // Disconnect threshold
   PLL_REGISTER::Get(0xc).FromValue(0x34).WriteTo(mmio);
+}
+
+zx_status_t Vim3UsbPhy::CrBusAddr(uint32_t addr) {
+  auto* usbphy3_mmio = &*usbphy3_mmio_;
+
+  auto phy3_r4 = PHY3_R4::Get().FromValue(0).set_phy_cr_data_in(addr);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  phy3_r4.set_phy_cr_cap_addr(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  phy3_r4.set_phy_cr_cap_addr(1);
+  phy3_r4.WriteTo(usbphy3_mmio);
+
+  auto timeout = zx::deadline_after(zx::msec(1000));
+  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 1) {
+    zxlogf(WARNING, "Read set cap addr for addr %x timed out", addr);
+  }
+
+  phy3_r4.set_phy_cr_cap_addr(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  timeout = zx::deadline_after(zx::msec(1000));
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 0) {
+    zxlogf(WARNING, "Read cap addr for addr %x timed out", addr);
+  }
+
+  return ZX_OK;
+}
+
+uint32_t Vim3UsbPhy::CrBusRead(uint32_t addr) {
+  auto* usbphy3_mmio = &*usbphy3_mmio_;
+
+  CrBusAddr(addr);
+
+  auto phy3_r4 = PHY3_R4::Get().FromValue(0);
+  phy3_r4.set_phy_cr_read(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  phy3_r4.set_phy_cr_read(1);
+  phy3_r4.WriteTo(usbphy3_mmio);
+
+  auto timeout = zx::deadline_after(zx::msec(1000));
+  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 1) {
+    zxlogf(WARNING, "Read set for addr %x timed out", addr);
+  }
+
+  uint32_t data = phy3_r5.phy_cr_data_out();
+
+  phy3_r4.set_phy_cr_read(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  timeout = zx::deadline_after(zx::msec(1000));
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 0) {
+    zxlogf(WARNING, "Read for addr %x timed out", addr);
+  }
+
+  return data;
+}
+
+zx_status_t Vim3UsbPhy::CrBusWrite(uint32_t addr, uint32_t data) {
+  auto* usbphy3_mmio = &*usbphy3_mmio_;
+
+  CrBusAddr(addr);
+
+  auto phy3_r4 = PHY3_R4::Get().FromValue(0);
+  phy3_r4.set_phy_cr_data_in(data);
+  phy3_r4.WriteTo(usbphy3_mmio);
+
+  phy3_r4.set_phy_cr_cap_data(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  phy3_r4.set_phy_cr_cap_data(1);
+  phy3_r4.WriteTo(usbphy3_mmio);
+
+  auto timeout = zx::deadline_after(zx::msec(1000));
+  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 1) {
+    zxlogf(WARNING, "Write cap data for addr %x timed out", addr);
+  }
+
+  phy3_r4.set_phy_cr_cap_data(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  timeout = zx::deadline_after(zx::msec(1000));
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 0) {
+    zxlogf(WARNING, "Write cap data reset for addr %x timed out", addr);
+  }
+
+  phy3_r4.set_phy_cr_write(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  phy3_r4.set_phy_cr_write(1);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  timeout = zx::deadline_after(zx::msec(1000));
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 1) {
+    zxlogf(WARNING, "Write for addr %x timed out", addr);
+  }
+
+  phy3_r4.set_phy_cr_write(0);
+  phy3_r4.WriteTo(usbphy3_mmio);
+  timeout = zx::deadline_after(zx::msec(1000));
+  do {
+    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
+  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
+
+  if (phy3_r5.phy_cr_ack() != 0) {
+    zxlogf(WARNING, "Disable write for addr %x timed out", addr);
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t Vim3UsbPhy::InitPhy() {
@@ -156,6 +290,85 @@ zx_status_t Vim3UsbPhy::InitPhy() {
   // One time PLL initialization
   InitPll(&*usbphy20_mmio_);
   InitPll(&*usbphy21_mmio_);
+
+  return ZX_OK;
+}
+
+zx_status_t Vim3UsbPhy::InitPhy3() {
+  auto* usbphy3_mmio = &*usbphy3_mmio_;
+  auto* usbctrl_mmio = &*usbctrl_mmio_;
+
+  auto reg = usbphy3_mmio->Read32(0);
+  reg = reg | (3 << 5);
+  usbphy3_mmio->Write32(reg, 0);
+
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+
+  USB_R3_V2::Get()
+      .ReadFrom(usbctrl_mmio)
+      .set_p30_ssc_en(1)
+      .set_p30_ssc_range(2)
+      .set_p30_ref_ssp_en(1)
+      .WriteTo(usbctrl_mmio);
+
+  zx::nanosleep(zx::deadline_after(zx::usec(2)));
+
+  USB_R2_V2::Get()
+      .ReadFrom(usbctrl_mmio)
+      .set_p30_pcs_tx_deemph_3p5db(0x15)
+      .set_p30_pcs_tx_deemph_6db(0x20)
+      .WriteTo(usbctrl_mmio);
+
+  zx::nanosleep(zx::deadline_after(zx::usec(2)));
+
+  USB_R1_V2::Get()
+      .ReadFrom(usbctrl_mmio)
+      .set_u3h_host_port_power_control_present(1)
+      .set_u3h_fladj_30mhz_reg(0x20)
+      .set_p30_pcs_tx_swing_full(127)
+      .WriteTo(usbctrl_mmio);
+
+  zx::nanosleep(zx::deadline_after(zx::usec(2)));
+
+  auto phy3_r2 = PHY3_R2::Get().ReadFrom(usbphy3_mmio);
+  phy3_r2.set_phy_tx_vboost_lvl(0x4);
+  phy3_r2.WriteTo(usbphy3_mmio);
+  zx::nanosleep(zx::deadline_after(zx::usec(2)));
+
+  uint32_t data = CrBusRead(0x102d);
+  data |= (1 << 7);
+  CrBusWrite(0x102D, data);
+
+  data = CrBusRead(0x1010);
+  data &= ~0xff0;
+  data |= 0x20;
+  CrBusWrite(0x1010, data);
+
+  data = CrBusRead(0x1006);
+  data &= ~(1 << 6);
+  data |= (1 << 7);
+  data &= ~(0x7 << 8);
+  data |= (0x3 << 8);
+  data |= (0x1 << 11);
+  CrBusWrite(0x1006, data);
+
+  data = CrBusRead(0x1002);
+  data &= ~0x3f80;
+  data |= (0x16 << 7);
+  data &= ~0x7f;
+  data |= (0x7f | (1 << 14));
+  CrBusWrite(0x1002, data);
+
+  data = CrBusRead(0x30);
+  data &= ~(0xf << 4);
+  data |= (0x8 << 4);
+  CrBusWrite(0x30, data);
+  zx::nanosleep(zx::deadline_after(zx::usec(2)));
+
+  auto phy3_r1 = PHY3_R1::Get().ReadFrom(usbphy3_mmio);
+  phy3_r1.set_phy_los_bias(0x4);
+  phy3_r1.set_phy_los_level(0x9);
+  phy3_r1.WriteTo(usbphy3_mmio);
 
   return ZX_OK;
 }
@@ -278,6 +491,7 @@ zx_status_t Vim3UsbPhy::Create(void* ctx, zx_device_t* parent) {
 
   auto status = dev->Init();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Init() error %s", zx_status_get_string(status));
     return status;
   }
 
@@ -420,28 +634,45 @@ zx_status_t Vim3UsbPhy::Init() {
 
   status = pdev_.MapMmio(0, &usbctrl_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_.MapMmio(0) error %s", zx_status_get_string(status));
     return status;
   }
   status = pdev_.MapMmio(1, &usbphy20_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_.MapMmio(1) error %s", zx_status_get_string(status));
     return status;
   }
   status = pdev_.MapMmio(2, &usbphy21_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_.MapMmio(2) error %s", zx_status_get_string(status));
+    return status;
+  }
+  status = pdev_.MapMmio(3, &usbphy3_mmio_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_.MapMmio(3) error %s", zx_status_get_string(status));
     return status;
   }
 
   status = pdev_.GetInterrupt(0, &irq_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_.GetInterrupt(0) error %s", zx_status_get_string(status));
     return status;
   }
 
   status = InitPhy();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "InitPhy() error %s", zx_status_get_string(status));
     return status;
   }
   status = InitOtg();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "InitOtg() error %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = InitPhy3();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "InitPhy3() error %s", zx_status_get_string(status));
     return status;
   }
 
