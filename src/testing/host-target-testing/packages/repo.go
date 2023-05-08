@@ -186,7 +186,10 @@ func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updat
 func (r *Repository) CreatePackage(
 	ctx context.Context,
 	packagePath string,
-	createFunc func(path string) error) (string, error) {
+	createFunc func(path string) error,
+) (string, error) {
+	logger.Infof(ctx, "creating package %q", packagePath)
+
 	// Extract the package name from the path. The variant currently is optional, but if specified, must be "0".
 	packageName, packageVariant, found := strings.Cut(packagePath, "/")
 	if found && packageVariant != "0" {
@@ -222,14 +225,17 @@ func (r *Repository) CreatePackage(
 	return pkgMerkle, nil
 }
 
-// EditPackage takes the content of the source package from srcPacgePath, copies the content to
-// destination package at dstPackagePath and edits the content at destination with the help of
-// editFunc closure.
+// EditPackage takes the content of the source package from srcPackagePath,
+// copies the content to destination package at dstPackagePath and edits the
+// content at destination with the help of editFunc closure.
 func (r *Repository) EditPackage(
 	ctx context.Context,
 	srcPackagePath string,
 	dstPackagePath string,
-	editFunc func(path string) error) (Package, error) {
+	editFunc func(path string) error,
+) (Package, error) {
+	logger.Infof(ctx, "editing package %q. will create %q", srcPackagePath, dstPackagePath)
+
 	// First get the source package located at srcPackagePath
 	pkg, err := r.OpenPackage(ctx, srcPackagePath)
 	if err != nil {
@@ -270,12 +276,13 @@ func (r *Repository) EditUpdatePackageWithVBMetaProperties(
 	vbmetaPropertyFiles map[string]string,
 	editFunc func(path string) error) (Package, error) {
 	return r.EditPackage(ctx, srcUpdatePackage, dstUpdatePackage, func(tempDir string) error {
-
 		if err := editFunc(tempDir); err != nil {
 			return err
 		}
 
 		packagesJsonPath := filepath.Join(tempDir, "packages.json")
+		logger.Infof(ctx, "setting host name in %q to %q", packagesJsonPath, repoName)
+
 		err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
 			src, err := os.Open(packagesJsonPath)
 			if err != nil {
@@ -293,13 +300,12 @@ func (r *Repository) EditUpdatePackageWithVBMetaProperties(
 			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
 		}
 
-		logger.Infof(ctx, "host name in %q set to %q", packagesJsonPath, repoName)
-
 		srcVbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
-
 		if _, err := os.Stat(srcVbmetaPath); err != nil {
 			return fmt.Errorf("vbmeta %q does not exist in repo: %w", srcVbmetaPath, err)
 		}
+
+		logger.Infof(ctx, "updating vbmeta %q", srcVbmetaPath)
 
 		err = util.AtomicallyWriteFile(srcVbmetaPath, 0600, func(f *os.File) error {
 			if err := avbTool.MakeVBMetaImage(ctx, f.Name(), srcVbmetaPath, vbmetaPropertyFiles); err != nil {
@@ -327,8 +333,10 @@ func (r *Repository) EditUpdatePackage(
 	srcUpdatePackage string,
 	dstUpdatePackage string,
 	repoName string,
-	editFunc func(path string) error) (Package, error) {
+	editFunc func(path string) error,
+) (Package, error) {
 	vbmetaPropertyFiles := map[string]string{}
+
 	return r.EditUpdatePackageWithVBMetaProperties(
 		ctx,
 		avbTool,
@@ -349,8 +357,10 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 	srcUpdatePackagePath string,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
-	editFunc func(path string) error) (Package, error) {
+	editFunc func(path string) error,
+) (Package, error) {
 	repoName := "fuchsia.com"
+
 	return r.EditUpdatePackage(ctx,
 		avbTool, zbiTool,
 		srcUpdatePackagePath,

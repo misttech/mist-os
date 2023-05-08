@@ -509,23 +509,28 @@ func buildAndOtaToPackage(
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to create the %q pacakge: %w", systemImagePrime2, err)
+		return fmt.Errorf("failed to create the %q package: %w", systemImagePrime2, err)
 	}
 
 	systemImagePrimeMerkle := systemImagePrime2Pkg.Merkle()
 
+	updatePrime2 := "update_prime2/0"
 	_, err = repo.EditUpdatePackageWithNewSystemImageMerkle(
 		ctx,
 		avbTool,
 		zbiTool,
 		systemImagePrimeMerkle,
 		"update/0",
-		"update_prime2/0",
+		updatePrime2,
 		c.bootfsCompression,
 		func(path string) error {
 			return nil
 		},
 	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create the %q package: %w", updatePrime2, err)
+	}
 
 	return otaToPackage(
 		ctx,
