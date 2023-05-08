@@ -142,6 +142,7 @@ func TestBuild(t *testing.T) {
 			buildDirFiles: []string{
 				filepath.Join(clangCrashReportsDirName, "foo.sh"),
 				filepath.Join(clangCrashReportsDirName, "bar.sh"),
+				filepath.Join(clangCrashReportsDirName, "other.file"),
 			},
 			runnerFunc: func(cmd []string, _ io.Writer) error {
 				return fmt.Errorf("failed to run command: %s", cmd)
@@ -156,6 +157,10 @@ func TestBuild(t *testing.T) {
 					{
 						Path:       filepath.Join(buildDir, "clang-crashreports", "bar.tar"),
 						UploadDest: "clang-crashreports/bar.tar",
+					},
+					{
+						Path:       filepath.Join(buildDir, "clang-crashreports", "other.file"),
+						UploadDest: "clang-crashreports/other.file",
 					},
 				},
 			},

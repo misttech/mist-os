@@ -315,6 +315,16 @@ func collectClangCrashReports(buildDir string) ([]string, error) {
 		return nil, err
 	}
 
+	allFiles, err := filepath.Glob(filepath.Join(crashReportsDir, "*"))
+	if err != nil {
+		return nil, err
+	}
+
+	fileSet := make(map[string]struct{})
+	for _, file := range allFiles {
+		fileSet[file] = struct{}{}
+	}
+
 	reproducers, err := filepath.Glob(filepath.Join(crashReportsDir, "*.sh"))
 	if err != nil {
 		return nil, err
@@ -363,8 +373,14 @@ func collectClangCrashReports(buildDir string) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			delete(fileSet, file)
 		}
 		outputs = append(outputs, noExt+".tar")
+	}
+
+	for file := range fileSet {
+		outputs = append(outputs, file)
 	}
 
 	return outputs, nil
