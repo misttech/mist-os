@@ -102,7 +102,6 @@ mod privacy;
 mod service;
 mod setup;
 mod storage_migrations;
-pub mod task;
 
 pub mod agent;
 pub mod base;
