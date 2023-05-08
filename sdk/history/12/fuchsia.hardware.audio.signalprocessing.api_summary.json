@@ -283,8 +283,8 @@
     },
     {
         "kind": "enum/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/ElementType.END_POINT",
-        "value": "2"
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementType.ENDPOINT",
+        "value": "12"
     },
     {
         "kind": "enum/member",

@@ -18,7 +18,8 @@ type ElementType = flexible enum {
     /// Vendor Specific. A type of processing element not covered by any subsequent type definition.
     VENDOR_SPECIFIC = 1;
 
-    /// Define pipelines start/end.
+    /// The start/end of a pipeline.
+    @available(removed=12)
     END_POINT = 2;
 
     /// Controls pipelines channel mixing and routing.
@@ -50,6 +51,10 @@ type ElementType = flexible enum {
 
     /// Sample Rate Conversion.
     SAMPLE_RATE_CONVERSION = 11;
+
+    /// The start/end of a pipeline.
+    @available(added=12)
+    ENDPOINT = 12;
 };
 
 /// Type specific Parameters for an `Element`.

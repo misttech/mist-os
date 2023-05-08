@@ -114,9 +114,9 @@ topology can be selected at any time.
 The PEs returned by `GetElements` support a number of different types of signal processing
 defined by the PE types and parameters. PE types define standard signal processing (e.g. `GAIN`,
 `DELAY`, `EQUALIZER`, etc), vendor specific signal processing (`VENDOR_SPECIFIC` e.g. a type not
-defined in the `SignalProcessing` protocol) and `CONNECTION_POINT`s/`END_POINT`s used to construct
+defined in the `SignalProcessing` protocol) and `CONNECTION_POINT`s/`ENDPOINT`s used to construct
 multi-pipelines topologies (allow for pipelines start, end, routing and mixing definitions, see
-[Connection points](#connection-points) and [End points](end-points} below).
+[Connection points](#connection-points) and [Endpoints](endpoints} below).
 
 Each individual PE may have one or more inputs and one or more output channels. For routing and
 mixing, PEs may make the number of output channels different from the number of input channels.
@@ -176,7 +176,7 @@ This advertises this one topology with one pipeline:
 
 In this topology the beginning (where the input signal is input into the pipeline) and the end of
 the pipeline (where the output signal is output from the pipeline) are implicit. They can be made
-explicit with PEs of type `END_POINT` (see [End points](#end-points) below).
+explicit with PEs of type `ENDPOINT` (see [Endpoints](#endpoints) below).
 
 If only one topology is advertised, then the contents are informational only since the client can't
 change the use of one and only topology.
@@ -236,18 +236,18 @@ The PEs of type `CONNECTION_POINT` allow for:
 // TODO(fxbug.dev/64877): Add extra context for multi-pipeline construction.
 {% endcomment %}
 
-## End points {#end-points}
+## Endpoints {#endpoints}
 
-The PEs of type `END_POINT` are optional (even in the presence of `CONNECTION_POINT`s) and allow for
+The PEs of type `ENDPOINT` are optional (even in the presence of `CONNECTION_POINT`s) and allow for
 completing the pipelines structures with a clear starting input(s) and ending output(s).
-If no `END_POINT` is specified, then a PE with no incoming edges is an input and a PE with no
+If no `ENDPOINT` is specified, then a PE with no incoming edges is an input and a PE with no
 outgoing edges is an output. For instance, the example in
 [Multiple topologies](#multiple-topologies) above includes two topologies each with a single
 pipeline, the single pipeline in topology id 1 starts with PE id 3 and ends with PE id 1, and the
 single pipeline in topology id 2 starts with PE id 2 and ends with PE id 6.
 
 {% comment %}
-// TODO(fxbug.dev/64877): Add extra-context for end points usage.
+// TODO(fxbug.dev/64877): Add extra-context for endpoints usage.
 {% endcomment %}
 
 <!-- Reference links -->
