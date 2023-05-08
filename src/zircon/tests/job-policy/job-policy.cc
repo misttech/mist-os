@@ -315,6 +315,10 @@ uint64_t get_syscall_result(zx_thread_state_general_regs_t* regs) { return regs-
 
 uint64_t get_syscall_result(zx_thread_state_general_regs_t* regs) { return regs->r[0]; }
 
+#elif defined(__riscv)
+
+uint64_t get_syscall_result(zx_thread_state_general_regs_t* regs) { return regs->a0; }
+
 #else
 #error Unsupported architecture
 #endif
