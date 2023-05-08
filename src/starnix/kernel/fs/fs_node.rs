@@ -103,6 +103,7 @@ impl FsNodeInfo {
                 self.mode &= !FileMode::ISGID;
             }
         }
+        self.time_status_change = fuchsia_runtime::utc_time();
     }
 }
 
