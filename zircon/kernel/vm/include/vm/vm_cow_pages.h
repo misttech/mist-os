@@ -105,14 +105,6 @@ class VmCowPages final : public VmHierarchyBase,
     return root->page_source_ && root->page_source_->properties().is_user_pager;
   }
 
-  bool debug_is_user_pager_backed() const {
-    return page_source_ && page_source_->properties().is_user_pager;
-  }
-
-  bool debug_is_contiguous() const {
-    return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
-  }
-
   bool is_private_pager_copy_supported() const TA_REQ(lock()) {
     auto root = GetRootLocked();
     // The root will never be null. It will either point to a valid parent, or |this| if there's no
@@ -121,29 +113,6 @@ class VmCowPages final : public VmHierarchyBase,
     bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
     DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
     return result;
-  }
-
-  bool is_cow_clonable_locked() const TA_REQ(lock()) {
-    // Copy-on-write clones of pager vmos or their descendants aren't supported as we can't
-    // efficiently make an immutable snapshot.
-    if (can_root_source_evict_locked()) {
-      return false;
-    }
-
-    // We also don't support COW clones for contiguous VMOs.
-    if (is_source_supplying_specific_physical_pages()) {
-      return false;
-    }
-
-    // Copy-on-write clones of slices aren't supported at the moment due to the resulting VMO chains
-    // having non hidden VMOs between hidden VMOs. This case cannot be handled be CloneCowPageLocked
-    // at the moment and so we forbid the construction of such cases for the moment.
-    // Bug: 36841
-    if (is_slice_locked()) {
-      return false;
-    }
-
-    return true;
   }
 
   bool can_evict() const {
@@ -190,18 +159,6 @@ class VmCowPages final : public VmHierarchyBase,
     DEBUG_ASSERT(!cow->is_slice_locked());
     DEBUG_ASSERT(cow->is_source_preserving_page_content());
     cow->pager_stats_modified_ = true;
-  }
-
-  bool is_source_preserving_page_content() const {
-    bool result = page_source_ && page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == debug_is_user_pager_backed());
-    return result;
-  }
-
-  bool is_source_supplying_specific_physical_pages() const {
-    bool result = page_source_ && page_source_->properties().is_providing_specific_physical_pages;
-    DEBUG_ASSERT(result == debug_is_contiguous());
-    return result;
   }
 
   // When attributing pages hidden nodes must be attributed to either their left or right
@@ -467,9 +424,6 @@ class VmCowPages final : public VmHierarchyBase,
   // would be read as zero. Requested offset must be page aligned and within range.
   bool PageWouldReadZeroLocked(uint64_t page_offset) TA_REQ(lock());
 
-  // Returns whether this node is currently suitable for having a copy-on-write child made of it.
-  bool IsCowClonableLocked() const TA_REQ(lock());
-
   // see VmObjectPaged::AttributedPagesInRange
   using AttributionCounts = VmObject::AttributionCounts;
   AttributionCounts AttributedPagesInRangeLocked(uint64_t offset, uint64_t len) const
@@ -496,11 +450,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
                    VmCompressor* compressor);
 
-  // Swap an old page for a new page.  The old page must be at offset.  The new page must be in
-  // ALLOC state.  On return, the old_page is owned by the caller.  Typically the caller will
-  // remove the old_page from pmm_page_queues() and free the old_page.
-  void SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) TA_REQ(lock());
-
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed
   // before calling this function. If a gap or a marker is encountered, or a loaned page cannot be
@@ -515,13 +464,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // If page is still at offset, replace it with a loaned page.
   zx_status_t ReplacePageWithLoaned(vm_page_t* before_page, uint64_t offset) TA_EXCL(lock());
-
-  // If page is still at offset, replace it with a different page.  If with_loaned is true, replace
-  // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
-  // is required to be provided.
-  zx_status_t ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                vm_page_t** after_page, LazyPageRequest* page_request)
-      TA_REQ(lock());
 
   // Attempts to dedup the given page at the specified offset with the zero page. The only
   // correctness requirement for this is that `page` must be *some* valid vm_page_t, meaning that
@@ -612,9 +554,6 @@ class VmCowPages final : public VmHierarchyBase,
     uint64_t unlocked;
   };
   DiscardablePageCounts DebugGetDiscardablePageCounts() const TA_EXCL(lock());
-
-  // Walks up the parent tree and returns the root, or |this| if there is no parent.
-  const VmCowPages* GetRootLocked() const TA_REQ(lock());
 
   // Returns the parent of this cow pages, may be null. Generally the parent should never be
   // directly accessed externally, but this exposed specifically for tests.
@@ -742,6 +681,52 @@ class VmCowPages final : public VmHierarchyBase,
     DEBUG_ASSERT(result == !debug_is_user_pager_backed());
     return result;
   }
+
+  bool debug_is_user_pager_backed() const {
+    return page_source_ && page_source_->properties().is_user_pager;
+  }
+
+  bool debug_is_contiguous() const {
+    return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
+  }
+
+  bool is_cow_clonable_locked() const TA_REQ(lock()) {
+    // Copy-on-write clones of pager vmos or their descendants aren't supported as we can't
+    // efficiently make an immutable snapshot.
+    if (can_root_source_evict_locked()) {
+      return false;
+    }
+
+    // We also don't support COW clones for contiguous VMOs.
+    if (is_source_supplying_specific_physical_pages()) {
+      return false;
+    }
+
+    // Copy-on-write clones of slices aren't supported at the moment due to the resulting VMO chains
+    // having non hidden VMOs between hidden VMOs. This case cannot be handled be CloneCowPageLocked
+    // at the moment and so we forbid the construction of such cases for the moment.
+    // Bug: 36841
+    if (is_slice_locked()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool is_source_preserving_page_content() const {
+    bool result = page_source_ && page_source_->properties().is_preserving_page_content;
+    DEBUG_ASSERT(result == debug_is_user_pager_backed());
+    return result;
+  }
+
+  bool is_source_supplying_specific_physical_pages() const {
+    bool result = page_source_ && page_source_->properties().is_providing_specific_physical_pages;
+    DEBUG_ASSERT(result == debug_is_contiguous());
+    return result;
+  }
+
+  // Walks up the parent tree and returns the root, or |this| if there is no parent.
+  const VmCowPages* GetRootLocked() const TA_REQ(lock());
 
   // Changes a Reference in the provided VmPageOrMarker into a real vm_page_t. The allocated page
   // is assumed to be for this VmCowPages, and so uses the pmm_alloc_flags_, but it is not assumed
@@ -1072,6 +1057,18 @@ class VmCowPages final : public VmHierarchyBase,
     list_add_tail(&list, &page->queue_node);
     page_source_->FreePages(&list);
   }
+
+  // Swap an old page for a new page.  The old page must be at offset.  The new page must be in
+  // ALLOC state.  On return, the old_page is owned by the caller.  Typically the caller will
+  // remove the old_page from pmm_page_queues() and free the old_page.
+  void SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) TA_REQ(lock());
+
+  // If page is still at offset, replace it with a different page.  If with_loaned is true, replace
+  // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
+  // is required to be provided.
+  zx_status_t ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
+                                vm_page_t** after_page, LazyPageRequest* page_request)
+      TA_REQ(lock());
 
   void CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) TA_REQ(lock());
 
