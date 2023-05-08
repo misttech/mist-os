@@ -210,7 +210,10 @@ TEST(ElfSearchTest, ForEachModule) {
   // explicitly ignored below.
   const char* file = "bin/elf-search-test-helper";
   const char* root_dir = getenv("TEST_ROOT_DIR");
-  ASSERT_NE("", root_dir);
+  // When running as a component, TEST_ROOT_DIR is not set and should be "/pkg".
+  if (!root_dir) {
+    root_dir = "/pkg";
+  }
   std::string helper = std::string(root_dir) + "/" + file;
   const char* argv[] = {helper.c_str()};
   springboard_t* sb =

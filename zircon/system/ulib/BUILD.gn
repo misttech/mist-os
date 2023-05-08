@@ -28,6 +28,7 @@ group("tests") {
     "cmdline:tests",
     "debugdata:tests",
     "driver-unit-test:tests",
+    "elf-search:tests",
     "fbl:tests",
     "fdio-caller:tests",
     "ffl:tests",

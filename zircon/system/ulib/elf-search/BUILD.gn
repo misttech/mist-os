@@ -18,3 +18,8 @@ zx_library("elf-search") {
     "//zircon/system/ulib/zx",
   ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ "test" ]
+}

@@ -2,12 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
 group("test") {
   testonly = true
-  deps = [ ":elf-search" ]
+  deps = [ ":elf-search-test-pkg" ]
 }
 
 executable("elf-search-test-helper") {
@@ -44,5 +45,11 @@ test("elf-search") {
 
 bootfs_test("elf-search-bootfs-test") {
   name = "elf-search"
+  deps = [ ":elf-search" ]
+}
+
+fuchsia_unittest_package("elf-search-test-pkg") {
+  package_name = "elf-search-test"
+  manifest = "meta/elf-search-test.cml"
   deps = [ ":elf-search" ]
 }
