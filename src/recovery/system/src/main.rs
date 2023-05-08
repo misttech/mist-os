@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Error},
     carnelian::{
-        app::Config,
+        app::{Config, ViewMode},
         color::Color,
         drawing::{path_for_circle, DisplayRotation, FontFace},
         input, make_message,
@@ -273,6 +273,7 @@ impl AppAssistant for RecoveryAppAssistant {
 
     fn filter_config(&mut self, config: &mut Config) {
         config.display_rotation = self.display_rotation;
+        config.view_mode = ViewMode::Direct;
     }
 }
 
