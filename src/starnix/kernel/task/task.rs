@@ -1520,6 +1520,8 @@ impl CurrentTask {
         Ok(().into())
     }
 
+    // NB: Allow warning below so that it is clear what we are doing on KILL_PROCESS
+    #[allow(clippy::wildcard_in_or_patterns)]
     pub fn run_seccomp_filters(&self, syscall: &Syscall) -> Option<Errno> {
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
@@ -1528,16 +1530,7 @@ impl CurrentTask {
             && syscall.decl.number as u32 != __NR_read
             && syscall.decl.number as u32 != __NR_write
         {
-            send_signal(
-                self,
-                SignalInfo {
-                    signal: SIGKILL,
-                    errno: 0,
-                    code: 0,
-                    detail: SignalDetail::default(),
-                    force: false,
-                },
-            );
+            send_signal(self, SignalInfo::default(SIGKILL));
             return Some(errno_from_code!(0));
         }
 
@@ -1598,17 +1591,11 @@ impl CurrentTask {
         }
 
         match result & !SECCOMP_RET_DATA {
-            // TODO: SECCOMP_RET_KILL_PROCESS, SECCOMP_RET_LOG
             SECCOMP_RET_ALLOW => None,
             SECCOMP_RET_ERRNO => Some(errno_from_code!((result & 0xff) as i16)),
+
             SECCOMP_RET_KILL_THREAD => {
-                let siginfo = SignalInfo {
-                    signal: SIGSYS,
-                    errno: 0,
-                    code: 0,
-                    detail: SignalDetail::default(),
-                    force: false,
-                };
+                let siginfo = SignalInfo::default(SIGSYS);
 
                 let is_last_thread = self.thread_group.read().tasks.len() == 1;
                 let mut task_state = self.write();
@@ -1668,9 +1655,11 @@ impl CurrentTask {
                 send_signal(self, siginfo);
                 Some(errno_from_code!(-(syscall.decl.number as i16)))
             }
-            _ => {
-                log_warn!("seccomp return value {} not implemented", result & 0xff);
-                None
+            SECCOMP_RET_KILL_PROCESS | _ => {
+                // from seccomp(2): If an action value other than one of the above is specified,
+                // then the filter action is treated as [...] SECCOMP_RET_KILL_PROCESS.
+                self.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
+                Some(errno_from_code!(0))
             }
         }
     }

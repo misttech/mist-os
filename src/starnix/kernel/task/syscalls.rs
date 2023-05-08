@@ -6,6 +6,7 @@ use fuchsia_zircon::AsHandleRef;
 
 use static_assertions::const_assert;
 use std::ffi::CString;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -686,6 +687,15 @@ pub fn sys_prctl(
                 return error!(EINVAL);
             }
             Ok(current_task.read().no_new_privs().into())
+        }
+        PR_GET_SECCOMP => {
+            if current_task.has_seccomp_filters.load(Ordering::Acquire)
+                == SeccompFilterState::None as u8
+            {
+                Ok(0.into())
+            } else {
+                Ok(2.into())
+            }
         }
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {

@@ -84,7 +84,7 @@ TEST(SeccompTest, RetTrapBypassesIgn) {
 TEST(SeccompTest, Strict) {
   pid_t const pid = fork();
   if (pid == 0) {
-    ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+    EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
     syscall(kFilteredSyscall);
   };
@@ -253,6 +253,75 @@ TEST(SeccompTest, FilterAccessInBounds) {
   int status;
   ASSERT_NE(waitpid(pid, &status, 0), -1);
   ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+}
+
+TEST(SeccompTest, RetKillProcess) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    std::thread t([]() {
+      install_filter_block(kFilteredSyscall, SECCOMP_RET_KILL_PROCESS);
+      syscall(kFilteredSyscall);
+      exit_with_failure_code();
+    });
+    // Should never join - process should be killed.
+    t.join();
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+}
+
+TEST(SeccompTest, KillProcessOnBadRetAction) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    std::thread t([]() {
+      install_filter_block(kFilteredSyscall, 0x00020000U);
+      syscall(kFilteredSyscall);
+      exit_with_failure_code();
+    });
+    // Should never join - process should be killed.
+    t.join();
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+}
+
+TEST(SeccompTest, PrctlGetSeccomp) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    std::thread t([]() {
+      EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+
+      // prctl(PR_GET_SECCOMP) with no filter returns 0
+      EXPECT_EQ(0, prctl(PR_GET_SECCOMP, 0, 0, 0, 0));
+
+      install_filter_block(kFilteredSyscall, SECCOMP_RET_KILL_PROCESS);
+
+      // prctl(PR_GET_SECCOMP) with a filter that does not block prctl returns 2
+      EXPECT_EQ(2, prctl(PR_GET_SECCOMP, 0, 0, 0, 0));
+
+      install_filter_block(__NR_prctl, SECCOMP_RET_KILL_PROCESS);
+
+      // We're about to kill the process, so if there weer any failures before this,
+      // report them and exit.
+      if (testing::Test::HasFatalFailure() || testing::Test::HasNonfatalFailure()) {
+        exit(1);
+      }
+
+      // prctl(PR_GET_SECCOMP) with a filter that blocks prctl kills the process
+      prctl(PR_GET_SECCOMP, 0, 0, 0, 0);
+      exit_with_failure_code();
+    });
+    // Should never join - process should be killed.
+    t.join();
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
 }
 
 }  // anonymous namespace
