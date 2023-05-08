@@ -65,7 +65,7 @@ static const std::vector<fpbus::Bti> usb_btis{
 
 // Static PLL configuration parameters.
 static const uint32_t pll_settings[] = {
-    0x09400414, 0x927e0000, 0xac5f49e5, 0xfe18, 0xfff, 0x78000, 0xe0004, 0xe000c,
+    0x09400414, 0x927e0000, 0xac5f69e5, 0xfe18, 0x8000fff, 0x78000, 0xe0004, 0xe000c,
 };
 
 static const usb_mode_t dr_mode = USB_MODE_PERIPHERAL;
