@@ -306,6 +306,10 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   last_vsync_timestamp_ = zx::time(timestamp);
   vsync_stalled_ = false;
 
+  config_stamp_t controller_config_stamp =
+      config_stamp_ptr ? *config_stamp_ptr : kInvalidConfigStampBanjo;
+  last_vsync_config_stamp_property_.Set(controller_config_stamp.value);
+
   fbl::AutoLock lock(mtx());
   DisplayInfo* info = nullptr;
   for (auto& display_config : displays_) {
@@ -319,9 +323,6 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
     zxlogf(ERROR, "No such display %lu", display_id);
     return;
   }
-
-  config_stamp_t controller_config_stamp =
-      config_stamp_ptr ? *config_stamp_ptr : kInvalidConfigStampBanjo;
 
   // See ::ApplyConfig for more explanation of how vsync image tracking works.
   //
@@ -487,6 +488,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
   last_valid_apply_config_timestamp_ = timestamp;
+
+  last_valid_apply_config_config_stamp_property_.Set(config_stamp.value);
 
   // Release the bootloader framebuffer referenced by the kernel. This only
   // needs to be done once on the first ApplyConfig().
@@ -976,10 +979,16 @@ Controller::Controller(zx_device_t* parent)
   root_ = inspector_.GetRoot().CreateChild("display");
   last_vsync_ns_property_ = root_.CreateUint("last_vsync_timestamp_ns", 0);
   last_vsync_interval_ns_property_ = root_.CreateUint("last_vsync_interval_ns", 0);
+  last_vsync_config_stamp_property_ =
+      root_.CreateUint("last_vsync_config_stamp", kInvalidConfigStampBanjo.value);
+
   last_valid_apply_config_timestamp_ns_property_ =
       root_.CreateUint("last_valid_apply_config_timestamp_ns", 0);
   last_valid_apply_config_interval_ns_property_ =
       root_.CreateUint("last_valid_apply_config_interval_ns", 0);
+  last_valid_apply_config_config_stamp_property_ =
+      root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStampBanjo.value);
+
   vsync_stalls_detected_ = root_.CreateUint("vsync_stalls", 0);
 }
 

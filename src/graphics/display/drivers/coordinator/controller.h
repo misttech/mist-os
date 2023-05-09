@@ -188,6 +188,7 @@ class Controller : public DeviceType,
   std::atomic<zx::time> last_vsync_timestamp_{};
   inspect::UintProperty last_vsync_ns_property_;
   inspect::UintProperty last_vsync_interval_ns_property_;
+  inspect::UintProperty last_vsync_config_stamp_property_;
 
   // Fields that track how often vsync was detected to have been stalled.
   std::atomic_bool vsync_stalled_ = false;
@@ -197,6 +198,7 @@ class Controller : public DeviceType,
   zx_time_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
+  inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
   config_stamp_t controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStampBanjo;
 };
