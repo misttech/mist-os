@@ -22,7 +22,6 @@ ffx_plugin("ffx_driver") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/devices/bin/driver_tools:lib",
     "//src/devices/bin/driver_tools/connector:lib",
-    "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/sys/lib/component_debug",

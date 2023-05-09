@@ -15,10 +15,15 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fidl_fuchsia_test_manager as ftm;
 use fuchsia_zircon_status::Status;
-use selectors::{self, VerboseError};
 
 struct DriverConnector {
     remote_control: Option<rc::RemoteControlProxy>,
+}
+
+#[derive(Default)]
+struct CapabilityOptions {
+    capability_name: Option<&'static str>,
+    default_capability_name_for_query: Option<&'static str>,
 }
 
 impl DriverConnector {
@@ -28,27 +33,31 @@ impl DriverConnector {
 
     async fn get_component_with_capability<S: ProtocolMarker>(
         &self,
-        capability: &str,
-        default_selector: &str,
+        moniker: &str,
+        capability_options: CapabilityOptions,
         select: bool,
     ) -> Result<S::Proxy> {
         async fn remotecontrol_connect<S: ProtocolMarker>(
             remote_control: &rc::RemoteControlProxy,
-            selector: &str,
+            moniker: &str,
+            capability: &str,
         ) -> Result<S::Proxy> {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
                 .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
-            let _: rc::ServiceMatch = remote_control
-                .connect(
-                    selectors::parse_selector::<VerboseError>(selector)?,
+            remote_control
+                .connect_capability(
+                    moniker,
+                    capability,
                     server_end.into_channel(),
+                    fio::OpenFlags::RIGHT_READABLE,
                 )
                 .await?
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "failed to connect to {} as {}: {:?}",
+                        "failed to connect to {} at {} as {}: {:?}",
                         S::DEBUG_NAME,
-                        selector,
+                        moniker,
+                        capability,
                         e
                     )
                 })?;
@@ -113,16 +122,24 @@ impl DriverConnector {
                 }
                 // We have to escape colons in the capability name to distinguish them from the
                 // syntactically meaningful colons in the ':expose:" string.
-                return Ok(capabilities[choice].replace(":", "\\:") + ":expose:" + capability);
+                return Ok(capabilities[choice].clone());
             }
         }
 
+        let CapabilityOptions { capability_name, default_capability_name_for_query } =
+            capability_options;
+        let default_capability_name_for_query =
+            default_capability_name_for_query.unwrap_or(S::DEBUG_NAME);
+        let capability_name = capability_name.unwrap_or(S::DEBUG_NAME);
+
         if let Some(ref remote_control) = self.remote_control {
-            let selector = match select {
-                true => user_choose_selector(remote_control, capability).await?,
-                false => default_selector.to_string(),
+            let (moniker, capability): (String, &str) = match select {
+                true => {
+                    (user_choose_selector(remote_control, capability_name).await?, capability_name)
+                }
+                false => (moniker.to_string(), default_capability_name_for_query),
             };
-            remotecontrol_connect::<S>(&remote_control, &selector).await
+            remotecontrol_connect::<S>(&remote_control, &moniker, &capability).await
         } else {
             anyhow::bail!("Failed to get remote control proxy");
         }
@@ -136,8 +153,8 @@ impl driver_connector::DriverConnector for DriverConnector {
         select: bool,
     ) -> Result<fdd::DriverDevelopmentProxy> {
         self.get_component_with_capability::<fdd::DriverDevelopmentMarker>(
-            "fuchsia.driver.development.DriverDevelopment",
-            "bootstrap/driver_manager:expose:fuchsia.driver.development.DriverDevelopment",
+            "/bootstrap/driver_manager",
+            CapabilityOptions::default(),
             select,
         )
         .await
@@ -146,8 +163,11 @@ impl driver_connector::DriverConnector for DriverConnector {
 
     async fn get_dev_proxy(&self, select: bool) -> Result<fio::DirectoryProxy> {
         self.get_component_with_capability::<fio::DirectoryMarker>(
-            "dev",
-            "bootstrap/devfs:expose:dev-topological",
+            "/bootstrap/devfs",
+            CapabilityOptions {
+                capability_name: Some("dev"),
+                default_capability_name_for_query: Some("dev-topological"),
+            },
             select,
         )
         .await
@@ -156,8 +176,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 
     async fn get_device_watcher_proxy(&self) -> Result<fdm::DeviceWatcherProxy> {
         self.get_component_with_capability::<fdm::DeviceWatcherMarker>(
-            "fuchsia.hardware.usb.DeviceWatcher",
-            "bootstrap/driver_manager:expose:fuchsia.hardware.usb.DeviceWatcher",
+            "/bootstrap/driver_manager",
+            CapabilityOptions::default(),
             false,
         )
         .await
@@ -166,8 +186,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {
         self.get_component_with_capability::<fdr::DriverRegistrarMarker>(
-            "fuchsia.driver.registrar.DriverRegistrar",
-            "bootstrap/driver_index:expose:fuchsia.driver.registrar.DriverRegistrar",
+            "/bootstrap/driver_index",
+            CapabilityOptions::default(),
             select,
         )
         .await
@@ -176,8 +196,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 
     async fn get_tool_runner_proxy(&self, select: bool) -> Result<fdp::ToolRunnerProxy> {
         self.get_component_with_capability::<fdp::ToolRunnerMarker>(
-            "fuchsia.driver.playground.ToolRunner",
-            "core/driver_playground:expose:fuchsia.driver.playground.ToolRunner",
+            "/core/driver_playground",
+            CapabilityOptions::default(),
             select,
         )
         .await
@@ -186,8 +206,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 
     async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {
         self.get_component_with_capability::<ftm::RunBuilderMarker>(
-            "",
-            "core/test_manager:expose:fuchsia.test.manager.RunBuilder",
+            "/core/test_manager",
+            CapabilityOptions::default(),
             false,
         )
         .await
