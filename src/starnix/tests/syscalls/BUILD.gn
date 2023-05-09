@@ -28,6 +28,22 @@ source_set("test_utils") {
   ]
 }
 
+if (target_cpu == "x64" || target_cpu == "arm64") {
+  resource("fuse_overlayfs") {
+    sources = []
+    if (target_cpu == "x64") {
+      sources += [ "//prebuilt/starnix/fuse-overlayfs-amd64/fuse-overlayfs" ]
+    }
+    if (target_cpu == "arm64") {
+      sources += [ "//prebuilt/starnix/fuse-overlayfs-arm64/fuse-overlayfs" ]
+    }
+    outputs = [ "data/fuse-overlayfs" ]
+  }
+} else {
+  group("fuse_overlayfs") {
+  }
+}
+
 test("syscalls_test_bin") {
   exclude_toolchain_tags = [ "asan" ]
   sources = [
@@ -37,6 +53,7 @@ test("syscalls_test_bin") {
     "epoll_test.cc",
     "fcntl_test.cc",
     "fs_test.cc",
+    "fuse_test.cc",
     "input_test.cc",
     "mmap_test.cc",
     "mount_test.cc",
@@ -94,6 +111,7 @@ test("crash") {
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
+  deps = [ ":fuse_overlayfs" ]
   uses_expectations = true
 }
 
