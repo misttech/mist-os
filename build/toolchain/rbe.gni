@@ -35,7 +35,9 @@ rbe_common_scripts = [ "//build/rbe/fuchsia-reproxy-wrap.sh" ]
 rbe_common_py_scripts = [
   "//build/rbe/remote_action.py",
   "//build/rbe/cl_utils.py",
+  "//build/rbe/depfile.py",
   "//build/rbe/fuchsia.py",
+  "//build/rbe/output_leak_scanner.py",
 ]
 
 rbe_common_sh_tools = [ "//build/rbe/fuchsia-rbe-action.sh" ]
