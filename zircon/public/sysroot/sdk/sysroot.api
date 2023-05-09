@@ -117,7 +117,7 @@
   "include/sys/sem.h": "8a68e1b4afc91c0790e0068bb545f3ec",
   "include/sys/shm.h": "ba562f3765ac5020b266ee6b7f21bc65",
   "include/sys/signal.h": "73af5aa28f1ba19ab3b6059af30f1677",
-  "include/sys/socket.h": "3bddae76e97c419573ba7c6cf6eaafb8",
+  "include/sys/socket.h": "8c11414d5907559cd0bccfcc35688b3a",
   "include/sys/stat.h": "b559eea705f7068d09092ceca4ef79a7",
   "include/sys/statfs.h": "3ac6b81a820ff11142eb1dffff111833",
   "include/sys/statvfs.h": "e90ebbd77065ec12a0e19f1bc2297e01",

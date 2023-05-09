@@ -147,6 +147,12 @@ void SendWithCmsg(int sock, char* buf, size_t buf_size, int cmsg_level, int cmsg
   };
   memcpy(CMSG_DATA(cmsg), &cmsg_value, sizeof(cmsg_value));
 
+  // Verify that message doesn't extend past the data block.
+  uint8_t* data = CMSG_DATA(cmsg);
+  uint8_t* data_end = data + sizeof(cmsg_value);
+  uint8_t* msg_end = reinterpret_cast<uint8_t*>(cmsg) + cmsg->cmsg_len;
+  EXPECT_EQ(data_end, msg_end);
+
   const ssize_t r = sendmsg(sock, &msg, 0);
   ASSERT_NE(r, -1) << strerror(errno);
   ASSERT_EQ(r, ssize_t(buf_size));
@@ -3572,6 +3578,13 @@ class DatagramLinearizedSendSemanticsCmsgTestInstance : public NetDatagramSocket
       CmsgType found_value;
       memcpy(&found_value, CMSG_DATA(cmsg), sizeof(found_value));
       EXPECT_EQ(found_value, expected_value);
+
+      // Verify that message doesn't extend past the data block.
+      uint8_t* data = CMSG_DATA(cmsg);
+      uint8_t* data_end = data + sizeof(found_value);
+      uint8_t* msg_end = reinterpret_cast<uint8_t*>(cmsg) + cmsg->cmsg_len;
+      EXPECT_EQ(data_end, msg_end);
+
       EXPECT_EQ(CMSG_NXTHDR(&msghdr, cmsg), nullptr);
     });
   }
