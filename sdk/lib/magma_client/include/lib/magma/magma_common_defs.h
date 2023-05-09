@@ -20,11 +20,9 @@ extern "C" {
 // LINT.ThenChange()
 
 // LINT.IfChange
-#if defined(__Fuchsia__)
 // The entrypoints should be exported from libmagma_client.a. ICDs should use a
 // version script to re-exporting magma entrypoints.
-#define MAGMA_EXPORT __attribute__((visibility("default")))
-#else
+#ifndef MAGMA_EXPORT
 #define MAGMA_EXPORT
 #endif
 

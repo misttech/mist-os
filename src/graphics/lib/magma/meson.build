@@ -2,11 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-c_args = []
-cpp_args = [ '-DMAGMA_DEBUG_INTERNAL_USE_ONLY' ]
+c_args = [
+  '-fvisibility=hidden',
+  '-DMAGMA_EXPORT=__attribute__((visibility("default")))',
+]
+
+cpp_args = c_args + [ '-DMAGMA_DEBUG_INTERNAL_USE_ONLY', '-fno-exceptions' ]
 
 prog_python = import('python').find_installation('python3')
+prog_objcopy = find_program('objcopy')
+
 magma_json = files('include/magma/magma.json')
+prog_cc = meson.get_compiler('c')
 
 inc_configuration = include_directories(['.', 'src'])
 inc_platform = include_directories('src/magma_util/platform')
@@ -43,9 +50,39 @@ libmagma_virt = static_library(
   install : true
 )
 
+
+magma_virt_relocated = custom_target('magma_virt_relocated',
+  output: 'magma_virt_relocated.o',
+  input: libmagma_virt,
+  command: [prog_cc.cmd_array(),
+      '-r',
+      '-Wl,--whole-archive',
+      '@INPUT@',
+      '-Wl,--no-whole-archive',
+      '-fno-exceptions',
+      '-o',
+      '@OUTPUT@',
+  ],
+)
+
+magma_virt_localized = custom_target('magma_virt_localized',
+  output: 'magma_virt_localized.o',
+  input: magma_virt_relocated,
+  command: [prog_objcopy,
+      '--localize-hidden',
+      '@INPUT@',
+      '@OUTPUT@'
+  ],
+)
+
+libmagma_virt_hermetic = static_library('magma_virt_hermetic',
+  sources: magma_virt_localized,
+  install: true,
+)
+
 dep_magma = declare_dependency(
   include_directories : [inc_magma, inc_msd_intel_gen],
-  link_with : libmagma_virt)
+  link_with : libmagma_virt_hermetic)
 
 # Disabled because failing to build with android ndkl
 #if get_option('with_tests')
