@@ -75,9 +75,6 @@ type LinkDiagnosticInfo = table {
 
 /// A description of the configuration of a given link.
 type LinkConfig = strict union {
-    /// A link configured via fuchsia.overnet.MeshController/AttachSocket - these are links
-    /// that are implemented externally to Overnet.
-    7: socket Empty;
     1: reserved;
     /// A link using overnetstack's UDP protocol.
     /// The content of this config is the address of the peer.
@@ -92,6 +89,14 @@ type LinkConfig = strict union {
     5: ascendd_server AscenddLinkConfig;
     /// A host binary connecting to ascendd. Text is the path to the ascendd socket.
     6: ascendd_client AscenddLinkConfig;
+    /// A link configured via fuchsia.overnet.MeshController/AttachSocket - these are links
+    /// that are implemented externally to Overnet.
+    7: socket Empty;
+    /// A link over a USB connection.
+    /// The text is a platform-specific device identifier. On Fuchsia and Linux Hosts it will
+    /// usually be a device path, possibly truncated to fit this field. As such it should be used
+    /// for diagnostic purposes only.
+    8: usb string:256;
 };
 
 /// An ascendd link configuration.

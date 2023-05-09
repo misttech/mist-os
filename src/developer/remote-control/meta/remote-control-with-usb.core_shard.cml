@@ -6,13 +6,14 @@
         {
             name: "remote-control",
             url: "fuchsia-pkg://fuchsia.com/remote-control#meta/remote-control.cm",
+            startup: "eager",
             environment: "#core-env",
         },
     ],
     offer: [
         {
             directory: "dev-class",
-            from: "void",
+            from: "parent",
             as: "dev-overnet-usb",
             to: "#remote-control",
             subdir: "overnet-usb",

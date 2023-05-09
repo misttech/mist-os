@@ -1,0 +1,91 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    // Have /core use RCS so that svc_from_sys, and thus sshd_host, and thus remote_control_runner
+    // can see it.
+    use: [
+        {
+            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            from: "#remote-control",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.buildinfo.Provider" ],
+            from: "#build-info",
+            to: "#remote-control",
+        },
+        {
+            protocol: [ "fuchsia.fuzzer.Manager" ],
+            from: "#fuzz-manager",
+            to: "#remote-control",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.hwinfo.Device" ],
+            from: "#hwinfo",
+            to: "#remote-control",
+        },
+        {
+            protocol: [
+                "fuchsia.net.interfaces.State",
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "#network",
+            to: "#remote-control",
+        },
+        {
+            protocol: [
+                "fuchsia.overnet.Overnet",
+                "fuchsia.overnet.ServicePublisher",
+            ],
+            from: "#overnetstack",
+            to: "#remote-control",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.device.NameProvider",
+                "fuchsia.kernel.Stats",
+            ],
+            from: "parent",
+            to: "#remote-control",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#remote-control",
+            subdir: "remote-control",
+        },
+        {
+            protocol: [
+                "fuchsia.test.manager.Query",
+                "fuchsia.test.manager.RunBuilder",
+            ],
+            from: "#test_manager",
+            to: "#remote-control",
+            source_availability: "unknown",
+        },
+
+        // Note: These protocols are scoped to the root of the component topoology,
+        // hence the `.root` suffix
+        {
+            protocol: [
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmExplorer.root",
+                "fuchsia.sys2.RealmQuery.root",
+                "fuchsia.sys2.RouteValidator.root",
+            ],
+            from: "parent",
+            to: "#remote-control",
+        },
+
+        // Make RCS available to the runner command
+        {
+            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            from: "#remote-control",
+            to: "#sshd-host",
+        },
+    ],
+}

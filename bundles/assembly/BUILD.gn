@@ -411,7 +411,7 @@ assembly_input_bundle("core_realm_development_access") {
           shards = rebase_path(
                   [
                     "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
-                    "//src/developer/remote-control/meta/remote-control.core_shard.cml",
+                    "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
                   ],
                   root_build_dir)
         },
@@ -429,6 +429,48 @@ assembly_input_bundle("core_realm_development_access") {
     {
       package = "snapshot"
       components = [ "snapshot" ]
+    },
+  ]
+}
+
+assembly_input_bundle("core_realm_development_access_rcs_usb") {
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/overnet/usb:overnet-usb-package"
+      driver_components = [ "meta/overnet-usb.cm" ]
+    },
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/developer/remote-control/meta/remote-control-with-usb.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/developer/remote-control/meta/remote-control.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
     },
   ]
 }

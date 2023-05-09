@@ -33,6 +33,7 @@ mod graphics;
 mod identity;
 mod input;
 mod radar;
+mod rcs;
 mod session;
 mod starnix;
 mod storage;
@@ -209,6 +210,9 @@ fn configure_subsystems(
 
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'radar' subsystem")?;
+
+    rcs::RcsSubsystemConfig::define_configuration(context, &(), builder)
+        .context("Configuring the 'rcs' subsystem")?;
 
     session::SessionConfig::define_configuration(
         context,

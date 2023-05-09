@@ -65,6 +65,10 @@ fuchsia_driver_component("overnet-usb") {
   colocate = true
 }
 
+fuchsia_driver_package("overnet-usb-package") {
+  driver_components = [ ":overnet-usb" ]
+}
+
 test("overnet-usb-test-bin") {
   testonly = true
   sources = [ "overnet_usb_test.cc" ]

@@ -63,6 +63,8 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
 
 USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
     "core_realm_development_access",
+    "core_realm_development_access_rcs_no_usb",
+    "core_realm_development_access_rcs_usb",
 ]
 
 # The names of all of the platform's Assembly Input Bundles.

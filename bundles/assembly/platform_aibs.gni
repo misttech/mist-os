@@ -111,6 +111,8 @@ _userdebug_aib_names = [
   # Needed by both eng and userdebug products, but contains things disallowed in
   # user.
   "core_realm_development_access",
+  "core_realm_development_access_rcs_no_usb",
+  "core_realm_development_access_rcs_usb",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

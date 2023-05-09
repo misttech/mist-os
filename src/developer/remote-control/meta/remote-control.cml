@@ -18,6 +18,12 @@
             path: "/config/data",
         },
         {
+            directory: "dev-overnet-usb",
+            rights: [ "r*" ],
+            path: "/dev/class/overnet-usb",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.buildinfo.Provider",

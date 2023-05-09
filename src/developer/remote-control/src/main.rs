@@ -21,6 +21,7 @@ use {
 };
 
 mod args;
+mod usb;
 
 async fn exec_server() -> Result<(), Error> {
     diagnostics_log::initialize(PublishOptions::default().tags(&["remote-control"]))?;
@@ -142,6 +143,15 @@ async fn exec_server() -> Result<(), Error> {
         }
     };
 
+    let weak_router = Arc::downgrade(&router);
+    std::mem::drop(router);
+    let usb_fut = async move {
+        while let Err(e) = usb::run_usb_links(weak_router.clone()).await {
+            error!("USB scanner failed with error {e:?}, retrying ...");
+            fasync::Timer::new(std::time::Duration::from_secs(5)).await;
+        }
+    };
+
     let sc1 = service.clone();
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |req| {
@@ -151,7 +161,7 @@ async fn exec_server() -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
     let fidl_fut = fs.collect::<()>();
 
-    join!(fidl_fut, onet_fut, onet_circuit_fut);
+    join!(fidl_fut, onet_fut, onet_circuit_fut, usb_fut);
     Ok(())
 }
 

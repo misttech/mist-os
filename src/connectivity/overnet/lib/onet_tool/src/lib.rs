@@ -115,6 +115,9 @@ async fn list_links(args: ListLinks) -> Result<(), Error> {
                     Some(LinkConfig::Socket(fidl_fuchsia_overnet_protocol::Empty {})) => {
                         println!("  external");
                     }
+                    Some(LinkConfig::Usb(path)) => {
+                        println!("  usb {path}");
+                    }
                     Some(LinkConfig::Udp(addr)) => {
                         let addr = std::net::SocketAddrV6::new(
                             addr.address.addr.into(),
