@@ -65,8 +65,8 @@ function main {
     publish \
     "${AMBER_FILES}" \
     "${PUBLISH_OPTS[@]}" \
-    --package-list "${PACKAGES_TO_PUBLISH}" || throw "An internal error occured while publishing."
-  )
+    --package-list "${PACKAGES_TO_PUBLISH}"
+  ) || throw "An internal error occured while publishing."
 
   # Check if package server is running.
   PUBLISHED_PACKAGE_COUNT_MSG="Published $(wc -l < ${PACKAGES_TO_PUBLISH}) packages"

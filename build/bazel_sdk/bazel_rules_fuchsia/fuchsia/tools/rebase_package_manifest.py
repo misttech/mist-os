@@ -21,17 +21,11 @@ def parse_args():
         help='output package manifest file',
         required=True,
     )
-    parser.add_argument(
-        '--relative-base',
-        help='Path to artifact base',
-        required=True,
-    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    base_path = args.relative_base
 
     with open(args.package_manifest) as f:
         package_manifest_json = json.load(f)
@@ -41,13 +35,15 @@ def main():
     # some working directory (with the value `working_dir`), or to the directory
     # that contains the package manifest (which is the value `file`). When we're
     # `file`, we will need to first make the paths relative to the manifest
-    # directory, before we make it relative to the `relative_base` path.
+    # directory, before we make it relative to the `file` path.
     blob_sources_relative = package_manifest_json.get(
         'blob_sources_relative', 'working_dir')
 
-    # The output manifest will always be relative to a working directory.
-    package_manifest_json['blob_sources_relative'] = 'working_dir'
+    # The output manifest contents will always be relative to the manifest.
+    package_manifest_json['blob_sources_relative'] = 'file'
     package_manifest_dir = os.path.dirname(args.package_manifest)
+    updated_package_manifest_dir = os.path.dirname(
+        args.updated_package_manifest)
 
     for blob in package_manifest_json['blobs']:
         source_path = blob['source_path']
@@ -55,7 +51,8 @@ def main():
         if blob_sources_relative == 'file':
             source_path = os.path.join(package_manifest_dir, source_path)
 
-        blob['source_path'] = os.path.relpath(source_path, base_path)
+        blob['source_path'] = os.path.relpath(
+            source_path, updated_package_manifest_dir)
 
     try:
         subpackages = package_manifest_json['subpackages']
@@ -70,7 +67,7 @@ def main():
                     package_manifest_dir, manifest_path)
 
             subpackage['manifest_path'] = os.path.relpath(
-                manifest_path, base_path)
+                manifest_path, updated_package_manifest_dir)
 
     with open(args.updated_package_manifest, 'w') as f:
         json.dump(package_manifest_json, f, indent=2)

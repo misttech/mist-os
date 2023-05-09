@@ -148,8 +148,6 @@ def _fuchsia_prebuilt_package_impl(ctx):
             output_dir.path + "/package_manifest.json",
             "--updated-package-manifest",
             rebased_package_manifest_json.path,
-            "--relative-base",
-            ctx.attr.artifacts_base_path,
         ],
     )
     output_files.append(rebased_package_manifest_json)
@@ -194,10 +192,6 @@ _fuchsia_prebuilt_package = rule(
             doc = "The command line flag used to publish packages.",
             default = "//fuchsia:package_repo",
         ),
-        "artifacts_base_path": attr.string(
-            doc = "Artifacts base directories that items in config files are relative to.",
-            default = ".",
-        ),
         "_rebase_package_manifest": attr.label(
             default = "//fuchsia/tools:rebase_package_manifest",
             executable = True,
@@ -206,13 +200,12 @@ _fuchsia_prebuilt_package = rule(
     },
 )
 
-def fuchsia_prebuilt_package(*, name, archive, components = [], drivers = [], artifacts_base_path = ".", **kwargs):
+def fuchsia_prebuilt_package(*, name, archive, components = [], drivers = [], **kwargs):
     _fuchsia_prebuilt_package(
         name = name,
         archive = archive,
         components = components,
         drivers = drivers,
-        artifacts_base_path = artifacts_base_path,
         **kwargs
     )
 
