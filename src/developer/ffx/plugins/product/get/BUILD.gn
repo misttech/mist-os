@@ -5,7 +5,7 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_product_get") {
-  version = "0.1.0"
+  version = "0.2.0"
   edition = "2021"
   with_unit_tests = true
 
@@ -14,18 +14,18 @@ ffx_plugin("ffx_product_get") {
   sources = [ "src/lib.rs" ]
 
   deps = [
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/ffx/plugins/product/download:ffx_product_download",
+    "//src/developer/ffx/plugins/product/lookup:ffx_product_lookup",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
-    "//third_party/rust_crates:async-fs",
-    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
   ]
 
   test_deps = [
     "//src/lib/fuchsia-async",
+    "//src/lib/testing/fuchsia-hyper-test-support",
     "//third_party/rust_crates:tempfile",
   ]
 }
