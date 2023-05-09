@@ -1325,7 +1325,7 @@ that we want the legacy AIB packaged and archived for a given product:
 
 **Current value (from the default):** `false`
 
-From //build/images/fuchsia/BUILD.gn:27
+From //build/images/fuchsia/BUILD.gn:28
 
 ### cts_version
 
@@ -7093,6 +7093,16 @@ Usage: toolchain-controlled only
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:85
+
+### qemu_boot_format
+
+Boot format to use with QEMU. This chooses the boot format to use with
+QEMU, determining which boot shim implementation is used as QEMU "kernel".
+Valid alternatives vary by machine, but include "linuxboot".
+
+**Current value (from the default):** `"linuxboot"`
+
+From //zircon/kernel/phys/qemu.gni:103
 
 ### qr_codes_path
 
