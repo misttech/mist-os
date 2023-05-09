@@ -55,6 +55,7 @@ AUTO_DERIVE_TRAITS = [
     (r'ip6?t_replace', ['FromBytes']),
     (r'in6_addr', ['AsBytes', 'FromBytes']),
     (r'in6_pktinfo', ['AsBytes', 'FromBytes']),
+    (r'inotify_event', ['AsBytes']),
     (r'ip6t_ip6', ['FromBytes']),
     (r'sockaddr_in*', ['AsBytes', 'FromBytes']),
     (r'sock_fprog', ['FromBytes']),

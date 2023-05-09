@@ -8864,7 +8864,7 @@ impl Default for robust_list_head {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, AsBytes)]
 pub struct inotify_event {
     pub wd: __s32,
     pub mask: __u32,
