@@ -127,13 +127,13 @@ impl Controller {
         let response = GetElementAttributesResponse::decode(&buf[..])?;
         trace!("get_media_attributes received response {:#?}", response);
         Ok(fidl_avrcp::MediaAttributes {
-            title: response.title,
-            artist_name: response.artist_name,
-            album_name: response.album_name,
-            track_number: response.track_number,
-            total_number_of_tracks: response.total_number_of_tracks,
-            genre: response.genre,
-            playing_time: response.playing_time,
+            title: response.0.title.clone(),
+            artist_name: response.0.artist_name.clone(),
+            album_name: response.0.album_name.clone(),
+            track_number: response.0.track_number.clone(),
+            total_number_of_tracks: response.0.total_number_of_tracks.clone(),
+            genre: response.0.genre.clone(),
+            playing_time: response.0.playing_time.clone(),
             ..Default::default()
         })
     }

@@ -9,13 +9,14 @@ use {
 
 mod change_path;
 mod get_folder_items;
+mod get_item_attributes;
 mod get_total_items;
 mod set_addressed_player;
 mod set_browsed_player;
 
 pub use self::{
-    change_path::*, get_folder_items::*, get_total_items::*, set_addressed_player::*,
-    set_browsed_player::*,
+    change_path::*, get_folder_items::*, get_item_attributes::*, get_total_items::*,
+    set_addressed_player::*, set_browsed_player::*,
 };
 use crate::packets::{adjust_byte_size, AdvancedDecodable, Error, PacketResult, PduId, StatusCode};
 

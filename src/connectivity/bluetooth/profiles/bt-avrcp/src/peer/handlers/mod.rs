@@ -464,25 +464,26 @@ async fn handle_get_element_attributes(
     for attribute in cmd.attributes() {
         match &attribute {
             MediaAttributeId::Title => {
-                response.title = element_attributes.title.clone();
+                response.0.title = element_attributes.title.clone();
             }
             MediaAttributeId::ArtistName => {
-                response.artist_name = element_attributes.artist_name.clone();
+                response.0.artist_name = element_attributes.artist_name.clone();
             }
             MediaAttributeId::AlbumName => {
-                response.album_name = element_attributes.album_name.clone();
+                response.0.album_name = element_attributes.album_name.clone();
             }
             MediaAttributeId::TrackNumber => {
-                response.track_number = element_attributes.track_number.clone();
+                response.0.track_number = element_attributes.track_number.clone();
             }
             MediaAttributeId::TotalNumberOfTracks => {
-                response.total_number_of_tracks = element_attributes.total_number_of_tracks.clone();
+                response.0.total_number_of_tracks =
+                    element_attributes.total_number_of_tracks.clone();
             }
             MediaAttributeId::Genre => {
-                response.genre = element_attributes.genre.clone();
+                response.0.genre = element_attributes.genre.clone();
             }
             MediaAttributeId::PlayingTime => {
-                response.playing_time = element_attributes.playing_time.clone();
+                response.0.playing_time = element_attributes.playing_time.clone();
             }
             _ => {
                 warn!("Support for attribute {:?} not implemented.", attribute);

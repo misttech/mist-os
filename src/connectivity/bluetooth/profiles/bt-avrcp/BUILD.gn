@@ -56,6 +56,7 @@ rustc_binary("bin") {
     "src/metrics/mod.rs",
     "src/packets/browsing/change_path.rs",
     "src/packets/browsing/get_folder_items.rs",
+    "src/packets/browsing/get_item_attributes.rs",
     "src/packets/browsing/get_total_items.rs",
     "src/packets/browsing/mod.rs",
     "src/packets/browsing/set_addressed_player.rs",

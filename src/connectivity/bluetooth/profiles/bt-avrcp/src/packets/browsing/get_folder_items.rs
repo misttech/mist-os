@@ -7,12 +7,12 @@ use {
     packet_encoding::{Decodable, Encodable},
     std::collections::HashSet,
     std::convert::{TryFrom, TryInto},
-    tracing::{info, warn},
 };
 
 use crate::packets::{
-    adjust_byte_size, AdvancedDecodable, CharsetId, Error, FolderType, ItemType, MediaAttributeId,
-    MediaType, PacketResult, PlaybackStatus, Scope, StatusCode, ATTRIBUTE_ID_LEN,
+    adjust_byte_size, AdvancedDecodable, CharsetId, Error, FolderType, ItemType,
+    MediaAttributeEntries, MediaAttributeId, MediaType, PacketResult, PlaybackStatus, Scope,
+    StatusCode, ATTRIBUTE_ID_LEN,
 };
 
 const DEFAULT_PLAYER_FEATURE_BITS: fidl_avrcp::PlayerFeatureBits =
@@ -362,28 +362,11 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
     fn try_from(src: BrowseableItem) -> Result<Self, Self::Error> {
         match src {
             BrowseableItem::MediaElement(e) => {
-                let mut attrs = fidl_avrcp::MediaAttributes::default();
-                for attr in e.attributes {
-                    match attr.attribute_id {
-                        MediaAttributeId::Title => attrs.title = Some(attr.value),
-                        MediaAttributeId::ArtistName => attrs.artist_name = Some(attr.value),
-                        MediaAttributeId::AlbumName => attrs.album_name = Some(attr.value),
-                        MediaAttributeId::TrackNumber => attrs.track_number = Some(attr.value),
-                        MediaAttributeId::TotalNumberOfTracks => {
-                            attrs.total_number_of_tracks = Some(attr.value)
-                        }
-                        MediaAttributeId::Genre => attrs.genre = Some(attr.value),
-                        MediaAttributeId::PlayingTime => attrs.playing_time = Some(attr.value),
-                        MediaAttributeId::DefaultCoverArt => {
-                            info!("ignoring default cover art due to missing implementation")
-                        }
-                    };
-                }
                 Ok(Self::MediaElement(fidl_avrcp::MediaElementItem {
                     media_element_uid: Some(e.element_uid),
                     media_type: Some(e.media_type.into()),
                     displayable_name: Some(e.name.clone()),
-                    attributes: Some(attrs),
+                    attributes: Some(e.attributes.into()),
                     ..Default::default()
                 }))
             }
@@ -396,93 +379,6 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
             })),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
         }
-    }
-}
-
-/// AVRCP 1.6.2 section 6.10.2.3.1 Attribute Value entry
-#[derive(Clone, Debug, PartialEq)]
-struct AttributeValueEntry {
-    attribute_id: MediaAttributeId,
-    value: String,
-}
-
-impl AttributeValueEntry {
-    /// The smallest AttributeValueEntry size. Calculated by taking the number of bytes needed
-    /// to represent the mandatory (fixed sized) fields.
-    /// Attribute ID (4 bytes), char set ID (2 bytes), attr value len (2 bytes).
-    /// Defined in AVRCP 1.6.2, Section 6.10.2.3.1.
-    const MIN_PACKET_SIZE: usize = 8;
-}
-
-impl Encodable for AttributeValueEntry {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        // Only variable length field is `name`, which can be calculated by taking
-        // the length of the array.
-        Self::MIN_PACKET_SIZE + self.value.len()
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::OutOfRange);
-        }
-
-        let attr_id = u8::from(&self.attribute_id) as u32;
-        buf[0..4].copy_from_slice(&attr_id.to_be_bytes());
-
-        let charset_id = u16::from(&CharsetId::Utf8);
-        buf[4..6].copy_from_slice(&charset_id.to_be_bytes());
-        let val_len = self.value.len();
-        if val_len > std::u16::MAX.into() {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        buf[6..8].copy_from_slice(&(val_len as u16).to_be_bytes());
-        buf[8..8 + val_len].copy_from_slice(self.value.as_bytes());
-
-        Ok(())
-    }
-}
-
-impl AdvancedDecodable for AttributeValueEntry {
-    type Error = Error;
-
-    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
-        if buf.len() < Self::MIN_PACKET_SIZE {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        let attr_id = u32::from_be_bytes(buf[0..4].try_into().unwrap());
-        if attr_id > 0x8 {
-            // AVRCP spec 1.6.2 Appendix E
-            // Values 0x9-0xFFFFFFFF are reserved.
-            return Err(Error::InvalidMessage);
-        }
-        // Since media attribute ID is u8, we only extract the lowest octet.
-        let attribute_id = MediaAttributeId::try_from(buf[3])?;
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID value to utf8.
-        let is_utf8 = is_utf8_charset_id(&buf[4..6].try_into().unwrap());
-
-        let mut val_len = u16::from_be_bytes(buf[6..8].try_into().unwrap()) as usize;
-        if should_adjust {
-            val_len = adjust_byte_size(val_len)?;
-        }
-        if buf.len() < Self::MIN_PACKET_SIZE + val_len {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID folder names to utf8 names.
-        let value = if is_utf8 {
-            String::from_utf8(buf[Self::MIN_PACKET_SIZE..Self::MIN_PACKET_SIZE + val_len].to_vec())
-                .or(Err(Error::ParameterEncodingError))?
-        } else {
-            "Unknown Value".to_string()
-        };
-
-        Ok((AttributeValueEntry { attribute_id, value }, Self::MIN_PACKET_SIZE + val_len))
     }
 }
 
@@ -548,19 +444,6 @@ impl Encodable for MediaPlayerItem {
     }
 }
 
-/// TODO(fxb/102060): once we change CharsetId to be infalliable we can
-/// change or remove this method.
-fn is_utf8_charset_id(id_buf: &[u8; 2]) -> bool {
-    let raw_val = u16::from_be_bytes(*id_buf);
-    match CharsetId::try_from(raw_val) {
-        Ok(id) => id.is_utf8(),
-        Err(_) => {
-            warn!("Unsupported charset ID {:?}", raw_val,);
-            false
-        }
-    }
-}
-
 impl AdvancedDecodable for MediaPlayerItem {
     type Error = Error;
 
@@ -581,7 +464,7 @@ impl AdvancedDecodable for MediaPlayerItem {
             u64::from_be_bytes(buf[8..16].try_into().unwrap()),
             u64::from_be_bytes(buf[16..24].try_into().unwrap()),
         ];
-        let is_utf8 = is_utf8_charset_id(&buf[24..26].try_into().unwrap());
+        let is_utf8 = CharsetId::is_utf8_charset_id(&buf[24..26].try_into().unwrap());
 
         let mut name_len = u16::from_be_bytes(buf[26..28].try_into().unwrap()) as usize;
         if should_adjust {
@@ -684,7 +567,7 @@ impl AdvancedDecodable for FolderItem {
             return Err(Error::OutOfRange);
         }
         let is_playable = buf[9] == 1;
-        let is_utf8 = is_utf8_charset_id(&buf[10..12].try_into().unwrap());
+        let is_utf8 = CharsetId::is_utf8_charset_id(&buf[10..12].try_into().unwrap());
 
         let mut name_len = u16::from_be_bytes(buf[12..14].try_into().unwrap()) as usize;
         if should_adjust {
@@ -717,7 +600,7 @@ pub struct MediaElementItem {
     element_uid: u64,
     media_type: MediaType,
     name: String,
-    attributes: Vec<AttributeValueEntry>,
+    attributes: MediaAttributeEntries,
 }
 
 impl MediaElementItem {
@@ -735,9 +618,9 @@ impl Encodable for MediaElementItem {
 
     fn encoded_len(&self) -> usize {
         // Name and attributes are variable length.
-        Self::MIN_PACKET_SIZE
-            + self.name.len()
-            + self.attributes.iter().map(|attr| attr.encoded_len()).sum::<usize>()
+        // Subtract 1 from `self.attributes.encoded_len()` since we already account for
+        // Number of Attributes in `Self::MIN_PACKET_SIZE`.
+        Self::MIN_PACKET_SIZE - 1 + self.name.len() + self.attributes.encoded_len()
     }
 
     fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
@@ -756,14 +639,8 @@ impl Encodable for MediaElementItem {
         buf[11..13].copy_from_slice(&len.to_be_bytes());
         buf[13..13 + name_len].copy_from_slice(self.name.as_bytes());
 
-        buf[13 + name_len] = self.attributes.len() as u8;
-
-        let mut next_idx = Self::MIN_PACKET_SIZE + name_len; // after attribute length.
-        for a in &self.attributes {
-            a.encode(&mut buf[next_idx..next_idx + a.encoded_len()])?;
-            next_idx += a.encoded_len();
-        }
-
+        let next_idx = 13 + name_len; // after displayable name.
+        self.attributes.encode(&mut buf[next_idx..])?;
         Ok(())
     }
 }
@@ -779,7 +656,7 @@ impl AdvancedDecodable for MediaElementItem {
         let element_uid = u64::from_be_bytes(buf[0..8].try_into().unwrap());
         let media_type = MediaType::try_from(buf[8])?;
 
-        let is_utf8 = is_utf8_charset_id(&buf[9..11].try_into().unwrap());
+        let is_utf8 = CharsetId::is_utf8_charset_id(&buf[9..11].try_into().unwrap());
 
         let mut name_len = u16::from_be_bytes(buf[11..13].try_into().unwrap()) as usize;
         if should_adjust {
@@ -802,25 +679,12 @@ impl AdvancedDecodable for MediaElementItem {
         if buf.len() <= next_idx {
             return Err(Error::InvalidMessageLength);
         }
-        let num_attrs = buf[next_idx];
 
-        // Process all the attributes.
-        next_idx += 1;
-        let mut attributes = Vec::with_capacity(num_attrs.into());
-        for _processed in 0..num_attrs {
-            if buf.len() <= next_idx {
-                return Err(Error::InvalidMessageLength);
-            }
-            let (entry, decoded_len) =
-                AttributeValueEntry::try_decode(&buf[next_idx..], should_adjust)?;
-            next_idx += decoded_len;
-            attributes.push(entry);
-        }
-        if next_idx != buf.len() {
-            return Err(Error::InvalidMessageLength);
-        }
+        let (attributes, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[next_idx..], should_adjust)?;
+        next_idx += decoded_len;
 
-        Ok((MediaElementItem { element_uid, media_type, name, attributes }, buf.len()))
+        Ok((MediaElementItem { element_uid, media_type, name, attributes }, next_idx))
     }
 }
 
@@ -1185,18 +1049,11 @@ mod tests {
                 element_uid: 1,
                 media_type: MediaType::Video,
                 name: "Test".to_string(),
-                attributes: vec![
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(1)
-                            .expect("should be attribute id"),
-                        value: "1".to_string(),
-                    },
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(2)
-                            .expect("should be attribute id"),
-                        value: "22".to_string(),
-                    },
-                ],
+                attributes: MediaAttributeEntries {
+                    title: Some("1".to_string()),
+                    artist_name: Some("22".to_string()),
+                    ..MediaAttributeEntries::default()
+                },
             }),
         ];
         let response = GetFolderItemsResponse::new_success(5, item_list);
@@ -1312,11 +1169,10 @@ mod tests {
                         element_uid: 1,
                         media_type: MediaType::Video,
                         name: "abc".to_string(),
-                        attributes: vec![AttributeValueEntry {
-                            attribute_id: MediaAttributeId::try_from(1)
-                                .expect("should be attribute id"),
-                            value: "test".to_string(),
-                        },],
+                        attributes: MediaAttributeEntries {
+                            title: Some("test".to_string()),
+                            ..MediaAttributeEntries::default()
+                        },
                     })
                 );
             }
@@ -1385,11 +1241,10 @@ mod tests {
                         element_uid: 1,
                         media_type: MediaType::Video,
                         name: "abc".to_string(),
-                        attributes: vec![AttributeValueEntry {
-                            attribute_id: MediaAttributeId::try_from(1)
-                                .expect("should be attribute id"),
-                            value: "test".to_string(),
-                        },],
+                        attributes: MediaAttributeEntries {
+                            title: Some("test".to_string()),
+                            ..MediaAttributeEntries::default()
+                        },
                     })
                 ],
             })
@@ -1692,16 +1547,11 @@ mod tests {
             element_uid,
             media_type: MediaType::Video,
             name: element_name,
-            attributes: vec![
-                AttributeValueEntry {
-                    attribute_id: MediaAttributeId::try_from(1).expect("should be attribute id"),
-                    value: "1".to_string(),
-                },
-                AttributeValueEntry {
-                    attribute_id: MediaAttributeId::try_from(2).expect("should be attribute id"),
-                    value: "22".to_string(),
-                },
-            ],
+            attributes: MediaAttributeEntries {
+                title: Some("1".to_string()),
+                artist_name: Some("22".to_string()),
+                ..MediaAttributeEntries::default()
+            },
         };
 
         // 14 bytes of min payload size + 4 bytes for element name +
@@ -1732,7 +1582,7 @@ mod tests {
                 element_uid: 1,
                 media_type: MediaType::Video,
                 name: "abc".to_string(),
-                attributes: vec![],
+                attributes: MediaAttributeEntries::default(),
             }
         );
 
@@ -1750,18 +1600,11 @@ mod tests {
                 element_uid: 2,
                 media_type: MediaType::Audio,
                 name: "abc".to_string(),
-                attributes: vec![
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(1)
-                            .expect("should be attribute id"),
-                        value: "a".to_string(),
-                    },
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(2)
-                            .expect("should be attribute id"),
-                        value: "bc".to_string(),
-                    },
-                ],
+                attributes: MediaAttributeEntries {
+                    title: Some("a".to_string()),
+                    artist_name: Some("bc".to_string()),
+                    ..MediaAttributeEntries::default()
+                },
             }
         );
     }
@@ -1786,7 +1629,7 @@ mod tests {
                 element_uid: 1,
                 media_type: MediaType::Video,
                 name: "abc".to_string(),
-                attributes: vec![],
+                attributes: MediaAttributeEntries::default(),
             }
         );
 
@@ -1811,18 +1654,11 @@ mod tests {
                 element_uid: 2,
                 media_type: MediaType::Audio,
                 name: "abc".to_string(),
-                attributes: vec![
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(1)
-                            .expect("should be attribute id"),
-                        value: "a".to_string(),
-                    },
-                    AttributeValueEntry {
-                        attribute_id: MediaAttributeId::try_from(2)
-                            .expect("should be attribute id"),
-                        value: "bc".to_string(),
-                    },
-                ],
+                attributes: MediaAttributeEntries {
+                    title: Some("a".to_string()),
+                    artist_name: Some("bc".to_string()),
+                    ..MediaAttributeEntries::default()
+                },
             }
         );
     }
@@ -1839,16 +1675,6 @@ mod tests {
 
         // Invalid buf with mismatching name length field and actual name length.
         let invalid_buf = [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 2, 0x61, 0x62, 0x63, 0];
-        let _ =
-            MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
-        let _ =
-            MediaElementItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
-
-        // Invalid attribute ID was provided.
-        let invalid_buf = [
-            0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 3, 0x61, 0x62, 0x63, 1, 0, 0, 0, 9, 0, 106, 0, 4,
-            0x74, 0x65, 0x73, 0x74,
-        ];
         let _ =
             MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
         let _ =
@@ -1942,10 +1768,10 @@ mod tests {
             element_uid: 1,
             media_type: MediaType::Audio,
             name: "test".to_string(),
-            attributes: vec![AttributeValueEntry {
-                attribute_id: MediaAttributeId::Title,
-                value: "test".to_string(),
-            }],
+            attributes: MediaAttributeEntries {
+                title: Some("test".to_string()),
+                ..MediaAttributeEntries::default()
+            },
         });
 
         let converted: fidl_avrcp::FileSystemItem = item.try_into().expect("should have converted");

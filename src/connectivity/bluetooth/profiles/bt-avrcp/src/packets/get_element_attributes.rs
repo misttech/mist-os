@@ -8,8 +8,8 @@ use {
 };
 
 use crate::packets::{
-    AvcCommandType, CharsetId, Error, MediaAttributeId, PacketResult, PduId, VendorCommand,
-    VendorDependentPdu, ATTRIBUTE_ID_LEN,
+    AdvancedDecodable, AvcCommandType, Error, MediaAttributeEntries, MediaAttributeId,
+    PacketResult, PduId, VendorCommand, VendorDependentPdu, ATTRIBUTE_ID_LEN,
 };
 
 // See AVRCP 1.6.1 section 6.6 Media Information PDUs - GetElementAttributes for format.
@@ -137,25 +137,9 @@ impl Encodable for GetElementAttributesCommand {
     }
 }
 
-const ATTRIBUTE_RESPONSE_HEADER_LEN: usize = 8;
-// relative position of fields in attribute response prefix header
-const ATTRIBUTE_ID_OFFSET: usize = 3;
-const ATTRIBUTE_CHARSET_OFFSET: usize = 4;
-const ATTRIBUTE_PAYLOAD_LEN_OFFSET: usize = 6;
-
 #[derive(Debug, Default)]
 /// AVRCP 1.6.1 section 6.6 Media Information PDUs- GetElementAttributes
-pub struct GetElementAttributesResponse {
-    pub title: Option<String>,
-    pub artist_name: Option<String>,
-    pub album_name: Option<String>,
-    pub track_number: Option<String>,
-    pub total_number_of_tracks: Option<String>,
-    pub genre: Option<String>,
-    pub playing_time: Option<String>,
-    // Handle to image encoded as a string to retrieve cover art image using BIP over OBEX protocol.
-    pub default_cover_art: Option<String>,
-}
+pub struct GetElementAttributesResponse(pub MediaAttributeEntries);
 
 /// Packet PDU ID for vendor dependent packet encoding.
 impl VendorDependentPdu for GetElementAttributesResponse {
@@ -168,62 +152,11 @@ impl Decodable for GetElementAttributesResponse {
     type Error = Error;
 
     fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < 1 {
+        let (attributes, decoded_len) = MediaAttributeEntries::try_decode(&buf[..], false)?;
+        if buf.len() != decoded_len {
             return Err(Error::InvalidMessageLength);
         }
-
-        let mut response = Self::default();
-
-        // Ignoring the attribute count since we will count the elements are part of parsing the
-        // the whole packet.
-        let _attribute_count = buf[0];
-
-        let mut offset = ATTRIBUTE_COUNT_LEN; // skip attribute count
-        loop {
-            let attribute_header = buf
-                .get(offset..offset + ATTRIBUTE_RESPONSE_HEADER_LEN)
-                .ok_or(Error::InvalidMessageLength)?;
-
-            let attribute = MediaAttributeId::try_from(attribute_header[ATTRIBUTE_ID_OFFSET])?;
-            let _charset_id = ((attribute_header[ATTRIBUTE_CHARSET_OFFSET] as u16) << 8)
-                | (attribute_header[ATTRIBUTE_CHARSET_OFFSET + 1] as u16);
-            // TODO(fxbug.dev/2742): Properly handle non-ASCII and UTF-8 charsets.
-            let attribute_len = (((attribute_header[ATTRIBUTE_PAYLOAD_LEN_OFFSET] as u16) << 8)
-                | (attribute_header[ATTRIBUTE_PAYLOAD_LEN_OFFSET + 1] as u16))
-                as usize;
-            offset += ATTRIBUTE_RESPONSE_HEADER_LEN;
-
-            if attribute_len > 0 {
-                let attribute_value =
-                    buf.get(offset..offset + attribute_len).ok_or(Error::InvalidMessageLength)?;
-
-                // TODO(fxbug.dev/2742): validate charset_id is UTF8 or ASCII
-                let attribute_string = String::from_utf8_lossy(attribute_value).to_string();
-
-                match attribute {
-                    MediaAttributeId::Title => response.title = Some(attribute_string),
-                    MediaAttributeId::ArtistName => response.artist_name = Some(attribute_string),
-                    MediaAttributeId::AlbumName => response.album_name = Some(attribute_string),
-                    MediaAttributeId::TrackNumber => response.track_number = Some(attribute_string),
-                    MediaAttributeId::TotalNumberOfTracks => {
-                        response.total_number_of_tracks = Some(attribute_string)
-                    }
-                    MediaAttributeId::Genre => response.genre = Some(attribute_string),
-                    MediaAttributeId::PlayingTime => response.playing_time = Some(attribute_string),
-                    MediaAttributeId::DefaultCoverArt => {
-                        response.default_cover_art = Some(attribute_string)
-                    }
-                }
-                offset += attribute_len;
-            }
-
-            if offset == buf.len() {
-                break;
-            } else if offset > buf.len() {
-                return Err(Error::InvalidMessage);
-            }
-        }
-        Ok(response)
+        Ok(Self(attributes))
     }
 }
 
@@ -231,62 +164,11 @@ impl Encodable for GetElementAttributesResponse {
     type Error = Error;
 
     fn encoded_len(&self) -> usize {
-        let mut len = ATTRIBUTE_COUNT_LEN;
-        let mut count = |os: &Option<String>| {
-            if let Some(ref s) = os {
-                len += s.len() + ATTRIBUTE_RESPONSE_HEADER_LEN;
-            }
-        };
-        count(&self.title);
-        count(&self.artist_name);
-        count(&self.album_name);
-        count(&self.track_number);
-        count(&self.total_number_of_tracks);
-        count(&self.genre);
-        count(&self.playing_time);
-        count(&self.default_cover_art);
-        len
+        self.0.encoded_len()
     }
 
     fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::BufferLengthOutOfRange);
-        }
-
-        // The first field is attribute count. We count our attributes as we encode set it at the end.
-        let mut attribute_count = 0;
-        let mut offset = ATTRIBUTE_COUNT_LEN;
-
-        let mut write = |os: &Option<String>, attribute_id: MediaAttributeId| -> PacketResult<()> {
-            if let Some(ref s) = os {
-                attribute_count += 1;
-                let attribute_header = buf
-                    .get_mut(offset..offset + ATTRIBUTE_RESPONSE_HEADER_LEN)
-                    .ok_or(Error::BufferLengthOutOfRange)?;
-
-                let strlen = u16::try_from(s.len()).unwrap_or(std::u16::MAX) as usize;
-                let charset_id = u16::from(&CharsetId::Utf8);
-                attribute_header[ATTRIBUTE_ID_OFFSET] = u8::from(&attribute_id);
-                attribute_header[ATTRIBUTE_CHARSET_OFFSET] = (charset_id >> 8) as u8;
-                attribute_header[ATTRIBUTE_CHARSET_OFFSET + 1] = (charset_id & 0xff) as u8;
-                attribute_header[ATTRIBUTE_PAYLOAD_LEN_OFFSET] = (strlen >> 8) as u8;
-                attribute_header[ATTRIBUTE_PAYLOAD_LEN_OFFSET + 1] = (strlen & 0xff) as u8;
-                offset += ATTRIBUTE_RESPONSE_HEADER_LEN;
-                buf[offset..offset + strlen].copy_from_slice(&s.as_bytes()[..strlen]);
-                offset += strlen;
-            }
-            Ok(())
-        };
-        write(&self.title, MediaAttributeId::Title)?;
-        write(&self.artist_name, MediaAttributeId::ArtistName)?;
-        write(&self.album_name, MediaAttributeId::AlbumName)?;
-        write(&self.track_number, MediaAttributeId::TrackNumber)?;
-        write(&self.total_number_of_tracks, MediaAttributeId::TotalNumberOfTracks)?;
-        write(&self.genre, MediaAttributeId::Genre)?;
-        write(&self.playing_time, MediaAttributeId::PlayingTime)?;
-        write(&self.default_cover_art, MediaAttributeId::DefaultCoverArt)?;
-
-        buf[0] = attribute_count;
+        self.0.encode(&mut buf[..])?;
         Ok(())
     }
 }
@@ -388,10 +270,10 @@ mod tests {
 
     #[test]
     fn test_get_element_attributes_response_encode() {
-        let b = GetElementAttributesResponse {
+        let b = GetElementAttributesResponse(MediaAttributeEntries {
             title: Some(String::from("Test")),
-            ..GetElementAttributesResponse::default()
-        };
+            ..MediaAttributeEntries::default()
+        });
         assert_eq!(b.raw_pdu_id(), u8::from(&PduId::GetElementAttributes));
         assert_eq!(b.encoded_len(), 1 + 8 + 4); // count, attribute header (8), attribute encoded len (len of "Test")
         let mut buf = vec![0; b.encoded_len()];
@@ -420,12 +302,12 @@ mod tests {
         .expect("unable to decode packet");
         assert_eq!(b.raw_pdu_id(), u8::from(&PduId::GetElementAttributes));
         assert_eq!(b.encoded_len(), 1 + 8 + 4); // count, attribute header (8), attribute encoded len (len of "Test")
-        assert_eq!(b.title, Some(String::from("Test")));
+        assert_eq!(b.0.title, Some(String::from("Test")));
     }
 
     #[test]
     fn test_encode_packets() {
-        let b = GetElementAttributesResponse {
+        let b = GetElementAttributesResponse(MediaAttributeEntries {
             title: Some(String::from(
                 "Lorem ipsum dolor sit amet,\
                  consectetur adipiscing elit. Nunc eget elit cursus ipsum \
@@ -467,8 +349,8 @@ mod tests {
                  Curabitur vehicula mauris nec ex sollicitudin rhoncus. Integer ipsum libero, \
                  porta id velit et, egestas facilisis tellus.",
             )),
-            ..GetElementAttributesResponse::default()
-        };
+            ..MediaAttributeEntries::default()
+        });
         let packets = b.encode_packets().expect("unable to encode packets for event");
         println!(
             "count: {}, len of 0: {}, packets: {:x?}",

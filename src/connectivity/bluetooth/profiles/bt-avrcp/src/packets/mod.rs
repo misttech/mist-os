@@ -8,6 +8,7 @@ use {
     packet_encoding::{decodable_enum, Decodable, Encodable},
     std::{convert::TryFrom, result},
     thiserror::Error,
+    tracing::{info, warn},
 };
 
 mod browsing;
@@ -103,6 +104,19 @@ impl CharsetId {
             _ => false,
         }
     }
+
+    /// TODO(fxb/102060): once we change CharsetId to be infalliable we can
+    /// change or remove this method.
+    pub(crate) fn is_utf8_charset_id(id_buf: &[u8; 2]) -> bool {
+        let raw_val = u16::from_be_bytes(*id_buf);
+        match Self::try_from(raw_val) {
+            Ok(id) => id.is_utf8(),
+            Err(_) => {
+                warn!("Unsupported charset ID {:?}", raw_val,);
+                false
+            }
+        }
+    }
 }
 
 decodable_enum! {
@@ -164,6 +178,7 @@ decodable_enum! {
         SetBrowsedPlayer = 0x70,
         GetFolderItems = 0x71,
         ChangePath = 0x72,
+        GetItemAttributes = 0x73,
         PlayItem = 0x74,
         GetTotalNumberOfItems = 0x75,
         AddToNowPlaying = 0x90,
@@ -610,24 +625,378 @@ pub fn decode_avc_vendor_command(command: &bt_avctp::AvcCommand) -> Result<(PduI
     Ok((pdu_id, body))
 }
 
+/// Mirror version of AVRCP 1.6.2 section 26 Appendix E: list of list of media attributes.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MediaAttributeEntries {
+    pub title: Option<String>,
+    pub artist_name: Option<String>,
+    pub album_name: Option<String>,
+    pub track_number: Option<String>,
+    pub total_number_of_tracks: Option<String>,
+    pub genre: Option<String>,
+    pub playing_time: Option<String>,
+    // Handle to image encoded as a string to retrieve cover art image using BIP over OBEX protocol.
+    pub default_cover_art: Option<String>,
+}
+
+impl MediaAttributeEntries {
+    const NUM_ATTRIBUTES_LEN: usize = 1;
+    const CHARSET_ID_LEN: usize = 2;
+    const VALUE_LENGTH_LEN: usize = 2;
+    const ATTRIBUTE_HEADER_LEN: usize =
+        ATTRIBUTE_ID_LEN + Self::CHARSET_ID_LEN + Self::VALUE_LENGTH_LEN;
+    const UNKNOWN_VALUE_PLACEHOLDER: &str = "Unknown Value";
+
+    fn all_fields(&self) -> Vec<(MediaAttributeId, &Option<String>)> {
+        vec![
+            (MediaAttributeId::Title, &self.title),
+            (MediaAttributeId::ArtistName, &self.artist_name),
+            (MediaAttributeId::AlbumName, &self.album_name),
+            (MediaAttributeId::TrackNumber, &self.track_number),
+            (MediaAttributeId::TotalNumberOfTracks, &self.total_number_of_tracks),
+            (MediaAttributeId::Genre, &self.genre),
+            (MediaAttributeId::PlayingTime, &self.playing_time),
+            (MediaAttributeId::DefaultCoverArt, &self.default_cover_art),
+        ]
+    }
+
+    fn add_attribute(&mut self, attribute_id: MediaAttributeId, value: String) {
+        let prev: Option<String>;
+        match attribute_id {
+            MediaAttributeId::Title => prev = self.title.replace(value),
+            MediaAttributeId::ArtistName => prev = self.artist_name.replace(value),
+            MediaAttributeId::AlbumName => prev = self.album_name.replace(value),
+            MediaAttributeId::TrackNumber => prev = self.track_number.replace(value),
+            MediaAttributeId::TotalNumberOfTracks => {
+                prev = self.total_number_of_tracks.replace(value)
+            }
+            MediaAttributeId::Genre => prev = self.genre.replace(value),
+            MediaAttributeId::PlayingTime => prev = self.playing_time.replace(value),
+            MediaAttributeId::DefaultCoverArt => prev = self.default_cover_art.replace(value),
+        }
+        if let Some(prev_value) = prev {
+            warn!("Replaced value for attribute ID {attribute_id:?}. Previous value was \"{prev_value:?}\"");
+        }
+    }
+
+    fn num_attributes(&self) -> u8 {
+        self.all_fields().iter().filter(|f| f.1.is_some()).count() as u8
+    }
+
+    /// Size of one attribute value entry.
+    fn entry_size(os: &Option<String>) -> usize {
+        os.as_ref().map_or(0, |s| Self::ATTRIBUTE_HEADER_LEN + s.len())
+    }
+
+    /// Writes to the buffer and returns how many bytes were written.
+    /// If at any point, the write was not successful, returns an error.
+    /// The method can fail with a partial write to the buffer.
+    fn write(
+        attribute_id: MediaAttributeId,
+        value: &String,
+        buf: &mut [u8],
+    ) -> PacketResult<usize> {
+        let value_len = value.len();
+        if buf.len() < Self::ATTRIBUTE_HEADER_LEN + value_len {
+            return Err(Error::BufferLengthOutOfRange);
+        }
+
+        let attr_id = u8::from(&attribute_id) as u32;
+        buf[0..4].copy_from_slice(&attr_id.to_be_bytes());
+        let charset_id = u16::from(&CharsetId::Utf8);
+        buf[4..6].copy_from_slice(&charset_id.to_be_bytes());
+        if value_len > std::u16::MAX.into() {
+            return Err(Error::ParameterEncodingError);
+        }
+        buf[6..Self::ATTRIBUTE_HEADER_LEN].copy_from_slice(&(value_len as u16).to_be_bytes());
+        buf[Self::ATTRIBUTE_HEADER_LEN..Self::ATTRIBUTE_HEADER_LEN + value_len]
+            .copy_from_slice(value.as_bytes());
+
+        Ok(Self::ATTRIBUTE_HEADER_LEN + value_len)
+    }
+}
+
+impl Encodable for MediaAttributeEntries {
+    type Error = Error;
+
+    /// Returns the number of attributes field size plus the sum of sizes for all attribute value entries.
+    fn encoded_len(&self) -> usize {
+        Self::NUM_ATTRIBUTES_LEN
+            + self.all_fields().iter().fold(0, |acc, field| acc + Self::entry_size(field.1))
+    }
+
+    /// Encodes number of attributes and all the attribute values.
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::BufferLengthOutOfRange);
+        }
+
+        buf[0] = self.num_attributes();
+        let mut next_idx = 1;
+        self.all_fields().iter().filter(|f| f.1.is_some()).try_for_each(|v| {
+            let written = Self::write(v.0, v.1.as_ref().unwrap(), &mut buf[next_idx..])?;
+            next_idx += written;
+            Ok(())
+        })?;
+        Ok(())
+    }
+}
+
+impl AdvancedDecodable for MediaAttributeEntries {
+    type Error = Error;
+
+    /// Given the buffer of number of attributes and list of attribute value entry, decodes into
+    /// `MediaAttributeEntries` struct.
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() == 0 {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        let num_attrs = buf[0];
+
+        // Process all the attributes.
+        let mut next_idx = 1;
+        let mut attributes = MediaAttributeEntries::default();
+        for _processed in 0..num_attrs {
+            if buf.len() < next_idx + Self::ATTRIBUTE_HEADER_LEN {
+                return Err(Error::InvalidMessageLength);
+            }
+
+            let attr_id = u32::from_be_bytes(buf[next_idx..next_idx + 4].try_into().unwrap());
+            // AVRCP spec 1.6.2 Appendix E
+            // Values 0x9-0xFFFFFFFF are reserved.
+            let attr_id = u8::try_from(attr_id).map_err(|_| Error::InvalidMessage)?;
+            let attribute_id_or = MediaAttributeId::try_from(attr_id);
+            next_idx += 4;
+
+            // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+            // charset ID value to utf8.
+            let is_utf8 =
+                CharsetId::is_utf8_charset_id(&buf[next_idx..next_idx + 2].try_into().unwrap());
+            next_idx += 2;
+
+            let mut val_len =
+                u16::from_be_bytes(buf[next_idx..next_idx + 2].try_into().unwrap()) as usize;
+            if should_adjust {
+                val_len = adjust_byte_size(val_len)?;
+            }
+            next_idx += 2;
+
+            // Check that we have enough message length.
+            if buf.len() < (next_idx + val_len) {
+                return Err(Error::InvalidMessageLength);
+            }
+            // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+            // charset ID folder names to utf8 names.
+            let value = if is_utf8 {
+                String::from_utf8(buf[next_idx..next_idx + val_len].to_vec())
+                    .or(Err(Error::ParameterEncodingError))?
+            } else {
+                Self::UNKNOWN_VALUE_PLACEHOLDER.to_string()
+            };
+            if let Ok(attribute_id) = attribute_id_or {
+                attributes.add_attribute(attribute_id, value);
+            } else {
+                warn!("Ignoring attribute since attribute id {attr_id:?} is unrecognized");
+            }
+            next_idx += val_len;
+        }
+        Ok((attributes, next_idx))
+    }
+}
+
+impl From<MediaAttributeEntries> for fidl_avrcp::MediaAttributes {
+    fn from(src: MediaAttributeEntries) -> Self {
+        if let Some(_value) = src.default_cover_art {
+            info!("Default cover art is ignored since it's not supported.");
+        }
+        Self {
+            title: src.title,
+            artist_name: src.artist_name,
+            album_name: src.album_name,
+            total_number_of_tracks: src.total_number_of_tracks,
+            genre: src.genre,
+            playing_time: src.playing_time,
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use fidl_fuchsia_bluetooth_avrcp as fidl;
 
-    #[test]
-    fn test_playback_status_to_fidl() {
+    #[fuchsia::test]
+    fn playback_status_to_fidl() {
         let status = PlaybackStatus::Playing;
-        let status: fidl::PlaybackStatus = status.into();
         let expected = fidl::PlaybackStatus::Playing;
-        assert_eq!(expected, status);
+        assert_eq!(expected, status.into());
     }
 
-    #[test]
-    fn test_playback_status_from_fidl() {
+    #[fuchsia::test]
+    fn media_attribute_entries_encode_success() {
+        let a = MediaAttributeEntries::default();
+        assert_eq!(1, a.encoded_len());
+        let mut buf = vec![0; a.encoded_len()];
+        let _ = a.encode(&mut buf[..]).expect("should be ok");
+        assert_eq!(buf, &[0x00]);
+
+        let a = MediaAttributeEntries {
+            title: Some("test".to_string()),
+            artist_name: Some("foo".to_string()),
+            playing_time: Some("1:23".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(1 + 8 + 4 + 8 + 3 + 8 + 4, a.encoded_len());
+        let mut buf = vec![0; a.encoded_len()];
+        let _ = a.encode(&mut buf[..]).expect("should be ok");
+        assert_eq!(
+            buf,
+            &[
+                0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x04, 't' as u8, 'e' as u8,
+                's' as u8, 't' as u8, 0x00, 0x00, 0x00, 0x02, 0x00, 0x6A, 0x00, 0x03, 'f' as u8,
+                'o' as u8, 'o' as u8, 0x00, 0x00, 0x00, 0x07, 0x00, 0x6A, 0x00, 0x04, '1' as u8,
+                ':' as u8, '2' as u8, '3' as u8,
+            ]
+        );
+    }
+
+    #[fuchsia::test]
+    fn media_attribute_entries_encode_fail() {
+        // Insufficient buffer.
+        let a = MediaAttributeEntries::default();
+        let mut buf = vec![0; a.encoded_len() - 1];
+        let _ = a.encode(&mut buf[..]).expect_err("should have failed");
+
+        // Value too long.
+        let a = MediaAttributeEntries {
+            title: Some("1".to_string().repeat(65_536)),
+            ..Default::default()
+        };
+        let mut buf = vec![0; a.encoded_len()];
+        let _ = a.encode(&mut buf[..]).expect_err("should have failed");
+    }
+
+    #[fuchsia::test]
+    fn get_item_attributes_command_decode_success() {
+        // 0 entries.
+        let buf = vec![0x00];
+        let (a, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], false).expect("should succeed");
+        assert_eq!(buf.len(), decoded_len);
+        assert_eq!(MediaAttributeEntries::default(), a);
+
+        // Multiple entries with utf-8 and non utf-8 values.
+        let buf = vec![
+            0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x04, 't' as u8, 'e' as u8, 's' as u8,
+            't' as u8, 0x00, 0x00, 0x00, 0x02, 0x00, 0x88, 0x00, 0x03, 0x00, 0x01, 0x02,
+        ];
+        let (a, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], false).expect("should succeed");
+        assert_eq!(buf.len(), decoded_len);
+        assert_eq!(
+            MediaAttributeEntries {
+                title: Some("test".to_string()),
+                artist_name: Some(MediaAttributeEntries::UNKNOWN_VALUE_PLACEHOLDER.to_string()),
+                ..Default::default()
+            },
+            a
+        );
+
+        // With invalid attribute ID, 0x1F.
+        // Should decode correctly since attributes with unrecognized ID are ignored.
+        let buf = vec![
+            0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x04, 't' as u8, 'e' as u8, 's' as u8,
+            't' as u8, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x6A, 0x00, 0x01, 'a' as u8,
+        ];
+        let (a, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], false).expect("should succeed");
+        assert_eq!(buf.len(), decoded_len);
+        assert_eq!(
+            MediaAttributeEntries { title: Some("test".to_string()), ..Default::default() },
+            a
+        );
+
+        // Buffer with extra bytes.
+        // Should decode correctly since MediaAttributeEntries may be part of a bigger message.
+        let buf = vec![
+            0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x04, 't' as u8, 'e' as u8, 's' as u8,
+            't' as u8, 0x01, 0x02, 0x03, 0x04, // Some extra bytes.
+        ];
+        let (a, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], false).expect("should succeed");
+        assert_eq!(buf.len() - 4, decoded_len);
+        assert_eq!(
+            MediaAttributeEntries { title: Some("test".to_string()), ..Default::default() },
+            a
+        );
+
+        // Entry with mis-calculated value length.
+        let buf = vec![
+            0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x06, 't' as u8, 'e' as u8, 's' as u8,
+            't' as u8,
+        ];
+        let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
+        let (a, decoded_len) =
+            MediaAttributeEntries::try_decode(&buf[..], true).expect("should succeed");
+        assert_eq!(buf.len(), decoded_len);
+        assert_eq!(
+            MediaAttributeEntries { title: Some("test".to_string()), ..Default::default() },
+            a
+        );
+    }
+
+    #[fuchsia::test]
+    fn get_item_attributes_command_decode_fail() {
+        // Invalid number of attributes.
+        let buf = vec![0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x01, 'a' as u8];
+        let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
+        let _ = MediaAttributeEntries::try_decode(&buf[..], true).expect_err("should have failed");
+
+        // Entry with mis-calculated value length.
+        let buf = vec![
+            0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6A, 0x00, 0x0a, 't' as u8, 'e' as u8, 's' as u8,
+            't' as u8,
+        ];
+        let _ = MediaAttributeEntries::try_decode(&buf[..], false).expect_err("should have failed");
+        let _ = MediaAttributeEntries::try_decode(&buf[..], true).expect_err("should have failed");
+    }
+
+    #[fuchsia::test]
+    fn playback_status_from_fidl() {
         let status = fidl::PlaybackStatus::Stopped;
-        let status: PlaybackStatus = status.into();
         let expected = PlaybackStatus::Stopped;
-        assert_eq!(expected, status);
+        assert_eq!(expected, status.into());
+    }
+
+    #[fuchsia::test]
+    fn media_attribute_entries_to_fidl() {
+        // Emtry attributes.
+        let attributes = MediaAttributeEntries::default();
+        let expected = fidl::MediaAttributes::default();
+        assert_eq!(expected, attributes.into());
+
+        // Attributes with some fields.
+        let attributes = MediaAttributeEntries {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            ..Default::default()
+        };
+        let expected = fidl::MediaAttributes {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(expected, attributes.into());
+
+        // Attributes with default cover art field.
+        let attributes = MediaAttributeEntries {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            default_cover_art: Some("should be omitted".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(expected, attributes.into());
     }
 }

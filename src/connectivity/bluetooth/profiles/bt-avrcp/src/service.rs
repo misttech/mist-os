@@ -848,13 +848,14 @@ mod tests {
                                 .expect("unable to decode get element attributes");
 
                         // We are making a massive response to test packet continuations work properly.
-                        let element_attributes_response = GetElementAttributesResponse {
-                            title: Some(String::from(&LOREM_IPSUM[0..100])),
-                            artist_name: Some(String::from(&LOREM_IPSUM[500..])),
-                            album_name: Some(String::from(&LOREM_IPSUM[250..500])),
-                            genre: Some(String::from(&LOREM_IPSUM[100..250])),
-                            ..GetElementAttributesResponse::default()
-                        };
+                        let element_attributes_response =
+                            GetElementAttributesResponse(MediaAttributeEntries {
+                                title: Some(String::from(&LOREM_IPSUM[0..100])),
+                                artist_name: Some(String::from(&LOREM_IPSUM[500..])),
+                                album_name: Some(String::from(&LOREM_IPSUM[250..500])),
+                                genre: Some(String::from(&LOREM_IPSUM[100..250])),
+                                ..MediaAttributeEntries::default()
+                            });
                         let mut packets = element_attributes_response
                             .encode_packets()
                             .expect("unable to encode packets for event");
