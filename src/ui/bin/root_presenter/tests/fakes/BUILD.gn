@@ -6,28 +6,13 @@ source_set("fakes") {
   testonly = true
 
   sources = [
-    "fake_focuser.cc",
-    "fake_focuser.h",
     "fake_keyboard_focus_controller.cc",
     "fake_keyboard_focus_controller.h",
-    "fake_scenic.cc",
-    "fake_scenic.h",
-    "fake_session.cc",
-    "fake_session.h",
-    "fake_view.cc",
-    "fake_view.h",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.ui.keyboard.focus:fuchsia.ui.keyboard.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/sys/cpp/testing:unit",
-    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/testing/loop_fixture",
-    "//src/lib/ui/base_view",
-    "//src/ui/scenic/lib/gfx",
   ]
 }

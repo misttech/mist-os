@@ -741,7 +741,7 @@ future but was deemed too heavyweight for the current use-cases.
 [latencyreference]: https://www-user.tu-chemnitz.de/~attig/Attig-Rauh-Franke-Krems_2017_LatencyGuidelines.pdf
 [inputmethod]: https://en.wikipedia.org/wiki/Input_method
 [i18n]: /docs/development/internationalization/README.md
-[root-presenter]: /src/ui/bin/root_presenter/presentation.cc
+[root-presenter]: /src/ui/bin/root_presenter/README.md
 [input-pipeline]: /src/ui/bin/input-pipeline/
 [drivers]: /docs/development/drivers/concepts/driver_architectures/input_drivers/input.md
 [input-report]: https://fuchsia.dev/reference/fidl/fuchsia.input.report
