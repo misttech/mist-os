@@ -18,10 +18,16 @@
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_driver_base.h"
 #include "sys_driver_cpp/magma_driver.h"
 
-class MaliDriver : public MagmaDriverBase {
+#if MAGMA_TEST_DRIVER
+using MagmaDriverBaseType = MagmaTestDriverBase;
+#else
+using MagmaDriverBaseType = MagmaProductionDriverBase;
+#endif
+
+class MaliDriver : public MagmaDriverBaseType {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBase("mali", std::move(start_args), std::move(driver_dispatcher)) {}
+      : MagmaDriverBaseType("mali", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override {
     parent_device_ = ParentDeviceDFv2::Create(context().incoming());
