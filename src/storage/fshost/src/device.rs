@@ -74,7 +74,7 @@ pub trait Device: Send + Sync {
     fn fvm_path(&self) -> Option<String> {
         // The 4 is from the 4 characters in "/fvm"
         self.topological_path()
-            .find("/fvm")
+            .rfind("/fvm")
             .map(|index| (self.topological_path()[..index + 4]).to_string())
     }
 
