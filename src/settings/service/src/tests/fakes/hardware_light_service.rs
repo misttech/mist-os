@@ -24,8 +24,6 @@ pub(crate) struct HardwareLightService {
     pub(crate) rgb_values: Arc<Mutex<HashMap<u32, Rgb>>>,
 }
 
-/// Allow dead code since this is just a fake for testing.
-#[allow(dead_code)]
 impl HardwareLightService {
     pub(crate) fn new() -> Self {
         Self {
