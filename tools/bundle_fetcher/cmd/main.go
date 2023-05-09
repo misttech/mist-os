@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	colors color.EnableColor
-	level  logger.LogLevel
+	colors         color.EnableColor
+	level          logger.LogLevel
+	subcommandList []subcommands.Command
 )
 
 func init() {
@@ -26,13 +27,18 @@ func init() {
 
 	flag.Var(&colors, "color", "use color in output, can be never, auto, always")
 	flag.Var(&level, "level", "output verbosity, can be fatal, error, warning, info, debug or trace")
+
+	subcommandList = append(subcommandList,
+		subcommands.HelpCommand(),
+		subcommands.FlagsCommand(),
+		&productListCmd{},
+	)
 }
 
 func main() {
-	subcommands.Register(subcommands.HelpCommand(), "")
-	subcommands.Register(subcommands.FlagsCommand(), "")
-	subcommands.Register(&downloadCmd{}, "")
-	subcommands.Register(&productListCmd{}, "")
+	for _, cmd := range subcommandList {
+		subcommands.Register(cmd, "")
+	}
 
 	flag.Parse()
 	log := logger.NewLogger(level, color.NewColor(colors), os.Stdout, os.Stderr, "bundles ")

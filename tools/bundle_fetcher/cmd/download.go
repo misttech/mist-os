@@ -38,7 +38,6 @@ type productBundleContainerArtifacts struct {
 }
 
 const (
-	buildsDirName           = "builds"
 	imageDirName            = "images"
 	imageJSONName           = "images.json"
 	fileFormatName          = "files"
@@ -49,6 +48,12 @@ const (
 	virtualDeviceEntryName  = "virtual_device"
 	physicalDeviceEntryName = "physical_device"
 )
+
+func init() {
+	subcommandList = append(subcommandList,
+		&downloadCmd{},
+	)
+}
 
 func (*downloadCmd) Name() string { return "download" }
 
@@ -93,6 +98,10 @@ func (cmd *downloadCmd) parseFlags() error {
 }
 
 func (cmd *downloadCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	println("==================================================")
+	println("Deprecated: bundle_fetcher download is deprecated.")
+	println("Please use bundle_fetcher product-list instead.")
+	println("==================================================")
 	if err := cmd.execute(ctx); err != nil {
 		logger.Errorf(ctx, "%s", err)
 		return subcommands.ExitFailure

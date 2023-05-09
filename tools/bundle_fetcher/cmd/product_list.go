@@ -35,6 +35,7 @@ type productListCmd struct {
 }
 
 const (
+	buildsDirName          = "builds"
 	buildApiDirName        = "build_api"
 	productBundlesJSONName = "product_bundles.json"
 	transferJSONName       = "transfer.json"
