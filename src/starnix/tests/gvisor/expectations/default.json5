@@ -16,7 +16,6 @@
                 "AffinityTest.LargeCpuMask",
                 "AffinityTest.NewThread",
                 "AffinityTest.ConsistentWithProcCpuInfo",
-                "AffinityTest.ConsistentWithProcStat",
                 "AffinityTest.Sanity",
 
                 // aio_test
@@ -279,7 +278,6 @@
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
 
                 // lseek_test
-                "LseekTest.ProcStatTwice",
                 "LseekTest.EtcPasswdDup",
 
                 // link_test
@@ -549,8 +547,6 @@
                 "ProcMeminfo.ContainsBasicFields",
                 "ProcSentryMeminfo.ContainsFieldsAndEndsWithNewline",
                 "ProcStat.ContainsBasicFields",
-                "ProcStat.EndsWithNewline",
-                "ProcStat.Fields",
                 "ProcLoadavg.EndsWithNewline",
                 "ProcLoadavg.Fields",
                 "ProcSelfStat.PopulateWriteRSS",

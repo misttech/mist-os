@@ -411,10 +411,6 @@ pub fn load_executable(
     )?;
     let stack = stack_base + (stack_size - 8);
 
-    // Fuchsia does not have a quantity that corresposnds to AT_CLKTCK,
-    // but we provide a typical value expected in *nix here.
-    const STARNIX_CLOCK_TICKS_PER_SEC: u64 = 100;
-
     let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso {
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
         let map_result = current_task.mm.map(
@@ -447,7 +443,7 @@ pub fn load_executable(
                 AT_ENTRY,
                 main_elf.vaddr_bias.wrapping_add(main_elf.headers.file_header().entry) as u64,
             ),
-            (AT_CLKTCK, STARNIX_CLOCK_TICKS_PER_SEC),
+            (AT_CLKTCK, SCHEDULER_CLOCK_HZ as u64),
             (AT_SYSINFO_EHDR, vdso_base),
             (AT_SECURE, 0),
         ]

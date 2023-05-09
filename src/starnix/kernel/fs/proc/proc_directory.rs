@@ -19,6 +19,7 @@ use maplit::btreemap;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::Weak;
+use std::time::SystemTime;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///
@@ -57,6 +58,7 @@ impl ProcDirectory {
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(BytesFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
+            &b"stat"[..] =>  fs.create_node(StatFile::new_node(&kernel_stats), mode!(IFREG, 0o444), FsCred::root()),
             &b"sys"[..] => sysctl_directory(fs),
             &b"pressure"[..] => pressure_directory(fs),
             &b"net"[..] => net_directory(fs),
@@ -376,15 +378,90 @@ impl DynamicFileSource for UptimeFile {
         // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
         let cpu_stats =
             self.kernel_stats.get().get_cpu_stats(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
-        let idle_time = cpu_stats
-            .per_cpu_stats
-            .unwrap_or(vec![])
-            .iter()
-            .map(|s| s.idle_time.unwrap_or(0))
-            .sum();
+        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
+        let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
         let idle_time = zx::Duration::from_nanos(idle_time).into_seconds_f64();
 
         writeln!(sink, "{:.2} {:.2}", uptime, idle_time)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct StatFile {
+    kernel_stats: Arc<KernelStatsStore>,
+}
+impl StatFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+impl DynamicFileSource for StatFile {
+    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+        let uptime = zx::Time::get_monotonic() - zx::Time::ZERO;
+
+        let cpu_stats =
+            self.kernel_stats.get().get_cpu_stats(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+
+        // Number of values reported per CPU. See `get_cpu_stats_row` below for the list of values.
+        const NUM_CPU_STATS: usize = 10;
+
+        let get_cpu_stats_row = |cpu_stats: &fidl_fuchsia_kernel::PerCpuStats| {
+            let idle = zx::Duration::from_nanos(cpu_stats.idle_time.unwrap_or(0));
+
+            // Assume that all non-idle time is spent in user mode.
+            let user = uptime - idle;
+
+            // Zircon currently reports only number of various interrupts, but not the time spent
+            // handling them. Return zeros.
+            let nice: u64 = 0;
+            let system: u64 = 0;
+            let iowait: u64 = 0;
+            let irq: u64 = 0;
+            let softirq: u64 = 0;
+            let steal: u64 = 0;
+            let quest: u64 = 0;
+            let quest_nice: u64 = 0;
+
+            [
+                duration_to_scheduler_clock(user) as u64,
+                nice,
+                system,
+                duration_to_scheduler_clock(idle) as u64,
+                iowait,
+                irq,
+                softirq,
+                steal,
+                quest,
+                quest_nice,
+            ]
+        };
+        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
+        let mut cpu_total_row = [0u64; NUM_CPU_STATS];
+        for row in per_cpu_stats.iter().map(get_cpu_stats_row) {
+            for (i, value) in row.iter().enumerate() {
+                cpu_total_row[i] += value
+            }
+        }
+
+        writeln!(sink, "cpu {}", cpu_total_row.map(|n| n.to_string()).join(" "))?;
+        for (i, row) in per_cpu_stats.iter().map(get_cpu_stats_row).enumerate() {
+            writeln!(sink, "cpu{} {}", i, row.map(|n| n.to_string()).join(" "))?;
+        }
+
+        let context_switches: u64 =
+            per_cpu_stats.iter().map(|s| s.context_switches.unwrap_or(0)).sum();
+        writeln!(sink, "ctxt {}", context_switches)?;
+
+        let num_interrupts: u64 = per_cpu_stats.iter().map(|s| s.ints.unwrap_or(0)).sum();
+        writeln!(sink, "intr {}", num_interrupts)?;
+
+        let epoch_time = zx::Duration::from(
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default(),
+        );
+        let boot_time_epoch = epoch_time - uptime;
+        writeln!(sink, "btime {}", boot_time_epoch.into_seconds())?;
 
         Ok(())
     }

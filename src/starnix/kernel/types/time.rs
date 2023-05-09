@@ -5,9 +5,19 @@
 use fuchsia_zircon as zx;
 
 use crate::types::*;
+use static_assertions::const_assert_eq;
 
 const MICROS_PER_SECOND: i64 = 1000 * 1000;
 pub const NANOS_PER_SECOND: i64 = 1000 * 1000 * 1000;
+
+// Frequence of the "scheduler clock", which is used to report time values in some APIs, e.g. in
+// `/proc` and `times()`. The same clock may be referred to as "USER_HZ" or "clock ticks".
+// Passed to Linux processes by the loader as `AT_CLKTCK`, which they can get it from libc using
+// `sysconf(_SC_CLK_TCK)`. Linux usually uses 100Hz.
+pub const SCHEDULER_CLOCK_HZ: i64 = 100;
+
+const_assert_eq!(NANOS_PER_SECOND % SCHEDULER_CLOCK_HZ, 0);
+const NANOS_PER_SCHEDULER_TICK: i64 = NANOS_PER_SECOND / SCHEDULER_CLOCK_HZ;
 
 pub fn timeval_from_time(time: zx::Time) -> timeval {
     let nanos = time.into_nanos();
@@ -75,6 +85,10 @@ pub fn itimerspec_from_deadline_interval(deadline: zx::Time, interval: zx::Durat
         it_interval: timespec_from_duration(interval),
         it_value: timespec_from_time(deadline),
     }
+}
+
+pub fn duration_to_scheduler_clock(duration: zx::Duration) -> i64 {
+    duration.into_nanos() / NANOS_PER_SCHEDULER_TICK
 }
 
 #[cfg(test)]
