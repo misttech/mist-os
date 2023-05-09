@@ -55,7 +55,7 @@ template("ffx_apply_version") {
   # variant-less target, and one with the variant.
   variant_target("action") {
     target_name = main_target
-    _variant_shared = false
+    variant_shared_redirection = false
 
     forward_variables_from(invoker,
                            [

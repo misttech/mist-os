@@ -97,8 +97,8 @@ template("user_basic_redirect") {
     variant_target("group") {
       target_name = select_target
       variant_selector_target_type = "loadable_module"
-      _variant_shared = current_toolchain == shlib_toolchain ||
-                        toolchain_variant.is_pic_default
+      variant_shared_redirection = current_toolchain == shlib_toolchain ||
+                                   toolchain_variant.is_pic_default
       forward_variables_from(common, "*")
       forward_variables_from(invoker, [ "exclude_toolchain_tags" ])
       public_deps = invoker.public_deps

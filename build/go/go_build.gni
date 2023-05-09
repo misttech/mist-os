@@ -193,7 +193,7 @@ template("go_build") {
 
   variant_target("action") {
     target_name = main_target_name
-    _variant_shared = false
+    variant_shared_redirection = false
 
     forward_variables_from(invoker,
                            [

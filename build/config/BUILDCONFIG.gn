@@ -2242,7 +2242,7 @@ template("_fuchsia_binary") {
 #    `target_type` list of target type names (see `select_variant` documentation above).
 #    If not defined, this defaults to the target type carried through `target_name`.
 #
-#  _variant_shared (required)
+#  variant_shared_redirection (required)
 #    [boolean] If true, this will also redirect to the -shlib companion toolchain
 #    associated with the current one. In practice, this should only be true for
 #    loadable_module(), or equivalent, which require to be built in that toolchain.
@@ -2281,6 +2281,7 @@ template("variant_target") {
                              "target_name",
                              "target_type",
                              "variant_selector_target_type",
+                             "variant_shared_redirection",
                              "visibility",
                            ])
 
@@ -2507,7 +2508,7 @@ template("variant_target") {
   not_needed([ "excluded_toolchain" ])
 
   builder_toolchain = toolchain_variant.base + target_variant
-  if (invoker._variant_shared) {
+  if (invoker.variant_shared_redirection) {
     builder_toolchain += "-shared"
   }
 
@@ -2765,7 +2766,7 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
                                    "visibility",
                                  ])
           target_name = _target_name
-          _variant_shared = toolchain_variant.with_shared
+          variant_shared_redirection = toolchain_variant.with_shared
           metadata = {
             if (defined(invoker.metadata)) {
               forward_variables_from(invoker.metadata, "*")
@@ -3008,7 +3009,7 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
 #
 template("executable") {
   _executable_name = target_name
-  _variant_shared = false
+  variant_shared_redirection = false
   variant_target("executable") {
     deps = []
     assert_no_deps = []
@@ -3234,7 +3235,7 @@ template("loadable_module") {
   _module_name = target_name
 
   # NOTE: Allow PIC-friendly toolchains to use loadable_module().
-  _variant_shared = toolchain_variant.with_shared
+  variant_shared_redirection = toolchain_variant.with_shared
 
   variant_target("loadable_module") {
     target_name = _module_name
