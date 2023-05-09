@@ -221,7 +221,7 @@ async fn dynamic_index_needed_blobs() {
     let env = TestEnv::builder().build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -230,7 +230,7 @@ async fn dynamic_index_needed_blobs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -322,7 +322,7 @@ async fn dynamic_index_package_hash_update() {
     let env = TestEnv::builder().build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -330,7 +330,7 @@ async fn dynamic_index_package_hash_update() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, None)
+        .get(&meta_blob_info, needed_blobs_server_end, None)
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -464,7 +464,7 @@ async fn package_cache_get() {
         .await
         .unwrap();
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*package.meta_far_merkle_root()).into(), length: 42 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -473,7 +473,7 @@ async fn package_cache_get() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     // Request received, expect client requesting meta far.
@@ -502,14 +502,14 @@ async fn package_cache_get() {
         .collect::<HashMap<_, Vec<u8>>>();
 
     let mut missing_blobs_iter = missing_blobs.into_iter();
-    let mut blob = missing_blobs_iter.next().unwrap();
+    let blob = missing_blobs_iter.next().unwrap();
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
     let (content_blob, content_blob_server_end) =
         fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
     assert!(needed_blobs
-        .open_blob(&mut blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+        .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
         .unwrap());
@@ -526,7 +526,7 @@ async fn package_cache_get() {
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
     contains_missing_blob_stats(&hierarchy, 1, 0, 1);
 
-    let mut blob = missing_blobs_iter.next().unwrap();
+    let blob = missing_blobs_iter.next().unwrap();
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
     let (content_blob, content_blob_server_end) =
@@ -535,7 +535,7 @@ async fn package_cache_get() {
     assert_eq!(
         true,
         needed_blobs
-            .open_blob(&mut blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
             .unwrap()
@@ -575,7 +575,7 @@ async fn package_cache_concurrent_gets() {
     let env = TestEnv::builder().build().await;
 
     let blob_id = BlobId::from(*package.meta_far_merkle_root());
-    let mut meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 42 };
+    let meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 42 };
 
     let (_needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -583,7 +583,7 @@ async fn package_cache_concurrent_gets() {
     let _get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     // Initiate concurrent connection to `PackageCache`.
@@ -595,12 +595,12 @@ async fn package_cache_concurrent_gets() {
         .expect("connect to package cache");
 
     let blob_id2 = BlobId::from(*package2.meta_far_merkle_root());
-    let mut meta_blob_info2 = BlobInfo { blob_id: blob_id2.into(), length: 7 };
+    let meta_blob_info2 = BlobInfo { blob_id: blob_id2.into(), length: 7 };
     let (_needed_blobs2, needed_blobs_server_end2) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (_dir, dir_server_end2) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let _get_fut = package_cache_proxy2
-        .get(&mut meta_blob_info2, needed_blobs_server_end2, Some(dir_server_end2))
+        .get(&meta_blob_info2, needed_blobs_server_end2, Some(dir_server_end2))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let hierarchy = env
@@ -704,7 +704,7 @@ async fn retained_index_updated_and_persisted() {
 
     replace_retained_packages(&env.proxies.retained_packages, blob_ids.as_slice()).await;
 
-    let mut meta_blob_info = BlobInfo { blob_id: blob_ids[0].into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: blob_ids[0].into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -712,7 +712,7 @@ async fn retained_index_updated_and_persisted() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -763,7 +763,7 @@ async fn retained_index_updated_and_persisted() {
     ))
     .await;
 
-    let mut meta_blob_info2 =
+    let meta_blob_info2 =
         BlobInfo { blob_id: BlobId::from(*packages[1].meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs2, needed_blobs_server_end2) =
@@ -772,7 +772,7 @@ async fn retained_index_updated_and_persisted() {
     let get_fut2 = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info2, needed_blobs_server_end2, Some(dir_server_end2))
+        .get(&meta_blob_info2, needed_blobs_server_end2, Some(dir_server_end2))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far2, _contents2) = packages[1].contents();
@@ -842,7 +842,7 @@ async fn index_updated_mid_package_write() {
         .await
         .unwrap();
     let blob_id = BlobId::from(*package.meta_far_merkle_root());
-    let mut meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -850,7 +850,7 @@ async fn index_updated_mid_package_write() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far, contents) = package.contents();

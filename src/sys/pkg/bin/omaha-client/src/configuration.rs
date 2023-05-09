@@ -212,7 +212,7 @@ impl ClientConfiguration {
     ) -> (Version, Option<ChannelConfig>) {
         let default_version = Version::from(MINIMUM_VALID_VERSION);
         if let Some(ref cup) = cup {
-            match cup.get_info(&mut fpkg::PackageUrl { url: package.url.to_string() }).await {
+            match cup.get_info(&fpkg::PackageUrl { url: package.url.to_string() }).await {
                 Ok(Ok((cup_version, cup_channel))) => {
                     let channel_config =
                         package.channel_config.get_channel(&cup_channel).or_else(|| {

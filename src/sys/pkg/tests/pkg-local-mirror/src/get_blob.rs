@@ -12,10 +12,8 @@ use {
 async fn verify_get_blob_with_read_success(env: &TestEnv, blob: &str, file_contents: &str) {
     let (file_proxy, server_end) = create_proxy().unwrap();
 
-    let res = env
-        .local_mirror_proxy()
-        .get_blob(&mut BlobId::parse(blob).unwrap().into(), server_end)
-        .await;
+    let res =
+        env.local_mirror_proxy().get_blob(&BlobId::parse(blob).unwrap().into(), server_end).await;
 
     assert_eq!(res.unwrap(), Ok(()));
     assert_matches!(
@@ -81,7 +79,7 @@ async fn missing_blob() {
     let res = env
         .local_mirror_proxy()
         .get_blob(
-            &mut BlobId::parse("0000000000000000000000000000000000000000000000000000000000000000")
+            &BlobId::parse("0000000000000000000000000000000000000000000000000000000000000000")
                 .unwrap()
                 .into(),
             server_end,
@@ -114,7 +112,7 @@ async fn blobs_directory_closed() {
     let res = env
         .local_mirror_proxy()
         .get_blob(
-            &mut BlobId::parse("0000000000000000000000000000000000000000000000000000000000000000")
+            &BlobId::parse("0000000000000000000000000000000000000000000000000000000000000000")
                 .unwrap()
                 .into(),
             server_end,

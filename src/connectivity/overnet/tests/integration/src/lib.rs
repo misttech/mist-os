@@ -217,7 +217,7 @@ impl ServiceConsumerProxyInterface for ServiceConsumer {
 
     fn connect_to_service(
         &self,
-        node: &mut fidl_fuchsia_overnet_protocol::NodeId,
+        node: &fidl_fuchsia_overnet_protocol::NodeId,
         service_name: &str,
         chan: fidl::Channel,
     ) -> Result<(), fidl::Error> {

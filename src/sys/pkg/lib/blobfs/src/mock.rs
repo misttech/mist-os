@@ -405,7 +405,7 @@ impl Blob {
                         modification_time: 0,
                     };
                     attr.content_size = data.len().try_into().unwrap();
-                    responder.send(Status::OK.into_raw(), &mut attr).unwrap();
+                    responder.send(Status::OK.into_raw(), &attr).unwrap();
                 }
                 Some(Ok(fio::FileRequest::Close { responder })) => {
                     let _ = responder.send(&mut Ok(()));

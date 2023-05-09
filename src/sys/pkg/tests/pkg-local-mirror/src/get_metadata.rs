@@ -14,7 +14,7 @@ async fn verify_get_metadata_with_read_success(env: &TestEnv, path: &str, file_c
 
     let res = env
         .local_mirror_proxy()
-        .get_metadata(&mut RepositoryUrl { url: repo_url().to_string() }, path, server_end)
+        .get_metadata(&RepositoryUrl { url: repo_url().to_string() }, path, server_end)
         .await;
 
     assert_eq!(res.unwrap(), Ok(()));
@@ -89,7 +89,7 @@ async fn verify_get_metadata_with_on_open_failure_status(
 
     let res = env
         .local_mirror_proxy()
-        .get_metadata(&mut RepositoryUrl { url: repo_url().to_string() }, path, server_end)
+        .get_metadata(&RepositoryUrl { url: repo_url().to_string() }, path, server_end)
         .await;
 
     assert_eq!(res.unwrap(), Ok(()));
@@ -145,7 +145,7 @@ async fn metadata_directory_closed() {
     let (file_proxy, server_end) = create_proxy().unwrap();
     let res = env
         .local_mirror_proxy()
-        .get_metadata(&mut RepositoryUrl { url: repo_url().to_string() }, "1.root.json", server_end)
+        .get_metadata(&RepositoryUrl { url: repo_url().to_string() }, "1.root.json", server_end)
         .await;
 
     assert_eq!(res.unwrap(), Ok(()));

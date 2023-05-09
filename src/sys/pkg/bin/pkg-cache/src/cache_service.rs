@@ -1866,7 +1866,7 @@ mod serve_needed_blobs_tests {
                 assert_matches!(
                     proxy
                         .open_blob(
-                            &mut BlobId::from([2; 32]).into(),
+                            &BlobId::from([2; 32]).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed
                         )
@@ -1939,7 +1939,7 @@ mod serve_needed_blobs_tests {
                             fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
                         let open_fut = proxy.open_blob(
-                            &mut BlobId::from(hash).into(),
+                            &BlobId::from(hash).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed,
                         );
@@ -2009,7 +2009,7 @@ mod serve_needed_blobs_tests {
                             fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
                         let open_fut = proxy.open_blob(
-                            &mut BlobId::from(hash).into(),
+                            &BlobId::from(hash).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed,
                         );
@@ -2064,7 +2064,7 @@ mod serve_needed_blobs_tests {
                 assert_matches!(
                     proxy
                         .open_blob(
-                            &mut BlobId::from(content_blob).into(),
+                            &BlobId::from(content_blob).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed
                         )
@@ -2091,7 +2091,7 @@ mod serve_needed_blobs_tests {
                 assert_matches!(
                     proxy
                         .open_blob(
-                            &mut BlobId::from(content_blob).into(),
+                            &BlobId::from(content_blob).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed
                         )
@@ -2128,7 +2128,7 @@ mod serve_needed_blobs_tests {
                 assert_matches!(
                     proxy
                         .open_blob(
-                            &mut BlobId::from(content_blob).into(),
+                            &BlobId::from(content_blob).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed
                         )
@@ -2158,7 +2158,7 @@ mod serve_needed_blobs_tests {
                 assert_matches!(
                     proxy
                         .open_blob(
-                            &mut BlobId::from(content_blob).into(),
+                            &BlobId::from(content_blob).into(),
                             blob_server_end,
                             fpkg::BlobType::Uncompressed
                         )
@@ -2238,7 +2238,7 @@ mod serve_needed_blobs_tests {
                     fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
                 let open_fut = proxy.open_blob(
-                    &mut BlobId::from(content_blob).into(),
+                    &BlobId::from(content_blob).into(),
                     blob_server_end,
                     fpkg::BlobType::Uncompressed,
                 );
@@ -2768,7 +2768,7 @@ mod serve_write_blob_tests {
                 StubRequestor::SetAttr => proxy
                     .set_attr(
                         fio::NodeAttributeFlags::empty(),
-                        &mut fio::NodeAttributes {
+                        &fio::NodeAttributes {
                             mode: 0,
                             id: 0,
                             content_size: 0,

@@ -548,7 +548,7 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::GetAttr { responder } => responder
                 .send(
                     zx::Status::IO.into_raw(),
-                    &mut fio::NodeAttributes {
+                    &fio::NodeAttributes {
                         mode: 0,
                         id: 0,
                         content_size: 0,

@@ -158,19 +158,15 @@ fn init_scene(
         ..Default::default()
     };
     flatland
-        .create_image(&mut IMAGE_ID.clone(), buffer_tokens.import_token, 0, image_props)
+        .create_image(&IMAGE_ID, buffer_tokens.import_token, 0, image_props)
         .map_err(|_| anyhow!("FIDL error creating image"))?;
+    flatland.create_transform(&TRANSFORM_ID).map_err(|_| anyhow!("error creating transform"))?;
     flatland
-        .create_transform(&mut TRANSFORM_ID.clone())
-        .map_err(|_| anyhow!("error creating transform"))?;
-    flatland
-        .set_root_transform(&mut TRANSFORM_ID.clone())
+        .set_root_transform(&TRANSFORM_ID)
         .map_err(|_| anyhow!("error setting root transform"))?;
+    flatland.set_content(&TRANSFORM_ID, &IMAGE_ID).map_err(|_| anyhow!("error setting content"))?;
     flatland
-        .set_content(&mut TRANSFORM_ID.clone(), &mut IMAGE_ID.clone())
-        .map_err(|_| anyhow!("error setting content"))?;
-    flatland
-        .set_translation(&mut TRANSFORM_ID.clone(), &mut fmath::Vec_ { x: TRANSLATION_X, y: 0 })
+        .set_translation(&TRANSFORM_ID, &fmath::Vec_ { x: TRANSLATION_X, y: 0 })
         .map_err(|_| anyhow!("error setting translation"))?;
 
     Ok(allocation)
@@ -220,8 +216,8 @@ pub fn spawn_view_provider(
                             server
                                 .flatland
                                 .set_image_destination_size(
-                                    &mut IMAGE_ID.clone(),
-                                    &mut fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT },
+                                    &IMAGE_ID,
+                                    &fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT },
                                 )
                                 .expect("fidl error");
 

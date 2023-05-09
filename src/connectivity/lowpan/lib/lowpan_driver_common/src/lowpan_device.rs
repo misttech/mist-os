@@ -495,8 +495,8 @@ impl<T: Driver> ServeTo<DeviceExtraRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_current_mac_address()
                         .err_into::<Error>()
-                        .and_then(|mut response| {
-                            ready(responder.unwrap().send(&mut response).map_err(Error::from))
+                        .and_then(|response| {
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in get_current_mac_address request")?;
@@ -901,8 +901,8 @@ impl<T: Driver> ServeTo<DeviceTestRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_factory_mac_address()
                         .err_into::<Error>()
-                        .and_then(|mut response| {
-                            ready(responder.unwrap().send(&mut response).map_err(Error::from))
+                        .and_then(|response| {
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in get_factory_mac_address request")?;
@@ -911,8 +911,8 @@ impl<T: Driver> ServeTo<DeviceTestRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_current_mac_address()
                         .err_into::<Error>()
-                        .and_then(|mut response| {
-                            ready(responder.unwrap().send(&mut response).map_err(Error::from))
+                        .and_then(|response| {
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in get_current_mac_address request")?;

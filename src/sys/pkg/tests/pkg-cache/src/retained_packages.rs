@@ -85,7 +85,7 @@ async fn packages_are_retained_gc_mid_process() {
     let blob_id = BlobId::from(*package.meta_far_merkle_root());
 
     // Start installing a package (write the meta far).
-    let mut meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -93,7 +93,7 @@ async fn packages_are_retained_gc_mid_process() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far, contents) = package.contents();

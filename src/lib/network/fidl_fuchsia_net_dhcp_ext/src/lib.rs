@@ -117,7 +117,7 @@ pub async fn apply_new_routers(
 
     let new_routers = new_routers.into_iter().collect::<HashSet<_>>();
     for router in new_routers.difference(configured_routers) {
-        match stack.add_forwarding_entry(&mut fwd_entry(router)).await.map_err(Error::Fidl)? {
+        match stack.add_forwarding_entry(&fwd_entry(router)).await.map_err(Error::Fidl)? {
             Ok(()) => (),
             Err(e) => {
                 errors.push(ForwardingEntryError {
@@ -131,7 +131,7 @@ pub async fn apply_new_routers(
     }
 
     for router in configured_routers.difference(&new_routers) {
-        match stack.del_forwarding_entry(&mut fwd_entry(router)).await.map_err(Error::Fidl)? {
+        match stack.del_forwarding_entry(&fwd_entry(router)).await.map_err(Error::Fidl)? {
             Ok(()) => (),
             Err(e) => {
                 errors.push(ForwardingEntryError {

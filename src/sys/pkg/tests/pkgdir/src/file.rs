@@ -566,7 +566,7 @@ async fn unsupported_per_package_source(source: PackageSource) {
             zx::Status::from_raw(
                 file.set_attr(
                     fio::NodeAttributeFlags::empty(),
-                    &mut fio::NodeAttributes {
+                    &fio::NodeAttributes {
                         mode: 0,
                         id: 0,
                         content_size: 0,

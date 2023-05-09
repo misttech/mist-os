@@ -304,7 +304,7 @@ impl Loader {
         }
 
         buffer_collection
-            .set_constraints(true, &mut constraints)
+            .set_constraints(true, &constraints)
             .map_err(|_| vk::ERROR_INITIALIZATION_FAILED)?;
 
         Ok((scenic_import_token, buffer_collection))

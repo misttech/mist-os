@@ -213,7 +213,7 @@ mod tests {
         let installer_service =
             Arc::new(MockUpdateInstallerService::with_states(vec![State::Prepare]));
         let proxy = Arc::clone(&installer_service).spawn_installer_service();
-        let mut url =
+        let url =
             fidl_fuchsia_pkg::PackageUrl { url: "fuchsia-pkg://fuchsia.com/update".to_string() };
         let options = Options {
             initiator: Some(Initiator::User),
@@ -224,7 +224,7 @@ mod tests {
         let (monitor_client_end, stream) =
             fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
         proxy
-            .start_update(&mut url, options, monitor_client_end, None)
+            .start_update(&url, options, monitor_client_end, None)
             .await
             .expect("made start_update call")
             .expect("start_update call succeeded");

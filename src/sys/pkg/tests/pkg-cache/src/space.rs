@@ -24,14 +24,14 @@ use {
 
 // TODO(fxbug.dev/76724): Deduplicate this function.
 async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
-    let mut meta_blob_info =
+    let meta_blob_info =
         fpkg::BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, contents) = pkg.contents();
@@ -51,13 +51,13 @@ async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
 
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
-    for mut blob in missing_blobs {
+    for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let (content_blob, content_blob_server_end) =
             fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         assert!(needed_blobs
-            .open_blob(&mut blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
             .unwrap());
@@ -182,7 +182,7 @@ async fn gc_dynamic_index_protected() {
     // That's WAI, but complicating the do_fetch interface further isn't worth it.
     //
     // Here, we persist the meta.far
-    let mut meta_blob_info = fpkg::BlobInfo {
+    let meta_blob_info = fpkg::BlobInfo {
         blob_id: BlobId::from(*pkgprime.meta_far_merkle_root()).into(),
         length: 0,
     };
@@ -192,7 +192,7 @@ async fn gc_dynamic_index_protected() {
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, contents) = pkgprime.contents();
@@ -219,13 +219,13 @@ async fn gc_dynamic_index_protected() {
 
     // Fully fetch pkgprime, and ensure that blobs from the old package are not persisted past GC.
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
-    for mut blob in missing_blobs {
+    for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let (content_blob, content_blob_server_end) =
             fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         assert!(needed_blobs
-            .open_blob(&mut blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
             .unwrap());
@@ -320,7 +320,7 @@ async fn gc_updated_static_package() {
     // That's WAI, but complicating the do_fetch interface further isn't worth it.
     //
     // Here, we persist the meta.far
-    let mut meta_blob_info = fpkg::BlobInfo {
+    let meta_blob_info = fpkg::BlobInfo {
         blob_id: BlobId::from(*pkgprime.meta_far_merkle_root()).into(),
         length: 0,
     };
@@ -330,7 +330,7 @@ async fn gc_updated_static_package() {
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, contents) = pkgprime.contents();
@@ -357,13 +357,13 @@ async fn gc_updated_static_package() {
 
     // Fully fetch pkgprime, and ensure that blobs from the old package are not persisted past GC.
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
-    for mut blob in missing_blobs {
+    for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let (content_blob, content_blob_server_end) =
             fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         assert!(needed_blobs
-            .open_blob(&mut blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
             .unwrap());
@@ -439,7 +439,7 @@ async fn blob_write_fails_when_out_of_space() {
         .build()
         .await;
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         fpkg::BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -448,7 +448,7 @@ async fn blob_write_fails_when_out_of_space() {
     let _get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_blob, meta_blob_server_end) =
@@ -501,7 +501,7 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
 
     // Start the Get.
     let package_cache = &env.proxies.package_cache;
-    let mut meta_blob_info = fpkg::BlobInfo {
+    let meta_blob_info = fpkg::BlobInfo {
         blob_id: BlobId::from(*superpackage.meta_far_merkle_root()).into(),
         length: 0,
     };
@@ -509,7 +509,7 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // Write the meta.far.
@@ -547,7 +547,7 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
         fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
     assert!(needed_blobs
         .open_blob(
-            &mut BlobId::from(*subpackage.meta_far_merkle_root()).into(),
+            &BlobId::from(*subpackage.meta_far_merkle_root()).into(),
             subpackage_meta_blob_server_end,
             fpkg::BlobType::Uncompressed,
         )
@@ -588,7 +588,7 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
         fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
     assert!(needed_blobs
         .open_blob(
-            &mut BlobId::from(subpackage_content_files[0].0).into(),
+            &BlobId::from(subpackage_content_files[0].0).into(),
             subpackage_content_blob_a_server_end,
             fpkg::BlobType::Uncompressed,
         )
@@ -609,7 +609,7 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
         fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
     assert!(needed_blobs
         .open_blob(
-            &mut BlobId::from(subpackage_content_files[1].0).into(),
+            &BlobId::from(subpackage_content_files[1].0).into(),
             subpackage_content_blob_b_server_end,
             fpkg::BlobType::Uncompressed,
         )

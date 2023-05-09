@@ -102,12 +102,12 @@ pub async fn start_update(
     installer_proxy: &InstallerProxy,
     reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
 ) -> Result<UpdateAttempt, UpdateAttemptError> {
-    let mut url = fidl_fuchsia_pkg::PackageUrl { url: update_url.to_string() };
+    let url = fidl_fuchsia_pkg::PackageUrl { url: update_url.to_string() };
     let (monitor_client_end, monitor) =
         UpdateAttemptMonitor::new().map_err(UpdateAttemptError::FIDL)?;
 
     let attempt_id = installer_proxy
-        .start_update(&mut url, options.into(), monitor_client_end, reboot_controller_server_end)
+        .start_update(&url, options.into(), monitor_client_end, reboot_controller_server_end)
         .await
         .map_err(UpdateAttemptError::FIDL)?
         .map_err(|reason| match reason {

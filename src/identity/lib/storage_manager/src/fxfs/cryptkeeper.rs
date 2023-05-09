@@ -86,7 +86,7 @@ impl CryptKeeper {
                 .log_error_then("Connect to Realm protocol failed", faccount::Error::Resource)?;
 
             let () = proxy
-                .destroy_child(&mut fdecl::ChildRef {
+                .destroy_child(&fdecl::ChildRef {
                     name: self.crypt_component_name.to_string(),
                     collection: Some(self.crypt_collection_name.to_string()),
                 })
@@ -106,7 +106,7 @@ impl CryptKeeper {
 
         realm_proxy
             .create_child(
-                &mut fdecl::CollectionRef { name: args.crypt_collection_name.clone() },
+                &fdecl::CollectionRef { name: args.crypt_collection_name.clone() },
                 fdecl::Child {
                     name: Some(args.crypt_component_name.clone()),
                     url: Some(CRYPT_CM_URL.to_string()),

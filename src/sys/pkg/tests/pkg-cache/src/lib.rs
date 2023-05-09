@@ -84,7 +84,7 @@ async fn get_and_verify_package(
     package_cache: &fpkg::PackageCacheProxy,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
-    let mut meta_blob_info = fpkg::BlobInfo {
+    let meta_blob_info = fpkg::BlobInfo {
         blob_id: fpkg_ext::BlobId::from(*pkg.meta_far_merkle_root()).into(),
         length: 0,
     };
@@ -93,7 +93,7 @@ async fn get_and_verify_package(
         fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -131,11 +131,11 @@ pub async fn write_needed_blobs(
         if chunk.is_empty() {
             break;
         }
-        for mut blob_info in chunk {
+        for blob_info in chunk {
             let (blob_proxy, blob_server_end) =
                 fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
             assert!(needed_blobs
-                .open_blob(&mut blob_info.blob_id, blob_server_end, fpkg::BlobType::Uncompressed)
+                .open_blob(&blob_info.blob_id, blob_server_end, fpkg::BlobType::Uncompressed)
                 .await
                 .unwrap()
                 .unwrap());
@@ -175,7 +175,7 @@ async fn verify_package_cached(
     proxy: &fpkg::PackageCacheProxy,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
-    let mut meta_blob_info = fpkg::BlobInfo {
+    let meta_blob_info = fpkg::BlobInfo {
         blob_id: fpkg_ext::BlobId::from(*pkg.meta_far_merkle_root()).into(),
         length: 0,
     };
@@ -186,7 +186,7 @@ async fn verify_package_cached(
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
     let get_fut = proxy
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (_meta_blob, meta_blob_server_end) =
@@ -684,7 +684,7 @@ impl<B: Blobfs> TestEnv<B> {
         let status_fut = self
             .proxies
             .package_cache
-            .open(&mut merkle.parse::<fpkg_ext::BlobId>().unwrap().into(), server_end);
+            .open(&merkle.parse::<fpkg_ext::BlobId>().unwrap().into(), server_end);
 
         let () = status_fut.await.unwrap().map_err(zx::Status::from_raw)?;
         Ok(package)
@@ -697,7 +697,7 @@ impl<B: Blobfs> TestEnv<B> {
             .proxies
             .package_cache
             .open(
-                &mut "0000000000000000000000000000000000000000000000000000000000000000"
+                &"0000000000000000000000000000000000000000000000000000000000000000"
                     .parse::<fpkg_ext::BlobId>()
                     .unwrap()
                     .into(),

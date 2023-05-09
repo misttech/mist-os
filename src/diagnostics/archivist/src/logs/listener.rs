@@ -174,11 +174,11 @@ impl Listener {
     /// Send a single log message if it should be sent according to this listener's filter settings.
     async fn send_log(&mut self, log_message: &LogsData) {
         if self.filter.should_send(log_message) {
-            let mut to_send: LogMessage = log_message.into();
+            let to_send: LogMessage = log_message.into();
             if !is_valid(&to_send) {
                 return;
             }
-            self.check_result(self.listener.log(&mut to_send).await);
+            self.check_result(self.listener.log(&to_send).await);
         }
     }
 

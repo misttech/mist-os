@@ -981,7 +981,7 @@ impl<B: Blobfs> TestEnv<B> {
         &self,
         url: impl Into<String>,
     ) -> impl Future<Output = Result<pkg::BlobId, Status>> {
-        let fut = self.proxies.resolver.get_hash(&mut fpkg::PackageUrl { url: url.into() });
+        let fut = self.proxies.resolver.get_hash(&fpkg::PackageUrl { url: url.into() });
         async move { fut.await.unwrap().map(|blob_id| blob_id.into()).map_err(Status::from_raw) }
     }
 
@@ -996,7 +996,7 @@ impl<B: Blobfs> TestEnv<B> {
             .unwrap();
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = cache_service
-            .open(&mut hash.into(), server_end)
+            .open(&hash.into(), server_end)
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)?;
@@ -1071,14 +1071,14 @@ impl<B: Blobfs> TestEnv<B> {
         url: impl Into<String>,
         cup: pkg::CupData,
     ) -> Result<(), WriteError> {
-        self.proxies.cup.write(&mut fpkg::PackageUrl { url: url.into() }, cup.into()).await.unwrap()
+        self.proxies.cup.write(&fpkg::PackageUrl { url: url.into() }, cup.into()).await.unwrap()
     }
 
     pub async fn cup_get_info(
         &self,
         url: impl Into<String>,
     ) -> Result<(String, String), GetInfoError> {
-        self.proxies.cup.get_info(&mut fpkg::PackageUrl { url: url.into() }).await.unwrap()
+        self.proxies.cup.get_info(&fpkg::PackageUrl { url: url.into() }).await.unwrap()
     }
 }
 
@@ -1130,7 +1130,7 @@ pub fn resolve_with_context(
     Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
 > {
     let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
-    let response_fut = resolver.resolve_with_context(url, &mut context.into(), package_server_end);
+    let response_fut = resolver.resolve_with_context(url, &context.into(), package_server_end);
     async move {
         let resolved_context = response_fut.await.unwrap()?;
         Ok((package, (&resolved_context).try_into().unwrap()))

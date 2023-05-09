@@ -101,7 +101,7 @@ impl TunNetworkInterface {
 
             let (port, server_end) = create_proxy::<fhwnet::PortMarker>()?;
             tun_port.get_port(server_end).context("get_port failed")?;
-            let mut port_id = port
+            let port_id = port
                 .get_info()
                 .await
                 .context("get_info failed")?
@@ -113,7 +113,7 @@ impl TunNetworkInterface {
                 fnetifadmin::ControlSynchronousProxy::new(control_sync_client_channel);
             device_control
                 .create_interface(
-                    &mut port_id,
+                    &port_id,
                     control_sync_server.into(),
                     fnetifadmin::Options { name: name.clone(), ..Default::default() },
                 )
@@ -122,7 +122,7 @@ impl TunNetworkInterface {
             let (control, server_end) = fnetifext::admin::Control::create_endpoints()?;
             device_control
                 .create_interface(
-                    &mut port_id,
+                    &port_id,
                     server_end,
                     fnetifadmin::Options { name, ..Default::default() },
                 )
@@ -236,7 +236,7 @@ impl NetworkInterface for TunNetworkInterface {
 
     fn add_address(&self, addr: &Subnet) -> Result<(), Error> {
         info!("TunNetworkInterface: Adding Address: {:?}", addr);
-        let mut device_addr = fnet::Subnet {
+        let device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
         };
@@ -247,7 +247,7 @@ impl NetworkInterface for TunNetworkInterface {
         address_state_provider.detach()?;
 
         self.control_sync.lock().add_address(
-            &mut device_addr,
+            &device_addr,
             fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             server_end,
         )?;
@@ -261,7 +261,7 @@ impl NetworkInterface for TunNetworkInterface {
         if let Some(addresses) = routes.get_mut(&subnet) {
             addresses.insert(addr.addr);
         } else {
-            let mut forwarding_entry = fnetstack::ForwardingEntry {
+            let forwarding_entry = fnetstack::ForwardingEntry {
                 subnet,
                 device_id: self.id,
                 next_hop: None,
@@ -269,7 +269,7 @@ impl NetworkInterface for TunNetworkInterface {
             };
             self.stack_sync
                 .lock()
-                .add_forwarding_entry(&mut forwarding_entry, zx::Time::INFINITE)?
+                .add_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
                 .expect("add_forwarding_entry");
             routes.insert(subnet, HashSet::from([addr.addr]));
             info!("TunNetworkInterface: Successfully added forwarding entry for {:?}", addr);
@@ -281,14 +281,14 @@ impl NetworkInterface for TunNetworkInterface {
     fn remove_address(&self, addr: &Subnet) -> Result<(), Error> {
         info!("TunNetworkInterface: Removing Address: {:?}", addr);
 
-        let mut device_addr = fnet::Subnet {
+        let device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
         };
 
         self.control_sync
             .lock()
-            .remove_address(&mut device_addr, zx::Time::INFINITE)?
+            .remove_address(&device_addr, zx::Time::INFINITE)?
             .expect("control_sync.remove_address");
 
         let subnet = fnetext::apply_subnet_mask(device_addr);
@@ -302,7 +302,7 @@ impl NetworkInterface for TunNetworkInterface {
             if addresses.is_empty() {
                 routes.remove(&subnet);
 
-                let mut forwarding_entry = fnetstack::ForwardingEntry {
+                let forwarding_entry = fnetstack::ForwardingEntry {
                     subnet,
                     device_id: self.id,
                     next_hop: None,
@@ -311,7 +311,7 @@ impl NetworkInterface for TunNetworkInterface {
 
                 self.stack_sync
                     .lock()
-                    .del_forwarding_entry(&mut forwarding_entry, zx::Time::INFINITE)
+                    .del_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)
                     .squash_result()?;
                 info!("TunNetworkInterface: Successfully removed forwarding entry for {:?}", addr);
             }

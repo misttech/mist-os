@@ -472,14 +472,14 @@ pub mod test_check_for_system_update_impl {
         fn resolve_with_context(
             &self,
             _package_url: &str,
-            _context: &mut fpkg::ResolutionContext,
+            _context: &fpkg::ResolutionContext,
             _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
         ) -> Self::ResolveWithContextResponseFut {
             panic!("resolve_with_context not implemented");
         }
 
         type GetHashResponseFut = future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-        fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+        fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
             panic!("get_hash not implemented");
         }
     }
@@ -593,7 +593,7 @@ pub mod test_check_for_system_update_impl {
             fn resolve_with_context(
                 &self,
                 _package_url: &str,
-                _context: &mut fpkg::ResolutionContext,
+                _context: &fpkg::ResolutionContext,
                 _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
             ) -> Self::ResolveWithContextResponseFut {
                 future::err(fidl::Error::Invalid)
@@ -601,7 +601,7 @@ pub mod test_check_for_system_update_impl {
 
             type GetHashResponseFut =
                 future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-            fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+            fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
                 panic!("get_hash not implemented");
             }
         }
@@ -676,7 +676,7 @@ pub mod test_check_for_system_update_impl {
             fn resolve_with_context(
                 &self,
                 _package_url: &str,
-                _context: &mut fpkg::ResolutionContext,
+                _context: &fpkg::ResolutionContext,
                 _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
             ) -> Self::ResolveWithContextResponseFut {
                 panic!("resolve_with_context not implemented");
@@ -684,7 +684,7 @@ pub mod test_check_for_system_update_impl {
 
             type GetHashResponseFut =
                 future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-            fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+            fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
                 panic!("get_hash not implemented");
             }
         }
@@ -735,7 +735,7 @@ pub mod test_check_for_system_update_impl {
             fn resolve_with_context(
                 &self,
                 _package_url: &str,
-                _context: &mut fpkg::ResolutionContext,
+                _context: &fpkg::ResolutionContext,
                 _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
             ) -> Self::ResolveWithContextResponseFut {
                 panic!("resolve_with_context not implemented");
@@ -743,7 +743,7 @@ pub mod test_check_for_system_update_impl {
 
             type GetHashResponseFut =
                 future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-            fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+            fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
                 panic!("get_hash not implemented");
             }
         }
@@ -794,7 +794,7 @@ pub mod test_check_for_system_update_impl {
             fn resolve_with_context(
                 &self,
                 _package_url: &str,
-                _context: &mut fpkg::ResolutionContext,
+                _context: &fpkg::ResolutionContext,
                 _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
             ) -> Self::ResolveWithContextResponseFut {
                 panic!("resolve_with_context not implemented");
@@ -802,7 +802,7 @@ pub mod test_check_for_system_update_impl {
 
             type GetHashResponseFut =
                 future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-            fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+            fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
                 panic!("get_hash not implemented");
             }
         }
@@ -847,7 +847,7 @@ pub mod test_check_for_system_update_impl {
             fn resolve_with_context(
                 &self,
                 _package_url: &str,
-                _context: &mut fpkg::ResolutionContext,
+                _context: &fpkg::ResolutionContext,
                 _dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
             ) -> Self::ResolveWithContextResponseFut {
                 panic!("resolve_with_context not implemented");
@@ -855,7 +855,7 @@ pub mod test_check_for_system_update_impl {
 
             type GetHashResponseFut =
                 future::Ready<Result<PackageResolverGetHashResult, fidl::Error>>;
-            fn get_hash(&self, _package_url: &mut PackageUrl) -> Self::GetHashResponseFut {
+            fn get_hash(&self, _package_url: &PackageUrl) -> Self::GetHashResponseFut {
                 panic!("get_hash not implemented");
             }
         }

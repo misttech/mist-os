@@ -42,7 +42,7 @@ impl RepositoryProvider<Pouf1> for LocalMirrorRepositoryProvider {
         async move {
             let (local, remote) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
             self.proxy
-                .get_metadata(&mut RepositoryUrl::from(self.url.clone()).into(), &path, remote)
+                .get_metadata(&RepositoryUrl::from(self.url.clone()).into(), &path, remote)
                 .await
                 .context("sending get_metadata")
                 .map_err(make_opaque_error)?

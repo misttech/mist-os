@@ -79,20 +79,16 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
         Command::GetHash(GetHashCommand { pkg_url }) => {
             let resolver = connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
-            let blob_id =
-                resolver.get_hash(&mut PackageUrl { url: pkg_url }).await?.map_err(|i| {
-                    format_err!(
-                        "Failed to get package hash with error: {}",
-                        zx::Status::from_raw(i)
-                    )
-                })?;
+            let blob_id = resolver.get_hash(&PackageUrl { url: pkg_url }).await?.map_err(|i| {
+                format_err!("Failed to get package hash with error: {}", zx::Status::from_raw(i))
+            })?;
             println!("{}", BlobId::from(blob_id));
             Ok(0)
         }
         Command::PkgStatus(PkgStatusCommand { pkg_url }) => {
             let resolver = connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
-            let mut blob_id = match resolver.get_hash(&mut PackageUrl { url: pkg_url }).await? {
+            let blob_id = match resolver.get_hash(&PackageUrl { url: pkg_url }).await? {
                 Ok(blob_id) => blob_id,
                 Err(status) => match zx::Status::from_raw(status) {
                     zx::Status::NOT_FOUND => {
@@ -112,7 +108,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
             let cache = connect_to_protocol::<PackageCacheMarker>()
                 .context("Failed to connect to cache service")?;
             let (_, dir_server_end) = fidl::endpoints::create_proxy()?;
-            let res = cache.open(&mut blob_id, dir_server_end).await?;
+            let res = cache.open(&blob_id, dir_server_end).await?;
             match res.map_err(zx::Status::from_raw) {
                 Ok(_) => {}
                 Err(zx::Status::NOT_FOUND) => {
@@ -136,7 +132,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
             let (dir, dir_server_end) = fidl::endpoints::create_proxy()?;
 
             let () = cache
-                .open(&mut meta_far_blob_id.into(), dir_server_end)
+                .open(&meta_far_blob_id.into(), dir_server_end)
                 .await?
                 .map_err(zx::Status::from_raw)?;
 

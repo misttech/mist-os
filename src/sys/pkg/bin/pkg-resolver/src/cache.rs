@@ -815,7 +815,7 @@ async fn read_local_blob(
 
     inspect.state(inspect::LocalMirror::GetBlob);
     proxy
-        .get_blob(&mut merkle.into(), remote)
+        .get_blob(&merkle.into(), remote)
         .await
         .map_err(FetchError::FidlError)?
         .map_err(FetchError::LocalMirror)?;

@@ -75,7 +75,7 @@ mod tests {
 
         let (metadata, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = proxy
-            .get_metadata(&mut RepositoryUrl::from(url).into(), "timestamp.json", server_end)
+            .get_metadata(&RepositoryUrl::from(url).into(), "timestamp.json", server_end)
             .await
             .unwrap()
             .unwrap();
@@ -84,7 +84,7 @@ mod tests {
 
         let (blob, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = proxy
-            .get_blob(&mut BlobId::from(meta_far_merkle).into(), server_end)
+            .get_blob(&BlobId::from(meta_far_merkle).into(), server_end)
             .await
             .unwrap()
             .unwrap();

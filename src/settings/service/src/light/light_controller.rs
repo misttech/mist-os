@@ -248,7 +248,7 @@ impl LightController {
                     "set_brightness_value",
                 ),
                 Some(LightValue::Rgb(rgb)) => {
-                    let mut value = rgb.clone().try_into().map_err(|_| {
+                    let value = rgb.clone().try_into().map_err(|_| {
                         ControllerError::InvalidArgument(
                             SettingType::Light,
                             "value".into(),
@@ -257,7 +257,7 @@ impl LightController {
                     })?;
                     (
                         call_async!(self.light_proxy =>
-                            set_rgb_value(*hardware_index, &mut value))
+                            set_rgb_value(*hardware_index, & value))
                         .await,
                         "set_rgb_value",
                     )

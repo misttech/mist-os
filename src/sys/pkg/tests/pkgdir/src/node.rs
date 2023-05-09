@@ -557,7 +557,7 @@ async fn assert_set_attr(package_root: &fio::DirectoryProxy, path: &str, flags: 
 }
 
 async fn verify_set_attr(node: fio::NodeProxy) -> Result<(), Error> {
-    let mut node_attr = fio::NodeAttributes {
+    let node_attr = fio::NodeAttributes {
         mode: 0,
         id: 0,
         content_size: 0,
@@ -566,7 +566,7 @@ async fn verify_set_attr(node: fio::NodeProxy) -> Result<(), Error> {
         creation_time: 0,
         modification_time: 0,
     };
-    match node.set_attr(fio::NodeAttributeFlags::empty(), &mut node_attr).await {
+    match node.set_attr(fio::NodeAttributeFlags::empty(), &node_attr).await {
         Ok(status) => {
             if matches!(
                 zx::Status::from_raw(status),

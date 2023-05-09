@@ -172,12 +172,12 @@ impl PuppetEnv {
 
     async fn create_puppet(&mut self, id: usize) -> String {
         assert!(id < self.max_puppets);
-        let mut child_ref = ChildRef { name: format!("puppet-{id}"), collection: None };
+        let child_ref = ChildRef { name: format!("puppet-{id}"), collection: None };
 
         let (exposed_dir, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let realm = self.instance.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
-        realm.open_exposed_dir(&mut child_ref, server_end).await.unwrap().unwrap();
+        realm.open_exposed_dir(&child_ref, server_end).await.unwrap().unwrap();
 
         let _ = client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_dir)
             .unwrap();

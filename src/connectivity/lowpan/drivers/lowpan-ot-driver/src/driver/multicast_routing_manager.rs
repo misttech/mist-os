@@ -84,7 +84,7 @@ impl MulticastRoutingManager {
     ) {
         loop {
             match multicast_routing_client_end.watch_routing_events().await {
-                Ok((dropped_events, mut addresses, input_interface, event)) => {
+                Ok((dropped_events, addresses, input_interface, event)) => {
                     if dropped_events != 0 {
                         warn!("Dropped {dropped_events:?} events before getting the event");
                     }
@@ -139,10 +139,7 @@ impl MulticastRoutingManager {
                         ..Default::default()
                     };
 
-                    match multicast_routing_client_end
-                        .add_route(&mut addresses, route.clone())
-                        .await
-                    {
+                    match multicast_routing_client_end.add_route(&addresses, route.clone()).await {
                         Err(err) => {
                             error!(
                                 tag="mcast_routing", "Got FIDL error {:?} when trying to add route {:?} for address {:?}",
@@ -262,7 +259,7 @@ mod test {
         );
 
         let dropped_events = 0;
-        let mut addresses = fnet_mcast::Ipv6UnicastSourceAndMulticastDestination {
+        let addresses = fnet_mcast::Ipv6UnicastSourceAndMulticastDestination {
             unicast_source: UNICAST_SOURCE_ADDR_FIDL,
             multicast_destination: MULTICAST_DEST_ADDR1_FIDL,
         };
@@ -270,7 +267,7 @@ mod test {
 
         // Send the missing route event.
         responder
-            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &event)
+            .send(dropped_events, &addresses, BACKBONE_IF_ID, &event)
             .expect("Responding should succeed");
 
         // Now ensure that 'add_route' request has been successfully made.
@@ -336,7 +333,7 @@ mod test {
         );
 
         let dropped_events = 0;
-        let mut addresses = fnet_mcast::Ipv6UnicastSourceAndMulticastDestination {
+        let addresses = fnet_mcast::Ipv6UnicastSourceAndMulticastDestination {
             unicast_source: UNICAST_SOURCE_ADDR_FIDL,
             multicast_destination: MULTICAST_DEST_ADDR2_FIDL,
         };
@@ -344,7 +341,7 @@ mod test {
 
         // Send the missing route event.
         responder
-            .send(dropped_events, &mut addresses, BACKBONE_IF_ID, &event)
+            .send(dropped_events, &addresses, BACKBONE_IF_ID, &event)
             .expect("Responding should succeed");
 
         // We should not see any AddRoute or any other request, and should directly see another

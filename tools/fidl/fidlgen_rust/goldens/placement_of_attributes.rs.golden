@@ -210,7 +210,7 @@ impl fidl::endpoints::ProtocolMarker for ExampleProtocolMarker {
 }
 
 pub trait ExampleProtocolProxyInterface: Send + Sync {
-    fn r#method(&self, arg: &mut fidl_test_exampleusing::Empty) -> Result<(), fidl::Error>;
+    fn r#method(&self, arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error>;
 }
 
 #[derive(Debug)]
@@ -235,9 +235,9 @@ impl ExampleProtocolSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ExampleProtocolEvent, fidl::Error> {
         ExampleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
-    pub fn r#method(&self, mut arg: &mut fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
+    pub fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
         self.client.send::<ExampleProtocolMethodRequest, false>(
-            (&*arg,),
+            (arg,),
             0x53978e6fc7476749,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -280,15 +280,15 @@ impl ExampleProtocolProxy {
     pub fn take_event_stream(&self) -> ExampleProtocolEventStream {
         ExampleProtocolEventStream { event_receiver: self.client.take_event_receiver() }
     }
-    pub fn r#method(&self, mut arg: &mut fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
+    pub fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
         ExampleProtocolProxyInterface::r#method(self, arg)
     }
 }
 
 impl ExampleProtocolProxyInterface for ExampleProtocolProxy {
-    fn r#method(&self, mut arg: &mut fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
+    fn r#method(&self, mut arg: &fidl_test_exampleusing::Empty) -> Result<(), fidl::Error> {
         self.client.send::<ExampleProtocolMethodRequest, false>(
-            (&*arg,),
+            (arg,),
             0x53978e6fc7476749,
             fidl::encoding::DynamicFlags::empty(),
         )

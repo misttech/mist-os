@@ -47,7 +47,7 @@ async fn get_single_package_with_no_content_blobs() {
 
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -56,7 +56,7 @@ async fn get_single_package_with_no_content_blobs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -133,7 +133,7 @@ async fn get_and_hold_directory() {
     // Request and write a package, hold the package directory.
     let dir = get_and_verify_package(&env.proxies.package_cache, &package).await;
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*package.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -144,7 +144,7 @@ async fn get_and_hold_directory() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
@@ -168,7 +168,7 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
 
     let pkg = PackageBuilder::new("pkg-a").build().await.unwrap();
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -177,7 +177,7 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     drop(needed_blobs);
@@ -286,7 +286,7 @@ async fn get_package_already_present_on_fs() {
         .build()
         .await;
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -298,7 +298,7 @@ async fn get_package_already_present_on_fs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
@@ -341,7 +341,7 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
         .build()
         .await;
 
-    let mut meta_blob_info =
+    let meta_blob_info =
         BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -355,7 +355,7 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&mut meta_blob_info, needed_blobs_server_end, Some(pkgdir_server_end))
+        .get(&meta_blob_info, needed_blobs_server_end, Some(pkgdir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let () = get_fut.await.unwrap().unwrap();

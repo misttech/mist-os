@@ -74,7 +74,7 @@ pub fn get_dev_root_fd(realm_instance: &RealmInstance) -> fs::File {
 /// it is suitable only for use in tests.
 pub async fn setup_ramdisk(
     realm_instance: &RealmInstance,
-    mut type_guid: Guid,
+    type_guid: Guid,
     name: &str,
 ) -> (RamdiskClient, ControllerProxy) {
     // Create ramdisk
@@ -113,9 +113,9 @@ pub async fn setup_ramdisk(
 
     // create FVM child volume with desired GUID/label
     let mut rng = SmallRng::from_entropy();
-    let mut instance_guid = Guid { value: rng.gen() };
+    let instance_guid = Guid { value: rng.gen() };
     let status = volume_manager
-        .allocate_partition(1, &mut type_guid, &mut instance_guid, name, 0)
+        .allocate_partition(1, &type_guid, &instance_guid, name, 0)
         .await
         .expect("Could not request to create volume");
     Status::ok(status).expect("Could not create volume");

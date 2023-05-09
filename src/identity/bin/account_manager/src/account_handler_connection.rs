@@ -92,8 +92,7 @@ impl AccountHandlerConnection for AccountHandlerConnectionImpl {
             .context("failed to connect to fuchsia.component.Realm")
             .account_manager_error(ApiError::Resource)?;
 
-        let mut collection_ref =
-            CollectionRef { name: String::from(ACCOUNT_HANDLER_COLLECTION_NAME) };
+        let collection_ref = CollectionRef { name: String::from(ACCOUNT_HANDLER_COLLECTION_NAME) };
 
         let child_decl = Child {
             name: Some(account_handler_name.clone()),
@@ -103,7 +102,7 @@ impl AccountHandlerConnection for AccountHandlerConnectionImpl {
         };
 
         realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
+            .create_child(&collection_ref, child_decl, CreateChildArgs::default())
             .await
             .map_err(|err| {
                 warn!("Failed to create account_handler component instance: {:?}", err);

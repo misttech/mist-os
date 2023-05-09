@@ -385,7 +385,7 @@ impl TopGetFooResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut foo: &mut fidl_test_bottom::Foo) -> Result<(), fidl::Error> {
+    pub fn send(self, mut foo: &fidl_test_bottom::Foo) -> Result<(), fidl::Error> {
         let r = self.send_raw(foo);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -398,21 +398,21 @@ impl TopGetFooResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut foo: &mut fidl_test_bottom::Foo,
+        mut foo: &fidl_test_bottom::Foo,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(foo);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut foo: &mut fidl_test_bottom::Foo) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut foo: &fidl_test_bottom::Foo) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (&*foo,),
+            body: (foo,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

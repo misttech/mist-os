@@ -85,9 +85,9 @@ impl Client {
     ) -> impl Future<Output = Result<(), fidl::Error>> {
         match event {
             AccountEvent::AccountAdded(id) => {
-                let mut account_state =
+                let account_state =
                     AccountAuthState { account_id: (*id).into(), auth_state: minimum_auth_state() };
-                self.listener.on_account_added(&mut account_state)
+                self.listener.on_account_added(&account_state)
             }
             AccountEvent::AccountRemoved(id) => self.listener.on_account_removed((*id).into()),
         }
