@@ -59,7 +59,7 @@ config("headers.after") {
   # there is nothing to add to the toolchain's <limits.h> content.
   cflags = [
     "-idirafter",
-    rebase_path("limits-stub", root_build_dir),
+    rebase_path("include-after", root_build_dir),
   ]
 
   # This is propagated by :headers, but that's not used directly by the kernel
