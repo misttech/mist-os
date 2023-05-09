@@ -30,7 +30,6 @@ const NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER = "core/network/test-components
 const NETWORK_TEST_REALM_MONIKER = "/" + NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER + ":" + NETWORK_TEST_REALM_COMPONENT_NAME
 const NETWORK_TEST_REALM_URL = "fuchsia-pkg://fuchsia.com/network-test-realm#meta/controller.cm"
 
-const NETWORK_TEST_REALM_COMPONENT_SELECTOR = NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER + "\\:" + NETWORK_TEST_REALM_COMPONENT_NAME
 const NETSTACK_VERSION = "v2"
 
 func TestEmulatorWorksWithFfx(t *testing.T) {
@@ -183,13 +182,13 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 
 		if err := runFfx(
 			"net-test-realm",
-			NETWORK_TEST_REALM_COMPONENT_SELECTOR,
+			NETWORK_TEST_REALM_MONIKER,
 			"start-hermetic-network-realm",
 			NETSTACK_VERSION,
 		); err != nil {
 			t.Fatalf(
 				"ffx net-test-realm %s start-hermetic-network-realm %s = %s",
-				NETWORK_TEST_REALM_COMPONENT_SELECTOR,
+				NETWORK_TEST_REALM_MONIKER,
 				NETSTACK_VERSION,
 				err,
 			)

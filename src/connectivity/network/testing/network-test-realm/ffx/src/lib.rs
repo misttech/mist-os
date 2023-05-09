@@ -9,26 +9,30 @@ use anyhow::Context as _;
 use ffx_net_test_realm_args as ntr_args;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_test_realm as fntr;
 use tracing::error;
 
-const NET_TEST_REALM_CONTROLLER_SELECTOR_SUFFIX: &str = ":expose:fuchsia.net.test.realm.Controller";
-
 async fn connect_to_protocol<S: fidl::endpoints::ProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,
-    unparsed_selector: &str,
+    moniker: &str,
 ) -> anyhow::Result<S::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
         .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
-    let selector = selectors::parse_selector::<selectors::VerboseError>(&unparsed_selector)
-        .with_context(|| format!("failed to parse selector {}", unparsed_selector))?;
-    let _: fremotecontrol::ServiceMatch =
-        remote_control.connect(selector, server_end.into_channel()).await?.map_err(|e| {
+    remote_control
+        .connect_capability(
+            moniker,
+            S::DEBUG_NAME,
+            server_end.into_channel(),
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await?
+        .map_err(|e| {
             anyhow::anyhow!(
-                "failed to connect to {} as {}: {:?}. Did you forget to run ffx component start?",
+                "failed to connect to {} at {}: {:?}. Did you forget to run ffx component start?",
                 S::DEBUG_NAME,
-                unparsed_selector,
+                moniker,
                 e
             )
         })?;
@@ -55,12 +59,16 @@ impl FfxMain for NetTestRealmTool {
 
 async fn net_test_realm(
     remote_control: fremotecontrol::RemoteControlProxy,
-    cmd: ntr_args::Command,
+    mut cmd: ntr_args::Command,
 ) -> anyhow::Result<()> {
-    let ntr_controller_selector =
-        format!("{}{}", cmd.component_moniker, NET_TEST_REALM_CONTROLLER_SELECTOR_SUFFIX);
+    // The tool was called with a selector, make the arg an absolute moniker.
+    // TODO: remove once all clients of this tool are passing monikers.
+    if !cmd.component_moniker.starts_with("/") {
+        let moniker = cmd.component_moniker.replace("\\:", ":");
+        cmd.component_moniker = format!("/{moniker}");
+    }
     let controller =
-        connect_to_protocol::<fntr::ControllerMarker>(&remote_control, &ntr_controller_selector)
+        connect_to_protocol::<fntr::ControllerMarker>(&remote_control, &cmd.component_moniker)
             .await?;
     handle_command(controller, cmd.subcommand).await
 }

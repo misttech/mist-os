@@ -22,7 +22,7 @@ pub struct Command {
     #[argh(positional)]
     /// the moniker of the component that corresponds to the Network Test Realm
     /// instance (e.g.
-    /// "core/network/test-components\:net_test_realm_controller").
+    /// "/core/network/test-components:net_test_realm_controller").
     pub component_moniker: String,
 
     #[argh(subcommand)]
