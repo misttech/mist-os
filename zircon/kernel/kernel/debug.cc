@@ -281,7 +281,9 @@ static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags) {
           printf("Calibrating CPU %u: %" PRIu64 " loops per %" PRId64 " ns\n", cpu_num, loops,
                  duration_ns);
 
-          const U30 zmips = U30{loops} / duration_ns * 1000;
+          // On simpler, in-order architectures the number of loops corresponds to half of the clock
+          // rate. Scale this value by two for minor convenience.
+          const U30 zmips = 2 * U30{loops} / duration_ns * 1000;
           zmips_min = ktl::min(zmips_min, zmips);
           zmips_max = ktl::max(zmips_max, zmips);
           break;
