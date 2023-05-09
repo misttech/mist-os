@@ -160,6 +160,11 @@ template("ffx_tool") {
 
       category = invoker.sdk_category
 
+      _target_files = {
+        executable = file_base
+        executable_metadata = file_base_metadata
+      }
+
       meta = {
         dest = "$file_base-meta.json"
         schema = "ffx_tool"
@@ -169,8 +174,17 @@ template("ffx_tool") {
           name = output_name
           root = "tools"
           files = {
-            executable = file_base
-            executable_metadata = file_base_metadata
+          }
+          target_files = {
+          }
+          if (current_cpu == "arm64") {
+            target_files.arm64 = _target_files
+          } else if (current_cpu == "x64") {
+            target_files.x64 = _target_files
+          } else if (current_cpu == "riscv64") {
+            target_files.riscv64 = _target_files
+          } else {
+            assert(false, "Unknown CPU type: $current_cpu")
           }
         }
       }

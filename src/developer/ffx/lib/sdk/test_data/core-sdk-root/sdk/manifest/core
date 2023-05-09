@@ -59,8 +59,12 @@
         "deps": [],
         "files": [
             {
-            "destination": "tools/ffx_tools/ffx-assembly",
+            "destination": "tools/x64/ffx_tools/ffx-assembly",
             "source": "host_x64/ffx-assembly"
+            },
+            {
+            "destination": "tools/arm64/ffx_tools/ffx-assembly",
+            "source": "host_arm64/ffx-assembly"
             },
             {
             "destination": "tools/ffx_tools/ffx-assembly.json",

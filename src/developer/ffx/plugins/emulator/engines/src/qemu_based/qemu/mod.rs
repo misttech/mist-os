@@ -158,8 +158,7 @@ impl EmulatorEngine for QemuEngine {
     async fn load_emulator_binary(&mut self) -> Result<()> {
         let cli_name = match self.data.get_emulator_configuration().device.cpu.architecture {
             CpuArchitecture::Arm64 => Some("qemu-system-aarch64"),
-            CpuArchitecture::X64 => None,
-            CpuArchitecture::Unsupported => None,
+            _ => None,
         };
 
         let qemu_x64_path = match get_host_tool(QEMU_TOOL).await {

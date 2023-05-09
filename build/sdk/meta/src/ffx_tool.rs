@@ -32,7 +32,7 @@ pub struct FfxTool {
     pub kind: ElementType,
     pub files: FfxToolFiles,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub target_files: Option<HashMap<CpuArchitecture, Vec<String>>>,
+    pub target_files: Option<HashMap<CpuArchitecture, FfxToolFiles>>,
 }
 
 impl JsonObject for FfxTool {
@@ -46,8 +46,44 @@ impl JsonObject for FfxTool {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FfxToolFiles {
-    pub executable: File,
-    pub executable_metadata: File,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executable: Option<File>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executable_metadata: Option<File>,
+}
+
+impl FfxTool {
+    pub fn target_files<'a>(&'a self, arch: CpuArchitecture) -> Option<&'a FfxToolFiles> {
+        self.target_files.as_ref().and_then(|files| files.get(&arch))
+    }
+
+    pub fn executable<'a>(&'a self, arch: CpuArchitecture) -> Option<FfxToolFile<'a>> {
+        let target_file = self.target_files(arch).and_then(|files| files.executable.as_deref());
+        if let Some(target_item) = target_file {
+            Some(FfxToolFile { arch: Some(arch), file: target_item })
+        } else if let Some(item) = self.files.executable.as_deref() {
+            Some(FfxToolFile { arch: None, file: item })
+        } else {
+            None
+        }
+    }
+
+    pub fn executable_metadata<'a>(&'a self, arch: CpuArchitecture) -> Option<FfxToolFile<'a>> {
+        let target_file =
+            self.target_files(arch).and_then(|files| files.executable_metadata.as_deref());
+        if let Some(target_item) = target_file {
+            Some(FfxToolFile { arch: Some(arch), file: target_item })
+        } else if let Some(item) = self.files.executable_metadata.as_deref() {
+            Some(FfxToolFile { arch: None, file: item })
+        } else {
+            None
+        }
+    }
+}
+
+pub struct FfxToolFile<'a> {
+    pub arch: Option<CpuArchitecture>,
+    pub file: &'a str,
 }
 
 #[cfg(test)]
@@ -63,7 +99,6 @@ mod tests {
             "type": "ffx_tool",
             "root": "ffx_tools/foobar",
             "files": {
-                "executable": "ffx_tools/foobar/one",
                 "executable_metadata": "ffx_tools/foobar/one.json",
                 "support": [
                     "ffx_tools/foobar/one",
@@ -71,9 +106,9 @@ mod tests {
                 ]
             },
             "target_files": {
-                "x64": [
-                    "ffx_tools/foobar/foobar_x64"
-                ]
+                "x64": {
+                    "executable": "ffx_tools/x64/foobar/one"
+                }
             }
         }
         "#,
@@ -87,19 +122,18 @@ mod tests {
         {
             "name": "foobar",
             "type": "cc_prebuilt_library",
-            "root": "tools/foobar",
+            "root": "ffx_tools/foobar",
             "files": {
-                "executable": "ffx_tools/foobar/one",
                 "executable_metadata": "ffx_tools/foobar/one.json",
                 "support": [
-                    "tools/foobar/one",
-                    "tools/foobar/two"
+                    "ffx_tools/foobar/one",
+                    "ffx_tools/foobar/one.json"
                 ]
             },
             "target_files": {
-                "x64": [
-                    "tools/foobar/foobar_x64"
-                ]
+                "x64": {
+                    "executable": "ffx_tools/x64/foobar/one"
+                }
             }
         }
         "#,

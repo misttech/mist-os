@@ -64,12 +64,15 @@ macro_rules! display_impl {
     };
 }
 
-#[derive(Serialize, Default, Deserialize, Debug, Hash, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(
+    Serialize, Default, Deserialize, Debug, Hash, Copy, Clone, PartialOrd, Ord, PartialEq, Eq,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum CpuArchitecture {
     Arm64,
     #[default]
     X64,
+    Riscv64,
     Unsupported,
 }
 
@@ -85,10 +88,25 @@ impl From<&str> for CpuArchitecture {
             // Values based on https://doc.rust-lang.org/std/env/consts/constant.ARCH.html.
             "aarch64" => Self::Arm64,
             "x86_64" => Self::X64,
+            "riscv64" => Self::Riscv64,
             // Values from deserialization.
             "arm64" => Self::Arm64,
             "x64" => Self::X64,
             _ => Self::Unsupported,
+        }
+    }
+}
+
+impl CpuArchitecture {
+    pub fn current() -> Self {
+        if cfg!(target_arch = "aarch64") {
+            Self::Arm64
+        } else if cfg!(target_arch = "x86_64") {
+            Self::X64
+        } else if cfg!(target_arch = "riscv64") {
+            Self::Riscv64
+        } else {
+            panic!("Unsupported architecture for SDK {}", std::env::consts::ARCH)
         }
     }
 }

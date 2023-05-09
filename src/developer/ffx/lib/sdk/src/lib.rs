@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_error};
-use sdk_metadata::{ElementType, FfxTool, HostTool, Manifest, Part};
+use sdk_metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -37,7 +37,17 @@ pub struct Sdk {
 
 #[derive(Debug)]
 pub struct FfxToolFiles {
+    /// How "specific" this definition is, in terms of how many of the
+    /// relevant paths came from arch specific definitions:
+    /// - 0: Platform independent, no arch specific paths.
+    /// - 1: One of the paths came from an arch specific section.
+    /// - 2: Both the paths came from arch specific sections.
+    /// This allows for easy sorting of tool files by how specific
+    /// they are.
+    pub specificity_score: usize,
+    /// The actual executable binary to run
     pub executable: PathBuf,
+    /// The path to the FHO metadata file
     pub metadata: PathBuf,
 }
 
@@ -232,14 +242,18 @@ impl Sdk {
     }
 
     pub fn get_ffx_tools(&self) -> impl Iterator<Item = FfxToolFiles> + '_ {
-        self.get_all_ffx_tools().flat_map(|tool| FfxToolFiles::from_metadata(self, tool).ok())
+        self.get_all_ffx_tools().flat_map(|tool| {
+            FfxToolFiles::from_metadata(self, tool, CpuArchitecture::current()).ok().flatten()
+        })
     }
 
     pub fn get_ffx_tool(&self, name: &str) -> Option<FfxToolFiles> {
         self.get_all_ffx_tools()
             .filter(|tool| tool.name == name)
-            .min_by_key(|tool| tool.files.executable.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
-            .and_then(|tool| FfxToolFiles::from_metadata(self, tool).ok())
+            .filter_map(|tool| {
+                FfxToolFiles::from_metadata(self, tool, CpuArchitecture::current()).ok().flatten()
+            })
+            .max_by_key(|tool| tool.specificity_score)
     }
 
     pub fn get_host_tool(&self, name: &str) -> Result<PathBuf> {
@@ -343,10 +357,21 @@ pub fn in_tree_sdk_version() -> String {
 }
 
 impl FfxToolFiles {
-    fn from_metadata(sdk: &Sdk, tool: FfxTool) -> Result<Self> {
-        let executable = sdk.path_prefix.join(&sdk.get_real_path(&tool.files.executable)?);
-        let metadata = sdk.path_prefix.join(&sdk.get_real_path(&tool.files.executable_metadata)?);
-        Ok(Self { executable, metadata })
+    fn from_metadata(sdk: &Sdk, tool: FfxTool, arch: CpuArchitecture) -> Result<Option<Self>> {
+        let Some(executable) = tool.executable(arch) else {
+            return Ok(None);
+        };
+        let Some(metadata) = tool.executable_metadata(arch) else {
+            return Ok(None);
+        };
+
+        // Increment the score by zero or one for each of the executable and
+        // metadata files, depending on if they're architecture specific or not,
+        // for a total score of 0-2 (least specific to most specific).
+        let specificity_score = executable.arch.map_or(0, |_| 1) + metadata.arch.map_or(0, |_| 1);
+        let executable = sdk.path_prefix.join(&sdk.get_real_path(executable.file)?);
+        let metadata = sdk.path_prefix.join(&sdk.get_real_path(metadata.file)?);
+        Ok(Some(Self { executable, metadata, specificity_score }))
     }
 }
 
@@ -445,9 +470,9 @@ mod test {
         );
         assert_eq!("sdk://tools/ffx_tools/ffx-assembly", atoms[3].id);
         assert_eq!(ElementType::FfxTool, atoms[3].kind);
-        assert_eq!(3, atoms[3].files.len());
+        assert_eq!(4, atoms[3].files.len());
         assert_eq!("host_x64/ffx-assembly", atoms[3].files[0].source);
-        assert_eq!("tools/ffx_tools/ffx-assembly", atoms[3].files[0].destination);
+        assert_eq!("tools/x64/ffx_tools/ffx-assembly", atoms[3].files[0].destination);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -570,7 +595,7 @@ mod test {
         };
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
-        assert_eq!(sdk_root.join("tools/ffx_tools/ffx-assembly"), ffx_assembly.executable);
+        assert_eq!(sdk_root.join("tools/x64/ffx_tools/ffx-assembly"), ffx_assembly.executable);
         assert_eq!(sdk_root.join("tools/ffx_tools/ffx-assembly.json"), ffx_assembly.metadata);
     }
 

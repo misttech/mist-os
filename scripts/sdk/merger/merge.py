@@ -166,7 +166,13 @@ class ElementMeta(object):
                     else:
                         common_files.update(collection)
             if 'target_files' in self._meta:
-                arch_files.update(self._meta['target_files'])
+                for (arch, binaries) in self._meta["target_files"].items():
+                    arch_files[arch] = set()
+                    for (name, collection) in binaries.items():
+                        if name == "executable" or name == "executable_metadata":
+                            arch_files[arch].add(collection)
+                        else:
+                            arch_files[arch].update(collection)
         elif type == 'fidl_library':
             common_files.update(self._meta['sources'])
         elif type in ['host_tool', 'companion_host_tool']:

@@ -22,37 +22,19 @@
                     "minProperties": 1,
                     "properties": {
                         "arm64": {
-                            "$ref": "host_tool.json#/definitions/fileGroup",
+                            "$ref": "#/definitions/toolFiles",
                             "description": "Files for the arm64 architecture"
                         },
                         "x64": {
-                            "$ref": "host_tool.json#/definitions/fileGroup",
+                            "$ref": "#/definitions/toolFiles",
                             "description": "Files for the x64 architecture"
                         }
                     },
                     "type": "object"
                 },
                 "files": {
-                    "description": "The files pertaining to the element",
-                    "properties": {
-                        "executable": {
-                            "$ref": "common.json#/definitions/file",
-                            "description": "The path of the file that ffx should run to invoke the tool."
-                        },
-                        "executable_metadata": {
-                            "$ref": "common.json#/definitions/file",
-                            "description": "The path of the file that contains versioning information for ffx."
-                        }
-                    },
-                    "required": [
-                        "executable",
-                        "executable_metadata"
-                    ],
-                    "additionalProperties": {
-                        "$ref": "host_tool.json#/definitions/fileGroup",
-                        "description": "Additional groups of files that may be used by this subtool. Must be lists of files."
-                    },
-                    "type": "object"
+                    "$ref": "#/definitions/toolFiles",
+                    "description": "Architecture-generic files for this subtool"
                 },
                 "type": {
                     "allOf": [
@@ -74,6 +56,26 @@
             ]
         }
     ],
+    "definitions": {
+        "toolFiles": {
+            "description": "Types of files relevant to an ffx tool",
+            "properties": {
+                "executable": {
+                    "$ref": "common.json#/definitions/file",
+                    "description": "The path of the file that ffx should run to invoke the tool."
+                },
+                "executable_metadata": {
+                    "$ref": "common.json#/definitions/file",
+                    "description": "The path of the file that contains versioning information for ffx."
+                }
+            },
+            "additionalProperties": {
+                "$ref": "host_tool.json#/definitions/fileGroup",
+                "description": "Additional groups of files that may be used by this subtool. Must be lists of files."
+            },
+            "type": "object"
+        }
+    },
     "description": "An externally compiled ffx subtool",
     "id": "http://fuchsia.com/schemas/sdk/ffx_tool.json",
     "type": "object"

@@ -1,7 +1,17 @@
 {
     "files": {
-        "executable": "tools/ffx_tools/ffx-assembly",
         "executable_metadata": "tools/ffx_tools/ffx-assembly.json"
+    },
+    "target_files": {
+        "x64": {
+            "executable": "tools/x64/ffx_tools/ffx-assembly"
+        },
+        "arm64": {
+            "executable": "tools/arm64/ffx_tools/ffx-assembly"
+        },
+        "riscv64": {
+            "executable": "tools/riscv64/ffx_tools/ffx-assembly"
+        }
     },
     "name": "ffx-assembly",
     "root": "tools",
