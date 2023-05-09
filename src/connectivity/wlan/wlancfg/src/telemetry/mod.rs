@@ -197,8 +197,10 @@ pub enum TelemetryEvent {
         /// `downtime_no_saved_neighbor_duration` counter. This counter is used to
         /// adjust the raw downtime.
         num_candidates: Result<usize, ()>,
-        /// Whether a network has been selected. This field is currently unused.
-        selected_any: bool,
+        /// Count of number of networks selected. This will be 0 if there are no candidates selected
+        /// including if num_candidates is Ok(0) or Err. However, this will only be logged to
+        /// Cobalt is num_candidates is not Err and is greater than 0.
+        selected_count: usize,
     },
     /// Notify the telemetry event loop of connection result.
     /// If connection result is successful, telemetry will move its internal state to
@@ -948,35 +950,16 @@ impl Telemetry {
             TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type,
                 num_candidates,
-                ..
+                selected_count,
             } => {
-                match num_candidates {
-                    Ok(n) if n > 0 => {
-                        // Saved neighbors are seen, so clear the "no saved neighbor" flag. Account
-                        // for any untracked time to the `downtime_no_saved_neighbor_duration`
-                        // counter.
-                        if let ConnectionState::Disconnected(state) = &mut self.connection_state {
-                            if let Some(prev) = state.latest_no_saved_neighbor_time.take() {
-                                let duration = now - prev;
-                                state.accounted_no_saved_neighbor_duration += duration;
-                                self.stats_logger.queue_stat_op(
-                                    StatOp::AddDowntimeNoSavedNeighborDuration(duration),
-                                );
-                            }
-                        }
-                    }
-                    Ok(0) if network_selection_type == NetworkSelectionType::Undirected => {
-                        // No saved neighbor is seen. If "no saved neighbor" flag isn't set, then
-                        // set it to the current time. Otherwise, do nothing because the telemetry
-                        // loop will account for untracked downtime during periodic telemetry run.
-                        if let ConnectionState::Disconnected(state) = &mut self.connection_state {
-                            if state.latest_no_saved_neighbor_time.is_none() {
-                                state.latest_no_saved_neighbor_time = Some(now);
-                            }
-                        }
-                    }
-                    _ => (),
-                }
+                self.stats_logger
+                    .log_network_selection_metrics(
+                        &mut self.connection_state,
+                        network_selection_type,
+                        num_candidates,
+                        selected_count,
+                    )
+                    .await;
             }
             TelemetryEvent::ConnectResult {
                 iface_id,
@@ -2870,6 +2853,61 @@ impl StatsLogger {
             &[]
         )
     }
+
+    async fn log_network_selection_metrics(
+        &mut self,
+        connection_state: &mut ConnectionState,
+        network_selection_type: NetworkSelectionType,
+        num_candidates: Result<usize, ()>,
+        selected_count: usize,
+    ) {
+        let now = fasync::Time::now();
+        let mut metric_events = vec![];
+        metric_events.push(MetricEvent {
+            metric_id: metrics::NETWORK_SELECTION_COUNT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        match num_candidates {
+            Ok(n) if n > 0 => {
+                // Saved neighbors are seen, so clear the "no saved neighbor" flag. Account
+                // for any untracked time to the `downtime_no_saved_neighbor_duration`
+                // counter.
+                if let ConnectionState::Disconnected(state) = connection_state {
+                    if let Some(prev) = state.latest_no_saved_neighbor_time.take() {
+                        let duration = now - prev;
+                        state.accounted_no_saved_neighbor_duration += duration;
+                        self.queue_stat_op(StatOp::AddDowntimeNoSavedNeighborDuration(duration));
+                    }
+                }
+
+                // Log number of selected networks
+                metric_events.push(MetricEvent {
+                    metric_id: metrics::NUM_NETWORKS_SELECTED_METRIC_ID,
+                    event_codes: vec![],
+                    payload: MetricEventPayload::IntegerValue(selected_count as i64),
+                });
+            }
+            Ok(0) if network_selection_type == NetworkSelectionType::Undirected => {
+                // No saved neighbor is seen. If "no saved neighbor" flag isn't set, then
+                // set it to the current time. Otherwise, do nothing because the telemetry
+                // loop will account for untracked downtime during periodic telemetry run.
+                if let ConnectionState::Disconnected(state) = connection_state {
+                    if state.latest_no_saved_neighbor_time.is_none() {
+                        state.latest_no_saved_neighbor_time = Some(now);
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        log_cobalt_1dot1_batch!(
+            self.cobalt_1dot1_proxy,
+            &metric_events,
+            "log_network_selection_metrics",
+        );
+    }
 }
 
 fn append_device_connected_channel_cobalt_metrics(
@@ -3664,7 +3702,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(0),
-            selected_any: false,
+            selected_count: 0,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -3705,7 +3743,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(1),
-            selected_any: false,
+            selected_count: 0,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -3752,7 +3790,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(0),
-            selected_any: false,
+            selected_count: 0,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.advance_to_next_telemetry_checkpoint(test_fut.as_mut());
@@ -4381,7 +4419,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(0),
-            selected_any: false,
+            selected_count: 0,
         });
 
         test_helper.advance_by(6.hours(), test_fut.as_mut());
@@ -4815,7 +4853,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(0),
-            selected_any: false,
+            selected_count: 0,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -5801,7 +5839,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(0),
-            selected_any: false,
+            selected_count: 0,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -5810,7 +5848,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
             num_candidates: Ok(5),
-            selected_any: true,
+            selected_count: 1,
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -6659,6 +6697,56 @@ mod tests {
                 metrics::ConnectivityWlanMetricDimensionScanRequestsRemaining::TenToFourteen as u32
             ]
         );
+    }
+
+    #[fuchsia::test]
+    fn test_log_network_selection_metrics() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send network selection event
+        test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
+            network_selection_type: NetworkSelectionType::Undirected,
+            num_candidates: Ok(3),
+            selected_count: 2,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        // Verify the network selection is counted
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::NETWORK_SELECTION_COUNT_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Verify the number of selected candidates is recorded
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::NUM_NETWORKS_SELECTED_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(2));
+
+        // Send a network selection metric where there were 0 candidates.
+        test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
+            network_selection_type: NetworkSelectionType::Undirected,
+            num_candidates: Ok(0),
+            selected_count: 0,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        // Verify the network selection is counted
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::NETWORK_SELECTION_COUNT_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 2);
+
+        // The number of selected networks should not be recorded, since there were no candidates
+        // to select from
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::NUM_NETWORKS_SELECTED_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
     }
 
     struct TestHelper {

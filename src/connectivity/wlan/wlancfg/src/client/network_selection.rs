@@ -278,6 +278,18 @@ impl NetworkSelector {
             available_candidate_list.iter().map(|candidate| candidate.network.clone()).collect();
         let selected_networks = self.select_networks(available_networks, &network);
 
+        // Send network selection metrics
+        self.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
+            network_selection_type: match network {
+                Some(_) => telemetry::NetworkSelectionType::Directed,
+                None => telemetry::NetworkSelectionType::Undirected,
+            },
+            num_candidates: (!available_candidate_list.is_empty())
+                .then_some(available_candidate_list.len())
+                .ok_or(()),
+            selected_count: selected_networks.len(),
+        });
+
         // Filter down to only BSSs in the selected networks.
         let allowed_candidate_list = available_candidate_list
             .iter()
@@ -310,18 +322,6 @@ impl NetworkSelector {
             }
             None => None,
         };
-
-        // Send metrics
-        self.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
-            network_selection_type: match network {
-                Some(_) => telemetry::NetworkSelectionType::Directed,
-                None => telemetry::NetworkSelectionType::Undirected,
-            },
-            num_candidates: (!available_candidate_list.is_empty())
-                .then_some(available_candidate_list.len())
-                .ok_or(()),
-            selected_any: selection.is_some(),
-        });
 
         selection
     }
@@ -1647,7 +1647,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Undirected,
                 num_candidates: Err(()),
-                selected_any: false,
+                selected_count: 0,
             });
         });
     }
@@ -1843,7 +1843,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Undirected,
                 num_candidates: Ok(2),
-                selected_any: true,
+                selected_count: 2,
             });
         });
     }
@@ -1918,7 +1918,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Directed,
                 num_candidates: Ok(1),
-                selected_any: true,
+                selected_count: 1,
             });
         });
     }
@@ -1977,6 +1977,7 @@ mod tests {
         let network_selection_fut =
             network_selector.find_and_select_scanned_candidate(Some(test_id_1.clone()));
         pin_mut!(network_selection_fut);
+
         // Check that nothing is returned
         let results = exec.run_singlethreaded(&mut network_selection_fut);
         assert_eq!(results, None);
@@ -1992,7 +1993,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
                 network_selection_type: telemetry::NetworkSelectionType::Directed,
                 num_candidates: Err(()),
-                selected_any: false,
+                selected_count: 1,
             });
         });
     }
