@@ -44,6 +44,7 @@ class Flags {
   final bool shouldSilenceUnsupported;
   final bool shouldUpdateIfInBase;
   final bool shouldUsePackageHash;
+  final bool shouldShowSuggestions;
   final int slowThreshold;
   final String? timeout;
 
@@ -80,6 +81,7 @@ class Flags {
     this.shouldSilenceUnsupported = false,
     this.shouldUpdateIfInBase = true,
     this.shouldUsePackageHash = true,
+    this.shouldShowSuggestions = true,
     this.slowThreshold = 0,
     this.timeout,
     this.testFilter,
@@ -138,7 +140,8 @@ class Flags {
         ffxOutputDirectory: argResults['ffx-output-directory'],
         showFullMonikerInLogs: argResults['show-full-moniker-in-logs'],
         runDisabledTests: argResults['also-run-disabled-tests'],
-        fallbackUseRunTestSuite: argResults['use-run-test-suite']);
+        fallbackUseRunTestSuite: argResults['use-run-test-suite'],
+        shouldShowSuggestions: argResults['show-suggestions']);
   }
 
   @override
@@ -165,6 +168,7 @@ class Flags {
   shouldSilenceUnsupported: $shouldSilenceUnsupported
   shouldUpdateIfInBase: $shouldUpdateIfInBase
   shouldUsePackageHash: $shouldUsePackageHash
+  shouldShowSuggestions: $shouldShowSuggestions
   slowThreshold: $slowThreshold
   testFilter: $testFilter
   count: $count
@@ -384,6 +388,15 @@ class PermutatedTestsConfig {
     required this.flags,
     required this.testNameGroup,
   });
+
+  String name() {
+    return testNameGroup?.map((v) {
+          return v.arg;
+        }).where((v) {
+          return v != null;
+        }).join(',') ??
+        '';
+  }
 
   @override
   String toString() {

@@ -149,7 +149,8 @@ void main() {
   group('exit code', () {
     test('should be non-zero when no tests are found', () async {
       final testsConfig = TestsConfig.fromRawArgs(
-        rawArgs: [],
+        // skip suggestions, otherwise the async suggestion task causes a failure.
+        rawArgs: ['--no-show-suggestions'],
         fxEnv: FakeFxEnv.shared,
       );
       int commandExitCode = 0;

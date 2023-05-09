@@ -69,7 +69,7 @@ dart_tool("fxtest") {
     "//third_party/dart-pkg/pub/pedantic",
   ]
 
-  non_dart_deps = [ "scripts:fuzzy_matcher($host_toolchain)" ]
+  non_dart_deps = [ "scripts:install($host_toolchain)" ]
 }
 
 ## Tests

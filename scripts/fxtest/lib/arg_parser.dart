@@ -69,6 +69,10 @@ and component.''',
       negatable: true,
       help: '''use the package Merkle root hash from the build artifacts
 when executing device tests''')
+  ..addFlag('show-suggestions',
+      defaultsTo: true,
+      negatable: true,
+      help: '''show suggestions if the requested tests are not found''')
   ..addFlag('info',
       defaultsTo: false,
       negatable: false,

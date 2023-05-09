@@ -316,6 +316,16 @@ class FuchsiaTestCommand {
     return delivery_blob_config["type"];
   }
 
+  List<String> fuzzyMatchArgsForConfig({
+    required TestsConfig testsConfig,
+  }) {
+    final List<String> ret = [];
+    if (testsConfig.flags.isVerbose && !testsConfig.flags.allOutput) {
+      ret.add('--debug');
+    }
+    return ret;
+  }
+
   void noMatchesHelp({
     required TestsManifestReader manifestReader,
     required List<TestDefinition> testDefinitions,
@@ -328,6 +338,10 @@ class FuchsiaTestCommand {
           'arguments you provided.',
           [lightYellow]),
     ));
+
+    final List<String> fuzzyMatchArgs =
+        fuzzyMatchArgsForConfig(testsConfig: testsConfig);
+
     var manifestOfHints = manifestReader.aggregateTests(
       comparer: FuzzyComparer(threshold: testsConfig.flags.fuzzyThreshold),
       eventEmitter: (TestEvent event) => null,
@@ -336,7 +350,8 @@ class FuchsiaTestCommand {
       testDefinitions: testDefinitions,
       testsConfig: testsConfig,
     );
-    if (manifestOfHints.testBundles.isNotEmpty) {
+    if (manifestOfHints.testBundles.isNotEmpty &&
+        testsConfig.flags.shouldShowSuggestions) {
       manifestOfHints.testBundles.sort(
         (TestBundle bundle1, TestBundle bundle2) {
           return bundle1.confidence.compareTo(bundle2.confidence);
@@ -353,11 +368,27 @@ class FuchsiaTestCommand {
           requiresPadding: false,
         ));
       }
+
+      // Omit test file results so we do not duplicate the above results.
+      fuzzyMatchArgs.add('--omit-test-file');
+      final permutation = testsConfig.permutations.first;
+      emitEvent(TestInfo(
+          'For ${permutation.name()}, did you mean any of the following?'));
+      fxCommandRun(testsConfig.fxEnv.fx, 'search-tests',
+          fuzzyMatchArgs + [permutation.name()]);
     } else {
       emitEvent(TestInfo(
         'Make sure this test is transitively in your \'fx set\' arguments. See https://fuchsia.dev/fuchsia-src/development/testing/faq for more information.',
         requiresPadding: false,
       ));
+
+      if (testsConfig.flags.shouldShowSuggestions) {
+        final permutation = testsConfig.permutations.first;
+        emitEvent(TestInfo(
+            'For ${permutation.name()}, did you mean any of the following?'));
+        fxCommandRun(testsConfig.fxEnv.fx, 'search-tests',
+            fuzzyMatchArgs + [permutation.name()]);
+      }
     }
   }
 
@@ -380,6 +411,16 @@ class FuchsiaTestCommand {
       'Make sure this test is transitively in your \'fx set\' arguments. See https://fuchsia.dev/fuchsia-src/development/testing/faq for more information.',
       requiresPadding: false,
     ));
+
+    if (testsConfig.flags.shouldShowSuggestions) {
+      final List<String> fuzzyMatchArgs =
+          fuzzyMatchArgsForConfig(testsConfig: testsConfig);
+      final permutation = unusedConfigs.first;
+      emitEvent(TestInfo(
+          'For ${permutation.name()}, did you mean any of the following?'));
+      fxCommandRun(testsConfig.fxEnv.fx, 'search-tests',
+          fuzzyMatchArgs + [permutation.name()]);
+    }
   }
 
   TestBundle testBundleBuilder(
