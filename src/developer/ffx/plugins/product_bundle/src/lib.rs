@@ -105,6 +105,13 @@ async fn pb_remove<I>(
 where
     I: structured_ui::Interface + Sync,
 {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@");
+    println!("@  `ffx product-bundle remove` is deprecated");
+    println!("@");
+    println!("@  When using `ffx product download` in the future, please use `rm` instead.");
+    println!("@");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
     tracing::debug!("pb_remove");
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
@@ -275,6 +282,13 @@ async fn pb_list<I>(ui: &mut I, cmd: &ListCommand) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
 {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@");
+    println!("@  `ffx product-bundle list` is deprecated");
+    println!("@");
+    println!("@  Please use `ffx product lookup` instead.");
+    println!("@");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
     tracing::debug!("pb_list");
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
@@ -338,6 +352,13 @@ async fn pb_get<I>(ui: &mut I, cmd: &GetCommand, repos: &RepositoryRegistryProxy
 where
     I: structured_ui::Interface + Sync,
 {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@");
+    println!("@  `ffx product-bundle get` is deprecated");
+    println!("@");
+    println!("@  Please use `ffx product lookup`, `ffx product download`, and `ffx repository add` instead.");
+    println!("@");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
     let start = std::time::Instant::now();
     tracing::debug!("pb_get {:?}", cmd.product_bundle_name);
     let sdk = ffx_config::global_env_context()
@@ -557,6 +578,13 @@ where
 
 /// `ffx product-bundle create` sub-command.
 async fn pb_create(cmd: &CreateCommand) -> Result<()> {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@");
+    println!("@  `ffx product-bundle create` is deprecated");
+    println!("@");
+    println!("@  Please use `ffx product create` instead.");
+    println!("@");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
     create::create_product_bundle(cmd).await
 }
 
