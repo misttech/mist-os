@@ -8,27 +8,32 @@ use {
     ffx_storage_blackout_step_args::{
         BlackoutCommand, BlackoutSubcommand, SetupCommand, TestCommand, VerifyCommand,
     },
-    fidl::{endpoints::ProtocolMarker, prelude::*},
+    fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_blackout_test as fblackout,
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
+    fidl_fuchsia_io::OpenFlags,
     fuchsia_zircon_status::Status,
-    selectors::{self, VerboseError},
 };
 
 /// Connect to a protocol on a remote device using the remote control proxy.
 async fn remotecontrol_connect<S: ProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,
-    selector: &str,
+    moniker: &str,
 ) -> Result<S::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()?;
-    let _: fremotecontrol::ServiceMatch = remote_control
-        .connect(selectors::parse_selector::<VerboseError>(selector)?, server_end.into_channel())
+    remote_control
+        .connect_capability(
+            moniker,
+            S::DEBUG_NAME,
+            server_end.into_channel(),
+            OpenFlags::RIGHT_READABLE,
+        )
         .await?
         .map_err(|e| {
             anyhow::anyhow!(
-                "failed to connect to protocol {} with selector {}: {:?}",
+                "failed to connect to protocol {} at {}: {:?}",
                 S::DEBUG_NAME.to_string(),
-                selector.to_string(),
+                moniker,
                 e
             )
         })?;
@@ -42,10 +47,7 @@ async fn step(
 ) -> Result<()> {
     let proxy = remotecontrol_connect::<fblackout::ControllerMarker>(
         &remote_control,
-        &format!(
-            "core/ffx-laboratory\\:blackout-target:expose:{}",
-            fblackout::ControllerMarker::PROTOCOL_NAME
-        ),
+        "/core/ffx-laboratory:blackout-target",
     )
     .await?;
 
