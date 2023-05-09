@@ -98,6 +98,11 @@ SPECIALIZE_UNSIGNED(unsigned long, 0, ULONG_MAX);
 SPECIALIZE_SIGNED(long long, (-__LONG_LONG_MAX__ - 1LL), __LONG_LONG_MAX__);
 SPECIALIZE_UNSIGNED(unsigned long long, 0, (__LONG_LONG_MAX__ * 2ULL + 1ULL));
 
+#ifdef __SIZEOF_INT128__
+SPECIALIZE_SIGNED(__int128_t, (__int128_t{1} << 127),  (~__uint128_t{0} ^ (__int128_t{1} << 127)));
+SPECIALIZE_UNSIGNED(__uint128_t, 0, (~__uint128_t{0}));
+#endif
+
 #undef SPECIALIZE_SIGNED
 #undef SPECIALIZE_UNSIGNED
 #undef SPECIALIZE_INT
