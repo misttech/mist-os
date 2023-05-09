@@ -25,6 +25,7 @@ template("fshost_cml") {
                              "testonly",
                            ])
     sources = [
+      "//src/lib/storage/fs_management/client.shard.cml",
       "//src/storage/fshost/meta/base_fshost.cml",
       "//src/storage/fshost/meta/config.cml",
     ]

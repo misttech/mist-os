@@ -82,7 +82,13 @@ user_platform_aib_names =
       "wlan_softmac_support",
 
       # Storage
+      "fshost_common",
+      "fshost_storage",
       "fshost_fxfs",
+      "fshost_fxfs_fxblob",
+      "fshost_fxfs_minfs_migration",
+      "fshost_minfs",
+      "fshost_f2fs",
 
       # Session
       "session_manager",

@@ -19,6 +19,8 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         }
 
         if storage_config.configure_fshost {
+            builder.platform_bundle("fshost_common");
+            builder.platform_bundle("fshost_storage");
             builder.platform_bundle("fshost_fxfs");
 
             let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;

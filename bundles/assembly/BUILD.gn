@@ -810,18 +810,214 @@ assembly_input_bundle("testing_support") {
   ]
 }
 
-# AIB containing the default variant of fshost with fxfs enabled
+# AIB containing bootfs resources needed by all fshost variants
 #
 # optional: product must specify its inclusion
-# valid feature_set_levels: minimal
+# valid feature_set_levels: all
 # valid build-types: all
 #
-assembly_input_bundle("fshost_fxfs") {
+assembly_input_bundle("fshost_common") {
+  compiled_packages = [
+    {
+      bootfs_unpackaged = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = rebase_path("//src/storage/fshost/meta/base_fshost.cml",
+                               root_build_dir)
+        },
+      ]
+      component_includes = [
+        {
+          source =
+              rebase_path("//sdk/lib/inspect/client.shard.cml", root_build_dir)
+          destination = "inspect/client.shard.cml"
+        },
+        {
+          source =
+              rebase_path("//sdk/lib/syslog/client.shard.cml", root_build_dir)
+          destination = "syslog/client.shard.cml"
+        },
+        {
+          source =
+              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          destination = "syslog/offer.shard.cml"
+        },
+        {
+          source = rebase_path("//sdk/lib/syslog/use.shard.cml", root_build_dir)
+          destination = "syslog/use.shard.cml"
+        },
+      ]
+    },
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards =
+              rebase_path([
+                            "//src/lib/storage/fs_management/client.shard.cml",
+                            "//src/storage/fshost/meta/config.cml",
+                          ],
+                          root_build_dir)
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_common" ]
+}
+
+# AIB adding support for storage, needed by all fshost variants that use anything more than bootfs
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards = rebase_path([ "//src/storage/fshost/meta/core_fshost.cml" ],
+                               root_build_dir)
+        },
+      ]
+    },
+  ]
   bootfs_files_labels = [
-    "//src/storage/fshost:fshost_fxfs_bootfs",
+    "//src/storage/fshost:assembly_bundle_fshost_storage_common",
     "//src/storage/bin/blobfs:bootfs",
     "//src/lib/trace/rust:bootfs",
   ]
+}
+
+# AIB containing fshost with fxfs enabled, but not fxblob
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_fxfs") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards = rebase_path([
+                                 "//src/storage/fshost/meta/blobfs_fshost.cml",
+                                 "//src/storage/fshost/meta/fxfs_fshost.cml",
+                               ],
+                               root_build_dir)
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fxfs" ]
+}
+
+# AIB containing the fshost with fxfs and fxblob enabled
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_fxfs_fxblob") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards =
+              rebase_path([ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ],
+                          root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# AIB containing fshost support for minfs-to-fxfs migration.
+# Should be included with fshost_fxfs_fxblob or fshost_fxfs when migration
+# is necessary.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+# requires: one of fshost_fxfs*
+#
+assembly_input_bundle("fshost_fxfs_minfs_migration") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards = rebase_path([ "//src/storage/fshost/meta/minfs_fshost.cml" ],
+                               root_build_dir)
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_minfs" ]
+}
+
+# AIB containing fshost support for minfs. Not compatible with fxfs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_minfs") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards =
+              rebase_path([
+                            "//src/storage/fshost/meta/blobfs_fshost.cml",
+                            "//src/storage/fshost/meta/minfs_fshost.cml",
+                            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+                          ],
+                          root_build_dir)
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_minfs" ]
+}
+
+# AIB containing fshost support for f2fs
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_f2fs") {
+  compiled_packages = [
+    {
+      name = "fshost"
+      component_shards = [
+        {
+          component_name = "fshost"
+          shards =
+              rebase_path([
+                            "//src/storage/fshost/meta/blobfs_fshost.cml",
+                            "//src/storage/fshost/meta/f2fs_fshost.cml",
+                            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+                          ],
+                          root_build_dir)
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_f2fs" ]
 }
 
 assembly_input_bundle("system_update_checker") {
