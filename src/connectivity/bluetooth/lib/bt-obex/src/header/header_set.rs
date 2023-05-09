@@ -7,7 +7,7 @@ use packet_encoding::{Decodable, Encodable};
 use crate::error::{Error, PacketError};
 use crate::header::{Header, HeaderIdentifier};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HeaderSet {
     // TODO(fxbug.dev/125070): The ordering of headers matters. Make this more efficient by
     // possibly storing Headers in a Vec<T> and maintaining a map of HeaderIdentifier -> index to

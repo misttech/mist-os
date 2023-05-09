@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon as zx;
 use thiserror::Error;
 
 use crate::header::HeaderIdentifier;
+use crate::operation::{OpCode, ResponseCode};
 
 /// Errors that occur during the use of the OBEX library.
 #[derive(Error, Debug)]
@@ -13,6 +15,28 @@ pub enum Error {
     Packet(#[from] PacketError),
     #[error("Duplicate add of {:?} to HeaderSet", .0)]
     Duplicate(HeaderIdentifier),
+    #[error("Encountered an IO Error: {}", .0)]
+    IOError(#[from] zx::Status),
+    #[error("Internal error during {:?}: {:?}", .operation, .msg)]
+    OperationError { operation: OpCode, msg: String },
+    #[error("Peer rejected {:?} request with Error: {:?}", .operation, .response)]
+    PeerRejected { operation: OpCode, response: ResponseCode },
+    #[error("Invalid {:?} response from peer: {:?}", .operation, .msg)]
+    PeerResponse { operation: OpCode, msg: String },
+}
+
+impl Error {
+    pub fn peer_rejected(operation: OpCode, response: ResponseCode) -> Self {
+        Self::PeerRejected { operation, response }
+    }
+
+    pub fn response(operation: OpCode, msg: impl Into<String>) -> Self {
+        Self::PeerResponse { operation, msg: msg.into() }
+    }
+
+    pub fn operation(operation: OpCode, msg: impl Into<String>) -> Self {
+        Self::OperationError { operation, msg: msg.into() }
+    }
 }
 
 /// Errors that occur during the encoding & decoding of OBEX packets.

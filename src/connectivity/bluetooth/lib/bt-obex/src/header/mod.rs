@@ -18,7 +18,7 @@ mod obex_string;
 
 /// Specifies the type of action of the Action Operation.
 /// Defined in OBEX 1.5 Section 2.2.20.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum ActionIdentifier {
     Copy = 0x00,
@@ -241,7 +241,7 @@ impl Into<u8> for &HeaderIdentifier {
 /// Represents a user-defined Header type.
 // TODO(fxbug.dev/121500): This representation may change depending on what kind of user
 // headers we expect.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UserDefinedHeader {
     /// The Header Identifier (HI) can be any value between 0x30 and 0x3f. See
     /// `HeaderIdentifier::User` for more details.
@@ -252,7 +252,7 @@ pub struct UserDefinedHeader {
 
 /// The building block of an OBEX object. A single OBEX object consists of one or more Headers.
 /// Defined in OBEX 1.5 Section 2.0.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Header {
     Count(u32),
     Name(ObexString),
