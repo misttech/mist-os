@@ -5,8 +5,8 @@
 #ifndef SRC_CAMERA_DRIVERS_SENSORS_IMX227_IMX227_H_
 #define SRC_CAMERA_DRIVERS_SENSORS_IMX227_IMX227_H_
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/camera/sensor/cpp/banjo.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/mipicsi/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
@@ -65,13 +65,13 @@ using DeviceType = ddk::Device<Imx227Device>;
 class Imx227Device : public DeviceType,
                      public ddk::CameraSensor2Protocol<Imx227Device, ddk::base_protocol> {
  public:
-  Imx227Device(zx_device_t* device)
+  Imx227Device(zx_device_t* device, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24)
       : DeviceType(device),
         i2c_(device, "i2c"),
         gpio_vana_enable_(device, "gpio-vana"),
         gpio_vdig_enable_(device, "gpio-vdig"),
         gpio_cam_rst_(device, "gpio-reset"),
-        clk24_(device, "clock-sensor"),
+        clk24_(std::move(clk24)),
         mipi_(device, "mipicsi") {}
 
   static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Imx227Device>* device_out);
@@ -115,7 +115,7 @@ class Imx227Device : public DeviceType,
 
   // |ZX_PROTOCOL_CAMERA_SENSOR2|
   zx_status_t CameraSensor2Init();
-  void CameraSensor2DeInit();
+  zx_status_t CameraSensor2DeInit();
   zx_status_t CameraSensor2GetSensorId(uint32_t* out_id);
   zx_status_t CameraSensor2GetAvailableModes(operating_mode_t* out_modes_list, size_t modes_count,
                                              size_t* out_modes_actual);
@@ -147,7 +147,7 @@ class Imx227Device : public DeviceType,
   ddk::GpioProtocolClient gpio_vana_enable_;
   ddk::GpioProtocolClient gpio_vdig_enable_;
   ddk::GpioProtocolClient gpio_cam_rst_;
-  ddk::ClockProtocolClient clk24_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clk24_;
   ddk::MipiCsiProtocolClient mipi_;
 
   // Other
@@ -181,8 +181,8 @@ class Imx227Device : public DeviceType,
   // Other
   zx_status_t InitMipiCsi(uint32_t mode) __TA_REQUIRES(lock_);
   zx_status_t InitSensor(uint8_t idx) __TA_REQUIRES(lock_);
-  void HwInit() __TA_REQUIRES(lock_);
-  void HwDeInit() __TA_REQUIRES(lock_);
+  zx_status_t HwInit() __TA_REQUIRES(lock_);
+  zx_status_t HwDeInit() __TA_REQUIRES(lock_);
   void CycleResetOnAndOff() __TA_REQUIRES(lock_);
   void ShutDown();
   bool ValidateSensorID() __TA_REQUIRES(lock_);

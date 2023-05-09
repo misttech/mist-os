@@ -27,20 +27,30 @@ constexpr uint32_t MAX_RESET_ATTEMPTS = 4;
 zx_status_t Imx227Device::CameraSensor2Init() {
   std::lock_guard guard(lock_);
 
-  HwInit();
+  zx_status_t status = HwInit();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to init hardware: %s", zx_status_get_string(status));
+    return status;
+  }
 
   return ZX_OK;
 }
 
-void Imx227Device::CameraSensor2DeInit() {
+zx_status_t Imx227Device::CameraSensor2DeInit() {
   std::lock_guard guard(lock_);
   mipi_.DeInit();
-  HwDeInit();
+  zx_status_t status = HwDeInit();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to deinit hardware: %s", zx_status_get_string(status));
+    return status;
+  }
   // The reference code has this sleep. It is most likely needed for the clock to stabalize.
   // There is no other way to tell whether the sensor has successfully powered down.
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
   is_streaming_ = false;
+
+  return ZX_OK;
 }
 
 zx_status_t Imx227Device::CameraSensor2GetSensorId(uint32_t* out_id) {

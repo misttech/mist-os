@@ -42,6 +42,6 @@ node "gpio-vdig" {
 }
 
 node "clock-sensor" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.hardware.clock.FUNCTION == fuchsia.hardware.clock.FUNCTION.CAMERA_SENSOR;
 }

@@ -6,10 +6,13 @@
 #include "src/camera/drivers/sensors/imx227/imx227.h"
 
 #include <endian.h>
-#include <fuchsia/hardware/clock/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <fuchsia/hardware/mipicsi/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
 #include <zxtest/zxtest.h>
@@ -46,10 +49,45 @@ std::vector<uint8_t> SplitBytes(uint16_t bytes) {
   return std::vector<uint8_t>{static_cast<uint8_t>(bytes >> 8), static_cast<uint8_t>(bytes & 0xff)};
 }
 
+class FakeClockServer final : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
+ public:
+  explicit FakeClockServer(bool enabled) : enabled_(enabled) {}
+
+  void Enable(EnableCompleter::Sync& completer) override {
+    enabled_ = true;
+    completer.ReplySuccess();
+  }
+  void Disable(DisableCompleter::Sync& completer) override {
+    enabled_ = false;
+    completer.ReplySuccess();
+  }
+  void IsEnabled(IsEnabledCompleter::Sync& completer) override { completer.ReplySuccess(enabled_); }
+
+  bool enabled() const { return enabled_; }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  zx::result<fidl::ClientEnd<fuchsia_hardware_clock::Clock>> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    binding_.emplace(async_get_default_dispatcher(), std::move(endpoints->server), this,
+                     fidl::kIgnoreBindingClosure);
+    return zx::ok(std::move(endpoints->client));
+  }
+
+ private:
+  bool enabled_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_clock::Clock>> binding_;
+};
+
 class FakeImx227Device : public Imx227Device {
  public:
-  FakeImx227Device(zx_device_t* parent)
-      : Imx227Device(parent), proto_({&camera_sensor2_protocol_ops_, this}) {
+  FakeImx227Device(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_clock::Clock> clk24)
+      : Imx227Device(parent, std::move(clk24)), proto_({&camera_sensor2_protocol_ops_, this}) {
     SetProtocols();
     ExpectInitPdev();
     ASSERT_OK(InitPdev());
@@ -65,14 +103,12 @@ class FakeImx227Device : public Imx227Device {
   void ExpectInit() {
     mock_gpio_vana_enable_.ExpectWrite(ZX_OK, true);
     mock_gpio_vdig_enable_.ExpectWrite(ZX_OK, true);
-    mock_clk24_.ExpectEnable(ZX_OK);
     mock_gpio_cam_rst_.ExpectWrite(ZX_OK, false);
   }
 
   void ExpectDeInit() {
     mock_mipi_.ExpectDeInit(ZX_OK);
     mock_gpio_cam_rst_.ExpectWrite(ZX_OK, true);
-    mock_clk24_.ExpectDisable(ZX_OK);
     mock_gpio_vdig_enable_.ExpectWrite(ZX_OK, false);
     mock_gpio_vana_enable_.ExpectWrite(ZX_OK, false);
   }
@@ -162,7 +198,6 @@ class FakeImx227Device : public Imx227Device {
     gpio_vana_enable_ = ddk::GpioProtocolClient(mock_gpio_vana_enable_.GetProto());
     gpio_vdig_enable_ = ddk::GpioProtocolClient(mock_gpio_vdig_enable_.GetProto());
     gpio_cam_rst_ = ddk::GpioProtocolClient(mock_gpio_cam_rst_.GetProto());
-    clk24_ = ddk::ClockProtocolClient(mock_clk24_.GetProto());
     mipi_ = ddk::MipiCsiProtocolClient(mock_mipi_.GetProto());
 
     EXPECT_OK(loop_.StartThread());
@@ -173,7 +208,6 @@ class FakeImx227Device : public Imx227Device {
     mock_gpio_vana_enable_.VerifyAndClear();
     mock_gpio_vdig_enable_.VerifyAndClear();
     mock_gpio_cam_rst_.VerifyAndClear();
-    mock_clk24_.VerifyAndClear();
     mock_mipi_.VerifyAndClear();
   }
 
@@ -193,34 +227,41 @@ class FakeImx227Device : public Imx227Device {
   ddk::MockGpio mock_gpio_vana_enable_;
   ddk::MockGpio mock_gpio_vdig_enable_;
   ddk::MockGpio mock_gpio_cam_rst_;
-  ddk::MockClock mock_clk24_;
   ddk::MockMipiCsi mock_mipi_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 class Imx227DeviceTest : public zxtest::Test {
  public:
-  Imx227DeviceTest() : dut_(fake_parent_.get()) {
-    fake_parent_->AddProtocol(ZX_PROTOCOL_CAMERA_SENSOR2, dut_.proto()->ops, &dut_);
-  }
-
   void SetUp() override {
-    dut_.ExpectInit();
+    ASSERT_OK(mock_fidl_servers_loop_.StartThread("mock-fidl-servers"));
+    ASSERT_FALSE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
+    zx::result clk24_client = mock_clk24_.SyncCall(&FakeClockServer::BindServer);
+    ASSERT_OK(clk24_client);
+    dut_.emplace(fake_parent_.get(), std::move(clk24_client.value()));
+    fake_parent_->AddProtocol(ZX_PROTOCOL_CAMERA_SENSOR2, dut().proto()->ops, &dut_);
+    dut().ExpectInit();
     dut().ExpectCameraSensor2Init();
     ASSERT_OK(dut().CameraSensor2Init());
+    ASSERT_TRUE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
   }
 
   void TearDown() override {
-    dut_.ExpectDeInit();
-    dut().CameraSensor2DeInit();
+    dut().ExpectDeInit();
+    ASSERT_OK(dut().CameraSensor2DeInit());
+    ASSERT_FALSE(mock_clk24_.SyncCall(&FakeClockServer::enabled));
     ASSERT_NO_FATAL_FAILURE(dut().VerifyAll());
   }
 
-  FakeImx227Device& dut() { return dut_; }
+  FakeImx227Device& dut() { return dut_.value(); }
+
+  std::optional<FakeImx227Device> dut_;
 
  private:
+  async::Loop mock_fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<FakeClockServer> mock_clk24_{
+      mock_fidl_servers_loop_.dispatcher(), std::in_place, false};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  FakeImx227Device dut_;
 };
 
 // Returns the coarse integration time corresponding to the requested |frame_rate| if found in the

@@ -25,7 +25,7 @@ class Imx227DeviceTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    imx227_device_->CameraSensor2DeInit();
+    ASSERT_OK(imx227_device_->CameraSensor2DeInit());
     imx227_device_.release();
   }
 

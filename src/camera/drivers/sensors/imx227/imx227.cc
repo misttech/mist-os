@@ -13,6 +13,7 @@
 #include <lib/fpromise/result.h>
 #include <lib/trace/event.h>
 #include <threads.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <ddk/metadata/camera.h>
@@ -221,7 +222,7 @@ zx_status_t Imx227Device::InitSensor(uint8_t idx) {
   return ZX_OK;
 }
 
-void Imx227Device::HwInit() {
+zx_status_t Imx227Device::HwInit() {
   TRACE_DURATION("camera", "Imx227Device::HwInit");
 
   // Power up sequence. Reference: Page 51- IMX227-0AQH5-C datasheet.
@@ -232,22 +233,40 @@ void Imx227Device::HwInit() {
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   // Enable 24M clock for sensor.
-  clk24_.Enable();
+  fidl::WireResult result = clk24_->Enable();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send request to enable 24M clock: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to enable 24M clock: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
   gpio_cam_rst_.Write(0);
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
   RefreshCachedExposureParams();
+
+  return ZX_OK;
 }
 
-void Imx227Device::HwDeInit() {
+zx_status_t Imx227Device::HwDeInit() {
   TRACE_DURATION("camera", "Imx227Device::HwDeInit");
 
   gpio_cam_rst_.Write(1);
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
-  clk24_.Disable();
+  fidl::WireResult result = clk24_->Disable();
+  if (!result.ok() || result->is_error()) {
+    zxlogf(ERROR, "Failed to send request to disable 24M clock: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to disable 24M clock: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
   gpio_vdig_enable_.Write(0);
@@ -255,6 +274,8 @@ void Imx227Device::HwDeInit() {
 
   gpio_vana_enable_.Write(0);
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
+
+  return ZX_OK;
 }
 
 void Imx227Device::CycleResetOnAndOff() {
@@ -464,7 +485,16 @@ void Imx227Device::RefreshCachedExposureParams() {
 }
 
 zx_status_t Imx227Device::Create(zx_device_t* parent, std::unique_ptr<Imx227Device>* device_out) {
-  auto sensor_device = std::make_unique<Imx227Device>(parent);
+  const char* CLOCK_FRAGMENT_NAME = "clock-sensor";
+  zx::result clock_client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, CLOCK_FRAGMENT_NAME);
+  if (clock_client.is_error()) {
+    zxlogf(ERROR, "Failed to connect to clock protocol from fragment %s: %s", CLOCK_FRAGMENT_NAME,
+           clock_client.status_string());
+    return clock_client.error_value();
+  }
+  auto sensor_device = std::make_unique<Imx227Device>(parent, std::move(clock_client.value()));
 
   zx_status_t status = sensor_device->InitPdev();
   if (status != ZX_OK) {

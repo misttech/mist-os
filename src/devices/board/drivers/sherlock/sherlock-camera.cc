@@ -328,16 +328,16 @@ zx_status_t Sherlock::CameraInit() {
   auto imx227_sensor_clock_sensor_spec = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_hardware_clock::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::CLOCK_ID,
                   bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_CAM_INCK_24M),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_hardware_clock::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia_hardware_clock::FUNCTION,
                                 bind_fuchsia_hardware_clock::FUNCTION_CAMERA_SENSOR),
           },

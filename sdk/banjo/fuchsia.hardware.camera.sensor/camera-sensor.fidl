@@ -113,7 +113,9 @@ protocol CameraSensor2 {
         s zx.Status;
     });
     /// De-Initializes the sensor.
-    DeInit() -> ();
+    DeInit() -> (struct {
+        s zx.Status;
+    });
 
     /// Retrieves the sensor's ID.
     GetSensorId() -> (struct {
