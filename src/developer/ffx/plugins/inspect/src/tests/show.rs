@@ -5,8 +5,8 @@
 use crate::{
     run_command,
     tests::utils::{
-        inspect_bridge_data, make_inspect, make_inspect_with_length, make_inspects,
-        make_inspects_for_lifecycle, setup_fake_diagnostics_bridge, setup_fake_rcs,
+        inspect_accessor_data, make_inspect, make_inspect_with_length, make_inspects,
+        make_inspects_for_lifecycle, setup_fake_archive_accessor, setup_fake_rcs,
     },
 };
 use diagnostics_data::InspectHandleName;
@@ -22,10 +22,10 @@ async fn test_show_no_parameters() {
     let cmd = ShowCommand { manifest: None, selectors: vec![], file: vec![], accessor: None };
     let mut inspects = make_inspects();
     let inspect_data =
-        inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
+        inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![inspect_data]),
+        setup_fake_archive_accessor(vec![inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -54,10 +54,10 @@ async fn test_show_with_valid_file_name() {
         Some(InspectHandleName::filename("fuchsia.inspect.Tree"));
     inspects.push(inspect_with_file_name.clone());
     let inspect_data =
-        inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
+        inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![inspect_data]),
+        setup_fake_archive_accessor(vec![inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -86,10 +86,10 @@ async fn test_show_with_valid_file_glob() {
         make_inspect("test/moniker3".to_owned(), 3, 10, "bar"),
     ];
     let inspect_data =
-        inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
+        inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![inspect_data]),
+        setup_fake_archive_accessor(vec![inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -118,10 +118,10 @@ async fn test_show_with_invalid_file_name() {
         Some(InspectHandleName::filename("fuchsia.inspect.Tree"));
     inspects.push(inspect_with_file_name);
     let inspect_data =
-        inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
+        inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![inspect_data]),
+        setup_fake_archive_accessor(vec![inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -144,16 +144,16 @@ async fn test_show_unknown_manifest() {
         file: vec![],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
     let inspects = make_inspects();
     let inspect_data =
-        inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
+        inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     assert!(run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer
     )
@@ -173,7 +173,7 @@ async fn test_show_with_manifest_that_exists() {
         file: vec![],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
@@ -182,7 +182,7 @@ async fn test_show_with_manifest_that_exists() {
         make_inspect_with_length(String::from("test/moniker1"), 3, 10),
         make_inspect_with_length(String::from("test/moniker1"), 6, 30),
     ];
-    let inspect_data = inspect_bridge_data(
+    let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:root",
         ))]),
@@ -190,7 +190,7 @@ async fn test_show_with_manifest_that_exists() {
     );
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -213,11 +213,11 @@ async fn test_show_with_selectors_with_no_data() {
         file: vec![],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
-    let inspect_data = inspect_bridge_data(
+    let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:name:hello_not_real",
         ))]),
@@ -225,7 +225,7 @@ async fn test_show_with_selectors_with_no_data() {
     );
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )
@@ -247,12 +247,12 @@ async fn test_show_with_selectors_with_data() {
         file: vec![],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
     let mut inspects = vec![make_inspect_with_length(String::from("test/moniker1"), 6, 30)];
-    let inspect_data = inspect_bridge_data(
+    let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:name:hello_6",
         ))]),
@@ -260,7 +260,7 @@ async fn test_show_with_selectors_with_data() {
     );
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
     )

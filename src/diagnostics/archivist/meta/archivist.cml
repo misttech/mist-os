@@ -13,6 +13,9 @@
         {
             protocol: [
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
             ],
@@ -50,6 +53,9 @@
         {
             protocol: [
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
             ],

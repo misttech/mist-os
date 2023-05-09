@@ -4,21 +4,20 @@
 
 use crate::run_command;
 use crate::tests::utils::{
-    inspect_bridge_data, make_inspect_with_length, make_inspects_for_lifecycle,
-    setup_fake_diagnostics_bridge, setup_fake_rcs, FakeBridgeData,
+    inspect_accessor_data, make_inspect_with_length, make_inspects_for_lifecycle,
+    setup_fake_archive_accessor, setup_fake_rcs, FakeAccessorData,
 };
 use errors::ResultExt as _;
 use ffx_writer::{Format, MachineWriter, TestBuffers};
-use fidl_fuchsia_developer_remotecontrol::BridgeStreamParameters;
 use fidl_fuchsia_diagnostics::{
-    ClientSelectorConfiguration, DataType, SelectorArgument, StreamMode,
+    ClientSelectorConfiguration, DataType, SelectorArgument, StreamMode, StreamParameters,
 };
 use iquery::commands::SelectorsCommand;
 use std::sync::Arc;
 
 #[fuchsia::test]
 async fn test_selectors_no_parameters() {
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
@@ -30,7 +29,7 @@ async fn test_selectors_no_parameters() {
     let cmd = SelectorsCommand { manifest: None, selectors: vec![], accessor: None };
     assert!(run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
         )]),
@@ -45,9 +44,10 @@ async fn test_selectors_no_parameters() {
 
 #[fuchsia::test]
 async fn test_selectors_with_unknown_manifest() {
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(fidl_fuchsia_diagnostics::Format::Json),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
@@ -61,7 +61,7 @@ async fn test_selectors_with_unknown_manifest() {
     };
     assert!(run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
         )]),
@@ -83,7 +83,7 @@ async fn test_selectors_with_manifest_that_exists() {
         selectors: vec![],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
@@ -92,7 +92,7 @@ async fn test_selectors_with_manifest_that_exists() {
         make_inspect_with_length(String::from("test/moniker1"), 3, 10),
         make_inspect_with_length(String::from("test/moniker1"), 6, 30),
     ];
-    let inspect_data = inspect_bridge_data(
+    let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:root",
         ))]),
@@ -100,7 +100,7 @@ async fn test_selectors_with_manifest_that_exists() {
     );
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         SelectorsCommand::from(cmd),
         &mut writer,
     )
@@ -126,12 +126,12 @@ async fn test_selectors_with_selectors() {
         selectors: vec![String::from("test/moniker1:name:hello_3")],
         accessor: None,
     };
-    let lifecycle_data = inspect_bridge_data(
+    let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
     let inspects = vec![make_inspect_with_length(String::from("test/moniker1"), 3, 10)];
-    let inspect_data = inspect_bridge_data(
+    let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:name:hello_3",
         ))]),
@@ -139,7 +139,7 @@ async fn test_selectors_with_selectors() {
     );
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![lifecycle_data, inspect_data]),
+        setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         SelectorsCommand::from(cmd),
         &mut writer,
     )

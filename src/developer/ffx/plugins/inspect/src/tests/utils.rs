@@ -6,110 +6,83 @@ use anyhow::Result;
 use diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, InspectHandleName, Property};
 use errors as _;
 use ffx_writer as _;
-use fidl::{endpoints::ServerEnd, prelude::*};
-use fidl_fuchsia_developer_remotecontrol::{
-    ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
-    BridgeStreamParameters, DiagnosticsData, InlineData, RemoteControlProxy, RemoteControlRequest,
-    RemoteDiagnosticsBridgeProxy, RemoteDiagnosticsBridgeRequest,
+use fidl::{
+    endpoints::{create_proxy_and_stream, ServerEnd},
+    Channel,
 };
-use fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode};
-use futures::{StreamExt, TryStreamExt};
+use fidl_fuchsia_developer_remotecontrol::{
+    RemoteControlConnectCapabilityResponder, RemoteControlMarker, RemoteControlProxy,
+    RemoteControlRequest,
+};
+use fidl_fuchsia_diagnostics::{
+    ClientSelectorConfiguration, DataType, Format, StreamMode, StreamParameters,
+};
+use fidl_fuchsia_diagnostics_host::{
+    ArchiveAccessorMarker, ArchiveAccessorProxy, ArchiveAccessorRequest,
+};
+use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use iquery_test_support;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct FakeArchiveIteratorResponse {
     value: String,
-    iterator_error: Option<ArchiveIteratorError>,
-    should_fidl_error: bool,
 }
 
 impl FakeArchiveIteratorResponse {
     pub fn new_with_value(value: String) -> Self {
         FakeArchiveIteratorResponse { value, ..Default::default() }
     }
-
-    pub fn new_with_fidl_error() -> Self {
-        FakeArchiveIteratorResponse { should_fidl_error: true, ..Default::default() }
-    }
-
-    pub fn new_with_iterator_error(iterator_error: ArchiveIteratorError) -> Self {
-        FakeArchiveIteratorResponse { iterator_error: Some(iterator_error), ..Default::default() }
-    }
 }
 
-pub fn setup_fake_bridge_provider(
-    server_end: ServerEnd<ArchiveIteratorMarker>,
+pub fn setup_fake_accessor_provider(
+    mut server_end: fuchsia_async::Socket,
     responses: Arc<Vec<FakeArchiveIteratorResponse>>,
 ) -> Result<()> {
-    let mut stream = server_end.into_stream()?;
     fuchsia_async::Task::local(async move {
-        let mut iter = responses.iter();
-        while let Some(req) = stream.next().await {
-            let ArchiveIteratorRequest::GetNext { responder } = req.unwrap();
-            let next = iter.next();
-            match next {
-                Some(FakeArchiveIteratorResponse { value, iterator_error, should_fidl_error }) => {
-                    if let Some(err) = iterator_error {
-                        responder.send(&mut Err(*err)).unwrap();
-                    } else if *should_fidl_error {
-                        responder.control_handle().shutdown();
-                    } else {
-                        responder
-                            .send(&mut Ok(vec![ArchiveIteratorEntry {
-                                diagnostics_data: Some(DiagnosticsData::Inline(InlineData {
-                                    data: value.clone(),
-                                    truncated_chars: 0,
-                                })),
-                                ..Default::default()
-                            }]))
-                            .unwrap()
-                    }
-                }
-                None => responder.send(&mut Ok(vec![])).unwrap(),
-            }
+        if responses.is_empty() {
+            return;
         }
+        assert_eq!(responses.len(), 1);
+        server_end.write_all(responses[0].value.as_bytes()).await.unwrap();
     })
     .detach();
     Ok(())
 }
 
-pub struct FakeBridgeData {
-    parameters: BridgeStreamParameters,
+pub struct FakeAccessorData {
+    parameters: StreamParameters,
     responses: Arc<Vec<FakeArchiveIteratorResponse>>,
 }
 
-impl FakeBridgeData {
+impl FakeAccessorData {
     pub fn new(
-        parameters: BridgeStreamParameters,
+        parameters: StreamParameters,
         responses: Arc<Vec<FakeArchiveIteratorResponse>>,
     ) -> Self {
-        FakeBridgeData { parameters, responses }
+        FakeAccessorData { parameters, responses }
     }
 }
 
-pub fn setup_fake_diagnostics_bridge(
-    expected_data: Vec<FakeBridgeData>,
-) -> RemoteDiagnosticsBridgeProxy {
-    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<<fidl_fuchsia_developer_remotecontrol::RemoteDiagnosticsBridgeProxy as fidl::endpoints::Proxy>::Protocol>().unwrap();
+pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> ArchiveAccessorProxy {
+    let (proxy, mut stream) = create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
     fuchsia_async::Task::local(async move {
         'req: while let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteDiagnosticsBridgeRequest::StreamDiagnostics {
-                    parameters,
-                    iterator,
-                    responder,
-                } => {
+                ArchiveAccessorRequest::StreamDiagnostics { parameters, stream, responder } => {
                     for data in expected_data.iter() {
                         if data.parameters == parameters {
-                            setup_fake_bridge_provider(iterator, data.responses.clone()).unwrap();
-                            responder.send(&mut Ok(())).expect("should send");
+                            setup_fake_accessor_provider(
+                                fuchsia_async::Socket::from_socket(stream).unwrap(),
+                                data.responses.clone(),
+                            )
+                            .unwrap();
+                            responder.send().expect("should send");
                             continue 'req;
                         }
                     }
                     assert!(false, "{:?} did not match any expected parameters", parameters);
                 }
-                _ => assert!(false),
             }
         }
     })
@@ -135,15 +108,80 @@ pub fn setup_fake_rcs() -> RemoteControlProxy {
             match req {
                 RemoteControlRequest::RootRealmQuery { server, responder } => {
                     let querier = Arc::clone(&querier);
-                    fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
+                    fuchsia_async::Task::local(querier.serve(server)).detach();
                     responder.send(&mut Ok(())).unwrap();
                 }
-                _ => assert!(false),
+                _ => unreachable!("Not implemented"),
             }
         }
     })
     .detach();
     proxy
+}
+
+pub fn setup_fake_rcs_with_embedded_archive_accessor(
+    accessor_proxy: ArchiveAccessorProxy,
+    expected_moniker: String,
+    expected_protocol: String,
+) -> (RemoteControlProxy, Arc<Mutex<Vec<fuchsia_async::Task<()>>>>) {
+    let mock_realm_query = iquery_test_support::MockRealmQuery::default();
+    let (proxy, mut stream) =
+        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let running_tasks = Arc::new(Mutex::new(vec![]));
+    let running_tasks_clone = running_tasks.clone();
+    let task = fuchsia_async::Task::local(async move {
+        let querier = Arc::new(mock_realm_query);
+        if let Ok(Some(req)) = stream.try_next().await {
+            match req {
+                RemoteControlRequest::RootRealmQuery { server, responder } => {
+                    let querier = Arc::clone(&querier);
+                    fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
+                    responder.send(&mut Ok(())).unwrap();
+                }
+                RemoteControlRequest::ConnectCapability {
+                    moniker,
+                    capability_name,
+                    server_chan,
+                    flags: _,
+                    responder,
+                } => {
+                    assert_eq!(moniker, expected_moniker);
+                    assert_eq!(capability_name, expected_protocol);
+                    let task =
+                        handle_remote_control_connect(responder, server_chan, accessor_proxy);
+                    let mut tasks = running_tasks_clone.lock().unwrap();
+                    tasks.push(task);
+                }
+                _ => unreachable!("Not implemented"),
+            }
+        }
+    });
+    {
+        let mut tasks = running_tasks.lock().unwrap();
+        tasks.push(task);
+    }
+    (proxy, running_tasks)
+}
+
+fn handle_remote_control_connect(
+    responder: RemoteControlConnectCapabilityResponder,
+    service_chan: Channel,
+    accessor_proxy: ArchiveAccessorProxy,
+) -> fuchsia_async::Task<()> {
+    responder.send(&mut Ok(())).unwrap();
+    fuchsia_async::Task::local(async move {
+        let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
+        let mut diagnostics_stream = server_end.into_stream().unwrap();
+        while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+            parameters,
+            stream,
+            responder,
+        })) = diagnostics_stream.next().await
+        {
+            accessor_proxy.stream_diagnostics(parameters, stream).await.unwrap();
+            responder.send().unwrap();
+        }
+    })
 }
 
 pub fn make_inspect_with_length(moniker: String, timestamp: i64, len: usize) -> InspectData {
@@ -177,19 +215,20 @@ pub fn make_inspects() -> Vec<InspectData> {
     ]
 }
 
-pub fn inspect_bridge_data(
+pub fn inspect_accessor_data(
     client_selector_configuration: ClientSelectorConfiguration,
     inspects: Vec<InspectData>,
-) -> FakeBridgeData {
-    let params = BridgeStreamParameters {
+) -> FakeAccessorData {
+    let params = fidl_fuchsia_diagnostics::StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(Format::Json),
         client_selector_configuration: Some(client_selector_configuration),
         ..Default::default()
     };
     let value = serde_json::to_string(&inspects).unwrap();
     let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
-    FakeBridgeData::new(params, expected_responses)
+    FakeAccessorData::new(params, expected_responses)
 }
 
 pub fn get_empty_value_json() -> serde_json::Value {

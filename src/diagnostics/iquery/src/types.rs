@@ -6,6 +6,7 @@ use {anyhow, fidl, serde_json, std::str::FromStr, thiserror::Error};
 
 #[cfg(target_os = "fuchsia")]
 use diagnostics_reader as reader;
+use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, ConnectError};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -69,6 +70,34 @@ pub enum Error {
 
     #[error("Timeout")]
     Timeout,
+    #[error(transparent)]
+    SocketConversionError(#[from] std::io::Error),
+    #[error(transparent)]
+    FidlError(#[from] fidl::Error),
+    #[error("Failed to connect using RCS: {0:?}")]
+    ConnectError(ConnectError),
+    #[error("Not enough dots in selector")]
+    NotEnoughDots,
+    #[error("Must be an exact moniker. Wildcards are not supported.")]
+    MustBeExactMoniker,
+    #[error("Must use a property selector to specify the protocol.")]
+    MustUsePropertySelector,
+    #[error("Failed to connect to capability {0:?}")]
+    FailedToConnectToCapability(ConnectCapabilityError),
+    #[error("Must be exact protocol (protocol cannot contain wildcards)")]
+    MustBeExactProtocol,
+}
+
+impl From<ConnectError> for Error {
+    fn from(value: ConnectError) -> Self {
+        Self::ConnectError(value)
+    }
+}
+
+impl From<ConnectCapabilityError> for Error {
+    fn from(value: ConnectCapabilityError) -> Self {
+        Self::FailedToConnectToCapability(value)
+    }
 }
 
 impl Error {

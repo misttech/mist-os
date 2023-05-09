@@ -7,7 +7,8 @@ use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_inspect_args::{InspectCommand, InspectSubCommand};
 use fho::{deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::{
     Command, ListAccessorsResult, ListFilesResult, ListResult, SelectorsResult, ShowResult,
 };
@@ -19,7 +20,7 @@ mod bridge_provider;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use bridge_provider::DiagnosticsBridgeProvider;
+pub use bridge_provider::HostArchiveReader;
 
 fho::embedded_plugin!(InspectTool);
 
@@ -27,8 +28,10 @@ fho::embedded_plugin!(InspectTool);
 pub struct InspectTool {
     #[command]
     cmd: InspectCommand,
-    #[with(deferred(selector("core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge")))]
-    remote_diagnostics_bridge: Deferred<RemoteDiagnosticsBridgeProxy>,
+    #[with(deferred(selector(
+        "bootstrap/archivist:expose:fuchsia.diagnostics.host.ArchiveAccessor"
+    )))]
+    remote_diagnostics_bridge: Deferred<ArchiveAccessorProxy>,
     rcs: Deferred<RemoteControlProxy>,
 }
 
@@ -68,7 +71,7 @@ impl FfxMain for InspectTool {
 
 pub(crate) async fn run_command<C, O>(
     rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+    diagnostics_proxy: ArchiveAccessorProxy,
     cmd: C,
     writer: &mut MachineWriter<InspectOutput>,
 ) -> anyhow::Result<()>
@@ -76,7 +79,7 @@ where
     C: Command<Result = O>,
     InspectOutput: From<O>,
 {
-    let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
+    let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
     let result = cmd.execute(&provider).await.map_err(|e| anyhow!(ffx_error!("{}", e)))?;
     let result = InspectOutput::from(result);
     if writer.is_machine() {

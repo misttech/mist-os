@@ -19,8 +19,6 @@ use crate::{
     pipeline::Pipeline,
 };
 use archivist_config::Config;
-use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
 use fidl_fuchsia_diagnostics_host as fhost;
 use fidl_fuchsia_io as fio;
@@ -328,6 +326,11 @@ impl Archivist {
         incoming_external_event_producers
     }
 
+    fn add_host_before_last_dot(input: &str) -> String {
+        let (rest, last) = input.rsplit_once('.').unwrap();
+        format!("{}.host.{}", rest, last)
+    }
+
     /// Run archivist to completion.
     /// # Arguments:
     /// * `outgoing_channel`- channel to serve outgoing directory on.
@@ -419,16 +422,13 @@ impl Archivist {
             );
             let accessor_pipeline = Arc::clone(pipeline);
             // TODO(https://fxbug.dev/126321): Add Inspect support
-            if accessor_pipeline.protocol_name()
-                == fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
-            {
-                svc_dir.add_fidl_service_at(
-                    fhost::ArchiveAccessorMarker::PROTOCOL_NAME,
-                    move |stream: fhost::ArchiveAccessorRequestStream| {
-                        host_accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
-                    },
-                );
-            }
+            let accessor = Self::add_host_before_last_dot(accessor_pipeline.protocol_name());
+            svc_dir.add_fidl_service_at(
+                accessor,
+                move |stream: fhost::ArchiveAccessorRequestStream| {
+                    host_accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
+                },
+            );
         }
 
         // Ingest unattributed fuchsia.logger.LogSink connections.

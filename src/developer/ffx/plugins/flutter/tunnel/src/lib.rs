@@ -9,9 +9,10 @@ use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_core::ffx_plugin;
 use ffx_flutter_tunnel_args::TunnelCommand;
 use ffx_flutter_tunnel_ctrlc::wait_for_kill;
-use ffx_inspect::DiagnosticsBridgeProvider;
+use ffx_inspect::HostArchiveReader;
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetAddrInfo, TargetProxy};
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use netext::scope_id_to_name;
 use std::{
@@ -42,12 +43,12 @@ static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
 
 #[ffx_plugin(
     "flutter.tunnel",
-    RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
+    ArchiveAccessorProxy = "bootstrap/archivist:expose:fuchsia.diagnostics.host.ArchiveAccessor"
 )]
 pub async fn tunnel(
     target_proxy: TargetProxy,
     rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+    diagnostics_proxy: ArchiveAccessorProxy,
     cmd: TunnelCommand,
 ) -> Result<()> {
     tunnel_impl(target_proxy, rcs_proxy, diagnostics_proxy, cmd, &mut std::io::stdout()).await
@@ -56,13 +57,13 @@ pub async fn tunnel(
 pub async fn tunnel_impl<W: std::io::Write>(
     target_proxy: TargetProxy,
     rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+    diagnostics_proxy: ArchiveAccessorProxy,
     _cmd: TunnelCommand,
     writer: &mut W,
 ) -> Result<()> {
     let ffx: ffx_command::Ffx = argh::from_env();
 
-    let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
+    let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
     let result = provider
         .snapshot_diagnostics_data::<Inspect>(
             &None,

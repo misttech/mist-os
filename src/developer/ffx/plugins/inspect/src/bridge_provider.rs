@@ -2,36 +2,84 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use diagnostics_data::Data;
-use fidl::{self, endpoints::create_proxy, AsyncSocket};
-use fidl_fuchsia_developer_remotecontrol::{
-    ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, RemoteControlProxy,
-    RemoteDiagnosticsBridgeProxy,
-};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{
     ClientSelectorConfiguration::{SelectAll, Selectors},
-    SelectorArgument,
+    Format, Selector, SelectorArgument, StreamParameters, StringSelector, TreeSelector,
 };
+use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
+use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys2;
-use futures::AsyncReadExt as _;
+use futures::AsyncReadExt;
 use iquery::{
     commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
     types::Error,
 };
-use selectors;
+use serde::Deserialize;
+use std::borrow::Cow;
 
-pub struct DiagnosticsBridgeProvider {
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+pub struct HostArchiveReader {
+    diagnostics_proxy: ArchiveAccessorProxy,
     rcs_proxy: RemoteControlProxy,
 }
 
-impl DiagnosticsBridgeProvider {
-    pub fn new(
-        diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-        rcs_proxy: RemoteControlProxy,
-    ) -> Self {
+fn add_host_before_last_dot(input: &str) -> Result<String, Error> {
+    let (rest, last) = input.rsplit_once('.').ok_or(Error::NotEnoughDots)?;
+    Ok(format!("{}.host.{}", rest, last))
+}
+
+struct MonikerAndProtocol {
+    protocol: String,
+    moniker: String,
+}
+
+impl TryFrom<Selector> for MonikerAndProtocol {
+    type Error = Error;
+
+    fn try_from(selector: Selector) -> Result<Self, Self::Error> {
+        Ok(MonikerAndProtocol {
+            moniker: selector
+                .component_selector
+                .map(|selector| selector.moniker_segments)
+                .flatten()
+                .into_iter()
+                .flatten()
+                .map(|value| match value {
+                    StringSelector::ExactMatch(value) => Ok(value),
+                    _ => Err(Error::MustBeExactMoniker),
+                })
+                .collect::<Result<Vec<_>, Error>>()?
+                .join("/"),
+            protocol: selector
+                .tree_selector
+                .map(|value| match value {
+                    TreeSelector::PropertySelector(value) => Ok(value.target_properties),
+                    _ => Err(Error::MustUsePropertySelector),
+                })
+                .into_iter()
+                .flatten()
+                .map(|value| match value {
+                    StringSelector::ExactMatch(value) => Ok(value),
+                    _ => Err(Error::MustBeExactProtocol),
+                })
+                .next()
+                .ok_or(Error::MustBeExactProtocol)??,
+        })
+    }
+}
+
+impl HostArchiveReader {
+    pub fn new(diagnostics_proxy: ArchiveAccessorProxy, rcs_proxy: RemoteControlProxy) -> Self {
         Self { diagnostics_proxy, rcs_proxy }
     }
 
@@ -49,81 +97,69 @@ impl DiagnosticsBridgeProvider {
             Selectors(selectors.iter().cloned().map(|s| SelectorArgument::RawSelector(s)).collect())
         };
 
-        let accessor_selector = match accessor {
+        let accessor = match accessor {
             Some(ref s) => {
-                Some(selectors::parse_selector::<selectors::VerboseError>(s).map_err(|e| {
-                    Error::ParseSelector("unable to parse selector".to_owned(), anyhow!("{:?}", e))
-                })?)
+                let s = add_host_before_last_dot(s)?;
+                let selector =
+                    selectors::parse_selector::<selectors::VerboseError>(&s).map_err(|e| {
+                        Error::ParseSelector(
+                            "unable to parse selector".to_owned(),
+                            anyhow!("{:?}", e),
+                        )
+                    })?;
+                let moniker_and_protocol = MonikerAndProtocol::try_from(selector)?;
+
+                let (client, server) = fidl::endpoints::create_endpoints::<ArchiveAccessorMarker>();
+                self.rcs_proxy
+                    .connect_capability(
+                        &format!("/{}", moniker_and_protocol.moniker),
+                        &moniker_and_protocol.protocol,
+                        server.into_channel(),
+                        OpenFlags::RIGHT_READABLE,
+                    )
+                    .await??;
+                Cow::Owned(client.into_proxy()?)
             }
-            None => None,
+            None => Cow::Borrowed(&self.diagnostics_proxy),
         };
 
-        let params = BridgeStreamParameters {
+        let params = StreamParameters {
             stream_mode: Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot),
             data_type: Some(D::DATA_TYPE),
-            accessor: accessor_selector,
+            format: Some(Format::Json),
             client_selector_configuration: Some(selectors),
             ..Default::default()
         };
 
-        let (client, server) = create_proxy::<ArchiveIteratorMarker>()
-            .context("failed to create endpoints")
-            .map_err(Error::ConnectToArchivist)?;
+        let (client, server) = fuchsia_async::emulated_handle::Socket::create_stream();
 
-        let _ = self.diagnostics_proxy.stream_diagnostics(params, server).await.map_err(|s| {
+        let _ = accessor.stream_diagnostics(params, server).await.map_err(|s| {
             Error::IOError(
                 "call diagnostics_proxy".into(),
                 anyhow!("failure setting up diagnostics stream: {:?}", s),
             )
         })?;
 
-        match client.get_next().await {
-            Err(e) => {
-                return Err(Error::IOError("get next".into(), e.into()));
-            }
-            Ok(result) => {
-                // For style consistency we use a loop to process the event stream even though the
-                // first event always terminates processing.
-                #[allow(clippy::never_loop)]
-                for entry in result
-                    .map_err(|s| anyhow!("Iterator error: {:?}", s))
-                    .map_err(|e| Error::IOError("iterate results".into(), e))?
-                    .into_iter()
-                {
-                    match entry.diagnostics_data {
-                        Some(DiagnosticsData::Inline(inline)) => {
-                            let result = serde_json::from_str(&inline.data)
-                                .map_err(Error::InvalidCommandResponse)?;
-                            return Ok(result);
-                        }
-                        Some(DiagnosticsData::Socket(socket)) => {
-                            let mut socket = AsyncSocket::from_socket(socket).map_err(|e| {
-                                Error::IOError("create async socket".into(), e.into())
-                            })?;
-                            let mut result = Vec::new();
-                            let _ = socket.read_to_end(&mut result).await.map_err(|e| {
-                                Error::IOError("read snapshot from socket".into(), e.into())
-                            })?;
-                            let result = serde_json::from_slice(&result)
-                                .map_err(Error::InvalidCommandResponse)?;
-                            return Ok(result);
-                        }
-                        _ => {
-                            return Err(Error::IOError(
-                                "read diagnostics_data".into(),
-                                anyhow!("unknown diagnostics data type"),
-                            ))
-                        }
-                    }
-                }
-                return Ok(vec![]);
-            }
+        let mut client = fuchsia_async::Socket::from_socket(client)?;
+
+        let mut output = vec![];
+        match client.read_to_end(&mut output).await {
+            Err(e) => Err(Error::IOError("get next".into(), e.into())),
+            Ok(_) => Ok(serde_json::Deserializer::from_slice(&output)
+                .into_iter::<OneOrMany<Data<D>>>()
+                .filter_map(|value| value.ok())
+                .map(|value| match value {
+                    OneOrMany::One(value) => vec![value],
+                    OneOrMany::Many(values) => values,
+                })
+                .flatten()
+                .collect()),
         }
     }
 }
 
 #[async_trait]
-impl DiagnosticsProvider for DiagnosticsBridgeProvider {
+impl DiagnosticsProvider for HostArchiveReader {
     async fn snapshot<D>(
         &self,
         accessor_path: &Option<String>,

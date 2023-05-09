@@ -8,12 +8,13 @@ use crate::{
         screen::{Line, Screen},
         terminal::{Terminal, Termion},
     },
-    DiagnosticsBridgeProvider,
+    HostArchiveReader,
 };
 use anyhow::{Context, Result};
 use diagnostics_data::{Inspect, InspectData};
 use ffx_inspect_args::ApplySelectorsCommand;
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::DiagnosticsProvider;
 use std::{
     fs::read_to_string,
@@ -35,7 +36,7 @@ mod test_utils;
 
 pub async fn execute(
     rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+    diagnostics_proxy: ArchiveAccessorProxy,
     cmd: ApplySelectorsCommand,
 ) -> Result<()> {
     // Get full inspect data
@@ -48,7 +49,7 @@ pub async fn execute(
         )
         .context(format!("Unable to deserialize {}.", snapshot_file.display()))?
     } else {
-        let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
+        let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
         provider.snapshot::<Inspect>(&cmd.accessor_path, &[]).await?
     };
 

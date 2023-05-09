@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::run_command;
-use crate::tests::utils::{setup_fake_diagnostics_bridge, setup_fake_rcs};
+use crate::tests::utils::{setup_fake_archive_accessor, setup_fake_rcs};
 use ffx_writer::{Format, MachineWriter, TestBuffers};
 use iquery::commands::ListAccessorsCommand;
 
@@ -14,7 +14,7 @@ async fn test_list_accessors_no_parameters() {
     let cmd = ListAccessorsCommand { paths: vec![] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,
     )
@@ -39,7 +39,7 @@ async fn test_list_accessors_subcomponent() {
     let cmd = ListAccessorsCommand { paths: vec!["foo".into()] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,
     )
@@ -62,7 +62,7 @@ async fn test_list_accessors_deeper_subdirectory() {
     let cmd = ListAccessorsCommand { paths: vec!["foo/bar".into()] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,
     )
@@ -84,7 +84,7 @@ async fn test_list_accessors_multiple_paths() {
     let cmd = ListAccessorsCommand { paths: vec!["example".into(), "foo/bar/".into()] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,
     )
@@ -107,7 +107,7 @@ async fn test_list_accessors_path_with_no_accessors() {
     let cmd = ListAccessorsCommand { paths: vec!["this/is/bad".into()] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,
     )

@@ -4,7 +4,7 @@
 
 use crate::{
     run_command,
-    tests::utils::{setup_fake_diagnostics_bridge, setup_fake_rcs},
+    tests::utils::{setup_fake_archive_accessor, setup_fake_rcs},
 };
 use assert_matches::assert_matches;
 use ffx_writer::{Format, MachineWriter, TestBuffers};
@@ -17,7 +17,7 @@ async fn test_list_files_no_parameters() {
     let cmd = ListFilesCommand { monikers: vec![] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListFilesCommand::from(cmd),
         &mut writer,
     )
@@ -46,7 +46,7 @@ async fn test_list_files_with_valid_moniker() {
     let cmd = ListFilesCommand { monikers: vec!["example/component".to_owned()] };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListFilesCommand::from(cmd),
         &mut writer,
     )
@@ -69,7 +69,7 @@ async fn test_list_files_with_invalid_moniker() {
     let cmd = ListFilesCommand { monikers: vec!["bah".to_owned()] };
     let result = run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![]),
+        setup_fake_archive_accessor(vec![]),
         ListFilesCommand::from(cmd),
         &mut writer,
     )

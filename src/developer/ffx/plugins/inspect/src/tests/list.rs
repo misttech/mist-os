@@ -4,21 +4,23 @@
 
 use crate::run_command;
 use crate::tests::utils::{
-    make_inspects_for_lifecycle, setup_fake_diagnostics_bridge, setup_fake_rcs,
-    FakeArchiveIteratorResponse, FakeBridgeData,
+    make_inspects_for_lifecycle, setup_fake_archive_accessor, setup_fake_rcs,
+    setup_fake_rcs_with_embedded_archive_accessor, FakeAccessorData, FakeArchiveIteratorResponse,
 };
-use errors::ResultExt as _;
+
 use ffx_writer::{Format, MachineWriter, TestBuffers};
-use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, BridgeStreamParameters};
-use fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode};
+use fidl_fuchsia_diagnostics::{
+    ClientSelectorConfiguration, DataType, StreamMode, StreamParameters,
+};
 use iquery::commands::ListCommand;
 use std::sync::Arc;
 
 #[fuchsia::test]
 async fn test_list_empty() {
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(fidl_fuchsia_diagnostics::Format::Json),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
@@ -28,7 +30,7 @@ async fn test_list_empty() {
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
         )]),
@@ -43,68 +45,11 @@ async fn test_list_empty() {
 }
 
 #[fuchsia::test]
-async fn test_list_fidl_error() {
-    let params = BridgeStreamParameters {
-        stream_mode: Some(StreamMode::Snapshot),
-        data_type: Some(DataType::Inspect),
-        client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..Default::default()
-    };
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_fidl_error()]);
-    let test_buffers = TestBuffers::default();
-    let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
-
-    assert!(run_command(
-        setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
-            params,
-            expected_responses.clone()
-        )]),
-        ListCommand::from(cmd),
-        &mut writer
-    )
-    .await
-    .unwrap_err()
-    .ffx_error()
-    .is_some());
-}
-
-#[fuchsia::test]
-async fn test_list_iterator_error() {
-    let params = BridgeStreamParameters {
-        stream_mode: Some(StreamMode::Snapshot),
-        data_type: Some(DataType::Inspect),
-        client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..Default::default()
-    };
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_iterator_error(
-        ArchiveIteratorError::GenericError,
-    )]);
-    let test_buffers = TestBuffers::default();
-    let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
-
-    assert!(run_command(
-        setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
-            params,
-            expected_responses.clone()
-        )]),
-        ListCommand::from(cmd),
-        &mut writer
-    )
-    .await
-    .unwrap_err()
-    .ffx_error()
-    .is_some());
-}
-
-#[fuchsia::test]
 async fn test_list_with_data() {
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(fidl_fuchsia_diagnostics::Format::Json),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
@@ -116,7 +61,7 @@ async fn test_list_with_data() {
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
         )]),
@@ -135,9 +80,10 @@ async fn test_list_with_data() {
 
 #[fuchsia::test]
 async fn test_list_with_data_with_url() {
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(fidl_fuchsia_diagnostics::Format::Json),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
@@ -149,7 +95,7 @@ async fn test_list_with_data_with_url() {
     let cmd = ListCommand { manifest: None, with_url: true, accessor: None };
     run_command(
         setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
         )]),
@@ -176,15 +122,11 @@ async fn test_list_with_data_with_url() {
 
 #[fuchsia::test]
 async fn test_list_with_data_with_manifest_and_archive() {
-    let accessor = selectors::parse_selector::<selectors::FastError>(
-        "./test/component:expose:fuchsia.diagnostics.ArchiveAccessor",
-    )
-    .unwrap();
-    let params = BridgeStreamParameters {
+    let params = StreamParameters {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
+        format: Some(fidl_fuchsia_diagnostics::Format::Json),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        accessor: Some(accessor.clone()),
         ..Default::default()
     };
     let lifecycles = make_inspects_for_lifecycle();
@@ -197,11 +139,20 @@ async fn test_list_with_data_with_manifest_and_archive() {
         with_url: true,
         accessor: Some("./test/component:expose:fuchsia.diagnostics.ArchiveAccessor".to_owned()),
     };
-    run_command(
-        setup_fake_rcs(),
-        setup_fake_diagnostics_bridge(vec![FakeBridgeData::new(
-            params,
+    let (accessor, _task) = setup_fake_rcs_with_embedded_archive_accessor(
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
+            params.clone(),
             expected_responses.clone(),
+        )]),
+        "/./test/component".into(),
+        "fuchsia.diagnostics.host.ArchiveAccessor".into(),
+    );
+    run_command(
+        accessor,
+        setup_fake_archive_accessor(vec![FakeAccessorData::new(
+            params,
+            // We don't expect any responses on the default accessor.
+            Arc::new(vec![]),
         )]),
         ListCommand::from(cmd),
         &mut writer,
