@@ -6,6 +6,10 @@
         "fuchsia-pkg://fuchsia.com/package_with_structured_config_for_scrutiny_testing#meta/component_with_structured_config.cm": {
             fields: {
                 asserted_by_scrutiny_test: "not the string that was packaged",
+
+                // This string matches the packaged one, but should still cause verification to fail
+                // because we don't want a mutable-by-parent config field to be changed at runtime.
+                verifier_fails_due_to_mutability_parent: "don't check this string!",
             },
         },
     },

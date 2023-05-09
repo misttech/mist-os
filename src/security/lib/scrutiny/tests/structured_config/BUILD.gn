@@ -18,11 +18,14 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-component_name = "component_with_structured_config"
-package_name = "package_with_structured_config_for_scrutiny_testing"
-expected_value = "check this string!"
-
 if (is_fuchsia) {
+  # NB: These strings must match the assertions in the python scripts in this directory which test
+  # the configuration values of the assembly we create here.
+  component_name = "component_with_structured_config"
+  package_name = "package_with_structured_config_for_scrutiny_testing"
+  expected_value_in_policy = "check this string!"
+  expected_value_for_dont_check = "don't check this string!"
+
   group("tests") {
     testonly = true
     deps = []
@@ -38,9 +41,11 @@ if (is_fuchsia) {
 
   fuchsia_structured_config_values("values") {
     testonly = true
-    cm_label = ":${component_name}_manifest_compile"
+    cm_label = ":component_with_structured_config_manifest_compile"
     values = {
-      asserted_by_scrutiny_test = expected_value
+      # NB: If these field names are changed the python scripts must be updated as well.
+      asserted_by_scrutiny_test = expected_value_in_policy
+      verifier_fails_due_to_mutability_parent = expected_value_for_dont_check
     }
   }
 
@@ -48,7 +53,7 @@ if (is_fuchsia) {
     testonly = true
     package_name = package_name
     deps = [
-      ":$component_name",
+      ":component_with_structured_config",
       ":values",
     ]
   }
@@ -197,10 +202,6 @@ if (is_host) {
     }
   }
 
-  configured_url =
-      "fuchsia-pkg://fuchsia.com/${package_name}#meta/${component_name}.cm"
-  configured_key = "asserted_by_scrutiny_test"
-
   labels = {
     extractor = ":extractor($target_toolchain)"
     image_assembler = ":assembly.image_assembler($target_toolchain)"
@@ -245,12 +246,6 @@ if (is_host) {
       rebase_path(check_extracted_python_binary, root_build_dir),
       "--extracted-config",
       rebase_path(extracted_config_path, root_build_dir),
-      "--expected-url",
-      configured_url,
-      "--expected-key",
-      configured_key,
-      "--expected-value",
-      expected_value,
     ]
     deps = [
       ":extracted_config",
@@ -299,10 +294,6 @@ if (is_host) {
       rebase_path(depfile, root_build_dir),
       "--product-bundle",
       rebase_path(files.product_bundle_dir, root_build_dir),
-      "--failed-url",
-      configured_url,
-      "--failed-key",
-      configured_key,
     ]
     depfile = [ depfile ]
 

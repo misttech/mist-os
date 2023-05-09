@@ -7,9 +7,9 @@
 //! Library for resolving and encoding the runtime configuration values of a component.
 
 use cm_rust::{
-    ConfigChecksum, ConfigDecl, ConfigField as ConfigFieldDecl, ConfigNestedValueType,
-    ConfigSingleValue, ConfigValue, ConfigValueSpec, ConfigValueType, ConfigValuesData,
-    ConfigVectorValue, NativeIntoFidl,
+    ConfigChecksum, ConfigDecl, ConfigField as ConfigFieldDecl, ConfigMutability,
+    ConfigNestedValueType, ConfigSingleValue, ConfigValue, ConfigValueSpec, ConfigValueType,
+    ConfigValuesData, ConfigVectorValue, NativeIntoFidl,
 };
 use dynfidl::{BasicField, Field, Structure, VectorField};
 use fidl_fuchsia_component_decl as fdecl;
@@ -159,6 +159,9 @@ pub struct ConfigField {
 
     /// The configuration field's value.
     pub value: ConfigValue,
+
+    /// Ways this component's packaged values could have been overridden.
+    pub mutability: ConfigMutability,
 }
 
 impl ConfigField {
@@ -239,7 +242,7 @@ impl ConfigField {
             }
         }
 
-        Ok(ConfigField { key, value: spec_field.value })
+        Ok(ConfigField { key, value: spec_field.value, mutability: decl_field.mutability })
     }
 }
 
@@ -355,58 +358,105 @@ mod tests {
             resolved,
             ConfigFields {
                 fields: vec![
-                    ConfigField { key: "my_flag".to_string(), value: Single(Bool(false)) },
-                    ConfigField { key: "my_uint8".to_string(), value: Single(Uint8(255)) },
-                    ConfigField { key: "my_uint16".to_string(), value: Single(Uint16(65535)) },
-                    ConfigField { key: "my_uint32".to_string(), value: Single(Uint32(4000000000)) },
-                    ConfigField { key: "my_uint64".to_string(), value: Single(Uint64(8000000000)) },
-                    ConfigField { key: "my_int8".to_string(), value: Single(Int8(-127)) },
-                    ConfigField { key: "my_int16".to_string(), value: Single(Int16(-32766)) },
-                    ConfigField { key: "my_int32".to_string(), value: Single(Int32(-2000000000)) },
-                    ConfigField { key: "my_int64".to_string(), value: Single(Int64(-4000000000)) },
+                    ConfigField {
+                        key: "my_flag".to_string(),
+                        value: Single(Bool(false)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_uint8".to_string(),
+                        value: Single(Uint8(255)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_uint16".to_string(),
+                        value: Single(Uint16(65535)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_uint32".to_string(),
+                        value: Single(Uint32(4000000000)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_uint64".to_string(),
+                        value: Single(Uint64(8000000000)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_int8".to_string(),
+                        value: Single(Int8(-127)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_int16".to_string(),
+                        value: Single(Int16(-32766)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_int32".to_string(),
+                        value: Single(Int32(-2000000000)),
+                        mutability: Default::default(),
+                    },
+                    ConfigField {
+                        key: "my_int64".to_string(),
+                        value: Single(Int64(-4000000000)),
+                        mutability: Default::default(),
+                    },
                     ConfigField {
                         key: "my_string".to_string(),
                         value: Single(String("hello, world!".into())),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_flag".to_string(),
                         value: Vector(BoolVector(vec![true, false])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint8".to_string(),
                         value: Vector(Uint8Vector(vec![1, 2, 3])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint16".to_string(),
                         value: Vector(Uint16Vector(vec![2, 3, 4])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint32".to_string(),
                         value: Vector(Uint32Vector(vec![3, 4, 5])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_uint64".to_string(),
                         value: Vector(Uint64Vector(vec![4, 5, 6])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int8".to_string(),
                         value: Vector(Int8Vector(vec![-1, -2, 3])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int16".to_string(),
                         value: Vector(Int16Vector(vec![-2, -3, 4])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int32".to_string(),
                         value: Vector(Int32Vector(vec![-3, -4, 5])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_int64".to_string(),
                         value: Vector(Int64Vector(vec![-4, -5, 6])),
+                        mutability: Default::default(),
                     },
                     ConfigField {
                         key: "my_vector_of_string".to_string(),
                         value: Vector(StringVector(vec!["valid".into(), "valid".into()])),
+                        mutability: Default::default(),
                     },
                 ],
                 checksum: decl.checksum.clone(),

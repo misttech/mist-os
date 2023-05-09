@@ -11,5 +11,14 @@
             type: "string",
             max_size: 100,
         },
+
+        // This config field is mutable-by-parent, which scrutiny should not allow
+        // in statically-defined config policies because policy-specified values could be
+        // overidden at runtime.
+        verifier_fails_due_to_mutability_parent: {
+            type: "string",
+            max_size: 100,
+            mutability: [ "parent" ],
+        },
     },
 }

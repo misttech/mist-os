@@ -190,9 +190,7 @@ impl ComponentPolicy {
 
         for (name, policy) in &self.fields {
             if let Some(field) = config.fields.iter().find(|f| &f.key == name) {
-                if let Err(e) = policy.verify(field) {
-                    errors.push(e);
-                }
+                policy.verify(field, &mut errors);
             } else if !policy.is_transitional() {
                 errors.push(VerifyConfigError::NoSuchField { field: name.clone() });
             }
@@ -231,23 +229,36 @@ impl FieldPolicy {
             Self::Concise(..) => false,
         }
     }
-    fn verify(&self, field: &ConfigField) -> Result<(), VerifyConfigError> {
+    fn verify(&self, field: &ConfigField, errors: &mut Vec<VerifyConfigError>) {
+        // If any runtime mutability flags are set for the field we should fail because the field
+        // has an expected value according to the policy.
+        if !field.mutability.is_empty() {
+            errors.push(VerifyConfigError::MutableWithPolicy {
+                field: field.key.clone(),
+                mutability: field.mutability,
+            });
+        }
+
         let expected_json = match self {
             Self::Explicit { expected_value, .. } => expected_value,
             Self::Concise(v) => v,
         };
-        let expected =
-            config_value_from_json_value(expected_json, &field.value.ty()).map_err(|e| {
-                VerifyConfigError::TypeMismatch { field: field.key.clone(), error: e.to_string() }
-            })?;
-        if expected != field.value {
-            Err(VerifyConfigError::ValueMismatch {
-                field: field.key.clone(),
-                expected,
-                observed: field.value.clone(),
-            })
-        } else {
-            Ok(())
+        match config_value_from_json_value(expected_json, &field.value.ty()) {
+            Ok(expected) => {
+                if expected != field.value {
+                    errors.push(VerifyConfigError::ValueMismatch {
+                        field: field.key.clone(),
+                        expected,
+                        observed: field.value.clone(),
+                    });
+                }
+            }
+            Err(e) => {
+                errors.push(VerifyConfigError::TypeMismatch {
+                    field: field.key.clone(),
+                    error: e.to_string(),
+                });
+            }
         }
     }
 }
@@ -304,6 +315,8 @@ pub enum VerifyConfigError {
     },
     #[error("`{field}` has a different value ({observed}) than expected ({expected}).")]
     ValueMismatch { field: String, expected: cm_rust::ConfigValue, observed: cm_rust::ConfigValue },
+    #[error("`{field}` has an expected value in the policy which could be overridden at runtime by {mutability:?}.")]
+    MutableWithPolicy { field: String, mutability: cm_rust::ConfigMutability },
 }
 
 #[cfg(test)]
@@ -333,6 +346,7 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     }
                 ],
             }
@@ -360,10 +374,12 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     },
                     ConfigField {
                         key: "b".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     },
                 ],
             }
@@ -391,6 +407,7 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     }
                 ],
             }
@@ -428,6 +445,7 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     }
                 ],
             }
@@ -467,6 +485,7 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::Uint8(10)),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     }
                 ],
             }
@@ -594,6 +613,7 @@ mod tests {
                     ConfigField {
                         key: "a".to_string(),
                         value: ConfigValue::Single(ConfigSingleValue::String("not an int".to_string())),
+                        mutability: cm_rust::ConfigMutability::empty(),
                     }
                 ],
             }
@@ -604,6 +624,41 @@ mod tests {
         assert_matches!(
             &res["fuchsia-pkg://foo"][0],
             VerifyConfigError::TypeMismatch { field, .. } if field == "a"
+        );
+    }
+
+    #[test]
+    fn mutable_by_parent_fails_under_policy() {
+        let policy: StructuredConfigPolicy = serde_json::from_value(json! {{
+            "components": {
+                "fuchsia-pkg://foo": {
+                    "fields": {
+                        "a": 5,
+                    },
+                },
+            },
+        }})
+        .unwrap();
+        let config = btreemap! {
+            "fuchsia-pkg://foo".to_string() => ConfigFields {
+                checksum: ConfigChecksum::Sha256([0u8; 32]),
+                fields: vec![
+                    ConfigField {
+                        key: "a".to_string(),
+                        value: ConfigValue::Single(ConfigSingleValue::Uint8(5)),
+                        mutability: cm_rust::ConfigMutability::PARENT,
+                    }
+                ],
+            }
+        };
+
+        let res = policy.verify(config);
+        aggregate_policy_errors(&res).unwrap_err();
+        assert_matches!(
+            &res["fuchsia-pkg://foo"][0],
+            VerifyConfigError::MutableWithPolicy {
+                field, mutability
+            } if field == "a" && mutability == &cm_rust::ConfigMutability::PARENT
         );
     }
 }

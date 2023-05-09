@@ -8,6 +8,11 @@ import pathlib
 import subprocess
 import unittest
 
+# NB: These must be kept in sync with the values in BUILD.gn.
+component_name = "component_with_structured_config"
+package_name = "package_with_structured_config_for_scrutiny_testing"
+expected_value_in_policy = "check this string!"
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -22,16 +27,6 @@ def main():
         type=pathlib.Path,
         required=True,
         help="Path to JSON5 policy file which should produce errors.")
-    parser.add_argument(
-        "--failed-url",
-        type=str,
-        required=True,
-        help="Component URL which should cause a policy failure.")
-    parser.add_argument(
-        "--failed-key",
-        type=str,
-        required=True,
-        help="Component config key which should cause a policy failure.")
     parser.add_argument(
         "--depfile",
         type=pathlib.Path,
@@ -78,7 +73,9 @@ def main():
         output.returncode, 0, "ffx scrutiny verify must have failed")
 
     stderr = output.stderr.decode('UTF-8')
+    expected_error = f"""
+└── fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm
+      └── `asserted_by_scrutiny_test` has a different value ("{expected_value_in_policy}") than expected ("not the string that was packaged").
+      └── `verifier_fails_due_to_mutability_parent` has an expected value in the policy which could be overridden at runtime by PARENT."""
     test.assertIn(
-        args.failed_url, stderr, "error message must contain failed URL")
-    test.assertIn(
-        args.failed_key, stderr, "error message must contain failed config key")
+        expected_error, stderr, "error message must contain expected failures")

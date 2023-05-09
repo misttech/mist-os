@@ -7,6 +7,12 @@ import json
 import pathlib
 import unittest
 
+# NB: These must be kept in sync with the values in BUILD.gn.
+component_name = "component_with_structured_config"
+package_name = "package_with_structured_config_for_scrutiny_testing"
+expected_value_in_policy = "check this string!"
+expected_value_for_dont_check = "don't check this string!"
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -16,21 +22,6 @@ def main():
         type=pathlib.Path,
         required=True,
         help="Path to JSON dump of structured configuration from scrutiny.")
-    parser.add_argument(
-        "--expected-url",
-        type=str,
-        required=True,
-        help="URL of the component whose configuration we're asserting.")
-    parser.add_argument(
-        "--expected-key",
-        type=str,
-        required=True,
-        help="Expected name of configuration key.")
-    parser.add_argument(
-        "--expected-value",
-        type=str,
-        required=True,
-        help="Expected value to find in the JSON for this component.")
     args = parser.parse_args()
 
     test = unittest.TestCase()
@@ -39,6 +30,11 @@ def main():
         extracted_config = json.load(f)
 
     test.assertEqual(
-        extracted_config[args.expected_url],
-        {args.expected_key: args.expected_value},
-        "configuration from system image did not match expectation")
+        extracted_config[
+            f"fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm"],
+        {
+            "asserted_by_scrutiny_test":
+                expected_value_in_policy,
+            "verifier_fails_due_to_mutability_parent":
+                expected_value_for_dont_check
+        }, "configuration from system image did not match expectation")

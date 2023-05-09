@@ -588,6 +588,7 @@ mod tests {
                 value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
                     "hello, world!".to_string(),
                 )),
+                mutability: Default::default(),
             }],
             checksum: fake_checksum,
         };
