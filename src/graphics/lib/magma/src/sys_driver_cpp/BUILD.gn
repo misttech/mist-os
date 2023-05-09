@@ -91,6 +91,7 @@ source_set("magma_driver_base") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util/platform:logger",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",

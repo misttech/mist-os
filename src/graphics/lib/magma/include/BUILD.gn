@@ -44,6 +44,7 @@ source_set("msd_cc") {
     ":msd_defs",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/async",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
 }

@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/event.h>
 #include <lib/zx/vmo.h>
@@ -37,7 +38,7 @@ class Driver {
   virtual void Configure(uint32_t flags) {}
   // Returns a buffer handle that contains inspect data for the driver.  Returns
   // ZX_HANDLE_INVALID if driver doesn't support inspect.
-  virtual zx::vmo DuplicateInspectHandle() { return zx::vmo(); }
+  virtual std::optional<inspect::Inspector> DuplicateInspector() { return std::nullopt; }
 
   // Creates a device at system startup. `device_data` is a pointer to a platform-specific device
   // object which is guaranteed to outlive the returned Device.

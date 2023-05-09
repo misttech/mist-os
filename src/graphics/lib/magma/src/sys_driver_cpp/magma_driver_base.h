@@ -10,6 +10,7 @@
 #include <lib/driver/component/cpp/lifecycle.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
+#include <lib/inspect/component/cpp/service.h>
 
 #include "magma_util/macros.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
@@ -32,6 +33,10 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
 
     if (zx::result result = MagmaStart(); result.is_error()) {
       node().reset();
+      return result.take_error();
+    }
+
+    if (zx::result result = InitializeInspector(); result.is_error()) {
       return result.take_error();
     }
 
@@ -209,6 +214,25 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
 
   void BindConnector(fidl::ServerEnd<FidlDeviceType> server) {
     fidl::BindServer(dispatcher(), std::move(server), this);
+  }
+
+  zx::result<> InitializeInspector() {
+    std::lock_guard lock(magma_mutex_);
+    auto inspector = magma_driver()->DuplicateInspector();
+    if (inspector) {
+      auto res =
+          context().outgoing()->component().template AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
+              "diagnostics", [inspector = std::move(*inspector)](
+                                 fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
+                inspect::TreeServer::StartSelfManagedServer(
+                    inspector, {}, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                    std::move(server_end));
+              });
+      if (!res.is_ok()) {
+        return res.take_error();
+      }
+    }
+    return zx::ok();
   }
 
   // Node representing this device; given from the parent.

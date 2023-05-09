@@ -109,9 +109,7 @@ zx_status_t IntelDevice::Init() {
   if (status != ZX_OK)
     return status;
 
-  status = DdkAdd(ddk::DeviceAddArgs("magma_gpu")
-                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                      .set_inspect_vmo(zx::vmo(magma_driver()->DuplicateInspectVmo())));
+  status = DdkAdd(ddk::DeviceAddArgs("magma_gpu").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK)
     return DRET_MSG(status, "device_add failed");
   return ZX_OK;

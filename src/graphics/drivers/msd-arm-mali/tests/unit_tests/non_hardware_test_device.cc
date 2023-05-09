@@ -417,7 +417,7 @@ class TestNonHardwareMsdArmDevice {
     constexpr uint64_t kClientId = 123456;
     auto connection = device->Open(kClientId);
     ASSERT_TRUE(connection);
-    auto hierarchy = inspect::ReadFromVmo(zx::vmo(driver->DuplicateInspectHandle()));
+    auto hierarchy = inspect::ReadFromVmo(driver->DuplicateInspector()->DuplicateVmo());
     auto* dev_node = hierarchy.value().GetByPath({"msd-arm-mali", "device"});
     ASSERT_TRUE(dev_node);
     const auto& children = dev_node->children();

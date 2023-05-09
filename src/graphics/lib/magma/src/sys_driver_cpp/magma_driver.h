@@ -32,7 +32,7 @@ class MagmaDriver {
     return std::make_unique<MagmaDriver>(std::move(msd_drv));
   }
 
-  zx::vmo DuplicateInspectVmo() { return msd_drv_->DuplicateInspectHandle(); }
+  std::optional<inspect::Inspector> DuplicateInspector() { return msd_drv_->DuplicateInspector(); }
 
  private:
   std::unique_ptr<msd::Driver> msd_drv_;
