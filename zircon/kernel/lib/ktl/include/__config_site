@@ -50,4 +50,7 @@
 // This tells various headers to be strict about what includes what.
 #define _LIBCPP_REMOVE_TRANSITIVE_INCLUDES
 
+// This tells libc++ not to expect full locale APIs in some places.
+#define _LIBCPP_HAS_NO_LOCALIZATION
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_SITE_
