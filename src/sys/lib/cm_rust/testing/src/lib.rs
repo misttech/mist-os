@@ -171,6 +171,7 @@ impl ChildDeclBuilder {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         })
     }
 

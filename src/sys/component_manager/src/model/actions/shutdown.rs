@@ -904,6 +904,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             }],
             ..default_component_decl()
         };
@@ -935,6 +936,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             }],
             ..default_component_decl()
         };
@@ -964,6 +966,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             }],
             ..default_component_decl()
         };
@@ -985,6 +988,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -992,6 +996,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -1708,6 +1713,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -1715,6 +1721,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -1757,6 +1764,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -1764,6 +1772,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -1814,6 +1823,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -1821,6 +1831,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_c = ChildDecl {
             name: "childC".to_string(),
@@ -1828,6 +1839,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -1877,6 +1889,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -1884,6 +1897,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_c = ChildDecl {
             name: "childC".to_string(),
@@ -1891,6 +1905,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -1946,6 +1961,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -1953,6 +1969,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_c = ChildDecl {
             name: "childC".to_string(),
@@ -1960,6 +1977,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -2016,6 +2034,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -2023,6 +2042,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_c = ChildDecl {
             name: "childC".to_string(),
@@ -2030,6 +2050,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_d = ChildDecl {
             name: "childD".to_string(),
@@ -2037,6 +2058,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_e = ChildDecl {
             name: "childE".to_string(),
@@ -2044,6 +2066,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![
@@ -2125,6 +2148,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         // This declaration is invalid because the offer target doesn't exist
         let decl = ComponentDecl {
@@ -2166,6 +2190,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 on_terminate: None,
                 environment: None,
+                config_overrides: None,
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".to_string()),
@@ -2216,6 +2241,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 on_terminate: None,
                 environment: None,
+                config_overrides: None,
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".to_string()),
@@ -2337,6 +2363,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         // This declaration is invalid because the offer target doesn't exist
         let decl = ComponentDecl {
@@ -2378,6 +2405,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             }],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
@@ -2416,6 +2444,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
                 ChildDecl {
                     name: "childB".to_string(),
@@ -2423,6 +2452,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
             ],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
@@ -2490,6 +2520,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
                 ChildDecl {
                     name: "childB".to_string(),
@@ -2497,6 +2528,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
             ],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
@@ -2536,6 +2568,7 @@ mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             }],
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
@@ -2574,6 +2607,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
                 ChildDecl {
                     name: "childB".to_string(),
@@ -2581,6 +2615,7 @@ mod tests {
                     startup: fdecl::StartupMode::Lazy,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 },
             ],
             uses: vec![
@@ -2621,6 +2656,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let child_b = ChildDecl {
             name: "childB".to_string(),
@@ -2628,6 +2664,7 @@ mod tests {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         };
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Resolver(OfferResolverDecl {

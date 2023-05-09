@@ -112,6 +112,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/Child.config_overrides",
+        "ordinal": "6",
+        "type": "vector<fuchsia.component.decl/ConfigOverride>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/Child.environment",
         "ordinal": "4",
         "type": "string:100"
@@ -317,6 +323,22 @@
         "name": "fuchsia.component.decl/ConfigMutability",
         "strictness": "flexible",
         "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ConfigOverride.key",
+        "ordinal": "1",
+        "type": "string:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ConfigOverride.value",
+        "ordinal": "2",
+        "type": "fuchsia.component.decl/ConfigValue"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.decl/ConfigOverride"
     },
     {
         "kind": "table/member",

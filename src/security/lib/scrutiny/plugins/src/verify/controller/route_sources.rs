@@ -838,6 +838,7 @@ mod tests {
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                     ChildDecl{
                         name: "one_dir_provider".to_string(),
@@ -845,6 +846,7 @@ mod tests {
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                 ],
                 ..ComponentDecl::default()

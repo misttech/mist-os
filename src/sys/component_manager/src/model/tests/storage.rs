@@ -195,6 +195,7 @@ async fn use_in_collection_from_parent() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -375,6 +376,7 @@ async fn use_in_collection_from_grandparent() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -958,6 +960,7 @@ async fn storage_persistence_relative_moniker_path() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -987,6 +990,7 @@ async fn storage_persistence_relative_moniker_path() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1156,6 +1160,7 @@ async fn storage_persistence_instance_id_path() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1179,6 +1184,7 @@ async fn storage_persistence_instance_id_path() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1373,6 +1379,7 @@ async fn storage_persistence_inheritance() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1418,6 +1425,7 @@ async fn storage_persistence_inheritance() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1640,6 +1648,7 @@ async fn storage_persistence_disablement() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1685,6 +1694,7 @@ async fn storage_persistence_disablement() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;

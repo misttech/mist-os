@@ -508,6 +508,7 @@ impl ActionsTest {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         }
         .native_into_fidl();
         let res = self

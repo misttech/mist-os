@@ -34,6 +34,15 @@ type Child = table {
     /// (Optional, defaults to `NONE`) The action to take if this component
     /// instance terminates unexpectedly.
     5: on_terminate OnTerminate;
+
+    /// Configuration overrides to apply to the child's base configuration.
+    ///
+    /// For a configuration field to be overridden it must be marked as mutable by parent.
+    ///
+    /// Parents must pass `ConfigOverride` values which match the child's declared schema types
+    /// exactly.
+    @available(added=12)
+    6: config_overrides vector<ConfigOverride>:MAX;
 };
 
 /// Describes under what conditions the component may be started.
@@ -56,4 +65,11 @@ type OnTerminate = strict enum {
     /// reason. This is a specialized feature gated by Component Framework
     /// security policy.
     REBOOT = 1;
+};
+
+/// A directive to override the value of a particular configuration field in the child.
+@available(added=12)
+type ConfigOverride = table {
+    1: key ConfigKey;
+    2: value ConfigValue;
 };

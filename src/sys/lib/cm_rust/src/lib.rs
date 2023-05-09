@@ -877,6 +877,7 @@ pub struct ChildDecl {
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
     pub environment: Option<String>,
+    pub config_overrides: Option<Vec<ConfigOverride>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
@@ -932,6 +933,14 @@ pub struct EnvironmentDecl {
     pub resolvers: Vec<ResolverRegistration>,
     pub debug_capabilities: Vec<DebugRegistration>,
     pub stop_timeout_ms: Option<u32>,
+}
+
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[fidl_decl(fidl_table = "fdecl::ConfigOverride")]
+pub struct ConfigOverride {
+    pub key: String,
+    pub value: ConfigValue,
 }
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
@@ -3195,6 +3204,7 @@ mod tests {
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
+                            config_overrides: None,
                         },
                         ChildDecl {
                             name: "gtest".to_string(),
@@ -3202,6 +3212,7 @@ mod tests {
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: Some(fdecl::OnTerminate::None),
                             environment: None,
+                            config_overrides: None,
                         },
                         ChildDecl {
                             name: "echo".to_string(),
@@ -3209,6 +3220,7 @@ mod tests {
                             startup: fdecl::StartupMode::Eager,
                             on_terminate: Some(fdecl::OnTerminate::Reboot),
                             environment: Some("test_env".to_string()),
+                            config_overrides: None,
                         },
                     ],
                     collections: vec![

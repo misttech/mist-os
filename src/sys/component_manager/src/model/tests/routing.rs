@@ -423,6 +423,7 @@ async fn use_in_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -435,6 +436,7 @@ async fn use_in_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -532,6 +534,7 @@ async fn use_in_collection_not_offered() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -629,6 +632,7 @@ async fn dynamic_offer_from_parent() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -651,6 +655,7 @@ async fn dynamic_offer_from_parent() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -732,6 +737,7 @@ async fn dynamic_offer_siblings_same_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -744,6 +750,7 @@ async fn dynamic_offer_siblings_same_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -833,6 +840,7 @@ async fn dynamic_offer_siblings_cross_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -845,6 +853,7 @@ async fn dynamic_offer_siblings_cross_collection() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -931,6 +940,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -943,6 +953,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -975,6 +986,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1056,6 +1068,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1068,6 +1081,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {
@@ -1100,6 +1114,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;
@@ -1193,6 +1208,7 @@ async fn dynamic_offer_to_static_offer() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -1507,6 +1523,7 @@ async fn use_runner_from_environment_in_collection() {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             },
         )
         .await;
@@ -2016,6 +2033,7 @@ async fn use_with_destroyed_parent() {
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
+            config_overrides: None,
         },
     )
     .await;

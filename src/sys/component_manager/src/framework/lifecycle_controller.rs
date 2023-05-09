@@ -355,6 +355,7 @@ mod tests {
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
+                        config_overrides: None,
                     })
                     .add_child(cm_rust::ChildDecl {
                         name: "cant-resolve".to_string(),
@@ -362,6 +363,7 @@ mod tests {
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
+                        config_overrides: None,
                     })
                     .build(),
             ),
@@ -374,6 +376,7 @@ mod tests {
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
+                        config_overrides: None,
                     })
                     .build(),
             ),
@@ -428,6 +431,7 @@ mod tests {
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
+                        config_overrides: None,
                     })
                     .build(),
             ),
@@ -440,6 +444,7 @@ mod tests {
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
+                        config_overrides: None,
                     })
                     .build(),
             ),

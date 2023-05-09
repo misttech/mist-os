@@ -871,6 +871,8 @@ impl RealmNodeState {
                 Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
                 None => None,
             },
+            // TODO(https://fxbug.dev/102211) support config overrides
+            config_overrides: None,
         });
     }
 
@@ -2375,6 +2377,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -2435,6 +2438,7 @@ mod tests {
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
+                            config_overrides: None,
                         }],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -2463,6 +2467,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -2478,6 +2483,7 @@ mod tests {
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
+                            config_overrides: None,
                         }],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -2508,6 +2514,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -2543,6 +2550,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -2750,6 +2758,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -3268,6 +3277,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                     cm_rust::ChildDecl {
                         name: "b".to_string(),
@@ -3275,6 +3285,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                 ],
                 offers: vec![
@@ -3457,6 +3468,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
@@ -3594,6 +3606,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
@@ -3715,6 +3728,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                     cm_rust::ChildDecl {
                         name: "c".to_string(),
@@ -3722,6 +3736,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                 ],
                 offers: vec![
@@ -3935,6 +3950,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                     cm_rust::ChildDecl {
                         name: "c".to_owned(),
@@ -3942,6 +3958,7 @@ mod tests {
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                 ],
                 offers: vec![
@@ -4067,6 +4084,7 @@ mod tests {
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
+                            config_overrides: None,
                         }],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -4544,6 +4562,7 @@ mod tests {
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
                     environment: None,
+                    config_overrides: None,
                 }],
                 offers: vec![cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                     source: cm_rust::OfferSource::Child(cm_rust::ChildRef {

@@ -343,6 +343,7 @@ async fn get_and_replace_realm_decl() -> Result<(), Error> {
         startup: fcdecl::StartupMode::Eager,
         on_terminate: None,
         environment: None,
+        config_overrides: None,
     });
     builder.replace_realm_decl(root_decl.clone()).await?;
     assert_eq!(root_decl, builder.get_realm_decl().await?);
@@ -361,6 +362,7 @@ async fn get_and_replace_component_decl() -> Result<(), Error> {
         startup: fcdecl::StartupMode::Eager,
         on_terminate: None,
         environment: None,
+        config_overrides: None,
     });
     builder.replace_component_decl(&child, child_decl.clone()).await?;
     assert_eq!(child_decl, builder.get_component_decl(&child).await?);

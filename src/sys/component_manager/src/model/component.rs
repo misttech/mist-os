@@ -3228,6 +3228,7 @@ pub mod tests {
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
+                        config_overrides: None,
                     },
                     Some(&collection_decl),
                 )

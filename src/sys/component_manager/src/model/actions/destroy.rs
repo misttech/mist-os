@@ -510,6 +510,7 @@ pub mod tests {
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
+                config_overrides: None,
             };
             assert!(resolved_state.add_child_no_discover(&component_root, &child, None).is_ok());
         }

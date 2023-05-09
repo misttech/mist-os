@@ -221,6 +221,7 @@ pub mod tests {
                     startup: fdecl::StartupMode::Eager,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 })
                 .build(),
         )];
@@ -247,6 +248,7 @@ pub mod tests {
                     startup: fdecl::StartupMode::Eager,
                     environment: None,
                     on_terminate: None,
+                    config_overrides: None,
                 })
                 .build(),
         )];
