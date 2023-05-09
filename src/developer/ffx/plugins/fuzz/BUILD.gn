@@ -20,10 +20,10 @@ ffx_plugin("ffx_fuzz") {
   args_deps = [ "shell_args" ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_rust",

@@ -8,10 +8,11 @@ use {
     anyhow::{anyhow, bail, Context as _, Error, Result},
     errors::ffx_bail,
     ffx_fuzz_args::*,
+    fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_fuzzer as fuzz,
+    fidl_fuchsia_io::OpenFlags,
     fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer},
     futures::{pin_mut, select, FutureExt},
-    selectors::{parse_selector, VerboseError},
     serde_json::json,
     std::cell::RefCell,
     std::fs,
@@ -614,14 +615,16 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     async fn connect_to_manager(&self) -> Result<Manager> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>()
             .context("failed to create proxy for fuchsia.fuzzer.Manager")?;
-        let selector = "core/fuzz-manager:expose:fuchsia.fuzzer.Manager";
-        let parsed =
-            parse_selector::<VerboseError>(selector).context("failed to parse selector")?;
         let result = self
             .remote_control
-            .connect(parsed, server_end.into_channel())
+            .connect_capability(
+                "/core/fuzz-manager",
+                fuzz::ManagerMarker::DEBUG_NAME,
+                server_end.into_channel(),
+                OpenFlags::RIGHT_READABLE,
+            )
             .await
-            .context("fuchsia.developer.remotecontrol/Connect")?;
+            .context("fuchsia.developer.remotecontrol/ConnectCapability")?;
         result.map_err(|e| anyhow!("{:?}", e)).context("failed to connect to fuzz-manager")?;
         Ok(Manager::new(proxy))
     }
@@ -655,7 +658,7 @@ mod test_fixtures {
         crate::reader::test_fixtures::ScriptReader,
         anyhow::{anyhow, Context as _, Result},
         ffx_fuzz_args::FuzzerState,
-        fidl::endpoints::{create_proxy, ServerEnd},
+        fidl::endpoints::{create_proxy, ProtocolMarker, ServerEnd},
         fidl_fuchsia_developer_remotecontrol as rcs,
         fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
         fuchsia_async as fasync,
@@ -805,13 +808,17 @@ mod test_fixtures {
         let mut task = None;
         while let Some(request) = stream.next().await {
             match request {
-                Ok(rcs::RemoteControlRequest::Connect { selector: _, service_chan, responder }) => {
-                    let server_end = ServerEnd::<fuzz::ManagerMarker>::new(service_chan);
-                    let mut response = Ok(rcs::ServiceMatch {
-                        moniker: vec!["moniker".to_string()],
-                        subdir: "subdir".to_string(),
-                        service: "service".to_string(),
-                    });
+                Ok(rcs::RemoteControlRequest::ConnectCapability {
+                    moniker,
+                    capability_name,
+                    flags: _,
+                    server_chan,
+                    responder,
+                }) => {
+                    assert_eq!(moniker, "/core/fuzz-manager");
+                    assert_eq!(capability_name, fuzz::ManagerMarker::DEBUG_NAME);
+                    let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_chan);
+                    let mut response = Ok(());
                     responder.send(&mut response)?;
                     task =
                         Some(create_task(serve_manager(server_end, test.clone()), test.writer()));
