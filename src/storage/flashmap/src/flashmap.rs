@@ -452,7 +452,7 @@ impl Flashmap {
 
                     fidl_areas.sort_by(|a, b| a.offset.cmp(&b.offset));
 
-                    responder.send(&mut fidl_areas.iter_mut()).context("Replying to GetAreas")?;
+                    responder.send(&fidl_areas).context("Replying to GetAreas")?;
                 }
                 FlashmapRequest::GetEraseBlockSize { responder } => {
                     responder
