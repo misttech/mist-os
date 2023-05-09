@@ -14,9 +14,9 @@
 
 #include <netinet/tcp.h>
 
+#include "gtest/gtest.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
 #include "test/syscalls/linux/socket_inet_loopback_test_params.h"
 #include "test/util/capability_util.h"
 #include "test/util/socket_util.h"
@@ -29,18 +29,20 @@ namespace testing {
 
 namespace {
 
-using SocketInetLoopbackIsolatedTest = ::testing::TestWithParam<SocketInetTestParam>;
+using SocketInetLoopbackIsolatedTest =
+    ::testing::TestWithParam<SocketInetTestParam>;
 
 TEST_P(SocketInetLoopbackIsolatedTest, TCPActiveCloseTimeWaitTest) {
   SocketInetTestParam const& param = GetParam();
   sockaddr_storage listen_addr, conn_bound_addr;
   listen_addr = param.listener.addr;
-  SetupTimeWaitClose(&param.listener, &param.connector, false /*reuse*/, false /*accept_close*/,
-                     &listen_addr, &conn_bound_addr);
-  FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  SetupTimeWaitClose(&param.listener, &param.connector, false /*reuse*/,
+                     false /*accept_close*/, &listen_addr, &conn_bound_addr);
+  FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
 
-  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr), param.connector.addr_len),
+  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr),
+                   param.connector.addr_len),
               SyscallFailsWithErrno(EADDRINUSE));
 }
 
@@ -48,13 +50,15 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPActiveCloseTimeWaitReuseTest) {
   SocketInetTestParam const& param = GetParam();
   sockaddr_storage listen_addr, conn_bound_addr;
   listen_addr = param.listener.addr;
-  SetupTimeWaitClose(&param.listener, &param.connector, true /*reuse*/, false /*accept_close*/,
-                     &listen_addr, &conn_bound_addr);
-  FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
-  ASSERT_THAT(setsockopt(conn_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
+  SetupTimeWaitClose(&param.listener, &param.connector, true /*reuse*/,
+                     false /*accept_close*/, &listen_addr, &conn_bound_addr);
+  FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  ASSERT_THAT(setsockopt(conn_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
-  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr), param.connector.addr_len),
+  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr),
+                   param.connector.addr_len),
               SyscallFailsWithErrno(EADDRINUSE));
 }
 
@@ -69,51 +73,58 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPPassiveCloseNoTimeWaitTest) {
   SocketInetTestParam const& param = GetParam();
   sockaddr_storage listen_addr, conn_bound_addr;
   listen_addr = param.listener.addr;
-  SetupTimeWaitClose(&param.listener, &param.connector, false /*reuse*/, true /*accept_close*/,
-                     &listen_addr, &conn_bound_addr);
+  SetupTimeWaitClose(&param.listener, &param.connector, false /*reuse*/,
+                     true /*accept_close*/, &listen_addr, &conn_bound_addr);
 
   // Now bind a new socket and verify that we can immediately rebind the address
   // bound by the conn_fd as it never entered TIME_WAIT.
-  const FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
-  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr), param.connector.addr_len),
+  const FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr),
+                   param.connector.addr_len),
               SyscallSucceeds());
 
-  FileDescriptor listen_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.listener.family(), SOCK_STREAM, IPPROTO_TCP));
-  ASSERT_THAT(bind(listen_fd.get(), AsSockAddr(&listen_addr), param.listener.addr_len),
-              SyscallFailsWithErrno(EADDRINUSE));
+  FileDescriptor listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), param.listener.addr_len),
+      SyscallFailsWithErrno(EADDRINUSE));
 }
 
 TEST_P(SocketInetLoopbackIsolatedTest, TCPPassiveCloseNoTimeWaitReuseTest) {
   SocketInetTestParam const& param = GetParam();
   sockaddr_storage listen_addr, conn_bound_addr;
   listen_addr = param.listener.addr;
-  SetupTimeWaitClose(&param.listener, &param.connector, true /*reuse*/, true /*accept_close*/,
-                     &listen_addr, &conn_bound_addr);
+  SetupTimeWaitClose(&param.listener, &param.connector, true /*reuse*/,
+                     true /*accept_close*/, &listen_addr, &conn_bound_addr);
 
-  FileDescriptor listen_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.listener.family(), SOCK_STREAM, IPPROTO_TCP));
-  ASSERT_THAT(
-      setsockopt(listen_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  ASSERT_THAT(bind(listen_fd.get(), AsSockAddr(&listen_addr), param.listener.addr_len),
+  FileDescriptor listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  ASSERT_THAT(setsockopt(listen_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), param.listener.addr_len),
+      SyscallSucceeds());
   ASSERT_THAT(listen(listen_fd.get(), SOMAXCONN), SyscallSucceeds());
 
   // Now bind and connect  new socket and verify that we can immediately rebind
   // the address bound by the conn_fd as it never entered TIME_WAIT.
-  const FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
-  ASSERT_THAT(setsockopt(conn_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
+  const FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(param.connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  ASSERT_THAT(setsockopt(conn_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
-  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr), param.connector.addr_len),
+  ASSERT_THAT(bind(conn_fd.get(), AsSockAddr(&conn_bound_addr),
+                   param.connector.addr_len),
               SyscallSucceeds());
 
-  uint16_t const port = ASSERT_NO_ERRNO_AND_VALUE(AddrPort(param.listener.family(), listen_addr));
+  uint16_t const port =
+      ASSERT_NO_ERRNO_AND_VALUE(AddrPort(param.listener.family(), listen_addr));
   sockaddr_storage conn_addr = param.connector.addr;
   ASSERT_NO_ERRNO(SetAddrPort(param.connector.family(), &conn_addr, port));
-  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr), param.connector.addr_len),
+  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr),
+                                  param.connector.addr_len),
               SyscallSucceeds());
 }
 
@@ -131,49 +142,55 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPFinWait2Test) {
   TestAddress const& connector = param.connector;
 
   // Create the listening socket.
-  const FileDescriptor listen_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  const FileDescriptor listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
   sockaddr_storage listen_addr = listener.addr;
-  ASSERT_THAT(bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
+      SyscallSucceeds());
   ASSERT_THAT(listen(listen_fd.get(), SOMAXCONN), SyscallSucceeds());
 
   // Get the port bound by the listening socket.
   socklen_t addrlen = listener.addr_len;
-  ASSERT_THAT(getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen), SyscallSucceeds());
+  ASSERT_THAT(getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen),
+              SyscallSucceeds());
 
-  uint16_t const port = ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
+  uint16_t const port =
+      ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
 
   // Connect to the listening socket.
-  FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
 
   // Lower FIN_WAIT2 state to 5 seconds for test.
   constexpr int kTCPLingerTimeout = 5;
-  EXPECT_THAT(setsockopt(conn_fd.get(), IPPROTO_TCP, TCP_LINGER2, &kTCPLingerTimeout,
-                         sizeof(kTCPLingerTimeout)),
+  EXPECT_THAT(setsockopt(conn_fd.get(), IPPROTO_TCP, TCP_LINGER2,
+                         &kTCPLingerTimeout, sizeof(kTCPLingerTimeout)),
               SyscallSucceedsWithValue(0));
 
   sockaddr_storage conn_addr = connector.addr;
   ASSERT_NO_ERRNO(SetAddrPort(connector.family(), &conn_addr, port));
-  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr), connector.addr_len),
+  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr),
+                                  connector.addr_len),
               SyscallSucceeds());
 
   // Accept the connection.
-  auto accepted = ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
+  auto accepted =
+      ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
 
   // Get the address/port bound by the connecting socket.
   sockaddr_storage conn_bound_addr;
   socklen_t conn_addrlen = connector.addr_len;
-  ASSERT_THAT(getsockname(conn_fd.get(), AsSockAddr(&conn_bound_addr), &conn_addrlen),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      getsockname(conn_fd.get(), AsSockAddr(&conn_bound_addr), &conn_addrlen),
+      SyscallSucceeds());
 
   // close the connecting FD to trigger FIN_WAIT2  on the connected fd.
   conn_fd.reset();
 
   // Now bind and connect a new socket.
-  const FileDescriptor conn_fd2 =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  const FileDescriptor conn_fd2 = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
 
   // Disable cooperative saves after this point. As a save between the first
   // bind/connect and the second one can cause the linger timeout timer to
@@ -189,8 +206,9 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPFinWait2Test) {
 
   ds.reset();
 
-  ASSERT_THAT(RetryEINTR(connect)(conn_fd2.get(), AsSockAddr(&conn_addr), conn_addrlen),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      RetryEINTR(connect)(conn_fd2.get(), AsSockAddr(&conn_addr), conn_addrlen),
+      SyscallSucceeds());
 }
 
 // TCPLinger2TimeoutAfterClose creates a pair of connected sockets
@@ -206,44 +224,50 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPLinger2TimeoutAfterClose) {
   TestAddress const& connector = param.connector;
 
   // Create the listening socket.
-  const FileDescriptor listen_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  const FileDescriptor listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
   sockaddr_storage listen_addr = listener.addr;
-  ASSERT_THAT(bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
+      SyscallSucceeds());
   ASSERT_THAT(listen(listen_fd.get(), SOMAXCONN), SyscallSucceeds());
 
   // Get the port bound by the listening socket.
   socklen_t addrlen = listener.addr_len;
-  ASSERT_THAT(getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen), SyscallSucceeds());
+  ASSERT_THAT(getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen),
+              SyscallSucceeds());
 
-  uint16_t const port = ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
+  uint16_t const port =
+      ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
 
   // Connect to the listening socket.
-  FileDescriptor conn_fd =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
 
   sockaddr_storage conn_addr = connector.addr;
   ASSERT_NO_ERRNO(SetAddrPort(connector.family(), &conn_addr, port));
-  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr), connector.addr_len),
+  ASSERT_THAT(RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr),
+                                  connector.addr_len),
               SyscallSucceeds());
 
   // Accept the connection.
-  auto accepted = ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
+  auto accepted =
+      ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
 
   // Get the address/port bound by the connecting socket.
   sockaddr_storage conn_bound_addr;
   socklen_t conn_addrlen = connector.addr_len;
-  ASSERT_THAT(getsockname(conn_fd.get(), AsSockAddr(&conn_bound_addr), &conn_addrlen),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      getsockname(conn_fd.get(), AsSockAddr(&conn_bound_addr), &conn_addrlen),
+      SyscallSucceeds());
 
   // Disable cooperative saves after this point as TCP timers are not restored
   // across a S/R.
   {
     DisableSave ds;
     constexpr int kTCPLingerTimeout = 5;
-    EXPECT_THAT(setsockopt(conn_fd.get(), IPPROTO_TCP, TCP_LINGER2, &kTCPLingerTimeout,
-                           sizeof(kTCPLingerTimeout)),
+    EXPECT_THAT(setsockopt(conn_fd.get(), IPPROTO_TCP, TCP_LINGER2,
+                           &kTCPLingerTimeout, sizeof(kTCPLingerTimeout)),
                 SyscallSucceedsWithValue(0));
 
     // close the connecting FD to trigger FIN_WAIT2  on the connected fd.
@@ -257,18 +281,22 @@ TEST_P(SocketInetLoopbackIsolatedTest, TCPLinger2TimeoutAfterClose) {
 
   // Now bind and connect a new socket and verify that we can immediately
   // rebind the address bound by the conn_fd as it never entered TIME_WAIT.
-  const FileDescriptor conn_fd2 =
-      ASSERT_NO_ERRNO_AND_VALUE(Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+  const FileDescriptor conn_fd2 = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
 
-  ASSERT_THAT(bind(conn_fd2.get(), AsSockAddr(&conn_bound_addr), conn_addrlen), SyscallSucceeds());
-  ASSERT_THAT(RetryEINTR(connect)(conn_fd2.get(), AsSockAddr(&conn_addr), conn_addrlen),
+  ASSERT_THAT(bind(conn_fd2.get(), AsSockAddr(&conn_bound_addr), conn_addrlen),
               SyscallSucceeds());
+  ASSERT_THAT(
+      RetryEINTR(connect)(conn_fd2.get(), AsSockAddr(&conn_addr), conn_addrlen),
+      SyscallSucceeds());
 }
 
-INSTANTIATE_TEST_SUITE_P(All, SocketInetLoopbackIsolatedTest, SocketInetLoopbackTestValues(),
+INSTANTIATE_TEST_SUITE_P(All, SocketInetLoopbackIsolatedTest,
+                         SocketInetLoopbackTestValues(),
                          DescribeSocketInetTestParam);
 
-using SocketMultiProtocolInetLoopbackIsolatedTest = ::testing::TestWithParam<ProtocolTestParam>;
+using SocketMultiProtocolInetLoopbackIsolatedTest =
+    ::testing::TestWithParam<ProtocolTestParam>;
 
 TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, BindToDeviceReusePort) {
   // setsockopt(SO_BINDTODEVICE) requires CAP_NET_RAW.
@@ -277,35 +305,43 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, BindToDeviceReusePort) {
   ProtocolTestParam const& param = GetParam();
   TestAddress const& test_addr = V4Loopback();
 
-  auto socket1 = ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  auto socket2 = ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
+  auto socket1 =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
+  auto socket2 =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
 
   const char kLoopbackDeviceName[] = "lo";
 
   // Bind socket1 with REUSEPORT and BINDTODEVICE.
-  ASSERT_THAT(setsockopt(socket1.get(), SOL_SOCKET, SO_REUSEPORT, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(socket1.get(), SOL_SOCKET, SO_REUSEPORT, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
-  ASSERT_THAT(setsockopt(socket1.get(), SOL_SOCKET, SO_BINDTODEVICE, kLoopbackDeviceName,
-                         strlen(kLoopbackDeviceName)),
+  ASSERT_THAT(setsockopt(socket1.get(), SOL_SOCKET, SO_BINDTODEVICE,
+                         kLoopbackDeviceName, strlen(kLoopbackDeviceName)),
               SyscallSucceeds());
 
   // Bind the first socket to the loopback and take note of the selected port.
   auto addr = V4Loopback();
-  ASSERT_THAT(bind(socket1.get(), AsSockAddr(&addr.addr), addr.addr_len), SyscallSucceeds());
+  ASSERT_THAT(bind(socket1.get(), AsSockAddr(&addr.addr), addr.addr_len),
+              SyscallSucceeds());
   socklen_t addr_len = addr.addr_len;
-  ASSERT_THAT(getsockname(socket1.get(), AsSockAddr(&addr.addr), &addr_len), SyscallSucceeds());
+  ASSERT_THAT(getsockname(socket1.get(), AsSockAddr(&addr.addr), &addr_len),
+              SyscallSucceeds());
   EXPECT_EQ(addr_len, addr.addr_len);
 
   // Bind socket2 to the same device and address as socket1.
-  ASSERT_THAT(setsockopt(socket2.get(), SOL_SOCKET, SO_BINDTODEVICE, kLoopbackDeviceName,
-                         strlen(kLoopbackDeviceName)),
+  ASSERT_THAT(setsockopt(socket2.get(), SOL_SOCKET, SO_BINDTODEVICE,
+                         kLoopbackDeviceName, strlen(kLoopbackDeviceName)),
               SyscallSucceeds());
-  ASSERT_THAT(setsockopt(socket2.get(), SOL_SOCKET, SO_REUSEPORT, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(socket2.get(), SOL_SOCKET, SO_REUSEPORT, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
-  ASSERT_THAT(bind(socket2.get(), AsSockAddr(&addr.addr), addr.addr_len), SyscallSucceeds());
+  ASSERT_THAT(bind(socket2.get(), AsSockAddr(&addr.addr), addr.addr_len),
+              SyscallSucceeds());
 }
 
-TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4EphemeralPortReservedReuseAddr) {
+TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest,
+       V4EphemeralPortReservedReuseAddr) {
   ProtocolTestParam const& param = GetParam();
 
   // Bind the v4 loopback on a v4 socket.
@@ -314,10 +350,12 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4EphemeralPortReservedReuse
   const FileDescriptor bound_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
 
-  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
 
-  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len), SyscallSucceeds());
+  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len),
+              SyscallSucceeds());
 
   // Listen iff TCP.
   if (param.type == SOCK_STREAM) {
@@ -326,24 +364,27 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4EphemeralPortReservedReuse
 
   // Get the port that we bound.
   socklen_t bound_addr_len = test_addr.addr_len;
-  ASSERT_THAT(getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
+      SyscallSucceeds());
 
   // Connect to bind an ephemeral port.
   const FileDescriptor connected_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
 
-  ASSERT_THAT(
-      setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
+  ASSERT_THAT(setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
+              SyscallSucceeds());
 
-  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr), bound_addr_len),
+  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr),
+                                  bound_addr_len),
               SyscallSucceeds());
 
   // Get the ephemeral port.
   sockaddr_storage connected_addr = {};
   socklen_t connected_addr_len = sizeof(connected_addr);
-  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr), &connected_addr_len),
+  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr),
+                          &connected_addr_len),
               SyscallSucceeds());
   uint16_t const ephemeral_port =
       ASSERT_NO_ERRNO_AND_VALUE(AddrPort(test_addr.family(), connected_addr));
@@ -354,14 +395,16 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4EphemeralPortReservedReuse
   // Verify that the ephemeral port is not reserved.
   const FileDescriptor checking_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(
-      setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  EXPECT_THAT(bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+  ASSERT_THAT(setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
               SyscallSucceeds());
+  EXPECT_THAT(
+      bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+      SyscallSucceeds());
 }
 
-TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4MappedEphemeralPortReservedReuseAddr) {
+TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest,
+       V4MappedEphemeralPortReservedReuseAddr) {
   ProtocolTestParam const& param = GetParam();
 
   // Bind the v4 loopback on a dual stack socket.
@@ -369,9 +412,11 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4MappedEphemeralPortReserve
   sockaddr_storage bound_addr = test_addr.addr;
   const FileDescriptor bound_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len), SyscallSucceeds());
+  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len),
+              SyscallSucceeds());
 
-  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
 
   // Listen iff TCP.
@@ -381,22 +426,25 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4MappedEphemeralPortReserve
 
   // Get the port that we bound.
   socklen_t bound_addr_len = test_addr.addr_len;
-  ASSERT_THAT(getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
+      SyscallSucceeds());
 
   // Connect to bind an ephemeral port.
   const FileDescriptor connected_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(
-      setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr), bound_addr_len),
+  ASSERT_THAT(setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
+              SyscallSucceeds());
+  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr),
+                                  bound_addr_len),
               SyscallSucceeds());
 
   // Get the ephemeral port.
   sockaddr_storage connected_addr = {};
   socklen_t connected_addr_len = sizeof(connected_addr);
-  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr), &connected_addr_len),
+  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr),
+                          &connected_addr_len),
               SyscallSucceeds());
   uint16_t const ephemeral_port =
       ASSERT_NO_ERRNO_AND_VALUE(AddrPort(test_addr.family(), connected_addr));
@@ -407,14 +455,16 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V4MappedEphemeralPortReserve
   // Verify that the ephemeral port is not reserved.
   const FileDescriptor checking_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(
-      setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  EXPECT_THAT(bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+  ASSERT_THAT(setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
               SyscallSucceeds());
+  EXPECT_THAT(
+      bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+      SyscallSucceeds());
 }
 
-TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V6EphemeralPortReservedReuseAddr) {
+TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest,
+       V6EphemeralPortReservedReuseAddr) {
   ProtocolTestParam const& param = GetParam();
 
   // Bind the v6 loopback on a dual stack socket.
@@ -422,8 +472,10 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V6EphemeralPortReservedReuse
   sockaddr_storage bound_addr = test_addr.addr;
   const FileDescriptor bound_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len), SyscallSucceeds());
-  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(bind(bound_fd.get(), AsSockAddr(&bound_addr), test_addr.addr_len),
+              SyscallSucceeds());
+  ASSERT_THAT(setsockopt(bound_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
 
   // Listen iff TCP.
@@ -433,22 +485,25 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V6EphemeralPortReservedReuse
 
   // Get the port that we bound.
   socklen_t bound_addr_len = test_addr.addr_len;
-  ASSERT_THAT(getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      getsockname(bound_fd.get(), AsSockAddr(&bound_addr), &bound_addr_len),
+      SyscallSucceeds());
 
   // Connect to bind an ephemeral port.
   const FileDescriptor connected_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(
-      setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr), bound_addr_len),
+  ASSERT_THAT(setsockopt(connected_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
+              SyscallSucceeds());
+  ASSERT_THAT(RetryEINTR(connect)(connected_fd.get(), AsSockAddr(&bound_addr),
+                                  bound_addr_len),
               SyscallSucceeds());
 
   // Get the ephemeral port.
   sockaddr_storage connected_addr = {};
   socklen_t connected_addr_len = sizeof(connected_addr);
-  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr), &connected_addr_len),
+  ASSERT_THAT(getsockname(connected_fd.get(), AsSockAddr(&connected_addr),
+                          &connected_addr_len),
               SyscallSucceeds());
   uint16_t const ephemeral_port =
       ASSERT_NO_ERRNO_AND_VALUE(AddrPort(test_addr.family(), connected_addr));
@@ -459,14 +514,16 @@ TEST_P(SocketMultiProtocolInetLoopbackIsolatedTest, V6EphemeralPortReservedReuse
   // Verify that the ephemeral port is not reserved.
   const FileDescriptor checking_fd =
       ASSERT_NO_ERRNO_AND_VALUE(Socket(test_addr.family(), param.type, 0));
-  ASSERT_THAT(
-      setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)),
-      SyscallSucceeds());
-  EXPECT_THAT(bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+  ASSERT_THAT(setsockopt(checking_fd.get(), SOL_SOCKET, SO_REUSEADDR,
+                         &kSockOptOn, sizeof(kSockOptOn)),
               SyscallSucceeds());
+  EXPECT_THAT(
+      bind(checking_fd.get(), AsSockAddr(&connected_addr), connected_addr_len),
+      SyscallSucceeds());
 }
 
-INSTANTIATE_TEST_SUITE_P(AllFamilies, SocketMultiProtocolInetLoopbackIsolatedTest,
+INSTANTIATE_TEST_SUITE_P(AllFamilies,
+                         SocketMultiProtocolInetLoopbackIsolatedTest,
                          ProtocolTestValues(), DescribeProtocolTestParam);
 
 }  // namespace

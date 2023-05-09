@@ -36,10 +36,10 @@
 #include <linux/sockios.h>
 #endif
 
+#include "gtest/gtest.h"
 #include "absl/base/macros.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
 #include "test/syscalls/linux/ip_socket_test_util.h"
 #include "test/syscalls/linux/unix_domain_socket_test_util.h"
 #include "test/util/file_descriptor.h"
@@ -112,7 +112,8 @@ void BlockUntilPollin(int fd) {
       .fd = fd,
       .events = POLLIN,
   };
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, kInfiniteTimeout), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, kInfiniteTimeout),
+              SyscallSucceedsWithValue(1));
   ASSERT_EQ(pfd.revents, POLLIN);
 }
 
@@ -151,11 +152,13 @@ void SetPort(struct sockaddr_storage* addr, uint16_t port) {
 void UdpSocketTest::SetUp() {
   addrlen_ = GetAddrLength();
 
-  bind_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  bind_ =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
   memset(&bind_addr_storage_, 0, sizeof(bind_addr_storage_));
   bind_addr_ = AsSockAddr(&bind_addr_storage_);
 
-  sock_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  sock_ =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
 }
 
 PosixError UdpSocketTest::BindLoopback() {
@@ -179,7 +182,9 @@ PosixError UdpSocketTest::BindSocket(int socket, struct sockaddr* addr) {
   RETURN_ERROR_IF_SYSCALL_FAIL(getsockname(socket, addr, &len));
 
   if (addrlen_ != len) {
-    return PosixError(EINVAL, absl::StrFormat("getsockname len: %u expected: %u", len, addrlen_));
+    return PosixError(
+        EINVAL,
+        absl::StrFormat("getsockname len: %u expected: %u", len, addrlen_));
   }
   return PosixError(0);
 }
@@ -254,7 +259,8 @@ void UdpSocketTest::Disconnect(int sockfd) {
 }
 
 TEST_P(UdpSocketTest, Creation) {
-  FileDescriptor sock = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  FileDescriptor sock =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
   EXPECT_THAT(close(sock.release()), SyscallSucceeds());
 
   sock = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, 0));
@@ -267,14 +273,16 @@ TEST_P(UdpSocketTest, Getsockname) {
   // Check that we're not bound.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
   struct sockaddr_storage any = InetAnyAddr();
   EXPECT_EQ(memcmp(&addr, AsSockAddr(&any), addrlen_), 0);
 
   ASSERT_NO_ERRNO(BindLoopback());
 
-  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
 
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(memcmp(&addr, bind_addr_, addrlen_), 0);
@@ -293,7 +301,8 @@ TEST_P(UdpSocketTest, Getpeername) {
   ASSERT_THAT(connect(sock_.get(), bind_addr_, addrlen_), SyscallSucceeds());
 
   addrlen = sizeof(addr);
-  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(memcmp(&addr, bind_addr_, addrlen_), 0);
 }
@@ -303,9 +312,11 @@ TEST_P(UdpSocketTest, SendNotConnected) {
 
   // Do send & write, they must fail.
   char buf[512];
-  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallFailsWithErrno(EDESTADDRREQ));
+  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallFailsWithErrno(EDESTADDRREQ));
 
-  EXPECT_THAT(write(sock_.get(), buf, sizeof(buf)), SyscallFailsWithErrno(EDESTADDRREQ));
+  EXPECT_THAT(write(sock_.get(), buf, sizeof(buf)),
+              SyscallFailsWithErrno(EDESTADDRREQ));
 
   // Use sendto.
   ASSERT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, bind_addr_, addrlen_),
@@ -314,7 +325,8 @@ TEST_P(UdpSocketTest, SendNotConnected) {
   // Check that we're bound now.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_NE(*Port(&addr), 0);
 }
@@ -328,7 +340,8 @@ TEST_P(UdpSocketTest, ConnectBinds) {
   // Check that we're bound now.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_NE(*Port(&addr), 0);
 }
@@ -343,12 +356,14 @@ TEST_P(UdpSocketTest, Bind) {
   ASSERT_NO_ERRNO(BindLoopback());
 
   // Try to bind again.
-  EXPECT_THAT(bind(bind_.get(), bind_addr_, addrlen_), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(bind(bind_.get(), bind_addr_, addrlen_),
+              SyscallFailsWithErrno(EINVAL));
 
   // Check that we're still bound to the original address.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(bind_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(memcmp(&addr, bind_addr_, addrlen_), 0);
 }
@@ -357,7 +372,8 @@ TEST_P(UdpSocketTest, BindInUse) {
   ASSERT_NO_ERRNO(BindLoopback());
 
   // Try to bind again.
-  EXPECT_THAT(bind(sock_.get(), bind_addr_, addrlen_), SyscallFailsWithErrno(EADDRINUSE));
+  EXPECT_THAT(bind(sock_.get(), bind_addr_, addrlen_),
+              SyscallFailsWithErrno(EADDRINUSE));
 }
 
 TEST_P(UdpSocketTest, ConnectWriteToInvalidPort) {
@@ -368,7 +384,8 @@ TEST_P(UdpSocketTest, ConnectWriteToInvalidPort) {
   struct sockaddr_storage addr_storage = InetLoopbackAddr();
   socklen_t addrlen = sizeof(addr_storage);
   struct sockaddr* addr = AsSockAddr(&addr_storage);
-  FileDescriptor s = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  FileDescriptor s =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
   ASSERT_THAT(bind(s.get(), addr, addrlen), SyscallSucceeds());
   ASSERT_THAT(getsockname(s.get(), addr, &addrlen), SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
@@ -389,12 +406,14 @@ TEST_P(UdpSocketTest, ConnectWriteToInvalidPort) {
 
   // Poll to make sure we get the ICMP error back.
   struct pollfd pfd = {sock_.get(), POLLERR, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()),
+              SyscallSucceedsWithValue(1));
 
   // Now verify that we got an ICMP error back of ECONNREFUSED.
   int err;
   socklen_t optlen = sizeof(err);
-  ASSERT_THAT(getsockopt(sock_.get(), SOL_SOCKET, SO_ERROR, &err, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(sock_.get(), SOL_SOCKET, SO_ERROR, &err, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(err, ECONNREFUSED);
   ASSERT_EQ(optlen, sizeof(err));
 }
@@ -407,7 +426,8 @@ TEST_P(UdpSocketTest, ConnectSimultaneousWriteToInvalidPort) {
   struct sockaddr_storage addr_storage = InetLoopbackAddr();
   socklen_t addrlen = sizeof(addr_storage);
   struct sockaddr* addr = AsSockAddr(&addr_storage);
-  FileDescriptor s = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  FileDescriptor s =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
   ASSERT_THAT(bind(s.get(), addr, addrlen), SyscallSucceeds());
   ASSERT_THAT(getsockname(s.get(), addr, &addrlen), SyscallSucceeds());
   EXPECT_EQ(addrlen, addrlen_);
@@ -415,7 +435,9 @@ TEST_P(UdpSocketTest, ConnectSimultaneousWriteToInvalidPort) {
   ASSERT_THAT(close(s.release()), SyscallSucceeds());
 
   // Now connect to the port that we just released.
-  ScopedThread t([&] { ASSERT_THAT(connect(sock_.get(), addr, addrlen_), SyscallSucceeds()); });
+  ScopedThread t([&] {
+    ASSERT_THAT(connect(sock_.get(), addr, addrlen_), SyscallSucceeds());
+  });
 
   char buf[512];
   RandomizeBuffer(buf, sizeof(buf));
@@ -451,15 +473,17 @@ TEST_P(UdpSocketTest, ReceiveAfterDisconnect) {
 
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
-    EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+    EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen),
+                SyscallSucceeds());
     EXPECT_EQ(addrlen, addrlen_);
 
     // Send from sock to bind_.
     char buf[512];
     RandomizeBuffer(buf, sizeof(buf));
 
-    ASSERT_THAT(sendto(bind_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), addrlen),
-                SyscallSucceedsWithValue(sizeof(buf)));
+    ASSERT_THAT(
+        sendto(bind_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), addrlen),
+        SyscallSucceedsWithValue(sizeof(buf)));
 
     // Receive the data.
     char received[sizeof(buf)];
@@ -470,7 +494,8 @@ TEST_P(UdpSocketTest, ReceiveAfterDisconnect) {
     // Disconnect sock_.
     struct sockaddr unspec = {};
     unspec.sa_family = AF_UNSPEC;
-    ASSERT_THAT(connect(sock_.get(), &unspec, sizeof(unspec.sa_family)), SyscallSucceeds());
+    ASSERT_THAT(connect(sock_.get(), &unspec, sizeof(unspec.sa_family)),
+                SyscallSucceeds());
   }
 }
 
@@ -481,17 +506,20 @@ TEST_P(UdpSocketTest, Connect) {
   // Check that we're connected to the right peer.
   struct sockaddr_storage peer;
   socklen_t peerlen = sizeof(peer);
-  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen), SyscallSucceeds());
+  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen),
+              SyscallSucceeds());
   EXPECT_EQ(peerlen, addrlen_);
   EXPECT_EQ(memcmp(&peer, bind_addr_, addrlen_), 0);
 
   // Try to bind after connect.
   struct sockaddr_storage any = InetAnyAddr();
-  EXPECT_THAT(bind(sock_.get(), AsSockAddr(&any), addrlen_), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(bind(sock_.get(), AsSockAddr(&any), addrlen_),
+              SyscallFailsWithErrno(EINVAL));
 
   struct sockaddr_storage bind2_storage = InetLoopbackAddr();
   struct sockaddr* bind2_addr = AsSockAddr(&bind2_storage);
-  FileDescriptor bind2 = ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
+  FileDescriptor bind2 =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(GetParam(), SOCK_DGRAM, IPPROTO_UDP));
   ASSERT_NO_ERRNO(BindSocket(bind2.get(), bind2_addr));
 
   // Try to connect again.
@@ -499,7 +527,8 @@ TEST_P(UdpSocketTest, Connect) {
 
   // Check that peer name changed.
   peerlen = sizeof(peer);
-  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen), SyscallSucceeds());
+  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen),
+              SyscallSucceeds());
   EXPECT_EQ(peerlen, addrlen_);
   EXPECT_EQ(memcmp(&peer, bind2_addr, addrlen_), 0);
 }
@@ -509,7 +538,8 @@ TEST_P(UdpSocketTest, ConnectAnyZero) {
   SKIP_IF(IsRunningOnGvisor());
 
   struct sockaddr_storage any = InetAnyAddr();
-  EXPECT_THAT(connect(sock_.get(), AsSockAddr(&any), addrlen_), SyscallSucceeds());
+  EXPECT_THAT(connect(sock_.get(), AsSockAddr(&any), addrlen_),
+              SyscallSucceeds());
 
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
@@ -523,14 +553,16 @@ TEST_P(UdpSocketTest, ConnectAnyWithPort) {
 
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
 }
 
 TEST_P(UdpSocketTest, DisconnectAfterConnectAny) {
   // TODO(138658473): Enable when we can connect to port 0 with gVisor.
   SKIP_IF(IsRunningOnGvisor());
   struct sockaddr_storage any = InetAnyAddr();
-  EXPECT_THAT(connect(sock_.get(), AsSockAddr(&any), addrlen_), SyscallSucceeds());
+  EXPECT_THAT(connect(sock_.get(), AsSockAddr(&any), addrlen_),
+              SyscallSucceeds());
 
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
@@ -546,7 +578,8 @@ TEST_P(UdpSocketTest, DisconnectAfterConnectAnyWithPort) {
 
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  ASSERT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  ASSERT_THAT(getpeername(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
 
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(*Port(&bind_addr_storage_), *Port(&addr));
@@ -568,35 +601,42 @@ TEST_P(UdpSocketTest, DisconnectAfterBind) {
 
   struct sockaddr_storage unspec = {};
   unspec.ss_family = AF_UNSPEC;
-  EXPECT_THAT(connect(sock_.get(), AsSockAddr(&unspec), sizeof(unspec.ss_family)),
-              SyscallSucceeds());
+  EXPECT_THAT(
+      connect(sock_.get(), AsSockAddr(&unspec), sizeof(unspec.ss_family)),
+      SyscallSucceeds());
 
   // Check that we're still bound.
   socklen_t addrlen = sizeof(unspec);
-  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&unspec), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&unspec), &addrlen),
+              SyscallSucceeds());
 
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(memcmp(addr, &unspec, addrlen_), 0);
 
   addrlen = sizeof(addr);
-  EXPECT_THAT(getpeername(sock_.get(), addr, &addrlen), SyscallFailsWithErrno(ENOTCONN));
+  EXPECT_THAT(getpeername(sock_.get(), addr, &addrlen),
+              SyscallFailsWithErrno(ENOTCONN));
 }
 
-void ConnectThenDisconnect(const FileDescriptor& sock, const sockaddr* bind_addr,
+void ConnectThenDisconnect(const FileDescriptor& sock,
+                           const sockaddr* bind_addr,
                            const socklen_t expected_addrlen) {
   // Connect the bound socket.
-  ASSERT_THAT(connect(sock.get(), bind_addr, expected_addrlen), SyscallSucceeds());
+  ASSERT_THAT(connect(sock.get(), bind_addr, expected_addrlen),
+              SyscallSucceeds());
 
   // Disconnect.
   {
     sockaddr_storage unspec = {.ss_family = AF_UNSPEC};
-    ASSERT_THAT(connect(sock.get(), AsSockAddr(&unspec), sizeof(unspec)), SyscallSucceeds());
+    ASSERT_THAT(connect(sock.get(), AsSockAddr(&unspec), sizeof(unspec)),
+                SyscallSucceeds());
   }
   {
     // Check that we're not in a bound state.
     sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
-    ASSERT_THAT(getsockname(sock.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+    ASSERT_THAT(getsockname(sock.get(), AsSockAddr(&addr), &addrlen),
+                SyscallSucceeds());
     ASSERT_EQ(addrlen, expected_addrlen);
     // Everything should be the zero value except the address family.
     sockaddr_storage expected = {
@@ -619,7 +659,8 @@ TEST_P(UdpSocketTest, DisconnectAfterBindToUnspecAndConnect) {
 
   sockaddr_storage unspec = {.ss_family = AF_UNSPEC};
   int bind_res = bind(sock_.get(), AsSockAddr(&unspec), sizeof(unspec));
-  if ((!IsRunningOnGvisor() || IsRunningWithHostinet()) && GetParam() == AF_INET) {
+  if ((!IsRunningOnGvisor() || IsRunningWithHostinet()) &&
+      GetParam() == AF_INET) {
     // Linux allows this for undocumented compatibility reasons:
     // https://github.com/torvalds/linux/commit/29c486df6a208432b370bd4be99ae1369ede28d8.
     //
@@ -682,7 +723,8 @@ TEST_P(UdpSocketTest, DisconnectAfterBindToAny) {
   // Check that we're still bound.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+  EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen),
+              SyscallSucceeds());
 
   EXPECT_EQ(addrlen, addrlen_);
   EXPECT_EQ(memcmp(&addr, any, addrlen), 0);
@@ -707,14 +749,16 @@ TEST_P(UdpSocketTest, Disconnect) {
     // Check that we're connected to the right peer.
     struct sockaddr_storage peer;
     socklen_t peerlen = sizeof(peer);
-    EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen), SyscallSucceeds());
+    EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen),
+                SyscallSucceeds());
     EXPECT_EQ(peerlen, addrlen_);
     EXPECT_EQ(memcmp(&peer, bind_addr_, addrlen_), 0);
 
     // Try to disconnect.
     struct sockaddr_storage addr = {};
     addr.ss_family = AF_UNSPEC;
-    EXPECT_THAT(connect(sock_.get(), AsSockAddr(&addr), sizeof(addr.ss_family)), SyscallSucceeds());
+    EXPECT_THAT(connect(sock_.get(), AsSockAddr(&addr), sizeof(addr.ss_family)),
+                SyscallSucceeds());
 
     peerlen = sizeof(peer);
     EXPECT_THAT(getpeername(sock_.get(), AsSockAddr(&peer), &peerlen),
@@ -722,7 +766,8 @@ TEST_P(UdpSocketTest, Disconnect) {
 
     // Check that we're still bound.
     socklen_t addrlen = sizeof(addr);
-    EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen), SyscallSucceeds());
+    EXPECT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &addrlen),
+                SyscallSucceeds());
     EXPECT_EQ(addrlen, addrlen_);
     EXPECT_EQ(*Port(&addr), *Port(&any_storage));
   }
@@ -731,7 +776,8 @@ TEST_P(UdpSocketTest, Disconnect) {
 TEST_P(UdpSocketTest, ConnectBadAddress) {
   struct sockaddr addr = {};
   addr.sa_family = GetParam();
-  ASSERT_THAT(connect(sock_.get(), &addr, sizeof(addr.sa_family)), SyscallFailsWithErrno(EINVAL));
+  ASSERT_THAT(connect(sock_.get(), &addr, sizeof(addr.sa_family)),
+              SyscallFailsWithErrno(EINVAL));
 }
 
 TEST_P(UdpSocketTest, SendToAddressOtherThanConnected) {
@@ -761,26 +807,31 @@ TEST_P(UdpSocketTest, ConnectAndSendNoReceiver) {
   ASSERT_THAT(close(bind_.release()), SyscallSucceeds());
 
   char buf[512];
-  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallSucceedsWithValue(sizeof(buf)));
+  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallSucceedsWithValue(sizeof(buf)));
 
   // Poll to make sure we get the ICMP error back before issuing more writes.
   struct pollfd pfd = {sock_.get(), POLLERR, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()),
+              SyscallSucceedsWithValue(1));
 
   // Next write should fail with ECONNREFUSED due to the ICMP error generated in
   // response to the previous write.
-  ASSERT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallFailsWithErrno(ECONNREFUSED));
+  ASSERT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallFailsWithErrno(ECONNREFUSED));
 
   // The next write should succeed again since the last write call would have
   // retrieved and cleared the socket error.
   ASSERT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallSucceeds());
 
   // Poll to make sure we get the ICMP error back before issuing more writes.
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, IcmpTimeoutMillis()),
+              SyscallSucceedsWithValue(1));
 
   // Next write should fail with ECONNREFUSED due to the ICMP error generated in
   // response to the previous write.
-  ASSERT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallFailsWithErrno(ECONNREFUSED));
+  ASSERT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallFailsWithErrno(ECONNREFUSED));
 }
 
 #ifdef __linux__
@@ -788,17 +839,20 @@ TEST_P(UdpSocketTest, RecvErrorConnRefusedOtherAFSockOpt) {
   int got;
   socklen_t got_len = sizeof(got);
   if (GetParam() == AF_INET) {
-    EXPECT_THAT(setsockopt(sock_.get(), SOL_IPV6, IPV6_RECVERR, &kSockOptOn, sizeof(kSockOptOn)),
+    EXPECT_THAT(setsockopt(sock_.get(), SOL_IPV6, IPV6_RECVERR, &kSockOptOn,
+                           sizeof(kSockOptOn)),
                 SyscallFailsWithErrno(ENOPROTOOPT));
     EXPECT_THAT(getsockopt(sock_.get(), SOL_IPV6, IPV6_RECVERR, &got, &got_len),
                 SyscallFailsWithErrno(ENOTSUP));
     ASSERT_THAT(got_len, sizeof(got));
     return;
   }
-  ASSERT_THAT(setsockopt(sock_.get(), SOL_IP, IP_RECVERR, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(sock_.get(), SOL_IP, IP_RECVERR, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   {
-    EXPECT_THAT(getsockopt(sock_.get(), SOL_IP, IP_RECVERR, &got, &got_len), SyscallSucceeds());
+    EXPECT_THAT(getsockopt(sock_.get(), SOL_IP, IP_RECVERR, &got, &got_len),
+                SyscallSucceeds());
     ASSERT_THAT(got_len, sizeof(got));
     EXPECT_THAT(got, kSockOptOn);
   }
@@ -814,11 +868,13 @@ TEST_P(UdpSocketTest, RecvErrorConnRefusedOtherAFSockOpt) {
 
   // Send to an unbound port which should trigger a port unreachable error.
   char buf[1];
-  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallSucceedsWithValue(sizeof(buf)));
+  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallSucceedsWithValue(sizeof(buf)));
 
   // Should not have the error since we did not set the right socket option.
   msghdr msg = {};
-  EXPECT_THAT(recvmsg(sock_.get(), &msg, MSG_ERRQUEUE), SyscallFailsWithErrno(EAGAIN));
+  EXPECT_THAT(recvmsg(sock_.get(), &msg, MSG_ERRQUEUE),
+              SyscallFailsWithErrno(EAGAIN));
 }
 
 TEST_P(UdpSocketTest, RecvErrorConnRefused) {
@@ -837,11 +893,13 @@ TEST_P(UdpSocketTest, RecvErrorConnRefused) {
     opt_level = SOL_IPV6;
     opt_type = IPV6_RECVERR;
   }
-  ASSERT_THAT(setsockopt(sock_.get(), opt_level, opt_type, &v, optlen), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(sock_.get(), opt_level, opt_type, &v, optlen),
+              SyscallSucceeds());
   {
     int got;
     socklen_t got_len = sizeof(got);
-    EXPECT_THAT(getsockopt(sock_.get(), opt_level, opt_type, &got, &got_len), SyscallSucceeds());
+    EXPECT_THAT(getsockopt(sock_.get(), opt_level, opt_type, &got, &got_len),
+                SyscallSucceeds());
     ASSERT_THAT(got_len, sizeof(got));
     EXPECT_THAT(got, kSockOptOn);
   }
@@ -854,7 +912,8 @@ TEST_P(UdpSocketTest, RecvErrorConnRefused) {
   char buf[kBufLen];
   RandomizeBuffer(buf, sizeof(buf));
   // Send from sock_ to an unbound port. This should cause ECONNREFUSED.
-  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0), SyscallSucceedsWithValue(sizeof(buf)));
+  EXPECT_THAT(send(sock_.get(), buf, sizeof(buf), 0),
+              SyscallSucceedsWithValue(sizeof(buf)));
 
   // Dequeue error using recvmsg(MSG_ERRQUEUE).
   char got[kBufLen];
@@ -874,7 +933,8 @@ TEST_P(UdpSocketTest, RecvErrorConnRefused) {
   msg.msg_controllen = control_buf_len;
   msg.msg_name = reinterpret_cast<void*>(&remote);
   msg.msg_namelen = addrlen_;
-  ASSERT_THAT(recvmsg(sock_.get(), &msg, MSG_ERRQUEUE), SyscallSucceedsWithValue(kBufLen));
+  ASSERT_THAT(recvmsg(sock_.get(), &msg, MSG_ERRQUEUE),
+              SyscallSucceedsWithValue(kBufLen));
 
   // Check the contents of msg.
   EXPECT_EQ(memcmp(got, buf, sizeof(buf)), 0);  // iovec check
@@ -889,7 +949,8 @@ TEST_P(UdpSocketTest, RecvErrorConnRefused) {
   EXPECT_EQ(cmsg->cmsg_type, opt_type);
 
   // Check the contents of socket error.
-  struct sock_extended_err* sock_err = (struct sock_extended_err*)CMSG_DATA(cmsg);
+  struct sock_extended_err* sock_err =
+      (struct sock_extended_err*)CMSG_DATA(cmsg);
   EXPECT_EQ(sock_err->ee_errno, ECONNREFUSED);
   if (GetParam() == AF_INET) {
     EXPECT_EQ(sock_err->ee_origin, SO_EE_ORIGIN_ICMP);
@@ -904,7 +965,8 @@ TEST_P(UdpSocketTest, RecvErrorConnRefused) {
   // Now verify that the socket error was cleared by recvmsg(MSG_ERRQUEUE).
   int err;
   optlen = sizeof(err);
-  ASSERT_THAT(getsockopt(sock_.get(), SOL_SOCKET, SO_ERROR, &err, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(sock_.get(), SOL_SOCKET, SO_ERROR, &err, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(err, 0);
   ASSERT_EQ(optlen, sizeof(err));
 }
@@ -929,11 +991,13 @@ TEST_P(UdpSocketTest, ZerolengthWriteAllowed) {
   ASSERT_THAT(write(bind_.get(), buf, 0), SyscallSucceedsWithValue(0));
 
   struct pollfd pfd = {sock_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout*/ 1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout*/ 1000),
+              SyscallSucceedsWithValue(1));
 
   // Receive the packet.
   char received[3];
-  EXPECT_THAT(read(sock_.get(), received, sizeof(received)), SyscallSucceedsWithValue(0));
+  EXPECT_THAT(read(sock_.get(), received, sizeof(received)),
+              SyscallSucceedsWithValue(0));
 }
 
 TEST_P(UdpSocketTest, ZerolengthWriteAllowedNonBlockRead) {
@@ -953,19 +1017,23 @@ TEST_P(UdpSocketTest, ZerolengthWriteAllowedNonBlockRead) {
   // Set sock to non-blocking.
   int opts = 0;
   ASSERT_THAT(opts = fcntl(sock_.get(), F_GETFL), SyscallSucceeds());
-  ASSERT_THAT(fcntl(sock_.get(), F_SETFL, opts | O_NONBLOCK), SyscallSucceeds());
+  ASSERT_THAT(fcntl(sock_.get(), F_SETFL, opts | O_NONBLOCK),
+              SyscallSucceeds());
 
   char buf[3];
   // Send zero length packet from bind_ to sock_.
   ASSERT_THAT(write(bind_.get(), buf, 0), SyscallSucceedsWithValue(0));
 
   struct pollfd pfd = {sock_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   // Receive the packet.
   char received[3];
-  EXPECT_THAT(read(sock_.get(), received, sizeof(received)), SyscallSucceedsWithValue(0));
-  EXPECT_THAT(read(sock_.get(), received, sizeof(received)), SyscallFailsWithErrno(EAGAIN));
+  EXPECT_THAT(read(sock_.get(), received, sizeof(received)),
+              SyscallSucceedsWithValue(0));
+  EXPECT_THAT(read(sock_.get(), received, sizeof(received)),
+              SyscallFailsWithErrno(EAGAIN));
 }
 
 TEST_P(UdpSocketTest, SendAndReceiveNotConnected) {
@@ -1055,8 +1123,9 @@ TEST_P(UdpSocketTest, ReceiveBeforeConnect) {
 
   // Receive the data. It works because it was sent before the connect.
   char received[sizeof(buf)];
-  EXPECT_THAT(RecvTimeout(bind_.get(), received, sizeof(received), 1 /*timeout*/),
-              IsPosixErrorOkAndHolds(sizeof(received)));
+  EXPECT_THAT(
+      RecvTimeout(bind_.get(), received, sizeof(received), 1 /*timeout*/),
+      IsPosixErrorOkAndHolds(sizeof(received)));
   EXPECT_EQ(memcmp(buf, received, sizeof(buf)), 0);
 
   // Send again. This time it should not be received.
@@ -1089,7 +1158,8 @@ TEST_P(UdpSocketTest, ReceiveFrom) {
   char received[sizeof(buf)];
   struct sockaddr_storage addr2;
   socklen_t addr2len = sizeof(addr2);
-  EXPECT_THAT(recvfrom(bind_.get(), received, sizeof(received), 0, AsSockAddr(&addr2), &addr2len),
+  EXPECT_THAT(recvfrom(bind_.get(), received, sizeof(received), 0,
+                       AsSockAddr(&addr2), &addr2len),
               SyscallSucceedsWithValue(sizeof(received)));
   EXPECT_EQ(memcmp(buf, received, sizeof(buf)), 0);
   EXPECT_EQ(addr2len, addrlen_);
@@ -1097,11 +1167,13 @@ TEST_P(UdpSocketTest, ReceiveFrom) {
 }
 
 TEST_P(UdpSocketTest, Listen) {
-  ASSERT_THAT(listen(sock_.get(), SOMAXCONN), SyscallFailsWithErrno(EOPNOTSUPP));
+  ASSERT_THAT(listen(sock_.get(), SOMAXCONN),
+              SyscallFailsWithErrno(EOPNOTSUPP));
 }
 
 TEST_P(UdpSocketTest, Accept) {
-  ASSERT_THAT(accept(sock_.get(), nullptr, nullptr), SyscallFailsWithErrno(EOPNOTSUPP));
+  ASSERT_THAT(accept(sock_.get(), nullptr, nullptr),
+              SyscallFailsWithErrno(EOPNOTSUPP));
 }
 
 // This test validates that a read shutdown with pending data allows the read
@@ -1130,7 +1202,8 @@ TEST_P(UdpSocketTest, ReadShutdownNonblockPendingData) {
 
   int opts = 0;
   ASSERT_THAT(opts = fcntl(bind_.get(), F_GETFL), SyscallSucceeds());
-  ASSERT_THAT(fcntl(bind_.get(), F_SETFL, opts | O_NONBLOCK), SyscallSucceeds());
+  ASSERT_THAT(fcntl(bind_.get(), F_SETFL, opts | O_NONBLOCK),
+              SyscallSucceeds());
   ASSERT_THAT(opts = fcntl(bind_.get(), F_GETFL), SyscallSucceeds());
   ASSERT_NE(opts & O_NONBLOCK, 0);
 
@@ -1145,7 +1218,8 @@ TEST_P(UdpSocketTest, ReadShutdownNonblockPendingData) {
 
   // Because we read less than the entire packet length, since it's a packet
   // based socket any subsequent reads should return EWOULDBLOCK.
-  EXPECT_THAT(recv(bind_.get(), received, 1, 0), SyscallFailsWithErrno(EWOULDBLOCK));
+  EXPECT_THAT(recv(bind_.get(), received, 1, 0),
+              SyscallFailsWithErrno(EWOULDBLOCK));
 }
 
 // This test is validating that even after a socket is shutdown if it's
@@ -1197,7 +1271,8 @@ TEST_P(UdpSocketTest, ReadShutdown) {
 
   EXPECT_THAT(shutdown(sock_.get(), SHUT_RD), SyscallSucceeds());
 
-  EXPECT_THAT(recv(sock_.get(), received, sizeof(received), 0), SyscallSucceedsWithValue(0));
+  EXPECT_THAT(recv(sock_.get(), received, sizeof(received), 0),
+              SyscallSucceedsWithValue(0));
 }
 
 TEST_P(UdpSocketTest, ReadShutdownDifferentThread) {
@@ -1244,13 +1319,15 @@ TEST_P(UdpSocketTest, SynchronousReceive) {
 
   // Receive the data prior to actually starting the other thread.
   char received[512];
-  EXPECT_THAT(RetryEINTR(recv)(bind_.get(), received, sizeof(received), MSG_DONTWAIT),
-              SyscallFailsWithErrno(EWOULDBLOCK));
+  EXPECT_THAT(
+      RetryEINTR(recv)(bind_.get(), received, sizeof(received), MSG_DONTWAIT),
+      SyscallFailsWithErrno(EWOULDBLOCK));
 
   // Start the thread.
   ScopedThread t([&] {
     absl::SleepFor(absl::Milliseconds(200));
-    ASSERT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, this->bind_addr_, this->addrlen_),
+    ASSERT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, this->bind_addr_,
+                       this->addrlen_),
                 SyscallSucceedsWithValue(sizeof(buf)));
   });
 
@@ -1268,8 +1345,9 @@ TEST_P(UdpSocketTest, BoundaryPreserved_SendRecv) {
   RandomizeBuffer(buf, sizeof(buf));
 
   for (int i = 0; i < 3; ++i) {
-    ASSERT_THAT(sendto(sock_.get(), buf + i * psize, psize, 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(psize));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf + i * psize, psize, 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(psize));
   }
 
   // Receive the data as 3 separate packets.
@@ -1296,11 +1374,12 @@ TEST_P(UdpSocketTest, BoundaryPreserved_WritevReadv) {
   for (int i = 0; i < 2; i++) {
     struct iovec iov[2];
     for (int j = 0; j < 2; j++) {
-      iov[j].iov_base =
-          reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buf) + (i + 2 * j) * kPieceSize);
+      iov[j].iov_base = reinterpret_cast<void*>(
+          reinterpret_cast<uintptr_t>(buf) + (i + 2 * j) * kPieceSize);
       iov[j].iov_len = kPieceSize;
     }
-    ASSERT_THAT(writev(sock_.get(), iov, 2), SyscallSucceedsWithValue(2 * kPieceSize));
+    ASSERT_THAT(writev(sock_.get(), iov, 2),
+                SyscallSucceedsWithValue(2 * kPieceSize));
   }
 
   // Receive the data as 2 separate packets.
@@ -1308,11 +1387,12 @@ TEST_P(UdpSocketTest, BoundaryPreserved_WritevReadv) {
   for (int i = 0; i < 2; i++) {
     struct iovec iov[3];
     for (int j = 0; j < 3; j++) {
-      iov[j].iov_base =
-          reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(received) + (i + 2 * j) * kPieceSize);
+      iov[j].iov_base = reinterpret_cast<void*>(
+          reinterpret_cast<uintptr_t>(received) + (i + 2 * j) * kPieceSize);
       iov[j].iov_len = kPieceSize;
     }
-    ASSERT_THAT(readv(bind_.get(), iov, 3), SyscallSucceedsWithValue(2 * kPieceSize));
+    ASSERT_THAT(readv(bind_.get(), iov, 3),
+                SyscallSucceedsWithValue(2 * kPieceSize));
   }
   EXPECT_EQ(memcmp(buf, received, 4 * kPieceSize), 0);
 }
@@ -1329,8 +1409,8 @@ TEST_P(UdpSocketTest, BoundaryPreserved_SendMsgRecvMsg) {
   for (int i = 0; i < 2; i++) {
     struct iovec iov[2];
     for (int j = 0; j < 2; j++) {
-      iov[j].iov_base =
-          reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buf) + (i + 2 * j) * kPieceSize);
+      iov[j].iov_base = reinterpret_cast<void*>(
+          reinterpret_cast<uintptr_t>(buf) + (i + 2 * j) * kPieceSize);
       iov[j].iov_len = kPieceSize;
     }
     struct msghdr msg = {};
@@ -1338,7 +1418,8 @@ TEST_P(UdpSocketTest, BoundaryPreserved_SendMsgRecvMsg) {
     msg.msg_namelen = addrlen_;
     msg.msg_iov = iov;
     msg.msg_iovlen = 2;
-    ASSERT_THAT(sendmsg(sock_.get(), &msg, 0), SyscallSucceedsWithValue(2 * kPieceSize));
+    ASSERT_THAT(sendmsg(sock_.get(), &msg, 0),
+                SyscallSucceedsWithValue(2 * kPieceSize));
   }
 
   // Receive the data as 2 separate packets.
@@ -1346,14 +1427,15 @@ TEST_P(UdpSocketTest, BoundaryPreserved_SendMsgRecvMsg) {
   for (int i = 0; i < 2; i++) {
     struct iovec iov[3];
     for (int j = 0; j < 3; j++) {
-      iov[j].iov_base =
-          reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(received) + (i + 2 * j) * kPieceSize);
+      iov[j].iov_base = reinterpret_cast<void*>(
+          reinterpret_cast<uintptr_t>(received) + (i + 2 * j) * kPieceSize);
       iov[j].iov_len = kPieceSize;
     }
     struct msghdr msg = {};
     msg.msg_iov = iov;
     msg.msg_iovlen = 3;
-    ASSERT_THAT(recvmsg(bind_.get(), &msg, 0), SyscallSucceedsWithValue(2 * kPieceSize));
+    ASSERT_THAT(recvmsg(bind_.get(), &msg, 0),
+                SyscallSucceedsWithValue(2 * kPieceSize));
   }
   EXPECT_EQ(memcmp(buf, received, 4 * kPieceSize), 0);
 }
@@ -1394,10 +1476,12 @@ TEST_P(UdpSocketTest, FIONREADWriteShutdown) {
   EXPECT_EQ(n, 0);
 
   const char str[] = "abc";
-  ASSERT_THAT(send(bind_.get(), str, sizeof(str), 0), SyscallSucceedsWithValue(sizeof(str)));
+  ASSERT_THAT(send(bind_.get(), str, sizeof(str), 0),
+              SyscallSucceedsWithValue(sizeof(str)));
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   n = -1;
   EXPECT_THAT(ioctl(bind_.get(), FIONREAD, &n), SyscallSucceedsWithValue(0));
@@ -1428,10 +1512,12 @@ TEST_P(UdpSocketTest, Fionread) {
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
   for (int i = 0; i < 3; ++i) {
-    ASSERT_THAT(sendto(sock_.get(), buf + i * psize, psize, 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(psize));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf + i * psize, psize, 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(psize));
 
-    ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+    ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+                SyscallSucceedsWithValue(1));
 
     // Check that regardless of how many packets are in the queue, the size
     // reported is that of a single packet.
@@ -1457,10 +1543,12 @@ TEST_P(UdpSocketTest, FIONREADZeroLengthPacket) {
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
   for (int i = 0; i < 3; ++i) {
-    ASSERT_THAT(sendto(sock_.get(), buf + i * psize, 0, 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(0));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf + i * psize, 0, 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(0));
 
-    ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+    ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+                SyscallSucceedsWithValue(1));
 
     // Check that regardless of how many packets are in the queue, the size
     // reported is that of a single packet.
@@ -1501,7 +1589,8 @@ TEST_P(UdpSocketTest, FIONREADZeroLengthWriteShutdown) {
 TEST_P(UdpSocketTest, SoNoCheckOffByDefault) {
   int v = -1;
   socklen_t optlen = sizeof(v);
-  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(v, kSockOptOff);
   ASSERT_EQ(optlen, sizeof(v));
 }
@@ -1509,16 +1598,20 @@ TEST_P(UdpSocketTest, SoNoCheckOffByDefault) {
 TEST_P(UdpSocketTest, SoNoCheck) {
   int v = kSockOptOn;
   socklen_t optlen = sizeof(v);
-  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, optlen), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, optlen),
+              SyscallSucceeds());
   v = -1;
-  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(v, kSockOptOn);
   ASSERT_EQ(optlen, sizeof(v));
 
   v = kSockOptOff;
-  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, optlen), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, optlen),
+              SyscallSucceeds());
   v = -1;
-  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_NO_CHECK, &v, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(v, kSockOptOff);
   ASSERT_EQ(optlen, sizeof(v));
 }
@@ -1536,14 +1629,16 @@ TEST_P(UdpSocketTest, ErrorQueue) {
   msg.msg_controllen = sizeof(cmsgbuf);
 
   // recv*(MSG_ERRQUEUE) never blocks, even without MSG_DONTWAIT.
-  EXPECT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, MSG_ERRQUEUE), SyscallFailsWithErrno(EAGAIN));
+  EXPECT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, MSG_ERRQUEUE),
+              SyscallFailsWithErrno(EAGAIN));
 }
 #endif  // __linux__
 
 TEST_P(UdpSocketTest, SoTimestampOffByDefault) {
   int v = -1;
   socklen_t optlen = sizeof(v);
-  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, &optlen), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, &optlen),
+              SyscallSucceeds());
   ASSERT_EQ(v, kSockOptOff);
   ASSERT_EQ(optlen, sizeof(v));
 }
@@ -1553,7 +1648,8 @@ TEST_P(UdpSocketTest, SoTimestamp) {
   ASSERT_THAT(connect(sock_.get(), bind_addr_, addrlen_), SyscallSucceeds());
 
   int v = 1;
-  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, sizeof(v)), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, sizeof(v)),
+              SyscallSucceeds());
 
   char buf[3];
   // Send zero length packet from sock to bind_.
@@ -1561,7 +1657,8 @@ TEST_P(UdpSocketTest, SoTimestamp) {
               SyscallSucceedsWithValue(sizeof(buf)));
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   char cmsgbuf[CMSG_SPACE(sizeof(struct timeval))];
   msghdr msg;
@@ -1573,7 +1670,8 @@ TEST_P(UdpSocketTest, SoTimestamp) {
   msg.msg_control = cmsgbuf;
   msg.msg_controllen = sizeof(cmsgbuf);
 
-  ASSERT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, 0), SyscallSucceedsWithValue(0));
+  ASSERT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, 0),
+              SyscallSucceedsWithValue(0));
 
   struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
   ASSERT_NE(cmsg, nullptr);
@@ -1590,7 +1688,8 @@ TEST_P(UdpSocketTest, SoTimestamp) {
   // hostinet.
   if (!IsRunningWithHostinet()) {
     // There should be nothing to get via ioctl.
-    ASSERT_THAT(ioctl(bind_.get(), SIOCGSTAMP, &tv), SyscallFailsWithErrno(ENOENT));
+    ASSERT_THAT(ioctl(bind_.get(), SIOCGSTAMP, &tv),
+                SyscallFailsWithErrno(ENOENT));
   }
 }
 
@@ -1611,7 +1710,8 @@ TEST_P(UdpSocketTest, TimestampIoctl) {
               SyscallSucceedsWithValue(sizeof(buf)));
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   // There should be no control messages.
   char recv_buf[sizeof(buf)];
@@ -1631,7 +1731,8 @@ TEST_P(UdpSocketTest, TimestampIoctlNothingRead) {
   ASSERT_THAT(connect(sock_.get(), bind_addr_, addrlen_), SyscallSucceeds());
 
   struct timeval tv = {};
-  ASSERT_THAT(ioctl(sock_.get(), SIOCGSTAMP, &tv), SyscallFailsWithErrno(ENOENT));
+  ASSERT_THAT(ioctl(sock_.get(), SIOCGSTAMP, &tv),
+              SyscallFailsWithErrno(ENOENT));
 }
 
 // Test that the timestamp accessed via SIOCGSTAMP is still accessible after
@@ -1648,10 +1749,12 @@ TEST_P(UdpSocketTest, TimestampIoctlPersistence) {
   // Send packet from sock to bind_.
   ASSERT_THAT(RetryEINTR(write)(sock_.get(), buf, sizeof(buf)),
               SyscallSucceedsWithValue(sizeof(buf)));
-  ASSERT_THAT(RetryEINTR(write)(sock_.get(), buf, 0), SyscallSucceedsWithValue(0));
+  ASSERT_THAT(RetryEINTR(write)(sock_.get(), buf, 0),
+              SyscallSucceedsWithValue(0));
 
   struct pollfd pfd = {bind_.get(), POLLIN, 0};
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   // There should be no control messages.
   char recv_buf[sizeof(buf)];
@@ -1664,10 +1767,13 @@ TEST_P(UdpSocketTest, TimestampIoctlPersistence) {
 
   // Enable SO_TIMESTAMP and send a message.
   int v = 1;
-  EXPECT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, sizeof(v)), SyscallSucceeds());
-  ASSERT_THAT(RetryEINTR(write)(sock_.get(), buf, 0), SyscallSucceedsWithValue(0));
+  EXPECT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_TIMESTAMP, &v, sizeof(v)),
+              SyscallSucceeds());
+  ASSERT_THAT(RetryEINTR(write)(sock_.get(), buf, 0),
+              SyscallSucceedsWithValue(0));
 
-  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000), SyscallSucceedsWithValue(1));
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, /*timeout=*/1000),
+              SyscallSucceedsWithValue(1));
 
   // There should be a message for SO_TIMESTAMP.
   char cmsgbuf[CMSG_SPACE(sizeof(struct timeval))];
@@ -1677,7 +1783,8 @@ TEST_P(UdpSocketTest, TimestampIoctlPersistence) {
   msg.msg_iovlen = 1;
   msg.msg_control = cmsgbuf;
   msg.msg_controllen = sizeof(cmsgbuf);
-  ASSERT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, 0), SyscallSucceedsWithValue(0));
+  ASSERT_THAT(RetryEINTR(recvmsg)(bind_.get(), &msg, 0),
+              SyscallSucceedsWithValue(0));
   struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
   ASSERT_NE(cmsg, nullptr);
 
@@ -1691,12 +1798,14 @@ TEST_P(UdpSocketTest, TimestampIoctlPersistence) {
 TEST_P(UdpSocketTest, RecvBufLimitsEmptyRcvBuf) {
   // Discover minimum buffer size by setting it to zero.
   constexpr int kRcvBufSz = 0;
-  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &kRcvBufSz, sizeof(kRcvBufSz)),
+  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &kRcvBufSz,
+                         sizeof(kRcvBufSz)),
               SyscallSucceeds());
 
   int min = 0;
   socklen_t min_len = sizeof(min);
-  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &min, &min_len), SyscallSucceeds());
+  ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &min, &min_len),
+              SyscallSucceeds());
 
   // Bind bind_ to loopback.
   ASSERT_NO_ERRNO(BindLoopback());
@@ -1705,10 +1814,12 @@ TEST_P(UdpSocketTest, RecvBufLimitsEmptyRcvBuf) {
     // Send data of size min and verify that it's received.
     std::vector<char> buf(min);
     RandomizeBuffer(buf.data(), buf.size());
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
     std::vector<char> received(buf.size());
-    EXPECT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(), 1 /*timeout*/),
+    EXPECT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(),
+                            1 /*timeout*/),
                 IsPosixErrorOkAndHolds(received.size()));
   }
 
@@ -1718,11 +1829,13 @@ TEST_P(UdpSocketTest, RecvBufLimitsEmptyRcvBuf) {
     // is currently empty.
     std::vector<char> buf(min + 1);
     RandomizeBuffer(buf.data(), buf.size());
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
 
     std::vector<char> received(buf.size());
-    ASSERT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(), 1 /*timeout*/),
+    ASSERT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(),
+                            1 /*timeout*/),
                 IsPosixErrorOkAndHolds(received.size()));
   }
 }
@@ -1736,22 +1849,25 @@ TEST_P(UdpSocketTest, RecvBufLimits) {
   {
     // Discover minimum buffer size by trying to set it to zero.
     constexpr int kRcvBufSz = 0;
-    ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &kRcvBufSz, sizeof(kRcvBufSz)),
+    ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &kRcvBufSz,
+                           sizeof(kRcvBufSz)),
                 SyscallSucceeds());
 
     socklen_t min_len = sizeof(min);
-    ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &min, &min_len), SyscallSucceeds());
+    ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &min, &min_len),
+                SyscallSucceeds());
   }
 
   // Now set the limit to min * 2.
   int new_rcv_buf_sz = min * 2;
-  ASSERT_THAT(
-      setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &new_rcv_buf_sz, sizeof(new_rcv_buf_sz)),
-      SyscallSucceeds());
+  ASSERT_THAT(setsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &new_rcv_buf_sz,
+                         sizeof(new_rcv_buf_sz)),
+              SyscallSucceeds());
   int rcv_buf_sz = 0;
   {
     socklen_t rcv_buf_len = sizeof(rcv_buf_sz);
-    ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &rcv_buf_sz, &rcv_buf_len),
+    ASSERT_THAT(getsockopt(bind_.get(), SOL_SOCKET, SO_RCVBUF, &rcv_buf_sz,
+                           &rcv_buf_len),
                 SyscallSucceeds());
   }
 
@@ -1759,27 +1875,33 @@ TEST_P(UdpSocketTest, RecvBufLimits) {
     std::vector<char> buf(min);
     RandomizeBuffer(buf.data(), buf.size());
 
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
-    ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
+    ASSERT_THAT(
+        sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+        SyscallSucceedsWithValue(buf.size()));
     int sent = 4;
     if (IsRunningOnGvisor() && !IsRunningWithHostinet()) {
       // Linux seems to drop the 4th packet even though technically it should
       // fit in the receive buffer.
-      ASSERT_THAT(sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
-                  SyscallSucceedsWithValue(buf.size()));
+      ASSERT_THAT(
+          sendto(sock_.get(), buf.data(), buf.size(), 0, bind_addr_, addrlen_),
+          SyscallSucceedsWithValue(buf.size()));
       sent++;
     }
 
     for (int i = 0; i < sent - 1; i++) {
       // Receive the data.
       std::vector<char> received(buf.size());
-      EXPECT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(), 1 /*timeout*/),
+      EXPECT_THAT(RecvTimeout(bind_.get(), received.data(), received.size(),
+                              1 /*timeout*/),
                   IsPosixErrorOkAndHolds(received.size()));
       EXPECT_EQ(memcmp(buf.data(), received.data(), buf.size()), 0);
     }
@@ -1787,8 +1909,9 @@ TEST_P(UdpSocketTest, RecvBufLimits) {
     // The last receive should fail with EAGAIN as the last packet should have
     // been dropped due to lack of space in the receive buffer.
     std::vector<char> received(buf.size());
-    EXPECT_THAT(recv(bind_.get(), received.data(), received.size(), MSG_DONTWAIT),
-                SyscallFailsWithErrno(EAGAIN));
+    EXPECT_THAT(
+        recv(bind_.get(), received.data(), received.size(), MSG_DONTWAIT),
+        SyscallFailsWithErrno(EAGAIN));
   }
 }
 
@@ -1799,24 +1922,29 @@ TEST_P(UdpSocketTest, RecvBufLimits) {
 TEST_P(UdpSocketTest, SetSocketDetachFilter) {
   // Program generated using sudo tcpdump -i lo udp and port 1234 -dd
   struct sock_filter code[] = {
-      {0x28, 0, 0, 0x0000000c},  {0x15, 0, 6, 0x000086dd},   {0x30, 0, 0, 0x00000014},
-      {0x15, 0, 15, 0x00000011}, {0x28, 0, 0, 0x00000036},   {0x15, 12, 0, 0x000004d2},
-      {0x28, 0, 0, 0x00000038},  {0x15, 10, 11, 0x000004d2}, {0x15, 0, 10, 0x00000800},
-      {0x30, 0, 0, 0x00000017},  {0x15, 0, 8, 0x00000011},   {0x28, 0, 0, 0x00000014},
-      {0x45, 6, 0, 0x00001fff},  {0xb1, 0, 0, 0x0000000e},   {0x48, 0, 0, 0x0000000e},
-      {0x15, 2, 0, 0x000004d2},  {0x48, 0, 0, 0x00000010},   {0x15, 0, 1, 0x000004d2},
+      {0x28, 0, 0, 0x0000000c},  {0x15, 0, 6, 0x000086dd},
+      {0x30, 0, 0, 0x00000014},  {0x15, 0, 15, 0x00000011},
+      {0x28, 0, 0, 0x00000036},  {0x15, 12, 0, 0x000004d2},
+      {0x28, 0, 0, 0x00000038},  {0x15, 10, 11, 0x000004d2},
+      {0x15, 0, 10, 0x00000800}, {0x30, 0, 0, 0x00000017},
+      {0x15, 0, 8, 0x00000011},  {0x28, 0, 0, 0x00000014},
+      {0x45, 6, 0, 0x00001fff},  {0xb1, 0, 0, 0x0000000e},
+      {0x48, 0, 0, 0x0000000e},  {0x15, 2, 0, 0x000004d2},
+      {0x48, 0, 0, 0x00000010},  {0x15, 0, 1, 0x000004d2},
       {0x6, 0, 0, 0x00040000},   {0x6, 0, 0, 0x00000000},
   };
   struct sock_fprog bpf = {
       .len = ABSL_ARRAYSIZE(code),
       .filter = code,
   };
-  ASSERT_THAT(setsockopt(sock_.get(), SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf)),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      setsockopt(sock_.get(), SOL_SOCKET, SO_ATTACH_FILTER, &bpf, sizeof(bpf)),
+      SyscallSucceeds());
 
   constexpr int val = 0;
-  ASSERT_THAT(setsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, sizeof(val)),
-              SyscallSucceeds());
+  ASSERT_THAT(
+      setsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, sizeof(val)),
+      SyscallSucceeds());
 }
 
 #endif  // __linux__
@@ -1825,15 +1953,17 @@ TEST_P(UdpSocketTest, SetSocketDetachFilterNoInstalledFilter) {
   // TODO(gvisor.dev/2746): Support SO_ATTACH_FILTER/SO_DETACH_FILTER.
   SKIP_IF(IsRunningOnGvisor());
   constexpr int val = 0;
-  ASSERT_THAT(setsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, sizeof(val)),
-              SyscallFailsWithErrno(ENOENT));
+  ASSERT_THAT(
+      setsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, sizeof(val)),
+      SyscallFailsWithErrno(ENOENT));
 }
 
 TEST_P(UdpSocketTest, GetSocketDetachFilter) {
   int val = 0;
   socklen_t val_len = sizeof(val);
-  ASSERT_THAT(getsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, &val_len),
-              SyscallFailsWithErrno(ENOPROTOOPT));
+  ASSERT_THAT(
+      getsockopt(sock_.get(), SOL_SOCKET, SO_DETACH_FILTER, &val, &val_len),
+      SyscallFailsWithErrno(ENOPROTOOPT));
 }
 
 TEST_P(UdpSocketTest, SendToZeroPort) {
@@ -1842,18 +1972,21 @@ TEST_P(UdpSocketTest, SendToZeroPort) {
 
   // Sending to an invalid port should fail.
   SetPort(&addr, 0);
-  EXPECT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
-              SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(
+      sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
+      SyscallFailsWithErrno(EINVAL));
 
   SetPort(&addr, 1234);
-  EXPECT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
-              SyscallSucceedsWithValue(sizeof(buf)));
+  EXPECT_THAT(
+      sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
+      SyscallSucceedsWithValue(sizeof(buf)));
 }
 
 TEST_P(UdpSocketTest, ConnectToZeroPortUnbound) {
   struct sockaddr_storage addr = InetLoopbackAddr();
   SetPort(&addr, 0);
-  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_), SyscallSucceeds());
+  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_),
+              SyscallSucceeds());
 }
 
 TEST_P(UdpSocketTest, ConnectToZeroPortBound) {
@@ -1861,9 +1994,11 @@ TEST_P(UdpSocketTest, ConnectToZeroPortBound) {
   ASSERT_NO_ERRNO(BindSocket(sock_.get(), AsSockAddr(&addr)));
 
   SetPort(&addr, 0);
-  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_), SyscallSucceeds());
+  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_),
+              SyscallSucceeds());
   socklen_t len = sizeof(sockaddr_storage);
-  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &len), SyscallSucceeds());
+  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &len),
+              SyscallSucceeds());
   ASSERT_EQ(len, addrlen_);
 }
 
@@ -1872,22 +2007,26 @@ TEST_P(UdpSocketTest, ConnectToZeroPortConnected) {
   ASSERT_NO_ERRNO(BindSocket(sock_.get(), AsSockAddr(&addr)));
 
   // Connect to an address with non-zero port should succeed.
-  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_), SyscallSucceeds());
+  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_),
+              SyscallSucceeds());
   sockaddr_storage peername;
   socklen_t peerlen = sizeof(peername);
-  ASSERT_THAT(getpeername(sock_.get(), AsSockAddr(&peername), &peerlen), SyscallSucceeds());
+  ASSERT_THAT(getpeername(sock_.get(), AsSockAddr(&peername), &peerlen),
+              SyscallSucceeds());
   ASSERT_EQ(peerlen, addrlen_);
   ASSERT_EQ(memcmp(&peername, &addr, addrlen_), 0);
 
   // However connect() to an address with port 0 will make the following
   // getpeername() fail.
   SetPort(&addr, 0);
-  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_), SyscallSucceeds());
+  ASSERT_THAT(connect(sock_.get(), AsSockAddr(&addr), addrlen_),
+              SyscallSucceeds());
   ASSERT_THAT(getpeername(sock_.get(), AsSockAddr(&peername), &peerlen),
               SyscallFailsWithErrno(ENOTCONN));
 }
 
-INSTANTIATE_TEST_SUITE_P(AllInetTests, UdpSocketTest, ::testing::Values(AF_INET, AF_INET6));
+INSTANTIATE_TEST_SUITE_P(AllInetTests, UdpSocketTest,
+                         ::testing::Values(AF_INET, AF_INET6));
 
 class UdpSocketControlMessagesTest
     : public ::testing::TestWithParam<gvisor::testing::AddressFamily> {
@@ -1895,46 +2034,59 @@ class UdpSocketControlMessagesTest
   void SetUp() override {
     switch (GetParam()) {
       case AddressFamily::kIpv4: {
-        server_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+        server_ =
+            ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
         TestAddress addr = V4Loopback().WithPort(port_);
         ASSERT_THAT(
-            bind(server_.get(), reinterpret_cast<const sockaddr*>(&addr.addr), addr.addr_len),
+            bind(server_.get(), reinterpret_cast<const sockaddr*>(&addr.addr),
+                 addr.addr_len),
             SyscallSucceeds());
 
-        client_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-        ASSERT_THAT(
-            connect(client_.get(), reinterpret_cast<const sockaddr*>(&addr.addr), addr.addr_len),
-            SyscallSucceeds());
+        client_ =
+            ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+        ASSERT_THAT(connect(client_.get(),
+                            reinterpret_cast<const sockaddr*>(&addr.addr),
+                            addr.addr_len),
+                    SyscallSucceeds());
         break;
       }
 
       case AddressFamily::kIpv6: {
-        server_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
+        server_ = ASSERT_NO_ERRNO_AND_VALUE(
+            Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
         TestAddress addr = V6Loopback().WithPort(port_);
         ASSERT_THAT(
-            bind(server_.get(), reinterpret_cast<const sockaddr*>(&addr.addr), addr.addr_len),
+            bind(server_.get(), reinterpret_cast<const sockaddr*>(&addr.addr),
+                 addr.addr_len),
             SyscallSucceeds());
 
-        client_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
-        ASSERT_THAT(
-            connect(client_.get(), reinterpret_cast<const sockaddr*>(&addr.addr), addr.addr_len),
-            SyscallSucceeds());
+        client_ = ASSERT_NO_ERRNO_AND_VALUE(
+            Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
+        ASSERT_THAT(connect(client_.get(),
+                            reinterpret_cast<const sockaddr*>(&addr.addr),
+                            addr.addr_len),
+                    SyscallSucceeds());
         break;
       }
 
       case AddressFamily::kDualStack: {
-        server_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
+        server_ = ASSERT_NO_ERRNO_AND_VALUE(
+            Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
 
         TestAddress bind_addr = V4MappedLoopback().WithPort(port_);
-        ASSERT_THAT(bind(server_.get(), reinterpret_cast<const sockaddr*>(&bind_addr.addr),
+        ASSERT_THAT(bind(server_.get(),
+                         reinterpret_cast<const sockaddr*>(&bind_addr.addr),
                          bind_addr.addr_len),
                     SyscallSucceeds());
 
-        client_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+        client_ =
+            ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
         TestAddress connect_addr = V4Loopback().WithPort(port_);
-        ASSERT_THAT(connect(client_.get(), reinterpret_cast<const sockaddr*>(&connect_addr.addr),
-                            connect_addr.addr_len),
-                    SyscallSucceeds());
+        ASSERT_THAT(
+            connect(client_.get(),
+                    reinterpret_cast<const sockaddr*>(&connect_addr.addr),
+                    connect_addr.addr_len),
+            SyscallSucceeds());
         break;
       }
 
@@ -1969,12 +2121,13 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTOSOrTClass) {
   SKIP_IF(IsRunningWithHostinet());
 
   // Enable receiving TOS and maybe TClass on the receiver.
-  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTOS, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTOS, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   if (ServerAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(server_.get(), SOL_IPV6, IPV6_RECVTCLASS, &kSockOptOn, sizeof(kSockOptOn)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(server_.get(), SOL_IPV6, IPV6_RECVTCLASS,
+                           &kSockOptOn, sizeof(kSockOptOn)),
+                SyscallSucceeds());
   }
 
   // Set custom TOS and maybe TClass on the sender.
@@ -1982,9 +2135,11 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTOSOrTClass) {
   constexpr int kTClass = IPTOS_THROUGHPUT;
   ASSERT_NE(kTOS, kTClass);
 
-  ASSERT_THAT(setsockopt(client_.get(), SOL_IP, IP_TOS, &kTOS, sizeof(kTOS)), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(client_.get(), SOL_IP, IP_TOS, &kTOS, sizeof(kTOS)),
+              SyscallSucceeds());
   if (ClientAddressFamily() == AF_INET6) {
-    ASSERT_THAT(setsockopt(client_.get(), SOL_IPV6, IPV6_TCLASS, &kTClass, sizeof(kTClass)),
+    ASSERT_THAT(setsockopt(client_.get(), SOL_IPV6, IPV6_TCLASS, &kTClass,
+                           sizeof(kTClass)),
                 SyscallSucceeds());
   }
 
@@ -1998,11 +2153,13 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTOSOrTClass) {
 
   if (ClientAddressFamily() == AF_INET) {
     uint8_t tos;
-    ASSERT_NO_FATAL_FAILURE(RecvTOS(server_.get(), recv_data, &recv_data_len, &tos));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTOS(server_.get(), recv_data, &recv_data_len, &tos));
     EXPECT_EQ(static_cast<int>(tos), kTOS);
   } else {
     int tclass;
-    ASSERT_NO_FATAL_FAILURE(RecvTClass(server_.get(), recv_data, &recv_data_len, &tclass));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTClass(server_.get(), recv_data, &recv_data_len, &tclass));
     EXPECT_EQ(tclass, kTClass);
   }
   EXPECT_EQ(recv_data_len, sizeof(sent_data));
@@ -2013,12 +2170,13 @@ TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTOSorTClass) {
   SKIP_IF(IsRunningOnGvisor() && !IsRunningWithHostinet());
 
   // Enable receiving TOS and maybe TClass on the receiver.
-  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTOS, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTOS, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   if (ServerAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(server_.get(), SOL_IPV6, IPV6_RECVTCLASS, &kSockOptOn, sizeof(kSockOptOn)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(server_.get(), SOL_IPV6, IPV6_RECVTCLASS,
+                           &kSockOptOn, sizeof(kSockOptOn)),
+                SyscallSucceeds());
   }
 
   constexpr uint8_t kSendCmsgValue = IPTOS_LOWDELAY;
@@ -2028,16 +2186,18 @@ TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTOSorTClass) {
   size_t recv_data_len = sizeof(recv_data);
 
   if (ClientAddressFamily() == AF_INET) {
-    ASSERT_NO_FATAL_FAILURE(
-        SendTOS(client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
+    ASSERT_NO_FATAL_FAILURE(SendTOS(client_.get(), sent_data,
+                                    size_t(sizeof(sent_data)), kSendCmsgValue));
     uint8_t tos;
-    ASSERT_NO_FATAL_FAILURE(RecvTOS(server_.get(), recv_data, &recv_data_len, &tos));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTOS(server_.get(), recv_data, &recv_data_len, &tos));
     EXPECT_EQ(static_cast<int>(tos), kSendCmsgValue);
   } else {
-    ASSERT_NO_FATAL_FAILURE(
-        SendTClass(client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
+    ASSERT_NO_FATAL_FAILURE(SendTClass(
+        client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
     int tclass;
-    ASSERT_NO_FATAL_FAILURE(RecvTClass(server_.get(), recv_data, &recv_data_len, &tclass));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTClass(server_.get(), recv_data, &recv_data_len, &tclass));
     EXPECT_EQ(tclass, kSendCmsgValue);
   }
   EXPECT_EQ(recv_data_len, sizeof(sent_data));
@@ -2045,12 +2205,13 @@ TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTOSorTClass) {
 
 TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTTLOrHopLimit) {
   // Enable receiving TTL and maybe HOPLIMIT on the receiver.
-  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTTL, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTTL, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   if (ServerAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(server_.get(), SOL_IPV6, IPV6_RECVHOPLIMIT, &kSockOptOn, sizeof(kSockOptOn)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(server_.get(), SOL_IPV6, IPV6_RECVHOPLIMIT,
+                           &kSockOptOn, sizeof(kSockOptOn)),
+                SyscallSucceeds());
   }
 
   // Set custom TTL and maybe HOPLIMIT on the sender.
@@ -2058,11 +2219,12 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTTLOrHopLimit) {
   constexpr int kHopLimit = 42;
   ASSERT_NE(kTTL, kHopLimit);
 
-  ASSERT_THAT(setsockopt(client_.get(), SOL_IP, IP_TTL, &kTTL, sizeof(kTTL)), SyscallSucceeds());
+  ASSERT_THAT(setsockopt(client_.get(), SOL_IP, IP_TTL, &kTTL, sizeof(kTTL)),
+              SyscallSucceeds());
   if (ClientAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(client_.get(), SOL_IPV6, IPV6_UNICAST_HOPS, &kHopLimit, sizeof(kHopLimit)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(client_.get(), SOL_IPV6, IPV6_UNICAST_HOPS,
+                           &kHopLimit, sizeof(kHopLimit)),
+                SyscallSucceeds());
   }
 
   constexpr size_t kArbitrarySendSize = 1042;
@@ -2075,11 +2237,13 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTTLOrHopLimit) {
 
   if (ClientAddressFamily() == AF_INET) {
     int ttl;
-    ASSERT_NO_FATAL_FAILURE(RecvTTL(server_.get(), recv_data, &recv_data_len, &ttl));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTTL(server_.get(), recv_data, &recv_data_len, &ttl));
     EXPECT_EQ(ttl, kTTL);
   } else {
     int hoplimit;
-    ASSERT_NO_FATAL_FAILURE(RecvHopLimit(server_.get(), recv_data, &recv_data_len, &hoplimit));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvHopLimit(server_.get(), recv_data, &recv_data_len, &hoplimit));
     EXPECT_EQ(hoplimit, kHopLimit);
   }
   EXPECT_EQ(recv_data_len, sizeof(sent_data));
@@ -2087,12 +2251,13 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceiveTTLOrHopLimit) {
 
 TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTTLOrHopLimit) {
   // Enable receiving TTL and maybe HOPLIMIT on the receiver.
-  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTTL, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_RECVTTL, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   if (ServerAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(server_.get(), SOL_IPV6, IPV6_RECVHOPLIMIT, &kSockOptOn, sizeof(kSockOptOn)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(server_.get(), SOL_IPV6, IPV6_RECVHOPLIMIT,
+                           &kSockOptOn, sizeof(kSockOptOn)),
+                SyscallSucceeds());
   }
 
   constexpr int kSendCmsgValue = 42;
@@ -2102,16 +2267,18 @@ TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTTLOrHopLimit) {
   size_t recv_data_len = sizeof(recv_data);
 
   if (ClientAddressFamily() == AF_INET) {
-    ASSERT_NO_FATAL_FAILURE(
-        SendTTL(client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
+    ASSERT_NO_FATAL_FAILURE(SendTTL(client_.get(), sent_data,
+                                    size_t(sizeof(sent_data)), kSendCmsgValue));
     int ttl;
-    ASSERT_NO_FATAL_FAILURE(RecvTTL(server_.get(), recv_data, &recv_data_len, &ttl));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvTTL(server_.get(), recv_data, &recv_data_len, &ttl));
     EXPECT_EQ(ttl, kSendCmsgValue);
   } else {
-    ASSERT_NO_FATAL_FAILURE(
-        SendHopLimit(client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
+    ASSERT_NO_FATAL_FAILURE(SendHopLimit(
+        client_.get(), sent_data, size_t(sizeof(sent_data)), kSendCmsgValue));
     int hoplimit;
-    ASSERT_NO_FATAL_FAILURE(RecvHopLimit(server_.get(), recv_data, &recv_data_len, &hoplimit));
+    ASSERT_NO_FATAL_FAILURE(
+        RecvHopLimit(server_.get(), recv_data, &recv_data_len, &hoplimit));
     EXPECT_EQ(hoplimit, kSendCmsgValue);
   }
   EXPECT_EQ(recv_data_len, sizeof(sent_data));
@@ -2119,12 +2286,13 @@ TEST_P(UdpSocketControlMessagesTest, SendAndReceiveTTLOrHopLimit) {
 
 TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
   // Enable receiving IP_PKTINFO and maybe IPV6_PKTINFO on the receiver.
-  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_PKTINFO, &kSockOptOn, sizeof(kSockOptOn)),
+  ASSERT_THAT(setsockopt(server_.get(), SOL_IP, IP_PKTINFO, &kSockOptOn,
+                         sizeof(kSockOptOn)),
               SyscallSucceeds());
   if (ServerAddressFamily() == AF_INET6) {
-    ASSERT_THAT(
-        setsockopt(server_.get(), SOL_IPV6, IPV6_RECVPKTINFO, &kSockOptOn, sizeof(kSockOptOn)),
-        SyscallSucceeds());
+    ASSERT_THAT(setsockopt(server_.get(), SOL_IPV6, IPV6_RECVPKTINFO,
+                           &kSockOptOn, sizeof(kSockOptOn)),
+                SyscallSucceeds());
   }
 
   constexpr size_t kArbitrarySendSize = 1042;
@@ -2137,10 +2305,11 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
   switch (GetParam()) {
     case AddressFamily::kIpv4: {
       in_pktinfo received_pktinfo;
-      ASSERT_NO_FATAL_FAILURE(
-          RecvPktInfo(server_.get(), recv_data, &recv_data_len, &received_pktinfo));
+      ASSERT_NO_FATAL_FAILURE(RecvPktInfo(server_.get(), recv_data,
+                                          &recv_data_len, &received_pktinfo));
       EXPECT_EQ(recv_data_len, sizeof(sent_data));
-      EXPECT_EQ(received_pktinfo.ipi_ifindex, ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
+      EXPECT_EQ(received_pktinfo.ipi_ifindex,
+                ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
       EXPECT_EQ(ntohl(received_pktinfo.ipi_spec_dst.s_addr), INADDR_LOOPBACK);
       EXPECT_EQ(ntohl(received_pktinfo.ipi_addr.s_addr), INADDR_LOOPBACK);
       break;
@@ -2148,11 +2317,13 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
 
     case AddressFamily::kIpv6: {
       in6_pktinfo received_pktinfo;
-      ASSERT_NO_FATAL_FAILURE(
-          RecvIPv6PktInfo(server_.get(), recv_data, &recv_data_len, &received_pktinfo));
+      ASSERT_NO_FATAL_FAILURE(RecvIPv6PktInfo(
+          server_.get(), recv_data, &recv_data_len, &received_pktinfo));
       EXPECT_EQ(recv_data_len, sizeof(sent_data));
-      EXPECT_EQ(received_pktinfo.ipi6_ifindex, ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
-      ASSERT_EQ(memcmp(&received_pktinfo.ipi6_addr, &in6addr_loopback, sizeof(in6addr_loopback)),
+      EXPECT_EQ(received_pktinfo.ipi6_ifindex,
+                ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
+      ASSERT_EQ(memcmp(&received_pktinfo.ipi6_addr, &in6addr_loopback,
+                       sizeof(in6addr_loopback)),
                 0);
       break;
     }
@@ -2165,7 +2336,8 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
           iov.iov_len = recv_data_len,
       };
       // Add an extra byte to confirm we only read what we expected.
-      char control[CMSG_SPACE(sizeof(in_pktinfo)) + CMSG_SPACE(sizeof(in6_pktinfo)) + 1];
+      char control[CMSG_SPACE(sizeof(in_pktinfo)) +
+                   CMSG_SPACE(sizeof(in6_pktinfo)) + 1];
       msghdr msg = {
           .msg_iov = &iov,
           .msg_iovlen = 1,
@@ -2173,8 +2345,9 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
           .msg_controllen = sizeof(control),
       };
 
-      ASSERT_THAT(recv_data_len = RetryEINTR(recvmsg)(server_.get(), &msg, /*flags=*/0),
-                  SyscallSucceeds());
+      ASSERT_THAT(
+          recv_data_len = RetryEINTR(recvmsg)(server_.get(), &msg, /*flags=*/0),
+          SyscallSucceeds());
       EXPECT_EQ(recv_data_len, sizeof(sent_data));
       size_t expected_controllen = CMSG_SPACE(sizeof(in_pktinfo));
       if (!IsRunningOnGvisor() || IsRunningWithHostinet()) {
@@ -2207,8 +2380,10 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
       }
 
       ASSERT_TRUE(received_pktinfo.second);
-      EXPECT_EQ(received_pktinfo.first.ipi_ifindex, ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
-      EXPECT_EQ(ntohl(received_pktinfo.first.ipi_spec_dst.s_addr), INADDR_LOOPBACK);
+      EXPECT_EQ(received_pktinfo.first.ipi_ifindex,
+                ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
+      EXPECT_EQ(ntohl(received_pktinfo.first.ipi_spec_dst.s_addr),
+                INADDR_LOOPBACK);
       EXPECT_EQ(ntohl(received_pktinfo.first.ipi_addr.s_addr), INADDR_LOOPBACK);
 
       if (!IsRunningOnGvisor() || IsRunningWithHostinet()) {
@@ -2217,7 +2392,9 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
                   ASSERT_NO_ERRNO_AND_VALUE(GetLoopbackIndex()));
         struct in6_addr expected;
         inet_pton(AF_INET6, "::ffff:127.0.0.1", &expected);
-        EXPECT_EQ(memcmp(&received_pktinfo6.first.ipi6_addr, &expected, sizeof(expected)), 0);
+        EXPECT_EQ(memcmp(&received_pktinfo6.first.ipi6_addr, &expected,
+                         sizeof(expected)),
+                  0);
       } else {
         ASSERT_FALSE(received_pktinfo6.second);
       }
@@ -2229,14 +2406,16 @@ TEST_P(UdpSocketControlMessagesTest, SetAndReceivePktInfo) {
 
 TEST_P(UdpSocketTest, SendPacketLargerThanSendBufOnNonBlockingSocket) {
   constexpr int kSendBufSize = 4096;
-  ASSERT_THAT(setsockopt(sock_.get(), SOL_SOCKET, SO_SNDBUF, &kSendBufSize, sizeof(kSendBufSize)),
+  ASSERT_THAT(setsockopt(sock_.get(), SOL_SOCKET, SO_SNDBUF, &kSendBufSize,
+                         sizeof(kSendBufSize)),
               SyscallSucceeds());
 
   // Set sock to non-blocking.
   {
     int opts = 0;
     ASSERT_THAT(opts = fcntl(sock_.get(), F_GETFL), SyscallSucceeds());
-    ASSERT_THAT(fcntl(sock_.get(), F_SETFL, opts | O_NONBLOCK), SyscallSucceeds());
+    ASSERT_THAT(fcntl(sock_.get(), F_SETFL, opts | O_NONBLOCK),
+                SyscallSucceeds());
   }
 
   {
@@ -2246,43 +2425,54 @@ TEST_P(UdpSocketTest, SendPacketLargerThanSendBufOnNonBlockingSocket) {
 
   sockaddr_storage addr;
   socklen_t len = sizeof(sockaddr_storage);
-  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &len), SyscallSucceeds());
+  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&addr), &len),
+              SyscallSucceeds());
   ASSERT_EQ(len, addrlen_);
 
   // We are allowed to send packets as large as we want as long as there is
   // space in the send buffer, even if the new packet will result in more bytes
   // being used than available in the send buffer.
   char buf[kSendBufSize + 1];
-  ASSERT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
-              SyscallSucceedsWithValue(sizeof(buf)));
+  ASSERT_THAT(
+      sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
+      SyscallSucceedsWithValue(sizeof(buf)));
 
   // The second write may fail with EAGAIN if the previous send is still
   // in-flight.
-  ASSERT_THAT(sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
-              AnyOf(SyscallSucceedsWithValue(sizeof(buf)), SyscallFailsWithErrno(EAGAIN)));
+  ASSERT_THAT(
+      sendto(sock_.get(), buf, sizeof(buf), 0, AsSockAddr(&addr), sizeof(addr)),
+      AnyOf(SyscallSucceedsWithValue(sizeof(buf)),
+            SyscallFailsWithErrno(EAGAIN)));
 }
 
 INSTANTIATE_TEST_SUITE_P(AllInetTests, UdpSocketControlMessagesTest,
-                         ::testing::Values(AddressFamily::kIpv4, AddressFamily::kIpv6,
+                         ::testing::Values(AddressFamily::kIpv4,
+                                           AddressFamily::kIpv6,
                                            AddressFamily::kDualStack));
 
 TEST(UdpInet6SocketTest, ConnectInet4Sockaddr) {
   // glibc getaddrinfo expects the invariant expressed by this test to be held.
-  const sockaddr_in connect_sockaddr = {.sin_family = AF_INET,
-                                        .sin_addr = {.s_addr = htonl(INADDR_LOOPBACK)}};
-  auto sock_ = ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
-  ASSERT_THAT(connect(sock_.get(), reinterpret_cast<const struct sockaddr*>(&connect_sockaddr),
-                      sizeof(sockaddr_in)),
-              SyscallSucceeds());
+  const sockaddr_in connect_sockaddr = {
+      .sin_family = AF_INET, .sin_addr = {.s_addr = htonl(INADDR_LOOPBACK)}};
+  auto sock_ =
+      ASSERT_NO_ERRNO_AND_VALUE(Socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP));
+  ASSERT_THAT(
+      connect(sock_.get(),
+              reinterpret_cast<const struct sockaddr*>(&connect_sockaddr),
+              sizeof(sockaddr_in)),
+      SyscallSucceeds());
   sockaddr_storage sockname;
   socklen_t len = sizeof(sockaddr_storage);
-  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&sockname), &len), SyscallSucceeds());
+  ASSERT_THAT(getsockname(sock_.get(), AsSockAddr(&sockname), &len),
+              SyscallSucceeds());
   ASSERT_EQ(sockname.ss_family, AF_INET6);
   ASSERT_EQ(len, sizeof(sockaddr_in6));
   auto sin6 = reinterpret_cast<struct sockaddr_in6*>(&sockname);
   char addr_buf[INET6_ADDRSTRLEN];
   const char* addr;
-  ASSERT_NE(addr = inet_ntop(sockname.ss_family, &sockname, addr_buf, sizeof(addr_buf)), nullptr);
+  ASSERT_NE(addr = inet_ntop(sockname.ss_family, &sockname, addr_buf,
+                             sizeof(addr_buf)),
+            nullptr);
   ASSERT_TRUE(IN6_IS_ADDR_V4MAPPED(sin6->sin6_addr.s6_addr)) << addr;
 }
 
