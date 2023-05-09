@@ -195,7 +195,7 @@ impl FsNodeOps for RemoteNode {
         name: &FsStr,
         mode: FileMode,
         _dev: DeviceType,
-        _owner: FsCred,
+        owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
             log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
@@ -220,7 +220,7 @@ impl FsNodeOps for RemoteNode {
         let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
         let ops = Box::new(RemoteNode { zxio, rights: self.rights });
         let mode = get_mode(&attrs)?;
-        let child = node.fs().create_node_with_id(ops, attrs.id, mode, FsCred::root());
+        let child = node.fs().create_node_with_id(ops, attrs.id, mode, owner);
         update_into_from_attrs(&mut child.info_write(), &attrs);
         Ok(child)
     }
@@ -275,7 +275,7 @@ impl FsNodeOps for RemoteNode {
         node: &FsNode,
         name: &FsStr,
         target: &FsStr,
-        _owner: FsCred,
+        owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
             log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
@@ -291,7 +291,7 @@ impl FsNodeOps for RemoteNode {
             Box::new(RemoteSymlink { zxio }),
             attrs.id,
             get_mode(&attrs)?,
-            FsCred::root(),
+            owner,
         );
         update_into_from_attrs(&mut symlink.info_write(), &attrs);
         Ok(symlink)

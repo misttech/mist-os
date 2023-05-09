@@ -28,17 +28,15 @@
                 "AccessTest.UsrReadWriteExec",
 
                 // chdir_test
-                "ChdirTest.Success",
                 "ChdirTest.PermissionDenied",
+                "ChdirTest.Success",
 
                 // chmod_test
-                "ChmodTest.ChmodFileSucceeds",
                 "ChmodTest.ChmodDirSucceeds",
+                "ChmodTest.FchmodatDir",
+                "ChmodTest.FchmodatDirAbsolutePath",
                 "ChmodTest.FchmodDirSucceeds",
                 "ChmodTest.FchmodDirWithOpath",
-                "ChmodTest.FchmodatDirAbsolutePath",
-                "ChmodTest.FchmodatDir",
-                "ChmodTest.FchmodDowngradeWritability",
 
                 // chown_test
                 "ChownTest.FchownDirWithOpath",
@@ -52,16 +50,8 @@
                 "ChrootTest.WithoutCapability",
                 "ChrootTest.PermissionDenied",
 
-                // creat_test
-                "CreatTest.CreatTruncatesExistingFile",
-
                 // exec_test
                 "ExecTest.SymlinkLimitRefreshedForInterpreter",
-
-                // exec_binary_test
-                "ElfTest.MissingHeader",
-                "ElfTest.OutOfBoundsPhdrs",
-                "ExecveTest.BinaryAsDirectory",
 
                 // fallocate_test
                 "AllocateTest.Fallocate",
@@ -120,13 +110,9 @@
 
                 // fsync_test
                 "FsyncTest.TempDirSucceeds",
-                "FsyncTest.TempFileSucceeds",
 
                 // fuse_test
                 "FuseTest.RejectBadInit",
-
-                // futex_test
-                "SharedFutexTest.WakeInterprocessFile",
 
                 // getdents_test
                 "GetdentsTest/*.Issue128ProcSeekEnd",
@@ -164,17 +150,6 @@
                 "LinkTest.WithNewDirFD",
                 "LinkTest.WithOldDirFD",
 
-                // lseek_test
-                "LseekTest.Cur",
-                "LseekTest.End",
-                "LseekTest.InvalidWhence",
-                "LseekTest.NegativeOffset",
-                "LseekTest.Overflow",
-                "LseekTest.Set",
-
-                // madvise_test
-                "MadviseDontneedTest.DoesNotModifySharedFilePage",
-
                 // mkdir_test
                 "MkdirTest.CanCreateWritableDir",
                 "MkdirTest.DirAlreadyExists",
@@ -207,12 +182,7 @@
                 "MountTest.UmountNoFollow",
                 "MountTest.UmountPermDenied",
 
-                // mremap_test
-                "MremapTest.ExpansionPreservesCOWPagesAndExposesNewFilePages",
-
                 // open_create_test
-                "CreateTest.ChmodReadToWriteBetweenOpens",
-                "CreateTest.ChmodWriteToReadBetweenOpens",
                 "CreateTest.CreatDirWithOTruncAndReadOnly",
                 "CreateTest.CreatFileWithOTruncAndReadOnly",
                 "CreateTest.CreatWithOTrunc",
@@ -260,10 +230,6 @@
                 "OpenTest.SymlinkRecurse",
                 "OpenTest.Truncate",
                 "OpenTest.WriteOnly",
-
-                // proc_pid_smaps_test
-                // truncate() fails.
-                "ProcPidSmapsTest.SharedReadOnlyFile",
 
                 // read_test
                 "ReadTest.PartialReadSIGSEGV",
@@ -331,7 +297,7 @@
                 "Renameat2Test.NoReplaceDot",
 
                 // sendfile_socket_test
-                "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/*",
+                "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/0",
 
                 // socket_filesystem_non_blocking_test
                 "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.ReadNothingAvailable/*",
@@ -465,9 +431,6 @@
                 // socket_unix_unbound_filesystem_test
                 "AllUnixDomainSockets/UnboundFilesystemUnixSocketPairTest.*/*",
 
-                // splice_test
-                "SpliceTest.TwoRegularFiles",
-
                 // stat_test
                 "StatTest.BlocksIncreaseOnWrite",
                 "StatTest.ChildOfNonDir",
@@ -515,9 +478,6 @@
                 "StickyTest.StickyBitPermDenied",
                 "StickyTest.StickyBitSameUID",
 
-                // sync_file_range_test
-                "SyncFileRangeTest.CannotSyncFileRangeWithWaitBefore",
-
                 // truncate_test
                 "FixtureTruncateTest.Ftruncate",
                 "FixtureTruncateTest.FtruncateShrinkGrow",
@@ -541,11 +501,7 @@
                 "UnlinkTest.UnlinkAtEmptyPath",
 
                 // write test
-                "WriteTest.PwriteNoChangeOffset",
-                "WriteTest.WriteIncrementOffset",
                 "WriteTest.WriteIncrementOffsetAppend",
-                "WriteTest.WriteIncrementOffsetEOF",
-                "WriteTest.WriteIncrementOffsetSeek",
 
                 // xattr_test
                 "XattrTest.GetXattr",

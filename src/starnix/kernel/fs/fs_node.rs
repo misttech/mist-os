@@ -85,6 +85,11 @@ pub struct FsNodeInfo {
 }
 
 impl FsNodeInfo {
+    pub fn chmod(&mut self, mode: FileMode) {
+        self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
+        self.time_status_change = fuchsia_runtime::utc_time();
+    }
+
     fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
         if let Some(owner) = owner {
             self.uid = owner;
@@ -876,11 +881,20 @@ impl FsNode {
     /// Set the permissions on this FsNode to the given values.
     ///
     /// Does not change the IFMT of the node.
-    pub fn chmod(&self, mode: FileMode) {
-        // TODO(qsr, security): Check permissions.
+    pub fn chmod(&self, current_task: &CurrentTask, mut mode: FileMode) -> Result<(), Errno> {
         let mut info = self.info_write();
-        info.mode = (info.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
-        info.time_status_change = fuchsia_runtime::utc_time();
+        let creds = current_task.creds();
+        if !creds.has_capability(CAP_FOWNER) {
+            let creds = current_task.creds();
+            if info.uid != creds.euid {
+                return error!(EPERM);
+            }
+            if info.gid != creds.egid && !creds.is_in_group(info.gid) {
+                mode &= !FileMode::ISGID;
+            }
+        }
+        info.chmod(mode);
+        Ok(())
     }
 
     /// Sets the owner and/or group on this FsNode.

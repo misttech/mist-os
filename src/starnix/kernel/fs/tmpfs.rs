@@ -85,7 +85,7 @@ impl TmpFs {
         let mut mount_options = fs_args::generic_parse_mount_options(data);
         if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
             let mode = FileMode::from_string(mode)?;
-            root_node.chmod(mode);
+            root_node.info_write().chmod(mode);
         }
         if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
             let uid = fs_args::parse::<uid_t>(uid)?;
