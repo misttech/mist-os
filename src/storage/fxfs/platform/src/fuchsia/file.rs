@@ -468,7 +468,9 @@ impl PagerBackedVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use {
-        crate::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
+        crate::fuchsia::testing::{
+            close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        },
         anyhow::format_err,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::file,
@@ -665,7 +667,11 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(reused_device, false, true).await;
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions { format: false, as_blob: false, encrypted: true },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -700,7 +706,11 @@ mod tests {
 
         let input = "hello, world!";
         let reused_device = {
-            let fixture = TestFixture::open(DeviceHolder::new(device), true, true).await;
+            let fixture = TestFixture::open(
+                DeviceHolder::new(device),
+                TestFixtureOptions { format: true, as_blob: false, encrypted: true },
+            )
+            .await;
             let root = fixture.root();
 
             let file = open_file_checked(
@@ -725,7 +735,11 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(reused_device, false, true).await;
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions { format: false, as_blob: false, encrypted: true },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -750,7 +764,11 @@ mod tests {
     async fn test_writes_persist() {
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
         for i in 0..2 {
-            let fixture = TestFixture::open(device, /*format=*/ i == 0, true).await;
+            let fixture = TestFixture::open(
+                device,
+                TestFixtureOptions { format: i == 0, as_blob: false, encrypted: true },
+            )
+            .await;
             let root = fixture.root();
 
             let flags = if i == 0 {

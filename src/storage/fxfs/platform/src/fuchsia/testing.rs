@@ -4,7 +4,8 @@
 
 use {
     crate::fuchsia::{
-        directory::FxDirectory, file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
+        blob::BlobDirectory, directory::FxDirectory, file::FxFile, pager::PagerBackedVmo,
+        volume::FxVolumeAndRoot,
     },
     anyhow::Context,
     anyhow::Error,
@@ -39,49 +40,72 @@ pub struct TestFixture {
     encrypted: bool,
 }
 
+pub struct TestFixtureOptions {
+    pub encrypted: bool,
+    pub as_blob: bool,
+    pub format: bool,
+}
+
 impl TestFixture {
     pub async fn new() -> Self {
-        Self::open(DeviceHolder::new(FakeDevice::new(16384, 512)), true, true).await
+        Self::open(
+            DeviceHolder::new(FakeDevice::new(16384, 512)),
+            TestFixtureOptions { encrypted: true, as_blob: false, format: true },
+        )
+        .await
     }
 
     pub async fn new_unencrypted() -> Self {
-        Self::open(DeviceHolder::new(FakeDevice::new(16384, 512)), true, false).await
+        Self::open(
+            DeviceHolder::new(FakeDevice::new(16384, 512)),
+            TestFixtureOptions { encrypted: false, as_blob: false, format: true },
+        )
+        .await
     }
 
-    pub async fn open(device: DeviceHolder, format: bool, encrypted: bool) -> Self {
-        let (filesystem, volume) = if format {
+    pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
+        let (filesystem, volume) = if options.format {
             let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let vol = FxVolumeAndRoot::new::<FxDirectory>(
-                Weak::new(),
-                root_volume
-                    .new_volume(
-                        "vol",
-                        if encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
-                    )
+            let store = root_volume
+                .new_volume(
+                    "vol",
+                    if options.encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
+                )
+                .await
+                .unwrap();
+            let store_object_id = store.store_object_id();
+            let vol = if options.as_blob {
+                FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
                     .await
-                    .unwrap(),
-                0,
-            )
-            .await
-            .unwrap();
+                    .unwrap()
+            } else {
+                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id)
+                    .await
+                    .unwrap()
+            };
             (filesystem, vol)
         } else {
             let filesystem = FxFilesystem::open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let vol = FxVolumeAndRoot::new::<FxDirectory>(
-                Weak::new(),
-                root_volume
-                    .volume(
-                        "vol",
-                        if encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
-                    )
+            let store = root_volume
+                .volume(
+                    "vol",
+                    if options.encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
+                )
+                .await
+                .unwrap();
+            let store_object_id = store.store_object_id();
+            let vol = if options.as_blob {
+                FxVolumeAndRoot::new::<BlobDirectory>(Weak::new(), store, store_object_id)
                     .await
-                    .unwrap(),
-                0,
-            )
-            .await
-            .unwrap();
+                    .unwrap()
+            } else {
+                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id)
+                    .await
+                    .unwrap()
+            };
+
             (filesystem, vol)
         };
         let (root, server_end) =
@@ -94,7 +118,7 @@ impl TestFixture {
             Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
-        Self { state: Some(State { filesystem, volume, root }), encrypted }
+        Self { state: Some(State { filesystem, volume, root }), encrypted: options.encrypted }
     }
 
     /// Closes the test fixture, shutting down the filesystem. Returns the device, which can be
@@ -167,7 +191,7 @@ impl TestFixture {
         &self.state.as_ref().unwrap().root
     }
 
-    pub fn fs(&self) -> &FxFilesystem {
+    pub fn fs(&self) -> &Arc<FxFilesystem> {
         &self.state.as_ref().unwrap().filesystem
     }
 

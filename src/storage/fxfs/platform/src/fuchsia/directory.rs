@@ -772,7 +772,7 @@ mod tests {
             directory::FxDirectory,
             fuchsia::testing::{
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-                open_file_checked, TestFixture,
+                open_file_checked, TestFixture, TestFixtureOptions,
             },
         },
         assert_matches::assert_matches,
@@ -803,7 +803,11 @@ mod tests {
     async fn test_create_dir_persists() {
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
         for i in 0..2 {
-            let fixture = TestFixture::open(device, /*format=*/ i == 0, true).await;
+            let fixture = TestFixture::open(
+                device,
+                TestFixtureOptions { format: i == 0, encrypted: true, as_blob: false },
+            )
+            .await;
             let root = fixture.root();
 
             let flags = if i == 0 {

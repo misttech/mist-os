@@ -1228,13 +1228,14 @@ impl FileIo for FxUnsealedBlob {
 #[cfg(test)]
 mod tests {
     use {
-        super::{BlobDirectory, BLOCK_SIZE, READ_AHEAD_SIZE},
+        super::{BLOCK_SIZE, READ_AHEAD_SIZE},
         crate::fuchsia::{
-            directory::FxDirectory, node::FxNode, testing::open_file_checked, volume::FxVolume,
+            testing::{open_file_checked, TestFixture, TestFixtureOptions},
+            volume::FxVolume,
         },
         assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, ServerEnd},
-        fidl_fuchsia_io::{self as fio, DirectoryMarker, DirectoryProxy, MAX_TRANSFER_SIZE},
+        async_trait::async_trait,
+        fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
         fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
         fuchsia_fs::directory::{
             readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
@@ -1243,81 +1244,44 @@ mod tests {
         fuchsia_zircon::{self as zx, DurationNum as _},
         futures::StreamExt as _,
         fxfs::{
-            filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::{ObjectHandle as _, WriteBytes as _},
             object_store::{
                 directory::Directory,
                 transaction::{LockKey, TransactionHandler as _},
-                volume::root_volume,
                 DirectWriter, HandleOptions, ObjectStore, StoreObjectHandle,
                 BLOB_MERKLE_ATTRIBUTE_ID,
             },
             round::round_up,
             serialized_types::BlobMetadata,
         },
-        std::{
-            path::PathBuf,
-            sync::{Arc, Weak},
-        },
+        std::path::PathBuf,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
     };
 
-    struct Fixture {
-        filesystem: OpenFxFilesystem,
-        vol: Arc<FxVolume>,
-        root_proxy: DirectoryProxy,
+    async fn new_blob_fixture() -> TestFixture {
+        TestFixture::open(
+            DeviceHolder::new(FakeDevice::new(16384, 512)),
+            TestFixtureOptions { encrypted: false, as_blob: true, format: true },
+        )
+        .await
     }
 
-    impl Fixture {
-        async fn new() -> Self {
-            let device = DeviceHolder::new(FakeDevice::new(16384, 512));
-            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
-            let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let vol = Arc::new(
-                FxVolume::new(
-                    Weak::new(),
-                    root_volume.new_volume("blob", None).await.expect("new_volme failed"),
-                    0,
-                )
-                .expect("new failed"),
-            );
-            let root_object_id = vol.store().root_directory_object_id();
-            let root_dir = Directory::open(&vol, root_object_id).await.expect("open failed");
-            let root = Arc::new(BlobDirectory::new(FxDirectory::new(None, root_dir)));
-            vol.cache()
-                .get_or_reserve(root_object_id)
-                .await
-                .placeholder()
-                .unwrap()
-                .commit(&(root.clone() as Arc<dyn FxNode>));
+    #[async_trait]
+    trait BlobFixture {
+        async fn write_blob(&self, data: &[u8]) -> Hash;
+        async fn read_blob(&self, name: &str) -> Vec<u8>;
+        async fn get_blob_handle(&self, name: &str) -> StoreObjectHandle<FxVolume>;
+    }
 
-            let scope = ExecutionScope::new();
-            let (root_proxy, server_end) =
-                create_proxy::<DirectoryMarker>().expect("create_proxy failed");
-            root.clone().open(
-                scope.clone(),
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                Path::dot(),
-                ServerEnd::new(server_end.into_channel()),
-            );
-            Fixture { filesystem, vol, root_proxy }
-        }
-
-        async fn close(self) {
-            self.vol.terminate().await;
-            self.filesystem.close().await.expect("close failed");
-        }
-
+    #[async_trait]
+    impl BlobFixture for TestFixture {
         async fn write_blob(&self, data: &[u8]) -> Hash {
             let mut builder = MerkleTreeBuilder::new();
             builder.write(&data);
             let hash = builder.finish().root();
 
             let blob = open_file_checked(
-                &self.root_proxy,
+                self.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1339,8 +1303,7 @@ mod tests {
         }
 
         async fn read_blob(&self, name: &str) -> Vec<u8> {
-            let blob =
-                open_file_checked(&self.root_proxy, fio::OpenFlags::RIGHT_READABLE, name).await;
+            let blob = open_file_checked(self.root(), fio::OpenFlags::RIGHT_READABLE, name).await;
             let mut data = Vec::new();
             loop {
                 let chunk = blob
@@ -1358,23 +1321,29 @@ mod tests {
         }
 
         async fn get_blob_handle(&self, name: &str) -> StoreObjectHandle<FxVolume> {
-            let root_object_id = self.vol.store().root_directory_object_id();
-            let root_dir = Directory::open(&self.vol, root_object_id).await.expect("open failed");
+            let root_object_id = self.volume().volume().store().root_directory_object_id();
+            let root_dir =
+                Directory::open(self.volume().volume(), root_object_id).await.expect("open failed");
             let (object_id, _) = root_dir
                 .lookup(name)
                 .await
                 .expect("lookup failed")
                 .expect("file doesn't exist yet");
 
-            ObjectStore::open_object(&self.vol, object_id, HandleOptions::default(), None)
-                .await
-                .expect("open_object failed")
+            ObjectStore::open_object(
+                self.volume().volume(),
+                object_id,
+                HandleOptions::default(),
+                None,
+            )
+            .await
+            .expect("open_object failed")
         }
     }
 
     #[fasync::run(10, test)]
     async fn test_simple() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = [1; 1000];
 
@@ -1383,7 +1352,7 @@ mod tests {
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
 
         fixture
-            .root_proxy
+            .root()
             .unlink(&format!("{}", hash), fio::UnlinkOptions::default())
             .await
             .expect("FIDL failed")
@@ -1394,7 +1363,7 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_empty_blob() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![];
         let hash = fixture.write_blob(&data).await;
@@ -1405,7 +1374,7 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_large_blob() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![3; 3_000_000];
         let hash = fixture.write_blob(&data).await;
@@ -1417,7 +1386,7 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_large_compressed_blob() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![3; 3_000_000];
         let mut builder = MerkleTreeBuilder::new();
@@ -1426,18 +1395,18 @@ mod tests {
         {
             // Manually insert the blob with our own metadata.
             // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs and make-blob-image.
-            let root_object_id = fixture.vol.store().root_directory_object_id();
-            let root_dir =
-                Directory::open(&fixture.vol, root_object_id).await.expect("open failed");
+            let root_object_id = fixture.volume().volume().store().root_directory_object_id();
+            let root_dir = Directory::open(fixture.volume().volume(), root_object_id)
+                .await
+                .expect("open failed");
 
             let handle;
-            let keys = [LockKey::object(fixture.vol.store().store_object_id(), root_object_id)];
-            let mut transaction = fixture
-                .filesystem
-                .clone()
-                .new_transaction(&keys, Default::default())
-                .await
-                .unwrap();
+            let keys = [LockKey::object(
+                fixture.volume().volume().store().store_object_id(),
+                root_object_id,
+            )];
+            let mut transaction =
+                fixture.fs().clone().new_transaction(&keys, Default::default()).await.unwrap();
             handle = root_dir
                 .create_child_file(&mut transaction, &format!("{}", tree.root()))
                 .await
@@ -1487,7 +1456,7 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_blob_invalid_contents() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![0xffu8; (READ_AHEAD_SIZE + BLOCK_SIZE) as usize];
         let hash = fixture.write_blob(&data).await;
@@ -1507,28 +1476,30 @@ mod tests {
             transaction.commit().await.expect("failed to commit transaction");
         }
 
-        let blob =
-            open_file_checked(&fixture.root_proxy, fio::OpenFlags::RIGHT_READABLE, &name).await;
-        assert_matches!(blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed"), Ok(_));
-        blob.seek(fio::SeekOrigin::Start, READ_AHEAD_SIZE as i64)
-            .await
-            .expect("FIDL call failed")
-            .map_err(zx::Status::from_raw)
-            .expect("seek failed");
-        assert_matches!(
-            blob.read(MAX_TRANSFER_SIZE)
+        {
+            let blob =
+                open_file_checked(fixture.root(), fio::OpenFlags::RIGHT_READABLE, &name).await;
+            assert_matches!(blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed"), Ok(_));
+            blob.seek(fio::SeekOrigin::Start, READ_AHEAD_SIZE as i64)
                 .await
                 .expect("FIDL call failed")
-                .map_err(zx::Status::from_raw),
-            Err(zx::Status::IO_DATA_INTEGRITY)
-        );
+                .map_err(zx::Status::from_raw)
+                .expect("seek failed");
+            assert_matches!(
+                blob.read(MAX_TRANSFER_SIZE)
+                    .await
+                    .expect("FIDL call failed")
+                    .map_err(zx::Status::from_raw),
+                Err(zx::Status::IO_DATA_INTEGRITY)
+            );
+        }
 
         fixture.close().await;
     }
 
     #[fasync::run(10, test)]
     async fn test_readdir() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = [0xab; 2];
         let hash;
@@ -1538,7 +1509,7 @@ mod tests {
             hash = builder.finish().root();
 
             let blob = open_file_checked(
-                &fixture.root_proxy,
+                fixture.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1555,7 +1526,7 @@ mod tests {
             );
             // Before the blob is finished writing, it shouldn't appear in the directory.
             assert_eq!(
-                readdir_inclusive(&fixture.root_proxy).await.ok(),
+                readdir_inclusive(fixture.root()).await.ok(),
                 Some(vec![DirEntry { name: ".".to_string(), kind: DirentKind::Directory }])
             );
 
@@ -1566,7 +1537,7 @@ mod tests {
         }
 
         assert_eq!(
-            readdir_inclusive(&fixture.root_proxy).await.ok(),
+            readdir_inclusive(fixture.root()).await.ok(),
             Some(vec![
                 DirEntry { name: ".".to_string(), kind: DirentKind::Directory },
                 DirEntry { name: format! {"{}", hash}, kind: DirentKind::File },
@@ -1578,9 +1549,9 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_watchers() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
-        let mut watcher = Watcher::new(&fixture.root_proxy).await.unwrap();
+        let mut watcher = Watcher::new(fixture.root()).await.unwrap();
         assert_eq!(
             watcher.next().await,
             Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
@@ -1602,7 +1573,7 @@ mod tests {
             filenames.push(filename.clone());
 
             let blob = open_file_checked(
-                &fixture.root_proxy,
+                fixture.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1641,7 +1612,7 @@ mod tests {
 
         for (hash, filename) in hashes.iter().zip(filenames) {
             fixture
-                .root_proxy
+                .root()
                 .unlink(&format!("{}", hash), fio::UnlinkOptions::default())
                 .await
                 .expect("FIDL call failed")
@@ -1652,20 +1623,21 @@ mod tests {
             );
         }
 
+        std::mem::drop(watcher);
         fixture.close().await;
     }
 
     #[fasync::run(10, test)]
     async fn test_rename_fails() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![];
         let hash = fixture.write_blob(&data).await;
 
-        let (status, token) = fixture.root_proxy.get_token().await.expect("FIDL failed");
+        let (status, token) = fixture.root().get_token().await.expect("FIDL failed");
         zx::Status::ok(status).unwrap();
         fixture
-            .root_proxy
+            .root()
             .rename(&format!("{}", hash), token.unwrap().into(), "foo")
             .await
             .expect("FIDL failed")
@@ -1676,15 +1648,15 @@ mod tests {
 
     #[fasync::run(10, test)]
     async fn test_link_fails() {
-        let fixture = Fixture::new().await;
+        let fixture = new_blob_fixture().await;
 
         let data = vec![];
         let hash = fixture.write_blob(&data).await;
 
-        let (status, token) = fixture.root_proxy.get_token().await.expect("FIDL failed");
+        let (status, token) = fixture.root().get_token().await.expect("FIDL failed");
         zx::Status::ok(status).unwrap();
         let status = fixture
-            .root_proxy
+            .root()
             .link(&format!("{}", hash), token.unwrap().into(), "foo")
             .await
             .expect("FIDL failed");

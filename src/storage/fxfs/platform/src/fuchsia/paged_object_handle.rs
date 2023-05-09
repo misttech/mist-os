@@ -936,7 +936,9 @@ impl FlushRange {
 mod tests {
     use {
         super::*,
-        crate::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
+        crate::fuchsia::testing::{
+            close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        },
         fidl_fuchsia_io as fio,
         fuchsia_fs::file,
         fuchsia_zircon as zx,
@@ -981,7 +983,11 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_large_flush_requiring_multiple_transactions() {
         let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1025,7 +1031,11 @@ mod tests {
                 }
             }
         });
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1066,7 +1076,11 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_writeback_begin_and_end_are_called_correctly() {
         let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1118,7 +1132,11 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_writing_overrides_set_mtime() {
         let device = FakeDevice::new(8192, 512);
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1156,7 +1174,11 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_flushing_after_get_attr_does_not_change_mtime() {
         let device = FakeDevice::new(8192, 512);
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1201,7 +1223,11 @@ mod tests {
                 }
             }
         });
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1231,7 +1257,11 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_max_file_size() {
         let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(DeviceHolder::new(device), true, false).await;
+        let fixture = TestFixture::open(
+            DeviceHolder::new(device),
+            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
+        )
+        .await;
         let root = fixture.root();
 
         let file = open_file_checked(
