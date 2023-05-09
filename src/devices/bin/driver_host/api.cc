@@ -277,9 +277,7 @@ __EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t 
 
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
-  if (device) {
-    DEBUG_ASSERT_VALID_DEVICE(device);
-  }
+  DEBUG_ASSERT_VALID_DEVICE(device);
   return internal::set_scheduler_profile_by_role(thread, role, role_size);
 }
 
