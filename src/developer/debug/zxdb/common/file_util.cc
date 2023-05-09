@@ -58,6 +58,10 @@ std::time_t GetFileModificationTime(const std::string& path) {
 bool PathStartsWith(const std::filesystem::path& path, const std::filesystem::path& base) {
   if (path.is_absolute() != base.is_absolute())
     return false;
+
+  if (path.empty())
+    return base.empty();
+
   auto path_it = path.begin();
   for (const auto& ancestor : base) {
     if (ancestor.empty() || ancestor == ".")

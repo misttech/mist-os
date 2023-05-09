@@ -81,6 +81,7 @@ TEST(FileUtil, GetFileModificationTime) {
 }
 
 TEST(FileUtil, PathStartsWith) {
+  EXPECT_TRUE(PathStartsWith("", ""));
   EXPECT_TRUE(PathStartsWith("/abc", "/abc"));
   EXPECT_TRUE(PathStartsWith("/abc", "/"));
   EXPECT_TRUE(PathStartsWith("/abc/def", "/abc"));
@@ -97,6 +98,7 @@ TEST(FileUtil, PathStartsWith) {
   EXPECT_FALSE(PathStartsWith("/abc", "/a"));
   EXPECT_FALSE(PathStartsWith("/", ""));
   EXPECT_FALSE(PathStartsWith("", "/"));
+  EXPECT_FALSE(PathStartsWith("", "./../.."));
 }
 
 TEST(FileUtil, PathRelativeTo) {
