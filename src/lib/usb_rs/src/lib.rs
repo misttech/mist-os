@@ -5,15 +5,22 @@
 use futures::stream::Stream;
 use thiserror::Error;
 
-mod usb_linux;
+#[cfg_attr(target_os = "linux", path = "usb_linux/mod.rs")]
+#[cfg_attr(target_os = "macos", path = "usb_osx/mod.rs")]
+mod usb_plat;
+
+pub use usb_plat::{
+    BulkInEndpoint, BulkOutEndpoint, ControlEndpoint, Interface, InterruptEndpoint,
+    IsochronousEndpoint,
+};
 
 /// Selects the bit in USB endpoint addresses that tells us whether it is an in or and out endpoint.
 pub(crate) const USB_ENDPOINT_DIR_MASK: u8 = 0x80;
 
-pub struct DeviceHandle(usb_linux::DeviceHandleInner);
+pub struct DeviceHandle(usb_plat::DeviceHandleInner);
 
-impl From<usb_linux::DeviceHandleInner> for DeviceHandle {
-    fn from(inner: usb_linux::DeviceHandleInner) -> DeviceHandle {
+impl From<usb_plat::DeviceHandleInner> for DeviceHandle {
+    fn from(inner: usb_plat::DeviceHandleInner) -> DeviceHandle {
         DeviceHandle(inner)
     }
 }
@@ -135,12 +142,7 @@ pub fn wait_for_devices(
     notify_added: bool,
     notify_removed: bool,
 ) -> Result<impl Stream<Item = Result<DeviceEvent>>> {
-    usb_linux::wait_for_devices(notify_added, notify_removed)
+    usb_plat::wait_for_devices(notify_added, notify_removed)
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub use usb_linux::{
-    BulkInEndpoint, BulkOutEndpoint, ControlEndpoint, Interface, InterruptEndpoint,
-    IsochronousEndpoint,
-};

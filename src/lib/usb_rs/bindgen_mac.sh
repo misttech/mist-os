@@ -18,8 +18,6 @@ cd "${SCRIPT_DIR}"
 readonly RELPATH="${FULL_PATH#${FUCHSIA_DIR}/}"
 readonly BINDGEN="${PREBUILT_RUST_BINDGEN_DIR}/bindgen"
 
-ZEROCOPY_SYMS_REGEX="usb_descriptor_header|usb_(device|endpoint|interface)_descriptor"
-
 # Generate annotations for the top of the generated source file.
 readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -31,17 +29,21 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(improper_ctypes)]
+#![allow(clippy::approx_constant)]
 
-use zerocopy::{FromBytes, AsBytes, Unaligned};"
+// Configure linkage for MacOS.
+#[cfg(target_os = \"macos\")]
+#[link(name = \"IOKit\", kind = \"framework\")]
+#[link(name = \"CoreFoundation\", kind = \"framework\")]
+extern \"C\" {}"
 
 "${BINDGEN}" \
-    ${SCRIPT_DIR}/usbdevfs_stub.h \
+    ${SCRIPT_DIR}/iokit_usb_stub.h \
     --disable-header-comment \
     --raw-line "${RAW_LINES}" \
     --with-derive-default \
-    --with-derive-custom-struct ${ZEROCOPY_SYMS_REGEX}=FromBytes \
-    --with-derive-custom-struct ${ZEROCOPY_SYMS_REGEX}=AsBytes \
-    --with-derive-custom-struct ${ZEROCOPY_SYMS_REGEX}=Unaligned \
     --impl-debug \
-    --output src/usb_linux/usbdevice_fs.rs \
-    -- -I${FUCHSIA_DIR}/prebuilt/third_party/sysroot/linux/usr/include \
+    --no-debug "mach_voucher_attr_recipe_data|IOAsyncCompletionContent|IOUSBDeviceCapabilitySuperSpeedPlusUSB|IOUSBDeviceCapabilityBillboard" \
+    --output src/usb_osx/iokit_usb.rs \
+    -- -isysroot $(xcrun --sdk macosx --show-sdk-path)

@@ -160,7 +160,7 @@ group("tests") {
     "ui:tests",
     "unwinder:tests",
     "usb_bulk:tests",
-    "usb_rs:tests",
+    "usb_rs:tests($host_toolchain)",
     "utf8_path:tests",
     "utf_conversion:tests",
     "versioning:tests",

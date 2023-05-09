@@ -5,18 +5,47 @@
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
-if (is_host && !is_mac) {
-  rustc_library("usb_rs") {
-    edition = "2021"
-    with_unit_tests = true
+assert(is_host)
 
-    deps = [
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:libc",
-      "//third_party/rust_crates:nix",
-      "//third_party/rust_crates:notify",
-      "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:zerocopy",
+if (is_mac) {
+  static_library("usb_rs_stubs") {
+    sources = [
+      "iokit_usb_stub.c",
+      "iokit_usb_stub.h",
+    ]
+  }
+}
+
+rustc_library("usb_rs") {
+  edition = "2021"
+  with_unit_tests = true
+
+  deps = [
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:notify",
+    "//third_party/rust_crates:thiserror",
+  ]
+
+  sources = [
+    "src/lib.rs",
+    "src/usb_linux/discovery.rs",
+    "src/usb_linux/mod.rs",
+    "src/usb_linux/usbdevice_fs.rs",
+  ]
+
+  if (is_mac) {
+    deps += [ ":usb_rs_stubs" ]
+    sources += [
+      "src/usb_osx/iokit_usb.rs",
+      "src/usb_osx/iokit_wrappers.rs",
+      "src/usb_osx/mod.rs",
+    ]
+  } else {
+    sources += [
+      "src/usb_linux/discovery.rs",
+      "src/usb_linux/mod.rs",
+      "src/usb_linux/usbdevice_fs.rs",
     ]
 
     test_deps = [
@@ -24,18 +53,14 @@ if (is_host && !is_mac) {
       "//third_party/rust_crates:tempfile",
     ]
 
-    sources = [
-      "src/lib.rs",
-      "src/usb_linux/discovery.rs",
-      "src/usb_linux/mod.rs",
-      "src/usb_linux/usbdevice_fs.rs",
+    deps += [
+      "//third_party/rust_crates:nix",
+      "//third_party/rust_crates:zerocopy",
     ]
   }
 }
 
 group("tests") {
-  if (is_host && !is_mac) {
-    public_deps = [ ":usb_rs_test($host_toolchain)" ]
-  }
+  public_deps = [ ":usb_rs_test($host_toolchain)" ]
   testonly = true
 }

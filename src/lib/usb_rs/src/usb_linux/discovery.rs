@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use crate::usb_linux::DeviceHandleInner;
+use super::DeviceHandleInner;
 use crate::{DeviceEvent, Error, Result};
 
 /// Root of the Linux devfs
@@ -20,7 +20,7 @@ static DEV_BUS_DIR: &str = "/dev/bus";
 /// The USB bus folder within the Linux devfs
 static USB_FS_DIR: &str = "/dev/bus/usb";
 
-/// A stream of new devices as they appear on the bus. See [`wait_for_devices].
+/// A stream of new devices as they appear on the bus. See [`wait_for_devices`].
 pub struct DeviceStream {
     /// Watches the /dev filesystem for new USB devices.
     watcher: notify::RecommendedWatcher,
