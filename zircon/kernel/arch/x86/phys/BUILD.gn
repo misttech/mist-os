@@ -10,7 +10,7 @@ import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
-import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/kernel/phys/qemu_kernel_test.gni")
 import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 if (current_toolchain == default_toolchain) {
