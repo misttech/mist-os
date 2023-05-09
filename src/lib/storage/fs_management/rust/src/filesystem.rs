@@ -186,10 +186,10 @@ impl Filesystem {
     pub async fn format(&mut self) -> Result<(), Error> {
         let channel = self.device_channel()?;
         match self.config.mode() {
-            Mode::Component { mut format_options, .. } => {
+            Mode::Component { format_options, .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                proxy.format(channel, &mut format_options).await?.map_err(Status::from_raw)?;
+                proxy.format(channel, format_options).await?.map_err(Status::from_raw)?;
             }
             Mode::Legacy(mut config) => {
                 // SpawnAction is not Send, so make sure it is dropped before any `await`s.
@@ -228,8 +228,7 @@ impl Filesystem {
             Mode::Component { .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                let mut options = CheckOptions;
-                proxy.check(channel, &mut options).await?.map_err(Status::from_raw)?;
+                proxy.check(channel, CheckOptions).await?.map_err(Status::from_raw)?;
             }
             Mode::Legacy(mut config) => {
                 // SpawnAction is not Send, so make sure it is dropped before any `await`s.
@@ -261,15 +260,12 @@ impl Filesystem {
         if self.config.is_multi_volume() {
             bail!("Can't serve a multivolume filesystem; use serve_multi_volume");
         }
-        if let Mode::Component { mut start_options, reuse_component_after_serving, .. } =
+        if let Mode::Component { start_options, reuse_component_after_serving, .. } =
             self.config.mode()
         {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-            proxy
-                .start(self.device_channel()?, &mut start_options)
-                .await?
-                .map_err(Status::from_raw)?;
+            proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
 
             let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
             exposed_dir.open(
@@ -308,13 +304,10 @@ impl Filesystem {
         if !self.config.is_multi_volume() {
             bail!("Can't serve_multi_volume a single-volume filesystem; use serve");
         }
-        if let Mode::Component { mut start_options, .. } = self.config.mode() {
+        if let Mode::Component { start_options, .. } = self.config.mode() {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-            proxy
-                .start(self.device_channel()?, &mut start_options)
-                .await?
-                .map_err(Status::from_raw)?;
+            proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
 
             Ok(ServingMultiVolumeFilesystem {
                 _component: self.component.clone(),
@@ -695,7 +688,7 @@ impl ServingMultiVolumeFilesystem {
     pub async fn open_volume(
         &mut self,
         volume: &str,
-        mut options: MountOptions,
+        options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
         let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
@@ -704,7 +697,7 @@ impl ServingMultiVolumeFilesystem {
             self.exposed_dir.as_ref().unwrap(),
             &path,
         )?
-        .mount(server, &mut options)
+        .mount(server, options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
 
@@ -722,7 +715,7 @@ impl ServingMultiVolumeFilesystem {
             self.exposed_dir.as_ref().unwrap(),
             &path,
         )?
-        .check(&mut fidl_fuchsia_fxfs::CheckOptions { crypt })
+        .check(fidl_fuchsia_fxfs::CheckOptions { crypt })
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         Ok(())

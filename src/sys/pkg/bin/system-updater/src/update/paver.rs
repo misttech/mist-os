@@ -32,10 +32,10 @@ async fn paver_write_firmware(
     data_sink: &DataSinkProxy,
     configuration: Configuration,
     subtype: &str,
-    mut buffer: Buffer,
+    buffer: Buffer,
 ) -> Result<(), Error> {
     let res = data_sink
-        .write_firmware(configuration, subtype, &mut buffer)
+        .write_firmware(configuration, subtype, buffer)
         .await
         .context("while performing write_firmware call")?;
 
@@ -69,9 +69,9 @@ async fn paver_write_asset(
     data_sink: &DataSinkProxy,
     configuration: Configuration,
     asset: Asset,
-    mut buffer: Buffer,
+    buffer: Buffer,
 ) -> Result<(), WriteAssetError> {
-    let status = data_sink.write_asset(configuration, asset, &mut buffer).await?;
+    let status = data_sink.write_asset(configuration, asset, buffer).await?;
     Status::ok(status)?;
     Ok(())
 }

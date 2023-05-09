@@ -182,13 +182,13 @@ mod tests {
 
         // Launch the process
         let child_job_dup = child_job.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let mut launch_info = fprocess::LaunchInfo {
+        let launch_info = fprocess::LaunchInfo {
             executable: vmo,
             job: child_job_dup,
             name: "panic_on_start".to_string(),
         };
         let (status, _process) =
-            launcher_proxy.launch(&mut launch_info).await.context("failed to launch process")?;
+            launcher_proxy.launch(launch_info).await.context("failed to launch process")?;
         zx::Status::ok(status).context("error returned by process launcher")?;
 
         // The process panics when it starts, so wait for a message on the exceptions stream

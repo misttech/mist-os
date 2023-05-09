@@ -94,9 +94,9 @@ mod tests {
     // Writes a test input using the given `corpus_reader`.
     async fn send_one_input(corpus_reader: &fuzz::CorpusReaderProxy, data: Vec<u8>) -> Result<()> {
         let input_pair = InputPair::try_from_data(data)?;
-        let (mut fidl_input, input) = input_pair.as_tuple();
+        let (fidl_input, input) = input_pair.as_tuple();
         let (response, _) = futures::try_join!(
-            async move { corpus_reader.next(&mut fidl_input).await.map_err(Error::msg) },
+            async move { corpus_reader.next(fidl_input).await.map_err(Error::msg) },
             input.send(),
         )?;
         zx::Status::ok(response).map_err(Error::msg)

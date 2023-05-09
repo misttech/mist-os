@@ -20,7 +20,7 @@ async fn launch_and_test_v1_component() {
     let (directory, directory_request) =
         create_proxy::<fio::DirectoryMarker>().expect("create dir proxy");
 
-    let mut launch_info = fsys::LaunchInfo {
+    let launch_info = fsys::LaunchInfo {
         url: url.to_string(),
         arguments: None,
         out: None,
@@ -34,7 +34,7 @@ async fn launch_and_test_v1_component() {
         create_proxy::<fsys::ComponentControllerMarker>().expect("create component controller");
 
     launcher_proxy
-        .create_component(&mut launch_info, Some(component_controller_server))
+        .create_component(launch_info, Some(component_controller_server))
         .expect("create component");
 
     match component_controller.take_event_stream().try_next().await.expect("get event") {
@@ -58,7 +58,7 @@ async fn launch_v1_logging_component() {
     let launcher_proxy = connect_to_protocol::<fsys::LauncherMarker>().expect("failed to connect");
     let url = "fuchsia-pkg://fuchsia.com/test_manager_legacy_test#meta/logging_component.cmx";
 
-    let mut launch_info = fsys::LaunchInfo {
+    let launch_info = fsys::LaunchInfo {
         url: url.to_string(),
         arguments: None,
         out: None,
@@ -72,7 +72,7 @@ async fn launch_v1_logging_component() {
         create_proxy::<fsys::ComponentControllerMarker>().expect("create component controller");
 
     launcher_proxy
-        .create_component(&mut launch_info, Some(component_controller_server))
+        .create_component(launch_info, Some(component_controller_server))
         .expect("create component");
 
     let mut events = component_controller.take_event_stream();
@@ -92,7 +92,7 @@ async fn test_debug_data_for_v1_component() {
     let launcher_proxy = connect_to_protocol::<fsys::LauncherMarker>().expect("failed to connect");
     let url = "fuchsia-pkg://fuchsia.com/test_manager_legacy_test#meta/debug_data_test_v1.cmx";
 
-    let mut launch_info = fsys::LaunchInfo {
+    let launch_info = fsys::LaunchInfo {
         url: url.to_string(),
         arguments: None,
         out: None,
@@ -106,7 +106,7 @@ async fn test_debug_data_for_v1_component() {
         create_proxy::<fsys::ComponentControllerMarker>().expect("create component controller");
 
     launcher_proxy
-        .create_component(&mut launch_info, Some(component_controller_server))
+        .create_component(launch_info, Some(component_controller_server))
         .expect("create component");
 
     let mut events = component_controller.take_event_stream();

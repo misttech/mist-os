@@ -126,7 +126,7 @@ pub async fn launch_with_handles(
     };
 
     // Spawn the dash process.
-    let mut info = create_launch_info(process_name, &job).await?;
+    let info = create_launch_info(process_name, &job).await?;
     launcher.add_names(name_infos).map_err(|_| LauncherError::ProcessLauncher)?;
     launcher.add_handles(handle_infos).map_err(|_| LauncherError::ProcessLauncher)?;
     launcher.add_args(&args).map_err(|_| LauncherError::ProcessLauncher)?;
@@ -134,7 +134,7 @@ pub async fn launch_with_handles(
     let env_vars = &[path_envvar.into_bytes()];
     launcher.add_environs(env_vars).map_err(|_| LauncherError::ProcessLauncher)?;
     let (status, process) =
-        launcher.launch(&mut info).await.map_err(|_| LauncherError::ProcessLauncher)?;
+        launcher.launch(info).await.map_err(|_| LauncherError::ProcessLauncher)?;
     zx::Status::ok(status).map_err(|_| LauncherError::ProcessLauncher)?;
     let process = process.ok_or(LauncherError::ProcessLauncher)?;
 

@@ -248,8 +248,8 @@ pub async fn serve_controller(
                 let corpus_reader = corpus_reader.into_proxy()?;
                 if let Some(input_to_send) = fake.take_input_to_send() {
                     let input_pair = InputPair::try_from_data(input_to_send)?;
-                    let (mut fidl_input, input) = input_pair.as_tuple();
-                    let corpus_fut = corpus_reader.next(&mut fidl_input);
+                    let (fidl_input, input) = input_pair.as_tuple();
+                    let corpus_fut = corpus_reader.next(fidl_input);
                     let input_fut = input.send();
                     let results = join!(corpus_fut, input_fut);
                     assert!(results.0.is_ok());

@@ -92,8 +92,8 @@ async fn main() -> Result<(), Error> {
     let mut acceptor2 = acceptor2.into_stream()?;
     let mut acceptor3 = acceptor3.into_stream()?;
 
-    let (mut data_stream, client_end, mut con) = make_con()?;
-    let _port = vsock.connect(2, 8000, &mut con).await?.0;
+    let (mut data_stream, client_end, con) = make_con()?;
+    let _port = vsock.connect(2, 8000, con).await?.0;
     test_read_write(&mut data_stream, &client_end).await?;
 
     client_end.shutdown()?;

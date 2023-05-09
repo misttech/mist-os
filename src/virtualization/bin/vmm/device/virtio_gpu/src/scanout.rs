@@ -201,16 +201,16 @@ impl FlatlandScanout {
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
             create_proxy::<ParentViewportWatcherMarker>()
                 .context("failed to create ParentViewportWatcherProxy")?;
-        let (mut view_token, viewport_token) = create_view_creation_tokens();
+        let (view_token, viewport_token) = create_view_creation_tokens();
         let viewref_pair = ViewRefPair::new()?;
         let view_ref_for_presenter = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
-        let mut view_ref_for_keyboard = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
-        let mut view_identity = ViewIdentityOnCreation::from(viewref_pair);
+        let view_ref_for_keyboard = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
+        let view_identity = ViewIdentityOnCreation::from(viewref_pair);
         let view_bound_protocols = ViewBoundProtocols { mouse_source, ..Default::default() };
         flatland
             .create_view2(
-                &mut view_token,
-                &mut view_identity,
+                view_token,
+                view_identity,
                 view_bound_protocols,
                 parent_viewport_watcher_request,
             )
@@ -219,7 +219,7 @@ impl FlatlandScanout {
         // If we have a keyboard listener for a virtio-input device, connect it to our view now.
         let keyboard = if let Some(keyboard_listener) = keyboard_listener {
             let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()?;
-            match keyboard.add_listener(&mut view_ref_for_keyboard, keyboard_listener).await {
+            match keyboard.add_listener(view_ref_for_keyboard, keyboard_listener).await {
                 Err(e) => {
                     tracing::warn!("Failed to register keyboard listener: {}", e);
                     None
@@ -373,12 +373,12 @@ impl FlatlandScanout {
             ..Default::default()
         };
 
-        let mut import_token = resource
+        let import_token = resource
             .import_token()
             .ok_or_else(|| anyhow!("No import_token available for resource VMO"))?;
 
         self.flatland
-            .create_image(&mut content_id.clone(), &mut import_token, 0, image_props)
+            .create_image(&mut content_id.clone(), import_token, 0, image_props)
             .context("Failed to create image")?;
         let mut size = fmath::SizeU { width: resource.width(), height: resource.height() };
         self.flatland.set_image_destination_size(&mut content_id.clone(), &mut size)?;

@@ -137,7 +137,7 @@ impl<'a> AppModel<'a> {
             self.flatland
                 .create_image(
                     &mut IMAGE_IDS[image_index].clone(),
-                    &mut renderer.duplicate_buffer_collection_import_token(),
+                    renderer.duplicate_buffer_collection_import_token(),
                     image_index as u32,
                     image_props.clone(),
                 )
@@ -165,8 +165,8 @@ impl<'a> AppModel<'a> {
 
     fn create_parent_viewport_watcher(
         &mut self,
-        mut view_creation_token: fviews::ViewCreationToken,
-        mut view_identity: fviews::ViewIdentityOnCreation,
+        view_creation_token: fviews::ViewCreationToken,
+        view_identity: fviews::ViewIdentityOnCreation,
     ) {
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
             create_proxy::<fland::ParentViewportWatcherMarker>()
@@ -189,8 +189,8 @@ impl<'a> AppModel<'a> {
         // relayout when receive the initial layout info.  See CreateView() FIDL docs.
         self.flatland
             .create_view2(
-                &mut view_creation_token,
-                &mut view_identity,
+                view_creation_token,
+                view_identity,
                 view_bound_protocols,
                 parent_viewport_watcher_request,
             )

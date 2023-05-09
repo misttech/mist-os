@@ -99,10 +99,10 @@ impl TestGraphicalPresenter {
                 service = self.service_fs.next().fuse() => self.handle_incoming_service_connection(service).await,
                 request = self.view_provider.next() => match request {
                     Some(Ok(ViewProviderRequest::CreateView2 { args, .. })) => {
-                        if let Some(mut token) = args.view_creation_token {
+                        if let Some( token) = args.view_creation_token {
                             if let Some(viewport_watcher_request) = self.parent_viewport_request.take() {
                                 let viewref_pair = fuchsia_scenic::ViewRefPair::new()?;
-                                let mut view_identity =
+                                let  view_identity =
                                                     fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
                                 let (view_focused_proxy, view_focused) = fidl::endpoints::create_proxy::<ViewRefFocusedMarker>()
                                     .expect("Failed to create ViewRefFocused channel");
@@ -112,8 +112,8 @@ impl TestGraphicalPresenter {
                                     ..Default::default()
                                 };
                                 self.flatland.create_view2(
-                                    &mut token,
-                                    &mut view_identity,
+                                   token,
+                                   view_identity,
                                     view_bound_protocols,
                                     viewport_watcher_request)?;
 
@@ -306,7 +306,7 @@ impl TestGraphicalPresenter {
 
     fn present_view(
         &mut self,
-        mut viewport_creation_token: ViewportCreationToken,
+        viewport_creation_token: ViewportCreationToken,
         view_controller_request_stream: Option<ViewControllerRequestStream>,
     ) -> Result<ChildView, Error> {
         // The child view will take up the entire size of our root view.
@@ -322,7 +322,7 @@ impl TestGraphicalPresenter {
         self.flatland
             .create_viewport(
                 &mut VIEWPORT_CONTENT_ID.clone(),
-                &mut viewport_creation_token,
+                viewport_creation_token,
                 viewport_properties,
                 child_view_watcher_request,
             )
@@ -348,7 +348,7 @@ impl TestGraphicalPresenter {
             );
             loop {
                 match child_view_ref_stream.next().await {
-                    Some(Ok(mut token)) => match view_focuser.request_focus(&mut token).await {
+                    Some(Ok(token)) => match view_focuser.request_focus(token).await {
                         Ok(Ok(())) => {}
                         Ok(Err(e)) => {
                             tracing::error!("Error requesting focus:: {:?}", e);

@@ -529,7 +529,7 @@ mod tests {
             startup_proxy
                 .start(
                     ramdisk.open().await.expect("Unable to open ramdisk").into(),
-                    &mut StartOptions {
+                    StartOptions {
                         read_only: false,
                         verbose: false,
                         fsck_after_every_transaction: false,

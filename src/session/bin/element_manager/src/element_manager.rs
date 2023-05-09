@@ -260,7 +260,7 @@ impl ElementManager {
         annotation_controller: Option<ClientEnd<felement::AnnotationControllerMarker>>,
     ) -> Result<(fuiapp::ViewProviderProxy, felement::ViewControllerProxy), Error> {
         let view_provider = element.connect_to_protocol::<fuiapp::ViewProviderMarker>()?;
-        let scenic::ViewRefPair { mut control_ref, mut view_ref } = scenic::ViewRefPair::new()?;
+        let scenic::ViewRefPair { control_ref, view_ref } = scenic::ViewRefPair::new()?;
         let view_ref_dup = scenic::duplicate_view_ref(&view_ref)?;
         let mut view_spec = felement::ViewSpec {
             annotations: Some(initial_annotations),
@@ -290,8 +290,8 @@ impl ElementManager {
             // only wants to allow graphical views.
             view_provider.create_view_with_view_ref(
                 token_pair.view_token.value,
-                &mut control_ref,
-                &mut view_ref,
+                control_ref,
+                view_ref,
             )?;
 
             view_spec.view_holder_token = Some(token_pair.view_holder_token);

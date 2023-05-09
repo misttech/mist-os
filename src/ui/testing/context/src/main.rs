@@ -102,7 +102,7 @@ async fn run_context_server(
                     .root
                     .connect_to_protocol_at_exposed_dir::<test_scene::ControllerMarker>()
                     .expect("failed to connect to scene controller");
-                let mut root_view_token_pair = scenic::flatland::ViewCreationTokenPair::new()
+                let root_view_token_pair = scenic::flatland::ViewCreationTokenPair::new()
                     .expect("failed to create root view token pair");
                 let present_view_request = test_scene::ControllerPresentClientViewRequest {
                     viewport_creation_token: Some(root_view_token_pair.viewport_creation_token),
@@ -112,7 +112,7 @@ async fn run_context_server(
                     .present_client_view(present_view_request)
                     .expect("failed to present root puppet view");
                 responder
-                    .send(&mut root_view_token_pair.view_creation_token)
+                    .send(root_view_token_pair.view_creation_token)
                     .expect("failed to respond to `GetRootViewToken`");
             }
             ui_test_context::ContextRequest::ConnectToPuppetUnderTest {

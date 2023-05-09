@@ -248,7 +248,7 @@ impl ScenicViewStrategy {
     }
 
     fn listen_for_key_events(
-        mut view_ref: ViewRef,
+        view_ref: ViewRef,
         app_sender: &UnboundedSender<MessageInternal>,
         key: ViewKey,
     ) -> Result<(), Error> {
@@ -261,7 +261,7 @@ impl ScenicViewStrategy {
         let event_sender = app_sender.clone();
 
         fasync::Task::local(async move {
-            keyboard.add_listener(&mut view_ref, listener_client_end).await.expect("add_listener");
+            keyboard.add_listener(view_ref, listener_client_end).await.expect("add_listener");
 
             while let Some(event) =
                 listener_stream.try_next().await.expect("Failed to get next key event")

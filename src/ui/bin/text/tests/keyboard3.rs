@@ -169,7 +169,7 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
     let view_ref = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client
-        .add_listener(&mut scenic::duplicate_view_ref(&view_ref)?, listener_client_end)
+        .add_listener(scenic::duplicate_view_ref(&view_ref)?, listener_client_end)
         .await
         .expect("add_listener for first client");
 
@@ -179,12 +179,12 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
     let other_view_ref = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_other_client
-        .add_listener(&mut scenic::duplicate_view_ref(&other_view_ref)?, other_listener_client_end)
+        .add_listener(scenic::duplicate_view_ref(&other_view_ref)?, other_listener_client_end)
         .await
         .expect("add_listener for another client");
 
     // Focus second client.
-    focus_ctl.notify(&mut scenic::duplicate_view_ref(&other_view_ref)?).await?;
+    focus_ctl.notify(scenic::duplicate_view_ref(&other_view_ref)?).await?;
 
     // Drop proxy, emulating first client disconnecting from it.
     std::mem::drop(keyboard_service_client);
@@ -255,7 +255,7 @@ async fn test_sync_cancel_with_connections(
     let view_ref_a = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client_a
-        .add_listener(&mut scenic::duplicate_view_ref(&view_ref_a)?, listener_client_end_a)
+        .add_listener(scenic::duplicate_view_ref(&view_ref_a)?, listener_client_end_a)
         .await
         .expect("add_listener for first client");
 
@@ -265,7 +265,7 @@ async fn test_sync_cancel_with_connections(
     let view_ref_b = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client_b
-        .add_listener(&mut scenic::duplicate_view_ref(&view_ref_b)?, listener_client_end_b)
+        .add_listener(scenic::duplicate_view_ref(&view_ref_b)?, listener_client_end_b)
         .await
         .expect("add_listener for another client");
 
@@ -284,7 +284,7 @@ async fn test_sync_cancel_with_connections(
     };
 
     // Focus client A.
-    focus_ctl.notify(&mut scenic::duplicate_view_ref(&view_ref_a)?).await?;
+    focus_ctl.notify(scenic::duplicate_view_ref(&view_ref_a)?).await?;
 
     // Press the key and expect client A to receive the event.
     dispatch_and_expect_key_event(&key_simulator, &mut listener_a, event1_press).await?;
@@ -294,7 +294,7 @@ async fn test_sync_cancel_with_connections(
     // Focus client B.
     // Expect a cancel event for client A and a sync event for the client B.
     let (focus_result, client_a_event, client_b_event) = future::join3(
-        focus_ctl.notify(&mut scenic::duplicate_view_ref(&view_ref_b)?),
+        focus_ctl.notify(scenic::duplicate_view_ref(&view_ref_b)?),
         expect_key_event(&mut listener_a),
         expect_key_event(&mut listener_b),
     )
@@ -328,7 +328,7 @@ async fn test_sync_cancel_with_connections(
     assert!(listener_a.next().now_or_never().is_none(), "listener_a should have no more events");
 
     // Focus client A again.
-    focus_ctl.notify(&mut scenic::duplicate_view_ref(&view_ref_a)?).await?;
+    focus_ctl.notify(scenic::duplicate_view_ref(&view_ref_a)?).await?;
 
     assert!(
         listener_a.next().now_or_never().is_none(),
@@ -386,12 +386,12 @@ impl TestHandles {
         let _keyboard_service: ui_input3::KeyboardProxy =
             _test_env.connect_to_keyboard_service()?;
         _keyboard_service
-            .add_listener(&mut scenic::duplicate_view_ref(&_view_ref)?, listener_client_end)
+            .add_listener(scenic::duplicate_view_ref(&_view_ref)?, listener_client_end)
             .await
             .expect("add_listener");
 
         let focus_controller = _test_env.connect_to_focus_controller()?;
-        focus_controller.notify(&mut scenic::duplicate_view_ref(&_view_ref)?).await?;
+        focus_controller.notify(scenic::duplicate_view_ref(&_view_ref)?).await?;
 
         let injector_service = _test_env.connect_to_key_event_injector()?;
 

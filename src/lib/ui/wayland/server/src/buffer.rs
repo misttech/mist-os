@@ -76,11 +76,11 @@ impl Image {
                     fmath::SizeU { width: self.size.width as u32, height: self.size.height as u32 };
                 let image_props = ImageProperties { size: Some(size), ..Default::default() };
                 let content_id = flatland.borrow_mut().alloc_content_id();
-                let mut import_token = BufferCollectionImportToken { value: raw_import_token };
+                let import_token = BufferCollectionImportToken { value: raw_import_token };
                 flatland
                     .borrow()
                     .proxy()
-                    .create_image(&mut content_id.clone(), &mut import_token, 0, image_props)
+                    .create_image(&mut content_id.clone(), import_token, 0, image_props)
                     .expect("fidl error");
                 let content = Content { id: content_id, flatland: flatland.clone() };
 

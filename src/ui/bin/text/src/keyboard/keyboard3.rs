@@ -459,7 +459,7 @@ mod tests {
             let view_ref = scenic::ViewRefPair::new()?.view_ref;
 
             self.keyboard_proxy
-                .add_listener(&mut scenic::duplicate_view_ref(&view_ref)?, listener_client_end)
+                .add_listener(scenic::duplicate_view_ref(&view_ref)?, listener_client_end)
                 .await
                 .expect("add_listener");
             Ok((view_ref, listener))

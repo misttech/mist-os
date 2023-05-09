@@ -141,10 +141,10 @@ impl AudioFacade {
         const DURATION: std::time::Duration = std::time::Duration::from_secs(1);
         const FRAMES_PER_SECOND: u32 = 44100;
 
-        let (mut buffer, mut stream_type) =
+        let (buffer, mut stream_type) =
             self.sound_in_buffer(FREQUENCY, VOLUME, FRAMES_PER_SECOND, DURATION)?;
 
-        match self.player_proxy.add_sound_buffer(*id, &mut buffer, &mut stream_type) {
+        match self.player_proxy.add_sound_buffer(*id, buffer, &mut stream_type) {
             Ok(()) => (),
             Err(e) => return Err(format_err!("Cannot add sound to buffer: {}", e)),
         };

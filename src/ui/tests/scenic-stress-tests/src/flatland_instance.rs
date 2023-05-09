@@ -33,22 +33,22 @@ pub fn clone_view_ref(view_ref: &fviews::ViewRef) -> fviews::ViewRef {
 // Creates a flatland instance with a View and a solid fill rectangle, returning the ViewRef and
 // root transform id.
 async fn create_instance(
-    mut token: fviews::ViewCreationToken,
+    token: fviews::ViewCreationToken,
     realm: &ScopedInstance,
 ) -> (flatland::FlatlandProxy, fviews::ViewRef, flatland::TransformId) {
     let flatland_instance = realm
         .connect_to_protocol_at_exposed_dir::<flatland::FlatlandMarker>()
         .expect("Failed to connect Flatland instance");
-    let mut view_identity = fviews::ViewIdentityOnCreation::from(
+    let view_identity = fviews::ViewIdentityOnCreation::from(
         scenic::ViewRefPair::new().expect("failed to create ViewRefPair"),
     );
-    let view_ref = clone_view_ref(&mut view_identity.view_ref);
+    let view_ref = clone_view_ref(&view_identity.view_ref);
     let (_, parent_viewport_watcher_request) =
         create_proxy::<flatland::ParentViewportWatcherMarker>().unwrap();
     flatland_instance
         .create_view2(
-            &mut token,
-            &mut view_identity,
+            token,
+            view_identity,
             flatland::ViewBoundProtocols::default(),
             parent_viewport_watcher_request,
         )
@@ -67,7 +67,7 @@ async fn create_instance(
 // Does not call present.
 fn create_viewport(
     proxy: &flatland::FlatlandProxy,
-    mut token: fviews::ViewportCreationToken,
+    token: fviews::ViewportCreationToken,
     mut viewport_id: flatland::ContentId,
 ) {
     let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>()
@@ -75,7 +75,7 @@ fn create_viewport(
     proxy
         .create_viewport(
             &mut viewport_id,
-            &mut token,
+            token,
             flatland::ViewportProperties {
                 logical_size: Some(fmath::SizeU {
                     width: DISPLAY_WIDTH as u32,
@@ -190,7 +190,7 @@ impl FlatlandInstance {
     pub async fn new_root(realm: &ScopedInstance) -> (Self, fviews::ViewRef, fviews::ViewRef) {
         let fuchsia_scenic::flatland::ViewCreationTokenPair {
             view_creation_token: root_view_creation_token,
-            viewport_creation_token: mut root_viewport_creation_token,
+            viewport_creation_token: root_viewport_creation_token,
         } = fuchsia_scenic::flatland::ViewCreationTokenPair::new()
             .expect("failed to create token pair");
 
@@ -202,7 +202,7 @@ impl FlatlandInstance {
             let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>()
                 .expect("failed to create ChildViewWatcher endpoints");
             flatland_display
-                .set_content(&mut root_viewport_creation_token, child_view_watcher)
+                .set_content(root_viewport_creation_token, child_view_watcher)
                 .expect("Failure setting the display");
         }
 
@@ -259,11 +259,11 @@ impl FlatlandInstance {
             .connect_to_protocol_at_exposed_dir::<flatland::FlatlandMarker>()
             .expect("Failed to connect Flatland instance");
         let fuchsia_scenic::flatland::ViewCreationTokenPair {
-            mut view_creation_token,
+            view_creation_token,
             viewport_creation_token,
         } = fuchsia_scenic::flatland::ViewCreationTokenPair::new()
             .expect("failed to create token pair");
-        let mut view_identity = fviews::ViewIdentityOnCreation::from(
+        let view_identity = fviews::ViewIdentityOnCreation::from(
             scenic::ViewRefPair::new().expect("failed to create ViewRefPair"),
         );
         let (_, parent_viewport_watcher) =
@@ -276,12 +276,7 @@ impl FlatlandInstance {
             ..Default::default()
         };
         flatland_instance
-            .create_view2(
-                &mut view_creation_token,
-                &mut view_identity,
-                protocols,
-                parent_viewport_watcher,
-            )
+            .create_view2(view_creation_token, view_identity, protocols, parent_viewport_watcher)
             .expect("Failure creating view");
 
         let mut root_transform = flatland::TransformId { value: get_next_global_id() };

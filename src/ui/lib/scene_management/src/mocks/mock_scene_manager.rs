@@ -73,7 +73,7 @@ impl SceneManager for MockSceneManager {
 
     fn request_focus(
         &self,
-        view_ref: &mut ui_views::ViewRef,
+        view_ref: ui_views::ViewRef,
     ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult> {
         unimplemented!()
     }

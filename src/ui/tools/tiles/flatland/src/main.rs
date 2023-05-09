@@ -128,21 +128,18 @@ impl Service {
     ) -> Service {
         session.set_debug_name("Tiles Service").expect("fidl error");
 
-        let mut view_creation_tokens =
+        let view_creation_tokens =
             flatland::ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
         let (_, child_view_watcher_request) = create_proxy::<flatland::ChildViewWatcherMarker>()
             .expect("failed to create ChildViewWatcher endpoints");
         display
-            .set_content(
-                &mut view_creation_tokens.viewport_creation_token,
-                child_view_watcher_request,
-            )
+            .set_content(view_creation_tokens.viewport_creation_token, child_view_watcher_request)
             .expect("fidl error");
 
         let (parent_viewport_watcher_proxy, parent_viewport_watcher_request) =
             create_proxy::<flatland::ParentViewportWatcherMarker>()
                 .expect("failed to create ParentViewportWatcher endpoints");
-        let mut view_identity = ui_views::ViewIdentityOnCreation::from(
+        let view_identity = ui_views::ViewIdentityOnCreation::from(
             scenic::ViewRefPair::new().expect("failed to create ViewRefPair"),
         );
         let (focuser, focuser_request) =
@@ -153,8 +150,8 @@ impl Service {
         };
         session
             .create_view2(
-                &mut view_creation_tokens.view_creation_token,
-                &mut view_identity,
+                view_creation_tokens.view_creation_token,
+                view_identity,
                 view_bound_protocols,
                 parent_viewport_watcher_request,
             )
@@ -224,7 +221,7 @@ impl Service {
     ) -> Result<(), Error> {
         let id = self.next_id;
 
-        let mut view_creation_tokens = flatland::ViewCreationTokenPair::new()?;
+        let view_creation_tokens = flatland::ViewCreationTokenPair::new()?;
         view_provider
             .create_view2(ui_app::CreateView2Args {
                 view_creation_token: Some(view_creation_tokens.view_creation_token),
@@ -252,7 +249,7 @@ impl Service {
         self.session
             .create_viewport(
                 &mut link_id,
-                &mut view_creation_tokens.viewport_creation_token,
+                view_creation_tokens.viewport_creation_token,
                 link_properties,
                 child_view_watcher_request,
             )
@@ -484,8 +481,8 @@ async fn main() -> Result<(), Error> {
                     service.relayout();
                 }
             }
-            MessageInternal::ReceivedChildViewRef(mut view_ref) => {
-                let result = service.focuser.request_focus(&mut view_ref);
+            MessageInternal::ReceivedChildViewRef(view_ref) => {
+                let result = service.focuser.request_focus(view_ref);
                 fasync::Task::local(async move {
                     match result.await {
                         Ok(Ok(())) => {}

@@ -4492,7 +4492,7 @@ mod tests {
             .read_only_directory(
                 "data",
                 &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
-                &mut ftest::DirectoryContents {
+                ftest::DirectoryContents {
                     entries: vec![ftest::DirectoryEntry {
                         file_path: "hippos".to_string(),
                         file_contents: {

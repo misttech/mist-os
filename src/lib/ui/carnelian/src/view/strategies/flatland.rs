@@ -155,10 +155,10 @@ impl Plumber {
                 ..Default::default()
             };
             let mut flatland_image_id = flatland::ContentId { value: image_id as u64 };
-            let mut import_token = duplicate_import_token(&buffer_tokens.import_token)?;
+            let import_token = duplicate_import_token(&buffer_tokens.import_token)?;
             flatland.create_image(
                 &mut flatland_image_id.clone(),
-                &mut import_token,
+                import_token,
                 uindex,
                 image_props,
             )?;
@@ -289,7 +289,7 @@ impl FlatlandViewStrategy {
         flatland: &flatland::FlatlandProxy,
         app_sender: UnboundedSender<MessageInternal>,
         view_key: ViewKey,
-        mut view_creation_token: fidl_fuchsia_ui_views::ViewCreationToken,
+        view_creation_token: fidl_fuchsia_ui_views::ViewCreationToken,
     ) -> Result<(), Error> {
         let (parent_viewport_watcher, server_end) =
             create_proxy::<flatland::ParentViewportWatcherMarker>()?;
@@ -300,8 +300,7 @@ impl FlatlandViewStrategy {
         // Use CreateView2 if input events are expected.
         let input = Config::get().input;
         if input {
-            let mut view_identity =
-                fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
+            let view_identity = fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
             let mut view_bound_protocols = flatland::ViewBoundProtocols::default();
 
             let (touch_client, touch_server) = create_endpoints();
@@ -313,8 +312,8 @@ impl FlatlandViewStrategy {
             view_bound_protocols.view_ref_focused = Some(view_ref_focused_server);
 
             flatland.create_view2(
-                &mut view_creation_token,
-                &mut view_identity,
+                view_creation_token,
+                view_identity,
                 view_bound_protocols,
                 server_end,
             )?;
@@ -419,7 +418,7 @@ impl FlatlandViewStrategy {
 
             Self::listen_for_key_events(view_ref, &app_sender, view_key)?;
         } else {
-            flatland.create_view(&mut view_creation_token, server_end)?;
+            flatland.create_view(view_creation_token, server_end)?;
         }
 
         let sender = app_sender.clone();
@@ -648,7 +647,7 @@ impl FlatlandViewStrategy {
     }
 
     fn listen_for_key_events(
-        mut view_ref: ViewRef,
+        view_ref: ViewRef,
         app_sender: &UnboundedSender<MessageInternal>,
         key: ViewKey,
     ) -> Result<(), Error> {
@@ -661,7 +660,7 @@ impl FlatlandViewStrategy {
         let event_sender = app_sender.clone();
 
         fasync::Task::local(async move {
-            keyboard.add_listener(&mut view_ref, listener_client_end).await.expect("add_listener");
+            keyboard.add_listener(view_ref, listener_client_end).await.expect("add_listener");
 
             while let Some(event) =
                 listener_stream.try_next().await.expect("Failed to get next key event")

@@ -87,14 +87,14 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         value = echo
-                            .echo_struct(&mut value, "")
+                            .echo_struct(value, "")
                             .await
                             .context("Error calling echo_struct on proxy")?;
                     }
-                    responder.send(&mut value).context("Error responding")?;
+                    responder.send(value).context("Error responding")?;
                 }
                 EchoRequest::EchoStructWithError {
-                    mut value,
+                    value,
                     result_err,
                     forward_to_server,
                     result_variant,
@@ -103,7 +103,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut result = echo
-                            .echo_struct_with_error(&mut value, result_err, "", result_variant)
+                            .echo_struct_with_error(value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_struct_with_error on proxy")?;
                         responder.send(&mut result).context("Error responding")?;
@@ -123,7 +123,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                 } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        echo.echo_struct_no_ret_val(&mut value, "")
+                        echo.echo_struct_no_ret_val(value, "")
                             .context("Error sending echo_struct_no_ret_val to proxy")?;
                         let mut event_stream = echo.take_event_stream();
                         if let EchoEvent::EchoEvent { value: response_val } = event_stream
@@ -137,22 +137,20 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                             panic!("Unexpected event type");
                         }
                     }
-                    control_handle
-                        .send_echo_event(&mut value)
-                        .context("Error responding with event")?;
+                    control_handle.send_echo_event(value).context("Error responding with event")?;
                 }
                 EchoRequest::EchoArrays { mut value, forward_to_server, responder } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         value = echo
-                            .echo_arrays(&mut value, "")
+                            .echo_arrays(value, "")
                             .await
                             .context("Error calling echo_arrays on proxy")?;
                     }
-                    responder.send(&mut value).context("Error responding")?;
+                    responder.send(value).context("Error responding")?;
                 }
                 EchoRequest::EchoArraysWithError {
-                    mut value,
+                    value,
                     result_err,
                     forward_to_server,
                     result_variant,
@@ -161,7 +159,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut result = echo
-                            .echo_arrays_with_error(&mut value, result_err, "", result_variant)
+                            .echo_arrays_with_error(value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_struct_with_error on proxy")?;
                         responder.send(&mut result).context("Error responding")?;
@@ -178,14 +176,14 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         value = echo
-                            .echo_vectors(&mut value, "")
+                            .echo_vectors(value, "")
                             .await
                             .context("Error calling echo_vectors on proxy")?;
                     }
-                    responder.send(&mut value).context("Error responding")?;
+                    responder.send(value).context("Error responding")?;
                 }
                 EchoRequest::EchoVectorsWithError {
-                    mut value,
+                    value,
                     result_err,
                     forward_to_server,
                     result_variant,
@@ -194,7 +192,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut result = echo
-                            .echo_vectors_with_error(&mut value, result_err, "", result_variant)
+                            .echo_vectors_with_error(value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_struct_with_error on proxy")?;
                         responder.send(&mut result).context("Error responding")?;

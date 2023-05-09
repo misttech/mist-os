@@ -78,9 +78,9 @@ impl AppLauncher {
 
         static IMAGE_DATA: &'static [u8] = include_bytes!("../app_launcher.png");
         let (bytes, width, height) = load_png(Cursor::new(IMAGE_DATA)).expect("Failed to load png");
-        let mut image_data = load_image_from_bytes(&bytes, width, height).await?;
+        let image_data = load_image_from_bytes(&bytes, width, height).await?;
 
-        let image = window.create_image(&mut image_data)?;
+        let image = window.create_image(image_data)?;
         image.set_size(LAUNCHER_IMG_WIDTH, LAUNCHER_IMG_HEIGHT)?;
         image.set_blend_mode(ui_comp::BlendMode::SrcOver)?;
         window.set_content(window.get_root_transform_id(), image.get_content_id())?;

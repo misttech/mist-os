@@ -532,8 +532,8 @@ pub async fn handle_accessibility_view_registry_request_stream(
                 let r = scene_manager.insert_a11y_view(a11y_view_token).await;
 
                 let _ = match r {
-                    Ok(mut result) => {
-                        let _ = responder.send(&mut result);
+                    Ok(result) => {
+                        let _ = responder.send(result);
                     }
                     Err(e) => {
                         warn!("Closing A11yViewRegistry connection due to error {:?}", e);

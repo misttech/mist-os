@@ -61,7 +61,7 @@ impl ChildView {
         height: u32,
         event_sender: EventSender,
     ) -> Result<Self, Error> {
-        let mut viewport_creation_token = match view_spec_holder.view_spec.viewport_creation_token {
+        let viewport_creation_token = match view_spec_holder.view_spec.viewport_creation_token {
             Some(token) => token,
             None => {
                 return Err(format_err!("Ignoring non-flatland client's attempt to present."));
@@ -75,7 +75,7 @@ impl ChildView {
 
         flatland.create_viewport(
             &mut viewport_content_id.clone(),
-            &mut viewport_creation_token,
+            viewport_creation_token,
             ui_comp::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width, height }),
                 ..Default::default()

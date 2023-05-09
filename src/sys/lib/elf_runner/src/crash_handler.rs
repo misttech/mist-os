@@ -131,13 +131,13 @@ mod tests {
 
         // Create the process, but don't start it yet
         let child_job_dup = child_job.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let mut launch_info = fprocess::LaunchInfo {
+        let launch_info = fprocess::LaunchInfo {
             executable: vmo,
             job: child_job_dup,
             name: "panic_on_start".to_string(),
         };
         let (status, process_start_data) = launcher_proxy
-            .create_without_starting(&mut launch_info)
+            .create_without_starting(launch_info)
             .await
             .context("failed to launch process")?;
         zx::Status::ok(status).context("error returned by process launcher")?;

@@ -383,7 +383,7 @@ impl ElfRunner {
 
         let break_on_start = start_info.break_on_start.take();
 
-        let (utc_clock_xform, mut launch_info, runtime_dir_builder, tasks) = match self
+        let (utc_clock_xform, launch_info, runtime_dir_builder, tasks) = match self
             .configure_launcher(
                 &resolved_url,
                 start_info,
@@ -422,7 +422,7 @@ impl ElfRunner {
         }
 
         // Launch the component
-        let (status, process) = launcher.launch(&mut launch_info).await.map_err(|err| {
+        let (status, process) = launcher.launch(launch_info).await.map_err(|err| {
             ElfRunnerError::ProcessLauncherFidlError { url: resolved_url.clone(), err }
         })?;
         zx::Status::ok(status).map_err(|status| ElfRunnerError::CreateProcessFailed {

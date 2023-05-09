@@ -269,13 +269,13 @@ mod tests {
     #[fuchsia::test]
     async fn start_util_with_args() -> Result<(), Error> {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
-        let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
+        let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_args = &["arg0", "arg1", "arg2"];
         let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes().to_vec()).collect();
         launcher.add_args(&test_args_bytes)?;
 
-        let (status, process) = launcher.launch(&mut launch_info).await?;
+        let (status, process) = launcher.launch(launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -291,14 +291,14 @@ mod tests {
     #[fuchsia::test]
     async fn start_util_with_env() -> Result<(), Error> {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
-        let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
+        let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_env = &[("VAR1", "value2"), ("VAR2", "value2")];
         let test_env_strs: Vec<_> = test_env.iter().map(|v| format!("{}={}", v.0, v.1)).collect();
         let test_env_bytes: Vec<_> = test_env_strs.into_iter().map(|s| s.into_bytes()).collect();
         launcher.add_environs(&test_env_bytes)?;
 
-        let (status, process) = launcher.launch(&mut launch_info).await?;
+        let (status, process) = launcher.launch(launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -313,7 +313,7 @@ mod tests {
     #[fuchsia::test]
     async fn start_util_with_namespace_entries() -> Result<(), Error> {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
-        let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
+        let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let mut randbuf = [0; 8];
         zx::cprng_draw(&mut randbuf);
@@ -339,7 +339,7 @@ mod tests {
         }];
         launcher.add_names(name_infos)?;
 
-        let (status, process) = launcher.launch(&mut launch_info).await?;
+        let (status, process) = launcher.launch(launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -355,13 +355,13 @@ mod tests {
     #[fuchsia::test]
     async fn create_without_starting() -> Result<(), Error> {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
-        let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
+        let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_args = &["arg0", "arg1", "arg2"];
         let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes().to_vec()).collect();
         launcher.add_args(&test_args_bytes)?;
 
-        let (status, start_data) = launcher.create_without_starting(&mut launch_info).await?;
+        let (status, start_data) = launcher.create_without_starting(launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let start_data = start_data.expect("Status was OK but no ProcessStartData returned");
 

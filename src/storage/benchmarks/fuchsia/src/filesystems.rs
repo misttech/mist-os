@@ -316,7 +316,7 @@ impl MemfsInstance {
         let startup = connect_to_childs_protocol::<StartupMarker>("memfs".to_string(), None)
             .await
             .expect("Failed to connect to memfs");
-        let mut options = StartOptions {
+        let options = StartOptions {
             read_only: false,
             verbose: false,
             fsck_after_every_transaction: false,
@@ -328,7 +328,7 @@ impl MemfsInstance {
         // Memfs doesn't need a block device but FIDL prevents passing an invalid handle.
         let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>();
         startup
-            .start(device_client_end, &mut options)
+            .start(device_client_end, options)
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)

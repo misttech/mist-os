@@ -260,7 +260,7 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut host_services_list(vec![], &mut services_for_agents_fs)?,
+        host_services_list(vec![], &mut services_for_agents_fs)?,
         services_from_sessionmgr_server_end,
         Some(fmodular_internal::ViewParams::ViewCreationToken(link_token_pair.view_creation_token)),
     )?;
@@ -375,7 +375,7 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut host_services_list(
+        host_services_list(
             vec!["fuchsia.modular.Agent.test_agent".to_string()],
             &mut services_for_agents_fs,
         )?,
@@ -561,7 +561,7 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut host_services_list(
+        host_services_list(
             vec!["fuchsia.modular.Agent.test_agent".to_string()],
             &mut services_for_agents_fs,
         )?,
@@ -687,7 +687,7 @@ async fn test_v2_session_shell() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut host_services_list(
+        host_services_list(
             vec![felement::GraphicalPresenterMarker::PROTOCOL_NAME.to_string()],
             &mut services_for_agents_fs,
         )?,

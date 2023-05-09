@@ -99,9 +99,9 @@ impl FocusListener {
                     // Dispatch to text manager.
                     if let Some(ref focus_chain) = focus_chain.focus_chain {
                         if let Some(ref view_ref) = focus_chain.last() {
-                            let mut view_ref_dup = fuchsia_scenic::duplicate_view_ref(&view_ref)?;
+                            let view_ref_dup = fuchsia_scenic::duplicate_view_ref(&view_ref)?;
                             self.text_manager
-                                .notify(&mut view_ref_dup)
+                                .notify(view_ref_dup)
                                 .await
                                 .context("while notifying text_manager")?;
                         }

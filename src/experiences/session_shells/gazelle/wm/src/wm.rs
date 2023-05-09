@@ -604,8 +604,8 @@ impl WindowManager {
     }
 }
 
-fn set_focus(focuser: ui_views::FocuserProxy, mut view_ref: ui_views::ViewRef) {
-    spawn_async_on_err(focuser.request_focus(&mut view_ref), |error| {
+fn set_focus(focuser: ui_views::FocuserProxy, view_ref: ui_views::ViewRef) {
+    spawn_async_on_err(focuser.request_focus(view_ref), |error| {
         error!("Failed to request_focus: {:?}", error)
     });
 }

@@ -422,7 +422,7 @@ mod tests {
                     vmo_usable_start: 0,
                 };
                 responder
-                    .send(zx::Status::OK.into_raw(), &mut buffer_collection_info)
+                    .send(zx::Status::OK.into_raw(), buffer_collection_info)
                     .expect("send collection response")
             }
             x => panic!("Expected WaitForBuffersAllocated, got {:?}", x),

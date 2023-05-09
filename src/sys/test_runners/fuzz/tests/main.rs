@@ -316,9 +316,8 @@ async fn test_try_one_no_errors() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "NoErrors";
-        let (mut tx, mut fidl_input) =
-            make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
+        let (mut tx, fidl_input) = make_fidl_input(input).context("failed to make FIDL input")?;
+        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context(controller_name("TryOne"))?;
         response.map_err(Error::msg)?;
@@ -333,9 +332,8 @@ async fn test_try_one_crash() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "CRASH";
-        let (mut tx, mut fidl_input) =
-            make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
+        let (mut tx, fidl_input) = make_fidl_input(input).context("failed to make FIDL input")?;
+        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context(controller_name("TryOne"))?;
         response.map_err(Error::msg)?;
@@ -350,9 +348,8 @@ async fn test_minimize() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "THIS CRASH CAN BE MINIMIZED";
-        let (mut tx, mut fidl_input) =
-            make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.minimize(&mut fidl_input));
+        let (mut tx, fidl_input) = make_fidl_input(input).context("failed to make FIDL input")?;
+        let results = join!(tx.write_all(input.as_bytes()), controller.minimize(fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context("FIDL failure")?;
         response.map_err(Error::msg)?;
@@ -368,9 +365,8 @@ async fn test_cleanse() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "AAAACRASHAAAA";
-        let (mut tx, mut fidl_input) =
-            make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.cleanse(&mut fidl_input));
+        let (mut tx, fidl_input) = make_fidl_input(input).context("failed to make FIDL input")?;
+        let results = join!(tx.write_all(input.as_bytes()), controller.cleanse(fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context("FIDL failure")?;
         response.map_err(Error::msg)?;
@@ -387,11 +383,11 @@ async fn test_merge() -> Result<()> {
     let test = || async move {
         let seed_inputs = vec!["C", "AS"];
         for input in seed_inputs.iter() {
-            let (mut tx, mut fidl_input) =
+            let (mut tx, fidl_input) =
                 make_fidl_input(input).context("failed to make FIDL input")?;
             let results = join!(
                 tx.write_all(input.as_bytes()),
-                controller.add_to_corpus(fuzz::Corpus::Seed, &mut fidl_input)
+                controller.add_to_corpus(fuzz::Corpus::Seed, fidl_input)
             );
             results.0.context("failed to send input")?;
             let result = results.1.context(controller_name("AddToCorpus"))?;
@@ -400,11 +396,11 @@ async fn test_merge() -> Result<()> {
 
         let live_inputs = vec!["CR", "CRY", "CASH", "CRASS", "CRAM", "CRAMS", "SCRAM"];
         for input in live_inputs {
-            let (mut tx, mut fidl_input) =
+            let (mut tx, fidl_input) =
                 make_fidl_input(input).context("failed to make FIDL input")?;
             let results = join!(
                 tx.write_all(input.as_bytes()),
-                controller.add_to_corpus(fuzz::Corpus::Live, &mut fidl_input)
+                controller.add_to_corpus(fuzz::Corpus::Live, fidl_input)
             );
             results.0.context("failed to send input")?;
             let result = results.1.context(controller_name("AddToCorpus"))?;

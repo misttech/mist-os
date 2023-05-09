@@ -164,10 +164,10 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let mut buf = Buffer { vmo, size };
+    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(&mut buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file = fuchsia_fs::directory::open_file_no_describe(
@@ -193,10 +193,10 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let mut buf = Buffer { vmo, size };
+    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(&mut buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe(
@@ -230,10 +230,10 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
 
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
-    let mut buf = Buffer { vmo, size };
+    let buf = Buffer { vmo, size };
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(&mut buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe(

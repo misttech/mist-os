@@ -85,14 +85,14 @@ impl<'a> AppModel<'a> {
 
         // Create the view.
         let fuchsia_scenic::flatland::ViewCreationTokenPair {
-            mut view_creation_token,
+            view_creation_token,
             viewport_creation_token,
         } = fuchsia_scenic::flatland::ViewCreationTokenPair::new()
             .expect("failed to create view tokens");
         self.flatland
             .create_view2(
-                &mut view_creation_token,
-                &mut fviews::ViewIdentityOnCreation::from(
+                view_creation_token,
+                fviews::ViewIdentityOnCreation::from(
                     ViewRefPair::new().expect("failed viewref creation"),
                 ),
                 view_bound_protocols,

@@ -129,7 +129,7 @@ mod tests {
             ..Default::default()
         };
         log_connection_listener
-            .on_new_connection(&mut LogConnection { log_request, source_identity })
+            .on_new_connection(LogConnection { log_request, source_identity })
             .expect("on new connection");
         let event = event_stream.next().await.expect("received event");
         let expected_identity = ComponentIdentity {

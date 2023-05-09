@@ -229,13 +229,13 @@ impl Partition {
     ) -> Result<(), Error> {
         match self.pave_type {
             PartitionPaveType::Asset { r#type: asset, config } => {
-                let mut fidl_buf = self.read_data().await?;
-                data_sink.write_asset(config, asset, &mut fidl_buf).await?;
+                let fidl_buf = self.read_data().await?;
+                data_sink.write_asset(config, asset, fidl_buf).await?;
             }
             PartitionPaveType::Bootloader => {
-                let mut fidl_buf = self.read_data().await?;
+                let fidl_buf = self.read_data().await?;
                 // Currently we only store the bootloader in slot A, we don't use an A/B/R scheme.
-                data_sink.write_firmware(Configuration::A, "", &mut fidl_buf).await?;
+                data_sink.write_firmware(Configuration::A, "", fidl_buf).await?;
             }
             PartitionPaveType::Volume => {
                 let pauser = BlockWatcherPauser::new().await.context("Pausing block watcher")?;
@@ -299,13 +299,13 @@ impl Partition {
             return Err(Error::from(zx::Status::NOT_SUPPORTED));
         }
 
-        let mut fidl_buf = self.read_data().await?;
+        let fidl_buf = self.read_data().await?;
         match self.pave_type {
             PartitionPaveType::Asset { r#type: asset, config: _ } => {
                 // pave() will always pave to A, so this always paves to B.
                 // The A/B config from the partition is not respected because on a fresh
                 // install we want A/B to be identical, so we install the same thing to both.
-                data_sink.write_asset(Configuration::B, asset, &mut fidl_buf).await?;
+                data_sink.write_asset(Configuration::B, asset, fidl_buf).await?;
                 Ok(())
             }
             _ => Err(Error::from(zx::Status::NOT_SUPPORTED)),

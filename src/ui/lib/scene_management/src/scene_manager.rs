@@ -95,7 +95,7 @@ pub trait SceneManager: Send {
     /// Requests focus be transferred to the scene.
     fn request_focus(
         &self,
-        view_ref: &mut ui_views::ViewRef,
+        view_ref: ui_views::ViewRef,
     ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult>;
 
     /// Requests a new frame be presented in the scene.
@@ -396,9 +396,9 @@ pub fn handle_pointer_injector_configuration_setup_request_stream(
             let request = request_stream.try_next().await;
             match request {
                 Ok(Some(PointerInjectorConfigurationSetupRequest::GetViewRefs { responder })) => {
-                    let (mut context_view_ref, mut target_view_ref) =
+                    let (context_view_ref, target_view_ref) =
                         scene_manager.lock().await.get_pointerinjection_view_refs();
-                    if let Err(e) = responder.send(&mut context_view_ref, &mut target_view_ref) {
+                    if let Err(e) = responder.send(context_view_ref, target_view_ref) {
                         warn!("Failed to send GetViewRefs() response: {}", e);
                     }
                 }

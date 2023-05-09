@@ -132,7 +132,7 @@ async fn launch_process_impl(
     });
 
     // Load the component
-    let mut launch_info =
+    let launch_info =
         runner::component::configure_launcher(runner::component::LauncherConfigArgs {
             bin_path: args.bin_path,
             name: args.process_name,
@@ -156,8 +156,7 @@ async fn launch_process_impl(
         .duplicate(zx::Rights::SAME_RIGHTS)
         .expect("handle duplication failed!");
 
-    let (status, process) =
-        launcher.launch(&mut launch_info).await.map_err(LaunchError::LaunchCall)?;
+    let (status, process) = launcher.launch(launch_info).await.map_err(LaunchError::LaunchCall)?;
 
     let status = zx::Status::from_raw(status);
     if status != zx::Status::OK {

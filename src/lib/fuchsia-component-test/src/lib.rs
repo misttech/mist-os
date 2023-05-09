@@ -1776,7 +1776,7 @@ impl SubRealmBuilder {
         let fut = self.realm_proxy.read_only_directory(
             &directory_name.into(),
             &to,
-            &mut directory_contents.into(),
+            directory_contents.into(),
         );
         fut.await??;
         Ok(())

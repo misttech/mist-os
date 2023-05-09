@@ -208,7 +208,7 @@ impl SceneManager for GfxSceneManager {
         }
 
         let token_pair = scenic::ViewTokenPair::new()?;
-        let mut viewref_pair = scenic::ViewRefPair::new()?;
+        let viewref_pair = scenic::ViewRefPair::new()?;
 
         // Make two additional copies of the ViewRef.
         // - The original will be used to create the root view.
@@ -220,8 +220,8 @@ impl SceneManager for GfxSceneManager {
 
         view_provider.create_view_with_view_ref(
             token_pair.view_token.value,
-            &mut viewref_pair.control_ref,
-            &mut viewref_pair.view_ref,
+            viewref_pair.control_ref,
+            viewref_pair.view_ref,
         )?;
 
         self.add_view(token_pair.view_holder_token, Some("root".to_string()));
@@ -234,7 +234,7 @@ impl SceneManager for GfxSceneManager {
 
     fn request_focus(
         &self,
-        view_ref: &mut ui_views::ViewRef,
+        view_ref: ui_views::ViewRef,
     ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult> {
         self.focuser.request_focus(view_ref)
     }

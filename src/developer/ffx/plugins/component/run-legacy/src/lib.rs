@@ -103,7 +103,7 @@ async fn run_component_cmd<W: std::io::Write>(
         handle2: None,
     };
 
-    let mut info = LaunchInfo {
+    let info = LaunchInfo {
         url: run.url.clone(),
         arguments: Some(run.args),
         out: Some(Box::new(out_fd)),
@@ -113,7 +113,7 @@ async fn run_component_cmd<W: std::io::Write>(
         flat_namespace: None,
     };
 
-    launcher_proxy.create_component(&mut info, Some(control_server_end)).with_context(|| {
+    launcher_proxy.create_component(info, Some(control_server_end)).with_context(|| {
         format!("Error starting component. Ensure there is a target connected with `ffx list`")
     })?;
 

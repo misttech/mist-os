@@ -113,7 +113,7 @@ pub struct Window {
     id_generator: IdGenerator,
     flatland: Option<ui_comp::FlatlandProxy>,
     view_ref: ui_views::ViewRef,
-    view_identity: ui_views::ViewIdentityOnCreation,
+    view_identity: Option<ui_views::ViewIdentityOnCreation>,
     annotations: Option<Vec<felement::Annotation>>,
     annotation_controller_request_stream: Option<felement::AnnotationControllerRequestStream>,
     view_controller_proxy: Option<felement::ViewControllerProxy>,
@@ -136,7 +136,7 @@ impl Window {
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
         let view_ref = fuchsia_scenic::duplicate_view_ref(&view_ref_pair.view_ref)
             .expect("Failed to duplicate ViewRef");
-        let view_identity = ui_views::ViewIdentityOnCreation::from(view_ref_pair);
+        let view_identity = Some(ui_views::ViewIdentityOnCreation::from(view_ref_pair));
 
         let protocol_connector = Box::new(ProductionProtocolConnector());
 
@@ -250,7 +250,7 @@ impl Window {
         &mut self,
         shortcuts: Vec<ui_shortcut2::Shortcut>,
     ) -> Result<(), Error> {
-        let mut view_ref_for_shortcuts = self.get_view_ref()?;
+        let view_ref_for_shortcuts = self.get_view_ref()?;
         let window_id = self.id();
         let event_sender = self.event_sender.clone();
 
@@ -259,7 +259,7 @@ impl Window {
         let (listener_client_end, mut listener_stream) =
             create_request_stream::<ui_shortcut2::ListenerMarker>()?;
 
-        if let Err(error) = registry.set_view(&mut view_ref_for_shortcuts, listener_client_end) {
+        if let Err(error) = registry.set_view(view_ref_for_shortcuts, listener_client_end) {
             error!("Failed to set_view on fuchsia.ui.shortcut2.Registry: {:?}", error);
             return Err(error.into());
         }
@@ -331,7 +331,7 @@ impl Window {
 
         let presenter = Arc::new(Mutex::new(Presenter::new(flatland.clone())));
 
-        let (mut view_creation_token, viewport_creation_token) =
+        let (view_creation_token, viewport_creation_token) =
             // Check if view_creation_token was passed from ViewProvider.
             match self.attributes.view_creation_token.take() {
                 Some(view_creation_token) => (view_creation_token, None),
@@ -364,8 +364,8 @@ impl Window {
         self.presenter = Some(presenter);
 
         self.get_flatland().create_view2(
-            &mut view_creation_token,
-            &mut self.view_identity,
+            view_creation_token,
+            self.view_identity.take().expect("view_identity should be set on construction"),
             view_bound_protocols,
             parent_viewport_watcher_request,
         )?;
@@ -559,7 +559,7 @@ impl Window {
     }
 
     /// Creates an instance of flatland [Image] given [ImageData].
-    pub fn create_image(&mut self, image_data: &mut ImageData) -> Result<Image, Error> {
+    pub fn create_image(&mut self, image_data: ImageData) -> Result<Image, Error> {
         let content_id = self.next_content_id();
         Image::new(image_data, self.get_flatland(), content_id)
     }
@@ -573,7 +573,7 @@ impl Window {
     ) -> Result<Image, Error> {
         let sysmem_allocator = self.protocol_connector.connect_to_sysmem_allocator()?;
         let flatland_allocator = self.protocol_connector.connect_to_flatland_allocator()?;
-        let mut image_data = load_image_from_bytes_using_allocators(
+        let image_data = load_image_from_bytes_using_allocators(
             &bytes,
             width,
             height,
@@ -582,7 +582,7 @@ impl Window {
         )
         .await?;
 
-        self.create_image(&mut image_data)
+        self.create_image(image_data)
     }
 }
 
@@ -853,7 +853,7 @@ async fn wait_for_view_controller_close(
 
 async fn serve_keyboard_listener(
     window_id: WindowId,
-    mut view_ref: ui_views::ViewRef,
+    view_ref: ui_views::ViewRef,
     keyboard: ui_input3::KeyboardProxy,
     event_sender: EventSender,
 ) {
@@ -861,7 +861,7 @@ async fn serve_keyboard_listener(
         create_request_stream::<ui_input3::KeyboardListenerMarker>()
             .expect("failed to create listener stream");
 
-    match keyboard.add_listener(&mut view_ref, listener_client_end).await {
+    match keyboard.add_listener(view_ref, listener_client_end).await {
         Ok(()) => {
             while let Some(Ok(event)) = listener_stream.next().await {
                 let ui_input3::KeyboardListenerRequest::OnKeyEvent { event, responder, .. } = event;

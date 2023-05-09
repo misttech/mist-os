@@ -163,8 +163,8 @@ impl TilesSession for GfxTilesSession {
                 }
                 Ok(())
             }
-            MessageInternal::ReceivedClientViewRef { tile_id, mut view_ref } => {
-                let result = self.view_focuser.request_focus(&mut view_ref);
+            MessageInternal::ReceivedClientViewRef { tile_id, view_ref } => {
+                let result = self.view_focuser.request_focus(view_ref);
                 fasync::Task::local(async move {
                     match result.await {
                         Ok(Ok(())) => {
@@ -207,11 +207,11 @@ impl GfxTilesSession {
         // the async FIDL request (which is not idiomatic for Rust, where typically the "future
         // doesn't do anything" until awaited), and then call create_flatland_tiles_session() so
         // that present_root_view() eventually returns a result.
-        let ViewTokenPair { view_token, mut view_holder_token } = ViewTokenPair::new()?;
+        let ViewTokenPair { view_token, view_holder_token } = ViewTokenPair::new()?;
         let ViewRefPair { control_ref, view_ref } = ViewRefPair::new()?;
         let fut = scene_manager.present_root_view_legacy(
-            &mut view_holder_token,
-            &mut ui_views::ViewRef {
+            view_holder_token,
+            ui_views::ViewRef {
                 reference: view_ref.reference.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             },
         );

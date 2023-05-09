@@ -312,7 +312,7 @@ mod test {
                     BufferCollectionRequest::WaitForBuffersAllocated { responder } => {
                         let constraints =
                             stored_constraints.expect("Expected a BufferCollectionRequest!");
-                        let mut response = BufferCollectionInfo2 {
+                        let response = BufferCollectionInfo2 {
                             buffer_count: constraints.min_buffer_count,
                             // Everything below here is unused
                             settings: SingleBufferSettings {
@@ -397,7 +397,7 @@ mod test {
                                 VmoBuffer { vmo: None, vmo_usable_start: 0 },
                             ],
                         };
-                        responder.send(zx::sys::ZX_OK, &mut response).expect("Failed to send");
+                        responder.send(zx::sys::ZX_OK, response).expect("Failed to send");
                     }
                     _ => panic!("Unexpected request"),
                 }

@@ -130,7 +130,7 @@ pub(super) struct View {
 
 impl View {
     pub async fn new(
-        mut view_creation_token: ui_views::ViewCreationToken,
+        view_creation_token: ui_views::ViewCreationToken,
         touch_input_listener: Option<test_input::TouchInputListenerProxy>,
         mouse_input_listener: Option<test_input::MouseInputListenerProxy>,
         keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
@@ -154,7 +154,7 @@ impl View {
         let view_ref_pair = scenic::ViewRefPair::new().expect("failed to create view ref pair");
         let view_ref = scenic::duplicate_view_ref(&view_ref_pair.view_ref)
             .expect("failed to duplicate view ref");
-        let mut view_identity = ui_views::ViewIdentityOnCreation::from(view_ref_pair);
+        let view_identity = ui_views::ViewIdentityOnCreation::from(view_ref_pair);
 
         // Create root transform ID.
         let root_transform_id = Self::create_transform(flatland.clone(), &mut id_generator);
@@ -162,8 +162,8 @@ impl View {
         // Create the view and present.
         flatland
             .create_view2(
-                &mut view_creation_token,
-                &mut view_identity,
+                view_creation_token,
+                view_identity,
                 view_bound_protocols,
                 parent_viewport_watcher_request,
             )
@@ -299,7 +299,7 @@ impl View {
         let mut content_id = self.id_generator.next_content_id();
 
         // Create the view/viewport token pair.
-        let mut token_pair = scenic::flatland::ViewCreationTokenPair::new()
+        let token_pair = scenic::flatland::ViewCreationTokenPair::new()
             .expect("failed to create view creation token pair");
 
         // Create the embedding viewport.
@@ -308,7 +308,7 @@ impl View {
         self.flatland
             .create_viewport(
                 &mut content_id,
-                &mut token_pair.viewport_creation_token,
+                token_pair.viewport_creation_token,
                 ui_comp::ViewportProperties {
                     logical_size: view_bounds.size,
                     ..Default::default()
@@ -718,7 +718,7 @@ impl View {
         }
     }
 
-    async fn listen_for_key_events(this: Rc<RefCell<Self>>, mut view_ref: ui_views::ViewRef) {
+    async fn listen_for_key_events(this: Rc<RefCell<Self>>, view_ref: ui_views::ViewRef) {
         let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()
             .expect("failed to connect to Keyboard service");
         let (keyboard_client, mut keyboard_stream) =
@@ -726,7 +726,7 @@ impl View {
                 .expect("failed to create keyboard source channel");
 
         keyboard
-            .add_listener(&mut view_ref, keyboard_client)
+            .add_listener(view_ref, keyboard_client)
             .await
             .expect("failed to add keyboard listener");
         loop {

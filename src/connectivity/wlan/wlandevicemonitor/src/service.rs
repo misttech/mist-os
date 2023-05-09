@@ -367,14 +367,14 @@ async fn create_iface(
     // Send a CreateIfaceRequest. The vendor device will then spawn a USME device and pass
     // the bootstrap to it. The USME device will then read the config and GenericSme channel,
     // and continue to listen to requests via the GenericSme channel.
-    let mut phy_req = fidl_dev::CreateIfaceRequest {
+    let phy_req = fidl_dev::CreateIfaceRequest {
         role: req.role,
         mlme_channel: Some(usme_bootstrap_server.into_channel()),
         init_sta_addr: req.sta_addr,
     };
     let phy_assigned_iface_id = phy
         .proxy
-        .create_iface(&mut phy_req)
+        .create_iface(phy_req)
         .await
         .map_err(move |e| {
             error!("CreateIface failed: phy {}, fidl error {}", phy_id, e);

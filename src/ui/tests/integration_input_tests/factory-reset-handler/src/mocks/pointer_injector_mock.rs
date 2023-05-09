@@ -45,9 +45,9 @@ impl PointerInjectorMock {
                 SetupRequest::GetViewRefs { responder, .. } => {
                     responder
                         .send(
-                            &mut fuchsia_scenic::duplicate_view_ref(&injection_context)
+                            fuchsia_scenic::duplicate_view_ref(&injection_context)
                                 .expect("Failed to duplicate viewref"),
-                            &mut fuchsia_scenic::duplicate_view_ref(&injection_target)
+                            fuchsia_scenic::duplicate_view_ref(&injection_target)
                                 .expect("Failed to duplicate viewref"),
                         )
                         .expect("Failed to send view refs");

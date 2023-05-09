@@ -265,13 +265,13 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             let vmo = zx::Vmo::create(size)?;
             let () = vmo.write(&buf, 0)?;
 
-            let mut buf = Buffer { vmo, size };
+            let buf = Buffer { vmo, size };
 
             let ext4_server = fuchsia_component::client::connect_to_protocol::<Server_Marker>()?;
 
             tracing::info!("Mounting EXT4 VMO");
             match ext4_server
-                .mount_vmo(&mut buf, fio::OpenFlags::RIGHT_READABLE, directory_server_end)
+                .mount_vmo(buf, fio::OpenFlags::RIGHT_READABLE, directory_server_end)
                 .await
             {
                 Ok(MountVmoResult::Success(_)) => Ok(directory_proxy),

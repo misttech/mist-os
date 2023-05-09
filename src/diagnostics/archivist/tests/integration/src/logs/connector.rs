@@ -129,9 +129,7 @@ async fn serve_mocks(
                 ),
                 ..Default::default()
             };
-            listener
-                .on_new_connection(&mut LogConnection { log_request, source_identity })
-                .unwrap();
+            listener.on_new_connection(LogConnection { log_request, source_identity }).unwrap();
             let log_sink = ClientEnd::<LogSinkMarker>::new(client).into_proxy().unwrap();
             log_sink.connect(socket).unwrap();
         }

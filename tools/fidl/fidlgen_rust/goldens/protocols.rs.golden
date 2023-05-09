@@ -6434,10 +6434,7 @@ pub trait WithProtocolEndsProxyInterface: Send + Sync {
     ) -> Self::ServerEndsResponseFut;
     type StructContainingEndsResponseFut: std::future::Future<Output = Result<ProtocolEnds, fidl::Error>>
         + Send;
-    fn r#struct_containing_ends(
-        &self,
-        in_: &mut ProtocolEnds,
-    ) -> Self::StructContainingEndsResponseFut;
+    fn r#struct_containing_ends(&self, in_: ProtocolEnds) -> Self::StructContainingEndsResponseFut;
 }
 
 #[derive(Debug)]
@@ -6496,13 +6493,13 @@ impl WithProtocolEndsSynchronousProxy {
     }
     pub fn r#struct_containing_ends(
         &self,
-        mut in_: &mut ProtocolEnds,
+        mut in_: ProtocolEnds,
         ___deadline: zx::Time,
     ) -> Result<ProtocolEnds, fidl::Error> {
         let _response = self.client.send_query::<
                 WithProtocolEndsStructContainingEndsRequest,
                 WithProtocolEndsStructContainingEndsResponse,false,false>(
-                (in_,),
+                (&mut in_,),
                 0x3893f0baad26f5d5,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -6565,7 +6562,7 @@ impl WithProtocolEndsProxy {
     }
     pub fn r#struct_containing_ends(
         &self,
-        mut in_: &mut ProtocolEnds,
+        mut in_: ProtocolEnds,
     ) -> fidl::client::QueryResponseFut<ProtocolEnds> {
         WithProtocolEndsProxyInterface::r#struct_containing_ends(self, in_)
     }
@@ -6629,7 +6626,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
     type StructContainingEndsResponseFut = fidl::client::QueryResponseFut<ProtocolEnds>;
     fn r#struct_containing_ends(
         &self,
-        mut in_: &mut ProtocolEnds,
+        mut in_: ProtocolEnds,
     ) -> Self::StructContainingEndsResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -6645,7 +6642,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
             ProtocolEnds,
             false,
         >(
-            (in_,),
+            (&mut in_,),
             0x3893f0baad26f5d5,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -7164,7 +7161,7 @@ impl WithProtocolEndsStructContainingEndsResponder {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
-    pub fn send(self, mut out: &mut ProtocolEnds) -> Result<(), fidl::Error> {
+    pub fn send(self, mut out: ProtocolEnds) -> Result<(), fidl::Error> {
         let r = self.send_raw(out);
         if r.is_err() {
             self.control_handle.shutdown();
@@ -7175,20 +7172,20 @@ impl WithProtocolEndsStructContainingEndsResponder {
 
     /// Similar to "send" but does not shutdown the channel if
     /// an error occurs.
-    pub fn send_no_shutdown_on_err(self, mut out: &mut ProtocolEnds) -> Result<(), fidl::Error> {
+    pub fn send_no_shutdown_on_err(self, mut out: ProtocolEnds) -> Result<(), fidl::Error> {
         let r = self.send_raw(out);
         self.drop_without_shutdown();
         r
     }
 
-    fn send_raw(&self, mut out: &mut ProtocolEnds) -> Result<(), fidl::Error> {
+    fn send_raw(&self, mut out: ProtocolEnds) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (out,),
+            body: (&mut out,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

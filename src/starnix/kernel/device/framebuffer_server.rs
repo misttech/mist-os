@@ -137,7 +137,7 @@ fn init_scene(
         .recv()
         .map_err(|_| anyhow!("Error receiving buffer collection token"))?;
 
-    let mut buffer_tokens = BufferCollectionTokenPair::new();
+    let buffer_tokens = BufferCollectionTokenPair::new();
     let args = fuicomposition::RegisterBufferCollectionArgs {
         export_token: Some(buffer_tokens.export_token),
         buffer_collection_token: Some(sysmem_buffer_collection_token),
@@ -158,7 +158,7 @@ fn init_scene(
         ..Default::default()
     };
     flatland
-        .create_image(&mut IMAGE_ID.clone(), &mut buffer_tokens.import_token, 0, image_props)
+        .create_image(&mut IMAGE_ID.clone(), buffer_tokens.import_token, 0, image_props)
         .map_err(|_| anyhow!("FIDL error creating image"))?;
     flatland
         .create_transform(&mut TRANSFORM_ID.clone())
@@ -199,8 +199,8 @@ pub fn spawn_view_provider(
                 while let Ok(Some(event)) = request_stream.try_next().await {
                     match event {
                         fuiapp::ViewProviderRequest::CreateView2 { args, control_handle: _ } => {
-                            let mut view_creation_token = args.view_creation_token.unwrap();
-                            let mut view_identity = fuiviews::ViewIdentityOnCreation::from(
+                            let  view_creation_token = args.view_creation_token.unwrap();
+                            let  view_identity = fuiviews::ViewIdentityOnCreation::from(
                                 ViewRefPair::new().expect("Failed to create ViewRefPair"),
                             );
                             // We don't actually care about the parent viewport at the moment, because we don't resize.
@@ -210,8 +210,8 @@ pub fn spawn_view_provider(
                             server
                                 .flatland
                                 .create_view2(
-                                    &mut view_creation_token,
-                                    &mut view_identity,
+                                     view_creation_token,
+                                     view_identity,
                                     view_bound_protocols.take().expect("cannot create view because view bound protocols have been consumed"),
                                     parent_viewport_watcher_request,
                                 )

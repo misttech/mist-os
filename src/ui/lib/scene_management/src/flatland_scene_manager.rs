@@ -67,7 +67,7 @@ struct FlatlandInstance {
 impl FlatlandInstance {
     fn new(
         flatland: ui_comp::FlatlandProxy,
-        mut view_creation_token: ui_views::ViewCreationToken,
+        view_creation_token: ui_views::ViewCreationToken,
         id_generator: &mut scenic::flatland::IdGenerator,
     ) -> Result<FlatlandInstance, Error> {
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
@@ -80,11 +80,11 @@ impl FlatlandInstance {
             ..Default::default()
         };
 
-        let mut view_identity = ui_views::ViewIdentityOnCreation::from(scenic::ViewRefPair::new()?);
+        let view_identity = ui_views::ViewIdentityOnCreation::from(scenic::ViewRefPair::new()?);
         let view_ref = scenic::duplicate_view_ref(&view_identity.view_ref)?;
         flatland.create_view2(
-            &mut view_creation_token,
-            &mut view_identity,
+            view_creation_token,
+            view_identity,
             view_bound_protocols,
             parent_viewport_watcher_request,
         )?;
@@ -260,7 +260,7 @@ impl SceneManager for FlatlandSceneManager {
 
     fn request_focus(
         &self,
-        view_ref: &mut ui_views::ViewRef,
+        view_ref: ui_views::ViewRef,
     ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult> {
         self.root_flatland.focuser.request_focus(view_ref)
     }
@@ -385,22 +385,21 @@ impl FlatlandSceneManager {
         pointerinjector_flatland.set_debug_name("SceneManager PointerInjector")?;
         scene_flatland.set_debug_name("SceneManager Scene")?;
 
-        let mut root_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        let root_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
         let root_flatland = FlatlandInstance::new(
             root_flatland,
             root_view_creation_pair.view_creation_token,
             &mut id_generator,
         )?;
 
-        let mut pointerinjector_view_creation_pair =
-            scenic::flatland::ViewCreationTokenPair::new()?;
+        let pointerinjector_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
         let pointerinjector_flatland = FlatlandInstance::new(
             pointerinjector_flatland,
             pointerinjector_view_creation_pair.view_creation_token,
             &mut id_generator,
         )?;
 
-        let mut scene_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        let scene_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
         let scene_flatland = FlatlandInstance::new(
             scene_flatland,
             scene_view_creation_pair.view_creation_token,
@@ -431,7 +430,7 @@ impl FlatlandSceneManager {
                 create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
 
             display.set_content(
-                &mut root_view_creation_pair.viewport_creation_token,
+                root_view_creation_pair.viewport_creation_token,
                 child_view_watcher_request,
             )?;
         }
@@ -511,7 +510,7 @@ impl FlatlandSceneManager {
 
             flatland.create_viewport(
                 &mut pointerinjector_viewport_content_id.clone(),
-                &mut pointerinjector_view_creation_pair.viewport_creation_token,
+                pointerinjector_view_creation_pair.viewport_creation_token,
                 link_properties,
                 child_view_watcher_request,
             )?;
@@ -521,7 +520,7 @@ impl FlatlandSceneManager {
             )?;
         }
 
-        let mut a11y_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        let a11y_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
         // Bridge the pointerinjector and a11y Flatland instances.
         let (a11y_view_watcher, a11y_view_watcher_request) =
@@ -541,7 +540,7 @@ impl FlatlandSceneManager {
 
             flatland.create_viewport(
                 &mut a11y_viewport_content_id.clone(),
-                &mut a11y_view_creation_pair.viewport_creation_token,
+                a11y_view_creation_pair.viewport_creation_token,
                 link_properties,
                 a11y_view_watcher_request,
             )?;
@@ -553,8 +552,8 @@ impl FlatlandSceneManager {
 
         // Request for the a11y manager to create its view.
         a11y_view_provider.create_view(
-            &mut a11y_view_creation_pair.view_creation_token,
-            &mut scene_view_creation_pair.viewport_creation_token,
+            a11y_view_creation_pair.view_creation_token,
+            scene_view_creation_pair.viewport_creation_token,
         )?;
 
         // Start Present() loops for both Flatland instances, and request that both be presented.
@@ -636,7 +635,7 @@ impl FlatlandSceneManager {
 
     async fn set_root_view_internal(
         &mut self,
-        mut viewport_creation_token: ui_views::ViewportCreationToken,
+        viewport_creation_token: ui_views::ViewportCreationToken,
     ) -> Result<ui_views::ViewRef> {
         // Remove any existing viewport.
         if let Some(ids) = &self.scene_root_viewport_ids {
@@ -671,7 +670,7 @@ impl FlatlandSceneManager {
             };
             locked.create_viewport(
                 &mut ids.content_id.clone(),
-                &mut viewport_creation_token,
+                viewport_creation_token,
                 viewport_properties,
                 child_view_watcher_request,
             )?;
@@ -699,13 +698,12 @@ impl FlatlandSceneManager {
 
         let _child_status =
             child_view_watcher.get_status().await.context("could not call get_status")?;
-        let mut child_view_ref =
+        let child_view_ref =
             child_view_watcher.get_view_ref().await.context("could not get view_ref")?;
         let child_view_ref_copy =
             scenic::duplicate_view_ref(&child_view_ref).context("could not duplicate view_ref")?;
 
-        let request_focus_result =
-            self.root_flatland.focuser.request_focus(&mut child_view_ref).await;
+        let request_focus_result = self.root_flatland.focuser.request_focus(child_view_ref).await;
         match request_focus_result {
             Err(e) => warn!("Request focus failed with err: {}", e),
             Ok(Err(value)) => warn!("Request focus failed with err: {:?}", value),

@@ -940,10 +940,7 @@ mod tests {
         join!(
             async {
                 volume_proxy
-                    .mount(
-                        dir_server_end,
-                        &mut MountOptions { crypt: Some(client1), as_blob: false },
-                    )
+                    .mount(dir_server_end, MountOptions { crypt: Some(client1), as_blob: false })
                     .await
                     .expect("mount (fidl) failed")
                     .expect("mount failed");
@@ -967,7 +964,7 @@ mod tests {
                         volume_proxy
                             .mount(
                                 dir_server_end,
-                                &mut MountOptions { crypt: Some(client2), as_blob: false },
+                                MountOptions { crypt: Some(client2), as_blob: false },
                             )
                             .await
                             .expect("mount (fidl) failed")

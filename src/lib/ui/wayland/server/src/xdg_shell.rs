@@ -453,7 +453,7 @@ impl XdgSurface {
 
     fn spawn_keyboard_listener(
         surface_ref: ObjectRef<Surface>,
-        mut view_ref: ViewRef,
+        view_ref: ViewRef,
         task_queue: TaskQueue,
     ) -> Result<(), Error> {
         let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()?;
@@ -461,7 +461,7 @@ impl XdgSurface {
             create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>()?;
 
         fasync::Task::local(async move {
-            keyboard.add_listener(&mut view_ref, listener_client_end).await.unwrap();
+            keyboard.add_listener(view_ref, listener_client_end).await.unwrap();
 
             // Track the event time of the last three Escape key presses.
             let mut escapes: VecDeque<_> = vec![0; 3].into_iter().collect();
@@ -582,7 +582,7 @@ impl XdgSurface {
         geometry: Rect,
     ) -> Result<(), Error> {
         ftrace::duration!("wayland", "XdgSurface::spawn_child_view");
-        let mut creation_tokens =
+        let creation_tokens =
             ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
         let parent = parent_ref.get(client)?;
         let parent_view = parent.view.clone();
@@ -596,7 +596,7 @@ impl XdgSurface {
         flatland
             .borrow()
             .proxy()
-            .create_view(&mut creation_tokens.view_creation_token, server_end)
+            .create_view(creation_tokens.view_creation_token, server_end)
             .expect("fidl error");
         XdgSurface::spawn_parent_viewport_listener(
             this,
@@ -1311,11 +1311,11 @@ impl XdgToplevel {
                 if let Some(request) = stream.try_next().await.unwrap() {
                     match request {
                         ViewProviderRequest::CreateView2 { args, .. } => {
-                            let mut view_creation_token = args.view_creation_token.unwrap();
+                            let view_creation_token = args.view_creation_token.unwrap();
                             let viewref_pair = ViewRefPair::new()?;
                             let view_ref =
                                 fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
-                            let mut view_identity = ViewIdentityOnCreation::from(viewref_pair);
+                            let view_identity = ViewIdentityOnCreation::from(viewref_pair);
                             let (parent_viewport_watcher, parent_viewport_watcher_request) =
                                 create_proxy::<ParentViewportWatcherMarker>()
                                     .expect("failed to create ParentViewportWatcherProxy");
@@ -1338,8 +1338,8 @@ impl XdgToplevel {
                                 .borrow()
                                 .proxy()
                                 .create_view2(
-                                    &mut view_creation_token,
-                                    &mut view_identity,
+                                    view_creation_token,
+                                    view_identity,
                                     view_bound_protocols,
                                     parent_viewport_watcher_request,
                                 )
@@ -1419,12 +1419,11 @@ impl XdgToplevel {
         ftrace::duration!("wayland", "XdgToplevel::spawn_view");
         let (proxy, server_end) = create_proxy::<ViewControllerMarker>()?;
         let stream = proxy.take_event_stream();
-        let mut creation_tokens =
-            ViewCreationTokenPair::new().expect("failed to create token pair");
+        let creation_tokens = ViewCreationTokenPair::new().expect("failed to create token pair");
         let viewref_pair = ViewRefPair::new()?;
         let view_ref_dup = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let view_ref_dup2 = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
-        let mut view_identity = ViewIdentityOnCreation::from(viewref_pair);
+        let view_identity = ViewIdentityOnCreation::from(viewref_pair);
         let toplevel = this.get(client)?;
         let annotations = toplevel.title.as_ref().map(|title| {
             let title_key = AnnotationKey {
@@ -1458,8 +1457,8 @@ impl XdgToplevel {
             .borrow()
             .proxy()
             .create_view2(
-                &mut creation_tokens.view_creation_token,
-                &mut view_identity,
+                creation_tokens.view_creation_token,
+                view_identity,
                 view_bound_protocols,
                 parent_viewport_watcher_request,
             )
@@ -1935,7 +1934,7 @@ impl XdgSurfaceView {
     pub fn add_child_view(
         &mut self,
         id: u64,
-        mut viewport_creation_token: ViewportCreationToken,
+        viewport_creation_token: ViewportCreationToken,
         server_end: ServerEnd<ChildViewWatcherMarker>,
     ) {
         ftrace::duration!("wayland", "XdgSurfaceView::add_child_view");
@@ -1952,12 +1951,7 @@ impl XdgSurfaceView {
         self.flatland
             .borrow()
             .proxy()
-            .create_viewport(
-                &mut link,
-                &mut viewport_creation_token,
-                viewport_properties,
-                server_end,
-            )
+            .create_viewport(&mut link, viewport_creation_token, viewport_properties, server_end)
             .expect("fidl error");
         self.flatland
             .borrow()

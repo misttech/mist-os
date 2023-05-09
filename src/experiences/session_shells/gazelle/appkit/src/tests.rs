@@ -324,7 +324,7 @@ async fn create_child_view_spec(
     // Now load the image into shared memory buffer.
     let sysmem_allocator = protocol_connector.connect_to_sysmem_allocator()?;
     let flatland_allocator = protocol_connector.connect_to_flatland_allocator()?;
-    let mut image_data = load_image_from_bytes_using_allocators(
+    let image_data = load_image_from_bytes_using_allocators(
         &bytes,
         width,
         height,
@@ -361,7 +361,7 @@ async fn create_child_view_spec(
                     WindowEvent::Resized { width, height, .. } => {
                         if let Some(window) = window_holder.as_mut() {
                             let image = window
-                                .create_image(&mut image_data)
+                                .create_image(image_data)
                                 .expect("Failed to create image content");
                             image.set_size(width, height).expect("Failed to set image size");
                             window

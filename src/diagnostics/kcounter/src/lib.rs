@@ -80,7 +80,7 @@ mod tests {
                         (*counter).0 += 1;
                         let vmo = zx::Vmo::create(0).unwrap();
                         responder
-                            .send(zx::Status::OK.into_raw(), &mut Buffer { vmo, size: 0 })
+                            .send(zx::Status::OK.into_raw(), Buffer { vmo, size: 0 })
                             .expect("Failed to respond to GetInspectVmo");
                     }
                     Ok(CounterRequest::UpdateInspectVmo { responder }) => {

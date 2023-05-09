@@ -184,7 +184,7 @@ impl StorageManagerTrait for Fxfs {
         .log_error_then("Connect to Volume protocol failed", faccount::Error::Resource)?
         .mount(
             server_end,
-            &mut MountOptions { crypt: Some(cryptkeeper.crypt_client_end()?), as_blob: false },
+            MountOptions { crypt: Some(cryptkeeper.crypt_client_end()?), as_blob: false },
         )
         .await
         .log_warn_then("mount FIDL failed", faccount::Error::Resource)?

@@ -69,7 +69,7 @@ impl TilesSession for FlatlandTilesSession {
             } => {
                 // We have either a view holder token OR a viewport_creation_token, but for
                 // Flatland we can expect a viewport creation token.
-                let mut viewport_creation_token = match view_spec.viewport_creation_token {
+                let viewport_creation_token = match view_spec.viewport_creation_token {
                     Some(token) => token,
                     None => {
                         warn!("Client attempted to present Gfx component but only Flatland is supported.");
@@ -88,7 +88,7 @@ impl TilesSession for FlatlandTilesSession {
                 self.flatland
                     .create_viewport(
                         &mut viewport_content_id.clone(),
-                        &mut viewport_creation_token,
+                        viewport_creation_token,
                         viewport_properties,
                         tile_watcher_request,
                     )
@@ -174,8 +174,8 @@ impl TilesSession for FlatlandTilesSession {
 
                 Ok(())
             }
-            MessageInternal::ReceivedClientViewRef { tile_id, mut view_ref, .. } => {
-                let result = self.view_focuser.request_focus(&mut view_ref);
+            MessageInternal::ReceivedClientViewRef { tile_id, view_ref, .. } => {
+                let result = self.view_focuser.request_focus(view_ref);
                 fasync::Task::local(async move {
                     match result.await {
                         Ok(Ok(())) => {
@@ -218,9 +218,9 @@ impl FlatlandTilesSession {
         // the async FIDL request (which is not idiomatic for Rust, where typically the "future
         // doesn't do anything" until awaited), and then call create_flatland_tiles_session() so
         // that present_root_view() eventually returns a result.
-        let ViewCreationTokenPair { view_creation_token, mut viewport_creation_token } =
+        let ViewCreationTokenPair { view_creation_token, viewport_creation_token } =
             ViewCreationTokenPair::new()?;
-        let fut = scene_manager.present_root_view(&mut viewport_creation_token);
+        let fut = scene_manager.present_root_view(viewport_creation_token);
         let tiles_session =
             Self::create_flatland_tiles_session(view_creation_token, internal_sender).await?;
         let _ = fut.await?;
@@ -228,7 +228,7 @@ impl FlatlandTilesSession {
     }
 
     async fn create_flatland_tiles_session(
-        mut view_creation_token: ui_views::ViewCreationToken,
+        view_creation_token: ui_views::ViewCreationToken,
         internal_sender: UnboundedSender<MessageInternal>,
     ) -> Result<FlatlandTilesSession, Error> {
         let flatland = connect_to_protocol::<ui_comp::FlatlandMarker>()
@@ -247,14 +247,14 @@ impl FlatlandTilesSession {
         let (view_focuser, view_focuser_request) =
             fidl::endpoints::create_proxy::<ui_views::FocuserMarker>()
                 .expect("Failed to create Focuser channel");
-        let mut view_identity = ui_views::ViewIdentityOnCreation::from(ViewRefPair::new()?);
+        let view_identity = ui_views::ViewIdentityOnCreation::from(ViewRefPair::new()?);
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(view_focuser_request),
             ..Default::default()
         };
         flatland.create_view2(
-            &mut view_creation_token,
-            &mut view_identity,
+            view_creation_token,
+            view_identity,
             view_bound_protocols,
             parent_viewport_watcher_request,
         )?;

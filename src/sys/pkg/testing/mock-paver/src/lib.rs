@@ -768,7 +768,7 @@ pub mod tests {
             .write_asset(
                 paver::Configuration::A,
                 paver::Asset::Kernel,
-                &mut Buffer { vmo, size: data.len() as u64 },
+                Buffer { vmo, size: data.len() as u64 },
             )
             .await
             .expect("Writing asset");

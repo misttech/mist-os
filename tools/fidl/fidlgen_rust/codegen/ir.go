@@ -864,7 +864,12 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		case fidlgen.StructDeclType:
 			t.Fidl = name
 			t.Owned = name
-			t.Param = "&mut " + name
+			if t.IsResourceType() {
+				t.Param = name
+			} else {
+				// TODO(fxbug.dev/122199): Change to &name.
+				t.Param = "&mut " + name
+			}
 			if val.Nullable {
 				t.Fidl = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.Fidl)
 				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
@@ -956,7 +961,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 				return v
 			}
 			if t.IsResourceType() {
-				return v
+				return "&mut " + v
 			}
 			return "&*" + v
 		case fidlgen.TableDeclType:

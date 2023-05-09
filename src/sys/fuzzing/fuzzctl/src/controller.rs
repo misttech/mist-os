@@ -163,11 +163,11 @@ impl<O: OutputSink> Controller<O> {
             input_pairs.iter().fold(0, |total, input_pair| total + input_pair.len());
         let mut corpus_stats = corpus::Stats { num_inputs: 0, total_size: 0 };
         for input_pair in input_pairs.into_iter() {
-            let (mut fidl_input, input) = input_pair.as_tuple();
+            let (fidl_input, input) = input_pair.as_tuple();
             let fidl_input_size = fidl_input.size;
             let (result, _) = try_join!(
                 async {
-                    self.proxy.add_to_corpus(corpus_type, &mut fidl_input).await.map_err(Error::msg)
+                    self.proxy.add_to_corpus(corpus_type, fidl_input).await.map_err(Error::msg)
                 },
                 input.send(),
             )
@@ -236,8 +236,8 @@ impl<O: OutputSink> Controller<O> {
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
     ///
     pub async fn try_one(&self, input_pair: InputPair) -> Result<()> {
-        let (mut fidl_input, input) = input_pair.as_tuple();
-        let status = self.with_input("TryOne", self.proxy.try_one(&mut fidl_input), input).await?;
+        let (fidl_input, input) = input_pair.as_tuple();
+        let status = self.with_input("TryOne", self.proxy.try_one(fidl_input), input).await?;
         check_status("TryOne", status)
     }
 
@@ -254,9 +254,8 @@ impl<O: OutputSink> Controller<O> {
     ///   * The minimized input fails to be received and saved.
     ///
     pub async fn minimize(&self, input_pair: InputPair) -> Result<()> {
-        let (mut fidl_input, input) = input_pair.as_tuple();
-        let status =
-            self.with_input("Minimize", self.proxy.minimize(&mut fidl_input), input).await?;
+        let (fidl_input, input) = input_pair.as_tuple();
+        let status = self.with_input("Minimize", self.proxy.minimize(fidl_input), input).await?;
         match status {
             zx::Status::INVALID_ARGS => bail!("the provided input did not cause an error"),
             status => check_status("Minimize", status),
@@ -275,8 +274,8 @@ impl<O: OutputSink> Controller<O> {
     ///   * The cleansed input fails to be received and saved.
     ///
     pub async fn cleanse(&self, input_pair: InputPair) -> Result<()> {
-        let (mut fidl_input, input) = input_pair.as_tuple();
-        let status = self.with_input("Cleanse", self.proxy.cleanse(&mut fidl_input), input).await?;
+        let (fidl_input, input) = input_pair.as_tuple();
+        let status = self.with_input("Cleanse", self.proxy.cleanse(fidl_input), input).await?;
         match status {
             zx::Status::INVALID_ARGS => bail!("the provided input did not cause an error"),
             status => check_status("Cleanse", status),

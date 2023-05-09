@@ -84,12 +84,12 @@ impl Flash {
 
         // Write the new data. We reuse the vmo we got sent.
         result.vmo.write(nvram, 0).context("Writing new nvram to vmo")?;
-        let mut buffer = fidl_fuchsia_mem::Buffer { vmo: result.vmo, size: nvram.len() as u64 };
+        let buffer = fidl_fuchsia_mem::Buffer { vmo: result.vmo, size: nvram.len() as u64 };
         self.proxy
             .write(
                 &self.area.name,
                 next_entry_start.try_into().context("next_entry_start is out of bounds")?,
-                &mut buffer,
+                buffer,
             )
             .await
             .context("Sending FIDL write")?

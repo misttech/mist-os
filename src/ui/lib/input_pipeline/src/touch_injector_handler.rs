@@ -508,13 +508,13 @@ mod tests {
         if let Some(Ok(request)) = stream.next().await {
             match request {
                 pointerinjector_config::SetupRequest::GetViewRefs { responder, .. } => {
-                    let mut context = fuchsia_scenic::ViewRefPair::new()
+                    let context = fuchsia_scenic::ViewRefPair::new()
                         .expect("Failed to create viewrefpair.")
                         .view_ref;
-                    let mut target = fuchsia_scenic::ViewRefPair::new()
+                    let target = fuchsia_scenic::ViewRefPair::new()
                         .expect("Failed to create viewrefpair.")
                         .view_ref;
-                    let _ = responder.send(&mut context, &mut target);
+                    let _ = responder.send(context, target);
                 }
                 _ => {}
             };
