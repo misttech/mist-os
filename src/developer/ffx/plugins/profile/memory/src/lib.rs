@@ -23,11 +23,11 @@ use {
     fidl::endpoints::ProtocolMarker,
     fidl::Socket,
     fidl_fuchsia_developer_remotecontrol as rc,
+    fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_memory::MonitorProxy,
     fidl_fuchsia_memory_inspection::CollectorProxy,
     futures::AsyncReadExt,
     plugin_output::ProfileMemoryOutput,
-    selectors::{self, VerboseError},
     std::io::Write,
     std::time::Duration,
 };
@@ -65,15 +65,20 @@ impl JsonCollector for DeprecatedJsonCollectorImpl {
 /// Connect to a protocol on a remote device using the remote control proxy.
 async fn remotecontrol_connect<S: ProtocolMarker>(
     remote_control: &rc::RemoteControlProxy,
-    selector: &str,
+    moniker: &str,
 ) -> Result<S::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
         .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
-    let _: rc::ServiceMatch = remote_control
-        .connect(selectors::parse_selector::<VerboseError>(selector)?, server_end.into_channel())
+    remote_control
+        .connect_capability(
+            moniker,
+            S::DEBUG_NAME,
+            server_end.into_channel(),
+            OpenFlags::RIGHT_READABLE,
+        )
         .await?
         .map_err(|e| {
-            anyhow::anyhow!("failed to connect to {} as {}: {:?}", S::DEBUG_NAME, selector, e)
+            anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::DEBUG_NAME, moniker, e)
         })?;
     Ok(proxy)
 }
@@ -89,7 +94,7 @@ pub async fn plugin_entrypoint(
         // Attempt to connect to memory monitor's fuchsia.memory.inspection.Collector.
         let proxy = remotecontrol_connect::<fidl_fuchsia_memory_inspection::CollectorMarker>(
             &remote_control,
-            "core/memory_monitor:expose:fuchsia.memory.inspection.Collector",
+            "/core/memory_monitor",
         )
         .await;
 
@@ -103,7 +108,7 @@ pub async fn plugin_entrypoint(
             // TODO(fxb/122950) Stop connecting to`fuchsia.memory.Monitor`.
             let deprecated_proxy = remotecontrol_connect::<fidl_fuchsia_memory::MonitorMarker>(
                 &remote_control,
-                "core/memory_monitor:expose:fuchsia.memory.Monitor",
+                "/core/memory_monitor",
             )
             .await;
             let monitor_proxy = deprecated_proxy.expect("Failed to connect to fuchsia.memory.inspection.Collector and fuchsia.memory.Monitor.");
