@@ -703,10 +703,6 @@ class VmObject : public VmHierarchyBase,
 
   DECLARE_SINGLETON_CRITICAL_MUTEX(AllVmosLock);
   static GlobalList all_vmos_ TA_GUARDED(AllVmosLock::Get());
-
-  using Cursor = VmoCursor<VmObject, AllVmosLock, GlobalList, GlobalList::iterator>;
-
-  static fbl::DoublyLinkedList<Cursor*> all_vmos_cursors_ TA_GUARDED(AllVmosLock::Get());
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_H_
