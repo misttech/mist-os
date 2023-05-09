@@ -1,0 +1,40 @@
+[zxdb] b rust_functions.rs:29
+Created Breakpoint 1 @ rust_functions.rs:29
+Pending: No current matches for location. It will be matched against new
+         processes and shared libraries.
+
+[zxdb] run-component fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/rust_functions.cm
+run-component won't work for many v2 components. See "help run-component".
+Launched Process 1 state=Running koid=?? name=rust_functions.cm component=rust_functions.cm
+Breakpoint 1 now matching 1 addrs for rust_functions.rs:29
+🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
+
+# Rust functions need to be prepended with the module name.
+[zxdb] p rust_functions::print_hello()
+<No type>
+🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
+
+# Issue "next" twice to hit the original breakpoint again and then step over the line.
+[zxdb] n
+🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
+
+[zxdb] n
+🛑 rust_functions::main() • rust_functions.rs:??
+
+# Now it should stop at a generic breakpoint at the same place we were before.
+[zxdb] p rust_functions::nested_no_args()
+<No type>
+🛑 rust_functions::main() • rust_functions.rs:??
+
+# The global variable should be updated.
+[zxdb] p SOME_GLOBAL
+5
+
+# And we should be at the same location as before.
+[zxdb] f
+▶ 0 rust_functions::main() • rust_functions.rs:??
+  1 core::ops::function::FnOnce::call_once<…>(…) ??
+  2…?? «Rust startup» (-r expands)
+
+[zxdb] c
+Process 1 exited with code 0.

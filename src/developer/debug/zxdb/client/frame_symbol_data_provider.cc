@@ -8,6 +8,9 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/zxdb/client/call_function_thread_controller.h"
+#include "src/developer/debug/zxdb/client/call_function_thread_controller_arm64.h"
+#include "src/developer/debug/zxdb/client/call_function_thread_controller_x64.h"
 #include "src/developer/debug/zxdb/client/call_site_symbol_data_provider.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/memory_dump.h"
@@ -15,6 +18,7 @@
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
@@ -25,6 +29,19 @@ Err CallFrameDestroyedErr() { return Err("Call frame destroyed."); }
 
 Err RegisterUnavailableErr(debug::RegisterID id) {
   return Err(fxl::StringPrintf("Register %s unavailable.", debug::RegisterIDToString(id)));
+}
+
+std::unique_ptr<CallFunctionThreadController> MakeCallFunctionThreadController(
+    debug::Arch arch, const AddressRanges& ranges, FunctionReturnCallback return_cb,
+    fit::deferred_callback on_done = {}) {
+  switch (arch) {
+    case debug::Arch::kX64:
+      return std::make_unique<CallFunctionThreadControllerX64>(ranges, std::move(return_cb));
+    case debug::Arch::kArm64:
+      return std::make_unique<CallFunctionThreadControllerArm64>(ranges, std::move(return_cb));
+    default:
+      return nullptr;
+  }
 }
 
 }  // namespace
@@ -131,6 +148,38 @@ uint64_t FrameSymbolDataProvider::GetCanonicalFrameAddress() const {
   if (!frame_)
     return 0;
   return frame_->GetCanonicalFrameAddress();
+}
+
+void FrameSymbolDataProvider::MakeFunctionCall(const Function* fn,
+                                               fit::callback<void(const Err&)> cb) const {
+  if (!frame_) {
+    return cb(CallFrameDestroyedErr());
+  } else if (!frame_->GetThread()) {
+    return cb(Err("No thread."));
+  } else if (!fn) {
+    return cb(Err("Bad function."));
+  }
+
+  Thread* thread = frame_->GetThread();
+  if (!thread->CurrentStopSupportsFrames()) {
+    cb(Err("Thread must be stopped to call functions."));
+  }
+
+  AddressRanges range(fn->GetAbsoluteCodeRanges(
+      fn->GetSymbolContext(frame_->GetEvalContext()->GetProcessSymbols())));
+
+  std::unique_ptr<CallFunctionThreadController> controller = MakeCallFunctionThreadController(
+      frame_->session()->arch(), range,
+      [cb = std::move(cb)](const FunctionReturnInfo& return_info) mutable {
+        // TODO(https://fxbug.dev/5457): Figure out the return type here and return that.
+        cb(Err());
+      });
+
+  if (!controller) {
+    return cb(Err("Failed to make ABI function call thread controller"));
+  }
+
+  thread->ContinueWith(std::move(controller), [](const Err&) {});
 }
 
 }  // namespace zxdb

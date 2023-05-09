@@ -84,11 +84,26 @@ inferior("simplified_templates") {
   ]
 }
 
+inferior("cpp_functions") {
+  sources = [ "cpp_functions.cc" ]
+
+  cflags = [ "-fno-inline-functions" ]
+}
+
+inferior("rust_functions") {
+  type = "rustc_binary"
+  edition = "2021"
+  sources = [ "rust_functions.rs" ]
+  source_root = "rust_functions.rs"
+}
+
 fuchsia_package("zxdb_e2e_inferiors") {
   deps = [
     ":async_rust",
+    ":cpp_functions",
     ":inlined_crasher",
     ":loop",
+    ":rust_functions",
     ":simplified_templates",
     ":step_plt",
     ":wait_for_debugger",

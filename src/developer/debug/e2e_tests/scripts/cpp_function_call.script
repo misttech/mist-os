@@ -1,0 +1,38 @@
+[zxdb] b cpp_functions.cc:25
+Created Breakpoint 1 @ cpp_functions.cc:25
+Pending: No current matches for location. It will be matched against new
+         processes and shared libraries.
+
+[zxdb] run-component fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/cpp_functions.cm
+run-component won't work for many v2 components. See "help run-component".
+Launched Process 1 state=Running koid=?? name=cpp_functions.cm component=cpp_functions.cm
+Breakpoint 1 now matching 1 addrs for cpp_functions.cc:25
+🛑 on bp 1 main() • cpp_functions.cc:??
+
+[zxdb] p PrintHello()
+<No type>
+🛑 on bp 1 main() • cpp_functions.cc:??
+
+# Issue "next" twice to hit the original breakpoint again and then step over the line.
+[zxdb] n
+🛑 on bp 1 main() • cpp_functions.cc:??
+
+[zxdb] n
+🛑 main() • cpp_functions.cc:??
+
+[zxdb] p NestedTwiceNoArgs()
+<No type>
+🛑 main() • cpp_functions.cc:??
+
+# The global variable should have been updated.
+[zxdb] p SomeGlobal
+10
+
+# Should be at the same location as before.
+[zxdb] f
+▶ 0 main() • cpp_functions.cc:??
+  1…3 «libc startup» (-r expands)
+
+# Let the program finish.
+[zxdb] c
+Process 1 exited with code 0.

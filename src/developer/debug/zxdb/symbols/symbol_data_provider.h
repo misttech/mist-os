@@ -127,6 +127,15 @@ class SymbolDataProvider : public fxl::RefCountedThreadSafe<SymbolDataProvider> 
   // complete.
   virtual void WriteMemory(uint64_t address, std::vector<uint8_t> data, WriteCallback cb);
 
+  // Call function |fn| in the current target. The callback will be issued when the thread
+  // controller has determined that the function has returned (before the thread controller is
+  // actually finished, see FinishPhysicalFrameThreadController). Which allows the callback to call
+  // GetReturnValue to determine the returned type.
+  //
+  // |fn| must be resolved to a concrete Function object before calling this function, see
+  // ResolveFunction.
+  virtual void MakeFunctionCall(const Function* fn, fit::callback<void(const Err&)> cb) const;
+
  protected:
   FRIEND_MAKE_REF_COUNTED(SymbolDataProvider);
   FRIEND_REF_COUNTED_THREAD_SAFE(SymbolDataProvider);

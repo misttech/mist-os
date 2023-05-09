@@ -19,8 +19,10 @@
 #include "src/developer/debug/zxdb/expr/pretty_type_manager.h"
 #include "src/developer/debug/zxdb/expr/resolve_array.h"
 #include "src/developer/debug/zxdb/expr/resolve_collection.h"
+#include "src/developer/debug/zxdb/expr/resolve_function.h"
 #include "src/developer/debug/zxdb/expr/resolve_ptr_ref.h"
 #include "src/developer/debug/zxdb/expr/resolve_variant.h"
+#include "src/developer/debug/zxdb/expr/return_value.h"
 #include "src/developer/debug/zxdb/expr/vm_stream.h"
 #include "src/developer/debug/zxdb/symbols/arch.h"
 #include "src/developer/debug/zxdb/symbols/array_type.h"
@@ -441,6 +443,9 @@ void FunctionCallExprNode::EmitBytecode(VmStream& stream) const {
           params_and_object.pop_back();
 
           if (params_and_object.size() != 0) {
+            // TODO(https://fxbug.dev/5457): Member functions require a |this| pointer in C++ and a
+            // (typically) |self| reference in Rust.
+
             // Currently we do not support any parameters. This can be handled in the future if
             // needed.
             return cb(
@@ -460,16 +465,24 @@ void FunctionCallExprNode::EmitBytecode(VmStream& stream) const {
         static_cast<int>(args_.size()),
         [fn_name = ident->ident()](const fxl::RefPtr<EvalContext>& eval_context,
                                    const std::vector<ExprValue>& params, EvalCallback cb) {
-          // Check for builtins. We don't support calling functions in the target yet.
+          // Check for builtins first. If no builtin exists, try to call the function in the target.
           if (const EvalContext::BuiltinFuncCallback* impl =
                   eval_context->GetBuiltinFunction(fn_name)) {
             (*impl)(eval_context, params, std::move(cb));
-          } else {
-            cb(Err(fn_name.GetFullName() +
-                   " is not a known built-in function.\n"
-                   "Arbitrary function calls are not supported. Only certain built-in getters will "
-                   "work."));
+            return;
           }
+
+          auto err_or_fn = ResolveFunction(eval_context, fn_name, params);
+
+          if (err_or_fn.has_error()) {
+            return cb(err_or_fn.err());
+          }
+
+          auto fn = err_or_fn.value();
+          eval_context->GetDataProvider()->MakeFunctionCall(
+              fn.get(), [&eval_context, fn, cb = std::move(cb)](const Err& val) mutable {
+                GetReturnValue(eval_context, fn.get(), std::move(cb));
+              });
         }));
   } else {
     stream.push_back(VmOp::MakeError(Err("Unknown function call type.")));

@@ -157,7 +157,7 @@ void ThreadImpl::ContinueWith(std::unique_ptr<ThreadController> controller,
   controller_ptr->InitWithThread(
       this, [this, controller_ptr, on_continue = std::move(on_continue)](const Err& err) mutable {
         if (err.has_error()) {
-          controller_ptr->Log("InitWithThread failed.");
+          controller_ptr->Log("InitWithThread failed: %s", err.msg().c_str());
           NotifyControllerDone(controller_ptr);  // Remove the controller.
         } else {
           controller_ptr->Log("Initialized, continuing...");

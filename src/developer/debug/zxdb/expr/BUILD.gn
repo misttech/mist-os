@@ -90,6 +90,8 @@ static_library("expr") {
     "resolve_collection.h",
     "resolve_const_value.cc",
     "resolve_const_value.h",
+    "resolve_function.cc",
+    "resolve_function.h",
     "resolve_ptr_ref.cc",
     "resolve_ptr_ref.h",
     "resolve_type.cc",
