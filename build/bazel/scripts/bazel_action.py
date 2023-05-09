@@ -36,7 +36,7 @@ _FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
 # files are part of Bazel's installation, their content would hardly change
 # between build invocations anyway, so this is safe.
 #
-_BAZEL_BUILTIN_REPOSITORIES = ('@bazel_tools//',)
+_BAZEL_BUILTIN_REPOSITORIES = ('@bazel_tools//','@local_config_cc//')
 
 # Don't covert labels from these external repositories to hash files. Each entry
 # in this set should have a comment explaining the reasoning.
@@ -937,9 +937,6 @@ def main():
         #
         # --config=quiet is used to remove Bazel verbose output.
         #
-        # --noimplicit_deps removes 11,000 files from the result corresponding
-        # to the C++ and Python prebuilt toolchains
-        #
         # "--output label" ensures the output contains one label per line,
         # which will be followed by '(null)' for source files (or more
         # generally by a build configuration name or hex value for non-source
@@ -949,7 +946,6 @@ def main():
         ret = run_bazel_query(
             'query', [
                 '--config=quiet',
-                '--noimplicit_deps',
                 '--output',
                 'label',
                 f'buildfiles(deps({query_targets}))',
@@ -994,7 +990,6 @@ def main():
         bazel_source_files = get_bazel_query_output(
             'cquery', [
                 '--config=quiet',
-                '--noimplicit_deps',
                 '--output',
                 'label',
                 f'kind("source file", deps({query_targets}))',
