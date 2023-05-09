@@ -191,7 +191,20 @@ if (toolchain_environment == "kernel.phys32") {
     ]
   }
 
-  phys_executable("linux-x86-boot-shim") {
+  template("shim_executable") {
+    phys_executable(target_name) {
+      forward_variables_from(invoker, "*")
+      if (qemu_boot_shim.name == target_name) {
+        # This marks it as the official default boot shim for using QEMU.
+        images_metadata = {
+          name = "qemu-kernel"
+          archive = add_qemu_to_build_archives
+        }
+      }
+    }
+  }
+
+  shim_executable("linux-x86-boot-shim") {
     sources = [ "linux-x86-boot-shim.cc" ]
     deps = [
       ":legacy-boot-shim",
@@ -200,19 +213,13 @@ if (toolchain_environment == "kernel.phys32") {
     ]
   }
 
-  phys_executable("multiboot-shim") {
+  shim_executable("multiboot-shim") {
     sources = [ "multiboot-shim.cc" ]
     deps = [
       ":legacy-boot-shim",
       "..:multiboot",
       "//zircon/kernel/phys:symbolize",
     ]
-
-    # This marks it as the official default boot shim for using QEMU.
-    images_metadata = {
-      name = "qemu-kernel"
-      archive = add_qemu_to_build_archives
-    }
 
     # Everything should find this via the //:images build API.
     # But some things might still look for "out/.../multiboot.bin" directly.

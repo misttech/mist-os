@@ -5,25 +5,10 @@
 import("//build/images/args.gni")
 import("//build/product.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 # This centralizes the definition of a bunch of labels and files used in the
 # various //build/images/**/BUILD.gn files.
-
-# Kernel file used to populate emu manifest
-_qemu_kernel_file = ""
-_qemu_kernel_target = ""
-if (target_cpu == "x64") {
-  _qemu_kernel_file = "$root_build_dir/multiboot.bin"
-  _qemu_kernel_target = "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim"
-} else if (target_cpu == "arm64") {
-  _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
-  _qemu_kernel_target = "//zircon/kernel/target/arm64/boot-shim:qemu"
-} else if (target_cpu == "riscv64") {
-  _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
-  _qemu_kernel_target = "//zircon/kernel/target/riscv64/boot-shim:qemu"
-} else {
-  assert(false, "Unsupported target cpu: $target_cpu")
-}
 
 flash_manifest_version = 3
 
@@ -77,7 +62,9 @@ labels = {
   }
   zedboot_images = "//build/images/zedboot"
 
-  qemu_kernel = _qemu_kernel_target
+  _qemu_deps = qemu_boot_shim.deps
+  assert(_qemu_deps == [ _qemu_deps[0] ])
+  qemu_kernel = _qemu_deps[0]
 }
 
 supports_fastboot_fvm =
@@ -182,5 +169,5 @@ files = {
   installer_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.${_image_suffix}"
   installer_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.vbmeta"
 
-  qemu_kernel = _qemu_kernel_file
+  qemu_kernel = qemu_boot_shim.path
 }

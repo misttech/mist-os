@@ -80,7 +80,7 @@ if (is_linux) {
     deps = [ "${labels.images}" ]
     if (target_cpu == "x64") {
       sources += [ files.qemu_kernel ]
-      deps += [ "${labels.qemu_kernel}($target_toolchain)" ]
+      deps += [ "${labels.qemu_kernel}" ]
     }
   }
 

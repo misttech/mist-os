@@ -17,6 +17,7 @@ import("//src/developer/ffx/config.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/sys/core/build/core_shard.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 if (is_fuchsia) {
   # NB: These strings must match the assertions in the python scripts in this directory which test
@@ -83,11 +84,7 @@ if (is_fuchsia) {
     fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     fvm_fastboot = "${outdir}/fvm.fastboot.blk"
 
-    if (target_cpu == "x64") {
-      qemu_kernel = "$root_build_dir/multiboot.bin"
-    } else {
-      qemu_kernel = "$root_build_dir/qemu-boot-shim.bin"
-    }
+    qemu_kernel = qemu_boot_shim.path
 
     product_bundle = target_out_dir + "/product_bundle"
   }

@@ -5,6 +5,7 @@
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 ########
 # Guaranteed Invariants
@@ -1371,24 +1372,8 @@ assembly_input_bundle("example_assembly_bundle") {
 # itself (Zircon).
 #
 assembly_input_bundle("emulator_support") {
-  # Which label and file the qemu kernel is at is dependent on the arch of the
-  # target we are compiling for.
-  if (target_cpu == "x64") {
-    _qemu_kernel_file = "$root_build_dir/multiboot.bin"
-    _qemu_kernel_target =
-        "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim"
-  } else if (target_cpu == "arm64") {
-    _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
-    _qemu_kernel_target = "//zircon/kernel/target/arm64/boot-shim:qemu"
-  } else if (target_cpu == "riscv64") {
-    _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
-    _qemu_kernel_target = "//zircon/kernel/target/riscv64/boot-shim:qemu"
-  } else {
-    assert(false, "Unsupported target cpu: $target_cpu")
-  }
-
-  qemu_kernel = _qemu_kernel_file
-  deps = [ _qemu_kernel_target ]
+  qemu_kernel = qemu_boot_shim.path
+  deps = qemu_boot_shim.deps
 }
 
 # Enabling a soft-transition, remove when complete

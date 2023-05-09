@@ -18,6 +18,7 @@ import("//build/security/policies_swd.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/security/bin/scrutiny_x_smoke_test/scrutiny_x_smoke_test.gni")
 import("//src/sys/core/build/core.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 declare_args() {
   # Create the package and archive for the legacy assembly input bundle.  This
@@ -110,11 +111,7 @@ if (is_fuchsia) {
 
     esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
 
-    if (target_cpu == "x64") {
-      qemu_kernel = "$root_build_dir/multiboot.bin"
-    } else {
-      qemu_kernel = "$root_build_dir/qemu-boot-shim.bin"
-    }
+    qemu_kernel = qemu_boot_shim.path
   }
 
   # A scope of dependencies that serves to transition deps from the

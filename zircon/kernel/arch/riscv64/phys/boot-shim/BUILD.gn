@@ -38,10 +38,12 @@ phys_executable("riscv64-qemu-boot-shim") {
     "//zircon/kernel/phys/lib/boot-shim",
   ]
 
-  # This marks it as the official default boot shim for using QEMU.
-  images_metadata = {
-    name = "qemu-kernel"
-    archive = add_qemu_to_build_archives
+  if (qemu_boot_shim.name == target_name) {
+    # This marks it as the official default boot shim for using QEMU.
+    images_metadata = {
+      name = "qemu-kernel"
+      archive = add_qemu_to_build_archives
+    }
   }
 }
 
@@ -58,8 +60,6 @@ if (current_cpu == target_cpu) {
   # kernel and phys tests can be built.
   qemu_shim_tests += [ "core-tests" ]
 }
-
-qemu_boot_format = "linuxboot"
 
 template("qemu_shim_test") {
   foreach(shim, legacy_shims) {

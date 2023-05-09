@@ -7,8 +7,6 @@
 import("//build/testing/boot_test.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 
-# TODO(mcgrathr): declare_args() { qemu_boot_format = "multiboot"/"zeropage" }
-
 # zbi_test() $timeout value for short-running tests launched via QEMU.
 qemu_short_timeout = 30
 
@@ -38,18 +36,30 @@ qemu_short_timeout = 30
 #
 qemu_boot_formats = []
 
+# This is the default among the $name strings of $qemu_boot_formats.
+qemu_default_boot_format = ""
+
 if (current_cpu == "x64") {
+  qemu_default_boot_format = "multiboot"
   qemu_boot_formats += [
     {
       name = "multiboot"
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       deps = [ "//zircon/kernel/arch/x86/phys:multiboot" ]
+      shim_deps = [
+        "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim($environment)",
+      ]
+
+      # TODO(mcgrathr): Use root_out_dir of environment, multiboot-shim
+      # when nothing cares.
+      shim_path = "$root_build_dir/multiboot.bin"
       timeout = qemu_short_timeout
     },
     {
       name = "linuxboot"
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
       timeout = qemu_short_timeout
     },
   ]
@@ -65,21 +75,82 @@ if (current_cpu == "x64") {
   ]
 }
 if (current_cpu == "arm64" || current_cpu == "riscv64") {
+  qemu_default_boot_format = "linuxboot"
   qemu_boot_formats += [
     {
       name = "linuxboot"
       environment = phys_toolchain
       deps = [ "//zircon/kernel/arch/$current_cpu/phys:linuxboot" ]
+      if (current_cpu == "arm64") {
+        shim_deps = [ "//zircon/kernel/target/arm64/boot-shim:qemu(//zircon/kernel/arch/arm64:physmem_arm64)" ]
+
+        # TODO(mcgrathr): Use root_out_dir of environment, target name
+        # when nothing cares.
+        shim_path = "$root_build_dir/qemu-boot-shim.bin"
+      }
+      if (current_cpu == "riscv64") {
+        shim_deps = [ "//zircon/kernel/arch/riscv64/phys/boot-shim:riscv64-qemu-boot-shim($environment)" ]
+      }
       timeout = qemu_short_timeout
     },
   ]
 }
 
+declare_args() {
+  # Boot format to use with QEMU. This chooses the boot format to use with
+  # QEMU, determining which boot shim implementation is used as QEMU "kernel".
+  # Valid alternatives vary by machine, but include "linuxboot".
+  qemu_boot_format = qemu_default_boot_format
+}
+
+# This indicates what boot shim to use as the QEMU "kernel".
+# It's determined by the $qemu_boot_format build argument.
+#
+# Type: scope
+#
+#   * deps
+#     - Required: Direct deps to the target that produces the shim binary.
+#     This should be the target that produces the $path file.
+#     - Type: list(label_with_toolchain)
+#
+#   * path
+#     - Required: Path to the shim binary file, an output of $deps.
+#     - Type: path
+#
+qemu_boot_shim = {
+}
+
 # This is true when evaluated in one of the environments used by
 # a supported format in the $qemu_boot_formats list.
 in_qemu_environment = false
+
+_qemu_boot_format_names = []
 foreach(qemu, qemu_boot_formats) {
   if (toolchain_variant.base == qemu.environment) {
     in_qemu_environment = true
   }
+  _qemu_boot_format_names += [ qemu.name ]
+  if (qemu.name == qemu_boot_format) {
+    qemu_boot_shim = {
+      deps = qemu.shim_deps
+      name = get_label_info(deps[0], "name")
+      if (defined(qemu.shim_path)) {
+        path = qemu.shim_path
+      } else {
+        assert(deps == [ deps[0] ])
+        path = get_label_info("${deps[0]}", "root_out_dir") + "/" +
+               get_label_info(deps[0], "name") + ".bin"
+      }
+    }
+  }
 }
+
+assert(
+    _qemu_boot_format_names + [ qemu_boot_format ] - [ qemu_boot_format ] !=
+        _qemu_boot_format_names,
+    "qemu_boot_format=\"$qemu_boot_format\" not among available formats $_qemu_boot_format_names")
+
+assert(
+    qemu_boot_shim != {
+        },
+    "qemu_boot_format \"$qemu_boot_format\" has no Zircon boot shim available")

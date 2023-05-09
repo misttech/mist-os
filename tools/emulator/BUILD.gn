@@ -5,6 +5,7 @@
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/testing/host_test_data.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 group("tests") {
   testonly = true
@@ -67,20 +68,8 @@ if (is_linux) {
   host_test_data("kernel") {
     visibility = [ ":*" ]
 
-    if (target_cpu == "arm64") {
-      kernel_binary = "qemu-boot-shim.bin"
-      deps = [ "//zircon/kernel/target/arm64/boot-shim:qemu" ]
-    } else if (target_cpu == "x64") {
-      kernel_binary = "multiboot.bin"
-      deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim" ]
-    } else if (target_cpu == "riscv64") {
-      kernel_binary = "qemu-boot-shim.bin"
-      deps = [ "//zircon/kernel/target/riscv64/boot-shim:qemu" ]
-    } else {
-      assert(false, "CPU not supported")
-    }
-
-    sources = [ "$root_build_dir/$kernel_binary" ]
+    deps = qemu_boot_shim.deps
+    sources = [ qemu_boot_shim.path ]
   }
 
   generated_file("buildinfo.ini") {
