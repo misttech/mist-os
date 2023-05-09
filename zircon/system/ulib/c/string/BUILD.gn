@@ -11,12 +11,15 @@ llvm_libc_group("string") {
     ":str",
   ]
 
+  # TODO(fxbug.dev/102687): not yet using the llvm-libc versions of these
   non_test_deps = [
-    # TODO(fxbug.dev/102687): not yet using the llvm-libc versions of these
     "//zircon/third_party/ulib/musl/src/string:strerror_r",
     "//zircon/third_party/ulib/musl/src/string:strsignal",
     "//zircon/third_party/ulib/musl/src/string:strverscmp",
   ]
+
+  # TODO(fxbug.dev/102687): but run their tests in preparation
+  testonly_deps = [ ":strsignalerror" ]
 }
 
 llvm_libc_source_set("mem") {
@@ -165,6 +168,46 @@ llvm_libc_source_set("str") {
   ]
 
   deps = [ ":minimal-str" ]
+}
+
+llvm_libc_source_set("strsignalerror") {
+  visibility = [ ":*" ]
+
+  functions = [
+    "strerror",
+    "strerror_r",
+    "strsignal",
+  ]
+
+  deps = [ ":StringUtil" ]
+}
+
+libc_source_set("StringUtil") {
+  visibility = [ ":*" ]
+  dir = "$llvm_libc/src/__support/StringUtil"
+  public = [
+    "error_to_string.h",
+    "signal_to_string.h",
+  ]
+  sources = [
+    "error_to_string.cpp",
+    "message_mapper.h",
+    "signal_to_string.cpp",
+    "tables/error_table.h",
+    "tables/linux/error_table.h",
+    "tables/linux/signal_table.h",
+    "tables/posix_error_table.h",
+    "tables/posix_signal_table.h",
+    "tables/signal_table.h",
+    "tables/stdc_error_table.h",
+    "tables/stdc_signal_table.h",
+  ]
+}
+
+# llvm_libc_source_set() deps wants this too.
+group("StringUtil.unittests") {
+  visibility = [ ":*" ]
+  testonly = true
 }
 
 llvm_libc_source_set("compat") {

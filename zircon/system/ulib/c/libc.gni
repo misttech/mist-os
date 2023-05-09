@@ -441,6 +441,10 @@ template("llvm_libc_source_set") {
 #     - Optional: A list of labels not used for test code.
 #     - Type: list(label_without_toolchain)
 #
+#   * testonly_deps
+#     - Optional: A list of labels used *only* for test code.
+#     - Type: list(label_without_toolchain)
+#
 template("llvm_libc_group") {
   group_name = target_name
   target_dir = get_path_info(target_out_dir, "name")
@@ -468,6 +472,12 @@ template("llvm_libc_group") {
       }
       if (suffix == "" && defined(invoker.non_test_deps)) {
         deps += invoker.non_test_deps
+      }
+      if (suffix != "" && defined(invoker.testonly_deps)) {
+        foreach(label, invoker.testonly_deps) {
+          label += ".$suffix"
+          deps += [ label ]
+        }
       }
     }
   }
