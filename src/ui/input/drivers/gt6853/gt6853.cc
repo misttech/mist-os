@@ -32,10 +32,18 @@ constexpr zx::duration kResetSetupTime = zx::msec(2);
 constexpr int kFirmwareTries = 200;
 
 constexpr size_t kMaxSubsysCount = 28;
+
+// This requirement is imposed by the aml-i2c driver. The chip should support larger transfer sizes,
+// up to 4096 bytes in some cases.
 constexpr size_t kI2cMaxTransferSize = 256;
 
 constexpr uint8_t kCpuRunFromFlash[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 constexpr uint8_t kCpuRunFromRam[8] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
+
+constexpr uint16_t kMaxConfigSize = 4096;
+
+constexpr size_t kConfigFlagOffset = 1;
+constexpr size_t kConfigChecksumOffset = 3;
 
 }  // namespace
 
@@ -44,10 +52,13 @@ namespace touch {
 enum class Gt6853Device::HostCommand : uint8_t {
   kConfigStart = 0x80,
   kConfigEnd = 0x83,
+  kConfigReadStart = 0x86,
+  kConfigReadEnd = 0xff,
 };
 
 enum class Gt6853Device::DeviceCommand : uint8_t {
   kReadyForConfig = 0x82,
+  kReadyForConfigRead = 0x85,
   kDeviceIdle = 0xff,
 };
 
@@ -316,6 +327,11 @@ zx_status_t Gt6853Device::DownloadConfigIfNeeded(const fuchsia_mem::wire::Range&
 
   cpp20::span<const uint8_t> config{config_data + config_offset.value() + kConfigDataOffset,
                                     config_size - kConfigDataOffset};
+  if (config.size() > kMaxConfigSize) {
+    zxlogf(ERROR, "Config size is %zu, must be at most %u", config.size(), kMaxConfigSize);
+    return ZX_ERR_IO_INVALID;
+  }
+
   return SendConfig(config);
 }
 
@@ -400,7 +416,6 @@ zx_status_t Gt6853Device::PollCommandRegister(const DeviceCommand command) {
     zx::nanosleep(zx::deadline_after(zx::msec(1)));
   }
 
-  zxlogf(ERROR, "Timed out waiting for command register 0x%02x", static_cast<uint8_t>(command));
   return ZX_ERR_TIMED_OUT;
 }
 
@@ -434,27 +449,13 @@ zx_status_t Gt6853Device::SendConfig(cpp20::span<const uint8_t> config) {
   }
 
   if ((status = PollCommandRegister(DeviceCommand::kReadyForConfig)) != ZX_OK) {
+    zxlogf(ERROR, "Device not ready for config download");
     return status;
   }
 
-  constexpr size_t kMaxConfigPacketSize = 128;
-
-  size_t size = config.size();
-  size_t offset = 0;
-  while (size > 0) {
-    const size_t tx_size = std::min(size, kMaxConfigPacketSize);
-    uint8_t buffer[sizeof(Register::kConfigDataReg) + kMaxConfigPacketSize];
-
-    buffer[0] = static_cast<uint16_t>(Register::kConfigDataReg) >> 8;
-    buffer[1] = static_cast<uint16_t>(Register::kConfigDataReg) & 0xff;
-    memcpy(buffer + 2, config.data() + offset, tx_size);
-    if ((status = i2c_.WriteSync(buffer, tx_size + sizeof(Register::kConfigDataReg))) != ZX_OK) {
-      zxlogf(ERROR, "Failed to write %zu config bytes: %d", tx_size, status);
-      return status;
-    }
-
-    size -= tx_size;
-    offset += tx_size;
+  zx::result<> result = Write(Register::kConfigDataReg, config.data(), config.size());
+  if (result.is_error()) {
+    return result.error_value();
   }
 
   if ((status = SendCommand(HostCommand::kConfigEnd)) != ZX_OK) {
@@ -467,7 +468,61 @@ zx_status_t Gt6853Device::SendConfig(cpp20::span<const uint8_t> config) {
     return status;
   }
 
-  config_status_.Set("download succeeded");
+  // The readback check should succeed, but continue like normal even if it doesn't.
+  if (ReadBackConfig(config) == ZX_OK) {
+    config_status_.Set("download succeeded");
+  } else {
+    config_status_.Set("readback check failed");
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t Gt6853Device::ReadBackConfig(cpp20::span<const uint8_t> config) {
+  zx_status_t status = SendCommand(HostCommand::kConfigReadStart);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to start config readback");
+    return status;
+  }
+
+  if ((status = PollCommandRegister(DeviceCommand::kReadyForConfigRead)) != ZX_OK) {
+    zxlogf(ERROR, "Device not ready for config readback");
+    return status;
+  }
+
+  uint8_t config_read_back[kMaxConfigSize];
+  zx::result<> result = Read(Register::kConfigDataReg, config_read_back, config.size());
+
+  if ((status = SendCommand(HostCommand::kConfigReadEnd)) != ZX_OK) {
+    zxlogf(ERROR, "Failed to stop config readback");
+    return status;
+  }
+
+  if ((status = PollCommandRegister(DeviceCommand::kDeviceIdle)) != ZX_OK) {
+    zxlogf(ERROR, "Device not idle after config readback");
+    return status;
+  }
+
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to read config from device");
+    return result.error_value();
+  }
+
+  // Allow bit 0 of the flag register to be different.
+  if ((config_read_back[kConfigFlagOffset] ^ config[kConfigFlagOffset]) > 1) {
+    zxlogf(WARNING, "Config readback check failed");
+    return ZX_ERR_IO_DATA_INTEGRITY;
+  }
+
+  // Fix up the flag register and checksum.
+  config_read_back[kConfigFlagOffset] = config[kConfigFlagOffset];
+  config_read_back[kConfigChecksumOffset] = config[kConfigChecksumOffset];
+
+  if (memcmp(config_read_back, config.data(), config.size()) != 0) {
+    zxlogf(WARNING, "Config readback check failed");
+    return ZX_ERR_IO_DATA_INTEGRITY;
+  }
+
   return ZX_OK;
 }
 

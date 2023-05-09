@@ -75,7 +75,9 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
   bool ok() const { return event_reset_; }
 
   void set_sensor_id(const uint16_t sensor_id) { sensor_id_ = sensor_id; }
-  const std::vector<uint8_t>& get_config_data() const { return config_data_; }
+  cpp20::span<const uint8_t> get_config_data() const {
+    return {config_data_, std::size(config_data_)};
+  }
   const std::vector<FirmwarePacket>& get_firmware_packets() const { return firmware_packets_; }
 
  protected:
@@ -143,9 +145,16 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
       } else {
         return ZX_ERR_IO;
       }
-    } else if (address == static_cast<uint16_t>(Register::kConfigDataReg) &&
-               write_buffer_size > 0) {
-      config_data_.insert(config_data_.end(), write_buffer, write_buffer + write_buffer_size);
+    } else if (current_state_ == kWaitingForConfig &&
+               address >= static_cast<uint16_t>(Register::kConfigDataReg) &&
+               address < static_cast<uint16_t>(Register::kConfigDataReg) + sizeof(config_data_)) {
+      const size_t offset = address - static_cast<uint16_t>(Register::kConfigDataReg);
+      if (write_buffer_size > 0) {
+        memcpy(config_data_ + offset, write_buffer, write_buffer_size);
+      } else {
+        memcpy(read_buffer, config_data_ + offset, sizeof(config_data_));
+        *read_buffer_size = sizeof(config_data_);
+      }
     } else if (address >= static_cast<uint16_t>(Register::kIspBuffer) &&
                address < (static_cast<uint16_t>(Register::kIspBuffer) + 4096)) {
       const uint16_t offset = address - static_cast<uint16_t>(Register::kIspBuffer);
@@ -269,7 +278,7 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
   bool event_reset_ = false;
   uint16_t sensor_id_ = UINT16_MAX;
   State current_state_ = kIdle;
-  std::vector<uint8_t> config_data_;
+  uint8_t config_data_[651];  // All panels have configs of this size.
   uint8_t flash_packet_[4096];
   uint8_t subsys_type_ = 0;
   uint8_t access_patch0 = 0;

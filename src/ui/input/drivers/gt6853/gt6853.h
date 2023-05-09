@@ -130,6 +130,7 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   zx_status_t PollCommandRegister(DeviceCommand command);
   zx_status_t SendCommand(HostCommand command);
   zx_status_t SendConfig(cpp20::span<const uint8_t> config);
+  zx_status_t ReadBackConfig(cpp20::span<const uint8_t> config);
 
   zx_status_t UpdateFirmwareIfNeeded();
   // Returns the number of subsys entries found and populated.
