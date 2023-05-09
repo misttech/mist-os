@@ -28,6 +28,12 @@
 // USB Product ID for ADB Function.
 #define GOOGLE_USB_ADB_PID 0xA025
 
+// USB Product ID for Overnet Function.
+#define GOOGLE_USB_OVERNET_PID 0xA028
+
+// USB Product ID for Overnet Function.
+#define GOOGLE_USB_CDC_AND_OVERNET_PID 0xA029
+
 // USB Product ID for CDC Ethernet and ADB composite device.
 #define GOOGLE_USB_CDC_AND_ADB_PID 0xA026
 
