@@ -1374,19 +1374,17 @@
   has to the key consumer, with all layout and other mappings that apply."
   full_description: "An encoding corresponding to the meaning a key event
   has to the key consumer, with all layout and other mappings that apply."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
 - term: "Key sequence"
   short_description: "A sequence of key chords."
   full_description: "A sequence of key chords.
-
   Example: in Emacs, pressing C-x followed by C-s saves the current buffer.
-
   Since a single key actuation is a key chord (see definition above), every
   sequence of single key presses such as \"hello world\" is also a key sequence."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1414,25 +1412,22 @@
   short_description: "A map that transforms a sequence of physical keys into a key meaning."
   full_description: "A map that transforms a sequence of physical keys into a key meaning.
   Also known as <emph>keymap</emph>, or <emph>keyboard layout</emph>."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
 - term: "Keyboard shortcut"
   short_description: "A special kind of key binding."
   full_description: "A key chord that appears in some key binding.
-
   All keyboard shortcuts are chords, but only chords that have a key effect
   associated with them are shortcuts.
-
   On Fuchsia, a distinctive feature of shortcuts is that they can be routed
   to Views that are not in focus.
-
   This allows top-level Views such as the graphical shell, or Accessibility,
   to install system-wide shortcuts and intercept them instead of yielding them
   over to child views. Contrast to the behavior of key events, which are only
   ever delivered to focused views."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1486,10 +1481,9 @@
   short_description: "Caps lock, num lock, fn lock, scroll lock"
   full_description: "A \"state set by actuating a lock key, singly or in
   combination with a [modifier] key\". (ISO/IEC 9995-1:2009, section 4.5)
-
   Example lock state keys on PC keyboards are: CapsLock, NumLock, FnLock,
   ScrollLock."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1507,15 +1501,13 @@
   full_description: "The underlined character in a menu
   (<a href=\"https://en.wikipedia.org/wiki/Mnemonics_(keyboard)\">Wikipedia</a>).
   For example, the \"F\" in \"File\" which is accessed by pressing \"Alt+F\".
-
   Mnemonics are localized. For example, the \"File\" menu in an English version
   of a program has \"F\" as the mnemonic, so \"Alt+F\" would be used to access.
   The Dutch version of the same program would have \"Bestanden\" as the title
   of that very same menu, so \"Alt+B\" would be used for access.
-
   Mnemonics differ from shortcuts: in an application an \"Open\" command could
   have \"O\" as mnemonic, but Ctrl+F12 as a shortcut."
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1525,7 +1517,7 @@
   which, for as long as it is actuated, modifies the effects of other keys.
   A modifier key can be, for example, [...] a control key.\"
   (ISO/IEC 9995-1:2009, section 4.17)"
-  see_also:
+  see_also: [""]
   related_guides: [""]
   area: ["UI", "HCI"]
 
@@ -1738,11 +1730,9 @@
   short_description: "The numeric code associated with a key, as assigned by Fuchsia."
   full_description: "The numeric code associated with a key, as assigned by
   the operating system.
-
   In Fuchsia, the physical key codes are unsigned 32-bit integers, derived from
   the USB HID usage tables. The USB HID usage page number is encoded in the
   upper 16 bits, and the usage ID within a page is encoded in the lower 16 bits.
-
   An encoding of a physical key code used in Fuchsia: see input.Key."
   see_also: ["Physical key", "Scan code"]
   related_guides: [""]
