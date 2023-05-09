@@ -73,6 +73,17 @@ foreach(funcs,
     defines = []
     foreach(func, funcs) {
       cflags += [ "-fno-builtin-$func" ]
+
+      # TODO(fxbug.dev/126752): The .weakref shenanigans in dynlink.c aren't
+      # compatible with full LTO and a memcpy defined in C++. This only affects
+      # riscv64 in practice, since others use assembly definitions regardless.
+      if ((func == "memcpy" || func == "memset") && !is_gcc &&
+          toolchain_environment == "user.basic") {
+        cflags += [
+          "-fno-lto",
+          "-fno-whole-program-vtables",
+        ]
+      }
     }
   }
 
