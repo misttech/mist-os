@@ -155,6 +155,49 @@ def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_c
             },
         )
 
+def _ffx_tool_files(meta, files_str):
+    for (name, collection) in meta.items():
+        if name == "executable" or name == "executable_metadata":
+            # each set of file collections can only have one each of an
+            # executable and executable_metadata item, so we expect to just
+            # add one item.
+            files_str.append(collection)
+        else:
+            # any other kind of collection must be an array if present, so
+            # we extend the list.
+            files_str.extend(collection)
+
+# buildifier: disable=unused-variable
+def _generate_ffx_tool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+    tmpl = ctx.path(ctx.attr._ffx_tool_template)
+
+    # Include meta manifest itself because ffx uses it to locate ffx tools.
+    files_str = [meta["_meta_path"]]
+    if "files" in meta:
+        _ffx_tool_files(meta["files"], files_str)
+
+    if "target_files" in meta:
+        for arch in meta["target_files"]:
+            _ffx_tool_files(meta["target_files"][arch], files_str)
+
+    # normalize root to not have trailing slashes so the
+    # slice below won't fail if there's a / at the end.
+    meta_root = meta["root"].rstrip("/")
+    relative_files = []
+    for file in files_str:
+        relative_file = file[len(meta["root"]) + 1:]
+        relative_files.append(relative_file)
+
+    _merge_template(
+        ctx,
+        build_file,
+        tmpl,
+        {
+            "{{files}}": _get_starlark_list(relative_files),
+        },
+    )
+    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
+
 # buildifier: disable=unused-variable
 def _generate_host_tool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._host_tool_template)
@@ -466,6 +509,7 @@ def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_conte
         "fidl_library": _generate_fidl_library_build_rules,
         "companion_host_tool": _generate_companion_host_tool_build_rules,
         "host_tool": _generate_host_tool_build_rules,
+        "ffx_tool": _generate_ffx_tool_build_rules,
         "cc_source_library": _generate_cc_source_library_build_rules,
         "cc_prebuilt_library": _generate_cc_prebuilt_library_build_rules,
         "bind_library": _generate_bind_library_build_rules,

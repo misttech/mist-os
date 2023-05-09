@@ -178,6 +178,10 @@ allow Bazel to cache the file.
             default = "//fuchsia/workspace/sdk_templates:component_manifest_collection_template.BUILD",
             allow_single_file = True,
         ),
+        "_ffx_tool_template": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:ffx_tool_template.BUILD",
+            allow_single_file = True,
+        ),
         "_fidl_library_template": attr.label(
             default = "//fuchsia/workspace/sdk_templates:fidl_library_template.BUILD",
             allow_single_file = True,
