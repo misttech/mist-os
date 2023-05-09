@@ -6,15 +6,162 @@
 #include <lib/hdmi-dw/hdmi-dw.h>
 
 #include <fbl/array.h>
-#include <mock-mmio-reg/mock-mmio-reg.h>
+#include <gtest/gtest.h>
+#include <mock-mmio-range/mock-mmio-range.h>
+
+// The MMIO register addresses here are from the Synopsis DesignWare Cores HDMI
+// Transmitter Controller Databook, which is distributed by Synopsis.
+//
+// dwchdmi is version 2.12a, dated April 2016
 
 namespace hdmi_dw {
 
 namespace {
 
-constexpr size_t kRegSize = 0x00010000 / sizeof(uint8_t);  // in 32 bits chunks.
+// Register addresses from dwchdmi 6.2 "Interrupt Registers" table 6-14
+// "Registers for Address Block: Interrupt"
+constexpr int kIhFcStat0Offset = 0x100;
+constexpr int kIhFcStat1Offset = 0x101;
+constexpr int kIhFcStat2Offset = 0x102;
+constexpr int kIhAsStat0Offset = 0x103;
+constexpr int kIhPhyStat0Offset = 0x104;
+constexpr int kIhI2cmStat0Offset = 0x105;
+constexpr int kIhCecStat0Offset = 0x106;
+constexpr int kIhVpStat0Offset = 0x107;
+constexpr int kIhI2cmphyStat0Offset = 0x108;
+constexpr int kIhMuteFcStat0Offset = 0x180;
+constexpr int kIhMuteFcStat1Offset = 0x181;
+constexpr int kIhMuteFcStat2Offset = 0x182;
+constexpr int kIhMuteAsStat0Offset = 0x183;
+constexpr int kIhMutePhyStat0Offset = 0x184;
+constexpr int kIhMuteI2cmStat0Offset = 0x185;
+constexpr int kIhMuteCecStat0Offset = 0x186;
+constexpr int kIhMuteVpStat0Offset = 0x187;
+constexpr int kIhMuteI2cmphyStat0Offset = 0x188;
+constexpr int kIhMuteOffset = 0x1ff;
 
-}  // namespace
+// Register addresses from dwchdmi 6.3 "VideoSampler Registers" table 6-37
+// "Registers for Address Block: VideoSampler"
+constexpr int kTxInvid0Offset = 0x200;
+constexpr int kTxInstuffingOffset = 0x201;
+constexpr int kTxGydata0Offset = 0x202;
+constexpr int kTxGydata1Offset = 0x203;
+constexpr int kTxRcrdata0Offset = 0x204;
+constexpr int kTxRcrdata1Offset = 0x205;
+constexpr int kTxBcbdata0Offset = 0x206;
+constexpr int kTxBcbdata1Offset = 0x207;
+
+// Register addresses from dwchdmi 6.4 "VideoPacketizer Registers" table 6-46
+// "Registers for Address Block: VideoPacketizer"
+constexpr int kVpPrCdOffset = 0x801;
+constexpr int kVpStuffOffset = 0x802;
+constexpr int kVpRemapOffset = 0x803;
+constexpr int kVpConfOffset = 0x804;
+constexpr int kVpMaskOffset = 0x807;
+
+// Register addresses from dwchdmi 6.5 "FrameComposer Registers" table 6-53
+// "Registers for Address Block: FrameComposer"
+constexpr int kFcInvidconfOffset = 0x1000;
+constexpr int kFcInhactiv0Offset = 0x1001;
+constexpr int kFcInhactiv1Offset = 0x1002;
+constexpr int kFcInhblank0Offset = 0x1003;
+constexpr int kFcInhblank1Offset = 0x1004;
+constexpr int kFcInvactiv0Offset = 0x1005;
+constexpr int kFcInvactiv1Offset = 0x1006;
+constexpr int kFcInvblankOffset = 0x1007;
+constexpr int kFcHsyncindelay0Offset = 0x1008;
+constexpr int kFcHsyncindelay1Offset = 0x1009;
+constexpr int kFcHsyncinwidth0Offset = 0x100a;
+constexpr int kFcHsyncinwidth1Offset = 0x100b;
+constexpr int kFcVsyncindelayOffset = 0x100c;
+constexpr int kFcVsyncinwidthOffset = 0x100d;
+constexpr int kFcCtrldurOffset = 0x1011;
+constexpr int kFcExctrldurOffset = 0x1012;
+constexpr int kFcExctrlspacOffset = 0x1013;
+constexpr int kFcAviconf3Offset = 0x1017;
+constexpr int kFcGcpOffset = 0x1018;
+constexpr int kFcAviconf0Offset = 0x1019;
+constexpr int kFcAviconf1Offset = 0x101a;
+constexpr int kFcAviconf2Offset = 0x101b;
+constexpr int kFcMask0Offset = 0x10d2;
+constexpr int kFcMask1Offset = 0x10d6;
+constexpr int kFcMask2Offset = 0x10da;
+constexpr int kFcPrconfOffset = 0x10e0;
+constexpr int kFcScamblerCtrlOffset = 0x10e1;
+constexpr int kFcActspcHdlrCfgOffset = 0x10e8;
+constexpr int kFcInvact2d0Offset = 0x10e9;
+constexpr int kFcInvact2d1Offset = 0x10ea;
+
+// Register addresses from dwchdmi 6.12 "MainController Registers" table 6-317
+// "Registers for Address Block: Controller"
+constexpr int kMcClkdisOffset = 0x4001;
+constexpr int kMcSwrstzreqOffset = 0x4002;
+constexpr int kMcFlowctrlOffset = 0x4004;
+constexpr int kMcLockonclockOffset = 0x4006;
+
+// Register addresses from dwchdmi 6.13 "ColorSpaceConverter Registers" table
+// 6-327 "Registers for Address Block: ColorSpaceConverter"
+constexpr int kCscCfgOffset = 0x4100;
+constexpr int kCscScaleOffset = 0x4101;
+constexpr int kCscCoefA1MsbOffset = 0x4102;
+constexpr int kCscCoefA1LsbOffset = 0x4103;
+constexpr int kCscCoefA2MsbOffset = 0x4104;
+constexpr int kCscCoefA2LsbOffset = 0x4105;
+constexpr int kCscCoefA3MsbOffset = 0x4106;
+constexpr int kCscCoefA3LsbOffset = 0x4107;
+constexpr int kCscCoefA4MsbOffset = 0x4108;
+constexpr int kCscCoefA4LsbOffset = 0x4109;
+constexpr int kCscCoefB1MsbOffset = 0x410a;
+constexpr int kCscCoefB1LsbOffset = 0x410b;
+constexpr int kCscCoefB2MsbOffset = 0x410c;
+constexpr int kCscCoefB2LsbOffset = 0x410d;
+constexpr int kCscCoefB3MsbOffset = 0x410e;
+constexpr int kCscCoefB3LsbOffset = 0x410f;
+constexpr int kCscCoefB4MsbOffset = 0x4110;
+constexpr int kCscCoefB4LsbOffset = 0x4111;
+constexpr int kCscCoefC1MsbOffset = 0x4112;
+constexpr int kCscCoefC1LsbOffset = 0x4113;
+constexpr int kCscCoefC2MsbOffset = 0x4114;
+constexpr int kCscCoefC2LsbOffset = 0x4115;
+constexpr int kCscCoefC3MsbOffset = 0x4116;
+constexpr int kCscCoefC3LsbOffset = 0x4117;
+constexpr int kCscCoefC4MsbOffset = 0x4118;
+constexpr int kCscCoefC4LsbOffset = 0x4119;
+
+// Register addresses from dwchdmi 6.14 "HDCP Registers" table 6-358 "Registers
+// for Address Block: HDCP"
+constexpr int kAApiintclrOffset = 0x5006;
+
+// Register addresses from dwchdmi 6.15 "HDCP22 Registers" table 6-405
+// "Registers for Address Block: HDCP22"
+constexpr int kHdcp22regStatOffset = 0x790d;
+
+// Register addresses from dwchdmi 6.17 "EDDC Registers" table 6-424 "Registers
+// for Address Block: EDDC"
+//
+// The register names here reflect the updated I2C naming convention, adopted in
+// I2C specification revision 1.7.
+constexpr int kI2cmTargetOffset = 0x7e00;
+constexpr int kI2cmAddressOffset = 0x7e01;
+constexpr int kI2cmDataoOffset = 0x7e02;
+constexpr int kI2cmDataiOffset = 0x7e03;
+constexpr int kI2cmOperationOffset = 0x7e04;
+constexpr int kI2cmIntOffset = 0x7e05;
+constexpr int kI2cmCtlintOffset = 0x7e06;
+constexpr int kI2cmDivOffset = 0x7e07;
+constexpr int kI2cmSegAddrOffset = 0x7e08;
+constexpr int kI2cmSegPtrOffset = 0x7e0a;
+constexpr int kI2cmSsSclHcnt1AddrOffset = 0x7e0b;
+constexpr int kI2cmSsSclHcnt0AddrOffset = 0x7e0c;
+constexpr int kI2cmSsSclLcnt1AddrOffset = 0x7e0d;
+constexpr int kI2cmSsSclLcnt0AddrOffset = 0x7e0e;
+constexpr int kI2cmFsSclHcnt1AddrOffset = 0x7e0f;
+constexpr int kI2cmFsSclHcnt0AddrOffset = 0x7e10;
+constexpr int kI2cmFsSclLcnt1AddrOffset = 0x7e11;
+constexpr int kI2cmFsSclLcnt0AddrOffset = 0x7e12;
+constexpr int kI2cmSdaHoldOffset = 0x7e13;
+constexpr int kI2cmScdcReadUpdateOffset = 0x7e14;
+constexpr int kI2cmReadBuff0Offset = 0x7e20;
 
 using fuchsia_hardware_hdmi::wire::ColorDepth;
 using fuchsia_hardware_hdmi::wire::ColorFormat;
@@ -35,14 +182,7 @@ class FakeHdmiIpBase : public HdmiIpBase {
 class FakeHdmiDw : public HdmiDw {
  public:
   static std::unique_ptr<FakeHdmiDw> Create(fdf::MmioBuffer mmio) {
-    fbl::AllocChecker ac;
-    auto device = fbl::make_unique_checked<FakeHdmiDw>(&ac, std::move(mmio));
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: device object alloc failed", __func__);
-      return nullptr;
-    }
-
-    return device;
+    return std::make_unique<FakeHdmiDw>(std::move(mmio));
   }
 
   explicit FakeHdmiDw(fdf::MmioBuffer mmio) : HdmiDw(&base_), base_(std::move(mmio)) {}
@@ -51,63 +191,58 @@ class FakeHdmiDw : public HdmiDw {
   FakeHdmiIpBase base_;
 };
 
-class HdmiDwTest : public zxtest::Test {
+class HdmiDwTest : public testing::Test {
  public:
-  void SetUp() override {
-    fbl::AllocChecker ac;
-    mock_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
-                                                                       sizeof(uint32_t), kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: mock_mmio_ alloc failed", __func__);
-      return;
-    }
+  void SetUp() override { hdmi_dw_ = FakeHdmiDw::Create(mmio_range_.GetMmioBuffer()); }
 
-    hdmi_dw_ = FakeHdmiDw::Create(fdf::MmioBuffer(mock_mmio_->GetMmioBuffer()));
-    ASSERT_NOT_NULL(hdmi_dw_);
+  void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
+
+  void ExpectScdcWrite(uint8_t address, uint8_t value) {
+    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+        {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
+        {.address = kI2cmAddressOffset, .value = address, .write = true},
+        {.address = kI2cmDataoOffset, .value = value, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b01'0000, .write = true},
+    }));
   }
 
-  void TearDown() override { mock_mmio_->VerifyAll(); }
-
-  void ExpectScdcWrite(uint8_t addr, uint8_t val) {
-    (*mock_mmio_)[0x7E00].ExpectWrite(0x54);  // HDMITX_DWC_I2CM_SLAVE
-    (*mock_mmio_)[0x7E01].ExpectWrite(addr);  // HDMITX_DWC_I2CM_ADDR
-    (*mock_mmio_)[0x7E02].ExpectWrite(val);   // HDMITX_DWC_I2CM_DATAO
-    (*mock_mmio_)[0x7E04].ExpectWrite(0x10);  // HDMITX_DWC_I2CM_OPERATION
-  }
-
-  void ExpectScdcRead(uint8_t addr, uint8_t val) {
-    (*mock_mmio_)[0x7E00].ExpectWrite(0x54);  // HDMITX_DWC_I2CM_SLAVE
-    (*mock_mmio_)[0x7E01].ExpectWrite(addr);  // HDMITX_DWC_I2CM_ADDR
-    (*mock_mmio_)[0x7E04].ExpectWrite(0x01);  // HDMITX_DWC_I2CM_OPERATION
-
-    (*mock_mmio_)[0x7E03].ExpectRead(val);  // HDMITX_DWC_I2CM_DATAI
+  void ExpectScdcRead(uint8_t address, uint8_t value) {
+    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+        {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
+        {.address = kI2cmAddressOffset, .value = address, .write = true},
+        {.address = kI2cmOperationOffset, .value = 0b00'0001, .write = true},
+        {.address = kI2cmDataiOffset, .value = value},
+    }));
   }
 
  protected:
+  constexpr static int kMmioRangeSize = 0x10000;
+  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k8};
+
   std::unique_ptr<FakeHdmiDw> hdmi_dw_;
-  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_mmio_;
 };
 
 TEST_F(HdmiDwTest, InitHwTest) {
-  (*mock_mmio_)[0x4006].ExpectWrite(0xff);  // HDMITX_DWC_MC_LOCKONCLOCK
-  (*mock_mmio_)[0x4001].ExpectWrite(0x00);  // HDMITX_DWC_MC_CLKDIS
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kMcLockonclockOffset, .value = 0b1111'1111, .write = true},
+      {.address = kMcClkdisOffset, .value = 0b0000'0000, .write = true},
 
-  (*mock_mmio_)[0x7E05].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_INT
-  (*mock_mmio_)[0x7E06].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_CTLINT
+      {.address = kI2cmIntOffset, .value = 0b0000'0000, .write = true},
+      {.address = kI2cmCtlintOffset, .value = 0b0000'0000, .write = true},
+      {.address = kI2cmDivOffset, .value = 0b0000'0000, .write = true},
 
-  (*mock_mmio_)[0x7E07].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_DIV
+      {.address = kI2cmSsSclHcnt1AddrOffset, .value = 0x00, .write = true},
+      {.address = kI2cmSsSclHcnt0AddrOffset, .value = 0xcf, .write = true},
+      {.address = kI2cmSsSclLcnt1AddrOffset, .value = 0x00, .write = true},
+      {.address = kI2cmSsSclLcnt0AddrOffset, .value = 0xff, .write = true},
+      {.address = kI2cmFsSclHcnt1AddrOffset, .value = 0x00, .write = true},
+      {.address = kI2cmFsSclHcnt0AddrOffset, .value = 0x0f, .write = true},
+      {.address = kI2cmFsSclLcnt1AddrOffset, .value = 0x00, .write = true},
+      {.address = kI2cmFsSclLcnt0AddrOffset, .value = 0x20, .write = true},
 
-  (*mock_mmio_)[0x7E0B].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_SS_SCL_HCNT_1
-  (*mock_mmio_)[0x7E0C].ExpectWrite(0xcf);  // HDMITX_DWC_I2CM_SS_SCL_HCNT_0
-  (*mock_mmio_)[0x7E0D].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_SS_SCL_LCNT_1
-  (*mock_mmio_)[0x7E0E].ExpectWrite(0xff);  // HDMITX_DWC_I2CM_SS_SCL_LCNT_0
-  (*mock_mmio_)[0x7E0F].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_FS_SCL_HCNT_1
-  (*mock_mmio_)[0x7E10].ExpectWrite(0x0f);  // HDMITX_DWC_I2CM_FS_SCL_HCNT_0
-  (*mock_mmio_)[0x7E11].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_FS_SCL_LCNT_1
-  (*mock_mmio_)[0x7E12].ExpectWrite(0x20);  // HDMITX_DWC_I2CM_FS_SCL_LCNT_0
-  (*mock_mmio_)[0x7E13].ExpectWrite(0x08);  // HDMITX_DWC_I2CM_SDA_HOLD
-
-  (*mock_mmio_)[0x7E14].ExpectWrite(0x00);  // HDMITX_DWC_I2CM_SCDC_UPDATE
+      {.address = kI2cmSdaHoldOffset, .value = 0x08, .write = true},
+      {.address = kI2cmScdcReadUpdateOffset, .value = 0b0000'0000, .write = true},
+  }));
 
   hdmi_dw_->InitHw();
 }
@@ -139,41 +274,41 @@ TEST_F(HdmiDwTest, EdidTransferTest) {
       },
   };
 
-  (*mock_mmio_)[0x7E00].ExpectWrite(0x50);  // HDMITX_DWC_I2CM_SLAVE
-  (*mock_mmio_)[0x7E08].ExpectWrite(0x30);  // HDMITX_DWC_I2CM_SEGADDR
-  (*mock_mmio_)[0x7E0A].ExpectWrite(1);     // HDMITX_DWC_I2CM_SEGPTR
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
+      {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
+      {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
+      {.address = kI2cmAddressOffset, .value = 2, .write = true},
+      {.address = kI2cmOperationOffset, .value = 0b00'0100, .write = true},
 
-  (*mock_mmio_)[0x7E01].ExpectWrite(2);       // HDMITX_DWC_I2CM_ADDRESS
-  (*mock_mmio_)[0x7E04].ExpectWrite(1 << 2);  // HDMITX_DWC_I2CM_OPERATION
+      {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
+      {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+      {.address = kIhI2cmStat0Offset, .value = 0b010, .write = true},
 
-  (*mock_mmio_)[0x0105].ExpectRead(0x00).ExpectRead(0xff);  // HDMITX_DWC_IH_I2CM_STAT0
+      {.address = kI2cmReadBuff0Offset + 0, .value = 8},
+      {.address = kI2cmReadBuff0Offset + 1, .value = 7},
+      {.address = kI2cmReadBuff0Offset + 2, .value = 6},
+      {.address = kI2cmReadBuff0Offset + 3, .value = 5},
+      {.address = kI2cmReadBuff0Offset + 4, .value = 4},
+      {.address = kI2cmReadBuff0Offset + 5, .value = 3},
+      {.address = kI2cmReadBuff0Offset + 6, .value = 2},
+      {.address = kI2cmReadBuff0Offset + 7, .value = 1},
 
-  (*mock_mmio_)[0x0105].ExpectWrite(0x02);  // HDMITX_DWC_IH_I2CM_STAT0
+      {.address = kI2cmAddressOffset, .value = 10, .write = true},
+      {.address = kI2cmOperationOffset, .value = 0b00'0100, .write = true},
 
-  (*mock_mmio_)[0x7E20].ExpectRead(8);  // HDMITX_DWC_I2CM_READ_BUFF0
-  (*mock_mmio_)[0x7E21].ExpectRead(7);  // HDMITX_DWC_I2CM_READ_BUFF1
-  (*mock_mmio_)[0x7E22].ExpectRead(6);  // HDMITX_DWC_I2CM_READ_BUFF2
-  (*mock_mmio_)[0x7E23].ExpectRead(5);  // HDMITX_DWC_I2CM_READ_BUFF3
-  (*mock_mmio_)[0x7E24].ExpectRead(4);  // HDMITX_DWC_I2CM_READ_BUFF4
-  (*mock_mmio_)[0x7E25].ExpectRead(3);  // HDMITX_DWC_I2CM_READ_BUFF5
-  (*mock_mmio_)[0x7E26].ExpectRead(2);  // HDMITX_DWC_I2CM_READ_BUFF6
-  (*mock_mmio_)[0x7E27].ExpectRead(1);  // HDMITX_DWC_I2CM_READ_BUFF7
+      {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
+      {.address = kIhI2cmStat0Offset, .value = 0b010, .write = true},
 
-  (*mock_mmio_)[0x7E01].ExpectWrite(10);      // HDMITX_DWC_I2CM_ADDRESS
-  (*mock_mmio_)[0x7E04].ExpectWrite(1 << 2);  // HDMITX_DWC_I2CM_OPERATION
-
-  (*mock_mmio_)[0x0105].ExpectRead(0xff);  // HDMITX_DWC_IH_I2CM_STAT0
-
-  (*mock_mmio_)[0x0105].ExpectWrite(0x02);  // HDMITX_DWC_IH_I2CM_STAT0
-
-  (*mock_mmio_)[0x7E20].ExpectRead(1);  // HDMITX_DWC_I2CM_READ_BUFF0
-  (*mock_mmio_)[0x7E21].ExpectRead(2);  // HDMITX_DWC_I2CM_READ_BUFF1
-  (*mock_mmio_)[0x7E22].ExpectRead(3);  // HDMITX_DWC_I2CM_READ_BUFF2
-  (*mock_mmio_)[0x7E23].ExpectRead(4);  // HDMITX_DWC_I2CM_READ_BUFF3
-  (*mock_mmio_)[0x7E24].ExpectRead(5);  // HDMITX_DWC_I2CM_READ_BUFF4
-  (*mock_mmio_)[0x7E25].ExpectRead(6);  // HDMITX_DWC_I2CM_READ_BUFF5
-  (*mock_mmio_)[0x7E26].ExpectRead(7);  // HDMITX_DWC_I2CM_READ_BUFF6
-  (*mock_mmio_)[0x7E27].ExpectRead(8);  // HDMITX_DWC_I2CM_READ_BUFF7
+      {.address = kI2cmReadBuff0Offset + 0, .value = 1},
+      {.address = kI2cmReadBuff0Offset + 1, .value = 2},
+      {.address = kI2cmReadBuff0Offset + 2, .value = 3},
+      {.address = kI2cmReadBuff0Offset + 3, .value = 4},
+      {.address = kI2cmReadBuff0Offset + 4, .value = 5},
+      {.address = kI2cmReadBuff0Offset + 5, .value = 6},
+      {.address = kI2cmReadBuff0Offset + 6, .value = 7},
+      {.address = kI2cmReadBuff0Offset + 7, .value = 8},
+  }));
 
   hdmi_dw_->EdidTransfer(op_list, sizeof(op_list) / sizeof(op_list[0]));
   uint8_t expected_out[] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -212,151 +347,138 @@ TEST_F(HdmiDwTest, ConfigHdmitxTest) {
       .is4K = false,
   };
 
-  (*mock_mmio_)[0x0200].ExpectWrite(0x03);  // HDMITX_DWC_TX_INVID0
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kTxInvid0Offset, .value = 0x03, .write = true},
 
-  (*mock_mmio_)[0x0201].ExpectWrite(0x00);  // HDMITX_DWC_TX_INSTUFFING
-  (*mock_mmio_)[0x0202].ExpectWrite(0x00);  // HDMITX_DWC_TX_GYDATA0
-  (*mock_mmio_)[0x0203].ExpectWrite(0x00);  // HDMITX_DWC_TX_GYDATA1
-  (*mock_mmio_)[0x0204].ExpectWrite(0x00);  // HDMITX_DWC_TX_RCRDATA0
-  (*mock_mmio_)[0x0205].ExpectWrite(0x00);  // HDMITX_DWC_TX_RCRDATA1
-  (*mock_mmio_)[0x0206].ExpectWrite(0x00);  // HDMITX_DWC_TX_BCBDATA0
-  (*mock_mmio_)[0x0207].ExpectWrite(0x00);  // HDMITX_DWC_TX_BCBDATA1
+      {.address = kTxInstuffingOffset, .value = 0b000, .write = true},
+      {.address = kTxGydata0Offset, .value = 0x00, .write = true},
+      {.address = kTxGydata1Offset, .value = 0x00, .write = true},
+      {.address = kTxRcrdata0Offset, .value = 0x00, .write = true},
+      {.address = kTxRcrdata1Offset, .value = 0x00, .write = true},
+      {.address = kTxBcbdata0Offset, .value = 0x00, .write = true},
+      {.address = kTxBcbdata1Offset, .value = 0x00, .write = true},
 
-  // ConfigCsc
-  (*mock_mmio_)[0x4004].ExpectWrite(0x01);  // HDMITX_DWC_MC_FLOWCTRL
+      // ConfigCsc
+      {.address = kMcFlowctrlOffset, .value = 0x01, .write = true},
 
-  (*mock_mmio_)[0x4100].ExpectWrite(0x00);  // HDMITX_DWC_CSC_CFG
+      {.address = kCscCfgOffset, .value = 0b0000'0000, .write = true},
 
-  (*mock_mmio_)[0x4102].ExpectWrite(0x25);  // HDMITX_DWC_CSC_COEF_A1_MSB
-  (*mock_mmio_)[0x4103].ExpectWrite(0x91);  // HDMITX_DWC_CSC_COEF_A1_LSB
-  (*mock_mmio_)[0x4104].ExpectWrite(0x13);  // HDMITX_DWC_CSC_COEF_A2_MSB
-  (*mock_mmio_)[0x4105].ExpectWrite(0x23);  // HDMITX_DWC_CSC_COEF_A2_LSB
-  (*mock_mmio_)[0x4106].ExpectWrite(0x07);  // HDMITX_DWC_CSC_COEF_A3_MSB
-  (*mock_mmio_)[0x4107].ExpectWrite(0x4c);  // HDMITX_DWC_CSC_COEF_A3_LSB
-  (*mock_mmio_)[0x4108].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_A4_MSB
-  (*mock_mmio_)[0x4109].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_A4_LSB
-  (*mock_mmio_)[0x410A].ExpectWrite(0xe5);  // HDMITX_DWC_CSC_COEF_B1_MSB
-  (*mock_mmio_)[0x410B].ExpectWrite(0x34);  // HDMITX_DWC_CSC_COEF_B1_LSB
-  (*mock_mmio_)[0x410C].ExpectWrite(0x20);  // HDMITX_DWC_CSC_COEF_B2_MSB
-  (*mock_mmio_)[0x410D].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_B2_LSB
-  (*mock_mmio_)[0x410E].ExpectWrite(0xfa);  // HDMITX_DWC_CSC_COEF_B3_MSB
-  (*mock_mmio_)[0x410F].ExpectWrite(0xcc);  // HDMITX_DWC_CSC_COEF_B3_LSB
-  (*mock_mmio_)[0x4110].ExpectWrite(0x08);  // HDMITX_DWC_CSC_COEF_B4_MSB
-  (*mock_mmio_)[0x4111].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_B4_LSB
-  (*mock_mmio_)[0x4112].ExpectWrite(0xea);  // HDMITX_DWC_CSC_COEF_C1_MSB
-  (*mock_mmio_)[0x4113].ExpectWrite(0xcd);  // HDMITX_DWC_CSC_COEF_C1_LSB
-  (*mock_mmio_)[0x4114].ExpectWrite(0xf5);  // HDMITX_DWC_CSC_COEF_C2_MSB
-  (*mock_mmio_)[0x4115].ExpectWrite(0x33);  // HDMITX_DWC_CSC_COEF_C2_LSB
-  (*mock_mmio_)[0x4116].ExpectWrite(0x20);  // HDMITX_DWC_CSC_COEF_C3_MSB
-  (*mock_mmio_)[0x4117].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_C3_LSB
-  (*mock_mmio_)[0x4118].ExpectWrite(0x08);  // HDMITX_DWC_CSC_COEF_C4_MSB
-  (*mock_mmio_)[0x4119].ExpectWrite(0x00);  // HDMITX_DWC_CSC_COEF_C4_LSB
+      {.address = kCscCoefA1MsbOffset, .value = 0x25, .write = true},
+      {.address = kCscCoefA1LsbOffset, .value = 0x91, .write = true},
+      {.address = kCscCoefA2MsbOffset, .value = 0x13, .write = true},
+      {.address = kCscCoefA2LsbOffset, .value = 0x23, .write = true},
+      {.address = kCscCoefA3MsbOffset, .value = 0x07, .write = true},
+      {.address = kCscCoefA3LsbOffset, .value = 0x4c, .write = true},
+      {.address = kCscCoefA4MsbOffset, .value = 0x00, .write = true},
+      {.address = kCscCoefA4LsbOffset, .value = 0x00, .write = true},
 
-  (*mock_mmio_)[0x4101].ExpectWrite(0x50);  // HDMITX_DWC_CSC_COEF_C4_LSB
-  // ConfigCsc end
+      {.address = kCscCoefB1MsbOffset, .value = 0xe5, .write = true},
+      {.address = kCscCoefB1LsbOffset, .value = 0x34, .write = true},
+      {.address = kCscCoefB2MsbOffset, .value = 0x20, .write = true},
+      {.address = kCscCoefB2LsbOffset, .value = 0x00, .write = true},
+      {.address = kCscCoefB3MsbOffset, .value = 0xfa, .write = true},
+      {.address = kCscCoefB3LsbOffset, .value = 0xcc, .write = true},
+      {.address = kCscCoefB4MsbOffset, .value = 0x08, .write = true},
+      {.address = kCscCoefB4LsbOffset, .value = 0x00, .write = true},
 
-  (*mock_mmio_)[0x0801].ExpectWrite(0x00);  // HDMITX_DWC_VP_PR_CD
+      {.address = kCscCoefC1MsbOffset, .value = 0xea, .write = true},
+      {.address = kCscCoefC1LsbOffset, .value = 0xcd, .write = true},
+      {.address = kCscCoefC2MsbOffset, .value = 0xf5, .write = true},
+      {.address = kCscCoefC2LsbOffset, .value = 0x33, .write = true},
+      {.address = kCscCoefC3MsbOffset, .value = 0x20, .write = true},
+      {.address = kCscCoefC3LsbOffset, .value = 0x00, .write = true},
+      {.address = kCscCoefC4MsbOffset, .value = 0x08, .write = true},
+      {.address = kCscCoefC4LsbOffset, .value = 0x00, .write = true},
 
-  (*mock_mmio_)[0x0802].ExpectWrite(0x00);  // HDMITX_DWC_VP_STUFF
+      {.address = kCscScaleOffset, .value = 0b0101'0000, .write = true},
+      // ConfigCsc end
 
-  (*mock_mmio_)[0x0803].ExpectWrite(0x00);  // HDMITX_DWC_VP_REMAP
+      {.address = kVpPrCdOffset, .value = 0b0000'0000, .write = true},
+      {.address = kVpStuffOffset, .value = 0b00'0000, .write = true},
+      {.address = kVpRemapOffset, .value = 0b00, .write = true},
+      {.address = kVpConfOffset, .value = 0b100'0110, .write = true},
+      {.address = kVpMaskOffset, .value = 0b1111'1111, .write = true},
 
-  (*mock_mmio_)[0x0804].ExpectWrite(0x46);  // HDMITX_DWC_VP_CONF
+      {.address = kFcInvidconfOffset, .value = 0b1111'1000, .write = true},
 
-  (*mock_mmio_)[0x0807].ExpectWrite(0xff);  // HDMITX_DWC_VP_MASK
+      {.address = kFcInhactiv0Offset, .value = 24, .write = true},
+      {.address = kFcInhactiv1Offset, .value = 0, .write = true},
+      {.address = kFcInhblank0Offset, .value = 93, .write = true},
+      {.address = kFcInhblank1Offset, .value = 0, .write = true},
+      {.address = kFcInvactiv0Offset, .value = 75, .write = true},
+      {.address = kFcInvactiv1Offset, .value = 0, .write = true},
+      {.address = kFcInvblankOffset, .value = 83, .write = true},
+      {.address = kFcHsyncindelay0Offset, .value = 15, .write = true},
+      {.address = kFcHsyncindelay1Offset, .value = 0, .write = true},
+      {.address = kFcHsyncinwidth0Offset, .value = 50, .write = true},
+      {.address = kFcHsyncinwidth1Offset, .value = 0, .write = true},
+      {.address = kFcVsyncindelayOffset, .value = 104, .write = true},
+      {.address = kFcVsyncinwidthOffset, .value = 49, .write = true},
 
-  (*mock_mmio_)[0x1000].ExpectWrite(0xf8);  // HDMITX_DWC_FC_INVIDCONF
+      {.address = kFcCtrldurOffset, .value = 12, .write = true},
+      {.address = kFcExctrldurOffset, .value = 32, .write = true},
+      {.address = kFcExctrlspacOffset, .value = 1, .write = true},
 
-  (*mock_mmio_)[0x1001].ExpectWrite(24);  // HDMITX_DWC_FC_INHACTV0
-  (*mock_mmio_)[0x1002].ExpectWrite(0);   // HDMITX_DWC_FC_INHACTV1
+      {.address = kFcGcpOffset, .value = 0b001, .write = true},
+      {.address = kFcAviconf0Offset, .value = 0b0100'0010, .write = true},
+      {.address = kFcAviconf1Offset, .value = 0b0100'1000, .write = true},
+      {.address = kFcAviconf2Offset, .value = 0b0000'0000, .write = true},
+      {.address = kFcAviconf3Offset, .value = 0b0000, .write = true},
 
-  (*mock_mmio_)[0x1003].ExpectWrite(93);  // HDMITX_DWC_FC_INHBLANK0
-  (*mock_mmio_)[0x1004].ExpectWrite(0);   // HDMITX_DWC_FC_INHBLANK1
+      {.address = kFcActspcHdlrCfgOffset, .value = 0b00, .write = true},
+      {.address = kFcInvact2d0Offset, .value = 75, .write = true},
+      {.address = kFcInvact2d1Offset, .value = 0, .write = true},
 
-  (*mock_mmio_)[0x1005].ExpectWrite(75);  // HDMITX_DWC_FC_INVACTV0
-  (*mock_mmio_)[0x1006].ExpectWrite(0);   // HDMITX_DWC_FC_INVACTV1
+      {.address = kFcMask0Offset, .value = 0b1110'0111, .write = true},
+      {.address = kFcMask1Offset, .value = 0b1111'1011, .write = true},
+      {.address = kFcMask2Offset, .value = 0b0'0011, .write = true},
 
-  (*mock_mmio_)[0x1007].ExpectWrite(83);  // HDMITX_DWC_FC_INVBLANK
+      {.address = kFcPrconfOffset, .value = 0x10, .write = true},
 
-  (*mock_mmio_)[0x1008].ExpectWrite(15);  // HDMITX_DWC_FC_HSYNCINDELAY0
-  (*mock_mmio_)[0x1009].ExpectWrite(0);   // HDMITX_DWC_FC_HSYNCINDELAY1
-
-  (*mock_mmio_)[0x100A].ExpectWrite(50);  // HDMITX_DWC_FC_HSYNCINWIDTH0
-  (*mock_mmio_)[0x100B].ExpectWrite(0);   // HDMITX_DWC_FC_HSYNCINWIDTH1
-
-  (*mock_mmio_)[0x100C].ExpectWrite(104);  // HDMITX_DWC_FC_VSYNCINDELAY
-
-  (*mock_mmio_)[0x100D].ExpectWrite(49);  // HDMITX_DWC_FC_VSYNCINWIDTH
-
-  (*mock_mmio_)[0x1011].ExpectWrite(12);  // HDMITX_DWC_FC_CTRLDUR
-
-  (*mock_mmio_)[0x1012].ExpectWrite(32);  // HDMITX_DWC_FC_EXCTRLDUR
-
-  (*mock_mmio_)[0x1013].ExpectWrite(1);  // HDMITX_DWC_FC_EXCTRLSPAC
-
-  (*mock_mmio_)[0x1018].ExpectWrite(1);  // HDMITX_DWC_FC_GCP
-
-  (*mock_mmio_)[0x1019].ExpectWrite(0x42);  // HDMITX_DWC_FC_AVICONF0
-
-  (*mock_mmio_)[0x101A].ExpectWrite(0x48);  // HDMITX_DWC_FC_AVICONF1
-
-  (*mock_mmio_)[0x101B].ExpectWrite(0x0);  // HDMITX_DWC_FC_AVICONF2
-
-  (*mock_mmio_)[0x1017].ExpectWrite(0x0);  // HDMITX_DWC_FC_AVICONF3
-
-  (*mock_mmio_)[0x10E8].ExpectWrite(0x0);  // HDMITX_DWC_FC_ACTSPC_HDLR_CFG
-
-  (*mock_mmio_)[0x10E9].ExpectWrite(75);  // HDMITX_DWC_FC_INVACT_2D_0
-  (*mock_mmio_)[0x10EA].ExpectWrite(0);   // HDMITX_DWC_FC_INVACT_2D_1
-
-  (*mock_mmio_)[0x10D2].ExpectWrite(0xe7);  // HDMITX_DWC_FC_MASK0
-  (*mock_mmio_)[0x10D6].ExpectWrite(0xfb);  // HDMITX_DWC_FC_MASK1
-  (*mock_mmio_)[0x10DA].ExpectWrite(0x3);   // HDMITX_DWC_FC_MASK2
-
-  (*mock_mmio_)[0x10E0].ExpectWrite(0x10);  // HDMITX_DWC_FC_PRCONF
-
-  (*mock_mmio_)[0x0100].ExpectWrite(0xff);  // HDMITX_DWC_IH_FC_STAT0
-  (*mock_mmio_)[0x0101].ExpectWrite(0xff);  // HDMITX_DWC_IH_FC_STAT1
-  (*mock_mmio_)[0x0102].ExpectWrite(0xff);  // HDMITX_DWC_IH_FC_STAT2
-  (*mock_mmio_)[0x0103].ExpectWrite(0xff);  // HDMITX_DWC_IH_AS_STAT0
-  (*mock_mmio_)[0x0104].ExpectWrite(0xff);  // HDMITX_DWC_IH_PHY_STAT0
-  (*mock_mmio_)[0x0105].ExpectWrite(0xff);  // HDMITX_DWC_IH_I2CM_STAT0
-  (*mock_mmio_)[0x0106].ExpectWrite(0xff);  // HDMITX_DWC_IH_CEC_STAT0
-  (*mock_mmio_)[0x0107].ExpectWrite(0xff);  // HDMITX_DWC_IH_VP_STAT0
-  (*mock_mmio_)[0x0108].ExpectWrite(0xff);  // HDMITX_DWC_IH_I2CMPHY_STAT0
-  (*mock_mmio_)[0x5006].ExpectWrite(0xff);  // HDMITX_DWC_A_APIINTCLR
-  (*mock_mmio_)[0x790D].ExpectWrite(0xff);  // HDMITX_DWC_HDCP22REG_STAT
+      {.address = kIhFcStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhFcStat1Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhFcStat2Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhAsStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhPhyStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhCecStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhVpStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhI2cmphyStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kAApiintclrOffset, .value = 0b1111'1111, .write = true},
+      {.address = kHdcp22regStatOffset, .value = 0b1111'1111, .write = true},
+  }));
 
   hdmi_dw_->ConfigHdmitx(mode, p);
 }
 
 TEST_F(HdmiDwTest, SetupInterruptsTest) {
-  (*mock_mmio_)[0x0180].ExpectWrite(0xff);  // HDMITX_DWC_IH_MUTE_FC_STAT0
-  (*mock_mmio_)[0x0181].ExpectWrite(0xff);  // HDMITX_DWC_IH_MUTE_FC_STAT1
-  (*mock_mmio_)[0x0182].ExpectWrite(0x3);   // HDMITX_DWC_IH_MUTE_FC_STAT2
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kIhMuteFcStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhMuteFcStat1Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhMuteFcStat2Offset, .value = 0b0'0011, .write = true},
 
-  (*mock_mmio_)[0x0183].ExpectWrite(0x7);  // HDMITX_DWC_IH_MUTE_AS_STAT0
+      {.address = kIhMuteAsStat0Offset, .value = 0b0'0111, .write = true},
+      {.address = kIhMutePhyStat0Offset, .value = 0b11'1111, .write = true},
+      {.address = kIhMuteI2cmStat0Offset, .value = 0b010, .write = true},
+      {.address = kIhMuteCecStat0Offset, .value = 0b000'0000, .write = true},
+      {.address = kIhMuteVpStat0Offset, .value = 0b1111'1111, .write = true},
+      {.address = kIhMuteI2cmphyStat0Offset, .value = 0b11, .write = true},
 
-  (*mock_mmio_)[0x0184].ExpectWrite(0x3f);  // HDMITX_DWC_IH_MUTE_PHY_STAT0
-
-  (*mock_mmio_)[0x0185].ExpectWrite(1 << 1);  // HDMITX_DWC_IH_MUTE_I2CM_STAT0
-
-  (*mock_mmio_)[0x0186].ExpectWrite(0x0);  // HDMITX_DWC_IH_MUTE_CEC_STAT0
-
-  (*mock_mmio_)[0x0187].ExpectWrite(0xff);  // HDMITX_DWC_IH_MUTE_VP_STAT0
-
-  (*mock_mmio_)[0x0188].ExpectWrite(0x03);  // HDMITX_DWC_IH_MUTE_I2CMPHY_STAT0
-
-  (*mock_mmio_)[0x01FF].ExpectWrite(0x00);  // HDMITX_DWC_IH_MUTE
+      {.address = kIhMuteOffset, .value = 0b00, .write = true},
+  }));
 
   hdmi_dw_->SetupInterrupts();
 }
 
 TEST_F(HdmiDwTest, ResetTest) {
-  (*mock_mmio_)[0x4002].ExpectWrite(0x00).ExpectWrite(0x7d);  // HDMITX_DWC_MC_SWRSTZREQ
-  (*mock_mmio_)[0x100D].ExpectRead(0x41).ExpectWrite(0x41);   // HDMITX_DWC_FC_VSYNCINWIDTH
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kMcSwrstzreqOffset, .value = 0b0000'0000, .write = true},
+      {.address = kMcSwrstzreqOffset, .value = 0b0111'1101, .write = true},
+      {.address = kFcVsyncinwidthOffset, .value = 0x41},
+      {.address = kFcVsyncinwidthOffset, .value = 0x41, .write = true},
 
-  (*mock_mmio_)[0x4001].ExpectWrite(0x00);  // HDMITX_DWC_MC_CLKDIS
+      {.address = kMcClkdisOffset, .value = 0b00, .write = true},
+  }));
 
   hdmi_dw_->Reset();
 }
@@ -384,22 +506,32 @@ TEST_F(HdmiDwTest, SetupScdcTest) {
 }
 
 TEST_F(HdmiDwTest, ResetFcTest) {
-  (*mock_mmio_)[0x1000].ExpectRead(0xff).ExpectWrite(0xf7).ExpectRead(0x00).ExpectWrite(
-      0x08);  // HDMITX_DWC_FC_INVIDCONF
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kFcInvidconfOffset, .value = 0b1111'1111},
+      {.address = kFcInvidconfOffset, .value = 0b1111'0111, .write = true},
+      {.address = kFcInvidconfOffset, .value = 0b0000'0000},
+      {.address = kFcInvidconfOffset, .value = 0b0000'1000, .write = true},
+  }));
 
   hdmi_dw_->ResetFc();
 }
 
 TEST_F(HdmiDwTest, SetFcScramblerCtrlTest) {
   // is4k = true
-  (*mock_mmio_)[0x10E1].ExpectRead(0x00).ExpectWrite(0x01);  // HDMITX_DWC_FC_SCRAMBLER_CTRL
-
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000},
+      {.address = kFcScamblerCtrlOffset, .value = 0b0000'0001, .write = true},
+  }));
   hdmi_dw_->SetFcScramblerCtrl(true);
 
   // is4k = false
-  (*mock_mmio_)[0x10E1].ExpectWrite(0x00);  // HDMITX_DWC_FC_SCRAMBLER_CTRL
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+      {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000, .write = true},
+  }));
 
   hdmi_dw_->SetFcScramblerCtrl(false);
 }
+
+}  // namespace
 
 }  // namespace hdmi_dw

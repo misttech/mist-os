@@ -11,13 +11,15 @@ test("hdmi-dw") {
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp_wire",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/mock-mmio-reg",
+    "//src/devices/testing/mock-mmio-range",
     "//src/devices/testing/no_ddk",
     "//src/graphics/display/lib/designware:hdmi-dw",
     "//src/graphics/display/lib/hdmi",
     "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
