@@ -25,6 +25,15 @@ archives.
 
 From //build/images/args.gni:124
 
+### additional_boot_args
+
+List of arguments to add to /boot/config/additional_boot_args.
+These come after synthesized arguments to configure blobfs and pkgfs.
+
+**Current value (from the default):** `[]`
+
+From //build/images/args.gni:23
+
 ### additional_bootserver_arguments
 
 Additional bootserver args to add to pave.sh. New uses of this should be
@@ -560,7 +569,7 @@ From //build/board.gni:18
 A list of driver package labels to include in the 'base' package set. Used
 by the board definition rather than the product definition.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles/packages/prod:drivers-system", "//src/media/audio/bundles:virtual_audio_driver"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles/packages/prod:drivers-system"]`
 
 From //boards/common/arm64-common.gni:29
 
@@ -568,7 +577,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:25
 
-**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/media/audio/bundles:virtual_audio_driver"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen"]`
 
 From //boards/common/x64-common.gni:55
 
@@ -688,7 +697,7 @@ board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/bin/vulkan_loader"]`
 
-From //boards/common/arm64-common.gni:34
+From //boards/common/arm64-common.gni:31
 
 **Overridden from the default:** `[]`
 
@@ -696,7 +705,7 @@ From //build/board.gni:47
 
 **Current value for `target_cpu = "x64"`:** `["//src/graphics/bin/vulkan_loader", "//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt"]`
 
-From //boards/common/x64-common.gni:63
+From //boards/common/x64-common.gni:62
 
 **Overridden from the default:** `[]`
 
@@ -1393,7 +1402,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:137
+From //build/toolchain/rbe.gni:139
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1401,7 +1410,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:137
+From //build/toolchain/rbe.gni:139
 
 ### cxx_rbe_exec_strategy
 
@@ -1424,7 +1433,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:155
+From //build/toolchain/rbe.gni:157
 
 ### cxx_rbe_use_python_impl
 
@@ -1720,15 +1729,6 @@ List of strings to append to the zedboot kernel command line.
 **Current value (from the default):** `[]`
 
 From //build/dev.gni:29
-
-### additional_boot_args
-
-List of arguments to add to /boot/config/additional_boot_args.
-These come after synthesized arguments to configure blobfs and pkgfs.
-
-**Current value (from the default):** `[]`
-
-From //build/images/args.gni:23
 
 ### dir_docker
 
@@ -4854,7 +4854,7 @@ Maximum allowable size for fuchsia.zbi
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:39
+From //boards/common/arm64-common.gni:36
 
 **Overridden from the default:** `0`
 
@@ -4879,7 +4879,7 @@ Maximum allowable size for zedboot.zbi
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:40
+From //boards/common/arm64-common.gni:37
 
 **Overridden from the default:** `0`
 
@@ -7408,7 +7408,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:129
+From //build/toolchain/rbe.gni:131
 
 ### rust_rbe_enable
 
@@ -7420,7 +7420,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:85
+From //build/toolchain/rbe.gni:87
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7428,7 +7428,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:85
+From //build/toolchain/rbe.gni:87
 
 ### rust_rbe_exec_strategy
 
@@ -7451,7 +7451,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:103
+From //build/toolchain/rbe.gni:105
 
 ### rust_rbe_use_python_impl
 
