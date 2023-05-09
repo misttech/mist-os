@@ -118,6 +118,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
     std::weak_ptr<Node> node;
     std::string driver_url_suffix;
     std::shared_ptr<BindResultTracker> tracker;
+    bool composite_only;
   };
 
   // NodeManager interface.
@@ -146,7 +147,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // return std::nullopt.
   std::optional<std::string> BindNodeToResult(
       Node& node, fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
-      bool has_tracker);
+      bool composite_only, bool has_tracker);
 
   zx::result<> BindNodeToSpec(Node& node,
                               fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents);
@@ -196,6 +197,12 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // because no matching driver could be found, or because the matching driver
   // failed to start. Maps the node's component moniker to its weak pointer.
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes_;
+
+  // A list of composite node parents. In DFv1, a node can parent multiple composite
+  // nodes. To follow that same behavior, we store the parents in a map to bind them
+  // to other composites.
+  // TODO(fxb/122531): Only add nodes that are enabled for composite multibind.
+  std::unordered_map<std::string, std::weak_ptr<Node>> composite_parents_;
 };
 
 Collection ToCollection(const Node& node, fuchsia_driver_index::DriverPackageType package_type);
