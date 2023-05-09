@@ -14,7 +14,7 @@ use ffx_daemon_target::logger::{
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline};
 use fidl::{
-    endpoints::{create_proxy, ServerEnd},
+    endpoints::{create_proxy, ProtocolMarker, ServerEnd},
     AsyncSocket,
 };
 use fidl_fuchsia_developer_ffx::{
@@ -25,13 +25,14 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{
     ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorGetNextResponder,
     ArchiveIteratorMarker, ArchiveIteratorProxy, ArchiveIteratorRequest,
-    ArchiveIteratorRequestStream, ConnectError, DiagnosticsData, IdentifyHostError, InlineData,
+    ArchiveIteratorRequestStream, ConnectCapabilityError, DiagnosticsData, IdentifyHostError,
+    InlineData,
 };
 use fidl_fuchsia_diagnostics::StreamParameters;
 use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
+use fidl_fuchsia_io as fio;
 use fuchsia_async::Timer;
 use futures::{lock::Mutex, AsyncReadExt, AsyncWriteExt, StreamExt};
-use selectors::{parse_selector, VerboseError};
 use serde::{Deserialize, Serialize};
 use std::{
     iter::Iterator,
@@ -54,7 +55,7 @@ const NANOS_IN_SECOND: i64 = 1_000_000_000;
 const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 const RETRY_TIMEOUT_MILLIS: u64 = 1000;
 const READ_BUFFER_SIZE: usize = 1000 * 1000 * 5;
-const RCS_SELECTOR: &str = "bootstrap/archivist:expose:fuchsia.diagnostics.host.ArchiveAccessor";
+const ARCHIVIST_MONIKER: &str = "/bootstrap/archivist";
 
 fn get_timestamp() -> Result<Timestamp> {
     Ok(Timestamp::from(
@@ -117,9 +118,7 @@ impl StreamDiagnostics for DiagnosticsProxy {
         &mut self,
         target: Option<&str>,
         parameters: DaemonDiagnosticsStreamParameters,
-        iterator: fidl::endpoints::ServerEnd<
-            fidl_fuchsia_developer_remotecontrol::ArchiveIteratorMarker,
-        >,
+        iterator: fidl::endpoints::ServerEnd<ArchiveIteratorMarker>,
     ) -> Result<fidl_fuchsia_developer_ffx::DiagnosticsStreamDiagnosticsResult, anyhow::Error> {
         return Ok((self as &DiagnosticsProxy)
             .stream_diagnostics(target, parameters, iterator)
@@ -157,16 +156,11 @@ enum LogError {
     #[error("failed to connect to the target: {:?}", error)]
     TargetConnectionError { error: TargetConnectionError },
     #[error("failed to connect: {:?}", error)]
-    ConnectError { error: ConnectError },
+    ConnectCapabilityError { error: ConnectCapabilityError },
     #[error("FIDL error: {}", error)]
     FidlError {
         #[from]
         error: fidl::Error,
-    },
-    #[error("failed to parse selectors: {}", error)]
-    SelectorsError {
-        #[from]
-        error: selectors::Error,
     },
     #[error("Unable to identify host: {:?}", error)]
     IdentifyHostError { error: IdentifyHostError },
@@ -211,9 +205,9 @@ impl From<IdentifyHostError> for LogError {
     }
 }
 
-impl From<ConnectError> for LogError {
-    fn from(error: ConnectError) -> Self {
-        Self::ConnectError { error }
+impl From<ConnectCapabilityError> for LogError {
+    fn from(error: ConnectCapabilityError) -> Self {
+        Self::ConnectCapabilityError { error }
     }
 }
 
@@ -519,7 +513,14 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             .ok_or(LogError::NoBootTimestamp)?;
         let (diagnostics_client, diagnostics_server) = create_proxy::<ArchiveAccessorMarker>()?;
         let channel = diagnostics_server.into_channel();
-        rcs_client.connect(parse_selector::<VerboseError>(RCS_SELECTOR)?, channel).await??;
+        rcs_client
+            .connect_capability(
+                ARCHIVIST_MONIKER,
+                ArchiveAccessorMarker::DEBUG_NAME,
+                channel,
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await??;
         Ok(diagnostics_client)
     }
 }
@@ -579,9 +580,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         &mut self,
         _target: Option<&str>,
         mut parameters: DaemonDiagnosticsStreamParameters,
-        iterator: fidl::endpoints::ServerEnd<
-            fidl_fuchsia_developer_remotecontrol::ArchiveIteratorMarker,
-        >,
+        iterator: fidl::endpoints::ServerEnd<ArchiveIteratorMarker>,
     ) -> Result<fidl_fuchsia_developer_ffx::DiagnosticsStreamDiagnosticsResult, anyhow::Error> {
         let (socket, server) = fuchsia_async::emulated_handle::Socket::create_stream();
         let connection = self.connect().await?;
@@ -880,7 +879,8 @@ mod test {
         TargetRequest,
     };
     use fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorError, IdentifyHostResponse, RemoteControlRequest, ServiceMatch,
+        ArchiveIteratorError, IdentifyHostResponse, RemoteControlConnectCapabilityResponder,
+        RemoteControlMarker, RemoteControlRequest,
     };
     use fidl_fuchsia_diagnostics_host::ArchiveAccessorRequest;
     use futures::TryStreamExt;
@@ -1070,7 +1070,7 @@ mod test {
 
     async fn handle_open_remote_control(
         responder: fidl_fuchsia_developer_ffx::TargetOpenRemoteControlResponder,
-        remote_control: ServerEnd<fidl_fuchsia_developer_remotecontrol::RemoteControlMarker>,
+        remote_control: ServerEnd<RemoteControlMarker>,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
         use_socket: bool,
         time_offset: u64,
@@ -1091,12 +1091,23 @@ mod test {
         // Client should send an IdentifyHost request to get the timestamp
 
         // Client is then expected to connect to the remote diagnostics service
-        if let Some(Ok(RemoteControlRequest::Connect { selector, service_chan, responder })) =
-            remote_control_stream.next().await
+        if let Some(Ok(RemoteControlRequest::ConnectCapability {
+            moniker,
+            capability_name,
+            server_chan,
+            flags: _,
+            responder,
+        })) = remote_control_stream.next().await
         {
-            if let Some(value) =
-                handle_connect(selector, responder, service_chan, expected_responses, use_socket)
-                    .await
+            if let Some(value) = handle_connect_capability(
+                &moniker,
+                &capability_name,
+                responder,
+                server_chan,
+                expected_responses,
+                use_socket,
+            )
+            .await
             {
                 return value;
             }
@@ -1104,21 +1115,17 @@ mod test {
         None
     }
 
-    async fn handle_connect(
-        selector: fidl_fuchsia_diagnostics::Selector,
-        responder: fidl_fuchsia_developer_remotecontrol::RemoteControlConnectResponder,
+    async fn handle_connect_capability(
+        moniker: &str,
+        capability_name: &str,
+        responder: RemoteControlConnectCapabilityResponder,
         service_chan: fidl::Channel,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
         use_socket: bool,
     ) -> Option<Option<ControlFlow<()>>> {
-        assert_eq!(selector, parse_selector::<VerboseError>(RCS_SELECTOR).unwrap());
-        responder
-            .send(&mut Ok(ServiceMatch {
-                moniker: vec![],
-                service: Default::default(),
-                subdir: Default::default(),
-            }))
-            .unwrap();
+        assert_eq!(moniker, ARCHIVIST_MONIKER);
+        assert_eq!(capability_name, ArchiveAccessorMarker::DEBUG_NAME);
+        responder.send(&mut Ok(())).unwrap();
         let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
         let mut diagnostics_stream = server_end.into_stream().unwrap();
         if let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
@@ -1198,13 +1205,6 @@ mod test {
         assert_matches!(
             LogError::from(src.clone()),
             LogError::IdentifyHostError { error }
-            if error == src
-        );
-
-        let src = ConnectError::MultipleMatchingServices;
-        assert_matches!(
-            LogError::from(src.clone()),
-            LogError::ConnectError { error }
             if error == src
         );
     }
