@@ -103,7 +103,10 @@ impl FuchsiaBootResolver {
         )
         .map_err(|_| fresolution::ResolverError::Internal)?;
 
-        self.construct_component(path_proxy, boot_url, None).await
+        // unpackaged components resolved from the zbi are assigned the latest abi revision
+        let abi_revision = version_history::get_latest_abi_revision();
+
+        self.construct_component(path_proxy, boot_url, Some(abi_revision)).await
     }
 
     async fn resolve_packaged_component(
@@ -452,8 +455,11 @@ mod tests {
         // Check that both the returned component manifest and the component manifest in
         // the returned package dir match the expected value. This also tests that
         // the resolver returned the right package dir.
-        let ResolvedComponent { resolved_url, decl, package, .. } = component;
+        let ResolvedComponent { resolved_url, decl, package, abi_revision, .. } = component;
         assert_eq!(url, resolved_url);
+        assert!(version_history::is_supported_abi_revision(
+            abi_revision.expect("ABI revision should be set for boot component")
+        ));
 
         let expected_program = Some(cm_rust::ProgramDecl {
             runner: Some("elf".into()),
