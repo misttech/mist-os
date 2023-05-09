@@ -2826,7 +2826,7 @@ mod tests {
             json!({
                 "use": [ { "path": "/svc/fuchsia.logger.Log" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"event_stream\""
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\""
         ),
         test_cml_use_as_with_protocol(
             json!({

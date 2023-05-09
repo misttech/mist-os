@@ -29,8 +29,21 @@ impl<T> OneOrMany<T> {
     /// Returns an iterator over the values of `OneOrMany<T>`.
     pub fn iter(&self) -> Iter<'_, T> {
         match self {
-            OneOrMany::One(item) => Iter { inner_one: Some(item), inner_many: None },
-            OneOrMany::Many(items) => Iter { inner_one: None, inner_many: Some(items.iter()) },
+            Self::One(item) => Iter { inner_one: Some(item), inner_many: None },
+            Self::Many(items) => Iter { inner_one: None, inner_many: Some(items.iter()) },
+        }
+    }
+}
+
+impl<T> OneOrMany<T>
+where
+    T: PartialEq,
+{
+    /// Returns true if this `OneOrMany<T>` contains the given element.
+    pub fn contains(&self, e: &T) -> bool {
+        match self {
+            Self::One(item) => item == e,
+            Self::Many(items) => items.contains(e),
         }
     }
 }

@@ -415,7 +415,7 @@ mod tests {
                 "runner": "foo"
             },
             "use": [{
-                "protocol": "fuchsia.foo.Bar"
+                "protocol": ["fuchsia.foo.Bar"]
             }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
@@ -438,7 +438,7 @@ mod tests {
                 "binary": "bin/hello_world"
             },
             "use": [{
-                "protocol": "fuchsia.foo.Bar"
+                "protocol": [ "fuchsia.foo.Bar" ]
             }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
@@ -455,7 +455,7 @@ mod tests {
         ctx.assert_output_eq(json!({
             "use": [
             {
-                "protocol": "bar"
+                "protocol": [ "bar" ]
             },{
                 "protocol": "foo"
             }]
@@ -522,7 +522,7 @@ mod tests {
                     "protocol": "bar",
                 },
                 {
-                    "protocol": "bar"
+                    "protocol": [ "bar" ]
                 }
             ]
         }));

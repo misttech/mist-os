@@ -70,6 +70,92 @@ checkout environment.
 fx cmc include {{ "<var>" }}cmx_file{{ "</var>" }} --includeroot $FUCHSIA_DIR --includepath $FUCHSIA_DIR/sdk/lib
 ```
 
+Includes can cope with duplicate [`use`], [`offer`], [`expose`], or [`capabilities`]
+declarations referencing the same capability, as long as the properties are the same. For
+example:
+
+```json5
+// my_component.cml
+include: [ "syslog.client.shard.cml" ]
+use: [
+    {
+        protocol: [
+            "fuchsia.logger.LogSink",
+            "fuchsia.posix.socket.Provider",
+        ],
+    },
+],
+
+// syslog.client.shard.cml
+use: [
+    { protocol: "fuchsia.logger.LogSink" },
+],
+```
+
+In this example, the contents of the merged file will be the same as my_component.cml --
+`fuchsia.logger.LogSink` is deduped.
+
+However, this would fail to compile:
+
+```json5
+// my_component.cml
+include: [ "syslog.client.shard.cml" ]
+use: [
+    {
+        protocol: "fuchsia.logger.LogSink",
+        // properties for fuchsia.logger.LogSink don't match
+        from: "#archivist",
+    },
+],
+
+// syslog.client.shard.cml
+use: [
+    { protocol: "fuchsia.logger.LogSink" },
+],
+```
+
+An exception to this constraint is the `availability` property. If two routing declarations
+are identical, and one availability is stronger than the other, the availability will be
+"promoted" to the stronger value (if `availability` is missing, it defaults to `required`).
+For example:
+
+```json5
+// my_component.cml
+include: [ "syslog.client.shard.cml" ]
+use: [
+    {
+        protocol: [
+            "fuchsia.logger.LogSink",
+            "fuchsia.posix.socket.Provider",
+        ],
+        availability: "optional",
+    },
+],
+
+// syslog.client.shard.cml
+use: [
+    {
+        protocol: "fuchsia.logger.LogSink"
+        availability: "required",  // This is the default
+    },
+],
+```
+
+Becomes:
+
+```json5
+use: [
+    {
+        protocol: "fuchsia.posix.socket.Provider",
+        availability: "optional",
+    },
+    {
+        protocol: "fuchsia.logger.LogSink",
+        availability: "required",
+    },
+],
+```
+
 Includes are transitive, meaning that shards can have their own includes.
 
 Include paths can have diamond dependencies. For instance this is valid:
@@ -79,6 +165,11 @@ In this case A will transitively include B, C, D.
 Include paths cannot have cycles. For instance this is invalid:
 A includes B, B includes A.
 A cycle such as the above will result in a compile-time error.
+
+[`use`]: struct.Document.html#use
+[`offer`]: struct.Document.html#offer
+[`expose`]: struct.Document.html#expose
+[`capabilities`]: struct.Document.html#capabilities
 
 ### `disable` {#disable}
 

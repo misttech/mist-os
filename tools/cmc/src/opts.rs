@@ -78,6 +78,9 @@ pub enum Commands {
 
     #[structopt(name = "merge")]
     /// merge the listed cml or cmx files. Does NOT validate the resulting manifest.
+    ///
+    /// The semantics for merging are the same ones used for `include`:
+    /// https://fuchsia.dev/reference/cml#include
     Merge {
         #[structopt(name = "FILE", parse(from_os_str))]
         /// files to process

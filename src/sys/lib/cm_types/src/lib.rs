@@ -12,7 +12,7 @@ use {
     lazy_static::lazy_static,
     serde::de,
     serde::{Deserialize, Serialize},
-    std::{default::Default, fmt, str::FromStr},
+    std::{cmp, default::Default, fmt, str::FromStr},
     thiserror::Error,
     url,
 };
@@ -701,7 +701,7 @@ impl Default for DependencyType {
 /// Capability availability. See [`Availability`].
 ///
 /// [`Availability`]: ../../fidl_fuchsia_sys2/enum.Availability.html
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
     Required,
@@ -722,6 +722,26 @@ symmetrical_enums!(
 impl Default for Availability {
     fn default() -> Self {
         Self::Required
+    }
+}
+
+impl PartialOrd for Availability {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match (*self, *other) {
+            (Availability::Transitional, Availability::Optional)
+            | (Availability::Transitional, Availability::Required)
+            | (Availability::Optional, Availability::Required) => Some(cmp::Ordering::Less),
+            (Availability::Optional, Availability::Transitional)
+            | (Availability::Required, Availability::Transitional)
+            | (Availability::Required, Availability::Optional) => Some(cmp::Ordering::Greater),
+            (Availability::Required, Availability::Required)
+            | (Availability::Optional, Availability::Optional)
+            | (Availability::Transitional, Availability::Transitional)
+            | (Availability::SameAsTarget, Availability::SameAsTarget) => {
+                Some(cmp::Ordering::Equal)
+            }
+            (Availability::SameAsTarget, _) | (_, Availability::SameAsTarget) => None,
+        }
     }
 }
 

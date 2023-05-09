@@ -18,10 +18,12 @@ use {
     json5format::{FormatOptions, PathOption},
     lazy_static::lazy_static,
     maplit::{hashmap, hashset},
+    paste::paste,
     reference_doc::ReferenceDoc,
     serde::{de, Deserialize, Serialize},
     serde_json::{Map, Value},
     std::{
+        cmp,
         collections::{BTreeMap, HashMap, HashSet},
         fmt,
         hash::Hash,
@@ -858,6 +860,92 @@ pub struct Document {
     /// fx cmc include {{ "<var>" }}cmx_file{{ "</var>" }} --includeroot $FUCHSIA_DIR --includepath $FUCHSIA_DIR/sdk/lib
     /// ```
     ///
+    /// Includes can cope with duplicate [`use`], [`offer`], [`expose`], or [`capabilities`]
+    /// declarations referencing the same capability, as long as the properties are the same. For
+    /// example:
+    ///
+    /// ```json5
+    /// // my_component.cml
+    /// include: [ "syslog.client.shard.cml" ]
+    /// use: [
+    ///     {
+    ///         protocol: [
+    ///             "fuchsia.logger.LogSink",
+    ///             "fuchsia.posix.socket.Provider",
+    ///         ],
+    ///     },
+    /// ],
+    ///
+    /// // syslog.client.shard.cml
+    /// use: [
+    ///     { protocol: "fuchsia.logger.LogSink" },
+    /// ],
+    /// ```
+    ///
+    /// In this example, the contents of the merged file will be the same as my_component.cml --
+    /// `fuchsia.logger.LogSink` is deduped.
+    ///
+    /// However, this would fail to compile:
+    ///
+    /// ```json5
+    /// // my_component.cml
+    /// include: [ "syslog.client.shard.cml" ]
+    /// use: [
+    ///     {
+    ///         protocol: "fuchsia.logger.LogSink",
+    ///         // properties for fuchsia.logger.LogSink don't match
+    ///         from: "#archivist",
+    ///     },
+    /// ],
+    ///
+    /// // syslog.client.shard.cml
+    /// use: [
+    ///     { protocol: "fuchsia.logger.LogSink" },
+    /// ],
+    /// ```
+    ///
+    /// An exception to this constraint is the `availability` property. If two routing declarations
+    /// are identical, and one availability is stronger than the other, the availability will be
+    /// "promoted" to the stronger value (if `availability` is missing, it defaults to `required`).
+    /// For example:
+    ///
+    /// ```json5
+    /// // my_component.cml
+    /// include: [ "syslog.client.shard.cml" ]
+    /// use: [
+    ///     {
+    ///         protocol: [
+    ///             "fuchsia.logger.LogSink",
+    ///             "fuchsia.posix.socket.Provider",
+    ///         ],
+    ///         availability: "optional",
+    ///     },
+    /// ],
+    ///
+    /// // syslog.client.shard.cml
+    /// use: [
+    ///     {
+    ///         protocol: "fuchsia.logger.LogSink"
+    ///         availability: "required",  // This is the default
+    ///     },
+    /// ],
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```json5
+    /// use: [
+    ///     {
+    ///         protocol: "fuchsia.posix.socket.Provider",
+    ///         availability: "optional",
+    ///     },
+    ///     {
+    ///         protocol: "fuchsia.logger.LogSink",
+    ///         availability: "required",
+    ///     },
+    /// ],
+    /// ```
+    ///
     /// Includes are transitive, meaning that shards can have their own includes.
     ///
     /// Include paths can have diamond dependencies. For instance this is valid:
@@ -867,6 +955,11 @@ pub struct Document {
     /// Include paths cannot have cycles. For instance this is invalid:
     /// A includes B, B includes A.
     /// A cycle such as the above will result in a compile-time error.
+    ///
+    /// [`use`]: struct.Document.html#use
+    /// [`offer`]: struct.Document.html#offer
+    /// [`expose`]: struct.Document.html#expose
+    /// [`capabilities`]: struct.Document.html#capabilities
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
 
@@ -1038,7 +1131,52 @@ pub struct Document {
     pub config: Option<BTreeMap<ConfigKey, ConfigValueType>>,
 }
 
-macro_rules! merge_from_field {
+/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
+/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is a
+/// capability routing field of [`Document`]: `use`, `offer`, `expose`, or `capabilities`.
+///
+/// [`include`]: struct.Document.html#include
+/// [`Document`]: struct.Document.html
+macro_rules! merge_from_capability_field {
+    ($self:ident, $other:ident, $field_name:ident) => {
+        if let Some(all_ours) = $self.$field_name.as_mut() {
+            if let Some(all_theirs) = $other.$field_name.take() {
+                for mut theirs in all_theirs {
+                    for ours in &mut *all_ours {
+                        compute_diff(ours, &mut theirs);
+                    }
+                    all_ours.push(theirs);
+                }
+            }
+            // Post-filter step: remove empty entries.
+            all_ours.retain(|ours| {
+                let mut nonempty = false;
+                for list in [
+                    ours.service(),
+                    ours.protocol(),
+                    ours.directory(),
+                    ours.storage(),
+                    ours.resolver(),
+                    ours.runner(),
+                    ours.event_stream(),
+                ] {
+                    nonempty |= list.is_some();
+                }
+                nonempty
+            });
+        } else if let Some(theirs) = $other.$field_name.take() {
+            $self.$field_name.replace(theirs);
+        }
+    };
+}
+
+/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
+/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is _not_ a
+/// capability routing field of [`Document`] (`use`, `offer`, `expose`, or `capabilities`).
+///
+/// [`include`]: struct.Document.html#include
+/// [`Document`]: struct.Document.html
+macro_rules! merge_from_other_field {
     ($self:ident, $other:ident, $field_name:ident) => {
         if let Some(ref mut ours) = $self.$field_name {
             if let Some(theirs) = $other.$field_name.take() {
@@ -1055,61 +1193,104 @@ macro_rules! merge_from_field {
     };
 }
 
-macro_rules! flatten_on_capability_type {
-    ($input_clause:ident, $type:ident) => {
-        match &$input_clause.$type {
-            Some(OneOrMany::Many(ref clause_vec)) => clause_vec
-                .iter()
-                .map(|c| {
-                    let mut clause_clone = $input_clause.clone();
-                    clause_clone.$type = Some(OneOrMany::One(c.clone()));
-                    clause_clone
-                })
-                .collect::<Vec<_>>(),
-            Some(OneOrMany::One(_)) => vec![$input_clause.clone()],
-            _ => unreachable!("unable to flatten empty capability type"),
-        }
-    };
-}
-
-// flatten_field expands capability clauses which have multiple specifications
-// e.g. a Use clause that has a list of protocols. This is done on both the source
-// and destination Document before merging in order to correctly deduplicate capabilities
-// specified in both Documents.
-macro_rules! flatten_field {
-    ($input_doc:ident, $field_name:ident,$($sub_field: ident),* ) => {
-        match &$input_doc.$field_name {
-
-            Some(in_vals) => {
-                let mut new_vals = Vec::new();
-                for curr_val in in_vals {
-                    let val = match curr_val.capability_type() {
-                        $( stringify!($sub_field) => flatten_on_capability_type!(curr_val, $sub_field),)*
-                        _ =>  vec![curr_val.clone()],
-                    };
-                    new_vals.extend(val);
+/// Subtracts the capabilities in `$ours` from `$theirs` if the type matches `$type_name` and the
+/// declarations match. Stores the result in `$theirs`.
+///
+/// Inexact matches on `availability` are allowed if there is a partial order between them. The
+/// stronger availability is chosen.
+///
+/// This is a macro to let us easily specialize on the $type_name.
+macro_rules! compute_capability_diff {
+    ($ours:ident, $theirs:ident, $type_name:ident) => {
+        let our_field = $ours.$type_name();
+        let their_field = $theirs.$type_name();
+        match (our_field, their_field) {
+            (_, None) | (None, _) => {} // One of the declarations is not for `type_name`.
+            (Some(our_field), Some(their_field)) => {
+                // Check if the non-capability fields match before proceeding.
+                let mut ours_partial = $ours.clone();
+                let mut theirs_partial = $theirs.clone();
+                for e in [&mut ours_partial, &mut theirs_partial] {
+                    paste! { e.[<set_ $type_name>](None) };
+                    // Availability is allowed to differ (see merge algorithm below)
+                    e.set_availability(None);
                 }
-                $input_doc.$field_name = Some(new_vals);
-            },
-            _ => {}
+                let avail_cmp = $ours
+                    .availability()
+                    .unwrap_or_default()
+                    .partial_cmp(&$theirs.availability().unwrap_or_default());
+                if ours_partial != theirs_partial || avail_cmp.is_none() {
+                    // One of the following is true:
+                    // - The fields other than `availability` do not match.
+                    // - The fields other than `availability` do match, but `availability`
+                    //   does not and is incompatible (no partial order).
+                    // Either way, `ours` and `theirs` are not diffable.
+                } else {
+                    let avail_cmp = avail_cmp.unwrap();
+                    let mut our_entries_to_remove = HashSet::new();
+                    let mut their_entries_to_remove = HashSet::new();
+                    for e in &their_field {
+                        if !our_field.contains(e) {
+                            // Not a duplicate, so keep.
+                        } else {
+                            match avail_cmp {
+                                cmp::Ordering::Less => {
+                                    // Their availability is stronger, meaning theirs should take
+                                    // priority. Keep `e` in theirs, and remove it from ours.
+                                    our_entries_to_remove.insert(e);
+                                }
+                                cmp::Ordering::Greater => {
+                                    // Our availability is stronger, meaning ours should take
+                                    // priority. Remove `e` from theirs.
+                                    their_entries_to_remove.insert(e);
+                                }
+                                cmp::Ordering::Equal => {
+                                    // The availabilities are equal, so `e` is a duplicate.
+                                    their_entries_to_remove.insert(e);
+                                }
+                            }
+                        }
+                    }
+                    fn update_entries(
+                        decl: &mut impl CapabilityClause,
+                        field: &OneOrMany<Name>,
+                        to_remove: &HashSet<&Name>,
+                    ) {
+                        if to_remove.is_empty() {
+                            return;
+                        }
+                        let mut new_entries: Vec<_> = field.iter().cloned().collect();
+                        new_entries.retain(|e| !to_remove.contains(&e));
+                        let new_entries = match new_entries.len() {
+                            1 => Some(OneOrMany::One(new_entries.remove(0))),
+                            0 => None,
+                            _ => Some(OneOrMany::Many(new_entries)),
+                        };
+                        paste! { decl.[<set_ $type_name>](new_entries); }
+                    }
+                    update_entries($ours, &our_field, &our_entries_to_remove);
+                    update_entries($theirs, &their_field, &their_entries_to_remove);
+                }
+            }
         }
     };
 }
 
-// flatten_docs updates one or more Documents by expanding fields where one entry
-// can represent multiple capabilities. This prepares the Document to be merged with
-// the correct deduplication behavior.
-//
-// TODO(fxbug.dev/124675): Remove this macro and handle OneOrMany(Many) directly.
-macro_rules! flatten_docs {
-    ($($doc: ident),+ ) => {
-        $({
-            flatten_field!($doc, r#use, protocol, service);
-            flatten_field!($doc, offer, protocol, service);
-            flatten_field!($doc, expose, protocol, service);
-            flatten_field!($doc, capabilities, protocol, service);
-        })+
-    };
+/// Subtracts the capabilities in `ours` from `theirs` if the declarations match in their type and
+/// other fields, resulting in the removal of duplicates between `ours` and `theirs`. Stores the
+/// result in `theirs`. Returns true if `theirs` is empty, which is a signal to the caller that it
+/// can be discarded.
+fn compute_diff<T>(ours: &mut T, theirs: &mut T)
+where
+    T: CapabilityClause,
+{
+    compute_capability_diff!(ours, theirs, service);
+    compute_capability_diff!(ours, theirs, protocol);
+    compute_capability_diff!(ours, theirs, directory);
+    compute_capability_diff!(ours, theirs, storage);
+    compute_capability_diff!(ours, theirs, resolver);
+    compute_capability_diff!(ours, theirs, runner);
+    compute_capability_diff!(ours, theirs, event_stream);
 }
 
 impl Document {
@@ -1120,20 +1301,17 @@ impl Document {
     ) -> Result<(), Error> {
         // Flatten the mergable fields that may contain a
         // list of capabilities in one clause.
-        flatten_docs!(self, other);
-        merge_from_field!(self, other, include);
-        merge_from_field!(self, other, r#use);
-        merge_from_field!(self, other, expose);
-        merge_from_field!(self, other, offer);
-        merge_from_field!(self, other, capabilities);
-        merge_from_field!(self, other, children);
-        merge_from_field!(self, other, collections);
-        merge_from_field!(self, other, environments);
+        merge_from_capability_field!(self, other, r#use);
+        merge_from_capability_field!(self, other, expose);
+        merge_from_capability_field!(self, other, offer);
+        merge_from_capability_field!(self, other, capabilities);
+        merge_from_other_field!(self, other, include);
+        merge_from_other_field!(self, other, children);
+        merge_from_other_field!(self, other, collections);
+        merge_from_other_field!(self, other, environments);
         self.merge_program(other, include_path)?;
         self.merge_facets(other, include_path)?;
         self.merge_config(other, include_path)?;
-
-        self.dedup_uses();
 
         Ok(())
     }
@@ -1318,36 +1496,6 @@ impl Document {
             }
         }
         Ok(())
-    }
-
-    fn dedup_uses(&mut self) {
-        // List of allowed promotions in `use` availability clauses as (from, to). Example: when a duplicate
-        // `use` differs only because on has availability "optional" and the other is "required",
-        // remove the "optional" variant.
-        let allowed_promotions = [
-            (Availability::Optional, Availability::Required),
-            (Availability::Transitional, Availability::Required),
-            (Availability::Transitional, Availability::Optional),
-        ];
-
-        // Synthesize the less restrictive variants of every `use` in the list above
-        // if the more restrictive variant is present, and blindly remove those less restrictive
-        // variants from `self.use`.
-        if let Some(uses) = &mut self.r#use {
-            let mut dedup_candidates = vec![];
-            for u in uses.iter() {
-                let current_val = u.availability.as_ref().unwrap_or(&Availability::Required);
-                for (from_val, to_val) in allowed_promotions.iter() {
-                    if to_val == current_val {
-                        let mut candidate = u.clone();
-                        candidate.availability = Some(from_val.clone());
-                        dedup_candidates.push(candidate);
-                    }
-                }
-            }
-
-            uses.retain(|u| !dedup_candidates.contains(u));
-        }
     }
 
     pub fn includes(&self) -> Vec<String> {
@@ -1877,7 +2025,7 @@ pub struct Capability {
     pub storage_id: Option<StorageId>,
 }
 
-#[derive(Deserialize, Debug, PartialEq, ReferenceDoc, Serialize)]
+#[derive(Deserialize, Debug, Clone, PartialEq, ReferenceDoc, Serialize)]
 #[serde(deny_unknown_fields)]
 #[reference_doc(fields_as = "list")]
 pub struct DebugRegistration {
@@ -2488,7 +2636,7 @@ pub trait FromClause {
     fn from_(&self) -> OneOrMany<AnyRef<'_>>;
 }
 
-pub trait CapabilityClause {
+pub trait CapabilityClause: Clone + PartialEq {
     fn service(&self) -> Option<OneOrMany<Name>>;
     fn protocol(&self) -> Option<OneOrMany<Name>>;
     fn directory(&self) -> Option<OneOrMany<Name>>;
@@ -2496,6 +2644,16 @@ pub trait CapabilityClause {
     fn runner(&self) -> Option<OneOrMany<Name>>;
     fn resolver(&self) -> Option<OneOrMany<Name>>;
     fn event_stream(&self) -> Option<OneOrMany<Name>>;
+    fn set_service(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_directory(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_storage(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_runner(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_resolver(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>);
+
+    fn availability(&self) -> Option<Availability>;
+    fn set_availability(&mut self, a: Option<Availability>);
 
     /// Returns the name of the capability for display purposes.
     /// If `service()` returns `Some`, the capability name must be "service", etc.
@@ -2541,6 +2699,13 @@ pub trait RightsClause {
     fn rights(&self) -> Option<&Rights>;
 }
 
+fn always_one<T>(o: Option<OneOrMany<T>>) -> Option<T> {
+    o.map(|o| match o {
+        OneOrMany::One(o) => o,
+        OneOrMany::Many(_) => panic!("many is impossible"),
+    })
+}
+
 impl CapabilityClause for Capability {
     fn service(&self) -> Option<OneOrMany<Name>> {
         self.service.clone()
@@ -2563,6 +2728,34 @@ impl CapabilityClause for Capability {
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
     }
+
+    fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
+        self.service = o;
+    }
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
+        self.protocol = o;
+    }
+    fn set_directory(&mut self, o: Option<OneOrMany<Name>>) {
+        self.directory = always_one(o);
+    }
+    fn set_storage(&mut self, o: Option<OneOrMany<Name>>) {
+        self.storage = always_one(o);
+    }
+    fn set_runner(&mut self, o: Option<OneOrMany<Name>>) {
+        self.runner = always_one(o);
+    }
+    fn set_resolver(&mut self, o: Option<OneOrMany<Name>>) {
+        self.resolver = always_one(o);
+    }
+    fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
+        self.event_stream = o;
+    }
+
+    fn availability(&self) -> Option<Availability> {
+        None
+    }
+    fn set_availability(&mut self, _a: Option<Availability>) {}
+
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
             "service"
@@ -2636,6 +2829,22 @@ impl CapabilityClause for DebugRegistration {
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         None
     }
+
+    fn set_service(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
+        self.protocol = o;
+    }
+    fn set_directory(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_storage(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_runner(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_resolver(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_event_stream(&mut self, _o: Option<OneOrMany<Name>>) {}
+
+    fn availability(&self) -> Option<Availability> {
+        None
+    }
+    fn set_availability(&mut self, _a: Option<Availability>) {}
+
     fn capability_type(&self) -> &'static str {
         if self.protocol.is_some() {
             "protocol"
@@ -2691,6 +2900,32 @@ impl CapabilityClause for Use {
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
     }
+
+    fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
+        self.service = o;
+    }
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
+        self.protocol = o;
+    }
+    fn set_directory(&mut self, o: Option<OneOrMany<Name>>) {
+        self.directory = always_one(o);
+    }
+    fn set_storage(&mut self, o: Option<OneOrMany<Name>>) {
+        self.storage = always_one(o);
+    }
+    fn set_runner(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_resolver(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
+        self.event_stream = o;
+    }
+
+    fn availability(&self) -> Option<Availability> {
+        self.availability
+    }
+    fn set_availability(&mut self, a: Option<Availability>) {
+        self.availability = a;
+    }
+
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
             "service"
@@ -2710,7 +2945,7 @@ impl CapabilityClause for Use {
         "use"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "storage", "runner", "event_stream"]
+        &["service", "protocol", "directory", "storage", "event_stream"]
     }
 }
 
@@ -2766,6 +3001,32 @@ impl CapabilityClause for Expose {
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
     }
+
+    fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
+        self.service = o;
+    }
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
+        self.protocol = o;
+    }
+    fn set_directory(&mut self, o: Option<OneOrMany<Name>>) {
+        self.directory = o;
+    }
+    fn set_storage(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_runner(&mut self, o: Option<OneOrMany<Name>>) {
+        self.runner = o;
+    }
+    fn set_resolver(&mut self, o: Option<OneOrMany<Name>>) {
+        self.resolver = o;
+    }
+    fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
+        self.event_stream = o;
+    }
+
+    fn availability(&self) -> Option<Availability> {
+        None
+    }
+    fn set_availability(&mut self, _a: Option<Availability>) {}
+
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
             "service"
@@ -2843,6 +3104,36 @@ impl CapabilityClause for Offer {
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
     }
+
+    fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
+        self.service = o;
+    }
+    fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
+        self.protocol = o;
+    }
+    fn set_directory(&mut self, o: Option<OneOrMany<Name>>) {
+        self.directory = o;
+    }
+    fn set_storage(&mut self, o: Option<OneOrMany<Name>>) {
+        self.storage = o;
+    }
+    fn set_runner(&mut self, o: Option<OneOrMany<Name>>) {
+        self.runner = o;
+    }
+    fn set_resolver(&mut self, o: Option<OneOrMany<Name>>) {
+        self.resolver = o;
+    }
+    fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
+        self.event_stream = o;
+    }
+
+    fn availability(&self) -> Option<Availability> {
+        self.availability
+    }
+    fn set_availability(&mut self, a: Option<Availability>) {
+        self.availability = a;
+    }
+
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
             "service"
@@ -3550,7 +3841,7 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_upgraded_uses() {
+    fn test_merge_upgraded_availability() {
         let mut some =
             document(json!({ "use": [{ "protocol": "foo", "availability": "optional" }] }));
         let mut other1 = document(json!({ "use": [{ "protocol": "foo" }] }));
@@ -3913,54 +4204,302 @@ mod tests {
         );
     }
 
+    #[test_case("protocol")]
+    #[test_case("service")]
+    #[test_case("event_stream")]
+    fn test_merge_from_duplicate_use_array(typename: &str) {
+        let mut my = document(json!({ "use": [{ typename: "a" }]}));
+        let mut other = document(json!({ "use": [
+            { typename: ["a", "b"], "availability": "optional"}
+        ]}));
+        let result = document(json!({ "use": [
+            { typename: "a" },
+            { typename: "b", "availability": "optional" },
+        ]}));
+
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case("directory")]
+    #[test_case("storage")]
+    fn test_merge_from_duplicate_use_noarray(typename: &str) {
+        let mut my = document(json!({ "use": [{ typename: "a", "path": "/a"}]}));
+        let mut other = document(json!({ "use": [
+            { typename: "a", "path": "/a", "availability": "optional" },
+            { typename: "b", "path": "/b", "availability": "optional" },
+        ]}));
+        let result = document(json!({ "use": [
+            { typename: "a", "path": "/a" },
+            { typename: "b", "path": "/b", "availability": "optional" },
+        ]}));
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case("protocol")]
+    #[test_case("service")]
+    #[test_case("event_stream")]
+    fn test_merge_from_duplicate_capabilities_array(typename: &str) {
+        let mut my = document(json!({ "capabilities": [{ typename: "a" }]}));
+        let mut other = document(json!({ "capabilities": [ { typename: ["a", "b"] } ]}));
+        let result = document(json!({ "capabilities": [ { typename: "a" }, { typename: "b" } ]}));
+
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case("directory")]
+    #[test_case("storage")]
+    #[test_case("runner")]
+    #[test_case("resolver")]
+    fn test_merge_from_duplicate_capabilities_noarray(typename: &str) {
+        let mut my = document(json!({ "capabilities": [{ typename: "a", "path": "/a"}]}));
+        let mut other = document(json!({ "capabilities": [
+            { typename: "a", "path": "/a" },
+            { typename: "b", "path": "/b" },
+        ]}));
+        let result = document(json!({ "capabilities": [
+            { typename: "a", "path": "/a" },
+            { typename: "b", "path": "/b" },
+        ]}));
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case("protocol")]
+    #[test_case("service")]
+    #[test_case("event_stream")]
+    #[test_case("directory")]
+    #[test_case("storage")]
+    #[test_case("runner")]
+    #[test_case("resolver")]
+    fn test_merge_from_duplicate_offers(typename: &str) {
+        let mut my = document(json!({ "offer": [{ typename: "a", "from": "self", "to": "#c" }]}));
+        let mut other = document(json!({ "offer": [
+            { typename: ["a", "b"], "from": "self", "to": "#c", "availability": "optional" }
+        ]}));
+        let result = document(json!({ "offer": [
+            { typename: "a", "from": "self", "to": "#c" },
+            { typename: "b", "from": "self", "to": "#c", "availability": "optional" },
+        ]}));
+
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case("protocol")]
+    #[test_case("service")]
+    #[test_case("event_stream")]
+    #[test_case("directory")]
+    #[test_case("runner")]
+    #[test_case("resolver")]
+    fn test_merge_from_duplicate_exposes(typename: &str) {
+        let mut my = document(json!({ "expose": [{ typename: "a", "from": "self" }]}));
+        let mut other = document(json!({ "expose": [
+            { typename: ["a", "b"], "from": "self" }
+        ]}));
+        let result = document(json!({ "expose": [
+            { typename: "a", "from": "self" },
+            { typename: "b", "from": "self" },
+        ]}));
+
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "required" },
+            { "protocol": "b", "availability": "optional" },
+            { "protocol": "c", "availability": "transitional" },
+            { "protocol": "d", "availability": "same_as_target" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a"], "availability": "required" },
+            { "protocol": ["b"], "availability": "optional" },
+            { "protocol": ["c"], "availability": "transitional" },
+            { "protocol": ["d"], "availability": "same_as_target" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "required" },
+            { "protocol": "b", "availability": "optional" },
+            { "protocol": "c", "availability": "transitional" },
+            { "protocol": "d", "availability": "same_as_target" },
+        ]}))
+        ; "merge both same"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "optional" },
+            { "protocol": "b", "availability": "transitional" },
+            { "protocol": "c", "availability": "transitional" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "x"], "availability": "required" },
+            { "protocol": ["b", "y"], "availability": "optional" },
+            { "protocol": ["c", "z"], "availability": "required" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "x"], "availability": "required" },
+            { "protocol": ["b", "y"], "availability": "optional" },
+            { "protocol": ["c", "z"], "availability": "required" },
+        ]}))
+        ; "merge with upgrade"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "required" },
+            { "protocol": "b", "availability": "optional" },
+            { "protocol": "c", "availability": "required" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "x"], "availability": "optional" },
+            { "protocol": ["b", "y"], "availability": "transitional" },
+            { "protocol": ["c", "z"], "availability": "transitional" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "required" },
+            { "protocol": "b", "availability": "optional" },
+            { "protocol": "c", "availability": "required" },
+            { "protocol": "x", "availability": "optional" },
+            { "protocol": "y", "availability": "transitional" },
+            { "protocol": "z", "availability": "transitional" },
+        ]}))
+        ; "merge with downgrade"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "optional" },
+            { "protocol": "b", "availability": "transitional" },
+            { "protocol": "c", "availability": "transitional" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "x"], "availability": "same_as_target" },
+            { "protocol": ["b", "y"], "availability": "same_as_target" },
+            { "protocol": ["c", "z"], "availability": "same_as_target" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": "a", "availability": "optional" },
+            { "protocol": "b", "availability": "transitional" },
+            { "protocol": "c", "availability": "transitional" },
+            { "protocol": ["a", "x"], "availability": "same_as_target" },
+            { "protocol": ["b", "y"], "availability": "same_as_target" },
+            { "protocol": ["c", "z"], "availability": "same_as_target" },
+        ]}))
+        ; "merge with no replacement"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": ["a", "b", "c"], "availability": "optional" },
+            { "protocol": "d", "availability": "same_as_target" },
+            { "protocol": ["e", "f"] },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["c", "e", "g"] },
+            { "protocol": ["d", "h"] },
+            { "protocol": ["f", "i"], "availability": "transitional" },
+        ]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "b"], "availability": "optional" },
+            { "protocol": "d", "availability": "same_as_target" },
+            { "protocol": ["e", "f"] },
+            { "protocol": ["c", "g"] },
+            { "protocol": ["d", "h"] },
+            { "protocol": "i", "availability": "transitional" },
+        ]}))
+        ; "merge multiple"
+    )]
+
+    fn test_merge_from_duplicate_capability_availability(
+        mut my: Document,
+        mut other: Document,
+        result: Document,
+    ) {
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+        assert_eq!(my, result);
+    }
+
+    #[test_case(
+        document(json!({ "use": [{ "protocol": ["a", "b"] }]})),
+        document(json!({ "use": [{ "protocol": ["c", "d"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] }, { "protocol": ["c", "d"] }
+        ]}))
+        ; "merge capabilities with disjoint sets"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": ["a"] },
+            { "protocol": "b" },
+        ]})),
+        document(json!({ "use": [{ "protocol": ["a", "b"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["a"] }, { "protocol": "b" },
+        ]}))
+        ; "merge capabilities with equal set"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] },
+            { "protocol": "c" },
+        ]})),
+        document(json!({ "use": [{ "protocol": ["a", "b"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] }, { "protocol": "c" },
+        ]}))
+        ; "merge capabilities with subset"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] },
+        ]})),
+        document(json!({ "use": [{ "protocol": ["a", "b", "c"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] },
+            { "protocol": "c" },
+        ]}))
+        ; "merge capabilities with superset"
+    )]
+    #[test_case(
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] },
+        ]})),
+        document(json!({ "use": [{ "protocol": ["b", "c", "d"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["a", "b"] }, { "protocol": ["c", "d"] }
+        ]}))
+        ; "merge capabilities with intersection"
+    )]
+    #[test_case(
+        document(json!({ "use": [{ "protocol": ["a", "b"] }]})),
+        document(json!({ "use": [
+            { "protocol": ["c", "b", "d"] },
+            { "protocol": ["e", "d"] },
+        ]})),
+        document(json!({ "use": [
+            {"protocol": ["a", "b"] },
+            {"protocol": ["c", "d"] },
+            {"protocol": "e" }]}))
+        ; "merge capabilities from multiple arrays"
+    )]
     #[test_case(
         document(json!({ "use": [{ "protocol": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "use": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self"}]})),
-        document(json!({ "use": [{ "protocol": "foo.bar.Baz", "from": "self" },{"protocol": "some.other.Protocol", "from": "self"}]}))
-        ; "merge duplicate protocols in use clause"
-    )]
-    #[test_case(
         document(json!({ "use": [{ "service": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "use": [{ "service": ["foo.bar.Baz", "some.other.Service"], "from": "self"}]})),
-        document(json!({ "use": [{ "service": "foo.bar.Baz", "from": "self" },{"service": "some.other.Service", "from": "self"}]}))
-        ; "merge duplicate capabilities service use clause"
+        document(json!({ "use": [
+            {"protocol": "foo.bar.Baz", "from": "self"},
+            {"service": "foo.bar.Baz", "from": "self"}]}))
+        ; "merge capabilities, types don't match"
     )]
     #[test_case(
-        document(json!({ "offer": [{ "protocol": "foo.bar.Baz", "from": "self", "to": "#elements"}], "collections" :[{"name": "elements", "durability": "transient" }]})),
-        document(json!({ "offer": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]})),
-        document(json!({ "offer": [{ "protocol": "foo.bar.Baz", "from": "self", "to": "#elements" },{"protocol": "some.other.Protocol", "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]}))
-        ; "merge duplicate protocols in offer clause"
+        document(json!({ "use": [{ "protocol": "foo.bar.Baz", "from": "self"}]})),
+        document(json!({ "use": [{ "protocol": "foo.bar.Baz" }]})),
+        document(json!({ "use": [
+            {"protocol": "foo.bar.Baz", "from": "self"},
+            {"protocol": "foo.bar.Baz"}]}))
+        ; "merge capabilities, fields don't match"
     )]
-    #[test_case(
-        document(json!({ "offer": [{ "service": "foo.bar.Baz", "from": "self", "to": "#elements"}], "collections" :[{"name": "elements", "durability": "transient" }]})),
-        document(json!({ "offer": [{ "service": ["foo.bar.Baz", "some.other.Service"], "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]})),
-        document(json!({ "offer": [{ "service": "foo.bar.Baz", "from": "self", "to": "#elements" },{"service": "some.other.Service", "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]}))
-        ; "merge duplicate capabilities service offer clause"
-    )]
-    #[test_case(
-        document(json!({ "expose": [{ "protocol": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "expose": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self"}]})),
-        document(json!({ "expose": [{ "protocol": "foo.bar.Baz", "from": "self" },{"protocol": "some.other.Protocol", "from": "self"}]}))
-        ; "merge duplicate protocols in expose clause"
-    )]
-    #[test_case(
-        document(json!({ "expose": [{ "service": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "expose": [{ "service": ["foo.bar.Baz", "some.other.Service"], "from": "self"}]})),
-        document(json!({ "expose": [{ "service": "foo.bar.Baz", "from": "self" },{"service": "some.other.Service", "from": "self"}]}))
-        ; "merge duplicate service capabilities in expose clause"
-    )]
-    #[test_case(
-        document(json!({ "capabilities": [{ "protocol": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "capabilities": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self"}]})),
-        document(json!({ "capabilities": [{ "protocol": "foo.bar.Baz", "from": "self" },{"protocol": "some.other.Protocol", "from": "self"}]}))
-        ; "merge duplicate protocols in capabilities clause"
-    )]
-    #[test_case(
-        document(json!({ "capabilities": [{ "service": "foo.bar.Baz", "from": "self"}]})),
-        document(json!({ "capabilities": [{ "service": ["foo.bar.Baz", "some.other.Service"], "from": "self"}]})),
-        document(json!({ "capabilities": [{ "service": "foo.bar.Baz", "from": "self" },{"service": "some.other.Service", "from": "self"}]}))
-        ; "merge duplicate services in capabilities clause"
-    )]
+
     fn test_merge_from_duplicate_capability(
         mut my: Document,
         mut other: Document,

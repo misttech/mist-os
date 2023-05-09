@@ -21,6 +21,7 @@ rustc_library("cml") {
     "//third_party/rust_crates:json5format",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",

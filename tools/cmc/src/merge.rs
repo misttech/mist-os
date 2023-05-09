@@ -271,7 +271,7 @@ mod tests {
         let expected_json = json!({
             "use": [
                 {
-                    "protocol": "bar"
+                    "protocol": [ "bar" ],
                 },
                 {
                     "protocol": "foo"
