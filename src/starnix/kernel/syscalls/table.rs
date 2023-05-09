@@ -5,7 +5,7 @@
 use paste::paste;
 
 use crate::arch::syscalls::*;
-use crate::fs::FdNumber;
+use crate::fs::{FdNumber, WdNumber};
 use crate::syscalls::{decls::Syscall, CurrentTask, SyscallResult};
 use crate::types::*;
 
@@ -316,6 +316,7 @@ impl_from_syscall_arg! { for FdNumber: arg => Self::from_raw(arg as i32) }
 impl_from_syscall_arg! { for FileMode: arg => Self::from_bits(arg as u32) }
 impl_from_syscall_arg! { for DeviceType: arg => Self::from_bits(arg) }
 impl_from_syscall_arg! { for UncheckedSignal: arg => Self::new(arg) }
+impl_from_syscall_arg! { for WdNumber: arg => Self::from_raw(arg as i32) }
 
 impl<T> FromSyscallArg for UserRef<T> {
     fn from_arg(arg: u64) -> UserRef<T> {

@@ -24,6 +24,7 @@ mod static_directory;
 mod symlink_node;
 mod vec_directory;
 mod vmo_file;
+mod wd_number;
 mod xattr;
 
 pub mod buffers;
@@ -67,4 +68,5 @@ pub use static_directory::*;
 pub use symlink_node::*;
 pub use vec_directory::*;
 pub use vmo_file::*;
+pub use wd_number::*;
 pub use xattr::*;

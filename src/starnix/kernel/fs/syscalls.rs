@@ -2032,10 +2032,9 @@ pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNum
     }
     let non_blocking = flags & IN_NONBLOCK != 0;
     let close_on_exec = flags & IN_CLOEXEC != 0;
-    let ep_file = InotifyFileObject::new_file(current_task, non_blocking);
+    let inotify_file = InotifyFileObject::new_file(current_task, non_blocking);
     let fd_flags = if close_on_exec { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(ep_file, fd_flags)?;
-    Ok(fd)
+    current_task.add_file(inotify_file, fd_flags)
 }
 
 pub fn sys_inotify_add_watch(
@@ -2043,15 +2042,15 @@ pub fn sys_inotify_add_watch(
     fd: FdNumber,
     user_path: UserCString,
     mask: u32,
-) -> Result<u32, Errno> {
+) -> Result<WdNumber, Errno> {
     not_implemented!("sys_inotify_add_watch({}, {}, {})", fd, user_path, mask);
-    Ok(1)
+    Ok(WdNumber::from_raw(1))
 }
 
 pub fn sys_inotify_rm_watch(
     _current_task: &CurrentTask,
     fd: FdNumber,
-    wd: u32,
+    wd: WdNumber,
 ) -> Result<(), Errno> {
     not_implemented!("sys_inotify_rm_watch({}, {})", fd, wd);
     Ok(())

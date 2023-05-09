@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::{FdFlags, FdNumber};
+use crate::fs::{FdFlags, FdNumber, WdNumber};
 use crate::types::{FileMode, OpenFlags, SealFlags, Signal, UserAddress};
 
 #[derive(Eq, PartialEq, Debug)]
@@ -47,6 +47,12 @@ impl From<OpenFlags> for SyscallResult {
 
 impl From<FdNumber> for SyscallResult {
     fn from(value: FdNumber) -> Self {
+        SyscallResult(value.raw() as u64)
+    }
+}
+
+impl From<WdNumber> for SyscallResult {
+    fn from(value: WdNumber) -> Self {
         SyscallResult(value.raw() as u64)
     }
 }
