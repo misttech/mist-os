@@ -24,9 +24,11 @@ test("mipidsi") {
     "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp_wire",
     "//sdk/lib/fdio",
     "//src/graphics/display/lib/mipi-dsi",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 

@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <memory>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace mipi_dsi {
 
@@ -22,7 +24,7 @@ TEST(CreateCommand, CommandStructure) {
   EXPECT_EQ(cmd.pld_data_count, sizeof(tbuf));
   EXPECT_EQ(cmd.rsp_data_list, rbuf);
   EXPECT_EQ(cmd.rsp_data_count, sizeof(rbuf));
-  EXPECT_EQ(cmd.flags, 0);
+  EXPECT_EQ(cmd.flags, 0u);
   EXPECT_EQ(cmd.dsi_data_type, kMipiDsiDtUnknown);
 }
 
@@ -150,7 +152,7 @@ TEST(CreateCommandFidl, CommandStructure) {
   EXPECT_EQ(kMipiDsiVirtualChanId, res->virtual_channel_id());
   EXPECT_EQ(sizeof(rbuf), res->expected_read_length());
   EXPECT_EQ(sizeof(tbuf), res->write_length());
-  EXPECT_EQ(MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX, res->flags());
+  EXPECT_EQ(uint32_t{MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX}, res->flags());
   EXPECT_EQ(kMipiDsiDtGenShortRead2, res->dsi_data_type());
 }
 
