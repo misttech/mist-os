@@ -541,6 +541,10 @@ impl DirEntry {
             // establish the DirEntry that we are going to try to rename.
             let renamed = state.old_parent().component_lookup(current_task, old_basename)?;
 
+            // Check whether the sticky bit on the old parent prevents us from
+            // removing this child.
+            old_parent.node.check_sticky_bit(current_task, &renamed.node)?;
+
             // If new_parent is a descendant of renamed, the operation would
             // create a cycle. That's disallowed.
             if new_parent_ancestor_list.into_iter().any(|entry| Arc::ptr_eq(&entry, &renamed)) {

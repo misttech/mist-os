@@ -512,6 +512,7 @@
 
                 // sticky_test
                 "StickyTest.StickyBitCapFOWNER",
+                "StickyTest.StickyBitPermDenied",
                 "StickyTest.StickyBitSameUID",
 
                 // sync_file_range_test

@@ -745,6 +745,7 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
+        self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, name, child)?;
         self.update_ctime_mtime();
         Ok(())
@@ -831,6 +832,24 @@ impl FsNode {
         };
         if (mode_flags & access.bits()) != access.bits() {
             return error!(EACCES);
+        }
+        Ok(())
+    }
+
+    /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
+    /// `child`. If this node has `S_ISVTX`, then either the child must be owned by the `euid` of
+    /// `current_task` or `current_task` must have `CAP_FOWNER`.
+    pub fn check_sticky_bit(
+        &self,
+        current_task: &CurrentTask,
+        child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
+        let creds = current_task.creds();
+        if !creds.has_capability(CAP_FOWNER)
+            && self.info().mode.contains(FileMode::ISVTX)
+            && child.info().uid != creds.euid
+        {
+            return error!(EPERM);
         }
         Ok(())
     }
