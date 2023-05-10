@@ -986,6 +986,22 @@ pub struct sockaddr {
     pub sa_family: sa_family_t,
     pub sa_data: [::std::os::raw::c_char; 14usize],
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sockaddr_storage {
+    pub ss_family: sa_family_t,
+    pub __ss_padding: [::std::os::raw::c_char; 118usize],
+    pub __ss_align: ::std::os::raw::c_ulong,
+}
+impl Default for sockaddr_storage {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 pub type zxio_service_connector = ::std::option::Option<
     unsafe extern "C" fn(
         service_name: *const ::std::os::raw::c_char,
@@ -1095,6 +1111,21 @@ extern "C" {
         abilities: zxio_abilities_t,
     ) -> u32;
 }
+pub type in_port_t = u16;
+pub type in_addr_t = u32;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct in_addr {
+    pub s_addr: in_addr_t,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct sockaddr_in {
+    pub sin_family: sa_family_t,
+    pub sin_port: in_port_t,
+    pub sin_addr: in_addr,
+    pub sin_zero: [u8; 8usize],
+}
 #[repr(C)]
 #[derive(Copy, Clone, AsBytes, FromBytes)]
 pub struct in6_addr {
@@ -1117,6 +1148,24 @@ impl Default for in6_addr__bindgen_ty_1 {
     }
 }
 impl Default for in6_addr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct sockaddr_in6 {
+    pub sin6_family: sa_family_t,
+    pub sin6_port: in_port_t,
+    pub sin6_flowinfo: u32,
+    pub sin6_addr: in6_addr,
+    pub sin6_scope_id: u32,
+}
+impl Default for sockaddr_in6 {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {

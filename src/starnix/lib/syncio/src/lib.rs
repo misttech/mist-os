@@ -16,16 +16,16 @@ use fuchsia_zircon::{
     sys::{ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK},
     zx_status_t, HandleBased,
 };
-use linux_uapi::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_uint, c_void};
 use std::{
     ffi::CStr,
     mem::{size_of, size_of_val},
+    os::raw::{c_char, c_int, c_uint, c_void},
     pin::Pin,
 };
 use zerocopy::{AsBytes, FromBytes};
 use zxio::{
-    msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_seek_origin_t,
-    zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
+    msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zxio_object_type_t,
+    zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
 };
 
 pub mod zxio;
@@ -124,11 +124,11 @@ impl Iterator for DirentIterator {
         }
         let mut entry = zxio_dirent_t::default();
         let mut name_buffer = Vec::with_capacity(fio::MAX_FILENAME as usize);
-        // The FFI interface expects a pointer to std::os::raw:c_char which is i8 on Fuchsia.
+        // The FFI interface expects a pointer to c_char which is i8 on x86_64.
         // The Rust str and OsStr types expect raw character data to be stored in a buffer u8 values.
         // The types are equivalent for all practical purposes and Rust permits casting between the types,
         // so we insert a type cast here in the FFI bindings.
-        entry.name = name_buffer.as_mut_ptr() as *mut std::os::raw::c_char;
+        entry.name = name_buffer.as_mut_ptr() as *mut c_char;
         let status = unsafe { zxio_dirent_iterator_next(&mut *self.iterator.as_mut(), &mut entry) };
         let result = match zx::ok(status) {
             Ok(()) => {
@@ -365,7 +365,7 @@ pub trait ServiceConnector {
 ///
 /// SAFETY: Dereferences the raw pointers `service_name` and `provider_handle`.
 unsafe extern "C" fn service_connector<S: ServiceConnector>(
-    service_name: *const std::os::raw::c_char,
+    service_name: *const c_char,
     provider_handle: *mut zx_handle_t,
 ) -> zx_status_t {
     let (client_end, server_end) = zx::Channel::create();
@@ -460,7 +460,7 @@ impl Zxio {
             zxio::zxio_open(
                 self.as_ptr(),
                 flags.bits(),
-                path.as_ptr() as *const ::std::os::raw::c_char,
+                path.as_ptr() as *const c_char,
                 path.len(),
                 zxio.as_storage_ptr(),
             )
@@ -589,10 +589,10 @@ impl Zxio {
         let status = unsafe {
             zxio::zxio_rename(
                 self.as_ptr(),
-                old_path.as_ptr() as *const ::std::os::raw::c_char,
+                old_path.as_ptr() as *const c_char,
                 old_path.len(),
                 handle,
-                new_path.as_ptr() as *const ::std::os::raw::c_char,
+                new_path.as_ptr() as *const c_char,
                 new_path.len(),
             )
         };
@@ -893,7 +893,7 @@ impl Zxio {
         let status = unsafe {
             zxio::zxio_create_symlink(
                 self.as_ptr(),
-                name.as_ptr() as *const ::std::os::raw::c_char,
+                name.as_ptr() as *const c_char,
                 name.len(),
                 target.as_ptr(),
                 target.len(),

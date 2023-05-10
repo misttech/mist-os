@@ -29,7 +29,7 @@ bindgen.var_allowlist = ['ZXIO_SHUTDOWN.*',
                          'SO.*',
                          'IP.*',
                          'MSG_.*']
-bindgen.type_allowlist = ['cmsghdr.*', 'in6_.*']
+bindgen.type_allowlist = ['cmsghdr.*', 'in6_.*', 'sockaddr.*']
 
 bindgen.set_auto_derive_traits([
     (r'cmsghdr', ['AsBytes, FromBytes']),
