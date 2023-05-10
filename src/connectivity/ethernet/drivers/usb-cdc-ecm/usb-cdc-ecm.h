@@ -94,6 +94,7 @@ class UsbCdcEcm : public UsbCdcEcmType,
   std::optional<usb::Request<void>> interrupt_request_;
   sync_completion_t completion_;
   thrd_t int_thread_;
+  std::atomic_bool int_thread_created_ = false;
 
   // Send context
   // TX lock -- Must be acquired before ethernet_mutex when both locks are held.

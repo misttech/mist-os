@@ -51,7 +51,7 @@ void UsbCdcEcm::DdkUnbind(ddk::UnbindTxn unbind_txn) {
 }
 
 UsbCdcEcm::~UsbCdcEcm() {
-  if (int_thread_) {
+  if (int_thread_created_.load()) {
     thrd_join(int_thread_, nullptr);
   }
 }
@@ -400,6 +400,7 @@ zx_status_t UsbCdcEcm::Init() {
     zxlogf(ERROR, "Failed to create interrupt handler thread (%d)", thread_result);
     return ZX_ERR_NO_RESOURCES;
   }
+  int_thread_created_.store(true);
 
   return ZX_OK;
 }
