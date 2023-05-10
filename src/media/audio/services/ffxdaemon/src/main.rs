@@ -21,7 +21,9 @@ use {
         RendererType::{StandardRenderer, UltrasoundRenderer},
     },
     fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
-    fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
+    fidl_fuchsia_media_audio,
+    fidl_fuchsia_virtualaudio::DeviceType,
+    fuchsia as _, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon::{self as zx, HandleBased},
@@ -650,9 +652,20 @@ impl AudioDaemon {
                 }
 
                 AudioDaemonRequest::ListDevices { responder } => {
-                    let mut input_entries = device::get_entries("/dev/class/audio-input/").await?;
-                    let mut output_entries =
-                        device::get_entries("/dev/class/audio-output/").await?;
+                    let mut input_entries = device::get_entries(
+                        "/dev/class/audio-input/",
+                        DeviceType::StreamConfig,
+                        true,
+                    )
+                    .await?;
+                    let mut output_entries = device::get_entries(
+                        "/dev/class/audio-output/",
+                        DeviceType::StreamConfig,
+                        false,
+                    )
+                    .await?;
+
+                    // TODO(fxbug.dev/126775): Generalize to DAI & Codec types.
                     input_entries.append(&mut output_entries);
 
                     let response = AudioDaemonListDevicesResponse {
@@ -669,7 +682,7 @@ impl AudioDaemon {
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
 
                     let device =
-                        device::Device::connect(format_utils::path_for_selector(device_selector)?);
+                        device::Device::connect(format_utils::path_for_selector(&device_selector)?);
 
                     match device {
                         Err(e) => {
@@ -708,8 +721,9 @@ impl AudioDaemon {
                         payload.gain_state.ok_or(anyhow::anyhow!("No gain state specified"))?,
                     );
 
-                    let device =
-                        device::Device::connect(format_utils::path_for_selector(device_selector)?)?;
+                    let device = device::Device::connect(format_utils::path_for_selector(
+                        &device_selector,
+                    )?)?;
 
                     device.set_gain(gain_state)?;
                     responder

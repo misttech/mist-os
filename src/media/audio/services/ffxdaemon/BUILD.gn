@@ -44,6 +44,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_rust",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_rust",
+    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",

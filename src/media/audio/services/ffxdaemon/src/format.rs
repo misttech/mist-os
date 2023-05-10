@@ -310,13 +310,21 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
     }
 }
 
-pub fn path_for_selector(device_selector: DeviceSelector) -> Result<String, Error> {
+// TODO(fxbug.dev/126775): Generalize to DAI & Codec types.
+pub fn path_for_selector(device_selector: &DeviceSelector) -> Result<String, Error> {
     let input = device_selector
         .is_input
         .map(|is_input| if is_input { "input" } else { "output" })
         .ok_or(anyhow::anyhow!("Input/output missing"))?;
-    let id = device_selector.id.ok_or(anyhow::anyhow!("Device id missing"))?;
+    let id = device_selector.id.clone().ok_or(anyhow::anyhow!("Device id missing"))?;
     Ok(format!("/dev/class/audio-{}/{}", input, id))
+}
+
+pub fn device_id_for_path(path: &std::path::Path) -> Result<String> {
+    let device_id = path.file_name().ok_or(anyhow::anyhow!("Can't get filename from path"))?;
+    let id_str =
+        device_id.to_str().ok_or(anyhow::anyhow!("Could not convert device id to string"))?;
+    Ok(id_str.to_string())
 }
 
 pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {

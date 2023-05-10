@@ -17,6 +17,7 @@ ffx_plugin("ffx_audio_listdevices") {
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:serde",

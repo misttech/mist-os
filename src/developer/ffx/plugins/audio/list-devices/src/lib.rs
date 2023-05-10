@@ -18,9 +18,23 @@ use {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListDeviceResult {
-    pub devices: Vec<String>,
+    pub devices: Vec<DeviceSelectorWrapper>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeviceSelectorWrapper {
+    device_id: Option<String>,
+    is_input: Option<bool>,
+    device_type: DeviceTypeWrapper,
+    path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum DeviceTypeWrapper {
+    DAI,
+    CODEC,
+    STREAMCONFIG,
+}
 #[derive(FfxTool)]
 pub struct ListDevicesTool {
     #[command]
@@ -44,9 +58,45 @@ impl FfxMain for ListDevicesTool {
 
         if let Some(devices) = response.devices {
             writer
-                .machine_or_else(&ListDeviceResult { devices: devices.clone() }, || {
-                    devices.iter().map(|device| device.as_str()).join("\n")
-                })
+                .machine_or_else(
+                    &ListDeviceResult {
+                        devices: devices
+                            .clone()
+                            .into_iter()
+                            .map(|device| DeviceSelectorWrapper {
+                                device_id: device.id.clone(),
+                                device_type: DeviceTypeWrapper::STREAMCONFIG,
+                                is_input: device.is_input,
+                                path: format_utils::path_for_selector(&device)
+                                    .unwrap_or(format!("Path not available")),
+                            })
+                            .collect(),
+                    },
+                    || {
+                        devices
+                            .iter()
+                            .map(|device| {
+                                let in_out = match device.is_input {
+                                    Some(is_input) => {
+                                        if is_input {
+                                            format!("Input")
+                                        } else {
+                                            format!("Output")
+                                        }
+                                    }
+                                    None => format!("Input/Output not specified"),
+                                };
+
+                                format!(
+                                    "{:?} Device id: {:?}, Device type: {:?}, {in_out}",
+                                    format_utils::path_for_selector(&device),
+                                    device.id,
+                                    device.device_type
+                                )
+                            })
+                            .join("\n")
+                    },
+                )
                 .map_err(Into::into)
         } else {
             writeln!(writer, "No devices found.").bug()

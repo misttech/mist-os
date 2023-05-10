@@ -9,6 +9,8 @@ library fuchsia.audio.ffxdaemon;
 using fuchsia.media;
 using fuchsia.hardware.audio;
 using fuchsia.io;
+using fuchsia.audio.device;
+using fuchsia.virtualaudio;
 using zx;
 
 /// Where to route incoming audio data.
@@ -165,6 +167,9 @@ type DeviceSelector = table {
     ///
     /// Required.
     2: id fuchsia.io.Path;
+
+    /// Device type. If not specified, defaults to StreamConfig.
+    3: device_type fuchsia.virtualaudio.DeviceType;
 };
 
 /// Cancels an AudioDaemonRecordRequest if no duration was specified.
@@ -256,7 +261,7 @@ protocol AudioDaemon {
         /// List of available devices, sorted by name.
         ///
         /// Required.
-        1: devices vector<fuchsia.io.Path>:MAX;
+        1: devices vector<DeviceSelector>:fuchsia.audio.device.MAX_COUNT_DEVICES;
     }) error zx.Status;
 
     /// Returns details about a specific audio device.

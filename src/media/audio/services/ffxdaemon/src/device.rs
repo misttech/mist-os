@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_audio_ffxdaemon::DeviceSelector;
+
 use {
     crate::{socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{self, Context, Error},
@@ -9,7 +11,7 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_audio_ffxdaemon::{AudioDaemonCancelerMarker, DeviceInfo},
     fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_virtualaudio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
     futures::{AsyncWriteExt, StreamExt},
 };
@@ -387,7 +389,11 @@ impl Device {
 }
 
 // Helper function to enumerate on device directories to get information about available drivers.
-pub async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
+pub async fn get_entries(
+    path: &str,
+    device_type: fidl_fuchsia_virtualaudio::DeviceType,
+    is_input: bool,
+) -> Result<Vec<DeviceSelector>, Error> {
     let (control_client, control_server) = zx::Channel::create();
 
     // Creates a connection to a FIDL service at path.
@@ -409,10 +415,28 @@ pub async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
     }
 
     let entry_names = fuchsia_fs::directory::parse_dir_entries(&mut buf);
-    let full_paths: Vec<String> = entry_names
-        .into_iter()
-        .filter_map(|s| (s.and_then(|entry| Ok(path.to_owned() + entry.name.as_str())).ok()))
+    let full_paths = entry_names.into_iter().filter_map(|s| match s {
+        Ok(entry) => match entry.kind {
+            fio::DirentType::Directory => {
+                if entry.name.len() > 1 {
+                    Some(path.to_owned() + entry.name.as_str())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        Err(_) => None,
+    });
+
+    let device_selectors = full_paths
+        .map(|path| DeviceSelector {
+            is_input: Some(is_input),
+            id: format_utils::device_id_for_path(std::path::Path::new(&path)).ok(),
+            device_type: Some(device_type),
+            ..Default::default()
+        })
         .collect();
 
-    Ok(full_paths)
+    Ok(device_selectors)
 }

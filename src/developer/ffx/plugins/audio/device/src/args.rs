@@ -32,9 +32,11 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device id. stream device node id from either /dev/audio-input/* or /dev/audio-output/*"
+        description = "device id. stream device node id from /dev/class/audio-input/, or \
+        /dev/class/audio-output/.
+        If not specified, command will default to first device alphabetically listed."
     )]
-    pub id: String,
+    pub id: Option<String>,
 
     #[argh(
         option,
@@ -162,7 +164,10 @@ impl FromStr for DeviceDirection {
         match s.to_lowercase().as_str() {
             "input" => Ok(DeviceDirection::Input),
             "output" => Ok(DeviceDirection::Output),
-            _ => Err(anyhow::anyhow!("invalid device type, {}. Expected one of: input, output", s)),
+            _ => Err(anyhow::anyhow!(
+                "invalid device direction, {}. Expected one of: input, output",
+                s
+            )),
         }
     }
 }

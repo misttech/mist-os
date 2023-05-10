@@ -8,9 +8,11 @@ fidl("fuchsia.audio.ffxdaemon") {
   sources = [ "audio_proxy.fidl" ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.audio.device",
     "//sdk/fidl/fuchsia.hardware.audio",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.media",
+    "//sdk/fidl/fuchsia.virtualaudio",
     "//zircon/vdso/zx",
   ]
 }

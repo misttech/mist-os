@@ -47,10 +47,24 @@ impl FfxMain for DeviceTool {
             | SubCommand::Mute(_)
             | SubCommand::Unmute(_)
             | SubCommand::Agc(_) => {
+                let direction = self
+                    .cmd
+                    .device_direction
+                    .ok_or(anyhow::anyhow!("Missing device direction argument"))?;
+                let id = self.cmd.id.unwrap_or(
+                    get_first_device(
+                        &self.audio_proxy,
+                        fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                        direction == DeviceDirection::Input,
+                    )
+                    .await?
+                    .id
+                    .ok_or(anyhow::anyhow!("ID missing from default device."))?,
+                );
                 let mut request_info = DeviceGainStateRequest {
                     audio_proxy: self.audio_proxy,
-                    device_id: self.cmd.id,
-                    device_direction: self.cmd.device_direction,
+                    device_id: id,
+                    device_direction: direction,
                     gain_db: None,
                     agc_enabled: None,
                     muted: None,
@@ -120,6 +134,28 @@ pub struct JsonPcmFormats {
     pub frame_rates: Option<Vec<u32>>,
 }
 
+async fn get_first_device(
+    audio_proxy: &AudioDaemonProxy,
+    device_type: fidl_fuchsia_virtualaudio::DeviceType,
+    is_input: bool,
+) -> Result<DeviceSelector> {
+    let list_devices_response = audio_proxy
+        .list_devices()
+        .await?
+        .map_err(|e| anyhow::anyhow!("Could not retrieve available devices. {e}"))?;
+
+    match list_devices_response.devices {
+        Some(devices) => devices
+            .into_iter()
+            .find(|device| {
+                device.device_type.is_some_and(|t| t == device_type)
+                    && device.is_input.is_some_and(|t| t == is_input)
+            })
+            .ok_or(anyhow::anyhow!("Could not find any devices with requested type.")),
+        None => Err(anyhow::anyhow!("Could not find default device.")),
+    }
+}
+
 async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
     let device_direction = cmd
         .device_direction
@@ -129,17 +165,35 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         _ => panic!("Unreachable."),
     };
 
-    let (device_path, is_input) = match device_direction {
-        DeviceDirection::Input => (format!("/dev/class/audio-input/{}", cmd.id), true),
-        DeviceDirection::Output => (format!("/dev/class/audio-output/{}", cmd.id), false),
+    // TODO(fxbug.dev/126775): Generalize to DAI & Codec types.
+    let (device_selector, is_default_device) = match cmd.id {
+        Some(id) => (
+            DeviceSelector {
+                is_input: Some(device_direction == ffx_audio_device_args::DeviceDirection::Input),
+                id: Some(id),
+                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+                ..Default::default()
+            },
+            false,
+        ),
+
+        None => (
+            get_first_device(
+                &audio_proxy,
+                fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                device_direction == DeviceDirection::Input,
+            )
+            .await?,
+            true,
+        ),
     };
+    let device_id = device_selector
+        .id
+        .clone()
+        .ok_or(anyhow::anyhow!("Could not get id of requested device."))?;
 
     let request = AudioDaemonDeviceInfoRequest {
-        device: Some(DeviceSelector {
-            is_input: Some(DeviceDirection::Input == device_direction),
-            id: Some(cmd.id.clone()),
-            ..Default::default()
-        }),
+        device: Some(device_selector.clone()),
         ..Default::default()
     };
     let info = match audio_proxy.device_info(request).await? {
@@ -152,23 +206,23 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
     let stream_properties = device_info.stream_properties.clone().ok_or(anyhow::anyhow!(
         "Stream properties field missing for device with id {0}.",
-        cmd.id
+        device_id
     ))?;
 
     let supported_formats = device_info.supported_formats.clone().ok_or(anyhow::anyhow!(
         "Supported formats field missing for device with id {0}.",
-        cmd.id
+        device_id
     ))?;
 
     let gain_state = device_info
         .gain_state
         .clone()
-        .ok_or(anyhow::anyhow!("Gain state field missing for device with id {0}.", cmd.id))?;
+        .ok_or(anyhow::anyhow!("Gain state field missing for device with id {0}.", device_id))?;
 
-    let plug_state_info = device_info
-        .plug_state
-        .clone()
-        .ok_or(anyhow::anyhow!("Plug state info field missing for device with id {0}.", cmd.id))?;
+    let plug_state_info = device_info.plug_state.clone().ok_or(anyhow::anyhow!(
+        "Plug state info field missing for device with id {0}.",
+        device_id
+    ))?;
 
     let pcm_supported_formats: Vec<PcmSupportedFormats> =
         supported_formats.into_iter().filter_map(|format| format.pcm_supported_formats).collect();
@@ -194,7 +248,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         };
 
         let agc = match gain_state.agc_enabled {
-            Some(agc) => format!("{}", if agc { "on" } else { "off" }),
+            Some(agc) => format!("{}", if agc { "AGC on" } else { "AGC off" }),
             None => format!("AGC not available"),
         };
 
@@ -264,11 +318,18 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
             None => format!("Unavailable"),
         };
 
-        println!("Info for audio {} at {}", if is_input { "input" } else { "output" }, device_path);
+        if is_default_device {
+            println!("Note: Returning info for first listed device.")
+        }
+        println!(
+            "Info for audio {} at {}",
+            if device_selector.is_input.unwrap() { "input" } else { "output" },
+            format_utils::path_for_selector(&device_selector)?
+        );
         println!("\t Unique ID    : {}", &printable_unique_id);
         println!("\t Manufacturer : {}", manufacturer);
         println!("\t Product      : {}", product);
-        println!("\t Current Gain : {} ({}, AGC {})", current_gain_db, muted, agc);
+        println!("\t Current Gain : {} ({}, {})", current_gain_db, muted, agc);
         print!("\t Gain Caps    : ");
         print!("{} {}", gain_statement, gain_step);
         print!("; {} ; {} \n", can_mute, can_agc);
@@ -277,11 +338,10 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         println!("\t Plug Time    : {}", plug_time);
         println!("\t PD Caps      : {}", pd_caps);
 
+        print!("Number of format sets: {}", pcm_supported_formats.len());
         for format in &pcm_supported_formats {
-            print!(
-                "Number of channels    : {}",
-                format.clone().channel_sets.unwrap_or(Vec::new()).len()
-            );
+            println!("\nFormat set");
+            print!("\t Number of channels    :");
 
             let mut has_attributes = false;
             for channel_set in format.clone().channel_sets.unwrap_or(Vec::new()) {
@@ -303,7 +363,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
                 }
             }
             if has_attributes {
-                print!(" \nChannels attributes     :");
+                print!(" \n\t Channels attributes     :");
                 for channel_set in format.clone().channel_sets.unwrap_or(Vec::new()) {
                     for attribute in channel_set.clone().attributes.unwrap_or(Vec::new()) {
                         match attribute.min_frequency {
@@ -322,17 +382,20 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
                 }
             }
 
+            print!("\n\t Frame rate            :");
             for frame_rate in format.frame_rates.clone().unwrap_or(Vec::new()) {
-                print!("\nFrame rate      : {} Hz", frame_rate);
+                print!(" {frame_rate}Hz");
             }
 
+            print!("\n\t Bits per channel      :");
             for bytes_per_sample in format.bytes_per_sample.clone().unwrap_or(Vec::new()) {
-                print!("\nBits per channel: {} ", bytes_per_sample * 8);
+                print!(" {}", bytes_per_sample * 8);
             }
 
+            print!("\n\t Valid bits per channel:");
             for valid_bits_per_channel in format.valid_bits_per_sample.clone().unwrap_or(Vec::new())
             {
-                println!("\nValid bits per channel: {} ", valid_bits_per_channel);
+                println!(" {valid_bits_per_channel}");
             }
         }
         Ok(())
@@ -340,7 +403,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
     let print_json = || -> Result<(), anyhow::Error> {
         let device_info = DeviceInfoResult {
-            device_path: device_path.clone(),
+            device_path: format_utils::path_for_selector(&device_selector)?,
             manufacturer: stream_properties.manufacturer.clone(),
             product_name: stream_properties.product.clone(),
             current_gain_db: gain_state.gain_db,
@@ -408,12 +471,23 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
     let (play_remote, play_local) = fidl::Socket::create_datagram();
 
+    let device_id = match cmd.id {
+        Some(id) => Ok(id),
+        None => get_first_device(
+            &audio_proxy,
+            fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+            false,
+        )
+        .await
+        .and_then(|device| device.id.ok_or(anyhow::anyhow!("Failed to get default device"))),
+    }?;
     let request = AudioDaemonPlayRequest {
         socket: Some(play_remote),
         location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::RingBuffer(
             fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
                 is_input: Some(false),
-                id: Some(cmd.id),
+                id: Some(device_id),
+                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
                 ..Default::default()
             },
         )),
@@ -431,7 +505,17 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 }
 
 async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
-    let device_id = cmd.id;
+    let device_id = match cmd.id {
+        Some(id) => Ok(id),
+        None => get_first_device(
+            &audio_proxy,
+            fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+            true,
+        )
+        .await
+        .and_then(|device| device.id.ok_or(anyhow::anyhow!("Failed to get default device."))),
+    }?;
+
     let record_command = match cmd.subcommand {
         SubCommand::Record(record_command) => record_command,
         _ => ffx_bail!("Unreachable"),
@@ -445,6 +529,7 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
         location: Some(RecordLocation::RingBuffer(fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
             is_input: Some(true),
             id: Some(device_id),
+            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
             ..Default::default()
         })),
 
@@ -478,19 +563,15 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
 struct DeviceGainStateRequest {
     audio_proxy: AudioDaemonProxy,
     device_id: String,
-    device_direction: Option<DeviceDirection>,
+    device_direction: DeviceDirection,
     muted: Option<bool>,
     gain_db: Option<f32>,
     agc_enabled: Option<bool>,
 }
 
 async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
-    let Some(device_direction) = request.device_direction else {
-        return Err(anyhow::anyhow!("Device direction missing"));
-    };
-
     let dev_selector = DeviceSelector {
-        is_input: Some(DeviceDirection::Input == device_direction),
+        is_input: Some(DeviceDirection::Input == request.device_direction),
         id: Some(request.device_id),
         ..Default::default()
     };
