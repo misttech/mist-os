@@ -102,7 +102,7 @@ void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
     if (status != ZX_OK) {
       statuses.emplace_back(status);
       failed_vmos.emplace_back(std::move(v));
-      return;
+      continue;
     }
     // Pin VMO. Abusing usb_request_physmap
     usb_request_t req = {
@@ -117,7 +117,7 @@ void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
     if (status != ZX_OK) {
       statuses.emplace_back(status);
       failed_vmos.emplace_back(std::move(v));
-      return;
+      continue;
     }
 
     // Save

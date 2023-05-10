@@ -25,3 +25,14 @@ source_set("usb-endpoint") {
   ]
   public_configs = [ ":includes" ]
 }
+
+source_set("fake-usb-endpoint") {
+  testonly = true
+  public = [ "testing/fake-usb-endpoint.h" ]
+  sources = [ "testing/fake-usb-endpoint.h" ]
+  public_deps = [
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp" ]
+}
