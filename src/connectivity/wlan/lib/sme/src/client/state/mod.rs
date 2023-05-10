@@ -45,6 +45,10 @@ use {
 /// TODO(fxbug.dev/99620): Consider having a single overall connect timeout that is
 ///                        managed by SME and also includes the EstablishRsna step.
 const DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT: u32 = 60; // beacon intervals
+/// Maximum number of association attempts we will make without achieving a
+/// link up state. We abort and notify of a connection result if we exceed this
+/// count.
+const MAX_REASSOCIATIONS_WITHOUT_LINK_UP: u32 = 5;
 
 const IDLE_STATE: &str = "IdleState";
 const DISCONNECTING_STATE: &str = "Disconnecting
@@ -70,6 +74,7 @@ pub struct Connecting {
     cfg: ClientConfig,
     cmd: ConnectCommand,
     protection_ie: Option<ProtectionIe>,
+    reassociation_loop_count: u32,
 }
 
 #[derive(Debug)]
@@ -84,6 +89,7 @@ pub struct Associated {
     // TODO(fxbug.dev/82654): Remove `wmm_param` field when wlanstack telemetry is deprecated.
     wmm_param: Option<ie::WmmParam>,
     last_channel_switch_time: Option<zx::Time>,
+    reassociation_loop_count: u32,
 }
 
 #[derive(Debug)]
@@ -224,7 +230,7 @@ impl Idle {
             ssid: cmd.bss.ssid.clone(),
         });
 
-        Ok(Connecting { cfg: self.cfg, cmd, protection_ie })
+        Ok(Connecting { cfg: self.cfg, cmd, protection_ie, reassociation_loop_count: 0 })
     }
 
     fn on_disconnect_complete(
@@ -329,6 +335,7 @@ impl Connecting {
 
         if let LinkState::LinkUp(_) = link_state {
             report_connect_finished(&mut self.cmd.connect_txn_sink, ConnectResult::Success);
+            self.reassociation_loop_count = 0;
         }
 
         Ok(Associated {
@@ -341,6 +348,7 @@ impl Connecting {
             protection_ie: self.protection_ie,
             wmm_param,
             last_channel_switch_time: None,
+            reassociation_loop_count: self.reassociation_loop_count,
         })
     }
 
@@ -463,7 +471,7 @@ impl Associated {
         ind: fidl_mlme::DisassociateIndication,
         state_change_ctx: &mut Option<StateChangeContext>,
         context: &mut Context,
-    ) -> Connecting {
+    ) -> Result<Connecting, Disconnecting> {
         let (mut protection, connected_duration) = self.link_state.disconnect();
 
         let disconnect_reason = fidl_sme::DisconnectCause {
@@ -476,33 +484,57 @@ impl Associated {
             fidl_sme::DisconnectSource::Ap(disconnect_reason)
         };
 
-        if let Some(_duration) = connected_duration {
+        if self.reassociation_loop_count >= MAX_REASSOCIATIONS_WITHOUT_LINK_UP {
+            // We have exceeded our retry count. Disconnect.
             let fidl_disconnect_info =
-                fidl_sme::DisconnectInfo { is_sme_reconnecting: true, disconnect_source };
+                fidl_sme::DisconnectInfo { is_sme_reconnecting: false, disconnect_source };
             self.connect_txn_sink
                 .send(ConnectTransactionEvent::OnDisconnect { info: fidl_disconnect_info });
-        }
-        let msg = format!("received DisassociateInd msg; reason code {:?}", ind.reason_code);
-        let _ = state_change_ctx.replace(match connected_duration {
-            Some(_) => StateChangeContext::Disconnect { msg, disconnect_source },
-            None => StateChangeContext::Msg(msg),
-        });
+            let msg = format!(
+                "received DisassociateInd msg; reason code {:?}. Too many retries, disconnecting.",
+                ind.reason_code
+            );
+            let _ =
+                state_change_ctx.replace(StateChangeContext::Disconnect { msg, disconnect_source });
+            send_deauthenticate_request(&self.latest_ap_state, &context.mlme_sink);
+            let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+            Err(Disconnecting { cfg: self.cfg, action: PostDisconnectAction::None, timeout_id })
+        } else {
+            if connected_duration.is_some() {
+                // Only notify clients of SME if the link was fully established.
+                let fidl_disconnect_info =
+                    fidl_sme::DisconnectInfo { is_sme_reconnecting: true, disconnect_source };
+                self.connect_txn_sink
+                    .send(ConnectTransactionEvent::OnDisconnect { info: fidl_disconnect_info });
+            }
 
-        // Client is disassociating. The ESS-SA must be kept alive but reset.
-        if let Protection::Rsna(rsna) = &mut protection {
-            // Reset the state of the ESS-SA and its replay counter to zero per IEEE 802.11-2016 12.7.2.
-            rsna.supplicant.reset();
-        }
+            let msg = format!("received DisassociateInd msg; reason code {:?}", ind.reason_code);
+            let _ = state_change_ctx.replace(match connected_duration {
+                Some(_) => StateChangeContext::Disconnect { msg, disconnect_source },
+                None => StateChangeContext::Msg(msg),
+            });
 
-        context.att_id += 1;
-        let cmd = ConnectCommand {
-            bss: self.latest_ap_state,
-            connect_txn_sink: self.connect_txn_sink,
-            protection,
-        };
-        let req = fidl_mlme::ReconnectRequest { peer_sta_address: cmd.bss.bssid.0 };
-        context.mlme_sink.send(MlmeRequest::Reconnect(req));
-        Connecting { cfg: self.cfg, cmd, protection_ie: self.protection_ie }
+            // Client is disassociating. The ESS-SA must be kept alive but reset.
+            if let Protection::Rsna(rsna) = &mut protection {
+                // Reset the state of the ESS-SA and its replay counter to zero per IEEE 802.11-2016 12.7.2.
+                rsna.supplicant.reset();
+            }
+
+            context.att_id += 1;
+            let cmd = ConnectCommand {
+                bss: self.latest_ap_state,
+                connect_txn_sink: self.connect_txn_sink,
+                protection,
+            };
+            let req = fidl_mlme::ReconnectRequest { peer_sta_address: cmd.bss.bssid.0 };
+            context.mlme_sink.send(MlmeRequest::Reconnect(req));
+            Ok(Connecting {
+                cfg: self.cfg,
+                cmd,
+                protection_ie: self.protection_ie,
+                reassociation_loop_count: self.reassociation_loop_count + 1,
+            })
+        }
     }
 
     fn on_deauthenticate_ind(
@@ -596,6 +628,7 @@ impl Associated {
         if let LinkState::LinkUp(_) = link_state {
             if was_establishing_rsna {
                 report_connect_finished(&mut self.connect_txn_sink, ConnectResult::Success);
+                self.reassociation_loop_count = 0;
             }
         }
 
@@ -824,9 +857,10 @@ impl ClientState {
             Self::Associated(mut state) => match event {
                 MlmeEvent::DisassociateInd { ind } => {
                     let (transition, associated) = state.release_data();
-                    let connecting =
-                        associated.on_disassociate_ind(ind, &mut state_change_ctx, context);
-                    transition.to(connecting).into()
+                    match associated.on_disassociate_ind(ind, &mut state_change_ctx, context) {
+                        Ok(connecting) => transition.to(connecting).into(),
+                        Err(disconnecting) => transition.to(disconnecting).into(),
+                    }
                 }
                 MlmeEvent::DeauthenticateInd { ind } => {
                     let (transition, associated) = state.release_data();
@@ -1843,6 +1877,7 @@ mod tests {
             cfg: ClientConfig::default(),
             cmd: command,
             protection_ie: None,
+            reassociation_loop_count: 0,
         }));
         let assoc_conf = create_connect_conf(bssid, fidl_ieee80211::StatusCode::Success);
         let rsna_response_deadline = event::RSNA_RESPONSE_TIMEOUT_MILLIS.millis().after_now();
@@ -1885,6 +1920,7 @@ mod tests {
             cfg: ClientConfig::default(),
             cmd: command,
             protection_ie: None,
+            reassociation_loop_count: 0,
         }));
         let assoc_conf = create_connect_conf(bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
@@ -1948,6 +1984,7 @@ mod tests {
             cfg: ClientConfig::default(),
             cmd: command,
             protection_ie: None,
+            reassociation_loop_count: 0,
         }));
         let assoc_conf = create_connect_conf(bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
@@ -2030,6 +2067,7 @@ mod tests {
             cfg: ClientConfig::default(),
             cmd: command,
             protection_ie: None,
+            reassociation_loop_count: 0,
         }));
         let assoc_conf = create_connect_conf(bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
@@ -2395,8 +2433,42 @@ mod tests {
         };
 
         let state = state.on_mlme_event(disassociate_ind, &mut h.context);
+        assert_variant!(&state, ClientState::Connecting(connecting) =>
+                        assert_eq!(connecting.reassociation_loop_count, 1));
         assert_connecting(state, &bss);
         assert_eq!(h.context.att_id, 1);
+    }
+
+    #[test]
+    fn abort_connect_after_max_associate_retries() {
+        let mut h = TestHelper::new();
+        let (supplicant, _suppl_mock) = mock_psk_supplicant();
+        let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
+        let mut state = establishing_rsna_state(command);
+
+        match &mut state {
+            ClientState::Associated(associated) => {
+                associated.reassociation_loop_count = MAX_REASSOCIATIONS_WITHOUT_LINK_UP;
+            }
+            _ => unreachable!(),
+        }
+
+        let disassociate_ind = MlmeEvent::DisassociateInd {
+            ind: fidl_mlme::DisassociateIndication {
+                peer_sta_address: [0, 0, 0, 0, 0, 0],
+                reason_code: fidl_ieee80211::ReasonCode::UnacceptablePowerCapability,
+                locally_initiated: true,
+            },
+        };
+        let state = state.on_mlme_event(disassociate_ind, &mut h.context);
+
+        // We should notify of a disconnect and stop any retries.
+        assert_disconnecting(state);
+        let info = assert_variant!(
+            connect_txn_stream.try_next(),
+            Ok(Some(ConnectTransactionEvent::OnDisconnect { info })) => info
+        );
+        assert!(!info.is_sme_reconnecting);
     }
 
     #[test]
@@ -3219,14 +3291,23 @@ mod tests {
     }
 
     fn connecting_state(cmd: ConnectCommand) -> ClientState {
-        testing::new_state(Connecting { cfg: ClientConfig::default(), cmd, protection_ie: None })
-            .into()
+        testing::new_state(Connecting {
+            cfg: ClientConfig::default(),
+            cmd,
+            protection_ie: None,
+            reassociation_loop_count: 0,
+        })
+        .into()
     }
 
     fn assert_connecting(state: ClientState, bss: &BssDescription) {
         assert_variant!(&state, ClientState::Connecting(connecting) => {
             assert_eq!(connecting.cmd.bss.as_ref(), bss);
         });
+    }
+
+    fn assert_disconnecting(state: ClientState) {
+        assert_variant!(&state, ClientState::Disconnecting(_));
     }
 
     fn establishing_rsna_state(cmd: ConnectCommand) -> ClientState {
@@ -3251,6 +3332,7 @@ mod tests {
             protection_ie: None,
             wmm_param: None,
             last_channel_switch_time: None,
+            reassociation_loop_count: 0,
         })
         .into()
     }
@@ -3273,6 +3355,7 @@ mod tests {
             protection_ie: None,
             wmm_param,
             last_channel_switch_time: None,
+            reassociation_loop_count: 0,
         })
         .into()
     }
