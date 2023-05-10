@@ -530,6 +530,9 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
   if (do_dump) {
     std::vector<std::string> dump;
     DumpToString(&dump, mmu_exception /* fault_present */);
+#if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
+    MAGMA_LOG(WARNING, "Power state %u", power_state_);
+#endif
     for (auto& str : dump) {
       MAGMA_LOG(WARNING, "%s", str.c_str());
     }

@@ -154,7 +154,9 @@ class MsdVsiDevice : public msd_device_t,
     template <typename T>
     void Write(T val, uint32_t offset) {
       static_assert(sizeof(T) == sizeof(uint32_t));
-      if (offset >= kOffsetToRestrictedRegisters &&
+      const uint32_t irq_ack_offset = registers::IrqAck::Get().addr();
+
+      if ((offset >= kOffsetToRestrictedRegisters || offset == irq_ack_offset) &&
           device_.power_state_ == PowerState::kSuspended) {
         MAGMA_LOG(WARNING, "Writing register 0x%02X when suspended", offset);
         DASSERT(false);
@@ -166,7 +168,9 @@ class MsdVsiDevice : public msd_device_t,
     template <typename T>
     uint32_t Read(uint32_t offset) {
       static_assert(sizeof(T) == sizeof(uint32_t));
-      if (offset >= kOffsetToRestrictedRegisters &&
+      const uint32_t irq_ack_offset = registers::IrqAck::Get().addr();
+
+      if ((offset >= kOffsetToRestrictedRegisters || offset == irq_ack_offset) &&
           device_.power_state_ == PowerState::kSuspended) {
         MAGMA_LOG(WARNING, "Reading register 0x%02X when suspended", offset);
         DASSERT(false);
