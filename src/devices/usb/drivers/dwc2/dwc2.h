@@ -5,9 +5,12 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -16,6 +19,7 @@
 #include <threads.h>
 
 #include <atomic>
+#include <queue>
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
@@ -24,15 +28,19 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/dwc2/usb_dwc_regs.h"
+#include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint.h"
 
 namespace dwc2 {
 
 class Dwc2;
 using Dwc2Type = ddk::Device<Dwc2, ddk::Initializable, ddk::Unbindable, ddk::Suspendable>;
 
-class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protocol> {
+class Dwc2 : public Dwc2Type,
+             public ddk::UsbDciProtocol<Dwc2, ddk::base_protocol>,
+             public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
-  explicit Dwc2(zx_device_t* parent) : Dwc2Type(parent) {}
+  explicit Dwc2(zx_device_t* parent, async_dispatcher_t* dispatcher)
+      : Dwc2Type(parent), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
   zx_status_t Init();
@@ -55,8 +63,14 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   size_t UsbDciGetRequestSize();
   zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
+  // fuchsia_hardware_usb_dci::UsbDci protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override;
+
   // Allows tests to configure a fake interrupt.
   void SetInterrupt(zx::interrupt irq) { irq_ = std::move(irq); }
+
+  const zx::bti& bti() const { return bti_; }
 
  private:
   enum class Ep0State {
@@ -81,14 +95,33 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   }
   // clang-format on
 
-  using Request = usb::BorrowedRequest<void>;
-  using RequestQueue = usb::BorrowedRequestQueue<void>;
+  class Endpoint : public usb_endpoint::UsbEndpoint {
+   public:
+    Endpoint(uint8_t ep_num, Dwc2* dwc2)
+        : usb_endpoint::UsbEndpoint(dwc2->bti_, ep_num), dwc2_(dwc2) {
+      loop_.StartThread("dwc2-enpdoint-loop");
+    }
 
-  struct Endpoint {
+    // fuchsia_hardware_usb_endpoint::Endpoint protocol implementation.
+    void GetInfo(GetInfoCompleter::Sync& completer) override {
+      completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+    }
+    void QueueRequests(QueueRequestsRequest& request,
+                       QueueRequestsCompleter::Sync& completer) override;
+    void CancelAll(CancelAllCompleter::Sync& completer) override {
+      CancelAll();
+      completer.Reply(fit::ok());
+    }
+
+    void QueueRequest(usb_endpoint::RequestVariant request);
+    void CancelAll();
+
+    async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+
     // Requests waiting to be processed.
-    RequestQueue queued_reqs __TA_GUARDED(lock);
+    std::queue<usb_endpoint::RequestVariant> queued_reqs __TA_GUARDED(lock);
     // Request currently being processed.
-    usb_request_t* current_req __TA_GUARDED(lock) = nullptr;
+    std::optional<usb_endpoint::RequestVariant> current_req __TA_GUARDED(lock);
 
     // Values for current USB request
     uint32_t req_offset = 0;
@@ -101,10 +134,12 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
     fbl::Mutex lock;
 
     uint16_t max_packet_size = 0;
-    uint8_t ep_num = 0;
     bool enabled = false;
-    // Endpoint type: control, bulk, interrupt or isochronous
-    uint8_t type = 0;
+
+   private:
+    async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+
+    Dwc2* dwc2_;
   };
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Dwc2);
@@ -140,7 +175,7 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
 
   inline fdf::MmioBuffer* get_mmio() { return &*mmio_; }
 
-  Endpoint endpoints_[DWC_MAX_EPS];
+  std::optional<Endpoint> endpoints_[DWC_MAX_EPS];
 
   // Used for synchronizing global state
   // and non ep specific hardware registers.
@@ -180,6 +215,10 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   // Timestamp when we started waiting for the interrupt
   zx::time wait_start_time_;
   bool shutting_down_ __TA_GUARDED(lock_) = false;
+
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> bindings_;
 };
 
 }  // namespace dwc2

@@ -26,6 +26,8 @@
 
 namespace dwc2 {
 
+using Request = usb::BorrowedRequest<void>;
+
 // Handler for usbreset interrupt.
 void Dwc2::HandleReset() {
   auto* mmio = get_mmio();
@@ -98,10 +100,10 @@ void Dwc2::HandleEnumDone() {
 
   ep0_state_ = Ep0State::IDLE;
 
-  endpoints_[DWC_EP0_IN].max_packet_size = 64;
-  endpoints_[DWC_EP0_OUT].max_packet_size = 64;
-  endpoints_[DWC_EP0_IN].phys = static_cast<uint32_t>(ep0_buffer_.phys());
-  endpoints_[DWC_EP0_OUT].phys = static_cast<uint32_t>(ep0_buffer_.phys());
+  endpoints_[DWC_EP0_IN]->max_packet_size = 64;
+  endpoints_[DWC_EP0_OUT]->max_packet_size = 64;
+  endpoints_[DWC_EP0_IN]->phys = static_cast<uint32_t>(ep0_buffer_.phys());
+  endpoints_[DWC_EP0_OUT]->phys = static_cast<uint32_t>(ep0_buffer_.phys());
 
   DEPCTL0::Get(DWC_EP0_IN).ReadFrom(mmio).set_mps(DEPCTL0::MPS_64).WriteTo(mmio);
   DEPCTL0::Get(DWC_EP0_OUT).ReadFrom(mmio).set_mps(DEPCTL0::MPS_64).WriteTo(mmio);
@@ -413,7 +415,7 @@ zx_status_t Dwc2::HandleSetupRequest(size_t* out_actual) {
     status = ZX_ERR_NOT_SUPPORTED;
   }
   if (status == ZX_OK) {
-    auto* ep = &endpoints_[DWC_EP0_OUT];
+    auto& ep = endpoints_[DWC_EP0_OUT];
     ep->req_offset = 0;
     if (is_in) {
       ep->req_length = static_cast<uint32_t>(*out_actual);
@@ -432,13 +434,13 @@ void Dwc2::SetAddress(uint8_t address) {
 // Reads number of bytes transfered on specified endpoint
 uint32_t Dwc2::ReadTransfered(Endpoint* ep) {
   auto* mmio = get_mmio();
-  return ep->req_xfersize - DEPTSIZ::Get(ep->ep_num).ReadFrom(mmio).xfersize();
+  return ep->req_xfersize - DEPTSIZ::Get(ep->ep_addr()).ReadFrom(mmio).xfersize();
 }
 
 // Prepares to receive next control request on endpoint zero.
 void Dwc2::StartEp0() {
   auto* mmio = get_mmio();
-  auto* ep = &endpoints_[DWC_EP0_OUT];
+  auto& ep = endpoints_[DWC_EP0_OUT];
   ep->req_offset = 0;
   ep->req_xfersize = 3 * sizeof(usb_setup_t);
 
@@ -463,45 +465,49 @@ void Dwc2::StartEp0() {
 
 // Queues the next USB request for the specified endpoint
 void Dwc2::QueueNextRequest(Endpoint* ep) {
-  std::optional<Request> req;
-  if (ep->current_req == nullptr) {
-    req = ep->queued_reqs.pop();
+  if (ep->current_req || ep->queued_reqs.empty()) {
+    return;
   }
 
-  if (req.has_value()) {
-    auto* usb_req = req->take();
-    ep->current_req = usb_req;
+  ep->current_req.emplace(std::move(ep->queued_reqs.front()));
+  ep->queued_reqs.pop();
 
-    phys_iter_t iter;
-    zx_paddr_t phys;
-    usb_request_physmap(usb_req, bti_.get());
-    usb_request_phys_iter_init(&iter, usb_req, zx_system_get_page_size());
-    usb_request_phys_iter_next(&iter, &phys);
-    ep->phys = static_cast<uint32_t>(phys);
+  auto status =
+      std::visit([this](auto&& req) -> zx_status_t { return req.PhysMap(bti_); }, *ep->current_req);
+  ZX_ASSERT_MSG(status == ZX_OK, "PhysMap failed");
+  auto iters = ep->get_iter(*ep->current_req, zx_system_get_page_size());
+  ZX_DEBUG_ASSERT(iters.is_ok());
+  // Dwc2 currently does not support scatter gather as it is using Buffer DMA mode (Chapter 9 of
+  // dwc2 specs). To use scatter gather, we need to use Scatter/Gather DMA mode (Chapter 10).
+  ZX_ASSERT_MSG(iters->size() == 1, "Currently do not support scatter gather");
+  auto iter = iters->at(0).begin();
 
-    ep->req_offset = 0;
-    ep->req_length = static_cast<uint32_t>(usb_req->header.length);
-    StartTransfer(ep, ep->req_length);
-  }
+  ep->phys = static_cast<uint32_t>((*iter).first);
+  ep->req_offset = 0;
+  ep->req_length = static_cast<uint32_t>((*iter).second);
+  StartTransfer(ep, ep->req_length);
 }
 
 void Dwc2::StartTransfer(Endpoint* ep, uint32_t length) {
-  auto ep_num = ep->ep_num;
+  auto ep_num = ep->ep_addr();
   auto* mmio = get_mmio();
   bool is_in = DWC_EP_IS_IN(ep_num);
 
-  if (length > 0) {
+  // FidlRequests should be flushed already by higher level drivers!
+  if (length > 0 && (!ep->current_req || std::holds_alternative<Request>(*ep->current_req))) {
     if (is_in) {
       if (ep_num == DWC_EP0_IN) {
         ep0_buffer_.CacheFlush(ep->req_offset, length);
       } else {
-        usb_request_cache_flush(ep->current_req, ep->req_offset, length);
+        usb_request_cache_flush(std::get<Request>(ep->current_req.value()).request(),
+                                ep->req_offset, length);
       }
     } else {
       if (ep_num == DWC_EP0_OUT) {
         ep0_buffer_.CacheFlushInvalidate(ep->req_offset, length);
       } else {
-        usb_request_cache_flush_invalidate(ep->current_req, ep->req_offset, length);
+        usb_request_cache_flush_invalidate(std::get<Request>(ep->current_req.value()).request(),
+                                           ep->req_offset, length);
       }
     }
   }
@@ -585,12 +591,12 @@ void Dwc2::FlushRxFifoRetryIndefinite() {
 
 void Dwc2::StartEndpoints() {
   for (uint8_t ep_num = 1; ep_num < std::size(endpoints_); ep_num++) {
-    auto* ep = &endpoints_[ep_num];
+    auto& ep = endpoints_[ep_num];
     if (ep->enabled) {
       EnableEp(ep_num, true);
 
       fbl::AutoLock lock(&ep->lock);
-      QueueNextRequest(ep);
+      QueueNextRequest(&*ep);
     }
   }
 }
@@ -629,17 +635,17 @@ void Dwc2::HandleEp0Setup() {
 
   if (length > 0) {
     ep0_state_ = Ep0State::DATA;
-    auto* ep = &endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
+    auto& ep = endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
     ep->req_offset = 0;
 
     if (is_in) {
       ep->req_length = static_cast<uint32_t>(actual);
       fbl::AutoLock al(&ep->lock);
-      StartTransfer(ep, (ep->req_length > 127 ? ep->max_packet_size : ep->req_length));
+      StartTransfer(&*ep, (ep->req_length > 127 ? ep->max_packet_size : ep->req_length));
     } else {
       ep->req_length = length;
       fbl::AutoLock al(&ep->lock);
-      StartTransfer(ep, (length > 127 ? ep->max_packet_size : length));
+      StartTransfer(&*ep, (length > 127 ? ep->max_packet_size : length));
     }
   } else {
     // no data phase
@@ -652,9 +658,9 @@ void Dwc2::HandleEp0Setup() {
 void Dwc2::HandleEp0Status(bool is_in) {
   ep0_state_ = Ep0State::STATUS;
   uint8_t ep_num = (is_in ? DWC_EP0_IN : DWC_EP0_OUT);
-  auto* ep = &endpoints_[ep_num];
+  auto& ep = endpoints_[ep_num];
   fbl::AutoLock al(&ep->lock);
-  StartTransfer(ep, 0);
+  StartTransfer(&*ep, 0);
 
   if (is_in) {
     StartEp0();
@@ -669,8 +675,8 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
       break;
     }
     case Ep0State::DATA: {
-      auto* ep = &endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
-      auto transfered = ReadTransfered(ep);
+      auto& ep = endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
+      auto transfered = ReadTransfered(&*ep);
       ep->req_offset += transfered;
 
       if (is_in) {  // data direction is IN-type (to the host).
@@ -688,7 +694,7 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
           last_transmission_len_ = length;
 
           fbl::AutoLock al(&ep->lock);
-          StartTransfer(ep, length);
+          StartTransfer(&*ep, length);
         }
       } else {  // data direction is OUT-type (from the host).
         if (ep->req_offset == ep->req_length) {
@@ -707,7 +713,7 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
             length = 64;
           }
           fbl::AutoLock al(&ep->lock);
-          StartTransfer(ep, length);
+          StartTransfer(&*ep, length);
         }
       }
       break;
@@ -721,8 +727,8 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
     case Ep0State::TIMEOUT_RECOVERY: {
       if (is_in) {
         // Timeout was due to lost data.
-        auto* ep = &endpoints_[DWC_EP0_IN];
-        ep->req_offset += ReadTransfered(ep);
+        auto& ep = endpoints_[DWC_EP0_IN];
+        ep->req_offset += ReadTransfered(&*ep);
         ZX_ASSERT(ep->req_offset == ep->req_length);
         HandleEp0Status(false);
       } else {
@@ -746,46 +752,44 @@ void Dwc2::HandleEp0TimeoutRecovery() {
 
   // If the ACK was lost in transit, prepare DWC_EP0_OUT to receive ACK.
   {
-    auto* ep_out = &endpoints_[DWC_EP0_OUT];
+    auto& ep_out = endpoints_[DWC_EP0_OUT];
     fbl::AutoLock al(&ep_out->lock);
-    StartTransfer(ep_out, 0);
+    StartTransfer(&*ep_out, 0);
   }
 
   // Otherwise, if the data never made it to the host, prepare DWC_EP0_IN to retransmit.
   {
-    auto* ep_in = &endpoints_[DWC_EP0_IN];
+    auto& ep_in = endpoints_[DWC_EP0_IN];
     ep_in->req_offset -= last_transmission_len_;
     fbl::AutoLock al(&ep_in->lock);
-    StartTransfer(ep_in, last_transmission_len_);
+    StartTransfer(&*ep_in, last_transmission_len_);
   }
 }
 
 // Handles transfer complete events for endpoints other than endpoint zero
 void Dwc2::HandleTransferComplete(uint8_t ep_num) {
   ZX_DEBUG_ASSERT(ep_num != DWC_EP0_IN && ep_num != DWC_EP0_OUT);
-  auto* ep = &endpoints_[ep_num];
+  auto& ep = endpoints_[ep_num];
 
   ep->lock.Acquire();
 
-  ep->req_offset += ReadTransfered(ep);
+  ep->req_offset += ReadTransfered(&*ep);
   // Make a copy since this is used outside the critical section.
   auto actual = ep->req_offset;
 
-  usb_request_t* req = ep->current_req;
-  if (req) {
-    Request request(req, sizeof(usb_request_t));
-    // It is necessary to set current_req = nullptr
-    // in order to make this re-entrant safe and thread-safe.
-    // When we call request.Complete the callee may immediately re-queue this request.
+  if (ep->current_req) {
+    auto req = std::move(ep->current_req.value());
+    ep->current_req.reset();
+    // It is necessary to set current_req = nullptr in order to make this re-entrant safe and
+    // thread-safe. When we call request.Complete the callee may immediately re-queue this request.
     // if it is already in current_req it could be completed twice (since QueueNextRequest
     // would attempt to re-queue it, or CancelAll could take the lock on a separate thread and
     // forcefully complete it after we've already completed it).
-    ep->current_req = nullptr;
     ep->lock.Release();
-    request.Complete(ZX_OK, actual);
+    ep->RequestComplete(ZX_OK, actual, std::move(req));
     ep->lock.Acquire();
 
-    QueueNextRequest(ep);
+    QueueNextRequest(&*ep);
   }
   ep->lock.Release();
 }
@@ -934,26 +938,31 @@ void Dwc2::SetConnected(bool connected) {
 
   if (!connected) {
     // Complete any pending requests
-    RequestQueue complete_reqs;
+    for (size_t i = 0; i < std::size(endpoints_); i++) {
+      auto& ep = endpoints_[i];
 
-    for (uint8_t i = 0; i < std::size(endpoints_); i++) {
-      auto* ep = &endpoints_[i];
+      std::queue<usb_endpoint::RequestVariant> complete_reqs;
+      {
+        fbl::AutoLock lock(&ep->lock);
+        complete_reqs.swap(ep->queued_reqs);
 
-      fbl::AutoLock lock(&ep->lock);
-      if (ep->current_req) {
-        complete_reqs.push(Request(ep->current_req, sizeof(usb_request_t)));
-        ep->current_req = nullptr;
+        if (ep->current_req) {
+          complete_reqs.emplace(std::move(*ep->current_req));
+          ep->current_req.reset();
+        }
+
+        ep->enabled = false;
       }
-      for (auto req = ep->queued_reqs.pop(); req; req = ep->queued_reqs.pop()) {
-        complete_reqs.push(std::move(*req));
+
+      // Requests must be completed outside of the lock.
+      while (true) {
+        if (complete_reqs.empty()) {
+          break;
+        }
+
+        ep->RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(complete_reqs.front()));
+        complete_reqs.pop();
       }
-
-      ep->enabled = false;
-    }
-
-    // Requests must be completed outside of the lock.
-    for (auto req = complete_reqs.pop(); req; req = complete_reqs.pop()) {
-      req->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     }
   }
 
@@ -961,7 +970,7 @@ void Dwc2::SetConnected(bool connected) {
 }
 
 zx_status_t Dwc2::Create(void* ctx, zx_device_t* parent) {
-  auto dev = std::make_unique<Dwc2>(parent);
+  auto dev = std::make_unique<Dwc2>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
   auto status = dev->Init();
   if (status != ZX_OK) {
     return status;
@@ -986,8 +995,7 @@ zx_status_t Dwc2::Init() {
   }
 
   for (uint8_t i = 0; i < std::size(endpoints_); i++) {
-    auto* ep = &endpoints_[i];
-    ep->ep_num = i;
+    endpoints_[i].emplace(i, this);
   }
 
   size_t actual = 0;
@@ -1034,10 +1042,33 @@ zx_status_t Dwc2::Init() {
     return status;
   }
 
+  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_dci::UsbDciService>(
+      fuchsia_hardware_usb_dci::UsbDciService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service %s", result.status_string());
+    return result.status_value();
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb_dci::UsbDciService::Name,
+  };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
                       .forward_metadata(parent(), DEVICE_METADATA_USB_CONFIG)
                       .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
-                      .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER));
+                      .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Dwc2::Init DdkAdd failed: %d", status);
     return status;
@@ -1178,13 +1209,6 @@ void Dwc2::DdkSuspend(ddk::SuspendTxn txn) {
 }
 
 void Dwc2::UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_callback_t* cb) {
-  {
-    fbl::AutoLock lock(&lock_);
-    if (shutting_down_) {
-      lock.release();
-      usb_request_complete(req, ZX_ERR_IO_NOT_PRESENT, 0, cb);
-    }
-  }
   uint8_t ep_num = DWC_ADDR_TO_INDEX(req->header.ep_address);
   if (ep_num == DWC_EP0_IN || ep_num == DWC_EP0_OUT || ep_num >= std::size(endpoints_)) {
     zxlogf(ERROR, "Dwc2::UsbDciRequestQueue: bad ep address 0x%02X", req->header.ep_address);
@@ -1193,38 +1217,7 @@ void Dwc2::UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_cal
   }
   zxlogf(SERIAL, "UsbDciRequestQueue ep %u length %zu", ep_num, req->header.length);
 
-  auto* ep = &endpoints_[ep_num];
-
-  if (!ep->enabled) {
-    usb_request_complete(req, ZX_ERR_BAD_STATE, 0, cb);
-    return;
-  }
-
-  // OUT transactions must have length > 0 and multiple of max packet size
-  if (DWC_EP_IS_OUT(ep_num)) {
-    if (req->header.length == 0 || req->header.length % ep->max_packet_size != 0) {
-      zxlogf(ERROR, "dwc_ep_queue: OUT transfers must be multiple of max packet size");
-      usb_request_complete(req, ZX_ERR_INVALID_ARGS, 0, cb);
-      return;
-    }
-  }
-
-  fbl::AutoLock lock(&ep->lock);
-
-  if (!ep->enabled) {
-    zxlogf(ERROR, "dwc_ep_queue ep not enabled!");
-    usb_request_complete(req, ZX_ERR_BAD_STATE, 0, cb);
-    return;
-  }
-
-  if (!configured_) {
-    zxlogf(ERROR, "dwc_ep_queue not configured!");
-    usb_request_complete(req, ZX_ERR_BAD_STATE, 0, cb);
-    return;
-  }
-
-  ep->queued_reqs.push(Request(req, *cb, sizeof(usb_request_t)));
-  QueueNextRequest(ep);
+  endpoints_[ep_num]->QueueRequest(Request(req, *cb, sizeof(usb_request_t)));
 }
 
 zx_status_t Dwc2::UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
@@ -1257,10 +1250,9 @@ zx_status_t Dwc2::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  auto* ep = &endpoints_[ep_num];
+  auto& ep = endpoints_[ep_num];
   fbl::AutoLock lock(&ep->lock);
 
-  ep->type = ep_type;
   ep->max_packet_size = max_packet_size;
   ep->enabled = true;
 
@@ -1276,7 +1268,7 @@ zx_status_t Dwc2::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
   EnableEp(ep_num, true);
 
   if (configured_) {
-    QueueNextRequest(ep);
+    QueueNextRequest(&*ep);
   }
 
   return ZX_OK;
@@ -1291,7 +1283,7 @@ zx_status_t Dwc2::UsbDciDisableEp(uint8_t ep_address) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto* ep = &endpoints_[ep_num];
+  auto& ep = endpoints_[ep_num];
 
   fbl::AutoLock lock(&ep->lock);
 
@@ -1315,22 +1307,90 @@ size_t Dwc2::UsbDciGetRequestSize() { return Request::RequestSize(sizeof(usb_req
 
 zx_status_t Dwc2::UsbDciCancelAll(uint8_t epid) {
   uint8_t ep_num = DWC_ADDR_TO_INDEX(epid);
-  auto* ep = &endpoints_[ep_num];
-
-  fbl::AutoLock lock(&ep->lock);
-  if (DWC_EP_IS_OUT(ep_num)) {
-    FlushRxFifoRetryIndefinite();
-  } else {
-    FlushTxFifoRetryIndefinite(ep_num);
-  }
-  RequestQueue queue = std::move(ep->queued_reqs);
-  if (ep->current_req) {
-    queue.push(Request(ep->current_req, sizeof(usb_request_t)));
-    ep->current_req = nullptr;
-  }
-  lock.release();
-  queue.CompleteAll(ZX_ERR_IO_NOT_PRESENT, 0);
+  endpoints_[ep_num]->CancelAll();
   return ZX_OK;
+}
+
+void Dwc2::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                             ConnectToEndpointCompleter::Sync& completer) {
+  uint8_t ep_num = DWC_ADDR_TO_INDEX(request.ep_addr());
+  if (ep_num == DWC_EP0_IN || ep_num == DWC_EP0_OUT || ep_num >= std::size(endpoints_)) {
+    zxlogf(ERROR, "Dwc2::UsbDciRequestQueue: bad ep address 0x%02X", request.ep_addr());
+    completer.Reply(fit::as_error(ZX_ERR_IO_NOT_PRESENT));
+    return;
+  }
+
+  endpoints_[ep_num]->Connect(endpoints_[ep_num]->dispatcher(), std::move(request.ep()));
+  completer.Reply(fit::ok());
+}
+
+void Dwc2::Endpoint::QueueRequests(QueueRequestsRequest& request,
+                                   QueueRequestsCompleter::Sync& completer) {
+  for (auto& req : request.req()) {
+    QueueRequest(usb::FidlRequest{std::move(req)});
+  }
+}
+
+void Dwc2::Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
+  {
+    fbl::AutoLock l(&dwc2_->lock_);
+    if (dwc2_->shutting_down_) {
+      l.release();
+      RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
+      return;
+    }
+  }
+
+  // OUT transactions must have length > 0 and multiple of max packet size
+  if (DWC_EP_IS_OUT(ep_addr())) {
+    auto length = std::holds_alternative<Request>(request)
+                      ? std::get<Request>(request).request()->header.length
+                      : std::get<usb::FidlRequest>(request).length();
+    if (length == 0 || length % max_packet_size != 0) {
+      zxlogf(ERROR, "dwc_ep_queue: OUT transfers must be multiple of max packet size");
+      RequestComplete(ZX_ERR_INVALID_ARGS, 0, std::move(request));
+      return;
+    }
+  }
+
+  fbl::AutoLock _(&lock);
+
+  if (!enabled) {
+    zxlogf(ERROR, "dwc_ep_queue ep not enabled!");
+    RequestComplete(ZX_ERR_BAD_STATE, 0, std::move(request));
+    return;
+  }
+
+  if (!dwc2_->configured_) {
+    zxlogf(ERROR, "dwc_ep_queue not configured!");
+    RequestComplete(ZX_ERR_BAD_STATE, 0, std::move(request));
+    return;
+  }
+
+  queued_reqs.push(std::move(request));
+  dwc2_->QueueNextRequest(this);
+}
+
+void Dwc2::Endpoint::CancelAll() {
+  std::queue<usb_endpoint::RequestVariant> queue;
+  {
+    fbl::AutoLock _(&lock);
+    if (DWC_EP_IS_OUT(ep_addr())) {
+      dwc2_->FlushRxFifoRetryIndefinite();
+    } else {
+      dwc2_->FlushTxFifoRetryIndefinite(ep_addr());
+    }
+    queue = std::move(queued_reqs);
+    if (current_req) {
+      queue.push(std::move(current_req.value()));
+    }
+  }
+
+  while (!queue.empty()) {
+    auto req = std::move(queue.front());
+    queue.pop();
+    RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(req));
+  }
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

@@ -15,8 +15,22 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
+        { service: "fuchsia.hardware.usb.dci.UsbDciService" },
+    ],
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.usb.dci.UsbDciService",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.hardware.usb.endpoint.Endpoint",
+            from: "self",
+        },
     ],
 }
