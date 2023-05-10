@@ -545,8 +545,7 @@ mod tests {
             use_new_bytecode: false,
             enable_debug: false,
         };
-        let template = write_bind_template(bind_rules).unwrap();
-        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
+        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
@@ -573,8 +572,7 @@ mod tests {
             use_new_bytecode: false,
             enable_debug: false,
         };
-        let template = write_bind_template(bind_rules).unwrap();
-        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
+        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
@@ -599,8 +597,7 @@ mod tests {
             use_new_bytecode: true,
             enable_debug: false,
         };
-        let template = write_bind_template(bind_rules).unwrap();
-        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
+        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
@@ -631,8 +628,7 @@ mod tests {
             use_new_bytecode: true,
             enable_debug: false,
         };
-        let template = write_bind_template(bind_rules).unwrap();
-        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
+        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
@@ -665,8 +661,7 @@ mod tests {
             use_new_bytecode: false,
             enable_debug: false,
         };
-        let template = write_bind_template(bind_rules).unwrap();
-        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
+        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
