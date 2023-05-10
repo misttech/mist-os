@@ -106,15 +106,18 @@ impl Into<i64> for CodecId {
     }
 }
 
+fn unsupported_codec_id(codec: CodecId) -> AudioError {
+    AudioError::UnsupportedParameters { source: format_err!("Unknown CodecId: {codec:?}") }
+}
+
 impl TryFrom<CodecId> for media::EncoderSettings {
     type Error = AudioError;
 
     fn try_from(value: CodecId) -> Result<Self, Self::Error> {
         match value {
             CodecId::MSBC => Ok(media::EncoderSettings::Msbc(Default::default())),
-            _ => Err(AudioError::UnsupportedParameters {
-                source: format_err!("Unsupported CodecID {value}"),
-            }),
+            CodecId::CVSD => Ok(media::EncoderSettings::Cvsd(Default::default())),
+            _ => Err(unsupported_codec_id(value)),
         }
     }
 }
@@ -126,11 +129,7 @@ impl TryFrom<CodecId> for media::PcmFormat {
         let frames_per_second = match value {
             CodecId::CVSD => 64000,
             CodecId::MSBC => 16000,
-            _ => {
-                return Err(AudioError::UnsupportedParameters {
-                    source: format_err!("Unsupported CodecID {value}"),
-                })
-            }
+            _ => return Err(unsupported_codec_id(value)),
         };
         Ok(media::PcmFormat {
             pcm_mode: media::AudioPcmMode::Linear,

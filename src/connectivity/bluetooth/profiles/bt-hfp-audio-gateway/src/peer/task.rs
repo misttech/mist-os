@@ -750,44 +750,40 @@ impl PeerTask {
 
     async fn finish_sco_connection(&mut self, sco_connection: ScoConnection) -> Result<(), Error> {
         let peer_id = self.id.clone();
-        info!("Finishing SCO connection for peer {:}.", peer_id);
-        let res = self.a2dp_control.pause(Some(self.id.clone())).await;
+        info!(%peer_id, "Finishing SCO connection");
+        let res = self.a2dp_control.pause(Some(peer_id)).await;
         let pause_token = match res {
             Err(e) => {
-                warn!("Couldn't pause A2DP Audio: {:?} for peer {:}", e, peer_id);
+                warn!(%peer_id, ?e, "Couldn't pause A2DP Audio");
                 None
             }
             Ok(token) => {
-                info!("Successfully paused audio for peer {:}.", peer_id);
+                info!(%peer_id, "Successfully paused audio");
                 token
             }
         };
         let vigil = Vigil::new(ScoActive::new(&sco_connection, pause_token));
         {
             let mut audio = self.audio_control.lock();
-            // Start the DAI with the given parameters
             let codec_id = self.codec_for_parameter_set(&sco_connection.params.parameter_set);
             if let Err(e) = audio.start(self.id.clone(), sco_connection, codec_id) {
                 // Cancel the SCO connection, we can't send audio.
                 // TODO(fxbug.dev/79784): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
-                warn!(
-                    "Couldn't start Audio DAI ({:?}) for peer {:} - dropping audio connection",
-                    self.id, e
-                );
+                warn!(%peer_id, ?e, "Couldn't start Audio - dropping audio connection");
                 return Err(Error::system(format!("Couldn't start audio DAI"), e));
             } else {
-                info!("Successfully started Audio DAI for peer {:}.", peer_id);
+                info!(%peer_id, "Successfully started Audio DAI");
             }
         }
         Vigil::watch(&vigil, {
             let control = self.audio_control.clone();
             move |_| match control.lock().stop() {
-                Err(e) => warn!("Couldn't stop audio for peer {:}: {:?}", peer_id, e),
-                Ok(()) => info!("Stopped HFP Audio for peer {:}", peer_id),
+                Err(e) => warn!(%peer_id, ?e,  "Couldn't stop audio"),
+                Ok(()) => info!(%peer_id, "Stopped HFP Audio"),
             }
         });
-        info!("In finish_sco_connection for peer {:}, SCO state is {:?}", peer_id, vigil);
+        info!(%peer_id, ?vigil, "Done finish_sco_connection");
         self.sco_state.iset(ScoState::Active(vigil));
 
         Ok(())

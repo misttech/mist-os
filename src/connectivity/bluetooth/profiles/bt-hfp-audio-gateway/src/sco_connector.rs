@@ -116,8 +116,17 @@ pub(crate) fn parameter_sets_for_codec(
         }
         // CVSD parameter sets
         _ => {
+            let (io_bandwidth, io_frame_size, io_coding_format) = if in_band_sco {
+                (Some(16000), Some(8), Some(bredr::CodingFormat::Cvsd))
+            } else {
+                (Some(16000), Some(16), Some(bredr::CodingFormat::LinearPcm))
+            };
+
             let params_fn = |set| bredr::ScoConnectionParameters {
                 parameter_set: Some(set),
+                io_bandwidth,
+                io_frame_size,
+                io_coding_format,
                 ..params_with_data_path(sco_params_fallback(), in_band_sco)
             };
             vec![params_fn(CvsdS4), params_fn(CvsdS1), params_fn(CvsdD1)]
@@ -289,15 +298,21 @@ pub(crate) mod tests {
                 },
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::CvsdS4),
+                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::CvsdS1),
+                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
+                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
