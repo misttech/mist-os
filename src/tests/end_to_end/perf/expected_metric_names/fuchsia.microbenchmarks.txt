@@ -578,6 +578,7 @@ fuchsia.microbenchmarks: RandomMemcpy/4Mbytes/128Mbytes
 fuchsia.microbenchmarks: RandomMemcpy/4bytes/128Mbytes
 fuchsia.microbenchmarks: RandomMemcpy/64Kbytes/128Mbytes
 fuchsia.microbenchmarks: RandomMemcpy/64bytes/128Mbytes
+fuchsia.microbenchmarks: RestrictedEnterAndExitViaException
 fuchsia.microbenchmarks: RestrictedEnterAndExitViaSyscall
 fuchsia.microbenchmarks: RoundTrip_BasicChannel_MultiProcess
 fuchsia.microbenchmarks: RoundTrip_BasicChannel_SingleProcess

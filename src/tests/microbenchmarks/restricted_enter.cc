@@ -86,6 +86,12 @@ restricted_enter_wrapper:
   add   $(8*8),%rsp // pop the previous state on the stack
   ret
 )");
+
+asm(R"(
+.globl generate_exception
+generate_exception:
+  ud2
+)");
 #elif defined(__aarch64__)
 asm(R"(
 .globl vectab
@@ -157,27 +163,34 @@ restricted_enter_wrapper:
   add  sp, sp, #(14*8) // pop the previous state on the stack
   ret
 )");
+
+asm(R"(
+.globl generate_exception
+generate_exception:
+  udf #0
+)");
 #endif
 
 extern "C" void vectab();
 extern "C" void bounce();
+extern "C" void generate_exception();
 extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vector_table,
                                                 uint64_t* exit_code);
 
 class RestrictedState {
  public:
-  RestrictedState() {
+  RestrictedState(uintptr_t pc) {
     // Create a VMO and bind it to the current thread.
     zx::vmo vmo;
     ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
 
 #if defined(__x86_64__)
-    state_.ip = (uint64_t)bounce;
+    state_.ip = pc;
     state_.flags = 0;
-    state_.fs_base = (uintptr_t)&fs_val_;
-    state_.gs_base = (uintptr_t)&gs_val_;
+    state_.fs_base = reinterpret_cast<uintptr_t>(&fs_val_);
+    state_.gs_base = reinterpret_cast<uintptr_t>(&gs_val_);
 #elif defined(__aarch64__)
-    state_.pc = (uint64_t)bounce;
+    state_.pc = pc;
     state_.tpidr_el0 = reinterpret_cast<uintptr_t>(&tls_val_);
 #endif
 
@@ -198,17 +211,27 @@ class RestrictedState {
 };
 
 bool RestrictedEnterAndExitViaSyscall(perftest::RepeatState* state) {
-  RestrictedState restricted_state;
+  RestrictedState restricted_state(reinterpret_cast<uintptr_t>(bounce));
   uint64_t exit_code;
   while (state->KeepRunning()) {
-    ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                       &exit_code));
+    ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL,
+                                       reinterpret_cast<uintptr_t>(vectab), &exit_code));
+  }
+  return true;
+}
+
+bool RestrictedEnterAndExitViaException(perftest::RepeatState* state) {
+  RestrictedState restricted_state(reinterpret_cast<uintptr_t>(generate_exception));
+  uint64_t exit_code;
+  while (state->KeepRunning()) {
+    ASSERT_OK(restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(vectab), &exit_code));
   }
   return true;
 }
 
 void RegisterTests() {
   perftest::RegisterTest("RestrictedEnterAndExitViaSyscall", RestrictedEnterAndExitViaSyscall);
+  perftest::RegisterTest("RestrictedEnterAndExitViaException", RestrictedEnterAndExitViaException);
 }
 
 PERFTEST_CTOR(RegisterTests)
