@@ -10,7 +10,6 @@
 
 #include <string>
 
-#include "src/devices/bin/driver_manager/component_lifecycle.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 TEST_F(MultipleDeviceTestCase, UnbindThenSuspend) {
@@ -339,46 +338,6 @@ TEST_F(MultipleDeviceTestCase, DISABLED_ResumeTimeout) {
   // Wait for the event that the callback sets, otherwise the test will quit.
   resume_received_event.wait_one(ZX_USER_SIGNAL_0, zx::time(ZX_TIME_INFINITE), nullptr);
   ASSERT_TRUE(resume_callback_executed);
-}
-
-// Test devices are suspended when component lifecycle stop event is received.
-TEST_F(MultipleDeviceTestCase, ComponentLifecycleStop) {
-  ASSERT_OK(coordinator_loop()->StartThread("DevCoordLoop"));
-  set_coordinator_loop_thread_running(true);
-
-  async::Loop devhost_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  ASSERT_OK(devhost_loop.StartThread("DevHostLoop"));
-
-  async::Wait suspend_task_pbus(
-      platform_bus()->controller_server.channel().get(), ZX_CHANNEL_READABLE, 0,
-      [this](async_dispatcher_t*, async::Wait*, zx_status_t, const zx_packet_signal_t*) {
-        platform_bus()->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK);
-      });
-  ASSERT_OK(suspend_task_pbus.Begin(devhost_loop.dispatcher()));
-
-  async::Wait suspend_task_sys(
-      root_proxy()->controller_server.channel().get(), ZX_CHANNEL_READABLE, 0,
-      [this](async_dispatcher_t*, async::Wait*, zx_status_t, const zx_packet_signal_t*) {
-        root_proxy()->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK);
-      });
-  ASSERT_OK(suspend_task_sys.Begin(devhost_loop.dispatcher()));
-
-  zx::event event;
-  ASSERT_OK(zx::event::create(0, &event));
-  auto lifecycle_endpoints = fidl::CreateEndpoints<fuchsia_process_lifecycle::Lifecycle>();
-  ASSERT_OK(lifecycle_endpoints.status_value());
-  SuspendCallback suspend_callback = [&event](zx_status_t status) {
-    event.signal(0, ZX_USER_SIGNAL_0);
-  };
-  ASSERT_OK(devmgr::ComponentLifecycleServer::Create(
-      coordinator_loop()->dispatcher(), &coordinator(), std::move(lifecycle_endpoints->server),
-      std::move(suspend_callback)));
-  fidl::WireSyncClient client{std::move(lifecycle_endpoints->client)};
-  auto result = client->Stop();
-  ASSERT_OK(result.status());
-  event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr);
-  ASSERT_FALSE(suspend_task_pbus.is_pending());
-  ASSERT_FALSE(suspend_task_sys.is_pending());
 }
 
 // This functor accepts a |fidl::WireUnownedResult<FidlMethod>&| and checks that

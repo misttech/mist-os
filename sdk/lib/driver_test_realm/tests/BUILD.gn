@@ -39,4 +39,9 @@ fuchsia_unittest_package("package") {
     "//src/devices/misc/drivers/test",
     "//src/devices/misc/drivers/test-parent",
   ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

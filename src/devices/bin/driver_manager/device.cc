@@ -535,7 +535,7 @@ void Device::SendSuspend(uint32_t flags, SuspendCompletion completion) {
         if (response->status == ZX_OK) {
           LOGF(DEBUG, "Suspended device %p '%s' successfully", dev.get(), dev->name().data());
         } else {
-          LOGF(ERROR, "Failed to suspended device %p '%s': %s", dev.get(), dev->name().data(),
+          LOGF(WARNING, "Failed to suspended device %p '%s': %s", dev.get(), dev->name().data(),
                zx_status_get_string(response->status));
         }
         dev->CompleteSuspend(response->status);

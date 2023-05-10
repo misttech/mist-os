@@ -49,6 +49,7 @@
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 #include "src/devices/bin/driver_manager/v1/firmware_loader.h"
 #include "src/devices/bin/driver_manager/v1/suspend_resume_manager.h"
+#include "src/devices/bin/driver_manager/v2/node_remover.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -116,7 +117,7 @@ struct CoordinatorConfig {
 
 class Coordinator : public CompositeManagerBridge,
                     public fidl::WireServer<fuchsia_driver_development::DriverDevelopment>,
-                    public fidl::WireServer<fuchsia_device_manager::Administrator> {
+                    public dfv2::NodeRemover {
  public:
   Coordinator(const Coordinator&) = delete;
   Coordinator& operator=(const Coordinator&) = delete;
@@ -217,10 +218,8 @@ class Coordinator : public CompositeManagerBridge,
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;
 
-  // fuchsia.device.manager/Administrator interface
-  void UnregisterSystemStorageForShutdown(
-      UnregisterSystemStorageForShutdownCompleter::Sync& completer) override;
-  void SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) override;
+  void ShutdownAllDrivers(fit::callback<void()> callback) override;
+  void ShutdownPkgDrivers(fit::callback<void()> callback) override;
 
   // Creates a DFv2 component with a given driver and attaches it to `dev`.
   void CreateAndStartDFv2Component(const MatchedDriverInfo& driver, const fbl::RefPtr<Device>& dev);
@@ -257,8 +256,6 @@ class Coordinator : public CompositeManagerBridge,
   std::unique_ptr<BindDriverManager> bind_driver_manager_;
 
   uint32_t next_dfv2_device_id_ = 0;
-
-  fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
 
   // This needs to outlive `coordinator` but should be destroyed in the same
   // event loop iteration. Otherwise, we risk use-after-free issues if a client

@@ -106,8 +106,6 @@ source_set("lib") {
     "base_package_resolver.h",
     "bind_driver_manager.cc",
     "bind_driver_manager.h",
-    "component_lifecycle.cc",
-    "component_lifecycle.h",
     "composite_device.cc",
     "composite_device.h",
     "composite_device_fragment.cc",

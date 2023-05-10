@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "main.h"
+#include "src/devices/bin/driver_manager/main.h"
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <getopt.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
@@ -37,19 +39,18 @@
 
 #include <fbl/string_printf.h>
 
-#include "component_lifecycle.h"
-#include "coordinator.h"
-#include "driver_host_loader_service.h"
-#include "fdio.h"
-#include "fidl/fuchsia.process.lifecycle/cpp/markers.h"
-#include "lib/async/cpp/task.h"
+#include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device_watcher.h"
+#include "src/devices/bin/driver_manager/driver_host_loader_service.h"
+#include "src/devices/bin/driver_manager/fdio.h"
+#include "src/devices/bin/driver_manager/system_instance.h"
 #include "src/devices/bin/driver_manager/v2/driver_development_service.h"
+#include "src/devices/bin/driver_manager/v2/driver_runner.h"
+#include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
-#include "system_instance.h"
 
 DriverHostCrashPolicy CrashPolicyFromString(const std::string& crash_policy) {
   if (crash_policy == "reboot-system") {
@@ -277,43 +278,8 @@ int RunDfv1(driver_manager_config::Config dm_config,
     }
   }
 
-  // Check if whatever launched devmgr gave a channel for component lifecycle events
-  fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> component_lifecycle_request(
-      zx::channel(zx_take_startup_handle(PA_LIFECYCLE)));
-  if (component_lifecycle_request.is_valid()) {
-    status = devmgr::ComponentLifecycleServer::Create(loop.dispatcher(), &coordinator,
-                                                      std::move(component_lifecycle_request),
-                                                      std::move(suspend_callback));
-    if (status != ZX_OK) {
-      LOGF(ERROR, "driver_manager: Cannot create componentlifecycleserver: %s",
-           zx_status_get_string(status));
-      return status;
-    }
-  } else {
-    LOGF(INFO,
-         "No valid handle found for lifecycle events, assuming test environment and "
-         "continuing");
-  }
-
-  // TODO(https://fxbug.dev/116638): Wire this up to do something useful.
-  class DevfsLifecycle : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
-   public:
-    explicit DevfsLifecycle() = default;
-
-    void Stop(StopCompleter::Sync& completer) override { completer.Close(ZX_OK); }
-  };
-
-  {
-    zx::result result = outgoing.AddProtocol<fuchsia_process_lifecycle::Lifecycle>(
-        std::make_unique<DevfsLifecycle>(), "fuchsia.device.fs.lifecycle.Lifecycle");
-    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-  }
-
-  {
-    zx::result result = outgoing.AddProtocol<fuchsia_process_lifecycle::Lifecycle>(
-        std::make_unique<DevfsLifecycle>(), "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle");
-    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-  }
+  dfv2::ShutdownManager shutdown_manager(&coordinator, loop.dispatcher());
+  shutdown_manager.Publish(outgoing);
 
   coordinator.set_loader_service_connector(
       [loader_service = std::move(loader_service)](zx::channel* c) {

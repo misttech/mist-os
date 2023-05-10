@@ -871,19 +871,28 @@ void Coordinator::RemoveTestNode(RemoveTestNodeRequestView request,
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Coordinator::UnregisterSystemStorageForShutdown(
-    UnregisterSystemStorageForShutdownCompleter::Sync& completer) {
-  suspend_resume_manager_->suspend_handler().UnregisterSystemStorageForShutdown(
-      [completer = completer.ToAsync()](zx_status_t status) mutable { completer.Reply(status); });
-}
-
-void Coordinator::SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) {
-  LOGF(INFO, "Received administrator suspend event");
+void Coordinator::ShutdownAllDrivers(fit::callback<void()> callback) {
   suspend_resume_manager().Suspend(
       suspend_resume_manager().GetSuspendFlagsFromSystemPowerState(shutdown_system_state()),
-      [](zx_status_t status) {
-        LOGF(INFO, "Administrator suspend completed with status: %s", zx_status_get_string(status));
+      [cb = std::move(callback)](zx_status_t status) {
+        if (status != ZX_OK) {
+          // TODO(https://fxbug.dev/56208): Change this log back to error once isolated devmgr
+          // is fixed.
+          LOGF(WARNING, "Error suspending devices while stopping the component:%s",
+               zx_status_get_string(status));
+        }
+        LOGF(INFO, "Exiting driver manager gracefully");
+        // TODO(https://fxbug.dev/52627) This event handler should teardown devices and driver
+        // hosts properly for system state transitions where driver manager needs to go down.
+        // Exiting like so, will not run all the destructors and clean things up properly.
+        // Instead the main devcoordinator loop should be quit.
+        exit(0);
       });
+}
+
+void Coordinator::ShutdownPkgDrivers(fit::callback<void()> callback) {
+  suspend_resume_manager().suspend_handler().UnregisterSystemStorageForShutdown(
+      [cb = std::move(callback)](zx_status_t status) mutable { cb(); });
 }
 
 void Coordinator::PublishDriverDevelopmentService(component::OutgoingDirectory& outgoing) {
@@ -910,9 +919,6 @@ void Coordinator::PublishDriverDevelopmentService(component::OutgoingDirectory& 
 
 void Coordinator::InitOutgoingServices(component::OutgoingDirectory& outgoing) {
   outgoing_ = &outgoing;
-  auto result = outgoing.AddUnmanagedProtocol<fdm::Administrator>(
-      admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT(result.is_ok());
 }
 
 // TODO(fxb/107737): Ideally, we try to match and bind all devices, regardless if they
