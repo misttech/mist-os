@@ -119,6 +119,19 @@ struct InterruptClearRegister {
   static auto Get() { return InterruptRegister::Get(0x44); }
 };
 
+struct LineControlRegister : public hwreg::RegisterBase<LineControlRegister, uint16_t> {
+  DEF_FIELD(15, 8, reserved);
+  DEF_BIT(7, enable_sticky_parity);
+  DEF_FIELD(6, 5, word_length);
+  DEF_BIT(4, fifo_enable);
+  DEF_BIT(3, enable_two_stop_bits);
+  DEF_BIT(2, enable_even_parity);
+  DEF_BIT(1, enable_parity);
+  DEF_BIT(0, enable_enable_send_break);
+
+  static auto Get() { return hwreg::RegisterAddr<LineControlRegister>(0x2C); }
+};
+
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t> {
   using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t>;
 
@@ -138,8 +151,11 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
 
   template <class IoProvider>
   void Init(IoProvider& io) {
-    // The line control settings were initialized by the hardware or the boot
+    // Other line control settings were initialized by the hardware or the boot
     // loader and we just use them as they are.
+    auto lcr = LineControlRegister::Get().ReadFrom(io.io());
+    lcr.set_fifo_enable(true).WriteTo(io.io());
+
     auto cr = ControlRegister::Get().FromValue(0);
     cr.set_tx_enable(true).set_uart_enable(true).WriteTo(io.io());
   }

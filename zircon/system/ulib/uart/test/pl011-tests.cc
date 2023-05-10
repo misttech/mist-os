@@ -21,16 +21,18 @@ TEST(Pl011Tests, HelloWorld) {
 
   driver.io()
       .mock()
-      .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30)  // Init
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'h'}, 0)                  // Write
-      .ExpectRead(uint16_t{0b0000'0000}, 0x18)        // TxReady -> false
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'i'}, 0)                  // Write
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'\r'}, 0)                 // Write
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'\n'}, 0);                // Write
+      .ExpectRead(uint16_t{0b0000'0000'0110'0000}, 0x2C)   // Read state from LCR
+      .ExpectWrite(uint16_t{0b0000'0000'0111'0000}, 0x2C)  // Writeback with FIFO enabled
+      .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30)       // Init
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'h'}, 0)                       // Write
+      .ExpectRead(uint16_t{0b0000'0000}, 0x18)             // TxReady -> false
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'i'}, 0)                       // Write
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'\r'}, 0)                      // Write
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'\n'}, 0);                     // Write
 
   driver.Init();
   EXPECT_EQ(3, driver.Write("hi\n"));
@@ -41,17 +43,19 @@ TEST(Pl011Tests, Read) {
 
   driver.io()
       .mock()
-      .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30)  // Init
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'?'}, 0)                  // Write
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'\r'}, 0)                 // Write
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // TxReady -> true
-      .ExpectWrite(uint16_t{'\n'}, 0)                 // Write
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // Read (rx_fifo_empty)
-      .ExpectRead(uint16_t{'q'}, 0)                   // Read (data)
-      .ExpectRead(uint16_t{0b1000'0000}, 0x18)        // Read (rx_fifo_empty)
-      .ExpectRead(uint16_t{'\r'}, 0);                 // Read (data)
+      .ExpectRead(uint16_t{0b0000'0000'0110'0000}, 0x2C)   // Read state from LCR
+      .ExpectWrite(uint16_t{0b0000'0000'0111'0000}, 0x2C)  // Writeback with FIFO enabled
+      .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30)       // Init
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'?'}, 0)                       // Write
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'\r'}, 0)                      // Write
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // TxReady -> true
+      .ExpectWrite(uint16_t{'\n'}, 0)                      // Write
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // Read (rx_fifo_empty)
+      .ExpectRead(uint16_t{'q'}, 0)                        // Read (data)
+      .ExpectRead(uint16_t{0b1000'0000}, 0x18)             // Read (rx_fifo_empty)
+      .ExpectRead(uint16_t{'\r'}, 0);                      // Read (data)
 
   driver.Init();
   EXPECT_EQ(2, driver.Write("?\n"));
@@ -61,7 +65,11 @@ TEST(Pl011Tests, Read) {
 
 // Helper for initializing the driver.
 void Init(SimpleTestDriver& driver) {
-  driver.io().mock().ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30);  // Init
+  driver.io()
+      .mock()
+      .ExpectRead(uint16_t{0b0000'0000'0110'0000}, 0x2C)   // Read state from LCR
+      .ExpectWrite(uint16_t{0b0000'0000'0111'0000}, 0x2C)  // Writeback with FIFO enabled
+      .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30);      // Init
 
   driver.Init();
   driver.io().mock().VerifyAndClear();
@@ -70,6 +78,8 @@ void Init(SimpleTestDriver& driver) {
 void InitWithInterrupt(SimpleTestDriver& driver) {
   driver.io()
       .mock()
+      .ExpectRead(uint16_t{0b0000'0000'0110'0000}, 0x2C)   // Read state from LCR
+      .ExpectWrite(uint16_t{0b0000'0000'0111'0000}, 0x2C)  // Writeback with FIFO enabled
       .ExpectWrite(uint16_t{0b0001'0000'0001}, 0x30)       // Init
       .ExpectWrite<uint16_t>(0b0000'0011'1111'1111, 0x44)  // Clear Interrupts.
       .ExpectWrite<uint16_t>(0b0000, 0x34)                 // Rx and Tx Fifo to 1/8
