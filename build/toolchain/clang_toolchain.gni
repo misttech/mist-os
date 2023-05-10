@@ -72,7 +72,7 @@ template("clang_toolchain") {
     enable_rust =
         support_rust && (!defined(invoker.enable_rust) || invoker.enable_rust)
 
-    compiler_prefix = ""
+    compiler_prefix_list = []
     if (enable_rust) {
       if (defined(invoker.rust_rbe_enable)) {
         rust_rbe_enable = invoker.rust_rbe_enable
@@ -88,42 +88,45 @@ template("clang_toolchain") {
     if (cxx_rbe_enable) {
       # Use reclient to remotely build C++.
       _cxx_remote_wrapper_path = rebase_path(cxx_remote_wrapper, root_build_dir)
-      compiler_prefix =
-          string_join(" ",
-                      [
-                        rebase_path(python_exe_src, root_build_dir),
-                        "-S",
-                        _cxx_remote_wrapper_path,
-                      ])
+      compiler_prefix_list = [
+        rebase_path(python_exe_src, root_build_dir),
+        "-S",
+        _cxx_remote_wrapper_path,
+      ]
       assert(cxx_rbe_exec_strategy == "remote" ||
                  cxx_rbe_exec_strategy == "local" ||
                  cxx_rbe_exec_strategy == "remote_local_fallback" ||
                  cxx_rbe_exec_strategy == "racing",
              "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
       if (cxx_rbe_exec_strategy == "remote") {
-        compiler_prefix += " --exec_strategy=remote"
+        compiler_prefix_list += [ " --exec_strategy=remote" ]
       } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
-        compiler_prefix += " --exec_strategy=remote_local_fallback"
+        compiler_prefix_list += [ "--exec_strategy=remote_local_fallback" ]
       } else if (cxx_rbe_exec_strategy == "local") {
-        compiler_prefix += " --exec_strategy=local --remote_update_cache=false"
+        compiler_prefix_list += [
+          "--exec_strategy=local",
+          "--remote_update_cache=false",
+        ]
       } else if (cxx_rbe_exec_strategy == "racing") {
-        compiler_prefix += " --exec_strategy=racing"
+        compiler_prefix_list += [ "--exec_strategy=racing" ]
       }
-      compiler_prefix += " -- "
+      compiler_prefix_list += [ "--" ]
       not_needed([ "use_goma" ])
       _cxx_concurrent_jobs = concurrent_jobs.remote
     } else if (use_goma) {
-      compiler_prefix = rebase_path(goma_dir, root_build_dir) + "/gomacc"
+      compiler_prefix_list =
+          [ rebase_path(goma_dir, root_build_dir) + "/gomacc" ]
       _cxx_concurrent_jobs = concurrent_jobs.remote
     } else {
       if (defined(invoker.use_ccache)) {
         use_ccache = invoker.use_ccache
       }
       if (use_ccache) {
-        compiler_prefix = "ccache "
+        compiler_prefix_list = [ "ccache " ]
       }
       _cxx_concurrent_jobs = concurrent_jobs.local
     }
+    compiler_prefix = string_join(" ", compiler_prefix_list) + " "
 
     prefix = rebased_clang_prefix
     if (defined(invoker.prefix)) {
@@ -132,17 +135,19 @@ template("clang_toolchain") {
 
     # Configure builds to be restat-friendly by preserving timestamps of
     # unchanged outputs, for both local and remote builds.
-    _restat_rustc_prefix = ""
+    _restat_rustc_prefix_list = []
     if (restat_rust) {
-      _restat_rust_wrapper =
-          string_join(" ",
-                      [
-                        rebase_path(python_exe_src, root_build_dir),
-                        "-S",
-                        rebase_path(restat_wrapper, root_build_dir),
-                      ])
-      _restat_cmd_args =
-          "$_restat_rust_wrapper --outputs {{output}} {{DEPFILE}} -- "
+      _restat_rust_wrapper = [
+        rebase_path(python_exe_src, root_build_dir),
+        "-S",
+        rebase_path(restat_wrapper, root_build_dir),
+      ]
+      _restat_cmd_args = _restat_rust_wrapper + [
+                           "--outputs",
+                           "{{output}}",
+                           "{{DEPFILE}}",
+                           "--",
+                         ]
       if (rust_rbe_enable) {
         # To make sure local and remote execution consistently preserve
         # output timestamps, we need to stage local execution outputs to
@@ -151,26 +156,31 @@ template("clang_toolchain") {
         # and restat_wrapper_local_wrapper writes to a temporary file.
         # By hiding shell-syntax inside the temporary wrapper, this form also
         # composes cleanly with the action-tracer.
-        _restat_rustc_prefix =
-            rebase_path(restat_wrapper_local_wrapper, root_build_dir) + " " +
+        _restat_rustc_prefix_list =
+            [ rebase_path(restat_wrapper_local_wrapper, root_build_dir) ] +
             _restat_cmd_args
       } else {
         # Local-only execution may use the wrapper script directly.
-        _restat_rustc_prefix = _restat_cmd_args
+        _restat_rustc_prefix_list = _restat_cmd_args
       }
     }
-    _restat_cc_prefix = ""
+    _restat_rustc_prefix = string_join(" ", _restat_rustc_prefix_list) + " "
+
+    _restat_cc_prefix_list = []
     if (restat_cc) {
-      _restat_cc_wrapper =
-          string_join(" ",
-                      [
-                        rebase_path(python_exe_src, root_build_dir),
-                        "-S",
-                        rebase_path(restat_wrapper, root_build_dir),
-                      ])
-      _restat_cc_prefix =
-          "$_restat_cc_wrapper --outputs {{output}} {{DEPFILE}} -- "
+      _restat_cc_wrapper = [
+        rebase_path(python_exe_src, root_build_dir),
+        "-S",
+        rebase_path(restat_wrapper, root_build_dir),
+      ]
+      _restat_cc_prefix_list = _restat_cc_wrapper + [
+                                 "--outputs",
+                                 "{{output}}",
+                                 "{{DEPFILE}}",
+                                 "--",
+                               ]
     }
+    _restat_cc_prefix = string_join(" ", _restat_cc_prefix_list) + " "
 
     if (enable_rust) {
       # Configure Rust remote builds.

@@ -163,7 +163,7 @@ template("zircon_toolchain") {
   assert(defined(invoker.environment), "'environment' argument is required!")
 
   # Cached and distributed wrappers just go on the front of compiler commands.
-  compiler_prefix = ""
+  compiler_prefix_list = []
   if (defined(invoker.cxx_rbe_enable)) {
     cxx_rbe_enable = invoker.cxx_rbe_enable
   }
@@ -171,42 +171,44 @@ template("zircon_toolchain") {
     use_goma = invoker.use_goma
   }
   if (cxx_rbe_enable) {
-    compiler_prefix =
-        string_join(" ",
-                    [
-                      rebase_path(python_exe_src, root_build_dir),
-                      "-S",
-                      rebase_path(cxx_remote_wrapper, root_build_dir),
-                    ])
+    compiler_prefix_list = [
+      rebase_path(python_exe_src, root_build_dir),
+      "-S",
+      rebase_path(cxx_remote_wrapper, root_build_dir),
+    ]
     assert(
         cxx_rbe_exec_strategy == "remote" || cxx_rbe_exec_strategy == "local" ||
             cxx_rbe_exec_strategy == "remote_local_fallback" ||
             cxx_rbe_exec_strategy == "racing",
         "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
     if (cxx_rbe_exec_strategy == "remote") {
-      compiler_prefix += " --exec_strategy=remote"
+      compiler_prefix_list += [ "--exec_strategy=remote" ]
     } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
-      compiler_prefix += " --exec_strategy=remote_local_fallback"
+      compiler_prefix_list += [ "--exec_strategy=remote_local_fallback" ]
     } else if (cxx_rbe_exec_strategy == "local") {
-      compiler_prefix += " --exec_strategy=local --remote_update_cache=false"
+      compiler_prefix_list += [
+        "--exec_strategy=local",
+        "--remote_update_cache=false",
+      ]
     } else if (cxx_rbe_exec_strategy == "racing") {
-      compiler_prefix += " --exec_strategy=racing"
+      compiler_prefix_list += [ "--exec_strategy=racing" ]
     }
-    compiler_prefix += " -- "
+    compiler_prefix_list += [ "--" ]
     not_needed([ "use_goma" ])
     _cxx_concurrent_jobs = concurrent_jobs.remote
   } else if (use_goma) {
-    compiler_prefix = rebase_path(goma_dir, root_build_dir) + "/gomacc"
+    compiler_prefix_list = [ rebase_path(goma_dir, root_build_dir) + "/gomacc" ]
     _cxx_concurrent_jobs = concurrent_jobs.remote
   } else {
     if (defined(invoker.use_ccache)) {
       use_ccache = invoker.use_ccache
     }
     if (use_ccache) {
-      compiler_prefix = "ccache "
+      compiler_prefix_list = [ "ccache" ]
     }
     _cxx_concurrent_jobs = concurrent_jobs.local
   }
+  compiler_prefix = string_join(" ", compiler_prefix_list) + " "
 
   # Compute what will be the value of `toolchain_variant` for this instance.
   # This is invoker.toolchain_args.toolchain_variant, eventually augmented
