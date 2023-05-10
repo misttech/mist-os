@@ -33,9 +33,6 @@ Each driver can have its own topology. Glue drivers can abstract from applicatio
 exposed by DAI or codec drivers as needed for a particular configuration or product. Note that it is
 possible although not required to expose topologies to applications, in particular to `audio_core`.
 
-In cases where the topologies are static, it is not mandatory to expose the one and only topology
-since there is no way to change it. This is the case for simpler hardware codecs PEs.
-
 Note that topologies are not meant to fully describe the audio pipeline state/format/configuration
 in and out of every PE. The intent is to describe what can be changed/rearranged by the client (for
 instance a glue driver) based on its knowledge, configuration (for instance from metadata) and
