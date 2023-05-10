@@ -229,3 +229,8 @@ config("suppress_warnings") {
     "-Wno-deprecated-declarations",
   ]
 }
+
+group("tests") {
+  public_deps = [ "tests" ]
+  testonly = true
+}

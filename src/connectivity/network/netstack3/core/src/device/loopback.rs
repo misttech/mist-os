@@ -31,14 +31,14 @@ use crate::{
             },
             tx::{
                 BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
-                TransmitQueue, TransmitQueueContext, TransmitQueueNonSyncContext,
-                TransmitQueueState, TransmitQueueTypes,
+                TransmitQueue, TransmitQueueCommon, TransmitQueueContext,
+                TransmitQueueNonSyncContext, TransmitQueueState,
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
         socket::{
             BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
-            ReceivedFrame,
+            ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
@@ -533,11 +533,15 @@ impl<C: NonSyncContext> TransmitQueueNonSyncContext<LoopbackDevice, LoopbackDevi
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    TransmitQueueTypes<LoopbackDevice, C> for Locked<&SyncCtx<C>, L>
+    TransmitQueueCommon<LoopbackDevice, C> for Locked<&SyncCtx<C>, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
+
+    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        SentFrame::try_parse_as_ethernet(buf)
+    }
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>

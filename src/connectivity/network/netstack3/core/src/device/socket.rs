@@ -14,8 +14,11 @@ use lock_order::{
     Locked,
 };
 use net_types::ethernet::Mac;
-use packet::{BufferMut, Serializer};
-use packet_formats::ethernet::EtherType;
+use packet::{BufferMut, ParsablePacket as _, Serializer};
+use packet_formats::{
+    error::ParseError,
+    ethernet::{EtherType, EthernetFrameLengthCheck},
+};
 
 use crate::{
     context::SendFrameContext,
@@ -739,6 +742,28 @@ pub enum ReceivedFrame<B> {
     },
 }
 
+/// A frame sent on a device.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SentFrame<B> {
+    /// An ethernet frame sent on a device.
+    Ethernet(EthernetFrame<B>),
+}
+
+/// A frame couldn't be parsed as a [`SentFrame`].
+#[derive(Debug)]
+pub(crate) struct ParseSentFrameError;
+
+impl SentFrame<&[u8]> {
+    /// Tries to parse the given frame as an Ethernet frame.
+    pub(crate) fn try_parse_as_ethernet(
+        mut buf: &[u8],
+    ) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        packet_formats::ethernet::EthernetFrame::parse(&mut buf, EthernetFrameLengthCheck::NoCheck)
+            .map_err(|_: ParseError| ParseSentFrameError)
+            .map(|frame| SentFrame::Ethernet(frame.into()))
+    }
+}
+
 /// Data from an Ethernet frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EthernetFrame<B> {
@@ -755,8 +780,16 @@ pub struct EthernetFrame<B> {
 /// A frame sent or received on a device
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Frame<B> {
+    /// A sent frame.
+    Sent(SentFrame<B>),
     /// A received frame.
     Received(ReceivedFrame<B>),
+}
+
+impl<B> From<SentFrame<B>> for Frame<B> {
+    fn from(value: SentFrame<B>) -> Self {
+        Self::Sent(value)
+    }
 }
 
 impl<B> From<ReceivedFrame<B>> for Frame<B> {
@@ -788,14 +821,16 @@ impl<'a> ReceivedFrame<&'a [u8]> {
 impl<B> Frame<B> {
     fn protocol(&self) -> Option<u16> {
         match self {
-            Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.protocol,
+            Self::Sent(SentFrame::Ethernet(frame))
+            | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.protocol,
         }
     }
 
     /// Convenience method for consuming the `Frame` and producing the body.
     pub fn into_body(self) -> B {
         match self {
-            Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => {
+            Self::Received(ReceivedFrame::Ethernet { destination: _, frame })
+            | Self::Sent(SentFrame::Ethernet(frame)) => {
                 let EthernetFrame { src_mac: _, dst_mac: _, protocol: _, body } = frame;
                 body
             }
@@ -843,10 +878,20 @@ where
                     sync_ctx.with_socket_state(
                         socket,
                         |external_state, Target { protocol, device: _ }, _sync_ctx| {
-                            if protocol.map_or(false, |p| match p {
-                                Protocol::Specific(p) => Some(p.get()) == frame.protocol(),
-                                Protocol::All => true,
-                            }) {
+                            let should_deliver = match protocol {
+                                None => false,
+                                Some(p) => match p {
+                                    // Sent frames are only delivered to sockets
+                                    // matching all protocols for Linux
+                                    // compatibility. See https://github.com/google/gvisor/blob/68eae979409452209e4faaeac12aee4191b3d6f0/test/syscalls/linux/packet_socket.cc#L331-L392.
+                                    Protocol::Specific(p) => match frame {
+                                        Frame::Received(_) => Some(p.get()) == frame.protocol(),
+                                        Frame::Sent(_) => false,
+                                    },
+                                    Protocol::All => true,
+                                },
+                            };
+                            if should_deliver {
                                 ctx.receive_frame(external_state, &device, frame, whole_frame)
                             }
                         },
@@ -1036,6 +1081,37 @@ impl<C: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> f
 }
 
 #[cfg(test)]
+mod testutil {
+    use crate::context::testutil::FakeNonSyncCtx;
+    use crate::device::DeviceLayerStateTypes;
+
+    use super::*;
+
+    impl<TimerId, Event: Debug, State> DeviceSocketTypes for FakeNonSyncCtx<TimerId, Event, State> {
+        type SocketState = ();
+    }
+
+    impl<TimerId, Event: Debug, State> DeviceLayerStateTypes for FakeNonSyncCtx<TimerId, Event, State> {
+        type EthernetDeviceState = ();
+        type LoopbackDeviceState = ();
+    }
+
+    impl<TimerId, Event: Debug, State, DeviceId> NonSyncContext<DeviceId>
+        for FakeNonSyncCtx<TimerId, Event, State>
+    {
+        fn receive_frame(
+            &self,
+            _socket: &Self::SocketState,
+            _device: &DeviceId,
+            _frame: Frame<&[u8]>,
+            _raw_frame: &[u8],
+        ) {
+            unimplemented!()
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use alloc::{
         collections::{HashMap, HashSet},
@@ -1063,8 +1139,11 @@ mod tests {
     use super::*;
 
     impl Frame<&[u8]> {
-        fn cloned(self) -> Frame<Vec<u8>> {
+        pub(crate) fn cloned(self) -> Frame<Vec<u8>> {
             match self {
+                Self::Sent(SentFrame::Ethernet(frame)) => {
+                    Frame::Sent(SentFrame::Ethernet(frame.cloned()))
+                }
                 Self::Received(super::ReceivedFrame::Ethernet { destination, frame }) => {
                     Frame::Received(super::ReceivedFrame::Ethernet {
                         destination,
@@ -1660,10 +1739,47 @@ mod tests {
         id
     }
 
+    /// Deliver one frame to the provided contexts and return the IDs of the
+    /// sockets it was delivered to.
+    fn deliver_one_frame(
+        delivered_frame: Frame<&[u8]>,
+        mut sync_ctx: FakeSyncCtx<FakeSockets<MultipleDevicesId>, (), MultipleDevicesId>,
+        mut non_sync_ctx: FakeNonSyncCtx<MultipleDevicesId>,
+    ) -> HashSet<FakeStrongId> {
+        BufferSocketHandler::handle_frame(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &MultipleDevicesId::A,
+            delivered_frame.clone(),
+            TestData::BUFFER,
+        );
+
+        let FakeSockets { all_sockets, any_device_sockets: _, device_sockets: _ } =
+            sync_ctx.into_state();
+
+        all_sockets
+            .into_iter()
+            .filter_map(|(index, (ExternalSocketState(frames), _)): (_, (_, Target<_>))| {
+                let frames = frames.into_inner();
+                (!frames.is_empty()).then(|| {
+                    assert_eq!(
+                        frames,
+                        &[ReceivedFrame {
+                            device: MultipleDevicesId::A,
+                            frame: delivered_frame.cloned(),
+                            raw: TestData::BUFFER.into(),
+                        }]
+                    );
+                    FakeStrongId(index)
+                })
+            })
+            .collect()
+    }
+
     #[test]
     fn receive_frame_deliver_to_multiple() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let non_sync_ctx = FakeNonSyncCtx::default();
 
         use Protocol::*;
         use TargetDevice::*;
@@ -1693,47 +1809,15 @@ mod tests {
         let bound_any_right_protocol = make_bound(AnyDevice, Some(Specific(TestData::PROTO)));
         let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
 
-        BufferSocketHandler::handle_frame(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &MultipleDevicesId::A,
+        let mut sockets_with_received_frames = deliver_one_frame(
             super::ReceivedFrame::from_ethernet(
                 TestData::frame(),
                 FrameDestination::Individual { local: true },
             )
             .into(),
-            TestData::BUFFER,
+            sync_ctx,
+            non_sync_ctx,
         );
-
-        let FakeSockets { all_sockets, any_device_sockets: _, device_sockets: _ } =
-            sync_ctx.into_state();
-
-        let mut sockets_with_received_frames = all_sockets
-            .into_iter()
-            .filter_map(|(index, (ExternalSocketState(frames), _)): (_, (_, Target<_>))| {
-                let frames = frames.into_inner();
-                (!frames.is_empty()).then_some((FakeStrongId(index), frames))
-            })
-            .collect::<HashMap<_, _>>();
-        let mut assert_received = |id| {
-            let frames = sockets_with_received_frames.remove(&id).unwrap();
-            assert_eq!(
-                frames,
-                &[ReceivedFrame {
-                    device: MultipleDevicesId::A,
-                    frame: Frame::Received(super::ReceivedFrame::Ethernet {
-                        destination: FrameDestination::Individual { local: true },
-                        frame: EthernetFrame {
-                            src_mac: TestData::SRC_MAC,
-                            dst_mac: TestData::DST_MAC,
-                            protocol: Some(TestData::PROTO.into()),
-                            body: Vec::from(TestData::BODY),
-                        }
-                    }),
-                    raw: TestData::BUFFER.into(),
-                }]
-            )
-        };
 
         let _ = (
             never_bound,
@@ -1747,10 +1831,69 @@ mod tests {
             bound_any_wrong_protocol,
         );
 
-        assert_received(bound_a_all_protocols);
-        assert_received(bound_a_right_protocol);
-        assert_received(bound_any_all_protocols);
-        assert_received(bound_any_right_protocol);
+        assert!(sockets_with_received_frames.remove(&bound_a_all_protocols));
+        assert!(sockets_with_received_frames.remove(&bound_a_right_protocol));
+        assert!(sockets_with_received_frames.remove(&bound_any_all_protocols));
+        assert!(sockets_with_received_frames.remove(&bound_any_right_protocol));
+        assert!(sockets_with_received_frames.is_empty());
+    }
+
+    #[test]
+    fn sent_frame_deliver_to_multiple() {
+        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let non_sync_ctx = FakeNonSyncCtx::default();
+
+        use Protocol::*;
+        use TargetDevice::*;
+        let never_bound = {
+            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            SocketHandler::create(&mut sync_ctx, state)
+        };
+
+        let mut make_bound = |device, protocol| {
+            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            make_bound(&mut sync_ctx, device, protocol, state)
+        };
+        let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
+        let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
+        let bound_a_same_protocol =
+            make_bound(SpecificDevice(MultipleDevicesId::A), Some(Specific(TestData::PROTO)));
+        let bound_a_wrong_protocol =
+            make_bound(SpecificDevice(MultipleDevicesId::A), Some(Specific(WRONG_PROTO)));
+        let bound_b_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::B), None);
+        let bound_b_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::B), Some(All));
+        let bound_b_same_protocol =
+            make_bound(SpecificDevice(MultipleDevicesId::B), Some(Specific(TestData::PROTO)));
+        let bound_b_wrong_protocol =
+            make_bound(SpecificDevice(MultipleDevicesId::B), Some(Specific(WRONG_PROTO)));
+        let bound_any_no_protocol = make_bound(AnyDevice, None);
+        let bound_any_all_protocols = make_bound(AnyDevice, Some(All));
+        let bound_any_same_protocol = make_bound(AnyDevice, Some(Specific(TestData::PROTO)));
+        let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
+
+        let mut sockets_with_received_frames = deliver_one_frame(
+            SentFrame::Ethernet(TestData::frame().into()).into(),
+            sync_ctx,
+            non_sync_ctx,
+        );
+
+        let _ = (
+            never_bound,
+            bound_a_no_protocol,
+            bound_a_same_protocol,
+            bound_a_wrong_protocol,
+            bound_b_no_protocol,
+            bound_b_all_protocols,
+            bound_b_same_protocol,
+            bound_b_wrong_protocol,
+            bound_any_no_protocol,
+            bound_any_same_protocol,
+            bound_any_wrong_protocol,
+        );
+
+        // Only any-protocol sockets receive sent frames.
+        assert!(sockets_with_received_frames.remove(&bound_a_all_protocols));
+        assert!(sockets_with_received_frames.remove(&bound_any_all_protocols));
         assert!(sockets_with_received_frames.is_empty());
     }
 

@@ -11,5 +11,6 @@ group("tests") {
     "jellyfish:tests",
     "pigweed:tests",
     "re2:tests",
+    "tcpdump:tests",
   ]
 }

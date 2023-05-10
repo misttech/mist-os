@@ -18,8 +18,8 @@ use netstack3_core::{
     device::{
         socket::{
             DeviceSocketTypes, EthernetFrame, Frame, NonSyncContext, Protocol, ReceivedFrame,
-            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SocketId,
-            SocketInfo, TargetDevice,
+            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SentFrame,
+            SocketId, SocketInfo, TargetDevice,
         },
         DeviceId, FrameDestination, WeakDeviceId,
     },
@@ -150,6 +150,12 @@ enum MessageDataInfo {
 impl MessageData {
     fn new(frame: &Frame<&[u8]>, device: &DeviceId<BindingsNonSyncCtxImpl>) -> Self {
         let (packet_type, info) = match frame {
+            Frame::Sent(sent) => (
+                fppacket::PacketType::Outgoing,
+                match sent {
+                    SentFrame::Ethernet(frame) => MessageDataInfo::new_ethernet(frame),
+                },
+            ),
             Frame::Received(ReceivedFrame::Ethernet { destination, frame }) => {
                 let packet_type = match destination {
                     FrameDestination::Broadcast => fppacket::PacketType::Broadcast,

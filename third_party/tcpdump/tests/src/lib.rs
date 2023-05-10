@@ -26,7 +26,7 @@ use net_declare::{fidl_ip_v4, fidl_mac, std_socket_addr};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack2, TestSandboxExt as _},
+    realms::{Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, Serializer};
@@ -263,13 +263,12 @@ async fn version_test() {
     .await
 }
 
-#[fuchsia::test]
+#[netstack_test]
 // TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
-async fn packet_test() {
-    let name = "packet_test";
+async fn packet_test<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
     start_tcpdump_and_wait_for_patterns(
         &realm,
@@ -287,8 +286,10 @@ async fn packet_test() {
 // TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn bridged_packet_test(name: &str) {
+    // TODO(https://fxbug.dev/86661): Support bridging in Netstack3.
+    type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
     let net = sandbox.create_network(name).await.expect("error creating network");
     let iface =

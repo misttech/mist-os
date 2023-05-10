@@ -194,12 +194,12 @@ impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-impl_lock_after!(IpState<Ipv6> => AllDeviceSockets);
-impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
-impl_lock_after!(AnyDeviceSockets => LoopbackTxQueue);
-impl_lock_after!(AnyDeviceSockets => EthernetTxQueue);
+impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
+impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
+impl_lock_after!(LoopbackTxQueue => AllDeviceSockets);
 
+impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 

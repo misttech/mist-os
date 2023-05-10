@@ -17,6 +17,7 @@ fuchsia_unittest_package("tests") {
     # The tests depend `fuchsia.posix.socket/Provider` and
     # `fuchsia.posix.socket.packet/Provider` which the netstack exposes.
     "//src/connectivity/network/netstack:component-debug",
+    "//src/connectivity/network/netstack3:component-debug",
 
     # TCPDump is under test.
     "//third_party/tcpdump:bin",

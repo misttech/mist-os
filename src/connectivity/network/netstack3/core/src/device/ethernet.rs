@@ -45,14 +45,14 @@ use crate::{
         queue::{
             tx::{
                 BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
-                TransmitQueue, TransmitQueueContext, TransmitQueueNonSyncContext,
-                TransmitQueueState, TransmitQueueTypes,
+                TransmitQueue, TransmitQueueCommon, TransmitQueueContext,
+                TransmitQueueNonSyncContext, TransmitQueueState,
             },
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
             BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
-            ReceivedFrame,
+            NonSyncContext as SocketNonSyncContext, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
@@ -567,11 +567,15 @@ impl<C: NonSyncContext> TransmitQueueNonSyncContext<EthernetLinkDevice, Ethernet
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueTypes<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+    TransmitQueueCommon<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
+
+    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        SentFrame::try_parse_as_ethernet(buf)
+    }
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
@@ -715,7 +719,7 @@ impl_timer_context!(
 /// frame.
 pub(super) fn send_ip_frame<
     B: BufferMut,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
         + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
@@ -756,8 +760,7 @@ where
 
 /// Receive an Ethernet frame from the network.
 pub(super) fn receive_frame<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>
-        + crate::device::socket::NonSyncContext<SC::DeviceId>,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     B: BufferMut,
     SC: BufferEthernetIpLinkDeviceDynamicStateContext<C, B>
         + ArpPacketHandler<B, EthernetLinkDevice, C>
@@ -805,7 +808,6 @@ pub(super) fn receive_frame<
         }
         Some(frame_dest) => frame_dest,
     };
-
     let ethertype = ethernet.ethertype();
 
     sync_ctx.handle_frame(
@@ -1025,7 +1027,7 @@ pub(super) fn insert_ndp_table_entry<
 }
 
 impl<
-        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
         B: BufferMut,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
             + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
@@ -1221,6 +1223,7 @@ mod tests {
     use crate::{
         context::testutil::FakeFrameCtx,
         device::{
+            socket::Frame,
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
@@ -1264,6 +1267,18 @@ mod tests {
 
     type FakeCtx =
         crate::context::testutil::FakeSyncCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
+
+    impl BufferSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        fn handle_frame(
+            &mut self,
+            _ctx: &mut FakeNonSyncCtx,
+            _device: &Self::DeviceId,
+            _frame: Frame<&[u8]>,
+            _whole_frame: &[u8],
+        ) {
+            // No-op: don't deliver frames.
+        }
+    }
 
     impl EthernetIpLinkDeviceStaticStateContext for FakeCtx {
         fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
@@ -1412,10 +1427,14 @@ mod tests {
         }
     }
 
-    impl TransmitQueueTypes<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+    impl TransmitQueueCommon<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
         type Meta = ();
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
+
+        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+            SentFrame::try_parse_as_ethernet(buf)
+        }
     }
 
     impl TransmitQueueContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
