@@ -165,6 +165,13 @@ pub fn migrate_nodefault(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/// This does nothing by itself, but with the Migrate derive macro, it defines the target to
+/// migrate to. Without this, Migrate will make a From impl for IdentVX to Ident.
+#[proc_macro_attribute]
+pub fn migrate_to_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 /// Adds a From implementation to help migrate structs or enums.  This will support the following
 /// migrations:
 ///
@@ -183,7 +190,25 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
     let input: syn::DeriveInput = parse_macro_input!(input);
 
     let ident = input.ident;
-    let latest = format_ident!("{}", format!("{}", ident).rsplit_once('V').unwrap().0);
+    let target = if let Some(attr) = input.attrs.iter().find(|a| {
+        a.style == syn::AttrStyle::Outer
+            && a.path.get_ident().is_some()
+            && a.path.get_ident().unwrap().to_string() == "migrate_to_version"
+    }) {
+        match attr.parse_args::<syn::Type>() {
+            Ok(ident) => ident.into_token_stream(),
+            Err(error) => error.into_compile_error(),
+        }
+    } else {
+        match format!("{}", ident).rsplit_once('V') {
+            Some((ident, _)) => format_ident!("{}", ident).into_token_stream(),
+            None => syn::Error::new(
+                ident.span(),
+                "struct or enum must have V in the name to be migrated.",
+            )
+            .into_compile_error(),
+        }
+    };
 
     let out = match input.data {
         Data::Enum(e) => {
@@ -195,7 +220,9 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
                         let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
                         (
                             quote! { { #(#field_names),* } },
-                            quote! { #latest::#var_ident { #(#field_names: #field_names.into()),* } },
+                            quote! {
+                                #target::#var_ident { #(#field_names: #field_names.into()),* }
+                            },
                         )
                     }
                     Fields::Unnamed(fields) => {
@@ -204,10 +231,10 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
                             (0..len).map(|i| format_ident!("f{}", i)).collect();
                         (
                             quote! { (#(#field_names),*) },
-                            quote! { #latest::#var_ident(#(#field_names.into()),*) },
+                            quote! { #target::#var_ident(#(#field_names.into()),*) },
                         )
                     }
-                    Fields::Unit => (quote! {}, quote! { #latest::#var_ident }),
+                    Fields::Unit => (quote! {}, quote! { #target::#var_ident }),
                 };
 
                 arms.extend(quote! {
@@ -216,7 +243,7 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
             }
 
             quote! {
-                impl From<#ident> for #latest {
+                impl From<#ident> for #target {
                     fn from(from: #ident) -> Self {
                         match from {
                             #arms
@@ -247,9 +274,9 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
             };
 
             quote! {
-                impl From<#ident> for #latest {
+                impl From<#ident> for #target {
                     fn from(from: #ident) -> Self {
-                        #latest {
+                        #target {
                             #(#field_names: from.#field_names.into()),*,
                             #default_string
                         }

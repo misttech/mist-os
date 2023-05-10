@@ -16,7 +16,7 @@ use {
                 ProjectProperty,
             },
         },
-        serialized_types::{migrate_nodefault, Migrate, Versioned},
+        serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -157,7 +157,20 @@ pub enum Mutation {
     UpdateMutationsKey(UpdateMutationsKey),
 }
 
-#[derive(Debug, Deserialize, Serialize, Versioned)]
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum MutationV25 {
+    ObjectStore(ObjectStoreMutationV25),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    BeginFlush,
+    EndFlush,
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[migrate_to_version(MutationV25)]
 pub enum MutationV20 {
     ObjectStore(ObjectStoreMutationV20),
     EncryptedObjectStore(Box<[u8]>),
@@ -168,34 +181,6 @@ pub enum MutationV20 {
     // with compacted ones.
     EndFlush,
     // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<MutationV20> for MutationV25 {
-    fn from(old: MutationV20) -> Self {
-        match old {
-            MutationV20::ObjectStore(obj) => MutationV25::ObjectStore(obj.into()),
-            MutationV20::EncryptedObjectStore(obj) => MutationV25::EncryptedObjectStore(obj),
-            MutationV20::Allocator(a) => MutationV25::Allocator(a),
-            MutationV20::BeginFlush => MutationV25::BeginFlush,
-            MutationV20::EndFlush => MutationV25::EndFlush,
-            MutationV20::DeleteVolume => MutationV25::DeleteVolume,
-            MutationV20::UpdateBorrowed(val) => MutationV25::UpdateBorrowed(val),
-            MutationV20::UpdateMutationsKey(obj) => MutationV25::UpdateMutationsKey(obj),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
-pub enum MutationV25 {
-    ObjectStore(ObjectStoreMutationV25),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    BeginFlush,
-    EndFlush,
     DeleteVolume,
     UpdateBorrowed(u64),
     UpdateMutationsKey(UpdateMutationsKey),
@@ -239,23 +224,18 @@ pub struct ObjectStoreMutation {
     pub op: Operation,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ObjectStoreMutationV20 {
-    item: ObjectItemV5,
-    op: Operation,
-}
-
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<ObjectStoreMutationV20> for ObjectStoreMutationV25 {
-    fn from(old: ObjectStoreMutationV20) -> Self {
-        Self { item: old.item.into(), op: old.op.into() }
-    }
-}
-
 #[derive(Debug, Deserialize, Migrate, Serialize)]
 #[migrate_nodefault]
 pub struct ObjectStoreMutationV25 {
     item: ObjectItemV25,
+    op: Operation,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV25)]
+pub struct ObjectStoreMutationV20 {
+    item: ObjectItemV5,
     op: Operation,
 }
 

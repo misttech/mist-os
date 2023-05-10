@@ -52,7 +52,7 @@ use {
         },
         range::RangeExt,
         round::{round_div, round_down, round_up},
-        serialized_types::{Migrate, Version, Versioned, LATEST_VERSION},
+        serialized_types::{migrate_to_version, Migrate, Version, Versioned, LATEST_VERSION},
         trace_duration,
     },
     anyhow::{anyhow, bail, Context, Error},
@@ -145,34 +145,20 @@ pub enum JournalRecord {
     DidFlushDevice(u64),
 }
 
-#[derive(Debug, Deserialize, Serialize, Versioned)]
-pub enum JournalRecordV20 {
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum JournalRecordV25 {
     EndBlock,
-    Mutation { object_id: u64, mutation: MutationV20 },
+    Mutation { object_id: u64, mutation: MutationV25 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),
 }
 
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<JournalRecordV20> for JournalRecordV25 {
-    fn from(old: JournalRecordV20) -> Self {
-        match old {
-            JournalRecordV20::EndBlock => JournalRecordV25::EndBlock,
-            JournalRecordV20::Mutation { object_id, mutation } => {
-                JournalRecordV25::Mutation { object_id, mutation: mutation.into() }
-            }
-            JournalRecordV20::Commit => JournalRecordV25::Commit,
-            JournalRecordV20::Discard(offset) => JournalRecordV25::Discard(offset),
-            JournalRecordV20::DidFlushDevice(offset) => JournalRecordV25::DidFlushDevice(offset),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
-pub enum JournalRecordV25 {
+#[migrate_to_version(JournalRecordV25)]
+pub enum JournalRecordV20 {
     EndBlock,
-    Mutation { object_id: u64, mutation: MutationV25 },
+    Mutation { object_id: u64, mutation: MutationV20 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),

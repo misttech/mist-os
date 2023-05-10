@@ -9,7 +9,7 @@ use {
             Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
-        serialized_types::{migrate_nodefault, Migrate, Versioned},
+        serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
     fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
@@ -387,28 +387,18 @@ pub struct ObjectAttributes {
     pub posix_attributes: Option<PosixAttributes>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ObjectAttributesV5 {
-    creation_time: Timestamp,
-    modification_time: Timestamp,
-}
-
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<ObjectAttributesV5> for ObjectAttributesV25 {
-    fn from(old: ObjectAttributesV5) -> Self {
-        Self {
-            creation_time: old.creation_time.into(),
-            modification_time: old.modification_time.into(),
-            ..Default::default()
-        }
-    }
-}
-
 #[derive(Debug, Default, Deserialize, Migrate, Serialize)]
 pub struct ObjectAttributesV25 {
     creation_time: Timestamp,
     modification_time: Timestamp,
     project_id: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+#[migrate_to_version(ObjectAttributesV25)]
+pub struct ObjectAttributesV5 {
+    creation_time: Timestamp,
+    modification_time: Timestamp,
 }
 
 /// ObjectValue is the value of an item in the object store.
@@ -443,11 +433,11 @@ pub enum ObjectValue {
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
-#[derive(Debug, Deserialize, Serialize, Versioned)]
-pub enum ObjectValueV5 {
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum ObjectValueV25 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributesV5 },
+    Object { kind: ObjectKind, attributes: ObjectAttributesV25 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
@@ -456,34 +446,12 @@ pub enum ObjectValueV5 {
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<ObjectValueV5> for ObjectValueV25 {
-    fn from(old: ObjectValueV5) -> Self {
-        match old {
-            ObjectValueV5::None => ObjectValueV25::None,
-            ObjectValueV5::Some => ObjectValueV25::Some,
-            ObjectValueV5::Object { kind, attributes } => {
-                ObjectValueV25::Object { kind, attributes: attributes.into() }
-            }
-            ObjectValueV5::Keys(keys) => ObjectValueV25::Keys(keys),
-            ObjectValueV5::Attribute { size } => ObjectValueV25::Attribute { size },
-            ObjectValueV5::Extent(e) => ObjectValueV25::Extent(e),
-            ObjectValueV5::Child { object_id, object_descriptor } => {
-                ObjectValueV25::Child { object_id, object_descriptor }
-            }
-            ObjectValueV5::Trim => ObjectValueV25::Trim,
-            ObjectValueV5::BytesAndNodes { bytes, nodes } => {
-                ObjectValueV25::BytesAndNodes { bytes, nodes }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
-pub enum ObjectValueV25 {
+#[derive(Debug, Deserialize, Serialize, Migrate, Versioned)]
+#[migrate_to_version(ObjectValueV25)]
+pub enum ObjectValueV5 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributesV25 },
+    Object { kind: ObjectKind, attributes: ObjectAttributesV5 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),

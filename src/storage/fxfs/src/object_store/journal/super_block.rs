@@ -45,7 +45,8 @@ use {
         },
         range::RangeExt,
         serialized_types::{
-            Migrate, Version, Versioned, VersionedLatest, EARLIEST_SUPPORTED_VERSION,
+            migrate_to_version, Migrate, Version, Versioned, VersionedLatest,
+            EARLIEST_SUPPORTED_VERSION,
         },
     },
     anyhow::{bail, ensure, Context, Error},
@@ -209,28 +210,18 @@ pub enum SuperBlockRecord {
     End,
 }
 
-#[derive(Debug, Deserialize, Serialize, Versioned)]
-pub enum SuperBlockRecordV5 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV5),
-    End,
-}
-
-// TODO(fxbug.dev/126597) - change migrate macro to implement From trait to a specified version
-impl From<SuperBlockRecordV5> for SuperBlockRecordV25 {
-    fn from(old: SuperBlockRecordV5) -> Self {
-        match old {
-            SuperBlockRecordV5::Extent(r) => SuperBlockRecordV25::Extent(r),
-            SuperBlockRecordV5::ObjectItem(obj) => SuperBlockRecordV25::ObjectItem(obj.into()),
-            SuperBlockRecordV5::End => SuperBlockRecordV25::End,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
 pub enum SuperBlockRecordV25 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV25),
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[migrate_to_version(SuperBlockRecordV25)]
+pub enum SuperBlockRecordV5 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV5),
     End,
 }
 
