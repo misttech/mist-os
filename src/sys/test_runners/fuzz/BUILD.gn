@@ -47,6 +47,7 @@ fuchsia_package("fuzz-test-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":fuzz-test-runner-component" ]
 }

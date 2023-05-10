@@ -57,6 +57,7 @@ fuchsia_package("inspect-test-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":inspect_test_runner" ]
 }

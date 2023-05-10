@@ -52,20 +52,7 @@
     ],
     facets: {
         "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "dart-aot-wrapper-runner",
-                "dart-jit-wrapper-runner",
-                "elf-test-ambient-exec-runner",
-                "fuzz-test-runner",
-                "g3_dart_jit_product_runner",
-                "go-test-runner",
-                "inspect-test-runner",
-                "legacy-test-runner",
-                "netemul-test-runner",
-                "rust-test-next-vdso-runner",
-                "starnix-test-runners",
-                "stress-test-runner",
-            ],
+            "deprecated-allowed-packages": [ "legacy-test-runner" ],
         },
     },
 }

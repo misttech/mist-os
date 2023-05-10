@@ -78,6 +78,7 @@ fuchsia_package("elf-test-ambient-exec-runner") {
   visibility = [
     ":*",
     "//bundles/assembly/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":elf-test-ambient-exec-runner-component" ]
 }
@@ -96,6 +97,7 @@ fuchsia_package("elf-test-create-raw-processes-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":elf-test-create-raw-processes-runner-component" ]
 }
@@ -116,6 +118,7 @@ fuchsia_package("elf-test-create-raw-processes-ambient-exec-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":elf-test-create-raw-processes-ambient-exec-runner-component" ]
 }

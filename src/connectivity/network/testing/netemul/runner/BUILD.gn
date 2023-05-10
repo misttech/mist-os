@@ -67,6 +67,7 @@ fuchsia_package("package") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   package_name = "netemul-test-runner"
   deps = [ ":component" ]

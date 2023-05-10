@@ -46,6 +46,7 @@ fuchsia_package("dart-aot-wrapper-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":dart_aot_wrapper_runner" ]
 }
@@ -63,6 +64,7 @@ fuchsia_package("dart-jit-wrapper-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":dart_jit_wrapper_runner" ]
 }

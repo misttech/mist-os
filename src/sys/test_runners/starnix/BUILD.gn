@@ -82,6 +82,7 @@ fuchsia_package("starnix-test-runners") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [
     ":starnix_test_runner",

@@ -75,6 +75,7 @@ fuchsia_package("rust-test-next-vdso-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":rust_test_next_vdso_runner" ]
 }

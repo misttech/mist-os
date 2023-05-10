@@ -200,11 +200,23 @@ fuchsia_package("pkg") {
   ]
 
   subpackages = [
-    "//src/sys/test_runners/rust:rust-test-runner",
-    "//src/sys/test_runners/gunit:gunit-runner",
-    "//src/sys/test_runners/gtest:gtest-runner",
+    "//src/connectivity/network/testing/netemul/runner:package",
+    "//src/sys/test_runners/dart_wrapper:dart-aot-wrapper-runner",
+    "//src/sys/test_runners/dart_wrapper:dart-jit-wrapper-runner",
+    "//src/sys/test_runners/elf:elf-test-ambient-exec-runner",
+    "//src/sys/test_runners/elf:elf-test-create-raw-processes-ambient-exec-runner",
+    "//src/sys/test_runners/elf:elf-test-create-raw-processes-runner",
     "//src/sys/test_runners/elf:elf-test-runner",
+    "//src/sys/test_runners/fuzz:fuzz-test-runner",
+    "//src/sys/test_runners/gotests:go-test-runner",
+    "//src/sys/test_runners/gtest:gtest-runner",
+    "//src/sys/test_runners/gunit:gunit-runner",
+    "//src/sys/test_runners/inspect:inspect-test-runner",
     "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
+    "//src/sys/test_runners/rust:rust-test-next-vdso-runner",
+    "//src/sys/test_runners/rust:rust-test-runner",
+    "//src/sys/test_runners/starnix:starnix-test-runners",
+    "//src/sys/test_runners/stress_test:stress-test-runner",
   ]
 }
 

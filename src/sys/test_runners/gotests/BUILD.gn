@@ -57,6 +57,7 @@ fuchsia_package("go-test-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":go_test_runner" ]
 }
