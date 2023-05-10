@@ -91,6 +91,29 @@ class DeregisterConnectionOwner : public FakeConnectionOwner {
   std::weak_ptr<MsdArmConnection> connection_;
 };
 
+class FailBusMapper : public magma::PlatformBusMapper {
+ public:
+  FailBusMapper() {}
+
+  std::unique_ptr<magma::PlatformBusMapper::BusMapping> MapPageRangeBus(
+      magma::PlatformBuffer* buffer, uint64_t start_page_index, uint64_t page_count) override {
+    return nullptr;
+  }
+  std::unique_ptr<magma::PlatformBuffer> CreateContiguousBuffer(size_t size,
+                                                                uint32_t alignment_log2,
+                                                                const char* name) override {
+    return nullptr;
+  }
+};
+
+class FailAllocateConnectionOwner : public FakeConnectionOwner {
+ public:
+  magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
+
+ private:
+  FailBusMapper bus_mapper_;
+};
+
 uint32_t g_test_data_size;
 magma_arm_mali_status g_status;
 
@@ -1242,6 +1265,13 @@ class TestConnection {
       EXPECT_EQ(0u, connection->jit_memory_regions_.size());
     }
   }
+
+  // Test that creating a device doesn't crash, even if all allocations fail.
+  void FailAllAllocation() {
+    FailAllocateConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_FALSE(connection);
+  }
 };
 
 TEST(TestConnection, MapUnmap) {
@@ -1352,4 +1382,9 @@ TEST(TestConnection, JitAllocateInvalidWriteAddress) {
 TEST(TestConnection, MemoryPressure) {
   TestConnection test;
   test.MemoryPressure();
+}
+
+TEST(TestConnection, FailAllAllocation) {
+  TestConnection test;
+  test.FailAllAllocation();
 }

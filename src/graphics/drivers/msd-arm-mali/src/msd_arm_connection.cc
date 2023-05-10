@@ -324,7 +324,9 @@ MsdArmConnection::~MsdArmConnection() {
 
   // Do this before tearing down GpuMappings to ensure it doesn't try to grab a
   // reference to this object while flushing the address space.
-  address_space_->ReleaseSpaceMappings();
+  if (address_space_) {
+    address_space_->ReleaseSpaceMappings();
+  }
   owner_->DeregisterConnection();
   jit_memory_regions_.clear();
 }
