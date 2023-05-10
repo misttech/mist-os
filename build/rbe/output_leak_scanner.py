@@ -89,13 +89,26 @@ def _whole_word_pattern(pattern: str) -> str:
     return left + pattern + right
 
 
+def _literal_dot_pattern(pattern: str) -> str:
+    return pattern.replace('.', r'\.')
+
+
 class PathPattern(object):
     """Represents a path that is used for pattern searching."""
 
     def __init__(self, path: Path):
+        """Constructor.
+
+        Args:
+          path: path, which may be relative or absolute, but not != '.'.
+        """
         self._text = str(path)
+        if self._text == '.':
+            raise ValueError(
+                f'You should skip PathPattern checks when path is just "{self._text}"'
+            )
         # match whole-word only
-        pattern = _whole_word_pattern(self._text)
+        pattern = _whole_word_pattern(_literal_dot_pattern(self._text))
         self._re_text = re.compile(pattern)
         self._re_bin = re.compile(pattern.encode())
 
@@ -277,17 +290,19 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     script_args = argv[:ddash]
     command = argv[ddash + 1:]
 
-    build_subdir = cl_utils.relpath(working_dir, start=exec_root)
-    path_pattern = PathPattern(build_subdir)
-
     main_args = _MAIN_ARG_PARSER.parse_args(script_args)
     label = main_args.label
 
-    pre_scan_exit_code = preflight_checks(
-        paths=main_args.outputs,
-        command=command,
-        pattern=path_pattern,
-        label=label)
+    build_subdir = cl_utils.relpath(working_dir, start=exec_root)
+    pre_scan_exit_code = 0
+    if str(build_subdir) != '.':
+        path_pattern = PathPattern(build_subdir)
+
+        pre_scan_exit_code = preflight_checks(
+            paths=main_args.outputs,
+            command=command,
+            pattern=path_pattern,
+            label=label)
 
     if not main_args.execute:
         return pre_scan_exit_code
@@ -296,6 +311,9 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     command_exit_code = subprocess.call(
         cl_utils.auto_env_prefix_command(command), cwd=working_dir)
     if command_exit_code != 0:
+        return command_exit_code
+
+    if str(build_subdir) == '.':  # nothing to check
         return command_exit_code
 
     # Command succeeded, scan its declared outputs.

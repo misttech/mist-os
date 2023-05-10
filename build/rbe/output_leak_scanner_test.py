@@ -45,6 +45,7 @@ class PathPatternTests(unittest.TestCase):
         p = output_leak_scanner.PathPattern(path)
         self.assertEqual(p.text, str(path))
         self.assertTrue(p.re_text.search('somewhere/over/the/rainbow'))
+        self.assertTrue(p.re_bin.search(b'somewhere/over/the/rainbow'))
 
     def test_equal(self):
         # different, but equivalent objects
@@ -56,6 +57,19 @@ class PathPatternTests(unittest.TestCase):
         self.assertNotEqual(
             output_leak_scanner.PathPattern(Path('foo/bar')),
             output_leak_scanner.PathPattern(Path('bar/foo')))
+
+    def test_dot_should_never_be_used(self):
+        with self.assertRaises(ValueError):
+            output_leak_scanner.PathPattern(Path())
+        with self.assertRaises(ValueError):
+            output_leak_scanner.PathPattern(Path('.'))
+
+    def test_dots_in_paths_are_literal(self):
+        path = Path('build.obj.stuff')
+        p = output_leak_scanner.PathPattern(path)
+        self.assertEqual(p.text, str(path))
+        self.assertTrue(p.re_text.search('foo/build.obj.stuff/bar'))
+        self.assertFalse(p.re_text.search('foo/build_obj_stuff/bar'))
 
 
 class MainArgParserTests(unittest.TestCase):
@@ -124,13 +138,13 @@ class FileContainsSubpathTests(unittest.TestCase):
             self.assertFalse(
                 output_leak_scanner.file_contains_subpath(
                     Path(td) / 'nonexistent',
-                    output_leak_scanner.PathPattern(Path('.'))))
+                    output_leak_scanner.PathPattern(Path('nonexistent'))))
 
     def test_ignore_dir(self):
         with tempfile.TemporaryDirectory() as td:
             self.assertFalse(
                 output_leak_scanner.file_contains_subpath(
-                    Path(td), output_leak_scanner.PathPattern(Path('.'))))
+                    Path(td), output_leak_scanner.PathPattern(Path('other'))))
 
     def test_text_no_match(self):
         with tempfile.TemporaryDirectory() as td:
@@ -339,6 +353,27 @@ class ScanLeaksTests(unittest.TestCase):
         message = stdout.getvalue()
         self.assertIn("Error", message)
         self.assertIn("'--' is missing", message)
+
+    def test_skip_checking_subdir_dot(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            with mock.patch.object(output_leak_scanner, 'preflight_checks',
+                                   return_value=0) as mock_pre_check:
+                with mock.patch.object(output_leak_scanner, 'postflight_checks',
+                                       return_value=0) as mock_post_check:
+                    with mock.patch.object(subprocess, 'call',
+                                           return_value=0) as mock_call:
+                        return_code = output_leak_scanner.scan_leaks(
+                            ['--', 'touch', 'down.txt'],
+                            exec_root=Path('/home/project'),
+                            working_dir=Path('/home/project'),
+                        )
+        mock_pre_check.assert_not_called()
+        mock_post_check.assert_not_called()
+        mock_call.assert_called_once()
+        self.assertEqual(return_code, 0)
+        message = stdout.getvalue()
+        self.assertEqual(message, '')
 
     def test_no_execute(self):
         stdout = io.StringIO()

@@ -1467,7 +1467,7 @@ class RemoteAction(object):
         # When using a remote canonical_working_dir, make sure the command
         # being launched does not reference the non-canonical local working
         # dir explicitly.
-        if self.canonicalize_working_dir:
+        if self.canonicalize_working_dir and str(self.build_subdir) != '.':
             leak_status = output_leak_scanner.preflight_checks(
                 paths=self.output_files_relative_to_working_dir,
                 command=self.local_only_command,

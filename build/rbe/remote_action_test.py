@@ -1093,6 +1093,33 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         )
         mock_run.assert_called()
 
+    def test_output_leak_scan_skipped_when_build_subdir_is_dot(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root  # build_subdir == '.'
+        canonical_dir_option = '--canonicalize_working_dir=true'
+        p = self._make_main_parser()
+        command = ['echo']
+        main_args, other = p.parse_known_args(
+            [canonical_dir_option, '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertTrue(action.canonicalize_working_dir)
+        self.assertIn(canonical_dir_option, action.options)
+        with mock.patch.object(output_leak_scanner, 'preflight_checks',
+                               return_value=0) as mock_scan:
+            with mock.patch.object(
+                    remote_action.RemoteAction, '_run_maybe_remotely',
+                    return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_scan.assert_not_called()
+        mock_run.assert_called()
+
     def test_output_leak_scan_with_canonical_working_dir_called(self):
         exec_root = Path('/home/project')
         build_dir = Path('build-out')
