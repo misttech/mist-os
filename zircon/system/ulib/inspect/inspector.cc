@@ -9,8 +9,6 @@
 #include <lib/inspect/cpp/vmo/state.h>
 #include <lib/inspect/cpp/vmo/types.h>
 
-#include <sstream>
-
 using inspect::internal::Heap;
 using inspect::internal::State;
 

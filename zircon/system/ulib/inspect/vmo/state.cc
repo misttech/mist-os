@@ -19,7 +19,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -1286,10 +1285,16 @@ zx_status_t State::InnerCreateAndIncrementStringReference(BorrowedStringValue na
 }
 
 std::string State::UniqueName(const std::string& prefix) {
-  std::ostringstream out;
   uint64_t value = next_unique_id_.fetch_add(1, std::memory_order_relaxed);
-  out << prefix << "0x" << std::hex << value;
-  return out.str();
+
+  // enough space to write uint64_t max + null terminate in hex, ie
+  // "0xffffffffffffffff\n"
+  constexpr size_t max_hex_string_len = 19;
+
+  std::array<char, max_hex_string_len> hex_buff;
+  sprintf(hex_buff.data(), "0x%lx", value);
+
+  return prefix + hex_buff.data();
 }
 
 InspectStats State::GetStats() const {
