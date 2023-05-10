@@ -353,6 +353,7 @@ std::pair<ktl::optional<VmCompressedStorage::CompressedRef>, vm_page_t*> VmTriPa
       full_pages_count_++;
     }
     stored_items_++;
+    total_compressed_item_size_ += len;
   }
   // Perform any remaining mempcy
   if (dest_addr) {
@@ -382,6 +383,7 @@ void VmTriPageStorage::Free(CompressedRef ref) {
       // the correct bucket counts.
       RemovePageFromBucketLocked(page);
     }
+    const uint64_t len = get_slot_length(page, slot);
     set_slot_length(page, slot, 0);
     if (page_is_full(page)) {
       // The page could still be full after freeing a slot if a very small allocation was placed in
@@ -396,6 +398,8 @@ void VmTriPageStorage::Free(CompressedRef ref) {
       page = nullptr;
     }
     stored_items_--;
+    DEBUG_ASSERT(len <= total_compressed_item_size_);
+    total_compressed_item_size_ -= len;
   }
   if (page) {
     DEBUG_ASSERT(page->state() == vm_page_state::ZRAM && page_is_empty(page));
@@ -411,7 +415,8 @@ VmTriPageStorage::MemoryUsage VmTriPageStorage::GetMemoryUsage() const {
     total += bucket_pages_count;
   }
   return MemoryUsage{.uncompressed_content_bytes = stored_items_ * PAGE_SIZE,
-                     .compressed_storage_bytes = total * PAGE_SIZE};
+                     .compressed_storage_bytes = total * PAGE_SIZE,
+                     .compressed_storage_used_bytes = total_compressed_item_size_};
 }
 
 void VmTriPageStorage::Dump() const {
@@ -421,8 +426,9 @@ void VmTriPageStorage::Dump() const {
   for (uint64_t bucket_pages_count : bucket_pages_counts_) {
     bucket_totals += bucket_pages_count;
   }
-  printf("[ZRAM]: Storing %" PRIu64 " items using %" PRIu64 " pages\n", stored_items_,
-         (full_pages_count_ + bucket_totals));
+  printf("[ZRAM]: Storing %" PRIu64 " items with compressed size %" PRIu64 " using %" PRIu64
+         " pages\n",
+         stored_items_, total_compressed_item_size_, (full_pages_count_ + bucket_totals));
   printf("[ZRAM]: %" PRIu64 " pages considered full, non-empty buckets:\n", full_pages_count_);
   for (size_t i = 0; i < kNumBuckets; i++) {
     if (bucket_pages_counts_[i] > 0) {

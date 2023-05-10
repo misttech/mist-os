@@ -137,6 +137,9 @@ class VmTriPageStorage final : public VmCompressedStorage {
   // vended.
   uint64_t stored_items_ TA_GUARDED(lock_) = 0;
 
+  // The total compressed size of all the items being stored.
+  uint64_t total_compressed_item_size_ TA_GUARDED(lock_) = 0;
+
   // Pages that we consider full and cannot have additional items stored in them.
   list_node_t full_pages_ TA_GUARDED(lock_);
   uint64_t full_pages_count_ TA_GUARDED(lock_) = 0;

@@ -73,6 +73,7 @@ class VmCompressedStorage : public fbl::RefCounted<VmCompressedStorage> {
   struct MemoryUsage {
     uint64_t uncompressed_content_bytes = 0;
     uint64_t compressed_storage_bytes = 0;
+    uint64_t compressed_storage_used_bytes = 0;
   };
   virtual MemoryUsage GetMemoryUsage() const = 0;
 };
