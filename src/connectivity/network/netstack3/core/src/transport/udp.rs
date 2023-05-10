@@ -58,10 +58,11 @@ use crate::{
             SetMulticastMembershipError, SockCreationError, SocketHopLimits, UnboundSocketState,
         },
         posix::{
-            PosixAddrState, PosixAddrVecIter, PosixAddrVecTag, PosixConflictPolicy,
-            PosixSharingOptions, PosixSocketStateSpec, ToPosixSharingOptions,
+            PosixAddrState, PosixAddrVecIter, PosixAddrVecTag, PosixSharingOptions,
+            ToPosixSharingOptions,
         },
         AddrVec, Bound, BoundSocketMap, InsertError, SocketAddrType, SocketMapAddrSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
     transport, SyncCtx,
@@ -144,10 +145,10 @@ fn iter_receiving_addrs<I: Ip + IpExt, D: WeakId>(
     PosixAddrVecIter::with_device(addr, device)
 }
 
-pub(crate) fn check_posix_sharing<A: SocketMapAddrSpec, P: PosixSocketStateSpec>(
+fn check_posix_sharing<I: IpExt, D: WeakId>(
     new_sharing: PosixSharingOptions,
-    dest: AddrVec<A>,
-    socketmap: &SocketMap<AddrVec<A>, Bound<P>>,
+    dest: AddrVec<IpPortSpec<I, D>>,
+    socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
 ) -> Result<(), InsertError> {
     // Having a value present at a shadowed address is disqualifying, unless
     // both the new and existing sockets allow port sharing.
@@ -187,10 +188,10 @@ pub(crate) fn check_posix_sharing<A: SocketMapAddrSpec, P: PosixSocketStateSpec>
     // from the other in the socketmap without a linear scan. Instead. we
     // rely on the fact that the tag values in the socket map have different
     // values for entries with and without device IDs specified.
-    fn conflict_exists<A: SocketMapAddrSpec, P: PosixSocketStateSpec>(
+    fn conflict_exists<I: IpExt, D: WeakId>(
         new_sharing: PosixSharingOptions,
-        socketmap: &SocketMap<AddrVec<A>, Bound<P>>,
-        addr: impl Into<AddrVec<A>>,
+        socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
+        addr: impl Into<AddrVec<IpPortSpec<I, D>>>,
         mut is_conflicting: impl FnMut(&PosixAddrVecTag) -> bool,
     ) -> bool {
         socketmap.descendant_counts(&addr.into()).any(|(tag, _): &(_, NonZeroUsize)| {
@@ -337,21 +338,34 @@ pub(crate) fn check_posix_sharing<A: SocketMapAddrSpec, P: PosixSocketStateSpec>
     }
 }
 
-impl<I: IpExt, D: Id> PosixSocketStateSpec for Udp<I, D> {
+impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ListenerId = ListenerId<I>;
     type ConnId = ConnId<I>;
 
     type ListenerState = ListenerState<I::Addr, D>;
     type ConnState = ConnState<I, D>;
+
+    type AddrVecTag = PosixAddrVecTag;
+
+    type ListenerSharingState = PosixSharingOptions;
+    type ConnSharingState = PosixSharingOptions;
+
+    type ListenerAddrState = PosixAddrState<Self::ListenerId>;
+
+    type ConnAddrState = PosixAddrState<Self::ConnId>;
 }
 
-impl<I: IpExt, D: WeakId> PosixConflictPolicy<IpPortSpec<I, D>> for Udp<I, D> {
-    fn check_posix_sharing(
-        new_sharing: PosixSharingOptions,
-        addr: AddrVec<IpPortSpec<I, D>>,
+impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, PosixSharingOptions, IpPortSpec<I, D>>
+    for Udp<I, D>
+where
+    AA: Into<AddrVec<IpPortSpec<I, D>>> + Clone,
+{
+    fn check_insert_conflicts(
+        new_sharing_state: &PosixSharingOptions,
+        addr: &AA,
         socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
     ) -> Result<(), InsertError> {
-        check_posix_sharing(new_sharing, addr, socketmap)
+        check_posix_sharing(*new_sharing_state, addr.clone().into(), socketmap)
     }
 }
 
@@ -2314,6 +2328,8 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
+    use itertools::Itertools as _;
+    use net_declare::net_ip_v4 as ip_v4;
     use net_declare::net_ip_v6;
     use net_types::{
         ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
@@ -2339,11 +2355,17 @@ mod tests {
         ip::{
             device::state::IpDeviceStateIpExt,
             icmp::{Icmpv4ErrorCode, Icmpv6ErrorCode},
-            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+            socket::{
+                testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+                IpSocketHandler,
+            },
             testutil::FakeIpDeviceIdCtx,
             ResolveRouteError, SendIpPacketMeta,
         },
-        socket::{self, datagram::MulticastInterfaceSelector},
+        socket::{
+            self,
+            datagram::{IpOptions, MulticastInterfaceSelector},
+        },
         testutil::{assert_empty, set_logger_for_test, TestIpExt as _},
     };
 
@@ -6137,5 +6159,224 @@ where {
             },
             Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8]),
         );
+    }
+
+    type FakeBoundSocketMap<I> = BoundSocketMap<
+        IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>,
+        Udp<I, FakeWeakDeviceId<FakeDeviceId>>,
+    >;
+
+    fn listen<I: Ip + IpExt>(
+        ip: I::Addr,
+        port: u16,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+        let addr = SpecifiedAddr::new(ip);
+        let port = NonZeroU16::new(port).expect("port must be nonzero");
+        AddrVec::Listen(ListenerAddr {
+            ip: ListenerIpAddr { addr, identifier: port },
+            device: None,
+        })
+    }
+
+    fn listen_device<I: Ip + IpExt>(
+        ip: I::Addr,
+        port: u16,
+        device: FakeWeakDeviceId<FakeDeviceId>,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+        let addr = SpecifiedAddr::new(ip);
+        let port = NonZeroU16::new(port).expect("port must be nonzero");
+        AddrVec::Listen(ListenerAddr {
+            ip: ListenerIpAddr { addr, identifier: port },
+            device: Some(device),
+        })
+    }
+
+    fn conn<I: Ip + IpExt>(
+        local_ip: I::Addr,
+        local_port: u16,
+        remote_ip: I::Addr,
+        remote_port: u16,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+        let local_ip = SpecifiedAddr::new(local_ip).expect("addr must be specified");
+        let local_port = NonZeroU16::new(local_port).expect("port must be nonzero");
+        let remote_ip = SpecifiedAddr::new(remote_ip).expect("addr must be specified");
+        let remote_port = NonZeroU16::new(remote_port).expect("port must be nonzero");
+        AddrVec::Conn(ConnAddr {
+            ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
+            device: None,
+        })
+    }
+
+    fn fake_listener_state<A: Eq + Hash, D: Eq + Hash>() -> ListenerState<A, D> {
+        ListenerState { ip_options: IpOptions::default() }
+    }
+
+    fn fake_conn_state<I: IpExt + TestIpExt>() -> ConnState<I, FakeWeakDeviceId<FakeDeviceId>> {
+        let mut ctx = crate::testutil::FakeNonSyncCtx::default();
+        let socket = FakeIpSocketCtx::new([FakeDeviceConfig {
+            device: FakeDeviceId,
+            local_ips: vec![I::FAKE_CONFIG.local_ip],
+            remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+        }])
+        .new_ip_socket(
+            &mut ctx,
+            None,
+            None,
+            I::FAKE_CONFIG.remote_ip,
+            IpProto::Udp.into(),
+            IpOptions::default(),
+        )
+        .unwrap();
+
+        ConnState { clear_device_on_disconnect: false, socket }
+    }
+
+    #[test_case([
+        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive),
+        (listen(ip_v4!("0.0.0.0"), 2), PosixSharingOptions::Exclusive)],
+            Ok(()); "listen_any_ip_different_port")]
+    #[test_case([
+        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive),
+        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive)],
+            Err(InsertError::Exists); "any_ip_same_port")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive)],
+            Err(InsertError::Exists); "listen_same_specific_ip")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort)],
+            Ok(()); "listen_same_specific_ip_reuse_port")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort)],
+            Err(InsertError::Exists); "listen_same_specific_ip_exclusive_reuse_port")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive)],
+            Err(InsertError::Exists); "listen_same_specific_ip_reuse_port_exclusive")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::ReusePort)],
+            Ok(()); "conn_shadows_listener_reuse_port")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+            Err(InsertError::ShadowAddrExists); "conn_shadows_listener_exclusive")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::ReusePort)],
+            Err(InsertError::ShadowAddrExists); "conn_shadows_listener_exclusive_reuse_port")]
+    #[test_case([
+        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+            Err(InsertError::ShadowAddrExists); "conn_shadows_listener_reuse_port_exclusive")]
+    #[test_case([
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+            Err(InsertError::IndirectConflict); "conn_indirect_conflict_specific_listener")]
+    #[test_case([
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+            Err(InsertError::IndirectConflict); "conn_indirect_conflict_any_listener")]
+    #[test_case([
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
+            Err(InsertError::IndirectConflict); "specific_listener_indirect_conflict_conn")]
+    #[test_case([
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
+            Err(InsertError::IndirectConflict); "any_listener_indirect_conflict_conn")]
+    fn bind_sequence<
+        C: IntoIterator<
+            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, PosixSharingOptions),
+        >,
+    >(
+        spec: C,
+        expected: Result<(), InsertError>,
+    ) {
+        let mut map = FakeBoundSocketMap::<Ipv4>::default();
+        let mut spec = spec.into_iter().peekable();
+        let mut try_insert = |(addr, options)| match addr {
+            AddrVec::Conn(c) => map
+                .conns_mut()
+                .try_insert(c, fake_conn_state(), options)
+                .map(|_| ())
+                .map_err(|(e, _, _)| e),
+            AddrVec::Listen(l) => map
+                .listeners_mut()
+                .try_insert(l, fake_listener_state(), options)
+                .map(|_| ())
+                .map_err(|(e, _, _)| e),
+        };
+        let last = loop {
+            let one_spec = spec.next().expect("empty list of test cases");
+            if spec.peek().is_none() {
+                break one_spec;
+            } else {
+                try_insert(one_spec).expect("intermediate bind failed")
+            }
+        };
+
+        let result = try_insert(last);
+        assert_eq!(result, expected);
+    }
+
+    #[test_case([
+            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
+            (listen(ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
+        ]; "distinct")]
+    #[test_case([
+            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+        ]; "listen_reuse_port")]
+    #[test_case([
+            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), PosixSharingOptions::ReusePort),
+            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), PosixSharingOptions::ReusePort),
+        ]; "conn_reuse_port")]
+    fn remove_sequence<I>(spec: I)
+    where
+        I: IntoIterator<
+            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, PosixSharingOptions),
+        >,
+        I::IntoIter: ExactSizeIterator,
+    {
+        enum Socket<A: IpAddress, D, LI, RI> {
+            Listener(ListenerId<A::Version>, ListenerAddr<A, D, LI>),
+            Conn(ConnId<A::Version>, ConnAddr<A, D, LI, RI>),
+        }
+        let spec = spec.into_iter();
+        let spec_len = spec.len();
+        for spec in spec.permutations(spec_len) {
+            let mut map = FakeBoundSocketMap::<Ipv4>::default();
+            let sockets = spec
+                .into_iter()
+                .map(|(addr, options)| match addr {
+                    AddrVec::Conn(c) => map
+                        .conns_mut()
+                        .try_insert(c.clone(), fake_conn_state(), options)
+                        .map(|entry| Socket::Conn(entry.id(), c))
+                        .expect("insert_failed"),
+                    AddrVec::Listen(l) => map
+                        .listeners_mut()
+                        .try_insert(l.clone(), fake_listener_state(), options)
+                        .map(|entry| Socket::Listener(entry.id(), l))
+                        .expect("insert_failed"),
+                })
+                .collect::<Vec<_>>();
+
+            for socket in sockets {
+                match socket {
+                    Socket::Listener(l, addr) => {
+                        assert_matches!(map.listeners_mut().remove(&l),
+                                        Some((_, _, a)) => assert_eq!(a, addr));
+                    }
+                    Socket::Conn(c, addr) => {
+                        assert_matches!(map.conns_mut().remove(&c),
+                                        Some((_, _, a)) => assert_eq!(a, addr));
+                    }
+                }
+            }
+        }
     }
 }
