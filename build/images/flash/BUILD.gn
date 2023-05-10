@@ -28,7 +28,6 @@ group("esp") {
 }
 
 bazel_input_resource("esp.bazel_input") {
-  testonly = true
   sources = [ "${root_build_dir}/fuchsia.esp.blk" ]
   outputs = [ "fuchsia.esp.blk" ]
   deps = [ ":esp" ]
