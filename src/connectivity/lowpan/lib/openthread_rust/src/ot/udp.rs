@@ -87,6 +87,6 @@ impl<T: Udp + ot::Boxable> Udp for ot::Box<T> {
 
 impl Udp for Instance {
     fn udp_get_sockets(&self) -> UdpSocketIterator<'_> {
-        UdpSocketIterator(unsafe { otUdpGetSockets(self.as_ot_ptr()) }, PhantomData::default())
+        UdpSocketIterator(unsafe { otUdpGetSockets(self.as_ot_ptr()) }, PhantomData)
     }
 }

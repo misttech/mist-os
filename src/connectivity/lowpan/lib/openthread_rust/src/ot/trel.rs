@@ -53,8 +53,8 @@ impl_ot_castable!(
     lifetime
     PlatTrelPeerInfo<'_>,
     otPlatTrelPeerInfo,
-    PhantomData::default(),
-    PhantomData::default()
+    PhantomData,
+    PhantomData
 );
 
 impl std::fmt::Debug for PlatTrelPeerInfo<'_> {
