@@ -2077,7 +2077,6 @@ mod test {
                    \n    [✓] Environment File Location: {env_file}\
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
-                   \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
@@ -2140,7 +2139,6 @@ mod test {
                    \n    [✓] Environment File Location: {env_file}\
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
-                   \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
@@ -2211,7 +2209,6 @@ mod test {
                    \n    [✓] Environment File Location: {env_file}\
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
-                   \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✗] Checking daemon\
@@ -2275,7 +2272,6 @@ mod test {
                    \n    [✓] Environment File Location: {env_file}\
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
-                   \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
@@ -2346,7 +2342,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -2539,7 +2534,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -2620,7 +2614,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -2665,7 +2658,6 @@ mod test {
                 \n[✓] FFX Environment Context\
                 \n    [✓] Kind of Environment: Isolated environment with an isolated root of {isolated_root}\
                 \n    [✓] Config Lock Files\
-                \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
@@ -2678,7 +2670,6 @@ mod test {
                 \n    [✗] Target: {UNRESPONSIVE_NODENAME}\
                 \n[✓] No issues found\n",
                 isolated_root=test_env.isolate_root.path().display(),
-                env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
             )
         );
@@ -2737,7 +2728,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -2818,7 +2808,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -2972,7 +2961,6 @@ mod test {
                     \n    [✓] Environment File Location: {env_file}\
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
-                    \n        [✓] {env_file} locked by {env_file}.lock\
                     \n        [✓] {user_file} locked by {user_file}.lock\
                     \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
@@ -3053,7 +3041,6 @@ mod test {
                     \n    [✓] Environment File Location: {env_file}\
                     \n    [✓] No build directory discovered in the environment.\
                     \n    [✓] Config Lock Files\
-                    \n        [✓] {env_file} locked by {env_file}.lock\
                     \n        [✓] {user_file} locked by {user_file}.lock\
                     \n    [✓] SSH Public/Private keys match\n\
                     \n[✓] Checking daemon\
@@ -3154,7 +3141,6 @@ mod test {
                 \n    [✓] Environment File Location: {env_file}\
                 \n    [✓] No build directory discovered in the environment.\
                 \n    [✓] Config Lock Files\
-                \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
@@ -3199,7 +3185,6 @@ mod test {
                 \n[✓] FFX Environment Context\
                 \n    [✓] Kind of Environment: Isolated environment with an isolated root of {isolated_root}\
                 \n    [✓] Config Lock Files\
-                \n        [✓] {env_file} locked by {env_file}.lock\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n    [✓] SSH Public/Private keys match\
                 \n[✓] Checking daemon\
@@ -3213,7 +3198,6 @@ mod test {
                 \n[✗] Doctor found issues in one or more categories; \
                 run 'ffx doctor -v' for more details.\n",
                 isolated_root=test_env.isolate_root.path().display(),
-                env_file=test_env.env_file.path().display(),
                 user_file=test_env.user_file.path().display(),
             )
         );
@@ -3269,7 +3253,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✓] SSH Public/Private keys match\
             \n[✓] Checking daemon\
@@ -3343,7 +3326,6 @@ mod test {
                    \n    [✓] Environment File Location: {env_file}\
                    \n    [✓] No build directory discovered in the environment.\
                    \n    [✓] Config Lock Files\
-                   \n        [✓] {env_file} locked by {env_file}.lock\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n    [✓] SSH Public/Private keys match\
                    \n[✓] Checking daemon\
@@ -3421,7 +3403,6 @@ mod test {
             \n    [✓] Environment File Location: {env_file}\
             \n    [✓] No build directory discovered in the environment.\
             \n    [✓] Config Lock Files\
-            \n        [✓] {env_file} locked by {env_file}.lock\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n    [✗] Private key {priv_key} does not exist. Check configuration or run `ffx doctor --repair-keys`\
             \n[✓] Checking daemon\

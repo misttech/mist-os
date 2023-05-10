@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{environment::EnvironmentKind, EnvironmentContext};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use std::path::Path;
 use std::{fs::create_dir_all, path::PathBuf};
 
 use std::env::var;
@@ -26,6 +27,12 @@ impl EnvironmentContext {
             Isolated { isolate_root, .. } => Ok(isolate_root.join(ENV_FILE)),
             _ => default_env_path(),
         }
+    }
+
+    pub fn get_default_build_dir_config_path(&self, build_dir: &Path) -> Result<PathBuf> {
+        let mut filename = build_dir.file_name().context("build dir filename")?.to_owned();
+        filename.push(".json");
+        Ok(build_dir.with_file_name(&filename))
     }
 
     pub fn get_default_ascendd_path(&self) -> Result<PathBuf> {

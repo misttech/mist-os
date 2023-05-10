@@ -195,10 +195,11 @@ impl Config {
     }
 
     pub(crate) fn from_env(env: &Environment) -> Result<Self> {
+        let user_conf = env.get_user();
         let build_conf = env.get_build();
 
-        let user = env.get_user().map(ConfigFile::from_file).transpose()?;
-        let build = build_conf.map(ConfigFile::from_file).transpose()?;
+        let user = user_conf.as_deref().map(ConfigFile::from_file).transpose()?;
+        let build = build_conf.as_deref().map(ConfigFile::from_file).transpose()?;
         let global = env.get_global().map(ConfigFile::from_file).transpose()?;
 
         Ok(Self::new(global, build, user, env.get_runtime_args().clone()))

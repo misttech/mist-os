@@ -92,7 +92,7 @@ pub async fn global_env() -> Result<Environment> {
     match context.load().await {
         Err(err) => {
             tracing::error!("failed to load environment, reverting to default: {}", err);
-            Environment::new_empty(context).await
+            Ok(Environment::new_empty(context))
         }
         Ok(ctx) => Ok(ctx),
     }
@@ -101,11 +101,6 @@ pub async fn global_env() -> Result<Environment> {
 /// Initialize the configuration. Only the first call in a process runtime takes effect, so users must
 /// call this early with the required values, such as in main() in the ffx binary.
 pub async fn init(context: &EnvironmentContext) -> Result<()> {
-    let env = context.env_file_path()?;
-    if !env.is_file() {
-        tracing::debug!("initializing environment {}", env.display());
-        Environment::init_env_file(&env).await?;
-    }
     let mut env_lock = ENV.lock().unwrap();
     if env_lock.is_some() {
         anyhow::bail!("Attempted to set the global environment more than once in a process invocation, outside of a test");

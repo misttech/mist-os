@@ -16,7 +16,7 @@ use std::{
     collections::HashMap,
     fmt,
     fs::{File, OpenOptions},
-    io::{BufReader, Read, Write},
+    io::{BufReader, ErrorKind, Read, Write},
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
@@ -244,7 +244,7 @@ impl EnvironmentContext {
     }
 
     pub async fn load(&self) -> Result<Environment> {
-        Environment::load(self.clone()).await
+        Environment::load(self).await
     }
 
     /// Gets an environment variable, either from the system environment or from the isolation-configured
@@ -483,19 +483,15 @@ pub struct Environment {
 impl Environment {
     /// Creates a new empty env that will be saved to a specific path, but is initialized
     /// with no settings. For internal use only, when loading the global environment fails.
-    pub(crate) async fn new_empty(context: EnvironmentContext) -> Result<Self> {
-        let _lock = Self::lock_env(&context.env_file_path()?).await?;
-
+    pub(crate) fn new_empty(context: EnvironmentContext) -> Self {
         let files = EnvironmentFiles::default();
-        Ok(Self { context, files })
+        Self { context, files }
     }
 
-    async fn load(context: EnvironmentContext) -> Result<Self> {
+    async fn load(context: &EnvironmentContext) -> Result<Self> {
         let path = context.env_file_path()?;
 
-        // Grab the lock because we're reading from the environment file.
-        let lockfile = Self::lock_env(&path).await?;
-        Self::load_with_lock(lockfile, path, context)
+        Self::load_env_file(&path, context)
     }
 
     pub fn context(&self) -> &EnvironmentContext {
@@ -512,16 +508,9 @@ impl Environment {
         context: &EnvironmentContext,
     ) -> Result<Vec<(PathBuf, Result<PathBuf, LockfileCreateError>)>> {
         let path = context.env_file_path()?.clone();
+        let env = Self::load_env_file(&path, context)?;
 
-        let (lock_path, env) = match Self::lock_env(&path).await {
-            Ok(lockfile) => (
-                lockfile.path().to_owned(),
-                Self::load_with_lock(lockfile, path.clone(), context.clone())?,
-            ),
-            Err(e) => return Ok(vec![(path, Err(e))]),
-        };
-
-        let mut checked = vec![(path, Ok(lock_path))];
+        let mut checked = vec![];
 
         if let Some(user) = env.files.user {
             let res = Lockfile::lock_for(&user, Duration::from_secs(1)).await;
@@ -541,9 +530,8 @@ impl Environment {
 
     pub async fn save(&self) -> Result<()> {
         let path = self.context.env_file_path()?;
-        let _lock = Self::lock_env(&path).await?;
 
-        Self::save_with_lock(_lock, path, &self.files)?;
+        Self::save_env_file(path, &self.files)?;
 
         crate::cache::invalidate(&self.context.cache).await;
 
@@ -558,16 +546,18 @@ impl Environment {
         crate::cache::load_config(&self.context.cache, build_dir, || Config::from_env(&self)).await
     }
 
-    fn load_with_lock(_lock: Lockfile, path: PathBuf, context: EnvironmentContext) -> Result<Self> {
-        let file = File::open(&path).context("opening file for read")?;
+    fn load_env_file(path: &Path, context: &EnvironmentContext) -> Result<Self> {
+        let files = match File::open(path) {
+            Ok(file) => serde_json::from_reader(BufReader::new(file))
+                .context("reading environment from disk"),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(EnvironmentFiles::default()),
+            Err(e) => Err(e).context("loading host log directories from ffx config"),
+        }?;
 
-        let files = serde_json::from_reader(BufReader::new(file))
-            .context("reading environment from disk")?;
-
-        Ok(Self { files, context })
+        Ok(Self { files, context: context.clone() })
     }
 
-    fn save_with_lock(_lock: Lockfile, path: PathBuf, files: &EnvironmentFiles) -> Result<()> {
+    fn save_env_file(path: PathBuf, files: &EnvironmentFiles) -> Result<()> {
         // First save the config to a temp file in the same location as the file, then atomically
         // rename the file to the final location to avoid partially written files.
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
@@ -582,15 +572,12 @@ impl Environment {
         Ok(())
     }
 
-    async fn lock_env(path: &Path) -> Result<Lockfile, LockfileCreateError> {
-        Lockfile::lock_for(path, Duration::from_secs(2)).await.map_err(|e| {
-            error!("Failed to create a lockfile for environment file {path}. Check that {lockpath} doesn't exist and can be written to. Ownership information: {owner:#?}", path=path.display(), lockpath=e.lock_path.display(), owner=e.owner);
-            e
-        })
-    }
-
-    pub fn get_user(&self) -> Option<&Path> {
-        self.files.user.as_deref()
+    pub fn get_user(&self) -> Option<PathBuf> {
+        self.files
+            .user
+            .as_ref()
+            .map(PathBuf::clone)
+            .or_else(|| self.context.get_default_user_file_path().ok())
     }
     pub fn set_user(&mut self, to: Option<&Path>) {
         self.files.user = to.map(Path::to_owned);
@@ -624,12 +611,15 @@ impl Environment {
         }
     }
 
-    pub fn get_build(&self) -> Option<&Path> {
-        self.build_dir()
-            .as_deref()
-            .and_then(|dir| self.files.build.as_ref().and_then(|dirs| dirs.get(dir)))
-            .map(PathBuf::as_ref)
+    pub fn get_build(&self) -> Option<PathBuf> {
+        let dir = self.build_dir()?;
+        self.files
+            .build
+            .as_ref()
+            .and_then(|dirs| dirs.get(dir).cloned())
+            .or_else(|| self.context.get_default_build_dir_config_path(dir).ok())
     }
+
     pub fn set_build(
         &mut self,
         to: &Path,
@@ -648,28 +638,43 @@ impl Environment {
     }
 
     fn display_user(&self) -> String {
-        self.files
-            .user
-            .as_ref()
-            .map_or_else(|| format!(" User: none\n"), |u| format!(" User: {}\n", u.display()))
+        match self.files.user.as_ref() {
+            Some(file) => format!(" User: {}\n", file.display()),
+            None => match self.context.get_default_user_file_path() {
+                Ok(default) => format!(" User: {} (default)\n", default.display()),
+                Err(_) => format!(" User: none"),
+            },
+        }
+    }
+
+    /// Returns the default build config file for the build dir if there is one,
+    /// None otherwise.
+    fn display_build_default(&self, current_build_dir: Option<&Path>) -> Option<String> {
+        let current = current_build_dir?;
+        let default = self.context.get_default_build_dir_config_path(current).ok()?;
+        Some(format!("  {} => {} (default)\n", current.display(), default.display()))
     }
 
     fn display_build(&self) -> String {
+        let mut current_build_dir = self.build_dir();
         let mut res = format!(" Build:");
-        match self.files.build.as_ref() {
-            Some(m) => {
-                if m.is_empty() {
-                    res.push_str(&format!("  none\n"));
-                }
+        if let Some(m) = self.files.build.as_ref() {
+            if !m.is_empty() {
                 res.push_str(&format!("\n"));
                 for (key, val) in m.iter() {
+                    // if we have an explicitly set path for the current build
+                    // dir then prevent displaying the default later by removing
+                    // it from the option.
+                    if Some(key.as_ref()) == current_build_dir {
+                        current_build_dir.take();
+                    }
                     res.push_str(&format!("  {} => {}\n", key.display(), val.display()));
                 }
             }
-            None => {
-                res.push_str(&format!("  none\n"));
-            }
         }
+        res.push_str(
+            self.display_build_default(current_build_dir).as_deref().unwrap_or("  none\n"),
+        );
         res
     }
 
@@ -698,26 +703,6 @@ impl Environment {
         )
     }
 
-    pub async fn init_env_file(path: &Path) -> Result<()> {
-        let _e = Self::lock_env(path).await?;
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .map_err(|e| {
-                ffx_error!(
-                    "Could not create envinronment file from given path \"{}\": {}",
-                    path.display(),
-                    e
-                )
-            })?;
-        f.write_all(b"{}")?;
-        f.sync_all()?;
-        Ok(())
-    }
-
     /// Checks the config files at the requested level to make sure they exist and are configured
     /// properly.
     pub async fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
@@ -725,15 +710,20 @@ impl Environment {
             ConfigLevel::User => {
                 if let None = self.files.user {
                     let default_path = self.context.get_default_user_file_path()?;
-                    // This will override the config file if it exists.  This would happen anyway
-                    // because of the cache.
-                    let mut file = File::create(&default_path).context("opening write buffer")?;
-                    file.write_all(b"{}").context("writing default user configuration file")?;
-                    file.sync_all()
-                        .context("syncing default user configuration file to filesystem")?;
 
+                    match create_new_file(&default_path) {
+                        Ok(mut file) => {
+                            file.write_all(b"{}")
+                                .context("writing default user configuration file")?;
+                            file.sync_all()
+                                .context("syncing default user configuration file to filesystem")?;
+                        }
+                        Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
+                        other => {
+                            other.context("creating default user configuration file").map(|_| ())?
+                        }
+                    }
                     self.files.user = Some(default_path);
-                    self.save().await?;
                 }
             }
             ConfigLevel::Global => {
@@ -751,15 +741,11 @@ impl Environment {
                         None => self.files.build.get_or_insert_with(Default::default),
                     };
                     if !build_dirs.contains_key(&b_dir) {
-                        let mut b_name =
-                            b_dir.file_name().context("build dir had no filename")?.to_owned();
-                        b_name.push(".json");
-                        let config = b_dir.with_file_name(&b_name);
+                        let config = self.context.get_default_build_dir_config_path(&b_dir)?;
                         if !config.is_file() {
                             info!("Build configuration file for '{b_dir}' does not exist yet, will create it by default at '{config}' if a value is set", b_dir=b_dir.display(), config=config.display());
                         }
                         build_dirs.insert(b_dir, config);
-                        self.save().await?;
                     }
                 }
                 None => bail!("Cannot set a build configuration without a build directory."),
@@ -768,6 +754,11 @@ impl Environment {
         }
         Ok(())
     }
+}
+
+/// polyfill for File::create_new, which is currently nightly-only.
+fn create_new_file(path: &Path) -> std::io::Result<File> {
+    OpenOptions::new().read(true).write(true).create(true).open(path)
 }
 
 impl fmt::Display for Environment {
@@ -794,8 +785,6 @@ impl TestEnv {
         let user_file = NamedTempFile::new().context("tmp access failed")?;
         let isolate_root = tempfile::tempdir()?;
 
-        Environment::init_env_file(env_file.path()).await.context("initializing env file")?;
-
         // Point the user config at a temporary file.
         let user_file_path = user_file.path().to_owned();
         let context = EnvironmentContext::isolated(
@@ -807,7 +796,7 @@ impl TestEnv {
         );
         let test_env = TestEnv { env_file, context, user_file, isolate_root, _guard };
 
-        let mut env = test_env.load().await;
+        let mut env = Environment::new_empty(test_env.context.clone());
         env.set_user(Some(&user_file_path));
         env.save().await.context("saving env file")?;
 
@@ -931,30 +920,20 @@ mod test {
             Some(env_file_path.clone()),
         );
         assert!(!env_file_path.is_file(), "Environment file shouldn't exist yet");
-        Environment::init_env_file(&env_file_path)
-            .await
-            .expect("Should be able to initialize the environment file");
         let mut env = context.load().await.expect("Should be able to load the environment");
 
         env.populate_defaults(&ConfigLevel::Build)
             .await
             .expect("Setting build level environment to automatic path should work");
         drop(env);
-        if let Some(build_configs) = context
+        let config = context
             .load()
             .await
             .expect("should be able to load the test-configured env-file.")
-            .files
-            .build
-        {
-            match build_configs.get(&build_dir_path) {
-                Some(config) if config == &build_dir_config => (),
-                Some(config) => panic!("Build directory config file was wrong. Expected: {build_dir_config}, got: {config})", build_dir_config=build_dir_config.display(), config=config.display()),
-                None => panic!("No build directory config was set"),
-            }
-        } else {
-            panic!("No build configurations set after setting a configuration value");
-        }
+            .get_build()
+            .expect("should be a default build configuration");
+
+        assert_eq!(config, build_dir_config, "build config for {build_dir_path:?}");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -973,9 +952,7 @@ mod test {
         );
 
         assert!(!env_file_path.is_file(), "Environment file shouldn't exist yet");
-        let mut env = Environment::new_empty(context.clone())
-            .await
-            .expect("Creating new empty environment file");
+        let mut env = Environment::new_empty(context.clone());
         let mut config_map = std::collections::HashMap::new();
         config_map.insert(build_dir_path.clone(), build_dir_config.clone());
         env.files.build = Some(config_map);
