@@ -6,9 +6,9 @@
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/tee/cpp/fidl.h>
 #include <lib/ddk/debug.h>
@@ -110,10 +110,10 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   // DecoderCore::Owner implementation.
   [[nodiscard]] MmioRegisters* mmio() override { return registers_.get(); }
 
-  void UngateClocks() override __TA_REQUIRES(video_decoder_lock_);
-  void GateClocks() override __TA_REQUIRES(video_decoder_lock_);
+  zx_status_t UngateClocks() override __TA_REQUIRES(video_decoder_lock_);
+  zx_status_t GateClocks() override __TA_REQUIRES(video_decoder_lock_);
 
-  void ToggleClock(ClockType type, bool enable) override;
+  zx_status_t ToggleClock(ClockType type, bool enable) override;
 
   // CanvasEntry::Owner implementation.
   void FreeCanvas(CanvasEntry* canvas) override;
@@ -226,7 +226,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
 
-  ddk::ClockProtocolClient clocks_[static_cast<int>(ClockType::kMax)];
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clocks_[static_cast<int>(ClockType::kMax)];
 
   // Unlike sysmem and canvas, tee is optional (no tee on vim2).
   fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;

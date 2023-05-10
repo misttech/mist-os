@@ -93,10 +93,14 @@ zx_status_t HevcDec::LoadFirmware(InternalBuffer& buffer) {
   return ZX_OK;
 }
 
-void HevcDec::PowerOn() {
+zx_status_t HevcDec::PowerOn() {
   ZX_DEBUG_ASSERT(!powered_on_);
 
-  owner_->UngateClocks();
+  zx_status_t status = owner_->UngateClocks();
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to ungate clocks: %s", zx_status_get_string(status));
+    return status;
+  }
 
   {
     auto temp = AoRtiGenPwrSleep0::Get().ReadFrom(mmio()->aobus);
@@ -191,9 +195,11 @@ void HevcDec::PowerOn() {
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
   DosSwReset3::Get().FromValue(0).WriteTo(mmio()->dosbus);
   powered_on_ = true;
+
+  return ZX_OK;
 }
 
-void HevcDec::PowerOff() {
+zx_status_t HevcDec::PowerOff() {
   ZX_DEBUG_ASSERT(powered_on_);
   powered_on_ = false;
   {
@@ -218,7 +224,14 @@ void HevcDec::PowerOff() {
     temp.set_reg_value(temp.reg_value() | hevc_sleep_bits());
     temp.WriteTo(mmio()->aobus);
   }
-  owner_->GateClocks();
+
+  zx_status_t status = owner_->GateClocks();
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to gate clocks: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 void HevcDec::StartDecoding() {

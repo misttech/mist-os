@@ -39,13 +39,20 @@ class FakeOwner : public DecoderCore::Owner {
   void set_device_type(DeviceType type) { device_type_ = type; }
 
   MmioRegisters* mmio() override { return mmio_; }
-  void UngateClocks() override { clocks_gated_ = false; }
-  void GateClocks() override { clocks_gated_ = true; }
+  zx_status_t UngateClocks() override {
+    clocks_gated_ = false;
+    return ZX_OK;
+  }
+  zx_status_t GateClocks() override {
+    clocks_gated_ = true;
+    return ZX_OK;
+  }
   zx::unowned_bti bti() override { return zx::unowned_bti(bti_); }
   DeviceType device_type() override { return device_type_; }
   fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() override { return allocator_; }
-  void ToggleClock(ClockType type, bool enable) override {
+  zx_status_t ToggleClock(ClockType type, bool enable) override {
     enable_clock_state_[static_cast<int>(type)] = enable;
+    return ZX_OK;
   }
   bool enable_clock_state(ClockType type) const {
     return enable_clock_state_[static_cast<int>(type)];

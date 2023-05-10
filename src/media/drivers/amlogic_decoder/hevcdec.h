@@ -42,8 +42,8 @@ class HevcDec : public DecoderCore {
   zx_status_t RestoreInputContext(InputContext* context) override;
 
  protected:
-  void PowerOn() override;
-  void PowerOff() override;
+  zx_status_t PowerOn() override;
+  zx_status_t PowerOff() override;
 
  private:
   void ResetForNewStream();

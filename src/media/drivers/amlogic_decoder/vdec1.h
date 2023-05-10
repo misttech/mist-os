@@ -6,6 +6,7 @@
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_VDEC1_H_
 
 #include <assert.h>
+#include <zircon/status.h>
 
 #include "decoder_core.h"
 
@@ -43,8 +44,8 @@ class Vdec1 : public DecoderCore {
   zx_status_t RestoreInputContext(InputContext* context) override;
 
  protected:
-  void PowerOn() override;
-  void PowerOff() override;
+  zx_status_t PowerOn() override;
+  zx_status_t PowerOff() override;
 
  private:
   MmioRegisters* mmio() const { return owner_->mmio(); }

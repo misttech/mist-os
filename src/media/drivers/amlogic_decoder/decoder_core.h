@@ -7,9 +7,11 @@
 
 #include <lib/ddk/io-buffer.h>
 #include <lib/zx/handle.h>
+#include <zircon/status.h>
 
 #include <mutex>
 
+#include "macros.h"
 #include "registers.h"
 #include "src/media/lib/internal_buffer/internal_buffer.h"
 #include "src/media/lib/memory_barriers/memory_barriers.h"
@@ -54,10 +56,10 @@ class DecoderCore {
     [[nodiscard]] virtual MmioRegisters* mmio() = 0;
 
     // Increment the powered refcount by one, and if was 0, ungate clocks.
-    virtual void UngateClocks() = 0;
+    virtual zx_status_t UngateClocks() = 0;
 
     // Decrement the powered refcount by one, and if now 0, gate clocks.
-    virtual void GateClocks() = 0;
+    virtual zx_status_t GateClocks() = 0;
 
     // Set a clock enabled or disabled.  In contrast to UngateClocks() / GateClocks(), this has no
     // refcount, so should only be used (via this interface) for clocks that are unique to only one
@@ -66,7 +68,7 @@ class DecoderCore {
     // implementation of UngageClocks() / GateClocks(), but that detail is internal to those
     // implementations, not the concern of this interface (and the refcount on those calls still
     // applies).
-    virtual void ToggleClock(ClockType type, bool enable) = 0;
+    virtual zx_status_t ToggleClock(ClockType type, bool enable) = 0;
 
     [[nodiscard]] virtual DeviceType device_type() = 0;
 
@@ -113,23 +115,33 @@ class DecoderCore {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  void IncrementPowerRef() {
+  zx_status_t IncrementPowerRef() {
     std::lock_guard<std::mutex> lock(power_ref_lock_);
     if (power_ref_count_++ == 0) {
-      PowerOn();
+      zx_status_t status = PowerOn();
+      if (status != ZX_OK) {
+        DECODE_ERROR("Failed to power on: %s", zx_status_get_string(status));
+        return status;
+      }
     }
+    return ZX_OK;
   }
 
-  void DecrementPowerRef() {
+  zx_status_t DecrementPowerRef() {
     std::lock_guard<std::mutex> lock(power_ref_lock_);
     if (--power_ref_count_ == 0) {
-      PowerOff();
+      zx_status_t status = PowerOff();
+      if (status != ZX_OK) {
+        DECODE_ERROR("Failed to power off: %s", zx_status_get_string(status));
+        return status;
+      }
     }
+    return ZX_OK;
   }
 
  protected:
-  virtual void PowerOn() __TA_REQUIRES(power_ref_lock_) = 0;
-  virtual void PowerOff() __TA_REQUIRES(power_ref_lock_) = 0;
+  virtual zx_status_t PowerOn() __TA_REQUIRES(power_ref_lock_) = 0;
+  virtual zx_status_t PowerOff() __TA_REQUIRES(power_ref_lock_) = 0;
 
  private:
   std::mutex power_ref_lock_;

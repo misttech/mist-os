@@ -129,11 +129,15 @@ void AmlogicVideo::AddNewDecoderInstance(std::unique_ptr<DecoderInstance> instan
 }
 
 // video_decoder_lock_ held
-void AmlogicVideo::UngateClocks() {
+zx_status_t AmlogicVideo::UngateClocks() {
   TRACE_DURATION("media", "AmlogicVideo::UngateClocks");
   ++clock_ungate_ref_;
   if (clock_ungate_ref_ == 1) {
-    ToggleClock(ClockType::kClkDos, true);
+    zx_status_t status = ToggleClock(ClockType::kClkDos, true);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to toggle clock: %s", zx_status_get_string(status));
+      return status;
+    }
     HhiGclkMpeg1::Get()
         .ReadFrom(&*hiubus_)
         .set_aiu(0xff)
@@ -143,6 +147,7 @@ void AmlogicVideo::UngateClocks() {
     HhiGclkMpeg2::Get().ReadFrom(&*hiubus_).set_vpu_interrupt(true).WriteTo(&*hiubus_);
     UngateParserClock();
   }
+  return ZX_OK;
 }
 
 void AmlogicVideo::UngateParserClock() {
@@ -152,7 +157,7 @@ void AmlogicVideo::UngateParserClock() {
 }
 
 // video_decoder_lock_ held
-void AmlogicVideo::GateClocks() {
+zx_status_t AmlogicVideo::GateClocks() {
   TRACE_DURATION("media", "AmlogicVideo::GateClocks");
   ZX_ASSERT(clock_ungate_ref_ > 0);
   --clock_ungate_ref_;
@@ -165,9 +170,14 @@ void AmlogicVideo::GateClocks() {
         .set_demux(false)
         .set_audio_in(false)
         .WriteTo(&*hiubus_);
-    ToggleClock(ClockType::kClkDos, false);
+    zx_status_t status = ToggleClock(ClockType::kClkDos, false);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to toggle clock: %s", zx_status_get_string(status));
+      return status;
+    }
     GateParserClock();
   }
+  return ZX_OK;
 }
 
 void AmlogicVideo::GateParserClock() {
@@ -807,13 +817,35 @@ zx_status_t AmlogicVideo::TeeVp9AddHeaders(zx_paddr_t page_phys_base, uint32_t b
   return status;
 }
 
-void AmlogicVideo::ToggleClock(ClockType type, bool enable) {
+zx_status_t AmlogicVideo::ToggleClock(ClockType type, bool enable) {
   TRACE_DURATION("media", "AmlogicVideo::ToggleClock");
+  int type_int = static_cast<int>(type);
   if (enable) {
-    clocks_[static_cast<int>(type)].Enable();
+    fidl::WireResult result = clocks_[type_int]->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to enable clock %d: %s", type_int,
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to enable clock %d: %s", type_int,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   } else {
-    clocks_[static_cast<int>(type)].Disable();
+    fidl::WireResult result = clocks_[type_int]->Disable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to disable clock %d: %s", type_int,
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to disable clock %d: %s", type_int,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
+  return ZX_OK;
 }
 
 void AmlogicVideo::SetMetrics(CodecMetrics* metrics) {
@@ -852,18 +884,27 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   canvas_.Bind(std::move(canvas_result.value()));
 
-  clocks_[static_cast<int>(ClockType::kGclkVdec)] =
-      ddk::ClockProtocolClient(parent_, "clock-dos-vdec");
-  if (!clocks_[static_cast<int>(ClockType::kGclkVdec)].is_valid()) {
-    DECODE_ERROR("Could not get CLOCK protocol\n");
-    return ZX_ERR_NO_RESOURCES;
+  const char* CLOCK_DOS_VDEC_FRAG_NAME = "clock-dos-vdec";
+  zx::result clock_client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, CLOCK_DOS_VDEC_FRAG_NAME);
+  if (clock_client.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", CLOCK_DOS_VDEC_FRAG_NAME,
+           clock_client.status_string());
+    return clock_client.status_value();
   }
+  clocks_[static_cast<int>(ClockType::kGclkVdec)].Bind(std::move(*clock_client));
 
-  clocks_[static_cast<int>(ClockType::kClkDos)] = ddk::ClockProtocolClient(parent_, "clock-dos");
-  if (!clocks_[static_cast<int>(ClockType::kClkDos)].is_valid()) {
-    DECODE_ERROR("Could not get CLOCK protocol\n");
-    return ZX_ERR_NO_RESOURCES;
+  const char* CLOCK_DOS_FRAG_NAME = "clock-dos";
+  clock_client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, CLOCK_DOS_FRAG_NAME);
+  if (clock_client.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", CLOCK_DOS_FRAG_NAME,
+           clock_client.status_string());
+    return clock_client.status_value();
   }
+  clocks_[static_cast<int>(ClockType::kClkDos)].Bind(std::move(*clock_client));
 
   // If tee is available as a fragment, we require that we can get ZX_PROTOCOL_TEE.  It'd be nice
   // if there were a less fragile way to detect this.  Passing in driver metadata for this doesn't

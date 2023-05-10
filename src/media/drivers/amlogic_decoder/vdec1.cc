@@ -101,7 +101,7 @@ zx_status_t Vdec1::LoadFirmware(InternalBuffer& buffer) {
   return ZX_OK;
 }
 
-void Vdec1::PowerOn() {
+zx_status_t Vdec1::PowerOn() {
   ZX_DEBUG_ASSERT(!powered_on_);
   // Make sure that the clocks are ungated before we apply power, and reset the
   // DOS unit.  In the past, we have seen a rare issue on ~3 devices where, a
@@ -119,7 +119,11 @@ void Vdec1::PowerOn() {
   // Either way, we currently let the clocks run before even powering up the DOS
   // unit.  The magic "bad" device seems to like this more than doing it after
   // resetting the DOS unit.
-  owner_->UngateClocks();
+  zx_status_t status = owner_->UngateClocks();
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to ungate clocks: %s", zx_status_get_string(status));
+    return status;
+  }
 
   {
     auto temp = AoRtiGenPwrSleep0::Get().ReadFrom(mmio()->aobus);
@@ -178,7 +182,11 @@ void Vdec1::PowerOn() {
       .WriteTo(mmio()->hiubus);
   // This driver doesn't currently reverse this setting during PowerOff(), but perhaps ideally it
   // would.
-  owner_->ToggleClock(ClockType::kGclkVdec, true);
+  status = owner_->ToggleClock(ClockType::kGclkVdec, true);
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to toggle clock: %s", zx_status_get_string(status));
+    return status;
+  }
   DosMemPdVdec::Get().FromValue(0).WriteTo(mmio()->dosbus);
 
   {
@@ -202,9 +210,11 @@ void Vdec1::PowerOn() {
   DosSwReset0::Get().FromValue(0).WriteTo(mmio()->dosbus);
 
   powered_on_ = true;
+
+  return ZX_OK;
 }
 
-void Vdec1::PowerOff() {
+zx_status_t Vdec1::PowerOff() {
   ZX_DEBUG_ASSERT(powered_on_);
   powered_on_ = false;
   if (IsDeviceAtLeast(owner_->device_type(), DeviceType::kG12A)) {
@@ -226,7 +236,14 @@ void Vdec1::PowerOff() {
     temp.set_reg_value(temp.reg_value() | vdec_sleep_bits());
     temp.WriteTo(mmio()->aobus);
   }
-  owner_->GateClocks();
+
+  zx_status_t status = owner_->GateClocks();
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to gate clocks: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 void Vdec1::StartDecoding() {

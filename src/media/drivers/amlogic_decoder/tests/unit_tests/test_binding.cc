@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -38,28 +38,11 @@ class FakeCanvas : public fidl::testing::WireTestBase<fuchsia_hardware_amlogicca
   }
 };
 
-class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_protocol> {
+class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
  public:
-  FakeClockDevice() : proto_({&clock_protocol_ops_, this}) {}
-
-  zx_status_t ClockEnable() { return ZX_OK; }
-  zx_status_t ClockDisable() { return ZX_OK; }
-  zx_status_t ClockIsEnabled(bool* out_enabled) { return ZX_OK; }
-
-  zx_status_t ClockSetRate(uint64_t hz) { return ZX_OK; }
-  zx_status_t ClockQuerySupportedRate(uint64_t max_rate, uint64_t* out_max_supported_rate) {
-    return ZX_OK;
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  zx_status_t ClockGetRate(uint64_t* out_current_rate) { return ZX_OK; }
-
-  zx_status_t ClockSetInput(uint32_t idx) { return ZX_OK; }
-  zx_status_t ClockGetNumInputs(uint32_t* out) { return ZX_OK; }
-  zx_status_t ClockGetInput(uint32_t* out) { return ZX_OK; }
-
-  const clock_protocol_t* proto() const { return &proto_; }
-
- private:
-  clock_protocol_t proto_;
 };
 
 struct IncomingNamespace {
@@ -69,6 +52,10 @@ struct IncomingNamespace {
   component::OutgoingDirectory outgoing_sysmem{async_get_default_dispatcher()};
   FakeCanvas fake_canvas;
   component::OutgoingDirectory outgoing_canvas{async_get_default_dispatcher()};
+  FakeClock fake_gclk_vdec;
+  component::OutgoingDirectory outgoing_gclk_vdec{async_get_default_dispatcher()};
+  FakeClock fake_clk_dos;
+  component::OutgoingDirectory outgoing_clk_dos{async_get_default_dispatcher()};
 };
 
 class BindingTest : public testing::Test {
@@ -150,12 +137,43 @@ class BindingTest : public testing::Test {
                           std::move(outgoing_endpoints->client), "canvas");
   }
 
-  void InitClocks() {
-    root_->AddProtocol(ZX_PROTOCOL_CLOCK, gclk_vdec_.proto()->ops, gclk_vdec_.proto()->ctx,
-                       "clock-dos-vdec");
-    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk_dos_.proto()->ops, clk_dos_.proto()->ctx,
-                       "clock-dos");
+  void InitGclkVdec() {
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(ZX_OK, outgoing_endpoints.status_value());
+    incoming_.SyncCall(
+        [server = std::move(outgoing_endpoints->server)](IncomingNamespace* infra) mutable {
+          ASSERT_EQ(ZX_OK, infra->outgoing_gclk_vdec
+                               .AddService<fuchsia_hardware_platform_device::Service>(
+                                   fuchsia_hardware_clock::Service::InstanceHandler(
+                                       {.clock = infra->fake_gclk_vdec.bind_handler(
+                                            async_get_default_dispatcher())}))
+                               .status_value());
+
+          ASSERT_EQ(ZX_OK, infra->outgoing_gclk_vdec.Serve(std::move(server)).status_value());
+        });
+    root_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                          std::move(outgoing_endpoints->client), "clock-dos-vdec");
   }
+
+  void InitClkDos() {
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(ZX_OK, outgoing_endpoints.status_value());
+    incoming_.SyncCall([server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      ASSERT_EQ(
+          ZX_OK,
+          infra->outgoing_clk_dos
+              .AddService<fuchsia_hardware_platform_device::Service>(
+                  fuchsia_hardware_clock::Service::InstanceHandler(
+                      {.clock = infra->fake_clk_dos.bind_handler(async_get_default_dispatcher())}))
+              .status_value());
+
+      ASSERT_EQ(ZX_OK, infra->outgoing_clk_dos.Serve(std::move(server)).status_value());
+    });
+    root_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                          std::move(outgoing_endpoints->client), "clock-dos");
+  }
+
   void InitFirmware() {
     // Firmware that's smaller than the header size will be ignored.
     root_->SetFirmware(std::vector<uint8_t>{0}, "amlogic_video_ucode.bin");
@@ -165,7 +183,8 @@ class BindingTest : public testing::Test {
     InitPdev();
     InitSysmem();
     InitCanvas();
-    InitClocks();
+    InitGclkVdec();
+    InitClkDos();
     InitFirmware();
     auto device = std::make_unique<DeviceCtx>(&driver_ctx_, root_.get());
     amlogic_decoder::AmlogicVideo* video = device->video();
@@ -181,8 +200,6 @@ class BindingTest : public testing::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
-  FakeClockDevice gclk_vdec_;
-  FakeClockDevice clk_dos_;
   DriverCtx driver_ctx_;
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
 };
