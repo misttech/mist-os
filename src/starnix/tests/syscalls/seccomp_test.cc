@@ -41,6 +41,7 @@ void exit_with_failure_code() {
     exit(0);
   }
 }
+
 // Installs a filter that blocks the given syscall.
 void install_filter_block(uint32_t syscall_nr, uint32_t action) {
   EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
@@ -322,6 +323,23 @@ TEST(SeccompTest, PrctlGetSeccomp) {
   int status;
   ASSERT_NE(waitpid(pid, &status, 0), -1);
   EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+}
+
+TEST(SeccompTest, ErrnoIsMaxFFF) {
+  pid_t const pid = fork();
+  if (pid == 0) {
+    EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+
+    install_filter_block(kFilteredSyscall, SECCOMP_RET_ERRNO | 0x1000);
+    syscall(kFilteredSyscall);
+    EXPECT_EQ(0xfff, errno);
+
+    exit_with_failure_code();
+  };
+  ASSERT_NE(pid, -1) << "Fork failed";
+  int status;
+  ASSERT_NE(waitpid(pid, &status, 0), -1);
+  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
 }
 
 }  // anonymous namespace

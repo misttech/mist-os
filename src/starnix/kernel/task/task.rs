@@ -1592,7 +1592,10 @@ impl CurrentTask {
 
         match result & !SECCOMP_RET_DATA {
             SECCOMP_RET_ALLOW => None,
-            SECCOMP_RET_ERRNO => Some(errno_from_code!((result & 0xff) as i16)),
+            SECCOMP_RET_ERRNO => {
+                // Linux kernel compatibility: if errno exceeds 0xfff, it is capped at 0xfff.
+                Some(errno_from_code!(std::cmp::min(result & 0xffff, 0xfff) as i16))
+            }
 
             SECCOMP_RET_KILL_THREAD => {
                 let siginfo = SignalInfo::default(SIGSYS);
