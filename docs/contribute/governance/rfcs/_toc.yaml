@@ -450,3 +450,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0216_hosted_repositories.md
   - title: "RFC-0217: Open package tracking"
     path: /docs/contribute/governance/rfcs/0217_open_package_tracking.md
+  - title: "RFC-0218: IOBuffer: A Peered Shared Memory Object for Efficient IO"
+    path: /docs/contribute/governance/rfcs/0218_io_buffer.md

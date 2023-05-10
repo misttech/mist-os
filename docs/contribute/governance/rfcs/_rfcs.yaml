@@ -2840,3 +2840,17 @@
   reviewers: ['wittrock@google.com', 'geb@google.com', 'crjohns@google.com']
   submitted: '2023-04-18'
   reviewed: '2023-05-05'
+
+- name: 'RFC-0218'
+  title: 'IOBuffer: A Peered Shared Memory Object for Efficient IO'
+  short_description: 'Introduces a new shared memory object designed to improve distributed IO use cases.'
+  authors: ['eieio@google.com']
+  file: '0218_io_buffer.md'
+  area: ['Kernel', 'System']
+  issue: []
+  gerrit_change_id: ['619562']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'rashaeqbal@google.com', 'fmeawad@google.com', 'gmtr@google.com', 'maniscalco@google.com', 'johngro@google.com', 'abarth@google.com', 'cpu@google.com']
+  submitted: '2022-09-29'
+  reviewed: '2023-05-09'
+
