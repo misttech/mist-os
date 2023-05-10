@@ -93,7 +93,7 @@ def main():
             for package_name in sorted(list(unique_package_names)):
                 write(f' • {package_name}\n')
             if unique_public_source_mirrors:
-                write('\nThe projects source is hosted at:\n')
+                write('\nThe projects\' source code is made available at:\n')
                 for mirror in sorted(list(unique_public_source_mirrors)):
                     write(f' • {mirror}\n')
 

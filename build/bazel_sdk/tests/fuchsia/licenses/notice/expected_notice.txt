@@ -3,7 +3,7 @@ The following license text(s) applies to these projects:
  • Package A
  • Package B
 
-The projects source is hosted at:
+The projects' source code is made available at:
  • http://mirror1
  • http://mirror2
 
