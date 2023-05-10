@@ -222,8 +222,7 @@ pub async fn setup_masquerade_nat_network<'a>(
         .await
         .transform_result()
         .expect("error enabling filter on router_ep2");
-    let (rules, generation) =
-        router_filter.get_nat_rules().await.transform_result().expect("failed to get NAT rules");
+    let (rules, generation) = router_filter.get_nat_rules().await.expect("failed to get NAT rules");
     assert_eq!(&rules, &[]);
     let () = router_filter
         .update_nat_rules(updates, generation)
@@ -232,11 +231,8 @@ pub async fn setup_masquerade_nat_network<'a>(
         .expect("failed to update NAT rules");
     let generation = generation + 1;
     {
-        let (got_nat_rules, got_generation) = router_filter
-            .get_nat_rules()
-            .await
-            .transform_result()
-            .expect("failed to get NAT rules");
+        let (got_nat_rules, got_generation) =
+            router_filter.get_nat_rules().await.expect("failed to get NAT rules");
         assert_eq!(got_nat_rules, updates);
         assert_eq!(got_generation, generation);
     }
@@ -304,11 +300,8 @@ pub async fn setup_masquerade_nat_network<'a>(
         );
 
         // The NAT rule for a NIC should be removed when the NIC is removed.
-        let (got_nat_rules, got_generation) = router_filter
-            .get_nat_rules()
-            .await
-            .transform_result()
-            .expect("failed to get NAT rules");
+        let (got_nat_rules, got_generation) =
+            router_filter.get_nat_rules().await.expect("failed to get NAT rules");
         assert_eq!(got_nat_rules, []);
         assert_eq!(got_generation, generation + 1);
 

@@ -46,24 +46,26 @@ func (fi *filterImpl) DisableInterface(_ fidl.Context, id uint64) (filter.Filter
 	return fi.filter.disableInterface(tcpip.NICID(id)), nil
 }
 
-func (fi *filterImpl) GetRules(fidl.Context) (filter.FilterGetRulesResult, error) {
-	return fi.filter.getRules(), nil
+func (fi *filterImpl) GetRules(fidl.Context) ([]filter.Rule, uint32, error) {
+	rules, generation := fi.filter.getRules()
+	return rules, generation, nil
 }
 
 func (fi *filterImpl) UpdateRules(_ fidl.Context, nrs []filter.Rule, generation uint32) (filter.FilterUpdateRulesResult, error) {
 	return fi.filter.updateRules(nrs, generation), nil
 }
 
-func (fi *filterImpl) GetNatRules(fidl.Context) (filter.FilterGetNatRulesResult, error) {
-	return fi.filter.getNATRules(), nil
+func (fi *filterImpl) GetNatRules(fidl.Context) ([]filter.Nat, uint32, error) {
+	rules, generation := fi.filter.getNATRules()
+	return rules, generation, nil
 }
 
 func (fi *filterImpl) UpdateNatRules(_ fidl.Context, natRules []filter.Nat, generation uint32) (filter.FilterUpdateNatRulesResult, error) {
 	return fi.filter.updateNATRules(natRules, generation), nil
 }
 
-func (*filterImpl) GetRdrRules(fidl.Context) (filter.FilterGetRdrRulesResult, error) {
-	return filter.FilterGetRdrRulesResultWithResponse(filter.FilterGetRdrRulesResponse{}), nil
+func (*filterImpl) GetRdrRules(fidl.Context) ([]filter.Rdr, uint32, error) {
+	return []filter.Rdr{}, 0, nil
 }
 
 func (*filterImpl) UpdateRdrRules(fidl.Context, []filter.Rdr, uint32) (filter.FilterUpdateRdrRulesResult, error) {

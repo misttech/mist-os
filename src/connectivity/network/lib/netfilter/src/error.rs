@@ -40,9 +40,6 @@ macro_rules! impl_trait {
 
 impl_trait!(FilterEnableInterfaceError);
 impl_trait!(FilterDisableInterfaceError);
-impl_trait!(FilterGetRulesError);
 impl_trait!(FilterUpdateRulesError);
-impl_trait!(FilterGetNatRulesError);
 impl_trait!(FilterUpdateNatRulesError);
-impl_trait!(FilterGetRdrRulesError);
 impl_trait!(FilterUpdateRdrRulesError);

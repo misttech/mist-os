@@ -47,9 +47,7 @@ protocol Filter {
     GetRules() -> (struct {
         rules vector<Rule>:MAX_RULES;
         generation uint32;
-    }) error strict enum {
-        RESERVED = 0;
-    };
+    });
 
     /// UpdateRules updates the current rules. It does not update NAT or RDR rules
     /// (use UpdateNatRules or UpdateRdrRules instead).
@@ -81,9 +79,7 @@ protocol Filter {
     GetNatRules() -> (struct {
         rules vector<Nat>:MAX_RULES;
         generation uint32;
-    }) error strict enum {
-        RESERVED = 0;
-    };
+    });
 
     /// UpdateNatRules updates the current NAT rules.
     ///
@@ -114,9 +110,7 @@ protocol Filter {
     GetRdrRules() -> (struct {
         rules vector<Rdr>:MAX_RULES;
         generation uint32;
-    }) error strict enum {
-        RESERVED = 0;
-    };
+    });
 
     /// UpdateRdrRules updates the previous RDR rules with new rules.
     ///

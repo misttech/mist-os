@@ -811,13 +811,11 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
     let filter = connect_with_context::<ffilter::FilterMarker, _>(connector).await?;
     match cmd {
         opts::FilterEnum::GetRules(opts::FilterGetRules {}) => {
-            let (rules, generation): (Vec<ffilter::Rule>, u32) =
-                filter_fidl!(filter.get_rules(), "error getting filter rules")?;
+            let (rules, generation): (Vec<ffilter::Rule>, u32) = filter.get_rules().await?;
             writeln!(out, "{:?} (generation {})", rules, generation)?;
         }
         opts::FilterEnum::SetRules(opts::FilterSetRules { rules }) => {
-            let (_cur_rules, generation) =
-                filter_fidl!(filter.get_rules(), "error getting filter rules")?;
+            let (_cur_rules, generation) = filter.get_rules().await?;
             let rules = netfilter::parser::parse_str_to_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_rules(&rules, generation),
@@ -826,13 +824,11 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
             info!("successfully set filter rules");
         }
         opts::FilterEnum::GetNatRules(opts::FilterGetNatRules {}) => {
-            let (rules, generation): (Vec<ffilter::Nat>, u32) =
-                filter_fidl!(filter.get_nat_rules(), "error getting NAT rules")?;
+            let (rules, generation): (Vec<ffilter::Nat>, u32) = filter.get_nat_rules().await?;
             writeln!(out, "{:?} (generation {})", rules, generation)?;
         }
         opts::FilterEnum::SetNatRules(opts::FilterSetNatRules { rules }) => {
-            let (_cur_rules, generation) =
-                filter_fidl!(filter.get_nat_rules(), "error getting NAT rules")?;
+            let (_cur_rules, generation) = filter.get_nat_rules().await?;
             let rules = netfilter::parser::parse_str_to_nat_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_nat_rules(&rules, generation),
@@ -841,13 +837,11 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
             info!("successfully set NAT rules");
         }
         opts::FilterEnum::GetRdrRules(opts::FilterGetRdrRules {}) => {
-            let (rules, generation): (Vec<ffilter::Rdr>, u32) =
-                filter_fidl!(filter.get_rdr_rules(), "error getting RDR rules")?;
+            let (rules, generation): (Vec<ffilter::Rdr>, u32) = filter.get_rdr_rules().await?;
             writeln!(out, "{:?} (generation {})", rules, generation)?;
         }
         opts::FilterEnum::SetRdrRules(opts::FilterSetRdrRules { rules }) => {
-            let (_cur_rules, generation) =
-                filter_fidl!(filter.get_rdr_rules(), "error getting RDR rules")?;
+            let (_cur_rules, generation) = filter.get_rdr_rules().await?;
             let rules = netfilter::parser::parse_str_to_rdr_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_rdr_rules(&rules, generation),

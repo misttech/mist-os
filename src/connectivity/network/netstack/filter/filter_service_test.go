@@ -56,15 +56,10 @@ func TestGetAndUpdateRules(t *testing.T) {
 		},
 	}
 
-	validateGetRulesResult := func(t *testing.T, result filter.FilterGetRulesResult, rules []filter.Rule) {
+	validateGetRulesResult := func(t *testing.T, resultRules []filter.Rule, rules []filter.Rule) {
 		t.Helper()
-		switch result.Which() {
-		case filter.FilterGetRulesResultResponse:
-			if diff := cmp.Diff(result.Response.Rules, rules, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
-				t.Errorf("result.Response.Rules: (-want +got)\n%s", diff)
-			}
-		case filter.FilterGetRulesResultErr:
-			t.Errorf("result.Err = %s", result.Err)
+		if diff := cmp.Diff(resultRules, rules, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
+			t.Errorf("result.Response.Rules: (-want +got)\n%s", diff)
 		}
 	}
 	validateUpdateRulesResult := func(t *testing.T, result filter.FilterUpdateRulesResult) {
@@ -94,12 +89,12 @@ func TestGetAndUpdateRules(t *testing.T) {
 
 	// Get the current rules (should be empty).
 	{
-		result, err := fi.GetRules(context.Background())
+		rules, generation, err := fi.GetRules(context.Background())
 		if err != nil {
 			t.Errorf("GetRules error: %s", err)
 		}
-		validateGetRulesResult(t, result, nil)
-		lastGeneration = result.Response.Generation
+		validateGetRulesResult(t, rules, nil)
+		lastGeneration = generation
 	}
 	// Update the current rules with trs1.
 	{
@@ -111,15 +106,15 @@ func TestGetAndUpdateRules(t *testing.T) {
 	}
 	// Get the current rules (should be trs1).
 	{
-		result, err := fi.GetRules(context.Background())
+		rules, generation, err := fi.GetRules(context.Background())
 		if err != nil {
 			t.Errorf("GetRules error: %s", err)
 		}
-		validateGetRulesResult(t, result, trs1)
-		if got, notWant := result.Response.Generation, lastGeneration; got == notWant {
+		validateGetRulesResult(t, rules, trs1)
+		if got, notWant := generation, lastGeneration; got == notWant {
 			t.Errorf("got result.Response.Generation = %d (want = not %d)", got, notWant)
 		}
-		lastGeneration = result.Response.Generation
+		lastGeneration = generation
 	}
 	// Try to update the current rules with trs2 using a wrong generation number (should fail).
 	{
@@ -139,12 +134,12 @@ func TestGetAndUpdateRules(t *testing.T) {
 	}
 	// Get the current rules (should be trs2).
 	{
-		result, err := fi.GetRules(context.Background())
+		rules, generation, err := fi.GetRules(context.Background())
 		if err != nil {
 			t.Errorf("GetRules error: %s", err)
 		}
-		validateGetRulesResult(t, result, trs2)
-		if got, notWant := result.Response.Generation, lastGeneration; got == notWant {
+		validateGetRulesResult(t, rules, trs2)
+		if got, notWant := generation, lastGeneration; got == notWant {
 			t.Errorf("got result.Response.Generation = %d (want = not %d)", got, notWant)
 		}
 	}

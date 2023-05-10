@@ -300,11 +300,8 @@ const FILTER_CAS_RETRY_INTERVAL_MILLIS: i64 = 500;
 macro_rules! cas_filter_rules {
     ($filter:expr, $get_rules:ident, $update_rules:ident, $rules:expr, $error_type:ident) => {
         for retry in 0..FILTER_CAS_RETRY_MAX {
-            let (_rules, generation) = $filter
-                .$get_rules()
-                .await
-                .unwrap_or_else(|err| exit_with_fidl_error(err))
-                .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
+            let (_rules, generation) =
+                $filter.$get_rules().await.unwrap_or_else(|err| exit_with_fidl_error(err));
 
             match $filter
                 .$update_rules(&$rules, generation)
@@ -333,11 +330,8 @@ macro_rules! cas_filter_rules {
 // This is a placeholder macro while some update operations are not supported.
 macro_rules! no_update_filter_rules {
     ($filter:expr, $get_rules:ident, $update_rules:ident, $rules:expr, $error_type:ident) => {
-        let (_rules, generation) = $filter
-            .$get_rules()
-            .await
-            .unwrap_or_else(|err| exit_with_fidl_error(err))
-            .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
+        let (_rules, generation) =
+            $filter.$get_rules().await.unwrap_or_else(|err| exit_with_fidl_error(err));
 
         match $filter
             .$update_rules(&$rules, generation)

@@ -127,13 +127,10 @@ func (f *Filter) RemovedNIC(id tcpip.NICID) {
 	}
 }
 
-func (f *Filter) getRules() filter.FilterGetRulesResult {
+func (f *Filter) getRules() ([]filter.Rule, uint32) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return filter.FilterGetRulesResultWithResponse(filter.FilterGetRulesResponse{
-		Rules:      f.mu.rules,
-		Generation: f.mu.generation,
-	})
+	return f.mu.rules, f.mu.generation
 }
 
 func (f *Filter) updateRules(rules []filter.Rule, generation uint32) filter.FilterUpdateRulesResult {
@@ -159,13 +156,10 @@ func (f *Filter) updateRules(rules []filter.Rule, generation uint32) filter.Filt
 	return filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{})
 }
 
-func (f *Filter) getNATRules() filter.FilterGetNatRulesResult {
+func (f *Filter) getNATRules() ([]filter.Nat, uint32) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return filter.FilterGetNatRulesResultWithResponse(filter.FilterGetNatRulesResponse{
-		Rules:      f.mu.natRules,
-		Generation: f.mu.natGeneration,
-	})
+	return f.mu.natRules, f.mu.natGeneration
 }
 
 func (f *Filter) updateNATRules(rules []filter.Nat, generation uint32) filter.FilterUpdateNatRulesResult {

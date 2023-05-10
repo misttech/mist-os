@@ -353,16 +353,10 @@ pub async fn test_filter(name: &str, test: Test) {
     .await;
 
     // Set the filters and do the test.
-    let (_rules, mut server_generation) = server_filter
-        .get_rules()
-        .await
-        .transform_result()
-        .expect("failed to get server's filter rules");
-    let (_rules, mut client_generation) = client_filter
-        .get_rules()
-        .await
-        .transform_result()
-        .expect("failed to get client's filter rules");
+    let (_rules, mut server_generation) =
+        server_filter.get_rules().await.expect("failed to get server's filter rules");
+    let (_rules, mut client_generation) =
+        client_filter.get_rules().await.expect("failed to get client's filter rules");
     if let Some(updates) = client_updates {
         let () = client_filter
             .update_rules(&updates, client_generation)
