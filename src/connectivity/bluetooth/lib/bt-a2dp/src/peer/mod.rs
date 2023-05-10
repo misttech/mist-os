@@ -73,6 +73,7 @@ pub struct Peer {
 struct StreamPermits {
     permits: Permits,
     open_streams: Arc<Mutex<HashMap<StreamEndpointId, Permit>>>,
+    reserved_streams: Arc<Mutex<HashSet<StreamEndpointId>>>,
     inner: Weak<Mutex<PeerInner>>,
     peer_id: PeerId,
     sender: mpsc::UnboundedSender<BoxFuture<'static, StreamPermit>>,
@@ -103,7 +104,14 @@ impl StreamPermits {
     ) -> (Self, mpsc::UnboundedReceiver<BoxFuture<'static, StreamPermit>>) {
         let (sender, reservations_receiver) = futures::channel::mpsc::unbounded();
         (
-            Self { inner, permits, peer_id, sender, open_streams: Default::default() },
+            Self {
+                inner,
+                permits,
+                peer_id,
+                sender,
+                open_streams: Default::default(),
+                reserved_streams: Default::default(),
+            },
             reservations_receiver,
         )
     }
@@ -127,6 +135,37 @@ impl StreamPermits {
         Some(StreamPermit { local_id, open_streams: self.open_streams.clone() })
     }
 
+    /// Get a reservation that will resolve to a StreamPermit to start a stream with the id
+    /// `local_id`
+    fn setup_reservation_for(&self, local_id: StreamEndpointId) {
+        if !self.reserved_streams.lock().insert(local_id.clone()) {
+            // Already reserved.
+            return;
+        }
+        let restart_stream_available_fut = {
+            let self_revoke_fn = Self::make_revocation_fn(&self, &local_id);
+            let reservation = self.permits.reserve_revokable(self_revoke_fn);
+            let open_streams = self.open_streams.clone();
+            let reserved_streams = self.reserved_streams.clone();
+            let label = self.label_for(&local_id);
+            let local_id = local_id.clone();
+            async move {
+                let permit = reservation.await;
+                permit.relabel(label);
+                if open_streams.lock().insert(local_id.clone(), permit).is_some() {
+                    warn!("Reservation replaces acquired permit for {}", local_id.clone());
+                }
+                if !reserved_streams.lock().remove(&local_id) {
+                    warn!(%local_id, "Unrecorded reservation resolved");
+                }
+                StreamPermit { local_id, open_streams }
+            }
+        };
+        if let Err(e) = self.sender.unbounded_send(restart_stream_available_fut.boxed()) {
+            warn!(id = %self.peer_id, %local_id, ?e, "Couldn't queue reservation to finish");
+        }
+    }
+
     /// Revokes a permit that was previously delivered, suspending the local stream and signaling
     /// the peer.
     /// The permit must have been previously received through StreamPermits::get or a have been
@@ -140,24 +179,7 @@ impl StreamPermits {
                     Err(e) => error!("Couldn't stop local stream {local_id:?}: {e:?}"),
                 }
             }
-            let self_revoke_fn = Self::make_revocation_fn(&self, &local_id);
-            let restart_stream_available_fut = {
-                let reservation = self.permits.reserve_revokable(self_revoke_fn);
-                let local_id = local_id.clone();
-                let open_streams = self.open_streams.clone();
-                let label = self.label_for(&local_id);
-                async {
-                    let permit = reservation.await;
-                    permit.relabel(label);
-                    if open_streams.lock().insert(local_id.clone(), permit).is_some() {
-                        warn!("Reservation replaces acquired permit for {}", local_id.clone());
-                    }
-                    StreamPermit { local_id, open_streams }
-                }
-            };
-            if let Err(e) = self.sender.unbounded_send(restart_stream_available_fut.boxed()) {
-                warn!(id = %self.peer_id, %local_id, ?e, "Couldn't queue reservation to finish");
-            }
+            self.setup_reservation_for(local_id.clone());
         }
         self.open_streams.lock().remove(&local_id).expect("permit revoked but don't have it")
     }
@@ -645,9 +667,12 @@ impl PeerInner {
             (peer.peer.clone(), stream_pairs)
         };
         for (local_id, remote_id) in stream_pairs {
-            let permit = Self::upgrade(weak.clone())?.lock().get_permit(&local_id)?;
-            Self::initiated_start(avdtp.clone(), weak.clone(), permit, &local_id, &remote_id)
-                .await?;
+            let permit_result =
+                Self::upgrade(weak.clone())?.lock().get_permit_or_reserve(&local_id);
+            if let Ok(permit) = permit_result {
+                Self::initiated_start(avdtp.clone(), weak.clone(), permit, &local_id, &remote_id)
+                    .await?;
+            }
         }
         Ok(())
     }
@@ -729,19 +754,21 @@ impl PeerInner {
     }
 
     /// Attempts to acquire a permit for streaming, if the permits are set.
-    /// Returns Ok if is is okay to stream, and Err otherwise.
-    fn get_permit(
+    /// Returns Ok if is is okay to stream, and Err if the permit was not available and a
+    /// reservation was made.
+    fn get_permit_or_reserve(
         &self,
         local_id: &StreamEndpointId,
-    ) -> Result<Option<StreamPermit>, avdtp::Error> {
-        match self.permits.as_ref().map(|p| p.get(local_id.clone())) {
-            None => Ok(None),
-            Some(Some(permit)) => Ok(Some(permit)),
-            Some(None) => {
-                info!(peer_id = %self.peer_id, %local_id, "No permit to start stream");
-                Err(avdtp::Error::InvalidState)
-            }
+    ) -> Result<Option<StreamPermit>, ()> {
+        let Some(permits) = self.permits.as_ref() else {
+            return Ok(None);
+        };
+        if let Some(permit) = permits.get(local_id.clone()) {
+            return Ok(Some(permit));
         }
+        info!(peer_id = %self.peer_id, %local_id, "No permit to start stream, adding a reservation");
+        permits.setup_reservation_for(local_id.clone());
+        Err(())
     }
 
     /// Starts the stream which is in the local Streams with `local_id`.
@@ -869,9 +896,10 @@ impl PeerInner {
                     let Some(remote_id) = stream.endpoint().remote_id().cloned() else {
                         return Err((seid, ErrorCode::BadState));
                     };
-                    let Ok(permit) = self.get_permit(&seid) else {
+                    let Ok(permit) = self.get_permit_or_reserve(&seid) else {
                             // Happens when we cannot start because of permits.
-                            // accept this one, then queue up for suspend.
+                            // Accept this one, then queue up for suspend.
+                            // We are already reserved for a permit.
                             immediate_suspend.push(remote_id);
                             return Ok(());
                     };
@@ -1154,7 +1182,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_disconnected() {
+    fn disconnected() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, _stream) =
             create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
@@ -1185,7 +1213,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_collect_capabilities_success() {
+    fn peer_collect_capabilities_success() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
@@ -1314,7 +1342,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_collect_all_capabilities_success() {
+    fn peer_collect_all_capabilities_success() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
@@ -1452,7 +1480,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_collect_capabilities_discovery_fails() {
+    fn peer_collect_capabilities_discovery_fails() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(false);
@@ -1492,7 +1520,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_collect_capabilities_get_capability_fails() {
+    fn peer_collect_capabilities_get_capability_fails() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(true);
@@ -1584,7 +1612,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_stream_start_success() {
+    fn peer_stream_start_success() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
@@ -1650,7 +1678,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_stream_start_picks_correct_direction() {
+    fn peer_stream_start_picks_correct_direction() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(false);
@@ -1739,7 +1767,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_stream_start_strips_unsupported_local_capabilities() {
+    fn peer_stream_start_strips_unsupported_local_capabilities() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(false);
@@ -1834,7 +1862,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_stream_start_fails_wrong_direction() {
+    fn peer_stream_start_fails_wrong_direction() {
         let mut exec = fasync::TestExecutor::new();
 
         // Setup peers with only one Source Stream.
@@ -1926,7 +1954,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_stream_start_fails_to_connect() {
+    fn peer_stream_start_fails_to_connect() {
         let mut exec = fasync::TestExecutor::new();
 
         let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
@@ -1979,7 +2007,7 @@ mod tests {
 
     /// Test that the delay reports get acknowledged and they are sent to cobalt.
     #[fuchsia::test]
-    async fn test_peer_delay_report() {
+    async fn peer_delay_report() {
         let (remote, _profile_requests, cobalt_recv, peer) = setup_peer_test(true);
         let remote_peer = avdtp::Peer::new(remote);
         let mut remote_events = remote_peer.take_request_stream();
@@ -2113,7 +2141,7 @@ mod tests {
 
     /// Test that the remote end can configure and start a stream.
     #[fuchsia::test]
-    fn test_peer_as_acceptor() {
+    fn peer_as_acceptor() {
         let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
@@ -2222,7 +2250,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_set_config_reject_first() {
+    fn peer_set_config_reject_first() {
         let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
@@ -2282,7 +2310,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_peer_starts_waiting_streams() {
+    fn peer_starts_waiting_streams() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
@@ -2368,7 +2396,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_needs_permit_to_start_streams() {
+    fn needs_permit_to_start_streams() {
         let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
@@ -2384,8 +2412,7 @@ mod tests {
             make_sbc_endpoint(2, avdtp::EndpointType::Sink),
             test_builder.builder(),
         ));
-        let next_task_fut = test_builder.next_task();
-        pin_mut!(next_task_fut);
+        let mut next_task_fut = test_builder.next_task();
 
         let permits = Permits::new(1);
         let taken_permit = permits.get().expect("permit taken");
@@ -2403,17 +2430,15 @@ mod tests {
         let sbc_endpoint_id = 1_u8.try_into().unwrap();
 
         let sbc_caps = sbc_capabilities();
-        let set_config_fut =
+        let mut set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, &sbc_caps);
-        pin_mut!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Set capabilities should be ready but got {:?}", x),
         };
 
-        let open_fut = remote_peer.open(&sbc_endpoint_id);
-        pin_mut!(open_fut);
+        let mut open_fut = remote_peer.open(&sbc_endpoint_id);
         match exec.run_until_stalled(&mut open_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Open should be ready but got {:?}", x),
@@ -2426,17 +2451,15 @@ mod tests {
         // Do the same, but for the OTHER stream.
         let sbc_endpoint_two = 2_u8.try_into().unwrap();
 
-        let set_config_fut =
+        let mut set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_two, &sbc_endpoint_two, &sbc_caps);
-        pin_mut!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Set capabilities should be ready but got {:?}", x),
         };
 
-        let open_fut = remote_peer.open(&sbc_endpoint_two);
-        pin_mut!(open_fut);
+        let mut open_fut = remote_peer.open(&sbc_endpoint_two);
         match exec.run_until_stalled(&mut open_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Open should be ready but got {:?}", x),
@@ -2449,10 +2472,8 @@ mod tests {
         // Remote peer should still be able to try to start the stream, and we will say yes, but
         // that last seid looks wonky.
         let unknown_endpoint_id: StreamEndpointId = 9_u8.try_into().unwrap();
-        let stream_ids =
-            [sbc_endpoint_id.clone(), sbc_endpoint_two.clone(), unknown_endpoint_id.clone()];
-        let start_fut = remote_peer.start(&stream_ids);
-        pin_mut!(start_fut);
+        let stream_ids = [sbc_endpoint_id.clone(), unknown_endpoint_id.clone()];
+        let mut start_fut = remote_peer.start(&stream_ids);
         match exec.run_until_stalled(&mut start_fut) {
             Poll::Ready(Err(avdtp::Error::RemoteRejected(rejection))) => {
                 assert_eq!(avdtp::ErrorCode::BadAcpSeid, rejection.error_code().unwrap().unwrap());
@@ -2461,13 +2482,11 @@ mod tests {
             x => panic!("Start should be ready but got {:?}", x),
         };
 
-        // We can't get a permit (none are available) so we immediately suspend both of them.
+        // We can't get a permit (none are available) so we suspend the one we didn't error on.
         let mut remote_requests = remote_peer.take_request_stream();
-        let next_remote_request_fut = remote_requests.next();
-        pin_mut!(next_remote_request_fut);
 
-        let suspended_stream_ids = match exec.run_until_stalled(&mut next_remote_request_fut) {
-            Poll::Ready(Some(Ok(avdtp::Request::Suspend { responder, stream_ids }))) => {
+        let suspended_stream_ids = match exec.run_singlethreaded(&mut remote_requests.next()) {
+            Some(Ok(avdtp::Request::Suspend { responder, stream_ids })) => {
                 responder.send().unwrap();
                 stream_ids
             }
@@ -2475,8 +2494,7 @@ mod tests {
         };
 
         assert!(suspended_stream_ids.contains(&sbc_endpoint_id));
-        assert!(suspended_stream_ids.contains(&sbc_endpoint_two));
-        assert_eq!(2, suspended_stream_ids.len());
+        assert_eq!(1, suspended_stream_ids.len());
 
         // And we should have not tried to start a task.
         match exec.run_until_stalled(&mut next_task_fut) {
@@ -2484,14 +2502,32 @@ mod tests {
             x => panic!("Local task should not have been created at this point: {:?}", x),
         };
 
-        // After the permit is available, they try again, and one will be started
-        drop(taken_permit);
-
-        let start_fut = remote_peer.start(&stream_ids[0..2]);
-        pin_mut!(start_fut);
+        // No matter how many times they ask to start, we will still suspend (but not queue another
+        // reservation for the same id)
+        let mut start_fut = remote_peer.start(&[sbc_endpoint_id.clone()]);
         match exec.run_until_stalled(&mut start_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Start should be ready but got {:?}", x),
+        }
+
+        let suspended_stream_ids = match exec.run_until_stalled(&mut remote_requests.next()) {
+            Poll::Ready(Some(Ok(avdtp::Request::Suspend { responder, stream_ids }))) => {
+                responder.send().unwrap();
+                stream_ids
+            }
+            x => panic!("Expected to receive a suspend request for the stream, got {:?}", x),
+        };
+        assert!(suspended_stream_ids.contains(&sbc_endpoint_id));
+
+        // After a permit is available, should try to start the first endpoint that failed.
+        drop(taken_permit);
+
+        match exec.run_singlethreaded(&mut remote_requests.next()) {
+            Some(Ok(avdtp::Request::Start { responder, stream_ids })) => {
+                assert_eq!(stream_ids, &[sbc_endpoint_id.clone()]);
+                responder.send().unwrap();
+            }
+            x => panic!("Expected start on permit available but got {x:?}"),
         };
 
         // And we should start a task.
@@ -2502,11 +2538,14 @@ mod tests {
 
         assert!(media_task.is_started());
 
-        // And we immediately suspend the one we couldn't start.
-        let next_remote_request_fut = remote_requests.next();
-        pin_mut!(next_remote_request_fut);
+        // If the remote asks to start another one, we still suspend it immediately.
+        let mut start_fut = remote_peer.start(&[sbc_endpoint_two.clone()]);
+        match exec.run_until_stalled(&mut start_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Start should be ready but got {:?}", x),
+        }
 
-        let suspended_stream_ids = match exec.run_until_stalled(&mut next_remote_request_fut) {
+        let suspended_stream_ids = match exec.run_until_stalled(&mut remote_requests.next()) {
             Poll::Ready(Some(Ok(avdtp::Request::Suspend { responder, stream_ids }))) => {
                 responder.send().unwrap();
                 stream_ids
@@ -2516,6 +2555,21 @@ mod tests {
 
         assert!(suspended_stream_ids.contains(&sbc_endpoint_two));
         assert_eq!(1, suspended_stream_ids.len());
+
+        // Once the first one is done, the second can start.
+        let mut suspend_fut = remote_peer.suspend(&[sbc_endpoint_id.clone()]);
+        match exec.run_until_stalled(&mut suspend_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Start should be ready but got {:?}", x),
+        }
+
+        match exec.run_singlethreaded(&mut remote_requests.next()) {
+            Some(Ok(avdtp::Request::Start { responder, stream_ids })) => {
+                assert_eq!(stream_ids, &[sbc_endpoint_two]);
+                responder.send().unwrap();
+            }
+            x => panic!("Expected start on permit available but got {x:?}"),
+        };
     }
 
     fn start_sbc_stream(
@@ -2766,7 +2820,7 @@ mod tests {
     /// Test that the version check method correctly differentiates between newer
     /// and older A2DP versions.
     #[fuchsia::test]
-    fn test_a2dp_version_check() {
+    fn version_check() {
         let p1: ProfileDescriptor = ProfileDescriptor {
             profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
             major_version: 1,
