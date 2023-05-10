@@ -6,16 +6,16 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
 use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
 use assembly_tool::Tool;
-use assembly_util::InsertAllUniqueExt;
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct CompiledPackageBuilder {
     pub name: String,
-    component_shards: BTreeMap<String, BTreeSet<Utf8PathBuf>>,
+    component_shards: BTreeMap<String, BTreeMap<String, Utf8PathBuf>>,
     main_definition: Option<MainPackageDefinition>,
     main_bundle_dir: Utf8PathBuf,
 }
@@ -65,21 +65,37 @@ impl CompiledPackageBuilder {
                 self.main_bundle_dir = bundle_dir.as_ref().into();
             }
             CompiledPackageDefinition::Additional(def) => {
-                for (component_name, component_shards) in def.component_shards.clone() {
-                    self.component_shards
-                        .entry(component_name.clone())
-                        .or_default()
-                        .try_insert_all_unique(
-                            component_shards.into_iter().map(|path| bundle_dir.as_ref().join(path)),
-                        )
-                        .map_err(|shard| {
+                for (component_name, component_shards_to_add) in def.component_shards.clone() {
+                    // Get the existing shards for this component, or create a new container for them.
+                    let component_shards =
+                        self.component_shards.entry(component_name.clone()).or_default();
+
+                    // Attempt to add each of the component shards, using their filename (not their
+                    // full path) as the sorting key, so that they have a stable sort order as they
+                    // are moved around.
+                    for shard_path in component_shards_to_add {
+                        let filename = shard_path.file_name().ok_or_else(|| {
                             anyhow!(
-                                "Duplicate component shard found for {}/meta/{}.cm: {}",
-                                &self.name,
-                                &component_name,
-                                shard
+                                "The component shard path does not have a filename: {}",
+                                shard_path
                             )
                         })?;
+                        component_shards
+                            .try_insert_unique(MapEntry(
+                                filename.to_string(),
+                                bundle_dir.as_ref().join(shard_path),
+                            ))
+                            .map_err(|shard| {
+                                anyhow!(
+                                    "Duplicate component shard found for {}/meta/{}.cm: {} \n          {}\n        and\n          {})",
+                                    &self.name,
+                                    &component_name,
+                                    shard.key(),
+                                    shard.previous_value(),
+                                    shard.new_value(),
+                                )
+                            })?;
+                    }
                 }
             }
         }
@@ -120,7 +136,7 @@ impl CompiledPackageBuilder {
         })?;
 
         if let Some(cml_shards) = self.component_shards.get(component_name) {
-            for cml_shard in cml_shards {
+            for cml_shard in cml_shards.values() {
                 component_builder.add_shard(cml_shard.as_path()).with_context(|| {
                     format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
                 })?;
@@ -276,7 +292,7 @@ mod tests {
                 name: "foo".into(),
                 component_shards: BTreeMap::from([(
                     "component2".into(),
-                    BTreeSet::from([outdir.join("shard1")])
+                    BTreeMap::from([("shard1".into(), outdir.join("shard1"))])
                 )]),
                 main_bundle_dir: outdir.into(),
                 main_definition: Some(MainPackageDefinition {

@@ -595,6 +595,7 @@ assembly_input_bundle("common_minimal") {
                     "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
                     "//src/connectivity/network/meta/persistence.core_shard.cml",
                     "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
+                    "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
 
                     # TODO(fxbug.dev/112433): The trace manager core shard should only
                     # appear in eng builds, however, many components do not properly
@@ -787,10 +788,12 @@ assembly_input_bundle("testing_support") {
           component_name = "core"
           shards = rebase_path(
                   [
+                    # These should only be added by this AIB, because their
+                    # packages are only added by this AIB, however due to many
+                    # routing issues, they are included in a wider set of
+                    # assemblies than just those that include "testing_support"
+                    #
                     # "//src/sys/test_manager/meta/test_manager.core_shard.cml",
-                    "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
-                    "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
-
                     # "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
                     # "//src/sys/testing/meta/test_realm.core_shard.cml",
                   ],

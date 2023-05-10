@@ -101,6 +101,5 @@ group("trace_manager_pkg") {
   deps = [ ":trace_manager" ]
 }
 
-core_shard("trace_manager_core_shard") {
-  shard_file = "meta/trace_manager.core_shard.cml"
+group("trace_manager_core_shard") {
 }

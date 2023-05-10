@@ -77,6 +77,5 @@ fuchsia_unittest_package("cache_manager_tests") {
   ]
 }
 
-core_shard("core_shard") {
-  shard_file = "meta/cache_manager.core_shard.cml"
+group("core_shard") {
 }

@@ -2,14 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("all_core_shards") {
-  deps = [
-    ":debian_core_shards",
-    ":termina_core_shards",
-    ":zircon_core_shards",
-  ]
-}
-
 group("all_guests") {
   testonly = true
   deps = [
@@ -28,10 +20,6 @@ group("termina") {
   ]
 }
 
-group("termina_core_shards") {
-  deps = [ "//src/virtualization/bin/guest_manager:termina_core_shard" ]
-}
-
 group("debian") {
   testonly = true
   deps = [
@@ -41,10 +29,6 @@ group("debian") {
   ]
 }
 
-group("debian_core_shards") {
-  deps = [ "//src/virtualization/bin/guest_manager:debian_core_shard" ]
-}
-
 group("zircon") {
   testonly = true
   deps = [
@@ -52,8 +36,4 @@ group("zircon") {
     "//src/virtualization/bin/guest_manager:zircon_guest_manager",
     "//src/virtualization/packages/zircon_guest",
   ]
-}
-
-group("zircon_core_shards") {
-  deps = [ "//src/virtualization/bin/guest_manager:zircon_core_shard" ]
 }

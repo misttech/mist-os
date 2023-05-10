@@ -86,19 +86,15 @@ assembly_input_groups("debug") {
     "//src/factory/factory_store_providers",
     "//src/cobalt/bin/app:cobalt_registry",
   ]
-  core_realm_shards = [
-    "//src/factory/factory_store_providers:factory_store_providers_shard",
-    "//src/diagnostics/realm:core_shard",
-  ]
+  core_realm_shards =
+      [ "//src/factory/factory_store_providers:factory_store_providers_shard" ]
 }
 
 assembly_input_groups("test") {
   visibility = [ "*" ]
 
   core_realm_shards = [
-    "//src/sys/test_manager:test_manager_core_shard",
     "//src/media/audio/audio_core:core_shard",
-    "//src/performance/trace_manager:trace_manager_core_shard",
     "//src/settings/service:setui_service_core_shard",
     "//src/media/sounds/soundplayer:core_shard",
   ]
