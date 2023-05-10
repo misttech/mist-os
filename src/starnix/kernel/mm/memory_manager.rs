@@ -1660,7 +1660,7 @@ impl DesiredAddress {
 }
 
 fn write_map(
-    sink: &mut SeqFileBuf,
+    sink: &mut DynamicFileBuf,
     range: &Range<UserAddress>,
     map: &Mapping,
 ) -> Result<(), Errno> {
@@ -1718,7 +1718,7 @@ impl SequenceFileSource for ProcMapsFile {
     fn next(
         &self,
         cursor: UserAddress,
-        sink: &mut SeqFileBuf,
+        sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let state = self.0.mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
@@ -1744,7 +1744,7 @@ impl SequenceFileSource for ProcSmapsFile {
     fn next(
         &self,
         cursor: UserAddress,
-        sink: &mut SeqFileBuf,
+        sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
         let state = self.0.mm.state.read();
@@ -1810,7 +1810,7 @@ impl ProcStatFile {
     }
 }
 impl DynamicFileSource for ProcStatFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let command = self.0.command();
         let command = command.as_c_str().to_str().unwrap_or("unknown");
         let mut stats = [0u64; 49];
@@ -1839,7 +1839,7 @@ impl ProcStatusFile {
     }
 }
 impl DynamicFileSource for ProcStatusFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let creds = self.0.creds();
         // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
         writeln!(sink, "Uid:\t{} {} {} {}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;

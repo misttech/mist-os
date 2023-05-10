@@ -12,9 +12,9 @@ use std::sync::{Arc, Weak};
 use crate::auth::FsCred;
 use crate::fs::buffers::InputBuffer;
 use crate::fs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_seekable_write, DynamicFile, FileObject,
-    FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, MemoryDirectoryFile, SeqFileBuf,
-    DynamicFileSource,
+    fileops_impl_delegate_read_and_seek, fileops_impl_seekable_write, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
+    MemoryDirectoryFile,
 };
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, Task};
@@ -128,7 +128,7 @@ struct ControlGroupFileSource {
     control_group: ControlGroupHandle,
 }
 impl DynamicFileSource for ControlGroupFileSource {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let remaining_tasks = {
             let control_group = &mut *self.control_group.lock();
             let remaining_tasks: Vec<Arc<Task>> =
@@ -148,12 +148,16 @@ impl DynamicFileSource for ControlGroupFileSource {
 }
 
 pub struct ControlGroupFile {
+    control_group: ControlGroupHandle,
     dynamic_file: DynamicFile<ControlGroupFileSource>,
 }
 
 impl ControlGroupFile {
     fn new(control_group: ControlGroupHandle) -> Self {
-        Self { dynamic_file: DynamicFile::new(ControlGroupFileSource { control_group }) }
+        Self {
+            control_group: control_group.clone(),
+            dynamic_file: DynamicFile::new(ControlGroupFileSource { control_group }),
+        }
     }
 }
 
@@ -176,7 +180,7 @@ impl FileOps for ControlGroupFile {
 
         // TODO(lindkvist): The task needs to be removed form any existing control group before
         // being added to a new one.
-        self.dynamic_file.source.control_group.lock().tasks.push(Arc::downgrade(&task));
+        self.control_group.lock().tasks.push(Arc::downgrade(&task));
 
         Ok(bytes.len())
     }

@@ -365,7 +365,7 @@ fn fill_buf_from_addr_range(
     task: &Arc<Task>,
     range_start: UserAddress,
     range_end: UserAddress,
-    sink: &mut SeqFileBuf,
+    sink: &mut DynamicFileBuf,
 ) -> Result<(), Errno> {
     #[allow(clippy::manual_saturating_arithmetic)]
     let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
@@ -384,7 +384,7 @@ impl CmdlineFile {
     }
 }
 impl DynamicFileSource for CmdlineFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let (start, end) = {
             let mm_state = self.0.mm.state.read();
             (mm_state.argv_start, mm_state.argv_end)
@@ -402,7 +402,7 @@ impl EnvironFile {
     }
 }
 impl DynamicFileSource for EnvironFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let (start, end) = {
             let mm_state = self.0.mm.state.read();
             (mm_state.environ_start, mm_state.environ_end)
@@ -420,7 +420,7 @@ impl AuxvFile {
     }
 }
 impl DynamicFileSource for AuxvFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let (start, end) = {
             let mm_state = self.0.mm.state.read();
             (mm_state.auxv_start, mm_state.auxv_end)
@@ -438,7 +438,7 @@ impl CommFile {
     }
 }
 impl DynamicFileSource for CommFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         sink.write(self.0.command().as_bytes());
         sink.write(b"\n");
         Ok(())
@@ -454,11 +454,11 @@ impl LimitsFile {
     }
 }
 impl DynamicFileSource for LimitsFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let state = self.0.thread_group.read();
         let limits = &state.limits;
 
-        let write_limit = |sink: &mut SeqFileBuf, value| {
+        let write_limit = |sink: &mut DynamicFileBuf, value| {
             if value == RLIM_INFINITY as u64 {
                 sink.write(format!("{:<20}", "unlimited").as_bytes());
             } else {

@@ -228,7 +228,6 @@ rustc_binary("starnix_kernel_bin") {
     "fs/proc/proc_directory.rs",
     "fs/proc/sysctl.rs",
     "fs/record_locks.rs",
-    "fs/seq_file.rs",
     "fs/simple_file.rs",
     "fs/socket/mod.rs",
     "fs/socket/socket.rs",

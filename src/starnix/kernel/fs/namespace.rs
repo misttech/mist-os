@@ -516,7 +516,7 @@ pub fn create_filesystem(
 struct ProcMountsFileSource(Arc<Task>);
 
 impl DynamicFileSource for ProcMountsFileSource {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
@@ -590,7 +590,7 @@ impl ProcMountinfoFile {
     }
 }
 impl DynamicFileSource for ProcMountinfoFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do

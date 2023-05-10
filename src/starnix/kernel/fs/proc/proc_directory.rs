@@ -270,7 +270,7 @@ fn pressure_directory(fs: &FileSystemHandle) -> FsNodeHandle {
 
 struct PressureFileSource;
 impl DynamicFileSource for PressureFileSource {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
         writeln!(sink, "full avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
         Ok(())
@@ -341,7 +341,7 @@ impl MeminfoFile {
     }
 }
 impl DynamicFileSource for MeminfoFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let memstats =
             self.kernel_stats.get().get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
                 log_error!("FIDL error getting memory stats: {e}");
@@ -372,7 +372,7 @@ impl UptimeFile {
 }
 
 impl DynamicFileSource for UptimeFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let uptime = (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds_f64();
 
         // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
@@ -398,7 +398,7 @@ impl StatFile {
     }
 }
 impl DynamicFileSource for StatFile {
-    fn generate(&self, sink: &mut SeqFileBuf) -> Result<(), Errno> {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let uptime = zx::Time::get_monotonic() - zx::Time::ZERO;
 
         let cpu_stats =
