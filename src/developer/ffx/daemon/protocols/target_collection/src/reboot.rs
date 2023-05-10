@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_utils::async_once::Once;
 use ffx_daemon_events::TargetConnectionState;
@@ -10,6 +11,7 @@ use ffx_daemon_target::{
     target::Target,
     zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
 };
+use ffx_ssh::ssh::get_ssh_key_paths;
 use fidl::{endpoints::ServerEnd, Error};
 use fidl_fuchsia_developer_ffx::{
     self as ffx, RebootListenerRequest, TargetRebootError, TargetRebootResponder, TargetRebootState,
@@ -18,8 +20,16 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
 use futures::{try_join, TryFutureExt, TryStreamExt};
 use selectors::{self, VerboseError};
+use std::net::IpAddr;
+use std::process::Command;
 use std::rc::Rc;
+use std::rc::Weak;
 use tasks::TaskManager;
+
+// TODO(125639): Remove when Power Manager stabilizes
+/// Configuration flag which enables using `dm` over ssh to reboot the target
+/// when it is in product mode
+const USE_SSH_FOR_REBOOT_FROM_PRODUCT: &'static str = "product.reboot.use_dm";
 
 const ADMIN_SELECTOR: &'static str =
     "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
@@ -172,37 +182,59 @@ impl RebootController {
             }
             // Everything else use AdminProxy
             _ => {
-                let admin_proxy = match self
-                    .get_admin_proxy()
-                    .map_err(|e| {
-                        tracing::warn!("error getting admin proxy: {}", e);
-                        TargetRebootError::TargetCommunication
-                    })
-                    .await
-                {
-                    Ok(a) => a,
-                    Err(e) => {
-                        responder.send(&mut Err(e))?;
-                        return Err(anyhow!("failed to get admin proxy"));
-                    }
-                };
-                match state {
-                    TargetRebootState::Product => {
-                        match admin_proxy.reboot(RebootReason::UserRequest).await {
-                            Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
-                            Err(e) => handle_fidl_connection_err(e, responder).map_err(Into::into),
-                        }
-                    }
-                    TargetRebootState::Bootloader => {
-                        match admin_proxy.reboot_to_bootloader().await {
-                            Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
-                            Err(e) => handle_fidl_connection_err(e, responder).map_err(Into::into),
-                        }
-                    }
-                    TargetRebootState::Recovery => match admin_proxy.reboot_to_recovery().await {
+                //TODO(125639): Remove when Power Manager stabilizes
+                let use_ssh_for_reboot: bool =
+                    ffx_config::get(USE_SSH_FOR_REBOOT_FROM_PRODUCT).await.unwrap_or(false);
+
+                if use_ssh_for_reboot {
+                    let res = run_ssh_command(Rc::downgrade(&self.target), state).await;
+                    match res {
                         Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
-                        Err(e) => handle_fidl_connection_err(e, responder).map_err(Into::into),
-                    },
+                        Err(e) => {
+                            tracing::error!("Target communication error when rebooting: {:?}", e);
+                            responder
+                                .send(&mut Err(TargetRebootError::TargetCommunication))
+                                .map_err(Into::into)
+                        }
+                    }
+                } else {
+                    let admin_proxy = match self
+                        .get_admin_proxy()
+                        .map_err(|e| {
+                            tracing::warn!("error getting admin proxy: {}", e);
+                            TargetRebootError::TargetCommunication
+                        })
+                        .await
+                    {
+                        Ok(a) => a,
+                        Err(e) => {
+                            responder.send(&mut Err(e))?;
+                            return Err(anyhow!("failed to get admin proxy"));
+                        }
+                    };
+                    match state {
+                        TargetRebootState::Product => {
+                            match admin_proxy.reboot(RebootReason::UserRequest).await {
+                                Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                                Err(e) => {
+                                    handle_fidl_connection_err(e, responder).map_err(Into::into)
+                                }
+                            }
+                        }
+                        TargetRebootState::Bootloader => {
+                            match admin_proxy.reboot_to_bootloader().await {
+                                Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                                Err(e) => {
+                                    handle_fidl_connection_err(e, responder).map_err(Into::into)
+                                }
+                            }
+                        }
+                        TargetRebootState::Recovery => match admin_proxy.reboot_to_recovery().await
+                        {
+                            Ok(_) => responder.send(&mut Ok(())).map_err(Into::into),
+                            Err(e) => handle_fidl_connection_err(e, responder).map_err(Into::into),
+                        },
+                    }
                 }
             }
         }
@@ -226,6 +258,100 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
     }
     Ok(())
 }
+
+// TODO(125639): Remove this block
+
+static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
+    // We do not want multiplexing
+    "-o",
+    "ControlPath none",
+    "-o",
+    "ControlMaster no",
+    "-o",
+    "ExitOnForwardFailure yes",
+    "-o",
+    "StreamLocalBindUnlink yes",
+    "-o",
+    "CheckHostIP=no",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+    "-o",
+    "LogLevel=ERROR",
+];
+
+#[tracing::instrument]
+async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
+    let t = target.upgrade().ok_or(anyhow!("Could not upgrade Target to build ssh command"))?;
+    let addr = t.ssh_address().ok_or(anyhow!("Could not get ssh address for target"))?;
+    let keys = get_ssh_key_paths().await?;
+    let mut cmd = build_ssh_command(addr.into(), keys, state);
+    tracing::debug!("About to run command on target to reboot: {:?}", cmd);
+    let ssh = cmd.spawn()?;
+    let output = ssh.wait_with_output()?;
+    match output.status.success() {
+        true => Ok(()),
+        _ => {
+            // Exit code 255 indicates that the ssh connection was suddenly dropped
+            // assume this is correct behaviour and return
+            if let Some(255) = output.status.code() {
+                Ok(())
+            } else {
+                let stdout = output.stdout;
+                tracing::error!(
+                    "Error rebooting. Error code: {:?}. Output from ssh command: {:?}",
+                    output.status.code(),
+                    stdout
+                );
+                Err(anyhow!("Error using `dm` command to reboot to bootloader. Check Daemon Logs"))
+            }
+        }
+    }
+}
+
+#[tracing::instrument]
+fn build_ssh_command(
+    addr: TargetAddr,
+    keys: Vec<String>,
+    desired_state: TargetRebootState,
+) -> Command {
+    let mut ssh_cmd = Command::new("ssh");
+
+    for arg in DEFAULT_SSH_OPTIONS {
+        ssh_cmd.arg(arg);
+    }
+
+    match addr.ip() {
+        IpAddr::V4(_) => {
+            ssh_cmd.arg("-o");
+            ssh_cmd.arg("AddressFamily inet");
+        }
+        IpAddr::V6(_) => {
+            ssh_cmd.arg("-o");
+            ssh_cmd.arg("AddressFamily inet6");
+        }
+    }
+
+    for k in keys {
+        ssh_cmd.arg("-i").arg(k);
+    }
+
+    // Port and host
+    ssh_cmd.arg("-p").arg(format!("{}", addr.port())).arg(format!("{}", addr));
+
+    let device_command = match desired_state {
+        TargetRebootState::Bootloader => "dm reboot-bootloader",
+        TargetRebootState::Recovery => "dm reboot-recovery",
+        TargetRebootState::Product => "dm reboot",
+    };
+
+    ssh_cmd.arg(device_command);
+
+    ssh_cmd
+}
+
+// END BLOCK
 
 #[cfg(test)]
 mod tests {
