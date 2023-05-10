@@ -111,6 +111,30 @@ struct FlashmapInner {
     mapping: MappedVmo,
 }
 
+// Like BrokerRequestData but without the vmo field.
+struct BrokerRequestDataWithoutVmo {
+    length: u32,
+    data_vmo: bool,
+    offset_data_vmo: u64,
+    offset_oob_vmo: u64,
+    offset_nand: u32,
+    oob_vmo: bool,
+}
+
+impl BrokerRequestDataWithoutVmo {
+    fn to_request_data(&self, vmo: Option<fidl::Vmo>) -> BrokerRequestData {
+        BrokerRequestData {
+            vmo,
+            length: self.length,
+            data_vmo: self.data_vmo,
+            offset_data_vmo: self.offset_data_vmo,
+            offset_oob_vmo: self.offset_oob_vmo,
+            offset_nand: self.offset_nand,
+            oob_vmo: self.oob_vmo,
+        }
+    }
+}
+
 impl Flashmap {
     /// Construct a new |Flashmap|. Will return an error if the given NAND device |device| doesn't
     /// contain a flashmap.
@@ -160,8 +184,7 @@ impl Flashmap {
                 }),
         };
 
-        let mut request = BrokerRequestData {
-            vmo: None,
+        let mut request = BrokerRequestDataWithoutVmo {
             length: pages_per_vmo as u32,
             data_vmo: true,
             offset_data_vmo: 0,
@@ -172,15 +195,14 @@ impl Flashmap {
 
         // Scan through the NAND, checking to see if each chunk contains the flashmap header.
         while read_start_page < max_offset {
-            request.vmo = Some(
-                inner
-                    .nand_vmo
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .context("duplicating VMO")?,
-            );
+            let vmo = inner
+                .nand_vmo
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .context("duplicating VMO")?;
             request.length =
                 std::cmp::min(pages_per_vmo as u32, (max_offset - read_start_page) as u32);
-            let (status, _) = self.device.read(&mut request).await.context("Sending NAND read")?;
+            let request_data = request.to_request_data(Some(vmo));
+            let (status, _) = self.device.read(request_data).await.context("Sending NAND read")?;
             zx::ok(status).context("reading failed")?;
 
             read_start_page += request.length;
@@ -238,7 +260,7 @@ impl Flashmap {
     /// |header| is the flashmap header.
     async fn load_flashmap(
         &mut self,
-        request: &mut BrokerRequestData,
+        request: &mut BrokerRequestDataWithoutVmo,
         mut offset_in_vmar: usize,
         header: FlashmapHeader,
     ) -> Result<(), Error> {
@@ -266,14 +288,14 @@ impl Flashmap {
             if data_needed % (self.info.page_size as usize) != 0 {
                 request.length += 1;
             }
-            request.vmo = Some(
+            let request_data = request.to_request_data(Some(
                 inner
                     .nand_vmo
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .context("duplicating VMO")?,
-            );
+            ));
 
-            let (status, _) = self.device.read(request).await.context("Sending NAND read")?;
+            let (status, _) = self.device.read(request_data).await.context("Sending NAND read")?;
             zx::ok(status).context("reading failed")?;
         }
 
@@ -329,7 +351,7 @@ impl Flashmap {
         let vmo = zx::Vmo::create((pages_to_read * self.info.page_size) as u64)?;
         let vmo_dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
 
-        let mut request = BrokerRequestData {
+        let request = BrokerRequestData {
             vmo: Some(vmo_dup),
             length: pages_to_read,
             data_vmo: true,
@@ -339,7 +361,7 @@ impl Flashmap {
             oob_vmo: false,
         };
 
-        let (status, _) = self.device.read(&mut request).await.map_err(|e| {
+        let (status, _) = self.device.read(request).await.map_err(|e| {
             warn!("Send read failed: {:?}", e);
             zx::Status::INTERNAL
         })?;
@@ -369,14 +391,14 @@ impl Flashmap {
 
         let offset_nand = area.offset + offset;
 
-        let mut request = BrokerRequestDataBytes {
+        let request = BrokerRequestDataBytes {
             vmo: data.vmo,
             offset_data_vmo: 0,
             length: data.size,
             offset_nand: offset_nand as u64,
         };
 
-        let status = self.device.write_bytes(&mut request).await.map_err(|e| {
+        let status = self.device.write_bytes(request).await.map_err(|e| {
             warn!("Send write failed: {:?}", e);
             zx::Status::INTERNAL
         })?;
@@ -413,7 +435,7 @@ impl Flashmap {
         let erase_start_block = erase_start_byte / erase_block_size;
         let erase_range_blocks = range / erase_block_size;
 
-        let mut request = BrokerRequestData {
+        let request = BrokerRequestData {
             length: erase_range_blocks,
             offset_nand: erase_start_block,
             vmo: None,
@@ -423,7 +445,7 @@ impl Flashmap {
             oob_vmo: false,
         };
 
-        let status = self.device.erase(&mut request).await.map_err(|e| {
+        let status = self.device.erase(request).await.map_err(|e| {
             warn!("Send erase failed: {:?}", e);
             zx::Status::INTERNAL
         })?;
