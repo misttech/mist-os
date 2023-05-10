@@ -422,74 +422,85 @@ TEST(RestrictedMode, Bench) {
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     {
-      constexpr int iter = 1000000;  // about a second worth of iterations on a mid range x86
       zx_restricted_reason_t reason_code;
       auto t = zx::ticks::now();
-      for (int i = 0; i < iter; i++) {
+      auto deadline = t + zx::ticks::per_second();
+      int iter = 0;
+      while (zx::ticks::now() <= deadline) {
         ASSERT_OK(
             restricted_enter_wrapper(kRestrictedEnterOptions, (uintptr_t)vectab, &reason_code));
+        iter++;
       }
       t = zx::ticks::now() - t;
 
-      printf("restricted call %ld ns per round trip (%ld raw ticks)\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
+      printf("restricted call %ld ns per round trip (%ld raw ticks), %d iters\n",
+             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
     }
 
     {
       // For way of comparison, time a null syscall.
-      constexpr int iter = 1000000;
       auto t = zx::ticks::now();
-      for (int i = 0; i < iter; i++) {
+      auto deadline = t + zx::ticks::per_second();
+      int iter = 0;
+      while (zx::ticks::now() <= deadline) {
         ASSERT_OK(zx_syscall_test_0());
+        iter++;
       }
       t = zx::ticks::now() - t;
 
-      printf("test syscall %ld ns per call (%ld raw ticks)\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
+      printf("test syscall %ld ns per call (%ld raw ticks), %d iters\n",
+             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
     }
 
     // Perform channel-based exception handling.
     {
-      constexpr int iter = 10000;
-      auto t = zx::ticks::now();
+      zx::ticks t;
+      int iter = 0;
       zx_restricted_reason_t reason_code;
 
       zx::channel exception_channel;
       ZX_ASSERT(zx::process::self()->create_exception_channel(0, &exception_channel) == ZX_OK);
       std::thread exception_handler([&]() {
-        for (int i = 0; i < iter; ++i) {
+        t = zx::ticks::now();
+        auto deadline = t + zx::ticks::per_second();
+        bool done;
+        do {
+          auto now = zx::ticks::now();
+          done = now > deadline;
           zx_thread_state_general_regs_t general_regs = {};
-          ReadExceptionFromChannel(exception_channel, general_regs, (i == iter - 1));
-        }
+          ReadExceptionFromChannel(exception_channel, general_regs, done);
+          iter++;
+        } while (!done);
+        t = zx::ticks::now() - t;
       });
       state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
       ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-      t = zx::ticks::now();
       // Iteration happens in the handler thread; we only have a single restricted_enter
       // when using channel-based exception handling.
       ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
                                          &reason_code));
-      t = zx::ticks::now() - t;
       exception_handler.join();
 
-      printf("channel-based exceptions %ld ns per round trip (%ld raw ticks)\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
+      printf("channel-based exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
+             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
     }
 
     // In-thread exception handling
     if constexpr (ARCH_HAS_IN_THREAD_EXCEPTIONS) {
-      constexpr int iter = 1000000;
+      auto t = zx::ticks::now();
+      auto deadline = t + zx::ticks::per_second();
+      int iter = 0;
       zx_restricted_reason_t reason_code;
       state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
       ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-      auto t = zx::ticks::now();
-      for (int i = 0; i < iter; i++) {
+      while (zx::ticks::now() <= deadline) {
         ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+        iter++;
       }
       t = zx::ticks::now() - t;
 
-      printf("in-thread exceptions %ld ns per round trip (%ld raw ticks)\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
+      printf("in-thread exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
+             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
     }
   }
 }
