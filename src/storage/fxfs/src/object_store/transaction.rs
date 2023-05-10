@@ -714,12 +714,12 @@ impl<'a> Transaction<'a> {
     /// returns it if found.
     pub fn get_object_mutation(
         &self,
-        object_id: u64,
+        store_object_id: u64,
         key: ObjectKey,
     ) -> Option<&ObjectStoreMutation> {
         if let Some(TxnMutation { mutation: Mutation::ObjectStore(mutation), .. }) =
             self.mutations.get(&TxnMutation {
-                object_id,
+                object_id: store_object_id,
                 mutation: Mutation::insert_object(key, ObjectValue::None),
                 associated_object: AssocObj::None,
             })

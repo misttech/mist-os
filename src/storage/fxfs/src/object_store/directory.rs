@@ -15,9 +15,7 @@ use {
                 ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
                 PosixAttributes, Timestamp,
             },
-            transaction::{
-                LockKey, Mutation, ObjectStoreMutation, Operation, Options, Transaction,
-            },
+            transaction::{LockKey, Mutation, Options, Transaction},
             HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle,
         },
         trace_duration,
@@ -401,22 +399,10 @@ impl<S: HandleOwner> Directory<S> {
         posix_attributes: Option<PosixAttributes>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let (mut item, op) = if let Some(ObjectStoreMutation { item, op }) = transaction
-            .get_object_mutation(self.store().store_object_id(), ObjectKey::object(self.object_id))
-        {
-            (item.clone(), op.clone())
-        } else {
-            (
-                self.store()
-                    .tree()
-                    .find(&ObjectKey::object(self.object_id))
-                    .await?
-                    .ok_or(anyhow!(FxfsError::NotFound))?,
-                Operation::ReplaceOrInsert,
-            )
-        };
+        let mut mutation =
+            self.store().txn_get_object_mutation(&transaction, self.object_id).await?;
         if let ObjectValue::Object { attributes, kind: ObjectKind::Directory { sub_dirs } } =
-            &mut item.value
+            &mut mutation.item.value
         {
             if let Some(time) = crtime {
                 attributes.creation_time = time;
@@ -430,10 +416,7 @@ impl<S: HandleOwner> Directory<S> {
             bail!(anyhow!(FxfsError::Inconsistent)
                 .context("update_attributes: expected directory object"));
         };
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::ObjectStore(ObjectStoreMutation { item, op }),
-        );
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
         Ok(())
     }
 
