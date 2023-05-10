@@ -104,6 +104,19 @@ impl ComponentDeclBuilder {
         self
     }
 
+    // Add a use decl for fuchsia.component.Realm.
+    pub fn use_realm(mut self) -> Self {
+        let use_ = cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
+            dependency_type: cm_rust::DependencyType::Strong,
+            source: cm_rust::UseSource::Framework,
+            source_name: "fuchsia.component.Realm".into(),
+            target_path: cm_rust::CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+            availability: cm_rust::Availability::Required,
+        });
+        self.result.uses.push(use_);
+        self
+    }
+
     /// Add a custom protocol declaration.
     pub fn protocol(mut self, protocol: cm_rust::ProtocolDecl) -> Self {
         self.result.capabilities.push(cm_rust::CapabilityDecl::Protocol(protocol));
@@ -393,6 +406,37 @@ impl ProtocolDeclBuilder {
 
 impl From<ProtocolDeclBuilder> for cm_rust::ProtocolDecl {
     fn from(builder: ProtocolDeclBuilder) -> Self {
+        builder.build()
+    }
+}
+
+// A convenience builder for constructing ServiceDecls.
+#[derive(Debug)]
+pub struct ServiceDeclBuilder(cm_rust::ServiceDecl);
+
+impl ServiceDeclBuilder {
+    /// Creates a new builder.
+    pub fn new(name: &str) -> Self {
+        Self(cm_rust::ServiceDecl {
+            name: name.into(),
+            source_path: Some(format!("/svc/foo.service").parse().unwrap()),
+        })
+    }
+
+    /// Sets the source path.
+    pub fn path(mut self, path: &str) -> Self {
+        self.0.source_path = Some(path.parse().unwrap());
+        self
+    }
+
+    /// Consumes the builder and returns a ServiceDecl.
+    pub fn build(self) -> cm_rust::ServiceDecl {
+        self.0
+    }
+}
+
+impl From<ServiceDeclBuilder> for cm_rust::ServiceDecl {
+    fn from(builder: ServiceDeclBuilder) -> Self {
         builder.build()
     }
 }

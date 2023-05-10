@@ -147,6 +147,12 @@ impl<const N: usize> BoundedName<N> {
     }
 }
 
+impl<'a, const N: usize> From<&'a BoundedName<N>> for &'a FlyStr {
+    fn from(o: &'a BoundedName<N>) -> Self {
+        &o.0
+    }
+}
+
 impl<const N: usize> PartialEq<&str> for BoundedName<N> {
     fn eq(&self, o: &&str) -> bool {
         &*self.0 == *o

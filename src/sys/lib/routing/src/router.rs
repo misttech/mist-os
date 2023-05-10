@@ -233,30 +233,27 @@ where
             Ok(capability_source)
         }
         OfferResult::OfferFromCollectionAggregate(offers, aggregation_component) => {
-            if offers.len() > 1 {
-                // TODO(fxbug.dev/4776): Support aggregating over multiple collections
-                return Err(RoutingError::UnsupportedRouteSource {
-                    source_type: "multiple collections".into(),
-                });
-            }
+            let collections: Vec<_> = offers
+                .iter()
+                .map(|e| match e.source() {
+                    OfferSource::Collection(n) => n.clone(),
+                    _ => unreachable!("this was checked before"),
+                })
+                .collect();
             let first_offer = offers.iter().next().unwrap();
-            let collection_name = match first_offer.source() {
-                OfferSource::Collection(n) => n.clone(),
-                _ => unreachable!("this was checked before"),
-            };
-            Ok(CapabilitySource::<C>::Collection {
+            Ok(CapabilitySource::<C>::CollectionAggregate {
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
                 component: aggregation_component.as_weak(),
                 aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
-                    collection_name: collection_name.clone(),
-                    collection_component: aggregation_component.as_weak(),
+                    collections: collections.clone(),
                     phantom_expose: std::marker::PhantomData::<E> {},
+                    collection_component: aggregation_component.as_weak(),
                     capability_name: first_offer.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                     mapper: mapper.clone(),
                 }),
-                collection_name,
+                collections: collections.clone(),
             })
         }
         OfferResult::OfferFromChildAggregate(offers, aggregation_component) => {
@@ -300,7 +297,7 @@ where
             );
             // TODO(fxbug.dev/71881) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
-            Ok(CapabilitySource::<C>::Aggregate {
+            Ok(CapabilitySource::<C>::OfferAggregate {
                 capability: AggregateCapability::Service(source_name),
                 component: aggregation_component.as_weak(),
                 capability_provider: Box::new(OfferAggregateServiceProvider::new(
@@ -345,31 +342,28 @@ where
 {
     match Expose::route(expose, expose_target, &sources, visitor, mapper, route).await? {
         ExposeResult::Source(source) => Ok(source),
-        ExposeResult::ExposeFromAggregate(exposes, aggregation_component) => {
-            if exposes.len() > 1 {
-                // TODO(fxbug.dev/4776): Support aggregating over multiple collections
-                return Err(RoutingError::UnsupportedRouteSource {
-                    source_type: "multiple collections".into(),
-                });
-            }
-            let first_expose = exposes.iter().next().expect("empty bundle");
-            let collection_name = match first_expose.source() {
-                ExposeSource::Collection(n) => n.clone(),
-                _ => unreachable!("this was checked before"),
-            };
-            Ok(CapabilitySource::<C>::Collection {
+        ExposeResult::ExposeFromAggregate(expose, aggregation_component) => {
+            let collections: Vec<_> = expose
+                .iter()
+                .map(|e| match e.source() {
+                    ExposeSource::Collection(n) => n.clone(),
+                    _ => unreachable!("this was checked before"),
+                })
+                .collect();
+            let first_expose = expose.iter().next().expect("empty bundle");
+            Ok(CapabilitySource::<C>::CollectionAggregate {
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
                 component: aggregation_component.as_weak(),
                 aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
-                    collection_name: collection_name.clone(),
+                    collections: collections.clone(),
                     collection_component: aggregation_component.as_weak(),
-                    phantom_expose: std::marker::PhantomData::<E> {},
+                    phantom_expose: std::marker::PhantomData::<E>,
                     capability_name: first_expose.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                     mapper: mapper.clone(),
                 }),
-                collection_name,
+                collections,
             })
         }
     }
@@ -783,7 +777,7 @@ pub struct Use<U>(PhantomData<U>);
 enum UseResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug, U> {
     /// The source of the Use was found (Framework, AboveRoot, etc.)
     Source(CapabilitySource<C>),
-    /// The Use led to a parent Offer declaration.
+    /// The Use led to a parent offer.
     OfferFromParent(RouteBundle<O>, Arc<C>),
     /// The Use led to a child Expose declaration.
     /// Note: Instead of FromChild carrying an ExposeDecl of the matching child, it carries a
@@ -1045,7 +1039,7 @@ enum OfferResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
     OfferFromChild(O, Arc<C>),
     /// Offer from multiple static children.
     OfferFromChildAggregate(RouteBundle<O>, Arc<C>),
-    /// Offer from a collection.
+    /// Offer from one or more collections.
     OfferFromCollectionAggregate(RouteBundle<O>, Arc<C>),
 }
 

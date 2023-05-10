@@ -177,13 +177,17 @@ impl GlobalPolicyChecker {
                     capability: source_capability.type_name(),
                 }
             }
-            CapabilitySource::Collection { capability, component, .. }
-            | CapabilitySource::Aggregate { capability, component, .. } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.abs_moniker.clone()),
-                source_name: capability.source_name().clone(),
-                source: CapabilityAllowlistSource::Self_,
-                capability: capability.type_name(),
-            },
+            CapabilitySource::CollectionAggregate { capability, component, .. }
+            | CapabilitySource::OfferAggregate { capability, component, .. } => {
+                CapabilityAllowlistKey {
+                    source_moniker: ExtendedMoniker::ComponentInstance(
+                        component.abs_moniker.clone(),
+                    ),
+                    source_name: capability.source_name().clone(),
+                    source: CapabilityAllowlistSource::Self_,
+                    capability: capability.type_name(),
+                }
+            }
         })
     }
 

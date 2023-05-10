@@ -2257,7 +2257,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Aggregate {
+                    >::OfferAggregate {
                         capability: AggregateCapability::Service(name),
                         ..
                     },

@@ -415,7 +415,7 @@ async fn use_in_collection() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -428,7 +428,7 @@ async fn use_in_collection() {
     )
     .await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "d".to_string(),
@@ -526,7 +526,7 @@ async fn use_in_collection_not_offered() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -624,7 +624,7 @@ async fn dynamic_offer_from_parent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child_with_args(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -647,7 +647,7 @@ async fn dynamic_offer_from_parent() {
     )
     .await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "d".to_string(),
@@ -729,7 +729,7 @@ async fn dynamic_offer_siblings_same_collection() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -742,7 +742,7 @@ async fn dynamic_offer_siblings_same_collection() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -832,7 +832,7 @@ async fn dynamic_offer_siblings_cross_collection() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "source_coll",
         ChildDecl {
             name: "b".to_string(),
@@ -845,7 +845,7 @@ async fn dynamic_offer_siblings_cross_collection() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "target_coll",
         ChildDecl {
             name: "c".to_string(),
@@ -932,7 +932,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -945,7 +945,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -978,7 +978,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
 
     test.destroy_dynamic_child(AbsoluteMoniker::root(), "coll", "b").await;
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -1060,7 +1060,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -1073,7 +1073,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1106,7 +1106,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
 
     test.destroy_dynamic_child(AbsoluteMoniker::root(), "coll", "c").await;
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1200,7 +1200,7 @@ async fn dynamic_offer_to_static_offer() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child_with_args(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1515,7 +1515,7 @@ async fn use_runner_from_environment_in_collection() {
         .await;
     universe
         .create_dynamic_child(
-            AbsoluteMoniker::root(),
+            &AbsoluteMoniker::root(),
             "coll",
             ChildDecl {
                 name: "b".to_string(),
@@ -2025,7 +2025,7 @@ async fn use_with_destroyed_parent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
+        &AbsoluteMoniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -2573,32 +2573,110 @@ async fn resolver_component_decl_is_validated() {
     );
 }
 
+enum RouteType {
+    Offer,
+    Expose,
+}
+
+async fn verify_service_route(
+    test: &RoutingTest,
+    use_decl: UseServiceDecl,
+    target_moniker: &str,
+    agg_moniker: &str,
+    child_monikers: &[&str],
+    route_type: RouteType,
+) {
+    let target_moniker: AbsoluteMoniker = target_moniker.try_into().unwrap();
+    let agg_moniker: AbsoluteMoniker = agg_moniker.try_into().unwrap();
+    let child_monikers: Vec<_> =
+        child_monikers.into_iter().map(|m| ChildMoniker::parse(m).unwrap()).collect();
+
+    // Test routing directly.
+    let target_component = test.model.look_up(&target_moniker).await.unwrap();
+    let agg_component = test.model.look_up(&agg_moniker).await.unwrap();
+    let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
+    match source {
+        RouteSource {
+            source: CapabilitySource::CollectionAggregate { collections, capability, component, .. },
+            relative_path: _,
+        } => {
+            let unique_colls: HashSet<_> =
+                child_monikers.iter().map(|c| c.collection().unwrap().to_string()).collect();
+            let mut unique_colls: Vec<_> = unique_colls.into_iter().collect();
+            unique_colls.sort();
+            assert_eq!(collections, unique_colls);
+            assert_matches!(capability, AggregateCapability::Service(_));
+            assert_eq!(*capability.source_name(), "foo");
+            assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &agg_component));
+        }
+        _ => panic!("wrong capability source"),
+    };
+
+    // Populate the collection(s) with dynamic children.
+    for child_moniker in &child_monikers {
+        let coll = child_moniker.collection().unwrap();
+        let name = child_moniker.name();
+        test.create_dynamic_child(&agg_moniker, coll, ChildDeclBuilder::new_lazy_child(name)).await;
+        test.start_instance_and_wait_start(&agg_moniker.child(child_moniker.clone()))
+            .await
+            .unwrap();
+    }
+
+    // Use the aggregated service from `target_moniker`.
+    test.check_use(
+        target_moniker,
+        CheckUse::Service {
+            path: "/svc/foo".try_into().unwrap(),
+            instance: ServiceInstance::Aggregated(child_monikers.len()),
+            member: "echo".to_string(),
+            expected_res: ExpectedResult::Ok,
+        },
+    )
+    .await;
+    match route_type {
+        RouteType::Offer => {}
+        RouteType::Expose => {
+            test.check_use_exposed_dir(
+                agg_moniker,
+                CheckUse::Service {
+                    path: "/foo".try_into().unwrap(),
+                    instance: ServiceInstance::Aggregated(child_monikers.len()),
+                    member: "echo".to_string(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        }
+    }
+}
+
 ///   a
 ///  / \
-/// b   coll: [service_child_a, non_service_child, service_child_b]
+/// b   coll
 ///
-/// root: offer service `foo` from coll to b
-/// b: use service
+/// root: offer service `foo` from `coll` to b
+/// b: route `use service`
 #[fuchsia::test]
-async fn route_service_from_parent_collection() {
+async fn offer_service_from_collection() {
     let use_decl = UseServiceDecl {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".into(),
-        target_path: CapabilityPath::try_from("/foo").unwrap(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
         availability: Availability::Required,
     };
-    let components = vec![
+    let mut components = vec![
         (
             "a",
             ComponentDeclBuilder::new()
+                .use_realm()
                 .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Collection("coll".to_string()),
+                    source: OfferSource::Collection("coll".into()),
                     source_name: "foo".into(),
                     source_instance_filter: None,
                     renamed_instances: None,
                     target_name: "foo".into(),
-                    target: OfferTarget::static_child("b".to_string()),
+                    target: OfferTarget::static_child("b".into()),
                     availability: Availability::Required,
                 }))
                 .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
@@ -2607,35 +2685,435 @@ async fn route_service_from_parent_collection() {
         ),
         ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
     ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
     let test = RoutingTestBuilder::new("a", components).build().await;
-    let b_component = test.model.look_up(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-    let a_component = test.model.look_up(&AbsoluteMoniker::root()).await.expect("root instance");
-    let source = RouteRequest::UseService(use_decl)
-        .route(&b_component)
-        .await
-        .expect("failed to route service");
-    match source {
-        RouteSource {
-            source: CapabilitySource::Collection { collection_name, capability, component, .. },
-            relative_path: _,
-        } => {
-            assert_eq!(collection_name, "coll");
-            assert_matches!(capability, AggregateCapability::Service(_));
-            assert_eq!(*capability.source_name(), "foo");
-            assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
-        }
-        _ => panic!("bad capability source"),
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/b",
+        "/",
+        &["coll:c1", "coll:c2", "coll:c3"],
+        RouteType::Offer,
+    )
+    .await;
+}
+
+///   a
+///  / \
+/// b   (coll1, coll2, coll3)
+///
+/// root: offer service `foo` from collections to b
+/// b: route `use service`
+#[fuchsia::test]
+async fn offer_service_from_collections() {
+    let use_decl = UseServiceDecl {
+        dependency_type: DependencyType::Strong,
+        source: UseSource::Parent,
+        source_name: "foo".into(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        availability: Availability::Required,
     };
+    let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
+        .into_iter()
+        .map(|coll| {
+            OfferDecl::Service(OfferServiceDecl {
+                source: OfferSource::Collection(coll.into()),
+                source_name: "foo".into(),
+                source_instance_filter: None,
+                renamed_instances: None,
+                target_name: "foo".into(),
+                target: OfferTarget::static_child("b".into()),
+                availability: Availability::Required,
+            })
+        })
+        .collect();
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .offer(offers.remove(0))
+                .offer(offers.remove(0))
+                .offer(offers.remove(0))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .add_lazy_child("b")
+                .build(),
+        ),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/b",
+        "/",
+        &["coll1:c1", "coll2:c2", "coll3:c3"],
+        RouteType::Offer,
+    )
+    .await;
+}
+
+///     a
+///    / \
+///   m  (coll1, coll2, coll3)
+///  /
+/// b
+///
+/// root: offer service `foo` from coll to b
+/// b: route `use service`
+#[fuchsia::test]
+async fn offer_service_from_collections_multilevel() {
+    let use_decl = UseServiceDecl {
+        dependency_type: DependencyType::Strong,
+        source: UseSource::Parent,
+        source_name: "foo".into(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        availability: Availability::Required,
+    };
+    let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
+        .into_iter()
+        .map(|coll| {
+            OfferDecl::Service(OfferServiceDecl {
+                source: OfferSource::Collection(coll.into()),
+                source_name: "foo".into(),
+                source_instance_filter: None,
+                renamed_instances: None,
+                target_name: "foo".into(),
+                target: OfferTarget::static_child("m".into()),
+                availability: Availability::Required,
+            })
+        })
+        .collect();
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .offer(offers.remove(0))
+                .offer(offers.remove(0))
+                .offer(offers.remove(0))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .add_lazy_child("m")
+                .build(),
+        ),
+        (
+            "m",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::Parent,
+                    source_name: "foo".into(),
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                    target_name: "foo".into(),
+                    target: OfferTarget::static_child("b".into()),
+                    availability: Availability::Required,
+                }))
+                .add_lazy_child("b")
+                .build(),
+        ),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/m/b",
+        "/",
+        &["coll1:c1", "coll2:c2", "coll3:c3"],
+        RouteType::Offer,
+    )
+    .await;
+}
+
+/// a
+///  \
+///   b
+///    \
+///    coll
+///
+/// b: expose service `foo` from `coll` to b
+/// a: route `use service`
+#[fuchsia::test]
+async fn expose_service_from_collection() {
+    let use_decl = UseServiceDecl {
+        dependency_type: DependencyType::Strong,
+        source: UseSource::Child("b".into()),
+        source_name: "foo".into(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        availability: Availability::Required,
+    };
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("b").build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Collection("coll".into()),
+                    source_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    target_name: "foo".into(),
+                    availability: Availability::Required,
+                }))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
+                .build(),
+        ),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/",
+        "/b",
+        &["coll:c1", "coll:c2", "coll:c3"],
+        RouteType::Expose,
+    )
+    .await;
+}
+
+/// a
+///  \
+///   b
+///    \
+///    (coll1, coll2, coll3)
+///
+/// b: expose service `foo` from collections to b
+/// a: route `use service`
+#[fuchsia::test]
+async fn expose_service_from_collections() {
+    let use_decl = UseServiceDecl {
+        dependency_type: DependencyType::Strong,
+        source: UseSource::Child("b".into()),
+        source_name: "foo".into(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        availability: Availability::Required,
+    };
+    let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
+        .into_iter()
+        .map(|coll| {
+            ExposeDecl::Service(ExposeServiceDecl {
+                source: ExposeSource::Collection(coll.into()),
+                source_name: "foo".into(),
+                target: ExposeTarget::Parent,
+                target_name: "foo".into(),
+                availability: Availability::Required,
+            })
+        })
+        .collect();
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("b").build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .expose(exposes.remove(0))
+                .expose(exposes.remove(0))
+                .expose(exposes.remove(0))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .build(),
+        ),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/",
+        "/b",
+        &["coll1:c1", "coll2:c2", "coll3:c3"],
+        RouteType::Expose,
+    )
+    .await;
+}
+
+/// a
+///  \
+///   m
+///    \
+///     b
+///      \
+///      (coll1, coll2, coll3)
+///
+/// b: expose service `foo` from collections to b
+/// a: route `use service`
+#[fuchsia::test]
+async fn expose_service_from_collections_multilevel() {
+    let use_decl = UseServiceDecl {
+        dependency_type: DependencyType::Strong,
+        source: UseSource::Child("m".into()),
+        source_name: "foo".into(),
+        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        availability: Availability::Required,
+    };
+    let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
+        .into_iter()
+        .map(|coll| {
+            ExposeDecl::Service(ExposeServiceDecl {
+                source: ExposeSource::Collection(coll.into()),
+                source_name: "foo".into(),
+                target: ExposeTarget::Parent,
+                target_name: "foo".into(),
+                availability: Availability::Required,
+            })
+        })
+        .collect();
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("m").build(),
+        ),
+        (
+            "m",
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Child("b".into()),
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .add_lazy_child("b")
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .expose(exposes.remove(0))
+                .expose(exposes.remove(0))
+                .expose(exposes.remove(0))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .build(),
+        ),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "foo".into(),
+                    target_name: "foo".into(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDeclBuilder::new("foo").build())
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/",
+        "/m/b",
+        &["coll1:c1", "coll2:c2", "coll3:c3"],
+        RouteType::Expose,
+    )
+    .await;
 }
 
 ///      root
 ///      /  \
-/// client   coll: [service_child_a, non_service_child, service_child_b]
+/// client   (coll1: [service_child_a, non_service_child], coll2: [service_child_b])
 ///
-/// root: offer service `foo` from collection `coll` to `client`
+/// root: offer service `foo` from `(coll1,coll2)` to `client`
 /// client: use service
 #[fuchsia::test]
-async fn list_service_instances_from_collection() {
+async fn list_service_instances_from_collections() {
     let use_decl = UseServiceDecl {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
@@ -2643,27 +3121,29 @@ async fn list_service_instances_from_collection() {
         target_path: CapabilityPath::try_from("/foo").unwrap(),
         availability: Availability::Required,
     };
+    let mut offers: Vec<_> = ["coll1", "coll2"]
+        .into_iter()
+        .map(|coll| {
+            OfferDecl::Service(OfferServiceDecl {
+                source: OfferSource::Collection(coll.into()),
+                source_name: "foo".into(),
+                source_instance_filter: None,
+                renamed_instances: None,
+                target_name: "foo".into(),
+                target: OfferTarget::static_child("client".into()),
+                availability: Availability::Required,
+            })
+        })
+        .collect();
     let components = vec![
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".into(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
-                    availability: Availability::Required,
-                }))
-                .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Collection("coll".to_string()),
-                    source_name: "foo".into(),
-                    source_instance_filter: None,
-                    renamed_instances: None,
-                    target_name: "foo".into(),
-                    target: OfferTarget::static_child("client".to_string()),
-                    availability: Availability::Required,
-                }))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
+                .use_realm()
+                .offer(offers.remove(0))
+                .offer(offers.remove(0))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
                 .add_lazy_child("client")
                 .build(),
         ),
@@ -2680,7 +3160,7 @@ async fn list_service_instances_from_collection() {
                 }))
                 .service(ServiceDecl {
                     name: "foo".into(),
-                    source_path: Some("/svc/foo".try_into().unwrap()),
+                    source_path: Some("/svc/foo.service".try_into().unwrap()),
                 })
                 .build(),
         ),
@@ -2696,7 +3176,7 @@ async fn list_service_instances_from_collection() {
                 }))
                 .service(ServiceDecl {
                     name: "foo".into(),
-                    source_path: Some("/svc/foo".try_into().unwrap()),
+                    source_path: Some("/svc/foo.service".try_into().unwrap()),
                 })
                 .build(),
         ),
@@ -2704,22 +3184,22 @@ async fn list_service_instances_from_collection() {
     ];
     let test = RoutingTestBuilder::new("root", components).build().await;
 
-    // Start a few dynamic children in the collection "coll".
+    // Start a few dynamic children in the collections.
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
-        "coll",
+        &AbsoluteMoniker::root(),
+        "coll1",
         ChildDeclBuilder::new_lazy_child("service_child_a"),
     )
     .await;
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
-        "coll",
+        &AbsoluteMoniker::root(),
+        "coll1",
         ChildDeclBuilder::new_lazy_child("non_service_child"),
     )
     .await;
     test.create_dynamic_child(
-        AbsoluteMoniker::root(),
-        "coll",
+        &AbsoluteMoniker::root(),
+        "coll2",
         ChildDeclBuilder::new_lazy_child("service_child_b"),
     )
     .await;
@@ -2732,22 +3212,22 @@ async fn list_service_instances_from_collection() {
         .expect("failed to route service");
     let aggregate_capability_provider = match source {
         RouteSource {
-            source: CapabilitySource::Collection { aggregate_capability_provider, .. },
+            source: CapabilitySource::CollectionAggregate { aggregate_capability_provider, .. },
             relative_path: _,
         } => aggregate_capability_provider,
         _ => panic!("bad capability source"),
     };
 
     // Check that only the instances that expose the service are listed.
-    let instances: HashSet<String> =
+    let instances: HashSet<ChildMoniker> =
         aggregate_capability_provider.list_instances().await.unwrap().into_iter().collect();
     assert_eq!(instances.len(), 2);
-    assert!(instances.contains("service_child_a"));
-    assert!(instances.contains("service_child_b"));
+    assert!(instances.contains(&"coll1:service_child_a".try_into().unwrap()));
+    assert!(instances.contains(&"coll2:service_child_b".try_into().unwrap()));
 
     // Try routing to one of the instances.
     let source = aggregate_capability_provider
-        .route_instance("service_child_a")
+        .route_instance(&"coll1:service_child_a".try_into().unwrap())
         .await
         .expect("failed to route to child");
     match source {
@@ -2758,9 +3238,9 @@ async fn list_service_instances_from_collection() {
             assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),
-                "/svc/foo".parse::<CapabilityPath>().unwrap()
+                "/svc/foo.service".parse::<CapabilityPath>().unwrap()
             );
-            assert_eq!(component.abs_moniker, vec!["coll:service_child_a"].try_into().unwrap());
+            assert_eq!(component.abs_moniker, vec!["coll1:service_child_a"].try_into().unwrap());
         }
         _ => panic!("bad child capability source"),
     }
@@ -2883,7 +3363,7 @@ async fn use_service_from_sibling_collection() {
 
     // Populate the collection with dynamic children.
     test.create_dynamic_child(
-        vec!["c"].try_into().unwrap(),
+        &vec!["c"].try_into().unwrap(),
         "coll",
         ChildDeclBuilder::new_lazy_child("foo"),
     )
@@ -2892,7 +3372,7 @@ async fn use_service_from_sibling_collection() {
         .await
         .expect("failed to start `foo`");
     test.create_dynamic_child(
-        vec!["c"].try_into().unwrap(),
+        &vec!["c"].try_into().unwrap(),
         "coll",
         ChildDeclBuilder::new_lazy_child("bar"),
     )
@@ -2901,7 +3381,7 @@ async fn use_service_from_sibling_collection() {
         .await
         .expect("failed to start `bar`");
     test.create_dynamic_child(
-        vec!["c"].try_into().unwrap(),
+        &vec!["c"].try_into().unwrap(),
         "coll",
         ChildDeclBuilder::new_lazy_child("baz"),
     )

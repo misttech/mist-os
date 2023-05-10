@@ -350,7 +350,7 @@ impl RoutingTest {
     /// Creates a dynamic child `child_decl` in `moniker`'s `collection`.
     pub async fn create_dynamic_child<'a>(
         &'a self,
-        moniker: AbsoluteMoniker,
+        moniker: &AbsoluteMoniker,
         collection: &'a str,
         decl: impl Into<ChildDecl>,
     ) {
@@ -366,13 +366,13 @@ impl RoutingTest {
     /// Creates a dynamic child `child_decl` in `moniker`'s `collection`.
     pub async fn create_dynamic_child_with_args<'a>(
         &'a self,
-        moniker: AbsoluteMoniker,
+        moniker: &AbsoluteMoniker,
         collection: &'a str,
         decl: impl Into<ChildDecl>,
         args: fcomponent::CreateChildArgs,
     ) {
         let component_name =
-            self.start_instance_and_wait_start(&moniker).await.expect("start instance failed");
+            self.start_instance_and_wait_start(moniker).await.expect("start instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
         Self::check_namespace(component_name, &self.mock_runner, self.components.clone()).await;
         let namespace = self
@@ -1230,7 +1230,7 @@ pub mod capability_util {
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             &path.basename,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         )
         .await
         .expect("failed to open service dir");
@@ -1413,7 +1413,7 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
+        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
@@ -1436,7 +1436,7 @@ pub mod capability_util {
         model: &Arc<Model>,
     ) -> Vec<String> {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
+        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());

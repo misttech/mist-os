@@ -266,7 +266,7 @@ impl<'a> OpenRequest<'a> {
                     _ => Ok(None),
                 }
             }
-            CapabilitySource::Aggregate { capability_provider, component, .. } => {
+            CapabilitySource::OfferAggregate { capability_provider, component, .. } => {
                 Ok(Some(Box::new(
                     AggregateServiceDirectoryProvider::create(
                         component.clone(),
@@ -276,17 +276,17 @@ impl<'a> OpenRequest<'a> {
                     .await?,
                 )))
             }
-            CapabilitySource::Collection {
+            CapabilitySource::CollectionAggregate {
                 capability,
                 component,
                 aggregate_capability_provider,
-                collection_name,
+                collections,
             } => {
                 let source_component_instance = component.upgrade()?;
 
                 let route = CollectionServiceRoute {
                     source_moniker: source_component_instance.abs_moniker.clone(),
-                    collection_name: collection_name.clone(),
+                    collections: collections.iter().map(|c| c.into()).collect(),
                     service_name: capability.source_name().clone(),
                 };
 

@@ -187,7 +187,7 @@ async fn use_in_collection_from_parent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".into(),
@@ -368,7 +368,7 @@ async fn use_in_collection_from_grandparent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".into(),
@@ -952,7 +952,7 @@ async fn storage_persistence_relative_moniker_path() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -982,7 +982,7 @@ async fn storage_persistence_relative_moniker_path() {
 
     // recreate dynamic child [c:2]
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1152,7 +1152,7 @@ async fn storage_persistence_instance_id_path() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1176,7 +1176,7 @@ async fn storage_persistence_instance_id_path() {
 
     // recreate dynamic child [c:2]
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1371,7 +1371,7 @@ async fn storage_persistence_inheritance() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1417,7 +1417,7 @@ async fn storage_persistence_inheritance() {
 
     // create [e:1] under the lower collection
     test.create_dynamic_child(
-        vec!["b", "persistent_coll:c"].try_into().unwrap(),
+        &vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "lower_coll",
         ChildDecl {
             name: "e".into(),
@@ -1640,7 +1640,7 @@ async fn storage_persistence_disablement() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].try_into().unwrap(),
+        &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1686,7 +1686,7 @@ async fn storage_persistence_disablement() {
 
     // create [e:1] under the non persistent collection
     test.create_dynamic_child(
-        vec!["b", "persistent_coll:c"].try_into().unwrap(),
+        &vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "non_persistent_coll",
         ChildDecl {
             name: "e".into(),

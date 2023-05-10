@@ -307,11 +307,13 @@ impl RouteValidator {
         let source = request.route(target).await?;
         let source = &source.source;
         let service_dir = match source {
-            CapabilitySource::Collection { capability, component, collection_name, .. } => {
+            CapabilitySource::CollectionAggregate {
+                capability, component, collections, ..
+            } => {
                 let component = component.upgrade()?;
                 let route = CollectionServiceRoute {
                     source_moniker: component.abs_moniker.clone(),
-                    collection_name: collection_name.clone(),
+                    collections: collections.iter().map(|c| c.into()).collect(),
                     service_name: capability.source_name().clone(),
                 };
                 let state = component.lock_state().await;
@@ -330,15 +332,14 @@ impl RouteValidator {
             Some(service_dir) => {
                 let mut service_info: Vec<_> = service_dir.entries().await;
                 // Sort the entries (they can show up in any order)
-                service_info.sort_by(|a, b| match a.source_child_name.cmp(&b.source_child_name) {
+                service_info.sort_by(|a, b| match a.source_id.cmp(&b.source_id) {
                     Ordering::Equal => a.service_instance.cmp(&b.service_instance),
                     o => o,
                 });
                 let service_info = service_info
                     .into_iter()
                     .map(|e| {
-                        let child_name =
-                            format!("{}:{}", service_dir.collection(), e.source_child_name);
+                        let child_name = format!("{}", e.source_id);
                         fsys::ServiceInstance {
                             instance_name: Some(e.name.clone()),
                             child_name: Some(child_name),
