@@ -38,7 +38,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // The filename is in the format pci-<bus>:<device>.<function>. The function is always zero for
     // virtio block devices.
     let topological_path_suffix =
-        format!("/pci-{:02}:{:02}.0-fidl/virtio-block/block", pci_bus, pci_device);
+        format!("/{:02}:{:02}.0/pt/virtio-block/block", pci_bus, pci_device);
 
     // This tool has access to block nodes in the /dev/class/block path, but we need to match
     // against composite PCI devices which sit in the /dev/ root we cannot get blanket access to. To

@@ -108,19 +108,19 @@ impl FromStr for DeviceCategoryList {
     name = "conformance",
     example = "To run all tests for a given driver:
 
-$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.so
+$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.cm
 
 To run all tests for a given device:
 
-$ ffx driver conformance test --device pci-00:05.0-fidl/my-device
+$ ffx driver conformance test --device sys/platform/pt/PCI0/bus/00:05.0/pt/my-device
 
 To run all tests of a given type(s) for a given driver:
 
-$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.so --types functional,performance
+$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.cm --types functional,performance
 
 To run an arbitrary test(s) against a given driver:
 
-$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.so --tests fuchsia-pkg://fuchsia.com/my-test#meta/my-test.cm"
+$ ffx driver conformance test --driver fuchsia-boot:///#driver/my-driver.cm --tests fuchsia-pkg://fuchsia.com/my-test#meta/my-test.cm"
 )]
 pub struct ConformanceCommand {
     #[argh(subcommand)]

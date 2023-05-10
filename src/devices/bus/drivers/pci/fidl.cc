@@ -156,9 +156,7 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
       .spawn_colocated = false,
   };
 
-  char composite_name[ZX_DEVICE_NAME_MAX];
-  snprintf(composite_name, sizeof(composite_name), "pci-%s-fidl", device->config()->addr());
-  status = fidl_dev_unowned->DdkAddComposite(composite_name, &composite_desc);
+  status = fidl_dev_unowned->DdkAddComposite(device->config()->addr(), &composite_desc);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] Failed to create pci fidl composite: %s", device->config()->addr(),
            zx_status_get_string(status));

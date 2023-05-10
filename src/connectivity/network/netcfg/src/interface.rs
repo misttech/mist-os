@@ -47,7 +47,7 @@ impl Config {
         topological_path: std::borrow::Cow<'_, str>,
         mac_address: fidl_fuchsia_net_ext::MacAddress,
     ) -> PersistentIdentifier {
-        if topological_path.contains("/pci-") {
+        if topological_path.contains("/PCI0") {
             if topological_path.contains("/usb/") {
                 PersistentIdentifier::MacAddress(mac_address)
             } else {
@@ -75,17 +75,17 @@ impl Config {
     // devices; on-board devices are those devices whose topological path does not
     // contain "/usb". Topological paths of
     // both device types are expected to
-    // contain "/pci-"; devices whose topological path does not contain "/pci-" are
+    // contain "/PCI0"; devices whose topological path does not contain "/PCI0" are
     // identified by their MAC address.
     //
     // At the time of writing, typical topological paths appear similar to:
     //
     // PCI:
-    // "/dev/pci-02:00.0-fidl/e1000/ethernet"
+    // "/dev/sys/platform/pt/PCI0/bus/02:00.0_/02:00.0/e1000/ethernet"
     //
     // USB:
-    // "/dev/pci-00:14.0-fidl/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
-    // 00:14:0 following "/pci-" represents BDF (Bus Device Function)
+    // "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
+    // 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
     //
     // SDIO
     // "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy"
@@ -138,8 +138,11 @@ impl Config {
             crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
             crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
         };
-        let (suffix, pat) =
-            if topological_path.contains("/pci-") { ("p", "/pci-") } else { ("s", "/platform/") };
+        let (suffix, pat) = if topological_path.contains("/PCI0/bus/") {
+            ("p", "/PCI0/bus/")
+        } else {
+            ("s", "/platform/")
+        };
 
         let index = topological_path.find(pat).ok_or_else(|| {
             anyhow::format_err!(
@@ -351,26 +354,26 @@ mod tests {
         let test_cases = vec![
             // usb interfaces
             TestCase {
-                topological_path: "/dev/pci-00:14.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanx1",
             },
             TestCase {
-                topological_path: "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0_/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
                 mac: [0x02, 0x02, 0x02, 0x02, 0x02, 0x02],
                 interface_type: crate::InterfaceType::Ethernet,
                 want_name: "ethx2",
             },
             // pci intefaces
             TestCase {
-                topological_path: "/dev/pci-00:14.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
                 mac: [0x03, 0x03, 0x03, 0x03, 0x03, 0x03],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanp0014",
             },
             TestCase {
-                topological_path: "/dev/pci-00:15.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0_/00:14.0/ethernet",
                 mac: [0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
                 interface_type: crate::InterfaceType::Ethernet,
                 want_name: "ethp0015",
@@ -431,7 +434,7 @@ mod tests {
         let test_cases = vec![
             // Base case.
             FileBackedConfigTestCase {
-                topological_path: "/dev/pci-00:14.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanp0014",
@@ -439,7 +442,7 @@ mod tests {
             },
             // Same topological path as the base case, different MAC address.
             FileBackedConfigTestCase {
-                topological_path: "/dev/pci-00:14.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
                 mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanp0014",
@@ -447,22 +450,20 @@ mod tests {
             },
             // Test case that labels iwilwifi as ethernet.
             FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/platform-passthrough/PCI0/bus/01:00.0_\
-/pci-01:00.0-fidl/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0_/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Ethernet,
-                want_name: "ethp01000fd",
+                want_name: "ethp01",
                 expected_size: 2,
             },
             // Test case that changes the previous test case's device class to wlan.
             // The test should detect that the device class doesn't match the interface
             // name, and overwrite with the new interface name that does match.
             FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/platform-passthrough/PCI0/bus/01:00.0_\
-/pci-01:00.0-fidl/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0_/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanp01000fd",
+                want_name: "wlanp01",
                 expected_size: 2,
             },
         ];
