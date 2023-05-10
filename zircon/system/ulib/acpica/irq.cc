@@ -15,6 +15,7 @@ struct AcpiIrqThread {
   thrd_t thread;
   ACPI_OSD_HANDLER handler;
   zx_handle_t irq_handle;
+  UINT32 interrupt_number;
   void* context;
 };
 static int acpi_irq_thread(void* arg) {
@@ -62,8 +63,6 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
     return AE_OK;
   }
 
-  ZX_DEBUG_ASSERT_MSG(InterruptLevel == 0x9, "%d", InterruptLevel);  // SCI
-
   fbl::AllocChecker ac;
   std::unique_ptr<AcpiIrqThread> arg(new (&ac) AcpiIrqThread());
   if (!ac.check()) {
@@ -79,6 +78,9 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
   arg->handler = Handler;
   arg->context = Context;
   arg->irq_handle = handle;
+  // |InterruptLevel| in the spec appears to be the interrupt number based on
+  // the errors returned in ACPICA 9.5.1, despite the name.
+  arg->interrupt_number = InterruptLevel;
 
   int ret = thrd_create_with_name(&arg->thread, acpi_irq_thread, arg.get(), "acpi_irq");
   if (ret != 0) {
@@ -103,8 +105,9 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
  * @return AE_NOT_EXIST There is no handler installed for this interrupt level.
  */
 ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLER Handler) {
-  ZX_DEBUG_ASSERT_MSG(InterruptNumber == 0x9, "%d", InterruptNumber);  // SCI
   ZX_DEBUG_ASSERT(sci_irq != nullptr);
+  ZX_DEBUG_ASSERT_MSG(sci_irq->interrupt_number == InterruptNumber, "%#x != %#x",
+                      sci_irq->interrupt_number, InterruptNumber);
   zx_interrupt_destroy(sci_irq->irq_handle);
   thrd_join(sci_irq->thread, nullptr);
   sci_irq.reset();
