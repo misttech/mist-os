@@ -299,6 +299,10 @@ class PageQueues {
 
   void Dump() TA_EXCL(lock_);
 
+  // Returns a global count of all pages compressed at the point of LRU change. This is a global
+  // method and will include stats from every PageQueues that has been instantiated.
+  static uint64_t GetLruPagesCompressed();
+
   // Enables reclamation of anonymous pages by causing them to be placed into the reclaimable queue
   // instead of the dedicated anonymous queue. The |zero_forks| parameter controls whether the
   // anonymous zero forks should also go into the general reclaimable queue or not.

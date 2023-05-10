@@ -209,7 +209,8 @@ void MemoryWatchdog::WorkerThread() {
       // in the out of memory state.
       while (mem_event_idx_ == PressureLevel::kOutOfMemory) {
         uint64_t evicted_pages = pmm_evictor()->EvictOneShotSynchronous(
-            MB * 10, Evictor::EvictionLevel::IncludeNewest, Evictor::Output::Print);
+            MB * 10, Evictor::EvictionLevel::IncludeNewest, Evictor::Output::Print,
+            Evictor::TriggerReason::OOM);
         if (evicted_pages == 0) {
           printf("memory-pressure: found no pages to evict\n");
           break;

@@ -28,9 +28,12 @@
 
 namespace {
 
-KCOUNTER(pager_backed_pages_evicted, "vm.reclamation.pages_evicted_pager_backed")
-KCOUNTER(compression_evicted, "vm.reclamation.pages_evicted_compressed")
-KCOUNTER(discardable_pages_evicted, "vm.reclamation.pages_evicted_discardable")
+KCOUNTER(pager_backed_pages_evicted, "vm.reclamation.pages_evicted_pager_backed.total")
+KCOUNTER(pager_backed_pages_evicted_oom, "vm.reclamation.pages_evicted_pager_backed.oom")
+KCOUNTER(compression_evicted, "vm.reclamation.pages_evicted_compressed.total")
+KCOUNTER(compression_evicted_oom, "vm.reclamation.pages_evicted_compressed.oom")
+KCOUNTER(discardable_pages_evicted, "vm.reclamation.pages_evicted_discardable.total")
+KCOUNTER(discardable_pages_evicted_oom, "vm.reclamation.pages_evicted_discardable.oom")
 
 inline void CheckedIncrement(uint64_t* a, uint64_t b) {
   uint64_t result;
@@ -40,6 +43,18 @@ inline void CheckedIncrement(uint64_t* a, uint64_t b) {
 }
 
 }  // namespace
+
+// static
+Evictor::EvictorStats Evictor::GetGlobalStats() {
+  EvictorStats stats;
+  stats.pager_backed_oom = pager_backed_pages_evicted_oom.SumAcrossAllCpus();
+  stats.pager_backed_other = pager_backed_pages_evicted.SumAcrossAllCpus() - stats.pager_backed_oom;
+  stats.compression_oom = compression_evicted_oom.SumAcrossAllCpus();
+  stats.compression_other = compression_evicted.SumAcrossAllCpus() - stats.compression_oom;
+  stats.discarded_oom = discardable_pages_evicted_oom.SumAcrossAllCpus();
+  stats.discarded_other = discardable_pages_evicted.SumAcrossAllCpus() - stats.discarded_oom;
+  return stats;
+}
 
 Evictor::Evictor(PmmNode* node) : pmm_node_(node), page_queues_(node->GetPageQueues()) {}
 
@@ -182,11 +197,17 @@ Evictor::EvictedPageCounts Evictor::EvictOneShotFromPreloadedTarget() {
     }
   }
 
+  if (target.oom_trigger) {
+    pager_backed_pages_evicted_oom.Add(static_cast<int64_t>(total_evicted_counts.pager_backed));
+    compression_evicted_oom.Add(static_cast<int64_t>(total_evicted_counts.compressed));
+    discardable_pages_evicted_oom.Add(static_cast<int64_t>(total_evicted_counts.discardable));
+  }
+
   return total_evicted_counts;
 }
 
 uint64_t Evictor::EvictOneShotSynchronous(uint64_t min_mem_to_free, EvictionLevel eviction_level,
-                                          Output output) {
+                                          Output output, TriggerReason reason) {
   if (!IsEvictionEnabled()) {
     return 0;
   }
@@ -198,6 +219,7 @@ uint64_t Evictor::EvictOneShotSynchronous(uint64_t min_mem_to_free, EvictionLeve
       .min_pages_to_free = min_mem_to_free / PAGE_SIZE,
       .level = eviction_level,
       .print_counts = (output == Output::Print),
+      .oom_trigger = (reason == TriggerReason::OOM),
   });
 
   auto evicted_counts = EvictOneShotFromPreloadedTarget();

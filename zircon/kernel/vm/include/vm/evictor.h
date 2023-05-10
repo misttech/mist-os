@@ -42,6 +42,11 @@ class Evictor {
     NoPrint = false,
   };
 
+  enum class TriggerReason : bool {
+    OOM = true,
+    Other = false,
+  };
+
   // Eviction target state is grouped together behind a lock to allow different threads to safely
   // trigger and perform the eviction.
   struct EvictionTarget {
@@ -52,6 +57,7 @@ class Evictor {
     uint64_t min_pages_to_free = 0;
     EvictionLevel level = EvictionLevel::OnlyOldest;
     bool print_counts = false;
+    bool oom_trigger = false;
   };
 
   // We count non-loaned and loaned evicted pages separately since the eviction goal is set in terms
@@ -106,7 +112,8 @@ class Evictor {
   // needs to be for being considered for eviction. This may acquire arbitrary vmo and aspace locks.
   uint64_t EvictOneShotSynchronous(uint64_t min_mem_to_free,
                                    EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
-                                   Output output = Output::NoPrint);
+                                   Output output = Output::NoPrint,
+                                   TriggerReason reason = TriggerReason::Other);
 
   // Reclaim memory until free memory equals the |free_mem_target| (in bytes) and at least
   // |min_mem_to_free| (in bytes) has been reclaimed. Reclamation will happen asynchronously on the
@@ -141,6 +148,17 @@ class Evictor {
 
   // Whether eviction should attempt to use compression.
   bool IsCompressionEnabled() const;
+
+  struct EvictorStats {
+    uint64_t pager_backed_oom = 0;
+    uint64_t pager_backed_other = 0;
+    uint64_t compression_oom = 0;
+    uint64_t compression_other = 0;
+    uint64_t discarded_oom = 0;
+    uint64_t discarded_other = 0;
+  };
+  // Return global eviction stats from all instantiations of the Evictor.
+  static EvictorStats GetGlobalStats();
 
  private:
   // Private constructor for test code to specify |queues| not owned by |node|.

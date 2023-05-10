@@ -31,7 +31,8 @@ KCOUNTER(pq_aging_reason_active_ratio, "pq.aging.reason.active_ratio")
 KCOUNTER(pq_aging_reason_manual, "pq.aging.reason.manual")
 KCOUNTER(pq_aging_blocked_on_lru, "pq.aging.blocked_on_lru")
 KCOUNTER(pq_lru_spurious_wakeup, "pq.lru.spurious_wakeup")
-KCOUNTER(pq_lru_pages_reclaimed, "pq.lru.pages_reclaimed")
+KCOUNTER(pq_lru_pages_evicted, "pq.lru.pages_evicted")
+KCOUNTER(pq_lru_pages_compressed, "pq.lru.pages_compressed")
 
 // Helper class for building an isolate list for deferred processing when acting on the LRU queues.
 // Pages are added while the page queues lock is held, and processed once the lock is dropped.
@@ -127,7 +128,11 @@ class LruIsolate {
         }
         if (backlink.cow->ReclaimPage(backlink.page, backlink.offset,
                                       VmCowPages::EvictionHintAction::Follow, compressor)) {
-          pq_lru_pages_reclaimed.Add(1);
+          if (backlink.cow->can_evict()) {
+            pq_lru_pages_evicted.Add(1);
+          } else {
+            pq_lru_pages_compressed.Add(1);
+          }
           pmm_free_page(backlink.page);
         }
       }
@@ -164,6 +169,9 @@ class LruIsolate {
 };
 
 }  // namespace
+
+// static
+uint64_t PageQueues::GetLruPagesCompressed() { return pq_lru_pages_compressed.SumAcrossAllCpus(); }
 
 PageQueues::PageQueues()
     : min_mru_rotate_time_(kDefaultMinMruRotateTime),
