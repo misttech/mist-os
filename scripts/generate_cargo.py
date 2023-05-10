@@ -256,7 +256,6 @@ def write_toml_file(
             "lib_crate_type": crate_type,
             "edition": edition,
             "source_root": rebase_gn_path(root_path, metadata["crate_root"]),
-            "crate_name": metadata["crate_name"],
             "rust_crates_path": rust_crates_path,
             "default_target": default_target,
         })
@@ -350,7 +349,6 @@ def write_toml_file(
             # this is a third-party dependency
             # TODO remove this when all things use GN. temporary hack?
             if "third_party/rust_crates:" in dep:
-                has_third_party_deps = True
                 match = re.search("rust_crates:([\w-]*)", dep)
                 crate_name, version = str(match.group(1)).rsplit("-v", 1)
                 dep_crate_names.add(crate_name)
@@ -375,7 +373,6 @@ def write_toml_file(
                 version = version_from_toolchain(toolchain)
                 crate_name = lookup_gn_pkg_name(
                     project, dep, for_workspace=for_workspace)
-                output_name = project.targets[dep]["crate_name"]
                 dep_dir = os.path.join(gn_cargo_dir, str(lookup[dep]))
                 fout.write(
                     CARGO_PACKAGE_DEP % {
@@ -445,11 +442,8 @@ def main():
     for target_info in cargo_toml["target"].values():
         collect_features(target_info.get("dependencies", {}))
 
-    host_binaries = []
-    target_binaries = []
-
     lookup = {}
-    for idx, target in enumerate(project.rust_targets):
+    for target in project.rust_targets:
         # hash is the GN target name without the prefixed //
         lookup[target] = hashlib.sha1(target[2:].encode("utf-8")).hexdigest()
 
@@ -558,15 +552,44 @@ def main():
                 fout.write(" }\n")
             fout.write("\n")
 
-    rust_targets = [
-        {
-            "label": t,
-            "crate_name": project.targets[t]["crate_name"],
-            "type": project.targets[t]["type"],
-        } for t in project.rust_targets if t in project.reachable_targets
-    ]
-    with open(os.path.join(gn_cargo_dir, "rust_targets.json"), "w") as f:
-        json.dump(rust_targets, f)
+    rust_targets = sorted(
+        [
+            {
+                "label": t,
+                "crate_name": project.targets[t]["crate_name"],
+                "type": project.targets[t]["type"],
+                "cargo_manifest_dir": lookup[t],
+            } for t in project.rust_targets if t in project.reachable_targets
+        ],
+        key=lambda t: t["label"])
+
+    # Returns a single rust target per "base" label (not including toolchain),
+    # either for fuchsia toolchains or host toolchains. This is used for rustdoc
+    # where we only want to document each crate once for fuchsia and once for host.
+    def rustdoc_targets(host):
+        cur = ""
+        result = []
+        for t in rust_targets:
+            if t["type"] == "executable":
+                continue
+            l = t["label"].replace(".actual", "")
+            base = l.split("(")[0]
+            is_host = "(//build/toolchain:host" in l
+            if host == is_host:
+                if base == cur:
+                    continue
+                cur = base
+                result.append(t)
+                result[-1]["label"] = l
+        return result
+
+    def dump_json(obj, filename):
+        with open(os.path.join(gn_cargo_dir, filename), "w") as f:
+            json.dump(obj, f)
+
+    dump_json(rust_targets, "rust_targets.json")
+    dump_json(rustdoc_targets(host=False), "rustdoc_targets.json")
+    dump_json(rustdoc_targets(host=True), "rustdoc_host_targets.json")
 
     return 0
 
