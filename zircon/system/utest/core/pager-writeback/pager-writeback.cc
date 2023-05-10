@@ -4928,11 +4928,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DecommitCleanOnDetach, 0) {
 }
 
 // Tests that DIRTY requests cannot be generated after detach.
-#if defined(__riscv)
-VMO_VMAR_TEST(PagerWriteback, DISABLED_NoDirtyRequestsAfterDetach) {
-#else
 VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
-#endif
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5017,11 +5013,7 @@ VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
 }
 
 // Tests that detach with a pending DIRTY request fails the request.
-#if defined(__riscv)
-VMO_VMAR_TEST(PagerWriteback, DISABLED_DetachWithPendingDirtyRequest) {
-#else
 VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
-#endif
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
