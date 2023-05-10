@@ -73,6 +73,10 @@ class UsbPeripheralHarness : public zxtest::Test {
     root_device_->SetMetadata(DEVICE_METADATA_USB_CONFIG, &kConfig, sizeof(kConfig));
     root_device_->SetMetadata(DEVICE_METADATA_SERIAL_NUMBER, &kSerialNumber, sizeof(kSerialNumber));
     root_device_->AddProtocol(ZX_PROTOCOL_USB_DCI, dci_->proto()->ops, dci_->proto()->ctx);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    root_device_->AddFidlService(fuchsia_hardware_usb_dci::UsbDciService::Name,
+                                 std::move(endpoints->client));
 
     zx::interrupt irq;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));

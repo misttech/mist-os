@@ -58,7 +58,33 @@ zx_status_t UsbVirtualBus::CreateDevice() {
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto status = device_->DdkAdd("usb-virtual-device");
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    device_ = nullptr;
+    return endpoints.status_value();
+  }
+  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_dci::UsbDciService>(
+      fuchsia_hardware_usb_dci::UsbDciService::InstanceHandler({
+          .device = dci_bindings_.CreateHandler(device_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service");
+    device_ = nullptr;
+    return result.status_value();
+  }
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    device_ = nullptr;
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb_dci::UsbDciService::Name,
+  };
+  auto status = device_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-device")
+                                    .set_fidl_service_offers(offers)
+                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     device_ = nullptr;
     return status;
@@ -69,27 +95,38 @@ zx_status_t UsbVirtualBus::CreateDevice() {
 
 zx_status_t UsbVirtualBus::CreateHost() {
   fbl::AllocChecker ac;
-  host_ = fbl::make_unique_checked<UsbVirtualHost>(&ac, zxdev(), this, dispatcher_);
+  host_ = fbl::make_unique_checked<UsbVirtualHost>(&ac, zxdev(), this);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
+    host_ = nullptr;
     return endpoints.status_value();
   }
-  auto status = host_->AddService(std::move(endpoints->server));
-  if (status != ZX_OK) {
+  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_hci::UsbHciService>(
+      fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
+          .device = hci_bindings_.CreateHandler(host_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service");
     host_ = nullptr;
-    return status;
+    return result.status_value();
+  }
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    host_ = nullptr;
+    return result.status_value();
   }
 
   std::array offers = {
       fuchsia_hardware_usb_hci::UsbHciService::Name,
   };
-  status = host_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-host")
-                             .set_fidl_service_offers(offers)
-                             .set_outgoing_dir(endpoints->client.TakeChannel()));
+  auto status = host_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-host")
+                                  .set_fidl_service_offers(offers)
+                                  .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     host_ = nullptr;
     return status;

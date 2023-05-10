@@ -5,8 +5,10 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_FUNCTION_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_FUNCTION_H_
 
+#include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
@@ -23,14 +25,17 @@ using UsbFunctionType = ddk::Device<UsbFunction>;
 // USB function drivers bind to this.
 class UsbFunction : public UsbFunctionType,
                     public ddk::UsbFunctionProtocol<UsbFunction, ddk::base_protocol>,
-                    public fbl::RefCounted<UsbFunction> {
+                    public fbl::RefCounted<UsbFunction>,
+                    public fidl::Server<fuchsia_hardware_usb_function::UsbFunction> {
  public:
   UsbFunction(zx_device_t* parent, UsbPeripheral* peripheral, FunctionDescriptor desc,
-              uint8_t configuration)
+              uint8_t configuration, async_dispatcher_t* dispatcher)
       : UsbFunctionType(parent),
         configuration_(configuration),
         peripheral_(peripheral),
-        function_descriptor_(desc) {}
+        function_descriptor_(desc),
+        dispatcher_(dispatcher),
+        outgoing_(dispatcher) {}
 
   // Device protocol implementation.
   void DdkRelease();
@@ -66,6 +71,35 @@ class UsbFunction : public UsbFunctionType,
 
   zx_status_t UsbFunctionCancelAll(uint8_t ep_address);
 
+  zx_status_t AddService(fidl::ServerEnd<fuchsia_io::Directory> server) {
+    zx::result result = outgoing_.AddService<fuchsia_hardware_usb_function::UsbFunctionService>(
+        fuchsia_hardware_usb_function::UsbFunctionService::InstanceHandler({
+            .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+        }));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to add service");
+      return result.status_value();
+    }
+    result = outgoing_.Serve(std::move(server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to service the outgoing directory");
+      return result.status_value();
+    }
+
+    return ZX_OK;
+  }
+
+  // fuchsia_hardware_usb_function.UsbFunction protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override {
+    auto status = peripheral_->ConnectToEndpoint(request.ep_addr(), std::move(request.ep()));
+    if (status != ZX_OK) {
+      completer.Reply(fit::as_error(status));
+      return;
+    }
+    completer.Reply(fit::ok());
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbFunction);
 
@@ -78,6 +112,10 @@ class UsbFunction : public UsbFunctionType,
 
   uint8_t num_interfaces_ = 0;
   fbl::Array<uint8_t> descriptors_;
+
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_function::UsbFunction> bindings_;
 };
 
 }  // namespace usb_peripheral

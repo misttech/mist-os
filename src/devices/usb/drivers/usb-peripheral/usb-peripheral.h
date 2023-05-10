@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_PERIPHERAL_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_PERIPHERAL_H_
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
@@ -137,6 +138,17 @@ class UsbPeripheral : public UsbPeripheralType,
 
   zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
+  zx_status_t ConnectToEndpoint(uint8_t ep_address,
+                                fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> ep) {
+    auto result = dci_new_->ConnectToEndpoint({ep_address, std::move(ep)});
+    if (result.is_error()) {
+      return result.error_value().is_domain_error()
+                 ? result.error_value().domain_error()
+                 : result.error_value().framework_error().status();
+    }
+    return ZX_OK;
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbPeripheral);
 
@@ -176,6 +188,7 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
+  fidl::SyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};
   // Map from endpoint index to function.

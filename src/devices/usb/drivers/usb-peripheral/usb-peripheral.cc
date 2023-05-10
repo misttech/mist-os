@@ -89,6 +89,14 @@ zx_status_t UsbPeripheral::Init() {
   if (!dci_.is_valid()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+
+  auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb_dci::UsbDciService::Device>();
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+  dci_new_.Bind(std::move(*client));
+
   // Starting USB mode is determined from device metadata.
   // We read initial value and store it in dev->usb_mode, but do not actually
   // enable it until after all of our functions have bound.
@@ -520,7 +528,8 @@ zx_status_t UsbPeripheral::AddFunction(UsbConfiguration& config, FunctionDescrip
 
   fbl::AllocChecker ac;
   auto function =
-      fbl::MakeRefCountedChecked<UsbFunction>(&ac, zxdev(), this, std::move(desc), config.index);
+      fbl::MakeRefCountedChecked<UsbFunction>(&ac, zxdev(), this, std::move(desc), config.index,
+                                              fdf::Dispatcher().GetCurrent()->async_dispatcher());
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -643,11 +652,25 @@ zx_status_t UsbPeripheral::AddFunctionDevices() {
           {BIND_USB_PID, 0, device_desc_.id_product},
       };
 
-      auto status =
-          function->DdkAdd(ddk::DeviceAddArgs(name)
-                               .set_props(props)
-                               .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
-                               .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER));
+      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      if (endpoints.is_error()) {
+        return endpoints.status_value();
+      }
+      auto status = function->AddService(std::move(endpoints->server));
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Could not add service %d", status);
+        return status;
+      }
+
+      std::array offers = {
+          fuchsia_hardware_usb_function::UsbFunctionService::Name,
+      };
+      status = function->DdkAdd(ddk::DeviceAddArgs(name)
+                                    .set_props(props)
+                                    .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
+                                    .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
+                                    .set_fidl_service_offers(offers)
+                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
       if (status != ZX_OK) {
         zxlogf(ERROR, "usb_dev_bind_functions add_device failed %d", status);
         return status;

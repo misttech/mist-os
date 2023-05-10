@@ -52,4 +52,9 @@ zx_status_t UsbVirtualDevice::UsbDciEpClearStall(uint8_t ep_address) {
 
 size_t UsbVirtualDevice::UsbDciGetRequestSize() { return bus_->UsbDciGetRequestSize(); }
 
+void UsbVirtualDevice::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                                         ConnectToEndpointCompleter::Sync& completer) {
+  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+}
+
 }  // namespace usb_virtual_bus

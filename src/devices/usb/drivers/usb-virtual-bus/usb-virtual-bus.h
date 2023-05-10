@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
@@ -37,7 +38,7 @@ using UsbVirtualBusType =
 class UsbVirtualBus : public UsbVirtualBusType {
  public:
   explicit UsbVirtualBus(zx_device_t* parent, async_dispatcher_t* dispatcher)
-      : UsbVirtualBusType(parent), dispatcher_(dispatcher) {}
+      : UsbVirtualBusType(parent), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
   static zx_status_t Create(zx_device_t* parent);
 
@@ -145,6 +146,10 @@ class UsbVirtualBus : public UsbVirtualBusType {
   thrd_t disconnect_thread_;
   std::optional<DisableCompleter::Async> disable_completer_;
   thrd_t disable_thread_;
+
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_hci::UsbHci> hci_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> dci_bindings_;
 };
 
 }  // namespace usb_virtual_bus

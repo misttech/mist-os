@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_DEVICE_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_VIRTUAL_BUS_USB_VIRTUAL_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <lib/ddk/device.h>
 
@@ -19,7 +20,8 @@ using UsbVirtualDeviceType = ddk::Device<UsbVirtualDevice>;
 
 // This class implements the virtual USB device controller protocol.
 class UsbVirtualDevice : public UsbVirtualDeviceType,
-                         public ddk::UsbDciProtocol<UsbVirtualDevice, ddk::base_protocol> {
+                         public ddk::UsbDciProtocol<UsbVirtualDevice, ddk::base_protocol>,
+                         public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
   explicit UsbVirtualDevice(zx_device_t* parent, UsbVirtualBus* bus)
       : UsbVirtualDeviceType(parent), bus_(bus) {}
@@ -38,6 +40,10 @@ class UsbVirtualDevice : public UsbVirtualDeviceType,
   zx_status_t UsbDciEpClearStall(uint8_t ep_address);
   zx_status_t UsbDciCancelAll(uint8_t endpoint);
   size_t UsbDciGetRequestSize();
+
+  // fuchsia_hardware_usb.UsbDci protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override;
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualDevice);

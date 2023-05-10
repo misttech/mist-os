@@ -20,23 +20,6 @@
 
 namespace usb_virtual_bus {
 
-zx_status_t UsbVirtualHost::AddService(fidl::ServerEnd<fuchsia_io::Directory> server) {
-  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_hci::UsbHciService>(
-      fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
-          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      }));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service");
-    return result.status_value();
-  }
-  result = outgoing_.Serve(std::move(server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to service the outgoing directory");
-    return result.status_value();
-  }
-  return ZX_OK;
-}
-
 void UsbVirtualHost::DdkRelease() { delete this; }
 
 void UsbVirtualHost::UsbHciRequestQueue(usb_request_t* req,
