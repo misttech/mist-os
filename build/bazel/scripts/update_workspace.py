@@ -41,6 +41,7 @@ import shutil
 import stat
 import subprocess
 import sys
+from typing import Sequence
 
 
 def get_host_platform() -> str:
@@ -430,6 +431,48 @@ def get_git_head_path(git_path: str) -> str:
     return os.path.join(git_dir, 'HEAD')
 
 
+def depfile_quote(path: str) -> str:
+    """Quote a path properly for depfiles, if necessary.
+
+    shlex.quote() does not work because paths with spaces
+    are simply encased in single-quotes, while the Ninja
+    depfile parser only supports escaping single chars
+    (e.g. ' ' -> '\ ').
+
+    Args:
+       path: input file path.
+    Retursn:
+       The input file path with proper quoting to be included
+       directly in a depfile.
+    """
+    return path.replace("\\", "\\\\").replace(" ", "\\ ")
+
+
+def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
+    """Find all prebuilt python files for content hash computation.
+
+    In particular, this ignores .pyc files which are problematic because
+    they include their own timestamp which does not necessarily match
+    the actual file timestamp, which triggers the python interpreter
+    to regenerate them randomly.
+
+    See https://stackoverflow.com/questions/23775760/how-does-the-python-interpreter-know-when-to-compile-and-update-a-pyc-file
+
+    Args:
+      install_path: Path of Python installation directory.
+    Returns:
+      A list of file paths.
+    """
+    result = []
+    for root, dirs, files in os.walk(install_path):
+        result.extend(
+            os.path.join(root, file)
+            for file in files
+            if not file.endswith('.pyc'))
+
+    return result
+
+
 _VALID_TARGET_CPUS = ('arm64', 'x64')
 
 
@@ -786,6 +829,10 @@ common --experimental_enable_bzlmod
             'crosstool_template.BUILD'),
     ]
 
+    python_content_files = find_prebuilt_python_content_files(
+        os.path.join(
+            fuchsia_dir, 'prebuilt', 'third_party', 'python3', host_tag))
+
     googletest_dir = os.path.join(
         fuchsia_dir, 'third_party', 'googletest', 'src')
 
@@ -807,14 +854,32 @@ common --experimental_enable_bzlmod
 
     # LINT.IfChange
     generated_repositories_inputs['fuchsia_sdk'] = all_core_sdk_metas
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # LINT.IfChange
     generated_repositories_inputs['internal_sdk'] = all_internal_part_metas
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # TODO: support content hash file in fuchsia_clang_repository() definition
+    # This is already supported by generate_prebuilt_clang_repository()
     generated_repositories_inputs['fuchsia_clang'] = fuchsia_clang_content_files
+
+    # LINT.IfChange
     generated_repositories_inputs['prebuilt_clang'] = clang_content_files
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # LINT.IfChange
+    generated_repositories_inputs['prebuilt_python'] = python_content_files
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # LINT.IfChange
     generated_repositories_inputs[
         'com_google_googletest'] = googletest_content_files
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+
+    # LINT.IfChange
     generated_repositories_inputs[
         'fuchsia_icu_config'] = fuchsia_icu_config_files
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
     # LINT.ThenChange(../BUILD.gn)
 
     for repo_name in sorted(generated_repositories_inputs.keys()):
@@ -823,10 +888,13 @@ common --experimental_enable_bzlmod
             'workspace', 'generated_repository_hashes', repo_name + '.hash')
         generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
         if args.depfile:
-            out = os.path.relpath(
-                os.path.join(topdir, repo_hash_file), gn_output_dir)
+            # Important: quote file paths because some of them may contain spaces!
+            out = depfile_quote(
+                os.path.relpath(
+                    os.path.join(topdir, repo_hash_file), gn_output_dir))
             ins = ' '.join(
-                os.path.relpath(p, gn_output_dir) for p in repo_inputs)
+                depfile_quote(os.path.relpath(p, gn_output_dir))
+                for p in repo_inputs)
             args.depfile.write(f'{out}: {ins}\n')
 
     force = args.force

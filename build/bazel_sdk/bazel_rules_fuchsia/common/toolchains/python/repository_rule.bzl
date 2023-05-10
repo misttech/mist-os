@@ -44,8 +44,22 @@ def _make_path_from_str(repo_ctx, path_str):
         path_str = "%s/%s" % (repo_ctx.workspace_root, path_str)
     return repo_ctx.path(path_str)
 
+# Ensure this repository rule is re-run everytime the content
+# of a given path changes (if relative to the workspace root).
+# Does not do anything if path is empty or absolute.
+def _record_path_dependency(repo_ctx, path_str):
+    if path_str and not path_str.startswith("/"):
+        repo_ctx.path(Label("@//:" + path_str))
+
 def _compact_python_runtime_impl(repo_ctx):
     repo_ctx.file("WORKSPACE.bzl", "")
+
+    # If content_hash_file is provided, make sure this repository rule
+    # is re-run whenever its content changes.
+    if repo_ctx.attr.content_hash_file:
+        _record_path_dependency(repo_ctx, repo_ctx.attr.content_hash_file)
+    elif repo_ctx.attr.interpreter_path:
+        _record_path_dependency(repo_ctx, repo_ctx.attr.interpreter_path)
 
     # Find the python/bin/ path.
     python_interpreter_path = repo_ctx.attr.interpreter_path
@@ -76,13 +90,6 @@ def _compact_python_runtime_impl(repo_ctx):
 
     if not python_version:
         fail("Could not find Python version from: %s" % python_binpath)
-
-    if repo_ctx.attr.interpreter_path and not repo_ctx.attr.interpreter_path.startswith("/"):
-        # Ensure this repository rule is re-run everytime the python<version>
-        # file changes. This should be enough to avoid incremental issues when
-        # switching between the regular and compact toolchain in the Fuchsia
-        # Jiri manifest.
-        repo_ctx.path(Label("@//:%s" % (repo_ctx.attr.interpreter_path)))
 
     # Create symlink to include directory.
     repo_ctx.symlink(python_binpath.dirname.get_child("include"), "include")
@@ -233,6 +240,10 @@ Path to an existing python library directory, absolute or relative
 to the project root directory. If not provided, this is auto-detected
 from the interpreter path location. Setting this is incompatible
 with lib_python_zip.""",
+        ),
+        "content_hash_file": attr.string(
+            doc = "Path to content hash file for this repository, relative to workspace root.",
+            mandatory = False,
         ),
     },
 )

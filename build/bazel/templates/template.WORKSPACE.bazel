@@ -260,6 +260,9 @@ load(
 
 compact_python_runtime_repository(
     name = "prebuilt_python",
+    # LINT.IfChange
+    content_hash_file = "generated_repository_hashes/prebuilt_python.hash",
+    # LINT.ThenChange(../scripts/update-workspace.py)
 )
 
 register_toolchains("@prebuilt_python//:py_toolchain")
