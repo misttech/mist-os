@@ -29,7 +29,7 @@ struct ProductBundle {
 type ProductManifest = Vec<ProductBundle>;
 
 /// `ffx product lookup` sub-command.
-#[ffx_plugin("product.experimental")]
+#[ffx_plugin()]
 pub async fn pb_lookup(cmd: LookupCommand) -> Result<()> {
     let mut input = stdin();
     let mut output = stdout();

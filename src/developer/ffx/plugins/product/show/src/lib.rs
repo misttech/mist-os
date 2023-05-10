@@ -14,7 +14,7 @@ use std::io::{stderr, stdin, stdout};
 use structured_ui::{Notice, Presentation, TableRows};
 
 /// `ffx product show` sub-command.
-#[ffx_plugin("product.experimental")]
+#[ffx_plugin()]
 pub async fn pb_show(cmd: ShowCommand) -> Result<()> {
     let mut input = stdin();
     let mut output = stdout();

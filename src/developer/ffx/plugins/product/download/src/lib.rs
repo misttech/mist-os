@@ -21,7 +21,7 @@ use std::{
 use structured_ui;
 
 /// `ffx product download` sub-command.
-#[ffx_plugin("product.experimental")]
+#[ffx_plugin()]
 pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
     let client = Client::initial()?;
     let mut input = stdin();

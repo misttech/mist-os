@@ -27,7 +27,7 @@ use std::fs::File;
 use tempfile::TempDir;
 
 /// Create a product bundle.
-#[ffx_plugin("product.experimental")]
+#[ffx_plugin()]
 pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
