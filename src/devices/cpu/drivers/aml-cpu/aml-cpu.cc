@@ -138,33 +138,43 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   // Build and publish each performance domain.
   for (const perf_domain_t& perf_domain : perf_doms.value()) {
     fbl::StringBuffer<32> fragment_name;
-    ddk::ClockProtocolClient pll_div16_client;
-    ddk::ClockProtocolClient cpu_div16_client;
+    fidl::ClientEnd<fuchsia_hardware_clock::Clock> pll_div16_client;
+    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_div16_client;
     if (fragments_per_pf_domain == kFragmentsPerPfDomain) {
       fragment_name.AppendPrintf("clock-pll-div16-%02d", perf_domain.id);
-      if ((st = ddk::ClockProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
-                                                           &pll_div16_client)) != ZX_OK) {
-        zxlogf(ERROR, "%s: Failed to create pll_div_16 clock client, st = %d", __func__, st);
-        return st;
+      zx::result clock_client =
+          DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+              parent, fragment_name.c_str());
+      if (clock_client.is_error()) {
+        zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n",
+               fragment_name.c_str(), clock_client.status_string());
+        return clock_client.status_value();
       }
+      pll_div16_client = std::move(*clock_client);
 
       fragment_name.Resize(0);
       fragment_name.AppendPrintf("clock-cpu-div16-%02d", perf_domain.id);
-      if ((st = ddk::ClockProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
-                                                           &cpu_div16_client)) != ZX_OK) {
-        zxlogf(ERROR, "%s: Failed to create cpu_div_16 clock client, st = %d", __func__, st);
-        return st;
+      clock_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          parent, fragment_name.c_str());
+      if (clock_client.is_error()) {
+        zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n",
+               fragment_name.c_str(), clock_client.status_string());
+        return clock_client.status_value();
       }
+      cpu_div16_client = std::move(*clock_client);
     }
 
     fragment_name.Resize(0);
     fragment_name.AppendPrintf("clock-cpu-scaler-%02d", perf_domain.id);
-    ddk::ClockProtocolClient cpu_scaler_client;
-    if ((st = ddk::ClockProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
-                                                         &cpu_scaler_client)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to create cpu_scaler clock client, st = %d", __func__, st);
-      return st;
+    zx::result clock_client =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+            parent, fragment_name.c_str());
+    if (clock_client.is_error()) {
+      zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", fragment_name.c_str(),
+             clock_client.status_string());
+      return clock_client.status_value();
     }
+    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_scaler_client{std::move(*clock_client)};
 
     // For A1, the CPU power is VDD_CORE, which share with other module.
     // The fixed voltage is 0.8v, we can't adjust it dynamically.
@@ -295,9 +305,10 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
   }
 
   // Set the frequency next.
-  zx_status_t st = cpuscaler_.SetRate(target_state.freq_hz);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not set CPU frequency, st = %d\n", __func__, st);
+  fidl::WireResult result = cpuscaler_->SetRate(target_state.freq_hz);
+  if (!result.ok() || result->is_error()) {
+    zxlogf(ERROR, "%s: Could not set CPU frequency: %s", __func__,
+           result.FormatDescription().c_str());
 
     // Put the voltage back if frequency scaling fails.
     if (pwr_.is_valid()) {
@@ -314,7 +325,11 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
         return result->error_value();
       }
     }
-    return st;
+
+    if (!result.ok()) {
+      return result.status();
+    }
+    return result->error_value();
   }
 
   // If we're decreasing the voltage, then we do it after the frequency has been
@@ -352,22 +367,29 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
 }
 
 zx_status_t AmlCpu::Init() {
-  zx_status_t result;
   constexpr uint32_t kInitialPstate = 0;
 
   if (plldiv16_.is_valid()) {
-    result = plldiv16_.Enable();
-    if (result != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to enable plldiv16, st = %d", __func__, result);
-      return result;
+    fidl::WireResult result = plldiv16_->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to enable plldiv16: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to enable plldiv16: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
 
   if (cpudiv16_.is_valid()) {
-    result = cpudiv16_.Enable();
-    if (result != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to enable cpudiv16_, st = %d", __func__, result);
-      return result;
+    fidl::WireResult result = cpudiv16_->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to enable cpudiv16: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to enable cpudiv16: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
 
@@ -403,7 +425,7 @@ zx_status_t AmlCpu::Init() {
   }
 
   uint32_t actual;
-  result = DdkSetPerformanceState(kInitialPstate, &actual);
+  zx_status_t result = DdkSetPerformanceState(kInitialPstate, &actual);
 
   if (result != ZX_OK) {
     zxlogf(ERROR, "%s: Failed to set initial performance state, st = %d", __func__, result);

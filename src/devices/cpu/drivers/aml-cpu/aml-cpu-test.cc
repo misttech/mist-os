@@ -4,7 +4,7 @@
 
 #include "aml-cpu.h"
 
-#include <fuchsia/hardware/clock/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -82,6 +82,53 @@ class FakeMmio {
   constexpr static uint64_t kCpuVersion = 43;
 
   ddk_fake::FakeMmioRegRegion mmio_;
+};
+
+class TestClockDevice : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
+ public:
+  fuchsia_hardware_clock::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_clock::Service::InstanceHandler({
+        .clock = binding_group_.CreateHandler(this, async_get_default_dispatcher(),
+                                              fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void Enable(EnableCompleter::Sync& completer) override {
+    enabled_ = true;
+    completer.ReplySuccess();
+  }
+
+  void Disable(DisableCompleter::Sync& completer) override {
+    enabled_ = false;
+    completer.ReplySuccess();
+  }
+
+  void IsEnabled(IsEnabledCompleter::Sync& completer) override { completer.ReplySuccess(enabled_); }
+
+  void SetRate(SetRateRequestView request, SetRateCompleter::Sync& completer) override {
+    rate_.emplace(request->hz);
+    completer.ReplySuccess();
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> Connect() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
+    EXPECT_OK(endpoints);
+    binding_group_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
+                              fidl::kIgnoreBindingClosure);
+    return std::move(endpoints->client);
+  }
+
+  bool enabled() const { return enabled_; }
+  std::optional<uint32_t> rate() const { return rate_; }
+
+ private:
+  bool enabled_ = false;
+  std::optional<uint32_t> rate_;
+  fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> binding_group_;
 };
 
 class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> {
@@ -162,34 +209,17 @@ class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> 
   fidl::ServerBindingGroup<fuchsia_hardware_power::Device> binding_group_;
 };
 
-class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_protocol> {
- public:
-  FakeClockDevice() : proto_({&clock_protocol_ops_, this}) {}
-
-  zx_status_t ClockEnable() { return ZX_OK; }
-  zx_status_t ClockDisable() { return ZX_OK; }
-  zx_status_t ClockIsEnabled(bool* out_enabled) { return ZX_OK; }
-
-  zx_status_t ClockSetRate(uint64_t hz) { return ZX_OK; }
-  zx_status_t ClockQuerySupportedRate(uint64_t max_rate, uint64_t* out_max_supported_rate) {
-    return ZX_OK;
-  }
-  zx_status_t ClockGetRate(uint64_t* out_current_rate) { return ZX_OK; }
-
-  zx_status_t ClockSetInput(uint32_t idx) { return ZX_OK; }
-  zx_status_t ClockGetNumInputs(uint32_t* out) { return ZX_OK; }
-  zx_status_t ClockGetInput(uint32_t* out) { return ZX_OK; }
-
-  const clock_protocol_t* proto() const { return &proto_; }
-
- private:
-  clock_protocol_t proto_;
-};
-
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory pdev_outgoing{async_get_default_dispatcher()};
   TestPowerDevice power_server;
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  component::OutgoingDirectory power_outgoing{async_get_default_dispatcher()};
+  TestClockDevice clock_pll_div16_server;
+  component::OutgoingDirectory clock_pll_div16_outgoing{async_get_default_dispatcher()};
+  TestClockDevice clock_cpu_div16_server;
+  component::OutgoingDirectory clock_cpu_div16_outgoing{async_get_default_dispatcher()};
+  TestClockDevice clock_cpu_scaler_server;
+  component::OutgoingDirectory clock_cpu_scaler_outgoing{async_get_default_dispatcher()};
 };
 
 class AmlCpuBindingTest : public zxtest::Test {
@@ -198,47 +228,68 @@ class AmlCpuBindingTest : public zxtest::Test {
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
     std::map<uint32_t, fake_pdev::Mmio> mmios;
     mmios[0] = mmio_.mmio();
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
+
+    zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(pdev_endpoints);
     zx::result power_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(power_endpoints);
-    incoming_.SyncCall(
-        [mmios = std::move(mmios), server = std::move(outgoing_endpoints->server),
-         power_server = std::move(power_endpoints->server)](IncomingNamespace* infra) mutable {
-          infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
-              .mmios = std::move(mmios),
-              .device_info =
-                  pdev_device_info_t{
-                      .pid = PDEV_PID_ASTRO,
-                  },
-          });
+    zx::result clock_pll_div16_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(clock_pll_div16_endpoints);
+    zx::result clock_cpu_div16_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(clock_cpu_div16_endpoints);
+    zx::result clock_cpu_scaler_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(clock_cpu_scaler_endpoints);
+    incoming_.SyncCall([mmios = std::move(mmios), pdev_server = std::move(pdev_endpoints->server),
+                        power_server = std::move(power_endpoints->server),
+                        clock_pll_div16_server = std::move(clock_pll_div16_endpoints->server),
+                        clock_cpu_div16_server = std::move(clock_cpu_div16_endpoints->server),
+                        clock_cpu_scaler_server = std::move(clock_cpu_scaler_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+          .mmios = std::move(mmios),
+          .device_info =
+              pdev_device_info_t{
+                  .pid = PDEV_PID_ASTRO,
+              },
+      });
+      ASSERT_OK(infra->pdev_outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->pdev_outgoing.Serve(std::move(pdev_server)));
 
-          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-              infra->pdev_server.GetInstanceHandler()));
-          ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_power::Service>(
-              infra->power_server.GetInstanceHandler()));
+      infra->power_server.SetVoltage(0);
+      infra->power_server.SetSupportedVoltageRange(0, 0);
+      ASSERT_OK(infra->power_outgoing.AddService<fuchsia_hardware_power::Service>(
+          infra->power_server.GetInstanceHandler()));
+      ASSERT_OK(infra->power_outgoing.Serve(std::move(power_server)));
 
-          ASSERT_OK(infra->outgoing.Serve(std::move(server)));
-          infra->power_server.SetVoltage(0);
-          infra->power_server.SetSupportedVoltageRange(0, 0);
-          ASSERT_OK(infra->outgoing.Serve(std::move(power_server)));
-        });
+      ASSERT_OK(infra->clock_pll_div16_outgoing.AddService<fuchsia_hardware_clock::Service>(
+          infra->clock_pll_div16_server.GetInstanceHandler()));
+      ASSERT_OK(infra->clock_pll_div16_outgoing.Serve(std::move(clock_pll_div16_server)));
+
+      ASSERT_OK(infra->clock_cpu_div16_outgoing.AddService<fuchsia_hardware_clock::Service>(
+          infra->clock_cpu_div16_server.GetInstanceHandler()));
+      ASSERT_OK(infra->clock_cpu_div16_outgoing.Serve(std::move(clock_cpu_div16_server)));
+
+      ASSERT_OK(infra->clock_cpu_scaler_outgoing.AddService<fuchsia_hardware_clock::Service>(
+          infra->clock_cpu_scaler_server.GetInstanceHandler()));
+      ASSERT_OK(infra->clock_cpu_scaler_outgoing.Serve(std::move(clock_cpu_scaler_server)));
+    });
+
     ASSERT_NO_FATAL_FAILURE();
 
     root_ = MockDevice::FakeRootParent();
     root_->SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
 
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints->client), "pdev");
+                          std::move(pdev_endpoints->client), "pdev");
     root_->AddFidlService(fuchsia_hardware_power::Service::Name, std::move(power_endpoints->client),
                           "power-01");
-
-    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk0_.proto()->ops, clk0_.proto()->ctx,
-                       "clock-pll-div16-01");
-    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk1_.proto()->ops, clk1_.proto()->ctx,
-                       "clock-cpu-div16-01");
-    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk2_.proto()->ops, clk2_.proto()->ctx,
-                       "clock-cpu-scaler-01");
+    root_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                          std::move(clock_pll_div16_endpoints->client), "clock-pll-div16-01");
+    root_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                          std::move(clock_cpu_div16_endpoints->client), "clock-cpu-div16-01");
+    root_->AddFidlService(fuchsia_hardware_clock::Service::Name,
+                          std::move(clock_cpu_scaler_endpoints->client), "clock-cpu-scaler-01");
 
     root_->SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
   }
@@ -251,10 +302,6 @@ class AmlCpuBindingTest : public zxtest::Test {
                                                                    std::in_place};
 
   FakeMmio mmio_;
-
-  FakeClockDevice clk0_;
-  FakeClockDevice clk1_;
-  FakeClockDevice clk2_;
 };
 
 TEST_F(AmlCpuBindingTest, TrivialBinding) {
@@ -294,6 +341,23 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
   });
 }
 
+class TestClockDeviceWrapper {
+ public:
+  explicit TestClockDeviceWrapper(const char* thread_name) { loop_.StartThread(thread_name); }
+
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> Connect() {
+    return clock_device_.SyncCall(&TestClockDevice::Connect);
+  }
+
+  bool enabled() { return clock_device_.SyncCall(&TestClockDevice::enabled); }
+  std::optional<uint32_t> rate() { return clock_device_.SyncCall(&TestClockDevice::rate); }
+
+ private:
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<TestClockDevice> clock_device_{loop_.dispatcher(),
+                                                                     std::in_place};
+};
+
 class TestPowerDeviceWrapper {
  public:
   TestPowerDeviceWrapper() { loop_.StartThread("power-loop"); }
@@ -326,8 +390,9 @@ class TestPowerDeviceWrapper {
 
 class AmlCpuTest : public AmlCpu {
  public:
-  AmlCpuTest(const ddk::ClockProtocolClient&& plldiv16, const ddk::ClockProtocolClient&& cpudiv16,
-             const ddk::ClockProtocolClient&& cpuscaler,
+  AmlCpuTest(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
+             fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
+             fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
              fidl::ClientEnd<fuchsia_hardware_power::Device> pwr,
              const std::vector<operating_point_t> operating_points, const uint32_t core_count)
       : AmlCpu(nullptr, std::move(plldiv16), std::move(cpudiv16), std::move(cpuscaler),
@@ -339,9 +404,7 @@ class AmlCpuTest : public AmlCpu {
 class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
  public:
   AmlCpuTestFixture()
-      : dut_(ddk::ClockProtocolClient(pll_clock_.GetProto()),
-             ddk::ClockProtocolClient(cpu_clock_.GetProto()),
-             ddk::ClockProtocolClient(scaler_clock_.GetProto()), power_.Connect(),
+      : dut_(pll_clock_.Connect(), cpu_clock_.Connect(), scaler_clock_.Connect(), power_.Connect(),
              kTestOperatingPoints, kTestCoreCount),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         operating_points_(kTestOperatingPoints) {}
@@ -351,8 +414,6 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
     //  + Should enable the CPU and PLL clocks.
     //  + Should initially assume that the device is in it's lowest performance state.
     //  + Should configure the device to it's highest performance state.
-    pll_clock_.ExpectEnable(ZX_OK);
-    cpu_clock_.ExpectEnable(ZX_OK);
 
     const operating_point_t& slowest = operating_points_.back();
     const operating_point_t& fastest = operating_points_.front();
@@ -362,7 +423,6 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
 
     // The DUT scales up to the fastest available pstate.
     power_.SetVoltage(fastest.volt_uv);
-    scaler_clock_.ExpectSetRate(ZX_OK, fastest.freq_hz);
 
     ASSERT_OK(dut_.Init());
 
@@ -377,15 +437,9 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
   }
 
  protected:
-  void VerifyAll() {
-    ASSERT_NO_FATAL_FAILURE(pll_clock_.VerifyAndClear());
-    ASSERT_NO_FATAL_FAILURE(cpu_clock_.VerifyAndClear());
-    ASSERT_NO_FATAL_FAILURE(scaler_clock_.VerifyAndClear());
-  }
-
-  ddk::MockClock pll_clock_;
-  ddk::MockClock cpu_clock_;
-  ddk::MockClock scaler_clock_;
+  TestClockDeviceWrapper pll_clock_{"pll-clock-loop"};
+  TestClockDeviceWrapper cpu_clock_{"cpu-clock-loop"};
+  TestClockDeviceWrapper scaler_clock_{"scaler-clock-loop"};
   TestPowerDeviceWrapper power_;
 
   AmlCpuTest dut_;
@@ -426,8 +480,6 @@ TEST_F(AmlCpuTestFixture, TestGetPerformanceStateInfo) {
     // Make sure that the driver returns an error, however.
     EXPECT_TRUE(pstateInfo->is_error());
   }
-
-  ASSERT_NO_FATAL_FAILURE(VerifyAll());
 }
 
 TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
@@ -435,32 +487,34 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   const uint32_t min_pstate_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
   const operating_point_t& min_pstate = kTestOperatingPoints[min_pstate_index];
 
-  scaler_clock_.ExpectSetRate(ZX_OK, min_pstate.freq_hz);
   power_.SetVoltage(min_pstate.volt_uv);
 
   uint32_t out_state = UINT32_MAX;
   zx_status_t result = dut_.DdkSetPerformanceState(min_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, min_pstate_index);
+  auto rate = scaler_clock_.rate();
+  ASSERT_TRUE(rate.has_value());
+  ASSERT_EQ(rate.value(), min_pstate.freq_hz);
 
   // Scale to the highest performance state.
   const uint32_t max_pstate_index = 0;
   const operating_point_t& max_pstate = kTestOperatingPoints[max_pstate_index];
 
-  scaler_clock_.ExpectSetRate(ZX_OK, max_pstate.freq_hz);
   power_.SetVoltage(max_pstate.volt_uv);
 
   out_state = UINT32_MAX;
   result = dut_.DdkSetPerformanceState(max_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, max_pstate_index);
+  rate = scaler_clock_.rate();
+  ASSERT_TRUE(rate.has_value());
+  ASSERT_EQ(rate.value(), max_pstate.freq_hz);
 
   // Set to the pstate that we're already at and make sure that it's a no-op.
   result = dut_.DdkSetPerformanceState(max_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, max_pstate_index);
-
-  ASSERT_NO_FATAL_FAILURE(VerifyAll());
 }
 
 TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {

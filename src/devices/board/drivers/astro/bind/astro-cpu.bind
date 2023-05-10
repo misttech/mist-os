@@ -25,16 +25,16 @@ node "pdev" {
 }
 
 node "clock-pll-div16-01" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.G12A_CLK_ID.CLK_SYS_PLL_DIV16;
 }
 
 node "clock-cpu-div16-01" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.G12A_CLK_ID.CLK_SYS_CPU_CLK_DIV16;
 }
 
 node "clock-cpu-scaler-01" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.clock.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.G12A_CLK_ID.CLK_SYS_CPU_CLK;
 }

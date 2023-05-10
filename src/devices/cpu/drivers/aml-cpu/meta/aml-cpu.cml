@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.power.Service" },
+        { service: "fuchsia.hardware.clock.Service" },
     ],
 }

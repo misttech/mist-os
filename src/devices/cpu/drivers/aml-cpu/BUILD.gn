@@ -26,9 +26,9 @@ fuchsia_driver("aml-cpu-driver") {
   sources = [ "aml-cpu.cc" ]
   deps = [
     ":aml-cpu-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
     "//sdk/lib/fidl",
@@ -61,10 +61,9 @@ test("aml-cpu-test-bin") {
   output_name = "aml-cpu-test"
   deps = [
     ":aml-cpu-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
     "//sdk/lib/async_patterns/testing/cpp",
