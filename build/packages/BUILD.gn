@@ -75,5 +75,6 @@ group("allowed_to_use_subpackages") {
     "//src/virtualization/bin/guest_manager:zircon_guest_manager",
     "//src/virtualization/bin/guest_manager_rs:debian_guest_manager_rs",
     "//src/virtualization/bin/termina_guest_manager:termina_guest_manager",
+    "//vendor/google/starnix/containers/*",
   ]
 }
