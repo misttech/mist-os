@@ -261,9 +261,9 @@ gvisor_benchmarks = [
   "write_benchmark",
 ]
 
-expect_includes("gvisor_test") {
+expect_includes("gvisor_benchmark") {
   includes = [
-    "meta/gvisor.shard.cml",
+    "meta/gvisor_benchmark.shard.cml",
     "meta/gvisor_container.shard.cml",
   ]
 }
@@ -331,7 +331,7 @@ template("gvisor_test_component") {
     if (use_expectations) {
       deps = [ ":gvisor_test_with_expectations" ]
     } else {
-      deps = [ ":gvisor_test" ]
+      deps = [ ":gvisor_benchmark" ]
     }
 
     deps += [

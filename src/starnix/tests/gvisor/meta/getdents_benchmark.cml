@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/starnix/tests/gvisor/meta/gvisor.shard.cml" ],
+    include: [ "//src/starnix/tests/gvisor/meta/gvisor_benchmark.shard.cml" ],
     program: {
         binary: "data/tests/getdents_benchmark",
     },
