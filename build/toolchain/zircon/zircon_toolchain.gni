@@ -171,17 +171,13 @@ template("zircon_toolchain") {
     use_goma = invoker.use_goma
   }
   if (cxx_rbe_enable) {
-    if (cxx_rbe_use_python_impl) {
-      compiler_prefix =
-          string_join(" ",
-                      [
-                        rebase_path(python_exe_src, root_build_dir),
-                        "-S",
-                        rebase_path(cxx_remote_wrapper, root_build_dir),
-                      ])
-    } else {
-      compiler_prefix = rebase_path(cxx_remote_wrapper, root_build_dir)
-    }
+    compiler_prefix =
+        string_join(" ",
+                    [
+                      rebase_path(python_exe_src, root_build_dir),
+                      "-S",
+                      rebase_path(cxx_remote_wrapper, root_build_dir),
+                    ])
     assert(
         cxx_rbe_exec_strategy == "remote" || cxx_rbe_exec_strategy == "local" ||
             cxx_rbe_exec_strategy == "remote_local_fallback" ||

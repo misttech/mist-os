@@ -14,15 +14,6 @@ rbe_common_tools = [
 rewrapper_config_file = "//build/rbe/fuchsia-rewrapper.cfg"
 reproxy_config_file = "//build/rbe/fuchsia-reproxy.cfg"
 
-declare_args() {
-  # EXPERIMENTAL.
-  # Set to true to use the Python implementation for remote wrappers,
-  # as opposed to the older (slower) bash scripts.  This option will
-  # eventually disappear upon completing the transition to the Python scripts.
-  cxx_rbe_use_python_impl = true
-  rust_rbe_use_python_impl = true
-}
-
 rbe_common_configs = [
   rewrapper_config_file,
   reproxy_config_file,
@@ -44,39 +35,22 @@ rbe_common_sh_tools = [ "//build/rbe/fuchsia-rbe-action.sh" ]
 
 rustc_remote_wrapper = "//build/rbe/rustc-remote-wrapper.sh"
 
-if (rust_rbe_use_python_impl) {
-  rustc_remote_wrapper = "//build/rbe/rustc_remote_wrapper.py"
+rustc_remote_wrapper = "//build/rbe/rustc_remote_wrapper.py"
 
-  # Dependencies for all RBE-enabled rust actions.
-  rust_rbe_deps =
-      rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
-        "//build/rbe/rustc.py",
-        rustc_remote_wrapper,
-      ]
-} else {
-  rustc_remote_wrapper = "//build/rbe/rustc-remote-wrapper.sh"
+# Dependencies for all RBE-enabled rust actions.
+rust_rbe_deps =
+    rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
+      "//build/rbe/rustc.py",
+      rustc_remote_wrapper,
+    ]
 
-  # Dependencies for all RBE-enabled rust actions.
-  rust_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_sh_tools +
-                  [ rustc_remote_wrapper ]
-}
+cxx_remote_wrapper = "//build/rbe/cxx_remote_wrapper.py"
 
-if (cxx_rbe_use_python_impl) {
-  cxx_remote_wrapper = "//build/rbe/cxx_remote_wrapper.py"
-
-  # Dependencies for all RBE-enabled C++ actions.
-  cxx_rbe_deps =
-      rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
-        "//build/rbe/cxx.py",
-        cxx_remote_wrapper,
-      ]
-} else {
-  cxx_remote_wrapper = "//build/rbe/cxx-remote-wrapper.sh"
-
-  # Dependencies for all RBE-enabled C++ actions.
-  cxx_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_sh_tools +
-                 [ cxx_remote_wrapper ]
-}
+# Dependencies for all RBE-enabled C++ actions.
+cxx_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
+                 "//build/rbe/cxx.py",
+                 cxx_remote_wrapper,
+               ]
 
 declare_args() {
   #########################

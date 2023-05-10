@@ -88,17 +88,13 @@ template("clang_toolchain") {
     if (cxx_rbe_enable) {
       # Use reclient to remotely build C++.
       _cxx_remote_wrapper_path = rebase_path(cxx_remote_wrapper, root_build_dir)
-      if (cxx_rbe_use_python_impl) {
-        compiler_prefix =
-            string_join(" ",
-                        [
-                          rebase_path(python_exe_src, root_build_dir),
-                          "-S",
-                          _cxx_remote_wrapper_path,
-                        ])
-      } else {
-        compiler_prefix = _cxx_remote_wrapper_path
-      }
+      compiler_prefix =
+          string_join(" ",
+                      [
+                        rebase_path(python_exe_src, root_build_dir),
+                        "-S",
+                        _cxx_remote_wrapper_path,
+                      ])
       assert(cxx_rbe_exec_strategy == "remote" ||
                  cxx_rbe_exec_strategy == "local" ||
                  cxx_rbe_exec_strategy == "remote_local_fallback" ||
@@ -228,15 +224,11 @@ template("clang_toolchain") {
         }
         _rustc_remote_wrapper_path =
             rebase_path(rustc_remote_wrapper, root_build_dir)
-        if (rust_rbe_use_python_impl) {
-          _rustc_wrapper_tokens = [
-            rebase_path(python_exe_src, root_build_dir),
-            "-S",
-            _rustc_remote_wrapper_path,
-          ]
-        } else {
-          _rustc_wrapper_tokens = [ _rustc_remote_wrapper_path ]
-        }
+        _rustc_wrapper_tokens = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          _rustc_remote_wrapper_path,
+        ]
         _rustc_wrapper = string_join(" ",
                                      _rustc_wrapper_tokens + _rewrapper_flags +
                                          [ "--" ]) + " "
