@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/composite_device_fragment.h"
+#include "src/devices/bin/driver_manager/v1/composite_device_fragment.h"
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <zircon/status.h>

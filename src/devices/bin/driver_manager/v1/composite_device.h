@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_H_
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
@@ -12,9 +12,9 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string.h>
 
-#include "src/devices/bin/driver_manager/composite_device_fragment.h"
 #include "src/devices/bin/driver_manager/driver.h"
 #include "src/devices/bin/driver_manager/metadata.h"
+#include "src/devices/bin/driver_manager/v1/composite_device_fragment.h"
 
 class Coordinator;
 class Device;
@@ -169,4 +169,4 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   Coordinator& coordinator_;
 };
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_H_

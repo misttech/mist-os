@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_FRAGMENT_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_FRAGMENT_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_FRAGMENT_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_FRAGMENT_H_
 
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <lib/ddk/binding.h>
@@ -136,4 +136,4 @@ class CompositeDeviceFragment
   bool uses_fragment_driver_ = false;
 };
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_FRAGMENT_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_DEVICE_FRAGMENT_H_

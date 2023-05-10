@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 
-#include "src/devices/bin/driver_manager/composite_device.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
+#include "src/devices/bin/driver_manager/v1/composite_device.h"
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 
 // Wrapper struct for a fbl::RefPtr<Device>. This allows the composite node spec

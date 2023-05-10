@@ -26,12 +26,12 @@
 #include <fbl/string.h>
 #include <fbl/vector.h>
 
-#include "src/devices/bin/driver_manager/composite_device.h"
 #include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device_v2.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/metadata.h"
+#include "src/devices/bin/driver_manager/v1/composite_device.h"
 #include "src/devices/bin/driver_manager/v1/init_task.h"
 #include "src/devices/bin/driver_manager/v1/resume_task.h"
 #include "src/devices/bin/driver_manager/v1/suspend_task.h"
