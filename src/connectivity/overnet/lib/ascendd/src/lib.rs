@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 mod serial;
+mod usb;
 
 use crate::serial::run_serial_link_handlers;
+use crate::usb::listen_for_usb_devices;
 use anyhow::Context as ErrorContext;
 use anyhow::{bail, format_err, Error};
 use argh::FromArgs;
@@ -52,6 +54,10 @@ pub struct Opt {
     /// when multiple ffxs are run concurrently, with no requirement to have
     /// them interact. (Normally set to false iff run as ffx daemon.)
     pub client_routing: bool,
+
+    #[argh(option, default = "false")]
+    /// allow ascendd to scan for USB devices and connect to them automatically.
+    pub usb: bool,
 }
 
 #[derive(Debug)]
@@ -65,6 +71,7 @@ impl Ascendd {
         hoist: &Hoist,
         stdout: impl AsyncWrite + Unpin + Send + 'static,
     ) -> Result<Self, Error> {
+        let usb = opt.usb;
         let (sockpath, serial, client_routing, incoming) = bind_listener(opt, hoist).await?;
         Ok(Self {
             task: Task::spawn(run_ascendd(
@@ -73,6 +80,7 @@ impl Ascendd {
                 serial,
                 incoming,
                 client_routing,
+                usb,
                 stdout,
             )),
         })
@@ -158,7 +166,7 @@ async fn bind_listener(
     opt: Opt,
     hoist: &Hoist,
 ) -> Result<(PathBuf, String, AscenddClientRouting, UnixListener), Error> {
-    let Opt { sockpath, serial, client_routing } = opt;
+    let Opt { sockpath, serial, client_routing, usb: _ } = opt;
     let sockpath = sockpath.unwrap_or(default_ascendd_path());
     let serial = serial.unwrap_or("none".to_string());
 
@@ -230,6 +238,7 @@ async fn run_ascendd(
     serial: String,
     incoming: UnixListener,
     client_routing: AscenddClientRouting,
+    usb: bool,
     stdout: impl AsyncWrite + Unpin + Send,
 ) -> Result<(), Error> {
     let node = hoist.node();
@@ -241,8 +250,15 @@ async fn run_ascendd(
     let sockpath = &sockpath.to_str().context("Non-unicode in socket path")?.to_owned();
     let hoist = &hoist;
 
-    futures::future::try_join(
+    futures::future::try_join3(
         run_serial_link_handlers(Arc::downgrade(&hoist.node()), &serial, stdout),
+        async move {
+            if usb {
+                listen_for_usb_devices(Arc::downgrade(&hoist.node())).await
+            } else {
+                Ok(())
+            }
+        },
         async move {
             incoming
                 .incoming()
