@@ -9,6 +9,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer, VecOutputBuffer};
 use crate::fs::SeekOrigin;
 use crate::task::*;
 use crate::types::*;
+use std::collections::VecDeque;
 
 pub trait SequenceFileSource: Send + Sync + 'static {
     type Cursor: Default + Send;
@@ -252,8 +253,15 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
             self.byte_offset += to_drain;
         }
 
-        // 2. Write out as much of the buffer as possible and shift the rest down
-        let written = data.write(&self.buf.0[..])?;
+        // 2. Copy out as much of the data as possible. `write()` may need to be called twice
+        // because `VecDeque` keeps the data in a ring buffer.
+        let (slice1, slice2) = self.buf.0.as_slices();
+        let mut written = data.write(slice1)?;
+        if written == slice1.len() && !slice2.is_empty() {
+            written += data.write(slice2)?;
+        }
+
+        // 3. Move the current position and drop the consumed data.
         self.buf.0.drain(..written);
         self.byte_offset += written;
         Ok(written)
@@ -261,10 +269,10 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
 }
 
 #[derive(Default)]
-pub struct DynamicFileBuf(Vec<u8>);
+pub struct DynamicFileBuf(VecDeque<u8>);
 impl DynamicFileBuf {
     pub fn write(&mut self, data: &[u8]) {
-        self.0.extend_from_slice(data);
+        self.0.extend(data.iter().copied());
     }
     pub fn write_iter<I>(&mut self, data: I)
     where
