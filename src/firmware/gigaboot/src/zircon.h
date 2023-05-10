@@ -4,10 +4,12 @@
 
 #ifndef SRC_FIRMWARE_GIGABOOT_SRC_ZIRCON_H_
 #define SRC_FIRMWARE_GIGABOOT_SRC_ZIRCON_H_
-
 #include <stdint.h>
 
-// Stage a file which will be added as a ZBI item on boot.
-int zircon_stage_zbi_file(const char* name, const uint8_t* data, size_t data_len);
+#include <efi/boot-services.h>
+#include <efi/types.h>
 
+efi_status generate_efi_memory_attributes_table_item(void* ramdisk, const size_t ramdisk_size,
+                                                     efi_system_table* sys, const void* mmap,
+                                                     size_t memory_map_size, size_t dsize);
 #endif  // SRC_FIRMWARE_GIGABOOT_SRC_ZIRCON_H_

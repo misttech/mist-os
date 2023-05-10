@@ -9,7 +9,6 @@
 #include <stdarg.h>
 #include <string.h>
 #include <sys/types.h>
-
 #include <xefi.h>
 
 int sprintf(char *str, const char *fmt, ...) {
@@ -63,13 +62,13 @@ __NO_INLINE static char *longlong_to_string(char *buf, unsigned long long n, siz
 
   /* only do the math if the number is >= 10 */
   while (n >= 10) {
-    int digit = n % 10;
+    unsigned long long digit = n % 10;
 
     n /= 10;
 
-    buf[--pos] = digit + '0';
+    buf[--pos] = (char)digit + '0';
   }
-  buf[--pos] = n + '0';
+  buf[--pos] = (char)n + '0';
 
   if (negative)
     *signchar = '-';
@@ -125,7 +124,7 @@ static int _vsnprintf_output(const char *str, size_t len, void *state) {
     count++;
   }
 
-  return count;
+  return (int)count;
 }
 
 int vsnprintf(char *str, size_t len, const char *fmt, va_list ap) {
@@ -215,7 +214,7 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
         OUTPUT_CHAR('%');
         break;
       case 'c':
-        uc = va_arg(ap, unsigned int);
+        uc = (unsigned char)va_arg(ap, unsigned int);
         OUTPUT_CHAR(uc);
         break;
       case 's':
@@ -257,39 +256,26 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
         goto next_format;
       case 'i':
       case 'd':
-        n = (flags & LONGLONGFLAG)
-                ? va_arg(ap, long long)
-                : (flags & LONGFLAG)
-                      ? va_arg(ap, long)
-                      : (flags & HALFHALFFLAG)
-                            ? (signed char)va_arg(ap, int)
-                            : (flags & HALFFLAG)
-                                  ? (short)va_arg(ap, int)
-                                  : (flags & SIZETFLAG)
-                                        ? va_arg(ap, ssize_t)
-                                        : (flags & INTMAXFLAG)
-                                              ? va_arg(ap, intmax_t)
-                                              : (flags & PTRDIFFFLAG) ? va_arg(ap, ptrdiff_t)
-                                                                      : va_arg(ap, int);
+        n = (flags & LONGLONGFLAG)   ? va_arg(ap, long long)
+            : (flags & LONGFLAG)     ? va_arg(ap, long)
+            : (flags & HALFHALFFLAG) ? (signed char)va_arg(ap, int)
+            : (flags & HALFFLAG)     ? (short)va_arg(ap, int)
+            : (flags & SIZETFLAG)    ? va_arg(ap, ssize_t)
+            : (flags & INTMAXFLAG)   ? va_arg(ap, intmax_t)
+            : (flags & PTRDIFFFLAG)  ? va_arg(ap, ptrdiff_t)
+                                     : va_arg(ap, int);
         flags |= SIGNEDFLAG;
         s = longlong_to_string(num_buffer, n, sizeof(num_buffer), flags, &signchar);
         goto _output_string;
       case 'u':
-        n = (flags & LONGLONGFLAG)
-                ? va_arg(ap, unsigned long long)
-                : (flags & LONGFLAG)
-                      ? va_arg(ap, unsigned long)
-                      : (flags & HALFHALFFLAG)
-                            ? (unsigned char)va_arg(ap, unsigned int)
-                            : (flags & HALFFLAG)
-                                  ? (unsigned short)va_arg(ap, unsigned int)
-                                  : (flags & SIZETFLAG)
-                                        ? va_arg(ap, size_t)
-                                        : (flags & INTMAXFLAG)
-                                              ? va_arg(ap, uintmax_t)
-                                              : (flags & PTRDIFFFLAG)
-                                                    ? (uintptr_t)va_arg(ap, ptrdiff_t)
-                                                    : va_arg(ap, unsigned int);
+        n = (flags & LONGLONGFLAG)   ? va_arg(ap, unsigned long long)
+            : (flags & LONGFLAG)     ? va_arg(ap, unsigned long)
+            : (flags & HALFHALFFLAG) ? (unsigned char)va_arg(ap, unsigned int)
+            : (flags & HALFFLAG)     ? (unsigned short)va_arg(ap, unsigned int)
+            : (flags & SIZETFLAG)    ? va_arg(ap, size_t)
+            : (flags & INTMAXFLAG)   ? va_arg(ap, uintmax_t)
+            : (flags & PTRDIFFFLAG)  ? (uintptr_t)va_arg(ap, ptrdiff_t)
+                                     : va_arg(ap, unsigned int);
         s = longlong_to_string(num_buffer, n, sizeof(num_buffer), flags, &signchar);
         goto _output_string;
       case 'p':
@@ -300,21 +286,14 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
         /* fallthrough */
       hex:
       case 'x':
-        n = (flags & LONGLONGFLAG)
-                ? va_arg(ap, unsigned long long)
-                : (flags & LONGFLAG)
-                      ? va_arg(ap, unsigned long)
-                      : (flags & HALFHALFFLAG)
-                            ? (unsigned char)va_arg(ap, unsigned int)
-                            : (flags & HALFFLAG)
-                                  ? (unsigned short)va_arg(ap, unsigned int)
-                                  : (flags & SIZETFLAG)
-                                        ? va_arg(ap, size_t)
-                                        : (flags & INTMAXFLAG)
-                                              ? va_arg(ap, uintmax_t)
-                                              : (flags & PTRDIFFFLAG)
-                                                    ? (uintptr_t)va_arg(ap, ptrdiff_t)
-                                                    : va_arg(ap, unsigned int);
+        n = (flags & LONGLONGFLAG)   ? va_arg(ap, unsigned long long)
+            : (flags & LONGFLAG)     ? va_arg(ap, unsigned long)
+            : (flags & HALFHALFFLAG) ? (unsigned char)va_arg(ap, unsigned int)
+            : (flags & HALFFLAG)     ? (unsigned short)va_arg(ap, unsigned int)
+            : (flags & SIZETFLAG)    ? va_arg(ap, size_t)
+            : (flags & INTMAXFLAG)   ? va_arg(ap, uintmax_t)
+            : (flags & PTRDIFFFLAG)  ? (uintptr_t)va_arg(ap, ptrdiff_t)
+                                     : va_arg(ap, unsigned int);
         s = longlong_to_hexstring(num_buffer, n, sizeof(num_buffer), flags);
         if (flags & ALTFLAG) {
           OUTPUT_CHAR('0');
@@ -324,17 +303,17 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
       case 'n':
         ptr = va_arg(ap, void *);
         if (flags & LONGLONGFLAG)
-          *(long long *)ptr = chars_written;
+          *(long long *)ptr = (long long)chars_written;
         else if (flags & LONGFLAG)
-          *(long *)ptr = chars_written;
+          *(long *)ptr = (long)chars_written;
         else if (flags & HALFHALFFLAG)
-          *(signed char *)ptr = chars_written;
+          *(signed char *)ptr = (signed char)chars_written;
         else if (flags & HALFFLAG)
-          *(short *)ptr = chars_written;
+          *(short *)ptr = (short)chars_written;
         else if (flags & SIZETFLAG)
           *(size_t *)ptr = chars_written;
         else
-          *(int *)ptr = chars_written;
+          *(int *)ptr = (int)chars_written;
         break;
       default:
         OUTPUT_CHAR('%');
@@ -395,7 +374,7 @@ int write_to_serial(char16_t *buffer, uint64_t len) {
     return 0;
   }
   len *= sizeof(char16_t);
-  return gSerial->Write(gSerial, &len, buffer) == EFI_SUCCESS ? len : -1;
+  return gSerial->Write(gSerial, &len, buffer) == EFI_SUCCESS ? (int)len : -1;
 }
 
 int puts16(char16_t *str) {

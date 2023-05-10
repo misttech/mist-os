@@ -9,7 +9,6 @@ group("tests") {
     "drivers/usb-fastboot-function:tests",
     "fastboot-tcp:tests",
     "fastboot-usb:tests",
-    "gigaboot:tests",
     "gigaboot/cpp/tests:tests",
     "lib/abr/test",
     "lib/fastboot/test",

@@ -5,7 +5,7 @@
 #include "netifc.h"
 
 #include <inttypes.h>
-#include <stdio.h>
+#include <printf.h>
 #include <string.h>
 #include <xefi.h>
 
@@ -13,7 +13,7 @@
 
 #include "inet6.h"
 #include "mdns.h"
-#include "osboot.h"
+#include "page_size.h"
 
 static efi_simple_network_protocol* snp;
 
@@ -119,7 +119,7 @@ int eth_send(void* data, size_t len) {
   }
 }
 
-void eth_dump_status(void) {
+static void eth_dump_status(void) {
 #ifdef VERBOSE
   printf("State/HwAdSz/HdrSz/MaxSz %d %d %d %d\n", snp->Mode->State, snp->Mode->HwAddressSize,
          snp->Mode->MediaHeaderSize, snp->Mode->MaxPacketSize);
@@ -166,7 +166,7 @@ int netifc_timer_expired(void) {
 
 /* Search the available network interfaces via SimpleNetworkProtocol handles
  * and find the first valid one with a Link detected */
-efi_simple_network_protocol* netifc_find_available(void) {
+static efi_simple_network_protocol* netifc_find_available(void) {
   efi_boot_services* bs = gSys->BootServices;
   efi_status ret;
   efi_simple_network_protocol* cur_snp = NULL;
@@ -174,7 +174,7 @@ efi_simple_network_protocol* netifc_find_available(void) {
   char16_t* paths[32];
   size_t nic_cnt = 0;
   size_t sz = sizeof(handles);
-  uint32_t last_parent = 0;
+  size_t last_parent = 0;
   uint32_t int_sts;
   void* tx_buf;
 
@@ -198,9 +198,8 @@ efi_simple_network_protocol* netifc_find_available(void) {
     if (i != last_parent) {
       if (memcmp(paths[i], paths[last_parent], strlen_16(paths[last_parent])) == 0) {
         continue;
-      } else {
-        last_parent = i;
       }
+      last_parent = i;
     }
 
     puts16(paths[i]);
@@ -333,68 +332,4 @@ void netifc_close(void) {
   snp->Stop(snp);
 }
 
-static void cleanup_tx_buf(void) {
-  uint32_t irq;
-  void* txdone;
-  while (eth_buffers_avail < num_eth_buffers) {
-    // Only check for completion if we have operations in progress.
-    // Otherwise, the result of GetStatus is unreliable. See fxbug.dev/30712.
-    if (snp->GetStatus(snp, &irq, &txdone)) {
-      printf("no ops in progress \n");
-      return;
-    }
-    if (txdone) {
-      // Check to make sure this is one of our buffers (see fxbug.dev/31405)
-      efi_physical_addr buf_paddr = (efi_physical_addr)txdone;
-      if ((buf_paddr >= eth_buffers_base) &&
-          (buf_paddr < (eth_buffers_base + (NUM_BUFFER_PAGES * PAGE_SIZE)))) {
-        eth_put_buffer(txdone);
-      }
-    } else {
-      // no buffers ready, so give up.
-      return;
-    }
-  }
-}
-
 int netifc_active(void) { return (snp != 0); }
-void netifc_poll(void) {
-  uint8_t data[1514];
-  efi_status r;
-  size_t hsz, bsz;
-
-  cleanup_tx_buf();
-
-  // Drain all incoming packets from the interface.
-  // If we don't do this as aggressively as we do, the interface might get backed up
-  // and start rejecting packets.
-  r = EFI_SUCCESS;
-  do {
-    hsz = 0;
-    bsz = sizeof(data);
-    r = snp->Receive(snp, &hsz, &bsz, data, NULL, NULL, NULL);
-    if (r != EFI_SUCCESS) {
-      return;
-    }
-
-#if DROP_PACKETS
-    rxc++;
-    if ((random() % DROP_PACKETS) == 0) {
-      printf("rx drop %d\n", rxc);
-      return;
-    }
-#endif
-
-#if TRACE
-    printf("RX %02x:%02x:%02x:%02x:%02x:%02x < %02x:%02x:%02x:%02x:%02x:%02x %02x%02x %d\n",
-           data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9],
-           data[10], data[11], data[12], data[13], (int)(bsz - hsz));
-#endif
-    eth_recv(data, bsz);
-
-    if (eth_buffers_avail <= 2) {
-      // running out of tx buffers - clean some up.
-      cleanup_tx_buf();
-    }
-  } while (r != EFI_NOT_READY);
-}

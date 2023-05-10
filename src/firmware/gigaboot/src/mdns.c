@@ -12,7 +12,6 @@
 #include <zircon/compiler.h>
 
 #include "device_id.h"
-#include "fastboot.h"
 #include "inet6.h"
 #include "netifc.h"
 #include "util.h"
@@ -26,6 +25,8 @@
 #define MDNS_SHORT_TTL (2 * 60)
 
 #define MDNS_PORT (5353)
+
+#define FB_SERVER_PORT 5554
 
 // Broadcast every 10 seconds.
 #define MDNS_BROADCAST_FREQ_MS (10000)
@@ -91,7 +92,7 @@ static struct mdns_name_segment* const mdns_name_fastboot_tcp_local = &name_segm
 static struct mdns_name_segment* const mdns_name_nodename_local = &name_segments[7];
 
 /*** packet writing ***/
-bool mdns_write_bytes(struct mdns_buf* b, const void* bytes, size_t len) {
+static bool mdns_write_bytes(struct mdns_buf* b, const void* bytes, size_t len) {
   if ((b->used + len) > MDNS_MAX_PKT) {
     printf("%s: len=%zu is too big, already used %zu bytes.\n", __func__, len, b->used);
     return false;
@@ -280,7 +281,7 @@ bool mdns_write_fastboot_packet(bool finished, bool tcp, struct mdns_buf* packet
 
 /*** fastboot mdns broadcasts ***/
 
-bool mdns_broadcast_fastboot(bool finished, bool fastboot_tcp) {
+static bool mdns_broadcast_fastboot(bool finished, bool fastboot_tcp) {
   static struct mdns_buf pkt;
   if (!mdns_write_fastboot_packet(finished, fastboot_tcp, &pkt)) {
     ELOG("Failed to create fastboot mDNS packet");

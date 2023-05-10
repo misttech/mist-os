@@ -11,7 +11,7 @@
 
 // Copies a word from the wordlist starting at |dest| and then adds |sep| at the end.
 // Returns a pointer to the character after the separator.
-char* append_word(char* dest, uint16_t num, char sep) {
+static char* append_word(char* dest, uint16_t num, char sep) {
   const char* word = dictionary[num % TOKEN_DICTIONARY_SIZE];
   memcpy(dest, word, strlen(word));
   dest += strlen(word);
@@ -20,7 +20,7 @@ char* append_word(char* dest, uint16_t num, char sep) {
   return dest;
 }
 
-void device_id_get_words(mac_addr addr, char out[DEVICE_ID_MAX]) {
+static void device_id_get_words(mac_addr addr, char out[DEVICE_ID_MAX]) {
   char* dest = out;
   dest = append_word(dest, (uint16_t)(addr.x[0] | ((addr.x[4] << 8) & 0xF00)), '-');
   dest = append_word(dest, (uint16_t)(addr.x[1] | ((addr.x[5] << 8) & 0xF00)), '-');
@@ -28,12 +28,12 @@ void device_id_get_words(mac_addr addr, char out[DEVICE_ID_MAX]) {
   dest = append_word(dest, (uint16_t)(addr.x[3] | ((addr.x[5] << 4) & 0xF00)), 0);
 }
 
-const char hex_chars[17] = "0123456789abcdef";
+static const char hex_chars[17] = "0123456789abcdef";
 
 // Copies 4 hex characters of hex value of the bits of |num|.
 // Then writes |sep| to the character after.
 // Returns a pointer to the character after the separator.
-char* append_hex(char* dest, uint16_t num, char sep) {
+static char* append_hex(char* dest, uint16_t num, char sep) {
   for (uint8_t i = 0; i < 4; i++) {
     uint16_t left = num >> ((3 - i) * 4);
     *dest = hex_chars[left & 0x0F];
@@ -47,7 +47,7 @@ char* append_hex(char* dest, uint16_t num, char sep) {
 #define PREFIX_LEN 9
 const char mac_prefix[PREFIX_LEN] = "fuchsia-";
 
-void device_id_get_mac(mac_addr addr, char out[DEVICE_ID_MAX]) {
+static void device_id_get_mac(mac_addr addr, char out[DEVICE_ID_MAX]) {
   char* dest = out;
   // Prepended with mac_prefix
   for (uint8_t i = 0; i < PREFIX_LEN; i++) {

@@ -269,10 +269,11 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity) {
   }
 
   // TODO(b/236039205): Add memory ranges for uart peripheral. Refer to
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/gigaboot/src/zircon.c;line=449;drc=de7e29bf0d7189a61b691ef0cdd0fd5ae1dfd605
   // `src/firmware/gigaboot/src/zircon.c` at line 477.
 
-  // TODO(b/236039205): Add memory ranges for GIC. Rfer to `src/firmware/gigaboot/src/zircon.c` at
-  // line 488.
+  // TODO(b/236039205): Add memory ranges for GIC. Rfer to
+  // `https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/gigaboot/src/zircon.c;line=480;drc=de7e29bf0d7189a61b691ef0cdd0fd5ae1dfd605`
 
   zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,
                                                       ranges, num_ranges * sizeof(zbi_mem_range_t));

@@ -53,15 +53,3 @@ uint32_t avb_div_by_10(uint64_t* dividend) {
   *dividend /= 10;
   return rem;
 }
-
-// Dependencies in legacy gigaboot that we do not intend to support.
-extern "C" void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport) {
-  printf("netboot is not supported");
-  abort();
-}
-
-extern "C" void tftp_recv(void* data, size_t len, const ip6_addr* daddr, uint16_t dport,
-                          const ip6_addr* saddr, uint16_t sport) {
-  printf("tftp is not supported");
-  abort();
-}

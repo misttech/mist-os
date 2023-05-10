@@ -136,10 +136,6 @@ char16_t* xefi_devpath_to_str(efi_device_path_protocol* path) {
   return prot->ConvertDevicePathToText(path, false, false);
 }
 
-int xefi_cmp_guid(const efi_guid* guid1, const efi_guid* guid2) {
-  return memcmp(guid1, guid2, sizeof(efi_guid));
-}
-
 char16_t* xefi_handle_to_str(efi_handle h) {
   efi_device_path_protocol* path;
   efi_status status = gBS->HandleProtocol(h, &DevicePathProtocol, (void*)&path);
@@ -163,14 +159,6 @@ char16_t* xefi_handle_to_str(efi_handle h) {
     return err;
   }
   return str;
-}
-
-efi_status xefi_open_protocol(efi_handle h, const efi_guid* guid, void** ifc) {
-  return gBS->OpenProtocol(h, guid, ifc, gImg, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
-}
-
-efi_status xefi_close_protocol(efi_handle h, const efi_guid* guid) {
-  return gBS->CloseProtocol(h, guid, gImg, NULL);
 }
 
 const char* xefi_strerror(efi_status status) {

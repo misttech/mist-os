@@ -10,10 +10,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <xefi.h>
+#include <zircon/compiler.h>
 
 #include <efi/boot-services.h>
 
-#include "compiler.h"
 #include "inet6.h"
 
 static efi_guid kTcp6ServiceBindingProtocolGuid = EFI_TCP6_SERVICE_BINDING_PROTOCOL_GUID;
@@ -73,7 +73,7 @@ static tcp6_result status_to_tcp6_result(efi_status status) {
     case EFI_NOT_READY:
       return TCP6_RESULT_PENDING;
     case EFI_CONNECTION_FIN:
-      FALLTHROUGH;
+      __FALLTHROUGH;
     case EFI_CONNECTION_RESET:
       DLOG_S(status, "TCP6 client has disconnected");
       return TCP6_RESULT_DISCONNECTED;

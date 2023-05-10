@@ -22,45 +22,25 @@ config("legacy_includes") {
 # toolchain
 source_set("legacy_c_gigaboot") {
   sources = [
-    "$dir_gigaboot/lib/cmdline.c",
     "$dir_gigaboot/lib/inet.c",
-    "$dir_gigaboot/lib/loadfile.c",
     "$dir_gigaboot/lib/printf.c",
     "$dir_gigaboot/lib/stdlib.c",
-    "$dir_gigaboot/lib/strings.c",
     "$dir_gigaboot/lib/xefi.c",
     "$dir_gigaboot/src/abr.c",
-    "$dir_gigaboot/src/acpi.c",
-    "$dir_gigaboot/src/avb.c",
-    "$dir_gigaboot/src/bootimg.c",
-    "$dir_gigaboot/src/cmdline.c",
     "$dir_gigaboot/src/device_id.c",
-    "$dir_gigaboot/src/diskio.c",
-    "$dir_gigaboot/src/fastboot.c",
-    "$dir_gigaboot/src/framebuffer.c",
     "$dir_gigaboot/src/inet6.c",
-    "$dir_gigaboot/src/logo.c",
     "$dir_gigaboot/src/mdns.c",
-    "$dir_gigaboot/src/misc.c",
     "$dir_gigaboot/src/netifc.c",
-    "$dir_gigaboot/src/pci.c",
     "$dir_gigaboot/src/tcp.c",
     "$dir_gigaboot/src/util.c",
-    "$dir_gigaboot/src/variable.c",
     "$dir_gigaboot/src/zircon.c",
   ]
   configs += [ "$dir_gigaboot/src:config" ]
 
   deps = [
     "//sdk/lib/zbi-format",
-    "//src/bringup/lib/netboot",
-    "//src/firmware/lib/abr:in_tree",
     "//src/firmware/lib/zbi:in_tree",
-    "//third_party/android/platform/external/avb:lib",
     "//zircon/kernel/lib/efi",
-    "//zircon/system/public",
-    "//zircon/system/ulib/ddk-platform-defs",
-    "//zircon/system/ulib/gfx-font",
     "//zircon/third_party/ulib/cksum",
   ]
 
@@ -73,22 +53,5 @@ source_set("legacy_c_gigaboot") {
   include_dirs = [
     ".",
     "../../src",
-  ]
-
-  public_deps = []
-  if (is_kernel) {
-    public_deps += [
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-  }
-
-  # TODO(b/238334864): Fix the compiling warning if code that has the
-  # problem needs to be used long term.
-  cflags_c = [
-    "-Wno-error",
-    "-Wno-implicit-int-conversion",
-    "-Wno-missing-prototypes",
-    "-Wno-implicit-function-declaration",
   ]
 }

@@ -133,8 +133,6 @@ char* ip6toa(char* _out, void* ip6addr);
 
 // provided by inet6.c
 void ip6_init(void* macaddr);
-void eth_recv(void* data, size_t len);
-mac_addr eth_addr(void);
 
 // provided by interface driver
 void* eth_get_buffer(size_t len);
@@ -144,13 +142,6 @@ int eth_add_mcast_filter(const mac_addr* addr);
 
 // call to transmit a UDP packet
 int udp6_send(const void* data, size_t len, const ip6_addr* daddr, uint16_t dport, uint16_t sport);
-
-// handle a netboot UDP packet
-void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport);
-
-// handle a TFTP (over UDP) packet
-void tftp_recv(void* data, size_t len, const ip6_addr* daddr, uint16_t dport, const ip6_addr* saddr,
-               uint16_t sport);
 
 // NOTES
 //

@@ -41,38 +41,6 @@ size_t strlen_16(char16_t* str);
 
 char16_t* xefi_devpath_to_str(efi_device_path_protocol* path);
 
-int xefi_cmp_guid(const efi_guid* guid1, const efi_guid* guid2);
-
-// Convenience wrappers for Open/Close protocol for use by
-// UEFI app code that's not a driver model participant
-efi_status xefi_open_protocol(efi_handle h, const efi_guid* guid, void** ifc);
-efi_status xefi_close_protocol(efi_handle h, const efi_guid* guid);
-
-efi_file_protocol* xefi_open_file(const char16_t* filename);
-void* xefi_read_file(efi_file_protocol* file, size_t* _sz, size_t front_bytes);
-void* xefi_load_file(const char16_t* filename, size_t* size_out, size_t front_bytes);
-
-efi_status xefi_find_pci_mmio(efi_boot_services* bs, uint8_t cls, uint8_t sub, uint8_t ifc,
-                              uint64_t* mmio);
-
-// Fetches any load options that were passed by the UEFI boot manager.
-//
-// On success:
-//   * |load_options| will always be valid; if no load options were provided, it
-//     will just be an empty UTF-16 string.
-//   * The caller is responsible for calling FreePool() to free |load_options|,
-//     even if |load_options_size| is zero.
-//
-// load_options_size: will be filled with the size of the load options provided.
-// load_options: will be updated to point to an allocated buffer containing
-//               |load_options_size| bytes, followed by an additional two bytes
-//               of zeros that should not be considered part of the
-//               |load_options| content.
-efi_status xefi_get_load_options(size_t* load_options_size, void** load_options);
-
-// GUIDs
-extern const efi_guid FileInfoGUID;
-
 typedef struct {
   efi_handle img;
   efi_system_table* sys;
