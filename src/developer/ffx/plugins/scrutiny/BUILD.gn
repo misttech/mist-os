@@ -38,4 +38,7 @@ ffx_tool("ffx_scrutiny_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+
+  sdk_target_name = "sdk"
+  sdk_category = "partner"
 }

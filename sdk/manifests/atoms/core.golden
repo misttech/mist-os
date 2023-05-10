@@ -191,8 +191,12 @@
 //sdk:version_history
 //src/developer/debug/zxdb:zxdb_sdk
 //src/developer/ffx/lib/symbol-index:symbol-index-sdk
+//src/developer/ffx/plugins/assembly:sdk
 //src/developer/ffx/plugins/emulator:aemu_internal
 //src/developer/ffx/plugins/emulator:qemu_internal
+//src/developer/ffx/plugins/package:sdk
+//src/developer/ffx/plugins/product:sdk
+//src/developer/ffx/plugins/scrutiny:sdk
 //src/developer/ffx:bin_sdk
 //src/lib/fidl/cpp:cpp_base_sdk
 //src/lib/fidl/cpp:cpp_sdk

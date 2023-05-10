@@ -221,6 +221,10 @@ sdk://tools/arm64/configc
 sdk://tools/arm64/device-finder
 sdk://tools/arm64/far
 sdk://tools/arm64/ffx
+sdk://tools/arm64/ffx_tools/ffx-assembly
+sdk://tools/arm64/ffx_tools/ffx-package
+sdk://tools/arm64/ffx_tools/ffx-product
+sdk://tools/arm64/ffx_tools/ffx-scrutiny
 sdk://tools/arm64/fidl-format
 sdk://tools/arm64/fidlc
 sdk://tools/arm64/fidlcat
@@ -249,6 +253,10 @@ sdk://tools/x64/configc
 sdk://tools/x64/device-finder
 sdk://tools/x64/far
 sdk://tools/x64/ffx
+sdk://tools/x64/ffx_tools/ffx-assembly
+sdk://tools/x64/ffx_tools/ffx-package
+sdk://tools/x64/ffx_tools/ffx-product
+sdk://tools/x64/ffx_tools/ffx-scrutiny
 sdk://tools/x64/fidl-format
 sdk://tools/x64/fidlc
 sdk://tools/x64/fidlcat
