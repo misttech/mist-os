@@ -176,8 +176,30 @@ config("coverage") {
 config("output_dir_sensitive") {
   if (rust_rbe_enable) {
     # --remote-flag=* is a pseudo flag that is intercepted by
-    # build/rbe/rustc-remote-wrapper.sh and forwarded to rewrapper (reclient).
+    # build/rbe/rustc_remote_wrapper.py and forwarded to rewrapper (reclient).
     rustflags = [ "--remote-flag=--canonicalize_working_dir=false" ]
+  }
+}
+
+# On remote-cache miss, execute locally, but still allow remote execution
+# to occur and populate the cache.  This may be an attractive option for
+# targets that are large, frequently miss the cache, frequently on the
+# critical path and prefer local build speeds.
+config("rbe_strategy_local") {
+  if (rust_rbe_enable) {
+    # --remote-flag=* is a pseudo flag that is intercepted by
+    # build/rbe/rustc_remote_wrapper.py and forwarded to rewrapper (reclient).
+    rustflags = [ "--remote-flag=--exec_strategy=local" ]
+  }
+}
+
+# Use whichever succeeds first between local and remote.
+# This has the advantage of also populating the remote cache.
+config("rbe_strategy_racing") {
+  if (rust_rbe_enable) {
+    # --remote-flag=* is a pseudo flag that is intercepted by
+    # build/rbe/rustc_remote_wrapper.py and forwarded to rewrapper (reclient).
+    rustflags = [ "--remote-flag=--exec_strategy=racing" ]
   }
 }
 
