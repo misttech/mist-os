@@ -461,17 +461,8 @@
 
                 // ping_socket_test
                 "PingSocket.PayloadTooLarge",
-                "PingSocket.ReceiveTOS",
-                "PingSocket.ReceiveTClass",
-                "PingSocket.ReceiveTTL",
-                "PingSocket.ReceiveHopLimit",
                 "PingSocket.ReceiveIPPacketInfo",
                 "PingSocket.ReceiveIPv6PktInfo",
-
-                // pipe_test
-                "Pipes/PipeTest.Flags/namednonblocking",
-                "Pipes/PipeTest.Flags/namedblocking",
-                "Pipes/PipeTest.OffsetCalls/*",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Any",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Loopback",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6Multicast",
@@ -479,6 +470,11 @@
                 "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllNodes",
                 "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllRouters",
                 "PingSockets/Fixture.Bind/ICMP_socket_IPv6UnknownUnicast",
+
+                // pipe_test
+                "Pipes/PipeTest.Flags/namednonblocking",
+                "Pipes/PipeTest.Flags/namedblocking",
+                "Pipes/PipeTest.OffsetCalls/*",
 
                 // pivot_root_test
                 "PivotRootTest.WithoutCapability",
@@ -681,10 +677,6 @@
                 // raw_socket_test
                 "RawSocketTest.ReceiveIPPacketInfo",
                 "RawSocketTest.ReceiveIPv6PacketInfo",
-                "RawSocketTest.ReceiveTOS",
-                "RawSocketTest.ReceiveTClass",
-                "RawSocketTest.ReceiveTTL",
-                "RawSocketTest.ReceiveHopLimit",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
 
                 // readahead_test

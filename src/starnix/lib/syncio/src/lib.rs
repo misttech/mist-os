@@ -16,8 +16,13 @@ use fuchsia_zircon::{
     sys::{ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK},
     zx_status_t, HandleBased,
 };
-use linux_uapi::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_void};
-use std::{ffi::CStr, pin::Pin};
+use linux_uapi::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_uint, c_void};
+use std::{
+    ffi::CStr,
+    mem::{size_of, size_of_val},
+    pin::Pin,
+};
+use zerocopy::{AsBytes, FromBytes};
 use zxio::{
     msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_seek_origin_t,
     zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
@@ -177,10 +182,143 @@ impl ZxioErrorCode {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ControlMessage {
+    IpTos(u8),
+    IpTtl(u8),
+    Ipv6Tclass(u8),
+    Ipv6HopLimit(u8),
+    Ipv6PacketInfo { iface: u32, local_addr: [u8; size_of::<zxio::in6_addr>()] },
+}
+
+const fn align_cmsg_size(len: usize) -> usize {
+    (len + size_of::<usize>() - 1) & !(size_of::<usize>() - 1)
+}
+
+const CMSG_HEADER_SIZE: usize = align_cmsg_size(size_of::<zxio::cmsghdr>());
+
+// Size of the buffer to allocate in recvmsg() for cmsgs buffer. We need a buffer that can fit
+// Ipv6Tclass, Ipv6HopLimit and Ipv6HopLimit messages.
+const MAX_CMSGS_BUFFER: usize =
+    CMSG_HEADER_SIZE * 3 + align_cmsg_size(1) * 2 + align_cmsg_size(size_of::<zxio::in6_pktinfo>());
+
+impl ControlMessage {
+    pub fn get_data_size(&self) -> usize {
+        match self {
+            ControlMessage::IpTos(_) => 1,
+            ControlMessage::IpTtl(_) => size_of::<c_int>(),
+            ControlMessage::Ipv6Tclass(_) => size_of::<c_int>(),
+            ControlMessage::Ipv6HopLimit(_) => size_of::<c_int>(),
+            ControlMessage::Ipv6PacketInfo { .. } => size_of::<zxio::in6_pktinfo>(),
+        }
+    }
+
+    // Serializes the data in the format expected by ZXIO.
+    fn serialize<'a>(&'a self, out: &'a mut [u8]) -> usize {
+        let data = &mut out[CMSG_HEADER_SIZE..];
+        let (size, level, type_) = match self {
+            ControlMessage::IpTos(v) => {
+                v.write_to_prefix(data).unwrap();
+                (1, zxio::SOL_IP, zxio::IP_TOS)
+            }
+            ControlMessage::IpTtl(v) => {
+                (*v as c_int).write_to_prefix(data).unwrap();
+                (size_of::<c_int>(), zxio::SOL_IP, zxio::IP_TTL)
+            }
+            ControlMessage::Ipv6Tclass(v) => {
+                (*v as c_int).write_to_prefix(data).unwrap();
+                (size_of::<c_int>(), zxio::SOL_IPV6, zxio::IPV6_TCLASS)
+            }
+            ControlMessage::Ipv6HopLimit(v) => {
+                (*v as c_int).write_to_prefix(data).unwrap();
+                (size_of::<c_int>(), zxio::SOL_IPV6, zxio::IPV6_HOPLIMIT)
+            }
+            ControlMessage::Ipv6PacketInfo { iface, local_addr } => {
+                let pktinfo = zxio::in6_pktinfo {
+                    ipi6_addr: zxio::in6_addr {
+                        __in6_union: zxio::in6_addr__bindgen_ty_1 { __s6_addr: *local_addr },
+                    },
+                    ipi6_ifindex: *iface,
+                };
+                pktinfo.write_to_prefix(data).unwrap();
+                (size_of_val(&pktinfo), zxio::SOL_IPV6, zxio::IPV6_PKTINFO)
+            }
+        };
+        let total_size = CMSG_HEADER_SIZE + size;
+        let header = zxio::cmsghdr {
+            cmsg_len: total_size as c_uint,
+            cmsg_level: level as i32,
+            cmsg_type: type_ as i32,
+        };
+        header.write_to_prefix(&mut out[..]).unwrap();
+
+        total_size
+    }
+}
+
+fn serialize_control_messages(messages: &[ControlMessage]) -> Vec<u8> {
+    let size = messages
+        .iter()
+        .fold(0, |sum, x| sum + CMSG_HEADER_SIZE + align_cmsg_size(x.get_data_size()));
+    let mut buffer = vec![0u8; size];
+    let mut pos = 0;
+    for msg in messages {
+        pos += align_cmsg_size(msg.serialize(&mut buffer[pos..]));
+    }
+    assert_eq!(pos, buffer.len());
+    buffer
+}
+
+fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
+    let mut result = vec![];
+    let mut pos = 0;
+    loop {
+        if pos >= data.len() {
+            return result;
+        }
+        let header_data = &data[pos..];
+        let header = match zxio::cmsghdr::read_from_prefix(header_data) {
+            Some(h) if h.cmsg_len as usize > CMSG_HEADER_SIZE => h,
+            _ => return result,
+        };
+
+        let msg_data = &data[pos + CMSG_HEADER_SIZE..pos + header.cmsg_len as usize];
+        let msg = match (header.cmsg_level as u32, header.cmsg_type as u32) {
+            (zxio::SOL_IP, zxio::IP_TOS) => {
+                ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap())
+            }
+            (zxio::SOL_IP, zxio::IP_TTL) => {
+                ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8)
+            }
+            (zxio::SOL_IPV6, zxio::IPV6_TCLASS) => {
+                ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8)
+            }
+            (zxio::SOL_IPV6, zxio::IPV6_HOPLIMIT) => {
+                ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8)
+            }
+            (zxio::SOL_IPV6, zxio::IPV6_PKTINFO) => {
+                let pkt_info = zxio::in6_pktinfo::read_from_prefix(msg_data).unwrap();
+                ControlMessage::Ipv6PacketInfo {
+                    local_addr: unsafe { pkt_info.ipi6_addr.__in6_union.__s6_addr },
+                    iface: pkt_info.ipi6_ifindex,
+                }
+            }
+            _ => panic!(
+                "ZXIO produced unexpected cmsg level={}, type={}",
+                header.cmsg_level, header.cmsg_type
+            ),
+        };
+        result.push(msg);
+
+        pos += align_cmsg_size(header.cmsg_len as usize);
+    }
+}
+
 pub struct RecvMessageInfo {
     pub address: Vec<u8>,
     pub message: Vec<u8>,
     pub message_length: usize,
+    pub control_messages: Vec<ControlMessage>,
     pub flags: i32,
 }
 
@@ -254,7 +392,7 @@ unsafe extern "C" fn service_connector<S: ServiceConnector>(
 unsafe extern "C" fn storage_allocator(
     _type: zxio_object_type_t,
     out_storage: *mut *mut zxio_storage_t,
-    out_context: *mut *mut ::std::os::raw::c_void,
+    out_context: *mut *mut c_void,
 ) -> zx_status_t {
     let zxio_ptr_ptr = out_context as *mut *mut zxio_storage_t;
     if let Some(zxio_ptr) = zxio_ptr_ptr.as_mut() {
@@ -337,7 +475,7 @@ impl Zxio {
         let status = unsafe {
             zxio::zxio_read(
                 self.as_ptr(),
-                data.as_ptr() as *mut ::std::os::raw::c_void,
+                data.as_ptr() as *mut c_void,
                 data.len(),
                 flags,
                 &mut actual,
@@ -361,7 +499,7 @@ impl Zxio {
             zxio::zxio_read_at(
                 self.as_ptr(),
                 offset,
-                data.as_ptr() as *mut ::std::os::raw::c_void,
+                data.as_ptr() as *mut c_void,
                 data.len(),
                 flags,
                 &mut actual,
@@ -377,7 +515,7 @@ impl Zxio {
         let status = unsafe {
             zxio::zxio_write(
                 self.as_ptr(),
-                data.as_ptr() as *const ::std::os::raw::c_void,
+                data.as_ptr() as *const c_void,
                 data.len(),
                 flags,
                 &mut actual,
@@ -394,7 +532,7 @@ impl Zxio {
             zxio::zxio_write_at(
                 self.as_ptr(),
                 offset,
-                data.as_ptr() as *const ::std::os::raw::c_void,
+                data.as_ptr() as *const c_void,
                 data.len(),
                 flags,
                 &mut actual,
@@ -526,9 +664,7 @@ impl Zxio {
 
     pub fn listen(&self, backlog: i32) -> Result<Result<(), ZxioErrorCode>, zx::Status> {
         let mut out_code = 0;
-        let status = unsafe {
-            zxio::zxio_listen(self.as_ptr(), backlog as std::os::raw::c_int, &mut out_code)
-        };
+        let status = unsafe { zxio::zxio_listen(self.as_ptr(), backlog as c_int, &mut out_code) };
         zx::ok(status)?;
         match out_code {
             0 => Ok(Ok(())),
@@ -606,9 +742,9 @@ impl Zxio {
         let status = unsafe {
             zxio::zxio_getsockopt(
                 self.as_ptr(),
-                level as std::os::raw::c_int,
-                optname as std::os::raw::c_int,
-                optval.as_mut_ptr() as *mut std::os::raw::c_void,
+                level as c_int,
+                optname as c_int,
+                optval.as_mut_ptr() as *mut c_void,
                 &mut optlen,
                 &mut out_code,
             )
@@ -632,7 +768,7 @@ impl Zxio {
                 self.as_ptr(),
                 level,
                 optname,
-                optval.as_ptr() as *const std::os::raw::c_void,
+                optval.as_ptr() as *const c_void,
                 optval.len() as socklen_t,
                 &mut out_code,
             )
@@ -661,37 +797,30 @@ impl Zxio {
         &self,
         mut addr: Vec<u8>,
         mut buffer: Vec<u8>,
-        mut cmsg: Vec<u8>,
+        cmsg: Vec<ControlMessage>,
         flags: u32,
     ) -> Result<Result<usize, ZxioErrorCode>, zx::Status> {
         let mut msg = zxio::msghdr::default();
         msg.msg_name = match addr.len() {
-            0 => std::ptr::null_mut() as *mut std::os::raw::c_void,
-            _ => addr.as_mut_ptr() as *mut std::os::raw::c_void,
+            0 => std::ptr::null_mut() as *mut c_void,
+            _ => addr.as_mut_ptr() as *mut c_void,
         };
         msg.msg_namelen = addr.len() as u32;
 
-        let mut iov = zxio::iovec {
-            iov_base: buffer.as_mut_ptr() as *mut std::os::raw::c_void,
-            iov_len: buffer.len(),
-        };
+        let mut iov =
+            zxio::iovec { iov_base: buffer.as_mut_ptr() as *mut c_void, iov_len: buffer.len() };
         msg.msg_iov = &mut iov;
         msg.msg_iovlen = 1;
 
-        msg.msg_control = cmsg.as_mut_ptr() as *mut std::os::raw::c_void;
-        msg.msg_controllen = cmsg.len() as u32;
+        let mut cmsg_buffer = serialize_control_messages(&cmsg);
+        msg.msg_control = cmsg_buffer.as_mut_ptr() as *mut c_void;
+        msg.msg_controllen = cmsg_buffer.len() as u32;
 
         let mut out_code = 0;
         let mut out_actual = 0;
 
         let status = unsafe {
-            zxio::zxio_sendmsg(
-                self.as_ptr(),
-                &msg,
-                flags as std::os::raw::c_int,
-                &mut out_actual,
-                &mut out_code,
-            )
+            zxio::zxio_sendmsg(self.as_ptr(), &msg, flags as c_int, &mut out_actual, &mut out_code)
         };
 
         zx::ok(status)?;
@@ -708,16 +837,18 @@ impl Zxio {
     ) -> Result<Result<RecvMessageInfo, ZxioErrorCode>, zx::Status> {
         let mut msg = msghdr::default();
         let mut addr = vec![0u8; std::mem::size_of::<sockaddr_storage>()];
-        msg.msg_name = addr.as_mut_ptr() as *mut std::os::raw::c_void;
+        msg.msg_name = addr.as_mut_ptr() as *mut c_void;
         msg.msg_namelen = addr.len() as u32;
 
         let mut iov_buf = vec![0u8; iovec_length];
-        let mut iov = zxio::iovec {
-            iov_base: iov_buf.as_mut_ptr() as *mut std::os::raw::c_void,
-            iov_len: iovec_length,
-        };
+        let mut iov =
+            zxio::iovec { iov_base: iov_buf.as_mut_ptr() as *mut c_void, iov_len: iovec_length };
         msg.msg_iov = &mut iov;
         msg.msg_iovlen = 1;
+
+        let mut cmsg_buffer = vec![0u8; MAX_CMSGS_BUFFER];
+        msg.msg_control = cmsg_buffer.as_mut_ptr() as *mut c_void;
+        msg.msg_controllen = cmsg_buffer.len() as u32;
 
         let mut out_code = 0;
         let mut out_actual = 0;
@@ -725,23 +856,26 @@ impl Zxio {
             zxio::zxio_recvmsg(
                 self.as_ptr(),
                 &mut msg,
-                flags as std::os::raw::c_int,
+                flags as c_int,
                 &mut out_actual,
                 &mut out_code,
             )
         };
         zx::ok(status)?;
 
-        let min_buf_len = std::cmp::min(iov_buf.len(), out_actual);
-        match out_code {
-            0 => Ok(Ok(RecvMessageInfo {
-                address: addr[..msg.msg_namelen as usize].to_vec(),
-                message: iov_buf[..min_buf_len].to_vec(),
-                message_length: out_actual,
-                flags: msg.msg_flags,
-            })),
-            _ => Ok(Err(ZxioErrorCode(out_code))),
+        if out_code != 0 {
+            return Ok(Err(ZxioErrorCode(out_code)));
         }
+
+        let control_messages = parse_control_messages(&cmsg_buffer[..msg.msg_controllen as usize]);
+        let min_buf_len = std::cmp::min(iov_buf.len(), out_actual);
+        Ok(Ok(RecvMessageInfo {
+            address: addr[..msg.msg_namelen as usize].to_vec(),
+            message: iov_buf[..min_buf_len].to_vec(),
+            message_length: out_actual,
+            control_messages,
+            flags: msg.msg_flags,
+        }))
     }
 
     pub fn read_link(&self) -> Result<&[u8], zx::Status> {

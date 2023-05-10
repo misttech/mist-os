@@ -10,6 +10,7 @@ use crate::fs::socket::{SocketAddress, SocketMessageFlags};
 use crate::fs::*;
 use crate::task::CurrentTask;
 use crate::types::*;
+use syncio;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
 #[derive(Clone, Debug)]
@@ -55,6 +56,7 @@ impl From<Vec<u8>> for Message {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ControlMsg {
     pub header: cmsghdr,
     pub data: Vec<u8>,
@@ -80,6 +82,14 @@ impl ControlMsg {
 #[cfg_attr(test, derive(PartialEq))]
 pub enum AncillaryData {
     Unix(UnixControlData),
+
+    // SOL_IP and SOL_IPV6.
+    Ip(syncio::ControlMessage),
+}
+
+// Reads int `cmsg` value and tries to convert it to u8.
+fn read_u8_value_from_int_cmsg(data: &[u8]) -> Option<u8> {
+    u8::try_from(c_int::read_from_prefix(data)?).ok()
 }
 
 impl AncillaryData {
@@ -89,18 +99,41 @@ impl AncillaryData {
     /// - `current_task`: The current task. Used to interpret SCM_RIGHTS messages.
     /// - `message`: The message header to parse.
     pub fn from_cmsg(current_task: &CurrentTask, message: ControlMsg) -> Result<Self, Errno> {
-        if message.header.cmsg_level != SOL_SOCKET {
-            return error!(
-                EINVAL,
-                format!("invalid cmsg_level {:?}", { message.header.cmsg_level })
-            );
+        match (message.header.cmsg_level, message.header.cmsg_type) {
+            (SOL_SOCKET, SCM_RIGHTS | SCM_CREDENTIALS) => {
+                Ok(AncillaryData::Unix(UnixControlData::new(current_task, message)?))
+            }
+            (SOL_IP, IP_TOS) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTos(
+                u8::read_from_prefix(&message.data[..]).ok_or(errno!(EINVAL))?,
+            ))),
+            (SOL_IP, IP_TTL) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTtl(
+                read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+            ))),
+            (SOL_IPV6, IPV6_TCLASS) => Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(
+                read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+            ))),
+            (SOL_IPV6, IPV6_HOPLIMIT) => {
+                Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6HopLimit(
+                    read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+                )))
+            }
+            (SOL_IPV6, IPV6_PKTINFO) => {
+                let pktinfo =
+                    in6_pktinfo::read_from_prefix(&message.data[..]).ok_or(errno!(EINVAL))?;
+                Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo {
+                    local_addr: pktinfo
+                        .ipi6_addr
+                        .as_bytes()
+                        .try_into()
+                        .ok()
+                        .ok_or(errno!(EINVAL))?,
+                    iface: pktinfo.ipi6_ifindex as u32,
+                }))
+            }
+            (level, type_) => {
+                error!(EINVAL, format!("invalid cmsg_level/type: 0x{:x}/0x{:x}", level, type_))
+            }
         }
-
-        if message.header.cmsg_type != SCM_RIGHTS && message.header.cmsg_type != SCM_CREDENTIALS {
-            return error!(EINVAL);
-        }
-
-        Ok(AncillaryData::Unix(UnixControlData::new(current_task, message)?))
     }
 
     /// Returns a `ControlMsg` representation of this `AncillaryData`. This includes
@@ -112,6 +145,25 @@ impl AncillaryData {
     ) -> Result<ControlMsg, Errno> {
         match self {
             AncillaryData::Unix(control) => control.into_controlmsg(current_task, flags),
+            AncillaryData::Ip(syncio::ControlMessage::IpTos(value)) => {
+                Ok(ControlMsg::new(SOL_IP, IP_TOS, value.as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::IpTtl(value)) => {
+                Ok(ControlMsg::new(SOL_IP, IP_TTL, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(value)) => {
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_TCLASS, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::Ipv6HopLimit(value)) => {
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_HOPLIMIT, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo { iface, local_addr }) => {
+                let pktinfo = in6_pktinfo {
+                    ipi6_addr: in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: local_addr } },
+                    ipi6_ifindex: iface as i32,
+                };
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_PKTINFO, pktinfo.as_bytes().to_vec()))
+            }
         }
     }
 
@@ -119,6 +171,7 @@ impl AncillaryData {
     pub fn total_size(&self) -> usize {
         match self {
             AncillaryData::Unix(control) => control.total_size(),
+            AncillaryData::Ip(msg) => msg.get_data_size(),
         }
     }
 
@@ -126,6 +179,7 @@ impl AncillaryData {
     pub fn minimum_size(&self) -> usize {
         match self {
             AncillaryData::Unix(control) => control.minimum_size(),
+            AncillaryData::Ip(msg) => msg.get_data_size(),
         }
     }
 
@@ -151,6 +205,7 @@ impl AncillaryData {
 
         let mut bytes = cmsg.header.as_bytes().to_owned();
         bytes.extend_from_slice(&cmsg.data[..cmsg_len - header_size]);
+
         Ok(bytes)
     }
 }

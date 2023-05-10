@@ -193,7 +193,7 @@ pub struct msghdr {
     pub msg_flags: u64,
 }
 
-#[derive(AsBytes, FromBytes, Default)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, Eq, PartialEq)]
 #[repr(packed)]
 pub struct cmsghdr {
     pub cmsg_len: usize,

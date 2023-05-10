@@ -17,7 +17,7 @@ use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 use std::sync::Arc;
-use syncio::{RecvMessageInfo, ServiceConnector, Zxio};
+use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
 /// Connects to `fuchsia_posix_socket::Provider` or
 /// `fuchsia_posix_socket_raw::Provider`.
@@ -70,7 +70,7 @@ impl InetSocket {
         &self,
         addr: &Option<SocketAddress>,
         data: &mut dyn InputBuffer,
-        cmsg: Vec<u8>,
+        cmsgs: Vec<ControlMessage>,
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
         let addr = match addr {
@@ -84,7 +84,7 @@ impl InetSocket {
         let bytes = data.peek_all()?;
         let send_bytes = self
             .zxio
-            .sendmsg(addr, bytes, cmsg, flags.bits() & !MSG_DONTWAIT)
+            .sendmsg(addr, bytes, cmsgs, flags.bits() & !MSG_DONTWAIT)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
         data.advance(send_bytes)?;
@@ -167,7 +167,7 @@ impl SocketOps for InetSocket {
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
         let iovec_length = data.available();
-        let info = self.recvmsg(iovec_length, flags)?;
+        let mut info = self.recvmsg(iovec_length, flags)?;
 
         let bytes_read = data.write_all(&info.message)?;
 
@@ -177,12 +177,11 @@ impl SocketOps for InetSocket {
             None
         };
 
-        // TODO: Handle ancillary_data.
         Ok(MessageReadInfo {
             bytes_read,
             message_length: info.message_length,
             address,
-            ancillary_data: vec![],
+            ancillary_data: info.control_messages.drain(..).map(AncillaryData::Ip).collect(),
         })
     }
 
@@ -192,10 +191,17 @@ impl SocketOps for InetSocket {
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
-        _ancillary_data: &mut Vec<AncillaryData>,
+        ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        // TODO: Handle ancillary_data.
-        self.sendmsg(dest_address, data, vec![], SocketMessageFlags::empty())
+        let mut cmsgs = vec![];
+        for d in ancillary_data.drain(..) {
+            match d {
+                AncillaryData::Ip(msg) => cmsgs.push(msg),
+                _ => return error!(EINVAL),
+            }
+        }
+
+        self.sendmsg(dest_address, data, cmsgs, SocketMessageFlags::empty())
     }
 
     fn wait_async(
