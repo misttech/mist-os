@@ -16,34 +16,45 @@ use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use log::{Level, Log, Metadata, Record, SetLoggerError};
-/// Logger which prints levels at or below info to stdout and levels at or
-/// above warn to stderr.
-struct Logger;
+use tracing::{Level, Subscriber};
+use tracing_subscriber::{
+    fmt::{
+        format::{self, FormatEvent, FormatFields},
+        FmtContext,
+    },
+    prelude::*,
+    registry::LookupSpan,
+};
 
-const LOG_LEVEL: Level = Level::Info;
+const LOG_LEVEL: Level = Level::INFO;
 
-impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        metadata.level() <= LOG_LEVEL
+struct SimpleFormatter;
+
+impl<S, N> FormatEvent<S, N> for SimpleFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: format::Writer<'_>,
+        event: &tracing::Event<'_>,
+    ) -> std::fmt::Result {
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
     }
-
-    fn log(&self, record: &Record<'_>) {
-        if self.enabled(record.metadata()) {
-            match record.metadata().level() {
-                Level::Trace | Level::Debug | Level::Info => println!("{}", record.args()),
-                Level::Warn | Level::Error => eprintln!("{}", record.args()),
-            }
-        }
-    }
-
-    fn flush(&self) {}
 }
 
-static LOGGER: Logger = Logger;
-
-fn logger_init() -> Result<(), SetLoggerError> {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(LOG_LEVEL.to_level_filter()))
+fn logger_init() {
+    tracing_subscriber::fmt()
+        .event_format(SimpleFormatter)
+        .with_writer(
+            std::io::stderr
+                .with_max_level(Level::WARN)
+                .or_else(std::io::stdout.with_max_level(LOG_LEVEL)),
+        )
+        .init()
 }
 
 struct Connector {
@@ -157,7 +168,7 @@ impl net_cli::ServiceConnector<fname::LookupMarker> for Connector {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    let () = logger_init()?;
+    logger_init();
     let command: net_cli::Command = argh::from_env();
     let connector = Connector::new()?;
     net_cli::do_root(ffx_writer::Writer::new(None), command, &connector).await

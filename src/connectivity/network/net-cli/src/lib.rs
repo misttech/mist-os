@@ -20,13 +20,13 @@ use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::{info, warn};
 use net_types::ip::{Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
 use serde_json::{json, value::Value};
 use std::collections::hash_map::HashMap;
 use std::{convert::TryFrom as _, iter::FromIterator as _, str::FromStr as _};
+use tracing::{info, warn};
 
 mod opts;
 pub use opts::{
