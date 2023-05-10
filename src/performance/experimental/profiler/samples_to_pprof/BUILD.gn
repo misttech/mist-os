@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//third_party/protobuf/proto_library.gni")
+
+if (is_host) {
+  executable("samples_to_pprof") {
+    output_name = "samples_to_pprof"
+    sources = [ "main.cc" ]
+    deps = [
+      # TODO(https://fxbug.dev/115412): Replace with pprof.
+      # "//third_party/github.com/google/pprof:profile_proto",
+      ":profile_proto",
+      "//src/lib/fxl",
+      "//third_party/protobuf:protobuf_full",
+    ]
+  }
+}
+
+proto_library("profile_proto") {
+  proto_out_dir = "//src/performance/profiler/profile"
+  sources = [ "//third_party/perfetto/protos/third_party/pprof/profile.proto" ]
+}
+
+install_host_tools("install") {
+  deps = [ ":samples_to_pprof($host_toolchain)" ]
+  outputs = [ "samples_to_pprof" ]
+}
