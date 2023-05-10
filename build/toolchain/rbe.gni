@@ -40,6 +40,10 @@ rustc_remote_wrapper = "//build/rbe/rustc_remote_wrapper.py"
 # Dependencies for all RBE-enabled rust actions.
 rust_rbe_deps =
     rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
+      # prebuilt_tool_remote_wrapper is needed for remote stripping binaries,
+      # which is a second remote action inside a rust executable action,
+      # in build/toolchain/clang_toolchain.gni.
+      "//build/rbe/prebuilt_tool_remote_wrapper.py",
       "//build/rbe/rustc.py",
       rustc_remote_wrapper,
     ]
@@ -51,6 +55,8 @@ cxx_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
                  "//build/rbe/cxx.py",
                  cxx_remote_wrapper,
                ]
+
+prebuilt_tool_remote_wrapper = "//build/rbe/prebuilt_tool_remote_wrapper.py"
 
 declare_args() {
   #########################

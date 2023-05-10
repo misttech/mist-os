@@ -501,12 +501,26 @@ template("clang_toolchain") {
           command += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
         }
         if (use_strip) {
+          remote_strip_prefix = ""
+          if (rust_rbe_enable) {
+            remote_strip_prefix = string_join(
+                    " ",
+                    [
+                      rebase_path(python_exe_src, root_build_dir),
+                      "-S",
+                      rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+                      "--inputs",
+                      "\"{{UNSTRIPPED_OUTFILE}}\"",
+                      "--output_files",
+                      "\"$outfile\"",
+                      "--",
+                    ])
+          }
           if (invoker.toolchain_os == "mac") {
-            command +=
-                " && $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
+            command += " && $remote_strip_prefix $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
           } else {
             # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
-            command += " && $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
+            command += " && $remote_strip_prefix $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
           }
           if (invoker.toolchain_os != "mac" && invoker.toolchain_os != "win") {
             outputs += [ "$outfile.build-id.stamp" ]
