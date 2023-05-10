@@ -78,7 +78,8 @@ class RustStdlibDirTests(unittest.TestCase):
 class RustcTargetToSysrootTripleTests(unittest.TestCase):
 
     def test_known(self):
-        for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu', 'x86_64-fuchsia'):
+        for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu',
+                  'riscv64gc-fuchsia', 'x86_64-fuchsia'):
             fuchsia.rustc_target_to_sysroot_triple(t)
 
     def test_unknown(self):
@@ -90,7 +91,8 @@ class RustcTargetToClangTargetTests(unittest.TestCase):
 
     def test_known(self):
         for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu',
-                  'x86_64-unknown-fuchsia', 'x86_64-apple-darwin'):
+                  'riscv64gc-unknown-fuchsia', 'x86_64-unknown-fuchsia',
+                  'x86_64-apple-darwin'):
             fuchsia.rustc_target_to_clang_target(t)
 
     def test_unknown(self):
@@ -107,6 +109,12 @@ class CSysrootFilesTest(unittest.TestCase):
                 fuchsia.c_sysroot_files(
                     sysroot_dir=Path('path/to/built/sysroot'),
                     sysroot_triple='x86_64-linux-foo',
+                    with_libgcc=True,
+                ))
+            list(
+                fuchsia.c_sysroot_files(
+                    sysroot_dir=Path('path/to/built/sysroot'),
+                    sysroot_triple='riscv64-linux-foo',
                     with_libgcc=True,
                 ))
             list(

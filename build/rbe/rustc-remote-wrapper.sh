@@ -806,6 +806,10 @@ test "${#remote_linker[@]}" = 0 || {
       clang_lib_triple="aarch64-unknown-fuchsia" ;;
     aarch64-linux-gnu | aarch64-*-linux-gnu)
       clang_lib_triple="aarch64-unknown-linux-gnu" ;;
+    riscv64-fuchsia | riscv64-*-fuchsia)
+      clang_lib_triple="riscv64-unknown-fuchsia" ;;
+    riscv64-linux-gnu | riscv64-*-linux-gnu)
+      clang_lib_triple="riscv64-unknown-linux-gnu" ;;
     x86_64-fuchsia | x86_64-*-fuchsia)
       clang_lib_triple="x86_64-unknown-fuchsia" ;;
     x86_64-linux-gnu | x86_64-*-linux-gnu)
@@ -848,6 +852,7 @@ done
 
 case "$target_triple" in
   aarch64-*-linux*) sysroot_triple=aarch64-linux-gnu ;;
+  riscv64-*-linux*) sysroot_triple=riscv64-linux-gnu ;;
   x86_64-*-linux*) sysroot_triple=x86_64-linux-gnu ;;
   *-fuchsia) sysroot_triple="" ;;
   wasm32-*) sysroot_triple="" ;;
@@ -866,6 +871,7 @@ test "${#link_sysroot[@]}" = 0 || {
     # Find the correct architecture ld.so.
     case "$sysroot_triple" in
       aarch64-linux*) sysroot_files+=( "$sysroot_dir"/lib/"$sysroot_triple"/ld-linux-aarch64.so.1 ) ;;
+      riscv64-linux*) sysroot_files+=( "$sysroot_dir"/lib/"$sysroot_triple"/ld-linux-riscv64-lp64d.so.1 ) ;;
       x86_64-linux*) sysroot_files+=( "$sysroot_dir"/lib/"$sysroot_triple"/ld-linux-x86-64.so.2 ) ;;
     esac
     sysroot_files+=(

@@ -198,6 +198,8 @@ def rust_stdlib_subdir(target_triple: str) -> str:
 def rustc_target_to_sysroot_triple(target: str) -> str:
     if target.startswith('aarch64-') and '-linux' in target:
         return 'aarch64-linux-gnu'
+    if target.startswith('riscv64gc-') and '-linux' in target:
+        return 'riscv64-linux-gnu'
     if target.startswith('x86_64-') and '-linux' in target:
         return 'x86_64-linux-gnu'
     if target.endswith('-fuchsia'):
@@ -218,6 +220,12 @@ def rustc_target_to_clang_target(target: str) -> str:
     if target == 'aarch64-linux-gnu' or (target.startswith('aarch64-') and
                                          target.endswith('-linux-gnu')):
         return "aarch64-unknown-linux-gnu"
+    if target == 'riscv64gc-fuchsia' or (target.startswith('riscv64gc-') and
+                                         target.endswith('-fuchsia')):
+        return "riscv64-unknown-fuchsia"
+    if target == 'riscv64gc-linux-gnu' or (target.startswith('riscv64gc-') and
+                                           target.endswith('-linux-gnu')):
+        return "riscv64-unknown-linux-gnu"
     if target == 'x86_64-fuchsia' or (target.startswith('x86_64-') and
                                       target.endswith('-fuchsia')):
         return "x86_64-unknown-fuchsia"
@@ -295,6 +303,8 @@ def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
     if sysroot_triple:
         if sysroot_triple.startswith('aarch64-linux'):
             yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-aarch64.so.1'
+        elif sysroot_triple.startswith('riscv64-linux'):
+            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-riscv64-lp64d.so.1'
         elif sysroot_triple.startswith('x86_64-linux'):
             yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-x86-64.so.2'
 
