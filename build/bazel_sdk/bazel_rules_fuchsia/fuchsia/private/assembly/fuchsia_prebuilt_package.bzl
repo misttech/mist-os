@@ -115,7 +115,7 @@ def _fuchsia_prebuilt_package_impl(ctx):
 
     # extract the package
     ctx.actions.run(
-        executable = sdk.ffx,
+        executable = sdk.ffx_package,
         arguments = [
             "--isolate-dir",
             ffx_isolate_dir.path,

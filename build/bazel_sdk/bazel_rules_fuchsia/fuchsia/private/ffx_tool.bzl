@@ -20,6 +20,9 @@ def get_ffx_assembly_inputs(fuchsia_toolchain):
     # these are listed as proper inputs.
     return [
         fuchsia_toolchain.ffx,
+        fuchsia_toolchain.ffx_assembly,
+        fuchsia_toolchain.ffx_assembly_fho_meta,
+        fuchsia_toolchain.ffx_assembly_manifest,
         fuchsia_toolchain.sdk_manifest,
         fuchsia_toolchain.blobfs,
         fuchsia_toolchain.blobfs_manifest,
@@ -44,5 +47,8 @@ def get_ffx_product_bundle_inputs(fuchsia_toolchain):
     """
     return [
         fuchsia_toolchain.ffx,
+        fuchsia_toolchain.ffx_product,
+        fuchsia_toolchain.ffx_product_fho_meta,
+        fuchsia_toolchain.ffx_product_manifest,
         fuchsia_toolchain.sdk_manifest,
     ]

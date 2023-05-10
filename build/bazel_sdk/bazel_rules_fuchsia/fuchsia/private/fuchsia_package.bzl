@@ -282,7 +282,7 @@ def _build_fuchsia_package_impl(ctx):
 
     # Build the package
     ctx.actions.run(
-        executable = sdk.ffx,
+        executable = sdk.ffx_package,
         arguments = [
             "--isolate-dir",
             ffx_isolate_build_dir.path,
@@ -311,7 +311,7 @@ def _build_fuchsia_package_impl(ctx):
 
     # Create the far file.
     ctx.actions.run(
-        executable = sdk.ffx,
+        executable = sdk.ffx_package,
         arguments = [
             "--isolate-dir",
             ffx_isolate_archive_dir.path,
