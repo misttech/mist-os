@@ -27,11 +27,6 @@ template("magma_pdev_entry") {
     sources +=
         [ "//src/graphics/lib/magma/src/magma_util/platform/zircon/binding.cc" ]
 
-    # Add the target gen directory as an include path so that `#include "bind.h"` will find the
-    # correct generated bind header. This allows us to use the same binding.cc file with multiple
-    # different bind rules.
-    include_dirs += [ "${target_gen_dir}" ]
-
     if (test_entry) {
       testonly = true
       defines += [ "TEST=1" ]
