@@ -13,7 +13,8 @@
 
 #include "assert.h"
 
-#if __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__x86_64__)
 asm(R"(
 .globl vectab
 vectab:
@@ -85,6 +86,78 @@ restricted_enter_wrapper:
   add   $(8*8),%rsp // pop the previous state on the stack
   ret
 )");
+#elif defined(__aarch64__)
+asm(R"(
+.globl vectab
+vectab:
+  // Back from restricted mode
+  // x0 holds the context, which is the stack pointer
+  // x1 holds the reason code
+
+  // Restore the stack pointer at the point of the restricted enter wrapper.
+  mov  sp,x0
+
+  // Load the frame pointer and return address from the wrapper.
+  ldp x30, x29, [sp], #16
+
+  // Restore the callee saved registers.
+  ldp x28, x27, [sp], #16
+  ldp x26, x25, [sp], #16
+  ldp x24, x23, [sp], #16
+  ldp x22, x21, [sp], #16
+  ldp x20, x19, [sp], #16
+
+  // Load the shadow call stack pointer and reason code pointer.
+  ldp x2, x18, [sp], #16
+
+  // Return the reason code from this function by setting the reason code pointer.
+  str  x1, [x2]
+
+  // Return back to whatever the address was in the link register.
+  // Make it appear as if the wrapper had returned ZX_OK
+  mov  x0, xzr
+  ret
+)");
+
+asm(R"(
+.globl bounce
+bounce:
+  mov x16, xzr
+  add x16, x16, #64
+.Lsyscall:
+  svc #0
+  b .Lsyscall
+)");
+
+asm(R"(
+.globl restricted_enter_wrapper
+restricted_enter_wrapper:
+  // Args 0 - 1 are already in place in X0 and X1.
+
+  // Save the reason code pointer and shadow call stack pointer on the stack.
+  stp x2, x18, [sp, #-16]!
+
+  // Save the callee saved regs since the return from restricted mode
+  // will modify all registers.
+  stp x20, x19, [sp, #-16]!
+  stp x22, x21, [sp, #-16]!
+  stp x24, x23, [sp, #-16]!
+  stp x26, x25, [sp, #-16]!
+  stp x28, x27, [sp, #-16]!
+
+  // Save the frame pointer and return address to the stack.
+  stp x30, x29, [sp, #-16]!
+
+  // Pass the stack pointer as the context argument to the syscall.
+  mov x2, sp
+
+  bl zx_restricted_enter
+
+  // if we got here it must have failed
+  add  sp, sp, #(14*8) // pop the previous state on the stack
+  ret
+)");
+#endif
 
 extern "C" void vectab();
 extern "C" void bounce();
@@ -98,10 +171,15 @@ class RestrictedState {
     zx::vmo vmo;
     ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
 
+#if defined(__x86_64__)
     state_.ip = (uint64_t)bounce;
     state_.flags = 0;
     state_.fs_base = (uintptr_t)&fs_val_;
     state_.gs_base = (uintptr_t)&gs_val_;
+#elif defined(__aarch64__)
+    state_.pc = (uint64_t)bounce;
+    state_.tpidr_el0 = reinterpret_cast<uintptr_t>(&tls_val_);
+#endif
 
     // Set the state
     ASSERT_OK(vmo.write(&state_, 0, sizeof(state_)));
@@ -110,8 +188,12 @@ class RestrictedState {
   ~RestrictedState() { ASSERT_OK(zx_restricted_unbind_state(0)); }
 
  private:
+#if defined(__x86_64__)
   uint64_t fs_val_ = 0;
   uint64_t gs_val_ = 0;
+#elif defined(__aarch64__)
+  uint64_t tls_val_ = 0;
+#endif
   zx_restricted_state state_{};
 };
 
@@ -131,4 +213,4 @@ void RegisterTests() {
 
 PERFTEST_CTOR(RegisterTests)
 
-#endif  // __x86_64__
+#endif  // __x86_64__ || __aarch64
