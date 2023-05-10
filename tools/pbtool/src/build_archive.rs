@@ -25,6 +25,13 @@ pub struct GenerateBuildArchive {
 
 impl GenerateBuildArchive {
     pub fn generate(self) -> Result<()> {
+        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+        println!("@");
+        println!("@  The `pbtool generate-build-archive` is deprecated.");
+        println!("@");
+        println!("@  Please flash using a product bundle (v2) instead.");
+        println!("@");
+        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         let product_bundle = ProductBundle::try_load_from(&self.product_bundle)?;
         let product_bundle = match product_bundle {
             ProductBundle::V1(_) => bail!("Only v2 product bundles are supported"),
