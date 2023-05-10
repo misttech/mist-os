@@ -43,6 +43,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
 
+// The name used to track the duration of a local binder ioctl.
+fuchsia_trace::string_name_macro!(trace_name_binder_ioctl, "binder_ioctl");
+
 /// Allows for sequential reading of a task's userspace memory.
 pub struct UserMemoryCursor {
     buffer: Vec<u8>,
@@ -2660,6 +2663,8 @@ impl BinderDriver {
         request: u32,
         user_arg: UserAddress,
     ) -> Result<SyscallResult, Errno> {
+        trace_duration!(trace_category_starnix!(), trace_name_binder_ioctl!(), "request" => request);
+
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         match request {
             uapi::BINDER_VERSION => {

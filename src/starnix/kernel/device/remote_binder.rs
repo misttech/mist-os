@@ -30,6 +30,21 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::{Arc, Weak};
 
+// The name used to track the duration of a remote binder ioctl.
+fuchsia_trace::string_name_macro!(trace_name_remote_binder_ioctl, "remote_binder_ioctl");
+fuchsia_trace::string_name_macro!(
+    trace_name_remote_binder_ioctl_send_work,
+    "remote_binder_ioctl_send_work"
+);
+fuchsia_trace::string_name_macro!(
+    trace_name_remote_binder_ioctl_fidl_reply,
+    "remote_binder_ioctl_fidl_reply"
+);
+fuchsia_trace::string_name_macro!(
+    trace_name_remote_binder_ioctl_worker_process,
+    "remote_binder_ioctl_worker_process"
+);
+
 trait RemoteControllerConnector: Send + Sync + 'static {
     fn connect_to_remote_controller(
         current_task: &CurrentTask,
@@ -192,6 +207,8 @@ enum TaskRequest {
         // request
         u32,
         // parameter
+        u64,
+        // KOID,
         u64,
         // responder
         oneshot::Sender<Result<(), Errno>>,
@@ -435,13 +452,27 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     ));
                 }
                 fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
+                    trace_duration!(trace_category_starnix!(), trace_name_remote_binder_ioctl_send_work!(), "request" => request);
+                    trace_flow_begin!(trace_category_starnix!(), trace_name_remote_binder_ioctl!(), tid.into(), "request" => request);
+
                     self.state.lock().enqueue_task_request(BoundTaskRequest {
                         koid: tid,
                         request: TaskRequest::Ioctl(
                             remote_binder_connection.clone(),
                             request,
                             parameter,
-                            into_sender(|e| {
+                            tid,
+                            into_sender(move |e| {
+                                trace_duration!(
+                                    trace_category_starnix!(),
+                                    trace_name_remote_binder_ioctl_fidl_reply!()
+                                );
+                                trace_flow_end!(
+                                    trace_category_starnix!(),
+                                    trace_name_remote_binder_ioctl!(),
+                                    tid.into()
+                                );
+
                                 let mut e = e.map_err(|e| {
                                     fposix::Errno::from_primitive(e.code.error_code() as i32)
                                         .unwrap_or(fposix::Errno::Einval)
@@ -704,7 +735,22 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     responder.send(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
-                TaskRequest::Ioctl(remote_binder_connection, request, parameter, responder) => {
+                TaskRequest::Ioctl(
+                    remote_binder_connection,
+                    request,
+                    parameter,
+                    koid,
+                    responder,
+                ) => {
+                    trace_duration!(
+                        trace_category_starnix!(),
+                        trace_name_remote_binder_ioctl_worker_process!()
+                    );
+                    trace_flow_step!(
+                        trace_category_starnix!(),
+                        trace_name_remote_binder_ioctl!(),
+                        koid.into()
+                    );
                     let result =
                         remote_binder_connection.ioctl(current_task, request, parameter.into());
                     let interruption = must_interrupt(&result);
