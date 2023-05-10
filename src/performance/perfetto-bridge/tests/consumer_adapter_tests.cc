@@ -205,7 +205,10 @@ class ConsumerAdapterTest : public gtest::TestLoopFixture {
         [this](perfetto::Consumer* consumer) { return ConnectConsumer(consumer); },
         std::move(fuchsia_tracing_owned), &perfetto_task_runner_);
   }
-  ~ConsumerAdapterTest() override = default;
+  ~ConsumerAdapterTest() override {
+    consumer_adapter_.reset();
+    RunLoopUntilIdle();
+  }
 
   void WaitForGetStats() { RunLoopFor(zx::sec(1)); }
 
