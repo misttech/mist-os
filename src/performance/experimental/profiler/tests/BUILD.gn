@@ -1,0 +1,33 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+
+executable("bin") {
+  testonly = true
+  output_name = "profiler_integration_test"
+  sources = [ "integration_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_test_component("profiler_integration_test_component") {
+  manifest = "meta/profiler_integration_test.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_test_package("profiler_integration_test") {
+  test_components = [ ":profiler_integration_test_component" ]
+  deps = [ "//src/performance/experimental/profiler:profiler_component" ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":profiler_integration_test" ]
+}

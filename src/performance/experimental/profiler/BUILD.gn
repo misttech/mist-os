@@ -46,3 +46,8 @@ fuchsia_package("profiler") {
 core_shard("profiler_core_shard") {
   shard_file = "meta/profiler.core_shard.cml"
 }
+
+group("tests") {
+  testonly = true
+  deps = [ "tests" ]
+}

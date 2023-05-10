@@ -1,0 +1,40 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/testing/system-test.shard.cml",
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/profiler_integration_test",
+    },
+    children: [
+        {
+            name: "profiler",
+            url: "#meta/profiler.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.cpu.profiler.Session",
+            from: "#profiler",
+        },
+    ],
+    offer: [
+        {
+            storage: "tmp",
+            from: "parent",
+            to: "#profiler",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.RootJob",
+                "fuchsia.logger.Log",
+            ],
+            from: "parent",
+            to: [ "#profiler" ],
+        },
+    ],
+}
