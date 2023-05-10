@@ -201,11 +201,22 @@ impl ProductBundleV2 {
 
         // Canonicalize the virtual device specifications path.
         if let Some(path) = &self.virtual_devices_path {
-            if !path.exists() {
-                std::fs::create_dir_all(&path)
-                    .with_context(|| format!("Creating the directory: {}", path))?;
+            let virtual_devices_path = product_bundle_dir.join(path);
+            let dir = virtual_devices_path
+                .parent()
+                .ok_or(anyhow!("No parent: {}", virtual_devices_path))?;
+            let base = virtual_devices_path
+                .file_name()
+                .ok_or(anyhow!("No file name: {}", virtual_devices_path))?;
+
+            // Create the directory to ensure that canonicalize will work.
+            if !dir.exists() {
+                std::fs::create_dir_all(&dir)
+                    .with_context(|| format!("Creating the directory: {}", dir))?;
             }
-            self.virtual_devices_path = Some(product_bundle_dir.join(&path).canonicalize_utf8()?);
+            // Only canonicalize the directory.
+            // This prevents problems when virtual_devices_path is a symlink.
+            self.virtual_devices_path = Some(dir.canonicalize_utf8()?.join(base));
         }
 
         Ok(())
