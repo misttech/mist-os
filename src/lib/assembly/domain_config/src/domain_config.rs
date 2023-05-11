@@ -46,6 +46,15 @@ impl DomainConfigPackage {
                 ..cml::Expose::new_from(cml::OneOrMany::One(cml::ExposeFromRef::Framework))
             });
 
+            // Add an empty file to the directory to ensure the directory gets created.
+            let empty_file_name = "_ensure_directory_creation";
+            let empty_file_path = outdir.join(empty_file_name);
+            let destination = Utf8PathBuf::from(&directory).join(empty_file_name);
+            std::fs::write(&empty_file_path, "").context("writing empty file")?;
+            builder
+                .add_file_as_blob(destination, &empty_file_path)
+                .with_context(|| format!("adding empty file {empty_file_path}"))?;
+
             // Add the necessary config files to the directory.
             for FileEntry { source, destination } in directory_config.entries.into_iter() {
                 let destination = Utf8PathBuf::from(&directory).join(destination);
@@ -126,9 +135,12 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 2);
+        assert_eq!(blobs.len(), 3);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
+        let blob =
+            blobs.iter().find(|&b| &b.path == "config-dir/_ensure_directory_creation").unwrap();
+        assert_eq!(blob.source_path, outdir.join("_ensure_directory_creation").to_string());
         let blob = blobs.iter().find(|&b| &b.path == "config-dir/config.json").unwrap();
         assert_eq!(blob.source_path, config_source.to_string());
         assert_eq!(
@@ -163,6 +175,7 @@ mod tests {
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
+            config-dir/_ensure_directory_creation=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             config-dir/config.json=ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb\n\
         "
         .to_string();
@@ -227,9 +240,12 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 1);
+        assert_eq!(blobs.len(), 2);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
+        let blob =
+            blobs.iter().find(|&b| &b.path == "config-dir/_ensure_directory_creation").unwrap();
+        assert_eq!(blob.source_path, outdir.join("_ensure_directory_creation").to_string());
 
         // Assert the contents of the package are correct.
         let far_path = outdir.join("meta.far");
@@ -256,6 +272,7 @@ mod tests {
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
+            config-dir/_ensure_directory_creation=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
         "
         .to_string();
         assert_eq!(expected_contents, contents);
