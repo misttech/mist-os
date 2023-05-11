@@ -57,10 +57,7 @@ PhysbootHandoff = _start
     call     boot_alloc_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
-    lla     a0, riscv64_kernel_translation_table
-    // Store the physical address of the pgtable for future use
-    lla     a1, riscv64_kernel_translation_table_phys
-    sd      a0, (a1)
+    lla     a0, riscv64_kernel_bootstrap_translation_table
     li      a1, 0
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
@@ -68,7 +65,7 @@ PhysbootHandoff = _start
     call    riscv64_boot_map
 
     // map a large run of physical memory at the base of the kernel's address space
-    lla     a0, riscv64_kernel_translation_table
+    lla     a0, riscv64_kernel_bootstrap_translation_table
     li      a1, KERNEL_ASPACE_BASE
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
@@ -78,7 +75,7 @@ PhysbootHandoff = _start
     // map the kernel to a fixed address
     // note: mapping the kernel here with full rwx, this will get locked down
     // later in vm initialization;
-    lla     a0, riscv64_kernel_translation_table
+    lla     a0, riscv64_kernel_bootstrap_translation_table
     lla     t0, kernel_relocated_base
     ld      a1, (t0)
     lla     a2, __executable_start
@@ -92,7 +89,7 @@ PhysbootHandoff = _start
 
     // set the satp register and enable the mmu
     // ASID 0, riscv64_kernel_translation_table address
-    lla     t0, riscv64_kernel_translation_table
+    lla     t0, riscv64_kernel_bootstrap_translation_table
     srli    t1, t0, PAGE_SIZE_SHIFT
     li      t2, (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT)
     or      t1, t1, t2

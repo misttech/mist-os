@@ -54,16 +54,21 @@
 // TODO(fxbug.dev/24762): Choose it randomly.
 uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 
-// The main translation table for the kernel. Globally declared because it's reached
-// from assembly.
-pte_t riscv64_kernel_translation_table[RISCV64_MMU_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
-// Physical address of the above table, saved in start.S.
-paddr_t riscv64_kernel_translation_table_phys;
+// The main translation table for the kernel. Used by the one kernel address space
+// when kernel only threads are active.
+alignas(PAGE_SIZE) pte_t riscv64_kernel_translation_table[RISCV64_MMU_PT_ENTRIES];
 
-// Global accessor for the kernel page table
-pte_t* riscv64_get_kernel_ptable() { return riscv64_kernel_translation_table; }
+// A copy of the above table with memory identity mapped at 0.
+alignas(PAGE_SIZE) pte_t riscv64_kernel_bootstrap_translation_table[RISCV64_MMU_PT_ENTRIES];
 
 namespace {
+
+// 256 top level page tables that are always mapped in the kernel half of all root
+// page tables. This allows for no need to explicitly maintain consistency between
+// the official kernel page table root and all of the user address spaces as they
+// come and go.
+alignas(PAGE_SIZE) pte_t
+    riscv64_kernel_top_level_page_tables[RISCV64_MMU_PT_ENTRIES / 2][RISCV64_MMU_PT_ENTRIES];
 
 uint64_t riscv_asid_mask;
 
@@ -195,6 +200,16 @@ constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
   }
 
   return true;
+}
+
+// Converts a symbol in the kernel to its physical address based on knowledge of
+// where the kernel is loaded virtually and physically. Only works for data within
+// the kernel proper.
+paddr_t kernel_virt_to_phys(const void* va) {
+  uintptr_t pa = reinterpret_cast<uintptr_t>(va);
+  pa += get_kernel_base_phys() - kernel_relocated_base;
+
+  return pa;
 }
 
 }  // namespace
@@ -478,6 +493,8 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
         return s;
       }
     }
+
+    // Check for an inner page table pointer.
     if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
       const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
       volatile pte_t* next_page_table =
@@ -492,9 +509,16 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
 
       LTRACEF_LEVEL(2, "exited recursion: back at level %u\n", level);
 
-      // if we unmapped an entire page table leaf and/or the unmap made the level below us empty,
-      // free the page table
-      if (chunk_size == block_size || page_table_is_clear(next_page_table)) {
+      // If this is an entry corresponding to a top level kernel page table (MMU_PT_LEVELS - 1),
+      // skip freeing it so that we always keep these kernel page tables populated in all address
+      // spaces.
+      const bool kernel_top_level_pt = (type_ == Riscv64AspaceType::kKernel) &&
+                                       (index >= RISCV64_MMU_PT_KERNEL_BASE_INDEX) &&
+                                       level == (RISCV64_MMU_PT_LEVELS - 1);
+      if (!kernel_top_level_pt &&
+          (chunk_size == block_size || page_table_is_clear(next_page_table))) {
+        // If we unmapped an entire page table leaf and/or the unmap made the level below us empty,
+        // free the page table.
         LTRACEF("pte %p[0x%lx] = 0 (was page table phys %#lx virt %p)\n", page_table, index,
                 page_table_paddr, next_page_table);
         update_pte(&page_table[index], 0);
@@ -505,6 +529,7 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
         FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
       }
     } else if (is_pte_valid(pte)) {
+      // Unmap this leaf page.
       LTRACEF("pte %p[0x%lx] = 0 (was phys %#lx)\n", page_table, index,
               RISCV64_PTE_PPN(page_table[index]));
       update_pte(&page_table[index], 0);
@@ -1128,8 +1153,8 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     DEBUG_ASSERT(base_ == KERNEL_ASPACE_BASE);
     DEBUG_ASSERT(size_ == KERNEL_ASPACE_SIZE);
 
-    tt_virt_ = riscv64_get_kernel_ptable();
-    tt_phys_ = riscv64_kernel_translation_table_phys;
+    tt_virt_ = riscv64_kernel_translation_table;
+    tt_phys_ = kernel_virt_to_phys(riscv64_kernel_translation_table);
     asid_ = (uint16_t)MMU_RISCV64_GLOBAL_ASID;
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
@@ -1163,7 +1188,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     // zero the top level translation table and copy the kernel memory mapping.
     memset((void*)tt_virt_, 0, PAGE_SIZE / 2);
     memcpy((void*)(tt_virt_ + RISCV64_MMU_PT_ENTRIES / 2),
-           (void*)(riscv64_get_kernel_ptable() + RISCV64_MMU_PT_ENTRIES / 2), PAGE_SIZE / 2);
+           (void*)(riscv64_kernel_translation_table + RISCV64_MMU_PT_ENTRIES / 2), PAGE_SIZE / 2);
   }
   pt_pages_ = 1;
 
@@ -1239,7 +1264,7 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
   } else {
     // Switching to the null aspace, which means kernel address space only.
     satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-           (riscv64_kernel_translation_table_phys >> PAGE_SIZE_SHIFT);
+           (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   }
   if (likely(old_aspace != nullptr)) {
     [[maybe_unused]] uint32_t prev =
@@ -1275,18 +1300,41 @@ vaddr_t Riscv64ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, 
 }
 
 void riscv64_mmu_early_init() {
-  // figure out the number of support ASID bits by writing all 1s to
-  // the asid field in satp and seeing which ones 'stick'
+  // Figure out the number of supported ASID bits by writing all 1s to
+  // the asid field in satp and seeing which ones 'stick'.
   auto satp_orig = riscv64_csr_read(satp);
   auto satp = satp_orig | (RISCV64_SATP_ASID_MASK << RISCV64_SATP_ASID_SHIFT);
   riscv64_csr_write(satp, satp);
   riscv_asid_mask = (riscv64_csr_read(satp) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
   riscv64_csr_write(satp, satp_orig);
 
-  // zero the bottom of the kernel page table to remove any left over boot mappings
-  memset(riscv64_get_kernel_ptable(), 0, PAGE_SIZE / 2);
+  // Fill in all of the unused top level page table pointers for the kernel half of the kernel
+  // top level table. These entries will be copied to all new address spaces, thus ensuring the
+  // top level entries are synchronized.
+  for (size_t i = RISCV64_MMU_PT_KERNEL_BASE_INDEX; i < RISCV64_MMU_PT_ENTRIES; i++) {
+    if (!is_pte_valid(riscv64_kernel_bootstrap_translation_table[i])) {
+      paddr_t pt_paddr = kernel_virt_to_phys(
+          riscv64_kernel_top_level_page_tables[i - RISCV64_MMU_PT_KERNEL_BASE_INDEX]);
 
-  // globally TLB flush
+      LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
+
+      pte_t pte = RISCV64_PTE_PPN_TO_PTE(pt_paddr) | RISCV64_PTE_V;
+      update_pte(&riscv64_kernel_bootstrap_translation_table[i], pte);
+    }
+  }
+
+  // Make a copy of our bootstrap table with the identity map present in the user part.
+  memcpy(riscv64_kernel_translation_table, riscv64_kernel_bootstrap_translation_table, PAGE_SIZE);
+
+  // Zero the bottom of the kernel page table to remove any left over boot mappings.
+  memset(riscv64_kernel_translation_table, 0, PAGE_SIZE / 2);
+
+  // Switch to the proper kernel translation table.
+  satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+         (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+  riscv64_csr_write(RISCV64_CSR_SATP, satp);
+
+  // Globally TLB flush.
   asm("sfence.vma  zero, zero" ::: "memory");
 }
 
@@ -1305,6 +1353,7 @@ void Riscv64VmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {
   // We can batch the icache invalidate and just perform it once at the end.
   need_invalidate_ = true;
 }
+
 void Riscv64VmICacheConsistencyManager::Finish() {
   if (!need_invalidate_) {
     return;
