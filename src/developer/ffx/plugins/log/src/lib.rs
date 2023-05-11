@@ -16,7 +16,7 @@ use ffx_core::macro_deps::fidl::endpoints::create_proxy;
 use ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand};
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_frontend::{exec_log_cmd, LogCommandParameters, LogFormatter};
-use fho::{daemon_protocol, deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{daemon_protocol, deferred, moniker, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{
     DiagnosticsProxy, StreamMode, TargetCollectionProxy, TargetQuery, TimeBound,
 };
@@ -557,7 +557,7 @@ pub struct LogTool {
     #[with(daemon_protocol())]
     diagnostics_proxy: DiagnosticsProxy,
     rcs_proxy: fho::Result<RemoteControlProxy>,
-    #[with(deferred(selector("bootstrap/archivist:expose:fuchsia.diagnostics.LogSettings")))]
+    #[with(deferred(moniker("/bootstrap/archivist")))]
     log_settings: Deferred<LogSettingsProxy>,
     #[command]
     cmd: LogCommand,
