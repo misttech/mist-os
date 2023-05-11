@@ -4,12 +4,12 @@
 
 use anyhow::{format_err, Context, Result};
 use ffx_input_args::ComponentInputCommand;
-use fho::{selector, FfxMain, FfxTool, SimpleWriter};
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_ui_input_config::FeaturesProxy;
 
 #[derive(FfxTool)]
 pub struct InputTool {
-    #[with(selector("core/ui/scene_manager:expose:fuchsia.ui.input.config.Features"))]
+    #[with(moniker("/core/ui/scene_manager"))]
     features_proxy: FeaturesProxy,
     #[command]
     cmd: ComponentInputCommand,
