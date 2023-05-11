@@ -31,22 +31,46 @@ namespace media::audio::drivers::test {
     }                                                      \
   } while (0)
 
-enum DeviceType : uint16_t { Input = 0, Output = 1, Dai = 2 };
+enum DriverType : uint16_t { StreamConfigInput = 0, StreamConfigOutput = 1, Dai = 2 };
+inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
+  switch (dev_dir) {
+    case DriverType::StreamConfigInput:
+      return (out << "StreamConfig(In)");
+    case DriverType::StreamConfigOutput:
+      return (out << "StreamConfig(Out)");
+    case DriverType::Dai:
+      return (out << "Dai");
+  }
+}
+
+enum DeviceType : uint16_t { BuiltIn = 0, Virtual = 1, A2DP = 2 };
+inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type) {
+  switch (device_type) {
+    case DeviceType::BuiltIn:
+      return (out << "Built-in");
+    case DeviceType::Virtual:
+      return (out << "VirtualAudio");
+    case DeviceType::A2DP:
+      return (out << "A2DP");
+  }
+}
 
 struct DeviceEntry {
-  // `index() == 0` means A2DP.
   std::variant<std::monostate, fidl::UnownedClientEnd<fuchsia_io::Directory>> dir;
   std::string filename;
-  DeviceType dev_type;
+  DriverType driver_type;
+  DeviceType device_type;
 
-  bool isA2DP() const { return dir.index() == 0; }
+  bool isA2DP() const { return device_type == DeviceType::A2DP; }
   bool isStreamConfig() const {
-    return dev_type == DeviceType::Input || dev_type == DeviceType::Output;
+    return driver_type == DriverType::StreamConfigInput ||
+           driver_type == DriverType::StreamConfigOutput;
   }
-  bool isDai() const { return dev_type == DeviceType::Dai; }
+  bool isDai() const { return driver_type == DriverType::Dai; }
 
   bool operator<(const DeviceEntry& rhs) const {
-    return std::tie(dir, filename, dev_type) < std::tie(rhs.dir, rhs.filename, rhs.dev_type);
+    return std::tie(dir, filename, driver_type, device_type) <
+           std::tie(rhs.dir, rhs.filename, rhs.driver_type, rhs.device_type);
   }
 };
 
@@ -57,16 +81,16 @@ struct DeviceEntry {
 // Devices are displayed in the 'audio-output/000' format, or simply the filename, if the
 // special dir_fd value is observed (an example might be 'Bluetooth-A2DP' for Bluetooth devices).
 std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
-  if (device_entry.isA2DP()) {
-    return device_entry.filename;
-  }
-  switch (device_entry.dev_type) {
-    case DeviceType::Dai:
-      return std::string("dai/" + device_entry.filename);
-    case DeviceType::Input:
-      return std::string("audio-input/" + device_entry.filename);
-    case DeviceType::Output:
-      return std::string("audio-output/" + device_entry.filename);
+  std::string device_name =
+      (device_entry.device_type == DeviceType::Virtual ? "Virtual" : device_entry.filename);
+
+  switch (device_entry.driver_type) {
+    case DriverType::StreamConfigInput:
+      return "audio-input/" + device_name;
+    case DriverType::StreamConfigOutput:
+      return "audio-output/" + device_name;
+    case DriverType::Dai:
+      return "dai/" + device_name;
   }
 }
 std::string inline TestNameForEntry(const std::string& test_class_name,
@@ -90,8 +114,8 @@ class TestBase : public media::audio::test::TestFixture {
   void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
 
   const DeviceEntry& device_entry() const { return device_entry_; }
-  void set_device_type(DeviceType device_type) {}
-  DeviceType device_type() const { return device_entry_.dev_type; }
+  DriverType driver_type() const { return device_entry_.driver_type; }
+  DeviceType device_type() const { return device_entry_.device_type; }
 
   // "Basic" (stream-config channel) tests and "Admin" (ring-buffer channel) tests both need to know
   // the supported formats, so this is implemented in the shared base class.

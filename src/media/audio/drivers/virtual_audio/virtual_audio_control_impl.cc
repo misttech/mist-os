@@ -38,11 +38,11 @@ zx_status_t VirtualAudioControlImpl::DdkBind(void* ctx, zx_device_t* parent_bus)
   // Add the virtual_audio device node under the given parent.
   zx_status_t status = device_add(parent_bus, &args, &control->dev_node_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "*** %s: could not add device '%s': %d", __func__, args.name, status);
+    zxlogf(ERROR, "%s: could not add device '%s': %d", __func__, args.name, status);
     return status;
   }
 
-  zxlogf(INFO, "*** %s: added device '%s': %d", __func__, args.name, status);
+  zxlogf(INFO, "%s: added device '%s': %d", __func__, args.name, status);
 
   // Use the dispatcher supplied by the driver runtime.
   control->dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
@@ -60,6 +60,7 @@ void VirtualAudioControlImpl::DdkUnbind(void* ctx) {
 
   auto self = static_cast<VirtualAudioControlImpl*>(ctx);
   if (self->devices_.empty()) {
+    zxlogf(INFO, "%s with no devices; unbinding self", __func__);
     device_unbind_reply(self->dev_node_);
     return;
   }
@@ -68,10 +69,12 @@ void VirtualAudioControlImpl::DdkUnbind(void* ctx) {
   auto remaining = std::make_shared<size_t>(self->devices_.size());
 
   for (auto& d : self->devices_) {
+    zxlogf(INFO, "%s with %lu devices; shutting one down", __func__, *remaining);
     d->ShutdownAsync([remaining, self]() {
       ZX_ASSERT(*remaining > 0);
       // After all devices are gone we can remove the control device itself.
       if (--(*remaining) == 0) {
+        zxlogf(INFO, "DdkUnbind(lambda): after shutting down devices; unbinding self");
         device_unbind_reply(self->dev_node_);
       }
     });
@@ -99,8 +102,10 @@ void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t msg,
 }
 
 namespace {
-// TODO(fxbug.dev/124865): Consider adding per-driver type constructors to explicity declare their
-// defaults.
+// TODO(fxbug.dev/124865): Consider per-driver type constructors that declare explicit defaults.
+//
+// Although one can configure `virtual_audio` instances in non-compliant ways for testing purposes,
+// the default settings should always produce a fully functional device that passes all tests.
 VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
   VirtualAudioDeviceImpl::Config config;
   config.device_type = fuchsia_virtualaudio::wire::DeviceType::kStreamConfig;
