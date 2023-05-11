@@ -6,14 +6,14 @@ use anyhow::{Context as _, Result};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
 use ffx_profiler_args::{ProfilerCommand, ProfilerSubCommand};
-use fho::{deferred, selector, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
 use std::{default::Default, io::stdin, io::BufRead, time::Duration};
 
 type Writer = MachineWriter<()>;
 #[derive(FfxTool)]
 pub struct ProfilerTool {
-    #[with(deferred(selector("core/profiler:expose:fuchsia.cpu.profiler.Session")))]
+    #[with(deferred(moniker("/core/profiler")))]
     controller: fho::Deferred<profiler::SessionProxy>,
     #[command]
     cmd: ProfilerCommand,
