@@ -100,12 +100,14 @@ TEST_F(Bitfield, Bitfield) {
   out = ResolveBitfieldMember(eval_context, all_zero, FoundMember(test_class_type.get(), j.get()));
   ASSERT_FALSE(out.has_error()) << out.err().msg();
   EXPECT_EQ(ExprValue(static_cast<int64_t>(0)), out.value());
-  EXPECT_EQ(ExprValueSource(kAddress, 3, 40), out.value().source());
+  // It's the same as ExprValueSource(kAddress, 3, 40).
+  EXPECT_EQ(ExprValueSource(kAddress + 5, 3, 0), out.value().source());
 
   out = ResolveBitfieldMember(eval_context, all_zero, FoundMember(test_class_type.get(), k.get()));
   ASSERT_FALSE(out.has_error());
   EXPECT_EQ(ExprValue(static_cast<uint32_t>(0)), out.value());
-  EXPECT_EQ(ExprValueSource(kAddress + 4, 17, 11), out.value().source());
+  // It's the same as ExprValueSource(kAddress + 4, 17, 11).
+  EXPECT_EQ(ExprValueSource(kAddress + 5, 17, 3), out.value().source());
 
   // Set bits to one one-at-a-time to make sure we find the right thing.
   out = ResolveBitfieldMember(eval_context, ExprValue(test_class_type, {1, 0, 0, 0, 0, 0, 0, 0}),
