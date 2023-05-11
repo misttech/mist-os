@@ -90,7 +90,7 @@ If this option is enabled and there is not sufficient CPU support, then this
 option has no effect.
 )""")
 
-// TODO(fxb/80082): Unify arch agnostic options.
+// TODO(fxbug.dev/80082): Unify arch agnostic options.
 DEFINE_OPTION("kernel.smp.maxcpus", uint32_t, x86_smp_max_cpus, {32}, R"""(
 This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS* 
 for a specific architecture.

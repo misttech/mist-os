@@ -842,6 +842,8 @@ The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
 #include "x86.inc"
 #elif defined(__aarch64__) && !BOOT_OPTIONS_GENERATOR
 #include "arm64.inc"
+#elif defined(__riscv) && !BOOT_OPTIONS_GENERATOR
+#include "riscv64.inc"
 #endif
 
 #if BOOT_OPTIONS_TESTONLY_OPTIONS

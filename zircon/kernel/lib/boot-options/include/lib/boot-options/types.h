@@ -22,6 +22,11 @@
 #include "arm64.h"
 #endif
 
+#if BOOT_OPTIONS_GENERATOR || defined(__riscv)
+// This declares special types used by machine-specific options in "riscv64.inc".
+#include "riscv64.h"
+#endif
+
 #if BOOT_OPTIONS_GENERATOR || defined(__x86_64__)
 // This declares special types used by machine-specific options in "x86.inc".
 #include "x86.h"

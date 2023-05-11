@@ -130,6 +130,10 @@ struct BootOptions {
   ARM64_OPTION_TYPES(OPTION_TYPE)
 #endif
 
+#if BOOT_OPTIONS_GENERATOR || defined(__riscv)
+  RISCV64_OPTION_TYPES(OPTION_TYPE)
+#endif
+
 #if BOOT_OPTIONS_GENERATOR || defined(__x86_64__)
   X86_OPTION_TYPES(OPTION_TYPE)
 #endif
@@ -152,6 +156,7 @@ struct BootOptions {
 #include "options.inc"
 #if BOOT_OPTIONS_GENERATOR
 #include "arm64.inc"
+#include "riscv64.inc"
 #include "x86.inc"
 #endif
 #undef DEFINE_OPTION

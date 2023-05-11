@@ -16,8 +16,7 @@ if (zircon_kernel_disable_asserts) {
 declare_args() {
   # Maximum number of CPUs the kernel will run on (others will be ignored).
   smp_max_cpus = 32
-
-  if (current_cpu == "arm64") {
+  if (current_cpu == "arm64" || current_cpu == "riscv64") {
     smp_max_cpus = 16
   }
 

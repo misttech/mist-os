@@ -236,6 +236,8 @@ void BootOptions::SetMany(std::string_view cmdline, FILE* complain) {
   smp_max_cpus = x86_smp_max_cpus;
 #elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
   smp_max_cpus = arm64_smp_max_cpus;
+#elif defined(__riscv)
+  smp_max_cpus = riscv64_smp_max_cpus;
 #endif
 }
 

@@ -1048,6 +1048,18 @@ by physboot (e.g., the UART's) will be mapped.
 This enables use of the MMU and caches during the kernel's early boot phase.
 
 
+## Options available only on riscv64 machines
+
+### kernel.smp.maxcpus=\<uint32_t>
+
+**Default:** `0x10`
+
+This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS*
+for a specific architecture.
+
+Note: The default value may vary for each architecture.
+
+
 ## Options available only on x86 machines
 
 ### kernel.x86.disable_spec_mitigations=\<bool>
