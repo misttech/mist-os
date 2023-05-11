@@ -58,6 +58,8 @@ const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 // If there are commands to turn off then turn on client connections within this amount of time
 // through the policy API, it is likely that a user intended to restart WLAN connections.
 const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
+// Short duration connection for metrics purposes.
+const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug))]
@@ -106,6 +108,7 @@ pub struct DisconnectInfo {
     pub connected_duration: zx::Duration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
+    pub previous_connect_reason: client::types::ConnectReason,
     pub ap_state: client::types::ApState,
 }
 
@@ -1096,6 +1099,37 @@ impl Telemetry {
                         warn!("Received disconnect event while not connected. Metric may not be logged");
                     }
                 }
+
+                // Logs user requested connection during short duration connection, which indicates
+                // that the we did not successfully select the user's preferred connection.
+                if info.disconnect_source
+                    == fidl_sme::DisconnectSource::User(
+                        fidl_sme::UserDisconnectReason::FidlConnectRequest,
+                    )
+                    && duration < METRICS_SHORT_CONNECT_DURATION
+                {
+                    let metric_events = vec![
+                        MetricEvent {
+                            metric_id:
+                                metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
+                            event_codes: vec![],
+                            payload: MetricEventPayload::Count(1),
+                        },
+                        MetricEvent {
+                            metric_id:
+                                metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
+                            event_codes: vec![info.previous_connect_reason as u32],
+                            payload: MetricEventPayload::Count(1),
+                        }
+                    ];
+
+                    log_cobalt_1dot1_batch!(
+                        self.stats_logger.cobalt_1dot1_proxy,
+                        &metric_events,
+                        "log_fidl_connect_request_during_short_duration",
+                    );
+                }
+
                 let connect_start_time = if info.is_sme_reconnecting {
                     // If `is_sme_reconnecting` is true, we already know that the process of
                     // establishing connection is already started at the moment of disconnect,
@@ -1107,7 +1141,6 @@ impl Telemetry {
                         _ => None,
                     }
                 };
-
                 self.connection_state = if track_subsequent_downtime {
                     ConnectionState::Disconnected(DisconnectedState {
                         disconnected_since: now,
@@ -2395,6 +2428,23 @@ impl StatsLogger {
                 event_codes: vec![policy_connect_reason as u32],
                 payload: MetricEventPayload::Count(1),
             });
+
+            // Also log non-retry connect attempts without dimension
+            match policy_connect_reason {
+                metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::FidlConnectRequest
+                | metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::ProactiveNetworkSwitch
+                | metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::IdleInterfaceAutoconnect
+                | metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::NewSavedNetworkAutoconnect => {
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::POLICY_CONNECTION_ATTEMPTS_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::Count(1),
+                    });
+                }
+                metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::RetryAfterDisconnectDetected
+                | metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::RetryAfterFailedConnectAttempt
+                | metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::RegulatoryChangeReconnect => (),
+            }
         }
 
         metric_events.push(MetricEvent {
@@ -3152,7 +3202,9 @@ mod tests {
 
     use {
         super::*,
-        crate::util::testing::{create_inspect_persistence_channel, create_wlan_hasher},
+        crate::util::testing::{
+            create_inspect_persistence_channel, create_wlan_hasher, generate_random_channel,
+        },
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
         fidl_fuchsia_wlan_stats,
@@ -5081,6 +5133,43 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_log_fidl_connect_request_during_short_duration() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        test_helper.advance_by(1.minute(), test_fut.as_mut());
+
+        let channel = generate_random_channel();
+        let ap_state = random_bss_description!(Wpa2, channel: channel).into();
+        let info = DisconnectInfo {
+            connected_duration: 1.minute(),
+            disconnect_source: fidl_sme::DisconnectSource::User(
+                fidl_sme::UserDisconnectReason::FidlConnectRequest,
+            ),
+            ap_state,
+            ..fake_disconnect_info()
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: info.clone(),
+        });
+
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let logged_metrics = test_helper.get_logged_metrics(
+            metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
+        );
+        assert_eq!(logged_metrics.len(), 1);
+
+        let logged_metrics = test_helper.get_logged_metrics(
+            metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
+        );
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, vec![info.previous_connect_reason as u32]);
+    }
+
+    #[fuchsia::test]
     fn test_log_disconnect_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.advance_by(3.hours(), test_fut.as_mut());
@@ -5427,6 +5516,11 @@ mod tests {
         let per_oui = test_helper.get_logged_metrics(metrics::SUCCESSFUL_CONNECT_PER_OUI_METRIC_ID);
         assert_eq!(per_oui.len(), 1);
         assert_eq!(per_oui[0].payload, MetricEventPayload::StringValue("00F620".to_string()));
+
+        let fidl_connect_count =
+            test_helper.get_logged_metrics(metrics::POLICY_CONNECTION_ATTEMPTS_METRIC_ID);
+        assert_eq!(fidl_connect_count.len(), 1);
+        assert_eq!(fidl_connect_count[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -7217,6 +7311,7 @@ mod tests {
             connected_duration: 6.hours(),
             is_sme_reconnecting: fidl_disconnect_info.is_sme_reconnecting,
             disconnect_source: fidl_disconnect_info.disconnect_source,
+            previous_connect_reason: client::types::ConnectReason::IdleInterfaceAutoconnect,
             ap_state: random_bss_description!(Wpa2).into(),
         }
     }

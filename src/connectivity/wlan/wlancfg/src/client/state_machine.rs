@@ -569,6 +569,7 @@ async fn connected_state(
                                 connected_duration: now - connect_start_time,
                                 is_sme_reconnecting: fidl_info.is_sme_reconnecting,
                                 disconnect_source: fidl_info.disconnect_source,
+                                previous_connect_reason: options.currently_fulfilled_connection.reason,
                                 ap_state: (*options.ap_state).clone(),
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
@@ -668,17 +669,18 @@ async fn connected_state(
                             bss_quality_data.signal_data
                         ).await;
                         let ap_state = options.ap_state;
+                        let info = DisconnectInfo {
+                            connected_duration: now - connect_start_time,
+                            is_sme_reconnecting: false,
+                            disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(reason)),
+                            previous_connect_reason: options.currently_fulfilled_connection.reason,
+                            ap_state: *ap_state,
+                        };
                         let options = DisconnectingOptions {
                             disconnect_responder: Some(responder),
                             previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
                             next_network: None,
                             reason,
-                        };
-                        let info = DisconnectInfo {
-                            connected_duration: now - connect_start_time,
-                            is_sme_reconnecting: false,
-                            disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                            ap_state: *ap_state,
                         };
                         common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                         return Ok(disconnecting_state(common_options, options).into_state());
@@ -688,10 +690,11 @@ async fn connected_state(
                         if new_connect_selection.target.network == options.currently_fulfilled_connection.target.network {
                             info!("Received connection request for current network, deduping");
                         } else {
-                            let disconnect_reason = convert_manual_connect_to_disconnect_reason(&new_connect_selection.reason).unwrap_or_else(|()| {
+                            let disconnect_reason = convert_manual_connect_to_disconnect_reason(&new_connect_selection.reason).unwrap_or_else(|_| {
                                 error!("Unexpected connection reason: {:?}", new_connect_selection.reason);
                                 types::DisconnectReason::Unknown
                             });
+
                             record_disconnect(
                                 &common_options,
                                 &options,
@@ -706,6 +709,13 @@ async fn connected_state(
                                 attempt_counter: 0,
                             };
                             let ap_state = options.ap_state;
+                            let info = DisconnectInfo {
+                                connected_duration: now - connect_start_time,
+                                is_sme_reconnecting: false,
+                                disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(disconnect_reason)),
+                                previous_connect_reason: options.currently_fulfilled_connection.reason,
+                                ap_state: *ap_state,
+                            };
                             let options = DisconnectingOptions {
                                 disconnect_responder: None,
                                 previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
@@ -713,12 +723,6 @@ async fn connected_state(
                                 reason: disconnect_reason,
                             };
                             info!("Connection to new network requested, disconnecting from current network");
-                            let info = DisconnectInfo {
-                                connected_duration: now - connect_start_time,
-                                is_sme_reconnecting: false,
-                                disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                                ap_state: *ap_state,
-                            };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                             return Ok(disconnecting_state(common_options, options).into_state())
                         }
@@ -1873,6 +1877,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest),
+                    previous_connect_reason: connect_selection.reason,
                     ap_state: ap_state.clone(),
                 });
             });
@@ -1991,6 +1996,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting,
                     disconnect_source: fidl_disconnect_info.disconnect_source,
+                    previous_connect_reason: connect_selection.reason,
                     ap_state: ap_state.clone(),
                 });
             });
@@ -2306,6 +2312,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch),
+                    previous_connect_reason: first_connect_selection.reason,
                     ap_state: first_ap_state.clone(),
                 });
             });
