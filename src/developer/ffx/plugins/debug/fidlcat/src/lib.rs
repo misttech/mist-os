@@ -5,7 +5,7 @@
 use anyhow::Result;
 use errors::ffx_error;
 use ffx_debug_connect::DebugAgentSocket;
-use fho::{deferred, selector, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, moniker, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::DebugAgentProxy;
 use fuchsia_async::unblock;
 use sdk::SdkVersion;
@@ -51,7 +51,7 @@ pub struct FidlTool {
     #[command]
     cmd: ffx_debug_fidlcat_args::FidlcatCommand,
     sdk: ffx_config::Sdk,
-    #[with(deferred(selector("core/debug_agent:expose:fuchsia.debugger.DebugAgent")))]
+    #[with(deferred(moniker("/core/debug_agent")))]
     debugger_proxy: Deferred<DebugAgentProxy>,
 }
 
