@@ -40,13 +40,13 @@ void TestBase::SetUp() {
   if (entry.isA2DP()) {
     ConnectToBluetoothDevice();
   } else {
-    switch (entry.driver_type) {
-      case DriverType::Dai:
+    switch (entry.dev_type) {
+      case DeviceType::Dai:
         ConnectToDaiDevice(device_entry());
         break;
-      case DriverType::StreamConfigInput:
+      case DeviceType::Input:
         [[fallthrough]];
-      case DriverType::StreamConfigOutput:
+      case DeviceType::Output:
         ConnectToStreamConfigDevice(device_entry());
         break;
     }
@@ -128,7 +128,8 @@ void TestBase::ConnectToStreamConfigDevice(const DeviceEntry& device_entry) {
             ZX_OK);
 
   device.set_error_handler([this](zx_status_t status) {
-    FAIL() << status << "Err " << status << ", failed to open channel to audio " << driver_type();
+    FAIL() << status << "Err " << status << ", failed to open channel to audio "
+           << (device_type() == DeviceType::Input ? "input" : "output");
   });
   fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config_client;
   fidl::InterfaceRequest<fuchsia::hardware::audio::StreamConfig> stream_config_server =
@@ -137,7 +138,7 @@ void TestBase::ConnectToStreamConfigDevice(const DeviceEntry& device_entry) {
 
   auto channel = stream_config_client.TakeChannel();
   FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio "
-                 << driver_type();
+                 << ((device_type() == DeviceType::Input) ? "input" : "output");
 
   CreateStreamConfigFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig>(std::move(channel)));

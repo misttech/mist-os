@@ -38,7 +38,7 @@ void BasicTest::RequestStreamProperties() {
         }
 
         ASSERT_TRUE(stream_props_.has_is_input());
-        if (driver_type() == DriverType::StreamConfigInput) {
+        if (device_type() == DeviceType::Input) {
           ASSERT_TRUE(prop.is_input());
         } else {
           ASSERT_FALSE(prop.is_input());
@@ -275,7 +275,8 @@ void BasicTest::WatchGainStateAndExpectNoUpdate() {
 // request. If this device's gain is fixed and cannot be changed, then SKIP the test.
 void BasicTest::RequestSetGain() {
   if (stream_props_.max_gain_db() == stream_props_.min_gain_db()) {
-    GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain (" << gain_state_.gain_db()
+    GTEST_SKIP() << "*** Audio " << ((device_type() == DeviceType::Input) ? "input" : "output")
+                 << " has fixed gain (" << gain_state_.gain_db()
                  << " dB). Skipping SetGain test. ***";
   }
 
