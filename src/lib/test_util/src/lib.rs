@@ -77,7 +77,7 @@ macro_rules! assert_near {
     ($x: expr, $y: expr, $delta: expr) => {
         let difference = $x - $y;
         assert!(
-            -$delta <= difference && difference <= $delta,
+            (-$delta..=$delta).contains(&difference),
             "assertion `{} is near {} (within delta {})` failed; actual: |{:?} - {:?}| > {:?}",
             stringify!($x),
             stringify!($y),
