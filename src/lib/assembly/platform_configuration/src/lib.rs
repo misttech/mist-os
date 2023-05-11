@@ -9,6 +9,9 @@ pub(crate) mod subsystems;
 
 pub use common::CompletedConfiguration;
 pub use common::ComponentConfigs;
+pub use common::DomainConfig;
+pub use common::DomainConfigDirectory;
+pub use common::DomainConfigs;
 pub use common::PackageConfigs;
 pub use common::PackageConfiguration;
 pub use subsystems::define_configuration;

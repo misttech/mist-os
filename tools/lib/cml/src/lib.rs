@@ -824,7 +824,7 @@ impl Right {
 /// [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
 ///
 /// ## Top-level keys
-#[derive(ReferenceDoc, Deserialize, Debug, PartialEq, Serialize)]
+#[derive(ReferenceDoc, Deserialize, Debug, Default, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Document {
     /// The optional `include` property describes zero or more other component manifest
@@ -2333,6 +2333,25 @@ pub struct Expose {
     /// the components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
+}
+
+impl Expose {
+    pub fn new_from(from: OneOrMany<ExposeFromRef>) -> Self {
+        Self {
+            from,
+            service: None,
+            protocol: None,
+            directory: None,
+            runner: None,
+            resolver: None,
+            r#as: None,
+            to: None,
+            rights: None,
+            subdir: None,
+            event_stream: None,
+            scope: None,
+        }
+    }
 }
 
 /// Example:

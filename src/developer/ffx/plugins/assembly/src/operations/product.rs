@@ -47,6 +47,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.set_package_config(package, config)?;
     }
 
+    // Add the domain config packages.
+    for (package, config) in configuration.domain_configs {
+        builder.add_domain_config(package, config)?;
+    }
+
     // Add the platform Assembly Input Bundles that were chosen by the configuration.
     for platform_bundle_name in &configuration.bundles {
         let platform_bundle_path = make_bundle_path(&input_bundles_dir, platform_bundle_name);

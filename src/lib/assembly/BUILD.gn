@@ -12,6 +12,7 @@ if (is_host) {
       "components:host_tests",
       "config_data:host_tests",
       "config_schema:host_tests",
+      "domain_config:host_tests",
       "driver_manifest:host_tests",
       "fvm:host_tests",
       "fxfs:host_tests",

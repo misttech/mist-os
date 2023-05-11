@@ -11,9 +11,12 @@ use assembly_config_schema::{
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
     DriverDetails, FileEntry,
 };
+use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::DriverManifestBuilder;
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
-use assembly_platform_configuration::{ComponentConfigs, PackageConfigs, PackageConfiguration};
+use assembly_platform_configuration::{
+    ComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
+};
 use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
@@ -53,6 +56,9 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// Modifications that must be made to configuration for packages.
     package_configs: PackageConfigs,
+
+    /// Domain config packages to create.
+    domain_configs: DomainConfigs,
 
     kernel_path: Option<Utf8PathBuf>,
     kernel_args: BTreeSet<String>,
@@ -104,6 +110,7 @@ impl ImageAssemblyConfigBuilder {
             bootfs_files: FileEntryMap::new("bootfs files"),
             bootfs_structured_config: ComponentConfigs::default(),
             package_configs: PackageConfigs::default(),
+            domain_configs: DomainConfigs::default(),
             kernel_path: None,
             kernel_args: BTreeSet::default(),
             kernel_clock_backstop: None,
@@ -420,6 +427,19 @@ impl ImageAssemblyConfigBuilder {
         }
     }
 
+    /// Add a domain config package.
+    pub fn add_domain_config(
+        &mut self,
+        package: impl AsRef<str>,
+        config: DomainConfig,
+    ) -> Result<()> {
+        if self.domain_configs.insert(package.as_ref().to_owned(), config).is_none() {
+            Ok(())
+        } else {
+            Err(anyhow::format_err!("duplicate domain config"))
+        }
+    }
+
     pub fn add_compiled_package(
         &mut self,
         compiled_package_def: &CompiledPackageDefinition,
@@ -456,6 +476,7 @@ impl ImageAssemblyConfigBuilder {
         // image assembly configuration.
         let Self {
             package_configs,
+            domain_configs,
             mut base,
             mut cache,
             base_drivers,
@@ -532,6 +553,18 @@ impl ImageAssemblyConfigBuilder {
                     // TODO(https://fxbug.dev/101556) return an error here
                 }
             }
+        }
+
+        // Construct the domain config packages
+        for (package_name, config) in domain_configs {
+            let outdir = outdir.join(&package_name);
+            std::fs::create_dir_all(&outdir)
+                .with_context(|| format!("creating directory {outdir}"))?;
+            let package = DomainConfigPackage::new(config);
+            let (path, manifest) = package
+                .build(outdir)
+                .with_context(|| format!("building domain config package {package_name}"))?;
+            base.insert(package_name.to_owned(), PackageEntry { path, manifest });
         }
 
         // TODO(https://fxbug.dev/98103) Make the presence of the base package an explicit parameter

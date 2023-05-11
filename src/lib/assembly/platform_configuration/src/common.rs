@@ -134,6 +134,9 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Add configuration for a named package in one of the package sets.
     fn package(&mut self, name: &str) -> &mut dyn PackageConfigBuilder;
+
+    /// Create a new domain config package.
+    fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder;
 }
 
 /// The interface for specifying the configuration to provide for bootfs.
@@ -149,6 +152,17 @@ pub(crate) trait PackageConfigBuilder {
 
     /// Add a config data file to the package in the builder.
     fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder>;
+}
+
+/// The interface for building a domain config.
+pub(crate) trait DomainConfigBuilder {
+    /// Add a directory to the domain config which can hold config resources.
+    fn directory(&mut self, name: &str) -> &mut dyn DomainConfigDirectoryBuilder;
+}
+
+/// The interface for specifying the config files to add to a domain config package directory.
+pub(crate) trait DomainConfigDirectoryBuilder {
+    fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a component.
@@ -185,22 +199,25 @@ impl ComponentConfigBuilderExt for &mut dyn ComponentConfigBuilder {
 /// The in-progress builder, which hides its state.
 #[derive(Default)]
 pub(crate) struct ConfigurationBuilderImpl {
-    // The Assembly Input Bundles to add
+    /// The Assembly Input Bundles to add.
     bundles: BTreeSet<String>,
 
-    // bootfs configuration
+    /// BootFS configuration.
     bootfs: BootfsConfig,
 
-    // Per-package configuration
+    /// Per-package configuration.
     package_configs: PackageConfigs,
+
+    /// The domain config packages to add.
+    domain_configs: DomainConfigs,
 }
 
 impl ConfigurationBuilderImpl {
     /// Convert the builder into the completed configuration that can be used
     /// to create the configured platform itself.
     pub fn build(self) -> CompletedConfiguration {
-        let Self { bundles, bootfs, package_configs } = self;
-        CompletedConfiguration { bundles, bootfs, package_configs }
+        let Self { bundles, bootfs, package_configs, domain_configs } = self;
+        CompletedConfiguration { bundles, bootfs, package_configs, domain_configs }
     }
 }
 
@@ -220,6 +237,9 @@ pub struct CompletedConfiguration {
     /// Which set doesn't matter, as a package can only be in one package set in
     /// the assembled image.
     pub package_configs: PackageConfigs,
+
+    /// The list of domain configs to add.
+    pub domain_configs: DomainConfigs,
 }
 
 /// A map from package names to the configuration to apply to them.
@@ -227,6 +247,9 @@ pub type PackageConfigs = BTreeMap<String, PackageConfiguration>;
 
 /// A map from component manifest path with a namespace to the values for for the component.
 pub type ComponentConfigs = BTreeMap<String, ComponentConfiguration>;
+
+/// A map from package name to domain config.
+pub type DomainConfigs = BTreeMap<String, DomainConfig>;
 
 /// All of the configuration that applies to a single package.
 ///
@@ -271,6 +294,17 @@ pub struct ComponentConfiguration {
     manifest_path: String,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct DomainConfig {
+    pub directories: BTreeMap<String, DomainConfigDirectory>,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct DomainConfigDirectory {
+    pub entries: NamedMap<FileEntry>,
+}
+
 impl ConfigurationBuilder for ConfigurationBuilderImpl {
     fn platform_bundle(&mut self, name: &str) {
         self.bundles.insert(name.to_string());
@@ -288,6 +322,30 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
                 name: name.to_owned(),
             }
         })
+    }
+
+    fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder {
+        self.domain_configs.entry(name.to_string()).or_insert_with_key(|name| DomainConfig {
+            directories: BTreeMap::new(),
+            name: name.to_owned(),
+        })
+    }
+}
+
+impl DomainConfigBuilder for DomainConfig {
+    fn directory(&mut self, name: &str) -> &mut dyn DomainConfigDirectoryBuilder {
+        self.directories
+            .entry(name.to_string())
+            .or_insert_with(|| DomainConfigDirectory { entries: NamedMap::new("domain configs") })
+    }
+}
+
+impl DomainConfigDirectoryBuilder for DomainConfigDirectory {
+    fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
+        self.entries
+            .try_insert_unique(file_entry.destination.clone(), file_entry)
+            .context("A config destination can only be set once for a domain config")?;
+        Ok(self)
     }
 }
 
