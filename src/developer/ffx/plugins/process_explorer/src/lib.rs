@@ -10,7 +10,7 @@ mod write_human_readable_output;
 
 use anyhow::Result;
 use ffx_process_explorer_args::{Args, QueryCommand};
-use fho::{selector, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_process_explorer::QueryProxy;
@@ -29,9 +29,9 @@ pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_process_explorer"))]
 pub struct ProcessExplorerTool {
-    #[with(selector("core/process_explorer:expose:fuchsia.process.explorer.Query"))]
+    #[with(moniker("/core/process_explorer"))]
     query_proxy: QueryProxy,
-    #[with(selector("core/build-info:expose:fuchsia.buildinfo.Provider"))]
+    #[with(moniker("/core/build-info"))]
     provider_proxy: ProviderProxy,
     #[command]
     cmd: QueryCommand,
