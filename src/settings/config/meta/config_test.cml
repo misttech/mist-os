@@ -11,12 +11,8 @@
         args: [
             "-x",
             "/pkg/data/workstation_eng_interface_configuration.json",
-            "-x",
-            "/pkg/data/workstation_userdebug_interface_configuration.json",
             "-a",
             "/pkg/data/workstation_eng_agent_configuration.json",
-            "-a",
-            "/pkg/data/workstation_userdebug_agent_configuration.json",
         ],
     },
 }

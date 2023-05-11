@@ -18,13 +18,6 @@ config_data("workstation_eng_interface_config") {
   sources = [ "workstation_eng_interface_configuration.json" ]
 }
 
-config_data("workstation_userdebug_interface_config") {
-  for_pkg = "setui_service"
-
-  outputs = [ "interface_configuration.json" ]
-  sources = [ "workstation_userdebug_interface_configuration.json" ]
-}
-
 config_data("workstation_eng_agent_config") {
   for_pkg = "setui_service"
 
@@ -32,19 +25,10 @@ config_data("workstation_eng_agent_config") {
   sources = [ "workstation_eng_agent_configuration.json" ]
 }
 
-config_data("workstation_userdebug_agent_config") {
-  for_pkg = "setui_service"
-
-  outputs = [ "agent_configuration.json" ]
-  sources = [ "workstation_userdebug_agent_configuration.json" ]
-}
-
 resource("test_jsons") {
   sources = [
     "workstation_eng_agent_configuration.json",
     "workstation_eng_interface_configuration.json",
-    "workstation_userdebug_agent_configuration.json",
-    "workstation_userdebug_interface_configuration.json",
   ]
   outputs = [ "data/{{source_file_part}}" ]
 }

@@ -425,8 +425,6 @@ group("config_data_template_allowlist") {
     "//src/security/tests/scrutiny_ffx_integration:empty_config",
     "//src/settings/config:workstation_eng_agent_config",
     "//src/settings/config:workstation_eng_interface_config",
-    "//src/settings/config:workstation_userdebug_agent_config",
-    "//src/settings/config:workstation_userdebug_interface_config",
     "//src/sys/appmgr:appmgr_scheme_config",
     "//src/sys/appmgr/config/gwp_asan:default",
     "//src/sys/appmgr/config/gwp_asan:no_sample",

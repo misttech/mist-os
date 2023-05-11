@@ -40,8 +40,8 @@ For each guest operating system, there is a guest manager and a core shard that
 must be included in the build.
 
 Below, {{ '<var>' }}PRODUCT{{ '</var>' }} is typically one of `core`,
-`workstation_eng`, `workstation_userdebug` and {{ '<var>' }}BOARD{{ '</var>' }}
-is typically one of `x64`, `chromebook-x64`, `sherlock`.
+`workstation_eng`, and {{ '<var>' }}BOARD{{ '</var>' }} is typically one of
+`x64`, `chromebook-x64`, `sherlock`.
 
 
 ```sh
@@ -123,9 +123,6 @@ Intel devices), and also window-manager pass-through so that Linux
 applications will have their own Fuchsia Views.
 
 ```sh
-# The Linux Terminal is enabled by default on _userdebug builds.
-$ fx set workstation_userdebug.x64
-
 # The Linux Terminal is disabled by on _eng builds so we need to re-add it:
 $ fx set workstation_eng.x64 \
         --with-base //src/virtualization/packages/termina_guest

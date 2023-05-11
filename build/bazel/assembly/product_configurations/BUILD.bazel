@@ -93,5 +93,3 @@ fuchsia_product_configuration(
         },
     },
 )
-
-# TODO(https://fxbug.dev/103248): Define targets for workstation_user and workstation_userdebug.
