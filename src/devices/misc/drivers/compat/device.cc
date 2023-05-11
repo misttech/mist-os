@@ -41,6 +41,11 @@ static constexpr ProtocolInfo kProtocolInfos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
+// TODO(fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
+// to unbind the driver of a node but not rebind it. This is a temporary
+// workaround to pass the fshost tests in DFv2.
+static constexpr std::string_view kKnownBadDriverUrl = "not-a-real-driver-url-see-fxb-126978";
+
 fidl::StringView ProtocolIdToClassName(uint32_t protocol_id) {
   for (const ProtocolInfo& info : kProtocolInfos) {
     if (info.id != protocol_id) {
@@ -1041,10 +1046,35 @@ void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer)
 }
 
 void Device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
-  executor().schedule_task(
-      RemoveChildren().then([completer = completer.ToAsync()](fpromise::result<>& result) mutable {
-        completer.ReplySuccess();
-      }));
+  // If we have children, we can just schedule their removal, and they will handle
+  // dropping any associated nodes.
+  if (!children_.empty()) {
+    executor().schedule_task(RemoveChildren().then(
+        [completer = completer.ToAsync()](fpromise::result<>& result) mutable {
+          completer.ReplySuccess();
+        }));
+    return;
+  }
+
+  // If we don't have children, we need to check if there is a driver bound to us,
+  // and if so unbind it.
+  // TODO(fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
+  // to unbind the driver of a node but not rebind it. This is a temporary
+  // workaround to pass the fshost tests in DFv2.
+  fidl::Arena arena;
+  auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
+                          .force_rebind(true)
+                          .driver_url_suffix(kKnownBadDriverUrl);
+  controller_->RequestBind(bind_request.Build())
+      .ThenExactlyOnce(
+          [completer = completer.ToAsync()](
+              fidl::WireUnownedResult<fdf::NodeController::RequestBind>& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+              return;
+            }
+            completer.Reply(zx::ok());
+          });
 }
 
 void Device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {

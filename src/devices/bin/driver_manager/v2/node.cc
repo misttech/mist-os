@@ -478,6 +478,9 @@ Node* Node::GetPrimaryParent() const {
 }
 
 void Node::CompleteBind(zx::result<> result) {
+  if (result.is_error()) {
+    driver_component_.reset();
+  }
   auto completer = std::move(request_bind_completer_);
   request_bind_completer_.reset();
   if (completer) {
@@ -562,6 +565,13 @@ void Node::FinishRemoval() {
 void Node::FinishRestart() {
   node_restarting_ = false;
   node_state_ = NodeState::kRunning;
+
+  if (restart_driver_url_suffix_.has_value()) {
+    auto tracker = CreateBindResultTracker();
+    node_manager_.value()->BindToUrl(*this, restart_driver_url_suffix_.value(), std::move(tracker));
+    restart_driver_url_suffix_.reset();
+    return;
+  }
 
   fuchsia_driver_index::DriverPackageType pkg_type;
   switch (collection_) {
@@ -675,6 +685,22 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
 void Node::RestartNode() {
   node_restarting_ = true;
   Remove(RemovalSet::kAll, nullptr);
+}
+
+std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
+  return std::make_shared<BindResultTracker>(
+      1, [this](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {
+        // We expect a single successful "bind". If we don't get it, we can assume the bind
+        // request failed. If we do get it, we will continue to wait for the driver's start hook
+        // to complete, which will only occur after the successful bind. The remaining flow will
+        // be similar to the RestartNode flow.
+        if (info.count() < 1) {
+          CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
+        } else if (info.count() > 1) {
+          LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
+          CompleteBind(zx::error(ZX_ERR_BAD_STATE));
+        }
+      });
 }
 
 fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChildHelper(
@@ -887,19 +913,7 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
     return;
   }
 
-  auto tracker = std::make_shared<BindResultTracker>(
-      1, [this](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {
-        // We expect a single successful "bind". If we don't get it, we can assume the bind
-        // request failed. If we do get it, we will continue to wait for the driver's start hook
-        // to complete, which will only occur after the successful bind. The remaining flow will be
-        // similar to the RestartNode flow.
-        if (info.count() < 1) {
-          CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
-        } else if (info.count() > 1) {
-          LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
-          CompleteBind(zx::error(ZX_ERR_BAD_STATE));
-        }
-      });
+  auto tracker = CreateBindResultTracker();
   node_manager_.value()->BindToUrl(*this, driver_url_suffix, std::move(tracker));
 }
 

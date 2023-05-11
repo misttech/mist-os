@@ -261,6 +261,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::string_view name,
       fit::callback<void(fit::result<fuchsia_driver_framework::wire::NodeError>)> callback);
 
+  std::shared_ptr<BindResultTracker> CreateBindResultTracker();
+
   fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> AddChildHelper(
       fuchsia_driver_framework::NodeAddArgs args,
       fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,

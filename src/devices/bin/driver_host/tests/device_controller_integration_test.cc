@@ -243,6 +243,11 @@ TEST_F(DeviceControllerIntegrationTest, TestUnbindChildrenSuccess) {
 
   fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
+  ASSERT_OK(
+      device_watcher::RecursiveWaitForFile(
+          devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child")
+          .status_value());
+
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall(parent_channel)->UnbindChildren();
   ASSERT_OK(resp.status());
@@ -253,6 +258,31 @@ TEST_F(DeviceControllerIntegrationTest, TestUnbindChildrenSuccess) {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
                                                  "sys/platform/11:0e:0/devhost-test-parent")
                 .status_value());
+
+  {
+    // Rebind the child driver.
+    auto resp = fidl::WireCall(parent_channel)->Bind(fidl::StringView::FromExternal(""));
+    ASSERT_OK(resp.status());
+    if (resp.value().is_error()) {
+      call_status = resp.value().error_value();
+    }
+    ASSERT_OK(call_status);
+  }
+  {
+    // Call |UnbindChildren| on the child, which has no children.
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child");
+    ASSERT_OK(channel.status_value());
+
+    fidl::ClientEnd<fuchsia_device::Controller> child_channel{std::move(channel.value())};
+    zx_status_t call_status = ZX_OK;
+    auto resp = fidl::WireCall(child_channel)->UnbindChildren();
+    ASSERT_OK(resp.status());
+    if (resp.value().is_error()) {
+      call_status = resp.value().error_value();
+    }
+    ASSERT_OK(call_status);
+  }
 }
 
 // Test binding again, but with different driver
