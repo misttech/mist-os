@@ -40,9 +40,6 @@ policy_labels.swd = "unrestricted"
 # TODO(fxbug.dev/9892): Support a package server on bots so this can be added to
 # universe like the tests.
 legacy_cache_package_labels += [
-  # Used for Chromium e2e tests. See fxb/96503.
-  "//src/experiences/session_shells/ermine/tools",
-
   # Used by Chromium tests, such as //src/chromium:tests.
   # In Chromium infra, these tests run on this image, so they must be in cache.
   # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
@@ -68,15 +65,6 @@ legacy_cache_package_labels +=
 # Add cfv2 sl4f to base.
 core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]
 legacy_base_package_labels += [ "//src/sys/bin/start_sl4f" ]
-
-# Build with both JIT and AOT non-product runners. JIT is used for debug builds, and AOT is used
-# for release builds.
-legacy_cache_package_labels += [
-  "//src/dart:dart_jit",
-  "//src/flutter:flutter_jit",
-  "//src/dart:dart_aot",
-  "//src/flutter:flutter_aot",
-]
 
 # Include virtual_audio in developer-focused products/builds, for interactive audio debugging.
 base_driver_package_labels +=

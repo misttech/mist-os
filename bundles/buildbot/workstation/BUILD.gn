@@ -20,8 +20,6 @@ group("workstation") {
     "//src/tests/end_to_end/time_sync:test",
 
     # Other e2e dep bundles
-    "//src/experiences/tests/e2e:end_to_end_deps",
-    "//src/experiences/tests/performance:performance_deps",
     "//src/tests/end_to_end/bundles:end_to_end_deps",
 
     # Integration tests
@@ -39,14 +37,11 @@ group("workstation") {
     # currently include WebEngine, so provide it to the buildbot.
     "//src/chromium:web_engine",
   ]
-
-  # Remove when all builder bots that use the workstation_eng product explicitly
-  # include workstation_host into their host labels within their fint
-  # parameters.
-  deps += [ ":host_tests" ]
 }
 
+# WARNING: Known to infrastructure.
 # This group contains tests to run on workstation_eng_paused product.
+# See http://cs/:eng_paused%20f:star
 group("eng_paused") {
   testonly = true
 
@@ -59,19 +54,5 @@ group("eng_paused") {
     # are placeholder tests to get the builder to run, since the
     # system-validation tests have been removed.
     "//src/ui/lib/input_pipeline:tests",
-  ]
-}
-
-group("host_tests") {
-  testonly = true
-
-  # The buildbot groups are not allowed to add platform features, only tests and
-  # tools.
-  assert_no_deps = [ "//bundles/platform/*" ]
-
-  deps = [
-    "//src/experiences/tests/chrome:test($host_toolchain)",
-    "//src/experiences/tests/e2e:test($host_toolchain)",
-    "//src/experiences/tests/performance:test($host_toolchain)",
   ]
 }
