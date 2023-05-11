@@ -232,7 +232,8 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
        bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_DID_MAGMA_VIP},
   };
 
-  status = device->DdkAdd(ddk::DeviceAddArgs("aml-nna").set_props(props));
+  status =
+      device->DdkAdd(ddk::DeviceAddArgs("aml-nna").set_props(props).forward_metadata(parent, 0));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create aml nna device: %d\n", status);
     return status;

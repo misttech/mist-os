@@ -39,8 +39,11 @@ std::unique_ptr<MsdVsiPlatformDevice> MsdVsiPlatformDevice::Create(void* platfor
   zx_status_t status =
       device_get_metadata(zircon_device->zx_device(), 0 /*type*/, &external_sram_phys_base,
                           sizeof(external_sram_phys_base), &actual);
-  if (status == ZX_OK)
+  if (status == ZX_OK) {
     DASSERT(actual == sizeof(external_sram_phys_base));
+  } else {
+    MAGMA_LOG(INFO, "Could not get sram phys base metadata: %s", zx_status_get_string(status));
+  }
 
   return std::make_unique<MsdVsiPlatformDeviceZircon>(
       std::move(platform_device),
