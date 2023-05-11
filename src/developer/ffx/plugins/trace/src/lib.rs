@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
-use fho::{daemon_protocol, deferred, selector, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::KnownCategory;
 use fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, ProviderSpec, TraceConfig};
@@ -242,9 +242,7 @@ type Writer = MachineWriter<TraceOutput>;
 pub struct TraceTool {
     #[with(daemon_protocol())]
     proxy: TracingProxy,
-    #[with(deferred(selector(
-        "core/trace_manager:expose:fuchsia.tracing.controller.Controller"
-    )))]
+    #[with(deferred(moniker("/core/trace_manager")))]
     controller: fho::Deferred<ControllerProxy>,
     #[command]
     cmd: TraceCommand,
