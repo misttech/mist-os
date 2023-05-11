@@ -33,7 +33,7 @@ rustc_library("guest_cli") {
   if (is_host) {
     deps += [
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-      "//src/lib/diagnostics/selectors",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     ]
   }
 

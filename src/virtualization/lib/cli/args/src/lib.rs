@@ -45,9 +45,9 @@ impl fmt::Display for GuestType {
 impl GuestType {
     pub fn moniker(&self) -> &str {
         match self {
-            GuestType::Debian => "core/debian-guest-manager",
-            GuestType::Termina => "core/termina-guest-manager",
-            GuestType::Zircon => "core/zircon-guest-manager",
+            GuestType::Debian => "/core/debian-guest-manager",
+            GuestType::Termina => "/core/termina-guest-manager",
+            GuestType::Zircon => "/core/zircon-guest-manager",
         }
     }
 
