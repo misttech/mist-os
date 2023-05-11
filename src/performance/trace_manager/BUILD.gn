@@ -100,6 +100,3 @@ group("trace_manager_pkg") {
   testonly = true
   deps = [ ":trace_manager" ]
 }
-
-group("trace_manager_core_shard") {
-}

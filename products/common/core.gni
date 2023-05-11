@@ -34,7 +34,6 @@ core_realm_shards += [
   "//src/sys/test_manager:test_manager_core_shard",
   "//src/sys/testing:test_realm_core_shard",
   "//src/sys/fuzzing:fuzzing-core-shard",
-  "//src/sys/cache_manager:core_shard",
   "//src/developer/debug/debug_agent:core_shard",
   "//src/developer:default-laboratory-env-core-shard",
   "//src/developer/remote-control:laboratory-core-shard",
