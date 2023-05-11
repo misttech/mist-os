@@ -791,9 +791,10 @@ impl HostDispatcher {
         host_path: &str,
     ) -> Result<(), Error> {
         let node = self.state.read().inspect.hosts().create_child(unique_name("device_"));
+        let controller_path = host_path.to_owned() + "/device_controller";
         let host_dev = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
             ControllerMarker,
-        >(dir, host_path)
+        >(dir, &controller_path)
         .with_context(|| format!("failed to open {host_path}"))?;
         let device_topo = host_dev.get_topological_path().await?.map_err(zx::Status::from_raw)?;
         info!("Adding Adapter: {:?} (topology: {:?})", host_path, device_topo);

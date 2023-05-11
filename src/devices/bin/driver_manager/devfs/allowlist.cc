@@ -11,9 +11,6 @@ bool AllowMultiplexingController(std::string_view class_name) {
   static const std::unordered_set<std::string_view> classes_that_include_controller({
       "block",
       "acpi",
-      "bt-hci",
-      "bt-emulator",
-      "bt-host",
       "media-codec",
       "thermal",
       "nand",
