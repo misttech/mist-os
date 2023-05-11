@@ -510,7 +510,7 @@ class AIBCreator:
             local_kernel_dst_path = os.path.join(self.outdir, kernel_dst_path)
             deps.add(fast_copy_makedirs(kernel_src_path, local_kernel_dst_path))
 
-        all_copied_includes: Set[FilePath] = set()
+        all_copied_include_entries: Set[FilePath] = set()
         for package in self.compiled_packages:
             copied_component_cmls = {}
             for component_name, cml_file in package.components.items():
@@ -539,10 +539,20 @@ class AIBCreator:
             #
             # Once that's complete, this whole mechanism can be removed.
             #
-            copied_includes, component_includes_deps = self._copy_component_includes(
-                package.includes, all_copied_includes)
+            # _copy_component_includes will check for and validate inconsistent
+            # include entries.
+            copied_include_entries, component_includes_deps = self._copy_component_includes(
+                package.includes, all_copied_include_entries)
             deps.update(component_includes_deps)
-            all_copied_includes.update(copied_includes)
+
+            # Save the copied entries so we can check for inconsistent
+            # duplicate include entries in other packages in this AIB
+            # in the following loop iterations
+            all_copied_include_entries.update(copied_include_entries)
+
+            # The final copied includes to add to the AIB.
+            copied_includes = set(
+                map(lambda x: x.destination, copied_include_entries))
 
             # Copy the package contents entries
             (copied_package_files, package_deps) = self._copy_file_entries(
@@ -552,7 +562,7 @@ class AIBCreator:
             copied_definition = CompiledPackageMainDefinition(
                 name=package.name,
                 components=copied_component_cmls,
-                includes=set(map(lambda x: x.destination, copied_includes)),
+                includes=copied_includes,
                 contents=set(copied_package_files),
                 bootfs_unpackaged=package.bootfs_unpackaged)
             result.packages_to_compile.append(copied_definition)
@@ -867,13 +877,13 @@ class AIBCreator:
                 "compiled_packages", "include", entry.destination)
             copy_destination = os.path.join(self.outdir, rebased_destination)
 
-            # Check if another package in the bundle has already linked the include file
             rebased_entry = FileEntry(entry.source, rebased_destination)
+
+            # Check whether we have previously specified a different
+            # source for the same include file
             if rebased_destination in map(lambda x: x.destination,
-                                          existing_shard_includes):
-                # Check whether another package may have specified a different
-                # source for the same include file and if so we should exit
-                #  with an error
+                                          existing_shard_includes |
+                                          shard_includes):
                 if rebased_entry not in existing_shard_includes:
                     raise AssemblyInputBundleCreationException(
                         f"Include file already exists with a different source: {copy_destination}"
