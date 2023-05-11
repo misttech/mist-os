@@ -5,6 +5,10 @@
 # Common workstation product configuration. This configuration is shared by the _eng,
 # _userdebug, and _user build types.
 
+print(
+    "***WARNING*** The workstation product is deprecated and will be removed soon.",
+    "Please use another product instead.")
+
 import("//products/common/core.gni")
 
 core_realm_shards += [
