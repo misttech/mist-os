@@ -59,15 +59,15 @@ constexpr ProtocolInfo proto_infos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
-zx::result<Devnode::Target> clone_target(Devnode::Target& target) {
-  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(Devnode::NoRemote()));
+Devnode::Target clone_target(Devnode::Target& target) {
+  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> Devnode::Target {
+                                 return Devnode::Target(Devnode::NoRemote());
                                },
-                               [](Devnode::Remote& remote) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(remote.Clone()));
+                               [](Devnode::Remote& remote) -> Devnode::Target {
+                                 return Devnode::Target(remote.Clone());
                                },
-                               [](Devnode::Connector& connector) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(connector.Clone()));
+                               [](Devnode::Connector& connector) -> Devnode::Target {
+                                 return Devnode::Target(connector.Clone());
                                }},
                     target);
 }
@@ -220,7 +220,7 @@ Devnode::Devnode(Devfs& devfs)
 Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name)
     : devfs_(devfs),
       parent_(&parent),
-      node_(fbl::MakeRefCounted<VnodeImpl>(*this, std::move(target))),
+      node_(fbl::MakeRefCounted<VnodeImpl>(*this, clone_target(target))),
       name_([this, &parent, name = std::move(name)]() {
         auto [it, inserted] = parent.unpublished.emplace(name, *this);
         ZX_ASSERT(inserted);
@@ -228,31 +228,38 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
       }()) {
   auto [device_controller, device_protocol] = std::visit(
       overloaded{
-          [](const NoRemote&) {
+          [](NoRemote&) {
             return std::make_tuple(fbl::RefPtr<fs::Service>(), fbl::RefPtr<fs::Service>());
           },
-          [](const Connector& connector) {
-            auto device_controller =
-                fbl::MakeRefCounted<fs::Service>([&connector](zx::channel channel) {
+          [](Connector& connector) {
+            auto device_controller = fbl::MakeRefCounted<fs::Service>(
+                [connector = connector.Clone()](zx::channel channel) {
                   return connector.connector->Connect(std::move(channel)).status();
                 });
             auto device_protocol = device_controller;
             return std::make_tuple(std::move(device_controller), std::move(device_protocol));
           },
-          [](const Remote& remote) {
+          [](Remote& remote) {
             auto device_controller =
-                fbl::MakeRefCounted<fs::Service>([&remote](zx::channel channel) {
+                fbl::MakeRefCounted<fs::Service>([remote = remote.Clone()](zx::channel channel) {
+                  if (!remote.connector) {
+                    return ZX_ERR_NOT_SUPPORTED;
+                  }
                   return remote.connector
                       ->ConnectToController(
                           fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)))
                       .status();
                 });
-            auto device_protocol = fbl::MakeRefCounted<fs::Service>([&remote](zx::channel channel) {
-              return remote.connector->ConnectToDeviceProtocol(std::move(channel)).status();
-            });
+            auto device_protocol =
+                fbl::MakeRefCounted<fs::Service>([remote = remote.Clone()](zx::channel channel) {
+                  if (!remote.connector) {
+                    return ZX_ERR_NOT_SUPPORTED;
+                  }
+                  return remote.connector->ConnectToDeviceProtocol(std::move(channel)).status();
+                });
             return std::make_tuple(std::move(device_controller), std::move(device_protocol));
           }},
-      this->target());
+      target);
   if (device_controller) {
     children().AddEntry(fuchsia_device_fs::wire::kDeviceControllerName,
                         std::move(device_controller));
@@ -421,12 +428,9 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
       }
       fbl::String instance_name = seq_name.value();
 
-      zx::result target_clone = clone_target(target);
-      if (target_clone.is_error()) {
-        return target_clone.error_value();
-      }
+      Devnode::Target target_clone = clone_target(target);
       out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(),
-                                        std::move(target_clone.value()), instance_name);
+                                        std::move(target_clone), instance_name);
     }
   }
   out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
@@ -630,12 +634,9 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
                                 std::optional<std::string_view> class_path,
                                 std::vector<std::unique_ptr<Devnode>>& out) {
   if (topological_path.has_value()) {
-    zx::result target_clone = clone_target(target);
-    if (target_clone.is_error()) {
-      return target_clone.error_value();
-    }
+    Devnode::Target target_clone = clone_target(target);
     zx_status_t status =
-        export_topological_path(std::move(target_clone.value()), topological_path.value(), out);
+        export_topological_path(std::move(target_clone), topological_path.value(), out);
     if (status != ZX_OK) {
       return status;
     }
