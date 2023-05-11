@@ -11,12 +11,12 @@ ffx_plugin("ffx_inspect") {
   with_unit_tests = true
 
   sources = [
+    "src/accessor_provider.rs",
     "src/apply_selectors/filter.rs",
     "src/apply_selectors/mod.rs",
     "src/apply_selectors/screen.rs",
     "src/apply_selectors/terminal.rs",
     "src/apply_selectors/test_utils.rs",
-    "src/bridge_provider.rs",
     "src/lib.rs",
     "src/tests/list.rs",
     "src/tests/list_accessors.rs",

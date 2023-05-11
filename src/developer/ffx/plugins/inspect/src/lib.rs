@@ -15,12 +15,12 @@ use iquery::commands::{
 use serde::Serialize;
 use std::{fmt, io::Write};
 
+mod accessor_provider;
 mod apply_selectors;
-mod bridge_provider;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use bridge_provider::HostArchiveReader;
+pub use accessor_provider::HostArchiveReader;
 
 fho::embedded_plugin!(InspectTool);
 
@@ -29,7 +29,7 @@ pub struct InspectTool {
     #[command]
     cmd: InspectCommand,
     #[with(deferred(moniker("bootstrap/archivist")))]
-    remote_diagnostics_bridge: Deferred<ArchiveAccessorProxy>,
+    archive_accessor: Deferred<ArchiveAccessorProxy>,
     rcs: Deferred<RemoteControlProxy>,
 }
 
@@ -38,29 +38,29 @@ impl FfxMain for InspectTool {
     type Writer = MachineWriter<InspectOutput>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let Self { rcs, remote_diagnostics_bridge, cmd } = self;
-        let (Ok(rcs), Ok(remote_diagnostics_bridge)) =
-            futures::future::join(rcs, remote_diagnostics_bridge).await else {
+        let Self { rcs, archive_accessor, cmd } = self;
+        let (Ok(rcs), Ok(archive_accessor)) =
+            futures::future::join(rcs, archive_accessor).await else {
                 ffx_bail!("Failed to connect to necessary emote Control protocols")
             };
         match cmd.sub_command {
             InspectSubCommand::ApplySelectors(cmd) => {
-                apply_selectors::execute(rcs, remote_diagnostics_bridge, cmd).await?;
+                apply_selectors::execute(rcs, archive_accessor, cmd).await?;
             }
             InspectSubCommand::Show(cmd) => {
-                run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;
+                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::List(cmd) => {
-                run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;
+                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::ListAccessors(cmd) => {
-                run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;
+                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::ListFiles(cmd) => {
-                run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;
+                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
             InspectSubCommand::Selectors(cmd) => {
-                run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;
+                run_command(rcs, archive_accessor, cmd, &mut writer).await?;
             }
         }
         Ok(())
