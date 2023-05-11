@@ -8,7 +8,7 @@ use {
     anyhow::{Context, Result},
     async_trait::async_trait,
     ffx_audio_listdevices_args::ListDevicesCommand,
-    fho::{selector, FfxMain, FfxTool, MachineWriter},
+    fho::{moniker, FfxMain, FfxTool, MachineWriter},
     fidl_fuchsia_audio_ffxdaemon::AudioDaemonProxy,
     fuchsia_zircon_status::Status,
     itertools::Itertools,
@@ -39,7 +39,7 @@ pub enum DeviceTypeWrapper {
 pub struct ListDevicesTool {
     #[command]
     _cmd: ListDevicesCommand,
-    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
+    #[with(moniker("/core/audio_ffx_daemon"))]
     audio_proxy: AudioDaemonProxy,
 }
 

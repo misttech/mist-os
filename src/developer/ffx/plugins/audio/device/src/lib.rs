@@ -8,7 +8,7 @@ use {
     blocking::Unblock,
     errors::ffx_bail,
     ffx_audio_device_args::{DeviceCommand, DeviceDirection, SubCommand},
-    fho::{selector, FfxMain, FfxTool, SimpleWriter},
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
         AudioDaemonProxy, AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
@@ -24,7 +24,7 @@ use {
 pub struct DeviceTool {
     #[command]
     cmd: DeviceCommand,
-    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
+    #[with(moniker("/core/audio_ffx_daemon"))]
     audio_proxy: AudioDaemonProxy,
 }
 

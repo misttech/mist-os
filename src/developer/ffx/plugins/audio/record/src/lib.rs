@@ -9,7 +9,7 @@ use {
     async_trait::async_trait,
     blocking::Unblock,
     ffx_audio_record_args::RecordCommand,
-    fho::{selector, FfxContext, FfxMain, FfxTool, SimpleWriter},
+    fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, CapturerType, RecordLocation,
     },
@@ -20,7 +20,7 @@ use {
 pub struct RecordTool {
     #[command]
     cmd: RecordCommand,
-    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
+    #[with(moniker("/core/audio_ffx_daemon"))]
     audio_proxy: AudioDaemonProxy,
 }
 fho::embedded_plugin!(RecordTool);

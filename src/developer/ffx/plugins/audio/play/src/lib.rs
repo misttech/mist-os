@@ -11,7 +11,7 @@ use {
         },
         PlayCommand,
     },
-    fho::{selector, FfxMain, FfxTool, SimpleWriter},
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{AudioDaemonPlayRequest, AudioDaemonProxy},
 };
 
@@ -19,7 +19,7 @@ use {
 pub struct PlayTool {
     #[command]
     cmd: PlayCommand,
-    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
+    #[with(moniker("/core/audio_ffx_daemon"))]
     audio_proxy: AudioDaemonProxy,
 }
 
