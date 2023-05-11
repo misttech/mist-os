@@ -92,6 +92,7 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
 }
 
 /// An occupied entry from an [`IdMapCollection`].
+#[derive(Debug)]
 pub struct OccupiedEntry<'a, K, T> {
     entry: id_map::OccupiedEntry<'a, K, T>,
     count: &'a mut usize,
@@ -352,6 +353,28 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
             Entry::Vacant(e) => Entry::Vacant(e.map_key(|_| key)),
         }
     }
+
+    /// Inserts a new entry, constructing a key with the provided function.
+    ///
+    /// # Panics
+    ///
+    /// The `make_key` function _must_ always construct keys of the same
+    /// variant, otherwise this method will panic.
+    pub fn push_entry(&mut self, make_key: fn(usize) -> K, value: T) -> OccupiedEntry<'_, K, T> {
+        let Self { count, data, _marker } = self;
+        let variant = make_key(0).get_variant();
+        let entry = data[variant].push_entry(value);
+        *count += 1;
+
+        let entry = entry.map_key(make_key);
+
+        let entry_variant = entry.key().get_variant();
+        assert_eq!(
+            entry_variant, variant,
+            "key variant is inconsistent; got both {variant} and {entry_variant}"
+        );
+        OccupiedEntry { entry, count }
+    }
 }
 
 impl<K: IdMapCollectionKey, T> Default for IdMapCollection<K, T> {
@@ -362,6 +385,8 @@ impl<K: IdMapCollectionKey, T> Default for IdMapCollection<K, T> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::collections::HashSet;
+
     use super::*;
     use crate::testutil::assert_empty;
 
@@ -519,5 +544,44 @@ mod tests {
         assert_eq!(*t.get(&KEY_A).unwrap(), 10);
         assert_eq!(*t.get(&KEY_B).unwrap(), 5);
         assert_eq!(*t.get(&KEY_C).unwrap(), 7);
+    }
+
+    #[test]
+    fn push_entry_valid() {
+        let mut t = TestCollection::new();
+        assert_eq!(t.insert(&KEY_A, 0), None);
+        assert_eq!(t.insert(&KEY_B, 1), None);
+        assert_eq!(t.insert(&KEY_C, 2), None);
+
+        let make_key = |index| FakeKey { id: index, var: FakeVariants::A };
+
+        {
+            let entry = t.push_entry(make_key, 30);
+            assert_eq!(entry.key(), &FakeKey { id: 1, var: FakeVariants::A });
+            assert_eq!(entry.get(), &30);
+        }
+
+        {
+            let entry = t.push_entry(make_key, 20);
+            assert_eq!(entry.key(), &FakeKey { id: 2, var: FakeVariants::A });
+            assert_eq!(entry.get(), &20);
+        }
+
+        assert_eq!(t.iter().collect::<HashSet<_>>(), HashSet::from([&0, &1, &2, &30, &20]));
+    }
+
+    #[test]
+    #[should_panic(expected = "variant is inconsistent")]
+    fn push_entry_invalid_key_fn() {
+        let mut t = TestCollection::new();
+        assert_eq!(t.insert(&KEY_A, 0), None);
+
+        let bad_make_key = |index| FakeKey {
+            id: index,
+            var: if index % 2 == 0 { FakeVariants::A } else { FakeVariants::B },
+        };
+
+        let _ = t.push_entry(bad_make_key, 1);
+        let _ = t.push_entry(bad_make_key, 2);
     }
 }

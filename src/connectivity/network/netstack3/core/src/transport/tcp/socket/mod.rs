@@ -52,7 +52,7 @@ use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
     context::TimerContext,
     data_structures::{
-        id_map::{self, Entry as IdMapEntry, IdMap},
+        id_map::{self, Entry as IdMapEntry, EntryKey, IdMap},
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
@@ -1284,8 +1284,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     unreachable!("invalid bound id that points to a listener entry")
                 }
             }
-
-            Ok(ListenerId(id.into(), IpVersionMarker::default()))
+            let MaybeListenerId(index, _marker) = id;
+            Ok(ListenerId(index, IpVersionMarker::default()))
         })
     }
 
@@ -3094,10 +3094,10 @@ impl<I: Ip> From<usize> for MaybeListenerId<I> {
     }
 }
 
-impl<I: Ip> Into<usize> for MaybeListenerId<I> {
-    fn into(self) -> usize {
+impl<I: Ip> EntryKey for MaybeListenerId<I> {
+    fn get_key_index(&self) -> usize {
         let Self(x, _marker) = self;
-        x
+        *x
     }
 }
 
@@ -3114,10 +3114,10 @@ impl<I: Ip> Into<usize> for ListenerId<I> {
     }
 }
 
-impl<I: Ip> Into<usize> for MaybeClosedConnectionId<I> {
-    fn into(self) -> usize {
+impl<I: Ip> EntryKey for MaybeClosedConnectionId<I> {
+    fn get_key_index(&self) -> usize {
         let Self(x, _marker) = self;
-        x
+        *x
     }
 }
 
@@ -4550,7 +4550,7 @@ mod tests {
             net.with_context(name, |TcpCtx { sync_ctx, non_sync_ctx }| {
                 assert_matches!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, id), Ok(()));
                 sync_ctx.with_tcp_sockets(|sockets| {
-                    let (conn, _, _addr) = remote.get_from_socketmap(&sockets.socketmap);
+                    let (conn, _, _addr) = id.get_from_socketmap(&sockets.socketmap);
                     assert_matches!(conn.state, State::FinWait1(_));
                 });
                 assert_matches!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, id), Ok(()));
@@ -4560,7 +4560,7 @@ mod tests {
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
             net.with_context(name, |TcpCtx { sync_ctx, non_sync_ctx }| {
                 sync_ctx.with_tcp_sockets(|sockets| {
-                    let (conn, _, _addr) = remote.get_from_socketmap(&sockets.socketmap);
+                    let (conn, _, _addr) = id.get_from_socketmap(&sockets.socketmap);
                     assert_matches!(conn.state, State::Closed(_));
                 });
                 SocketHandler::close_conn(sync_ctx, non_sync_ctx, id);

@@ -23,7 +23,7 @@ use thiserror::Error;
 use crate::{
     algorithm::ProtocolFlowId,
     data_structures::{
-        id_map::{Entry as IdMapEntry, IdMap, OccupiedEntry as IdMapOccupied},
+        id_map::{Entry as IdMapEntry, EntryKey, IdMap, OccupiedEntry as IdMapOccupied},
         socketmap::Tagged,
     },
     device::{AnyDevice, DeviceIdContext, WeakId},
@@ -347,7 +347,7 @@ where
 }
 
 pub(crate) trait DatagramSocketStateSpec: SocketMapStateSpec {
-    type UnboundId: Clone + From<usize> + Into<usize> + Debug;
+    type UnboundId: Clone + From<usize> + EntryKey + Debug;
     type UnboundSharingState: Default;
 }
 
@@ -405,7 +405,7 @@ pub(crate) fn remove_unbound<
     sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
         let DatagramSockets { unbound, bound: _ } = state;
         let UnboundSocketState { device: _, sharing: _, ip_options } =
-            unbound.remove(id.into()).expect("invalid UDP unbound ID");
+            unbound.remove(id.get_key_index()).expect("invalid UDP unbound ID");
 
         let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
         leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
@@ -525,7 +525,7 @@ where
         }?;
 
         let UnboundSocketState { device, sharing: _, ip_options: _ } = unbound
-            .get(id.clone().into())
+            .get(id.get_key_index())
             .unwrap_or_else(|| panic!("unbound ID {:?} is invalid", id));
         let (addr, device, identifier) = match addr {
             Some(addr) => {
@@ -559,7 +559,7 @@ where
             None => (None, device.clone().map(EitherDeviceId::Weak), identifier),
         };
 
-        let unbound_entry = match unbound.entry(id.clone().into()) {
+        let unbound_entry = match unbound.entry(id.get_key_index()) {
             IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
             IdMapEntry::Occupied(o) => o,
         };
@@ -629,7 +629,7 @@ where
 {
     sync_ctx.with_sockets_mut(|sync_ctx, state, allocator| {
         let DatagramSockets { bound, unbound } = state;
-        let occupied = match unbound.entry(id.clone().into()) {
+        let occupied = match unbound.entry(id.get_key_index()) {
             IdMapEntry::Vacant(_) => panic!("unbound socket {:?} not found", id),
             IdMapEntry::Occupied(o) => o,
         };
@@ -878,7 +878,7 @@ pub(crate) fn set_unbound_device<
     sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
         let DatagramSockets { unbound, bound: _ } = state;
         let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } =
-            unbound.get_mut(id.into()).expect("unbound UDP socket not found");
+            unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
         *device = device_id.map(|d| sync_ctx.downgrade_device_id(d));
     })
 }
@@ -1256,7 +1256,7 @@ where
         match id.into() {
             DatagramSocketId::Unbound(id) => {
                 let UnboundSocketState { device, sharing: _, ip_options: _ } =
-                    unbound.get(id.into()).expect("unbound socket not found");
+                    unbound.get(id.get_key_index()).expect("unbound socket not found");
                 device.clone()
             }
             DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
@@ -1392,7 +1392,7 @@ where
         let bound_device = match id.clone() {
             DatagramSocketId::Unbound(id) => {
                 let UnboundSocketState { device, sharing: _, ip_options: _ } =
-                    unbound.get(id.into()).expect("unbound UDP socket not found");
+                    unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
                 device
             }
             DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
@@ -1440,7 +1440,7 @@ where
         let ip_options = match id {
             DatagramSocketId::Unbound(id) => {
                 let UnboundSocketState { device: _, sharing: _, ip_options } =
-                    unbound.get_mut(id.into()).expect("unbound UDP socket not found");
+                    unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
                 ip_options
             }
 
@@ -1497,7 +1497,7 @@ where
     match id {
         DatagramSocketId::Unbound(id) => {
             let UnboundSocketState { ip_options, device, sharing: _ } =
-                unbound.get(id.into()).expect("unbound UDP socket not found");
+                unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
             (ip_options, device)
         }
         DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
@@ -1534,7 +1534,7 @@ where
     match id {
         DatagramSocketId::Unbound(id) => {
             let UnboundSocketState { ip_options, device: _, sharing: _ } =
-                unbound.get_mut(id.into()).expect("unbound UDP socket not found");
+                unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
             ip_options
         }
         DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
@@ -1672,9 +1672,10 @@ mod test {
         }
     }
 
-    impl<S> From<Id<S>> for usize {
-        fn from(Id(u, _): Id<S>) -> Self {
-            u
+    impl<S> EntryKey for Id<S> {
+        fn get_key_index(&self) -> usize {
+            let Self(u, PhantomData) = self;
+            *u
         }
     }
 

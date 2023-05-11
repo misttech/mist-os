@@ -5940,44 +5940,43 @@ where {
         // - A listener on the local IP and port 2
         // - A connection from the local IP to the remote IP on local port 2 and
         //   remote port 3
-        fn initialize_context<I: TestIpExt>() -> UdpFakeDeviceCtx<I> {
+        fn initialize_context<I: TestIpExt>(
+        ) -> (UdpFakeDeviceCtx<I>, ListenerId<I>, ListenerId<I>, ConnId<I>) {
             let mut ctx = UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::default());
             let UdpFakeDeviceCtx { sync_ctx, non_sync_ctx } = &mut ctx;
-            let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            assert_eq!(
+            let listener1 = {
+                let unbound = SocketHandler::create_udp_unbound(sync_ctx);
                 SocketHandler::listen_udp(
                     sync_ctx,
                     non_sync_ctx,
                     unbound,
                     None,
-                    Some(NonZeroU16::new(1).unwrap())
+                    Some(NonZeroU16::new(1).unwrap()),
                 )
-                .unwrap(),
-                ListenerId::new(0)
-            );
+                .unwrap()
+            };
 
-            let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            assert_eq!(
+            let listener2 = {
+                let unbound = SocketHandler::create_udp_unbound(sync_ctx);
                 SocketHandler::listen_udp(
                     sync_ctx,
                     non_sync_ctx,
                     unbound,
                     Some(ZonedAddr::Unzoned(local_ip::<I>())),
-                    Some(NonZeroU16::new(2).unwrap())
+                    Some(NonZeroU16::new(2).unwrap()),
                 )
-                .unwrap(),
-                ListenerId::new(1)
-            );
-            let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            let listener = SocketHandler::listen_udp(
-                sync_ctx,
-                non_sync_ctx,
-                unbound,
-                Some(ZonedAddr::Unzoned(local_ip::<I>())),
-                Some(NonZeroU16::new(3).unwrap()),
-            )
-            .unwrap();
-            assert_eq!(
+                .unwrap()
+            };
+            let conn = {
+                let unbound = SocketHandler::create_udp_unbound(sync_ctx);
+                let listener = SocketHandler::listen_udp(
+                    sync_ctx,
+                    non_sync_ctx,
+                    unbound,
+                    Some(ZonedAddr::Unzoned(local_ip::<I>())),
+                    Some(NonZeroU16::new(3).unwrap()),
+                )
+                .unwrap();
                 SocketHandler::connect_udp_listener(
                     sync_ctx,
                     non_sync_ctx,
@@ -5985,10 +5984,9 @@ where {
                     ZonedAddr::Unzoned(remote_ip::<I>()),
                     NonZeroU16::new(4).unwrap(),
                 )
-                .unwrap(),
-                ConnId::new(0)
-            );
-            ctx
+                .unwrap()
+            };
+            (ctx, listener1, listener2, conn)
         }
 
         // Serialize a UDP-in-IP packet with the given values, and then receive
@@ -6039,7 +6037,8 @@ where {
             I::PacketBuilder: core::fmt::Debug,
             I::ErrorCode: Copy + core::fmt::Debug + PartialEq,
         {
-            let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } = initialize_context::<I>();
+            let (UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx }, listener1, listener2, conn) =
+                initialize_context::<I>();
 
             let src_ip = local_ip::<I>();
             let dst_ip = remote_ip::<I>();
@@ -6057,7 +6056,7 @@ where {
             );
             assert_eq!(
                 non_sync_ctx.state().icmp_errors.as_slice(),
-                [IcmpError { id: ConnId::new(0).into(), err }]
+                [IcmpError { id: conn.into(), err }]
             );
 
             // Test that we receive an error for the listener.
@@ -6073,7 +6072,7 @@ where {
             );
             assert_eq!(
                 &non_sync_ctx.state().icmp_errors.as_slice()[1..],
-                [IcmpError { id: ListenerId::new(1).into(), err }]
+                [IcmpError { id: listener2.into(), err }]
             );
 
             // Test that we receive an error for the wildcard listener.
@@ -6089,7 +6088,7 @@ where {
             );
             assert_eq!(
                 &non_sync_ctx.state().icmp_errors.as_slice()[2..],
-                [IcmpError { id: ListenerId::new(0).into(), err }]
+                [IcmpError { id: listener1.into(), err }]
             );
 
             // Test that we receive an error for the wildcard listener even if
@@ -6106,7 +6105,7 @@ where {
             );
             assert_eq!(
                 &non_sync_ctx.state().icmp_errors.as_slice()[3..],
-                [IcmpError { id: ListenerId::new(0).into(), err }]
+                [IcmpError { id: listener1.into(), err }]
             );
 
             // Test that an error that doesn't correspond to any connection or

@@ -547,6 +547,7 @@ where
         let socket_options = socket_options.clone();
         let ListenerSharingState { sharing, listening: _ } = *sharing;
         let bound_device = bound_device.map(|d| d.as_weak_ref(ip_transport_ctx).into_owned());
+        let MaybeListenerId(listener_index, _marker) = listener_id;
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
@@ -559,7 +560,7 @@ where
                 },
                 Connection {
                     acceptor: Some(Acceptor::Pending(ListenerId(
-                        listener_id.into(),
+                        listener_index,
                         IpVersionMarker::default(),
                     ))),
                     state,
