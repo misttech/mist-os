@@ -405,7 +405,13 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   return zx::ok(std::move(composite));
 }
 
-Node::~Node() { CloseIfExists(controller_ref_); }
+Node::~Node() {
+  CloseIfExists(controller_ref_);
+  if (request_bind_completer_.has_value()) {
+    request_bind_completer_.value().ReplyError(ZX_ERR_CANCELED);
+    request_bind_completer_.reset();
+  }
+}
 
 const std::string& Node::driver_url() const {
   if (driver_component_) {
@@ -563,6 +569,7 @@ void Node::FinishRemoval() {
 }
 
 void Node::FinishRestart() {
+  ZX_ASSERT_MSG(node_restarting_, "FinishRestart called when node is not restarting.");
   node_restarting_ = false;
   node_state_ = NodeState::kRunning;
 
@@ -689,16 +696,21 @@ void Node::RestartNode() {
 
 std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
   return std::make_shared<BindResultTracker>(
-      1, [this](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {
+      1, [weak_self = weak_from_this()](
+             fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {
+        std::shared_ptr self = weak_self.lock();
+        if (!self) {
+          return;
+        }
         // We expect a single successful "bind". If we don't get it, we can assume the bind
         // request failed. If we do get it, we will continue to wait for the driver's start hook
         // to complete, which will only occur after the successful bind. The remaining flow will
         // be similar to the RestartNode flow.
         if (info.count() < 1) {
-          CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
+          self->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
         } else if (info.count() > 1) {
           LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
-          CompleteBind(zx::error(ZX_ERR_BAD_STATE));
+          self->CompleteBind(zx::error(ZX_ERR_BAD_STATE));
         }
       });
 }

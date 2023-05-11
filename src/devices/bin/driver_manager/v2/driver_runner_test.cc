@@ -1208,6 +1208,155 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.child", "boot-drivers")});
 }
 
+// The root driver adds a node that only binds after a RequestBind() call. Then Restarts through
+// RequestBind() with force_rebind, once without a url suffix, and another with the url suffix.
+TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
+  auto driver_index = CreateDriverIndex();
+  auto driver_index_client = driver_index.Connect();
+  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
+                             &LoaderFactory, dispatcher());
+  SetupDevfs(driver_runner);
+  auto defer = fit::defer([this] { Unbind(); });
+
+  fdf::NodeControllerPtr node_controller;
+  driver_host().SetStartHandler(
+      [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
+        auto& entries = start_args.program().entries();
+        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ("binary", entries[0].key);
+        EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
+        EXPECT_EQ("colocate", entries[1].key);
+        EXPECT_EQ("false", entries[1].value->str());
+
+        fdf::NodePtr root_node;
+        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+
+        fdf::NodeAddArgs args;
+        args.set_name("child");
+        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
+                            [](auto result) { EXPECT_FALSE(result.is_err()); });
+
+        BindDriver(std::move(request), std::move(root_node));
+      });
+
+  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
+
+  driver_index.set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
+    if (args.has_driver_url_suffix()) {
+      return zx::ok(FakeDriverIndex::MatchResult{
+          .url = "fuchsia-boot:///#meta/third-driver.cm",
+      });
+    }
+    return zx::ok(FakeDriverIndex::MatchResult{
+        .url = "fuchsia-boot:///#meta/second-driver.cm",
+    });
+  });
+
+  // Prepare realm for the second-driver CreateChild.
+  realm().SetCreateChildHandler(
+      [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
+        EXPECT_EQ("boot-drivers", collection.name);
+        EXPECT_EQ("dev.child", decl.name());
+        EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
+      });
+
+  // Bind the child node to the second-driver driver.
+  auto bind_request = fdf::NodeControllerRequestBindRequest();
+  node_controller->RequestBind(std::move(bind_request), [](auto result) {});
+  RunLoopUntilIdle();
+  ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
+
+  // Get the second-driver running.
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
+    EXPECT_FALSE(start_args.has_symbols());
+    auto& entries = start_args.program().entries();
+    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ("binary", entries[0].key);
+    EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
+    EXPECT_EQ("colocate", entries[1].key);
+    EXPECT_EQ("false", entries[1].value->str());
+
+    fdf::NodePtr node;
+    EXPECT_EQ(ZX_OK, node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+    BindDriver(std::move(request), std::move(node));
+  });
+  StartDriverHost("driver-hosts");
+  auto second_driver =
+      StartDriver(driver_runner, {
+                                     .url = "fuchsia-boot:///#meta/second-driver.cm",
+                                     .binary = "driver/second-driver.so",
+                                 });
+
+  // Prepare realm for the second-driver CreateChild again.
+  realm().SetCreateChildHandler(
+      [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
+        EXPECT_EQ("boot-drivers", collection.name);
+        EXPECT_EQ("dev.child", decl.name());
+        EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
+      });
+
+  // Request rebind of the second-driver to the node.
+  bind_request = fdf::NodeControllerRequestBindRequest();
+  bind_request.set_force_rebind(true);
+  node_controller->RequestBind(std::move(bind_request), [](auto result) {});
+  RunLoopUntilIdle();
+
+  // Get the second-driver running again.
+  // Skipping driver_host().SetStartHandler since that hasn't changed.
+  StartDriverHost("driver-hosts");
+  second_driver = StartDriver(driver_runner, {
+                                                 .url = "fuchsia-boot:///#meta/second-driver.cm",
+                                                 .binary = "driver/second-driver.so",
+                                             });
+
+  // Prepare realm for the third-driver CreateChild.
+  realm().SetCreateChildHandler(
+      [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
+        EXPECT_EQ("boot-drivers", collection.name);
+        EXPECT_EQ("dev.child", decl.name());
+        EXPECT_EQ("fuchsia-boot:///#meta/third-driver.cm", decl.url());
+      });
+
+  // Request rebind of the node with the third-driver.
+  bind_request = fdf::NodeControllerRequestBindRequest();
+  bind_request.set_force_rebind(true);
+  bind_request.set_driver_url_suffix("third");
+  node_controller->RequestBind(std::move(bind_request), [](auto result) {});
+  RunLoopUntilIdle();
+
+  // Get the third-driver running.
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
+    EXPECT_FALSE(start_args.has_symbols());
+    auto& entries = start_args.program().entries();
+    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ("binary", entries[0].key);
+    EXPECT_EQ("driver/third-driver.so", entries[0].value->str());
+    EXPECT_EQ("colocate", entries[1].key);
+    EXPECT_EQ("false", entries[1].value->str());
+
+    fdf::NodePtr node;
+    EXPECT_EQ(ZX_OK, node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+    BindDriver(std::move(request), std::move(node));
+  });
+  StartDriverHost("driver-hosts");
+  auto third_driver = StartDriver(driver_runner, {
+                                                     .url = "fuchsia-boot:///#meta/third-driver.cm",
+                                                     .binary = "driver/third-driver.so",
+                                                 });
+
+  StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({
+      CreateChildRef("dev", "boot-drivers"),
+      CreateChildRef("dev.child", "boot-drivers"),
+      CreateChildRef("dev.child", "boot-drivers"),
+      CreateChildRef("dev.child", "boot-drivers"),
+  });
+}
+
 // Start the root driver, and then add a child node that does not bind to a
 // second driver.
 TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
