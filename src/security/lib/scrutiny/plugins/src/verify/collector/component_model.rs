@@ -101,7 +101,8 @@ impl V2ComponentModelDataCollector {
                                         unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
                                             .context("decoding config values")?
                                             .fidl_into_native();
-                                    let resolved = ConfigFields::resolve(schema, values_data)
+                                    // TODO(https://fxbug.dev/126578) collect static parent overrides
+                                    let resolved = ConfigFields::resolve(schema, values_data, None)
                                         .context("resolving configuration")?;
                                     Some(resolved)
                                 } else {

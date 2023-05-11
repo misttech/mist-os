@@ -33,5 +33,8 @@ fuchsia_unittest_package("config_encoder_tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":config_encoder_tests" ]
+  deps = [
+    ":config_encoder_test($host_toolchain)",
+    ":config_encoder_tests",
+  ]
 }

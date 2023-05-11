@@ -729,9 +729,9 @@ impl Realm {
         let value_spec = cm_rust::ConfigValueSpec::fidl_into_native_todo_fxb_126609(value_spec);
         for (index, field) in config.fields.iter().enumerate() {
             if field.key == key {
-                config_encoder::ConfigField::resolve(value_spec.clone(), &field).map_err(|e| {
-                    RealmBuilderError::ConfigValueInvalid(name.clone(), anyhow::anyhow!(e))
-                })?;
+                config_encoder::ConfigField::resolve(value_spec.value.clone(), &field).map_err(
+                    |e| RealmBuilderError::ConfigValueInvalid(name.clone(), anyhow::anyhow!(e)),
+                )?;
                 let mut state_guard = child_node.state.lock().await;
                 state_guard.config_value_replacements.insert(index, value_spec);
                 return Ok(());

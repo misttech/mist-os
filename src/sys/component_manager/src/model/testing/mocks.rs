@@ -236,6 +236,7 @@ impl MockResolver {
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
             config_values,
             abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
+            config_parent_overrides: None,
         })
     }
 

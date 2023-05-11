@@ -8,7 +8,7 @@
 
 use cm_rust::{
     ConfigChecksum, ConfigDecl, ConfigField as ConfigFieldDecl, ConfigMutability,
-    ConfigNestedValueType, ConfigSingleValue, ConfigValue, ConfigValueSpec, ConfigValueType,
+    ConfigNestedValueType, ConfigOverride, ConfigSingleValue, ConfigValue, ConfigValueType,
     ConfigValuesData, ConfigVectorValue, NativeIntoFidl,
 };
 use dynfidl::{BasicField, Field, Structure, VectorField};
@@ -27,33 +27,63 @@ pub struct ConfigFields {
 impl ConfigFields {
     /// Resolve a component's configuration values according to its declared schema. Should not fail if
     /// `decl` and `specs` are well-formed.
-    pub fn resolve(decl: &ConfigDecl, specs: ConfigValuesData) -> Result<Self, ResolutionError> {
-        if decl.checksum != specs.checksum {
+    pub fn resolve(
+        decl: &ConfigDecl,
+        base_values: ConfigValuesData,
+        parent_overrides: Option<&Vec<ConfigOverride>>,
+    ) -> Result<Self, ResolutionError> {
+        // base values must have been packaged for the exact same layout as the decl contains
+        if decl.checksum != base_values.checksum {
             return Err(ResolutionError::ChecksumFailure {
                 expected: decl.checksum.clone(),
-                received: specs.checksum.clone(),
+                received: base_values.checksum.clone(),
             });
         }
 
-        if decl.fields.len() != specs.values.len() {
+        // ensure we have the correct number of base values for resolving by offset
+        if decl.fields.len() != base_values.values.len() {
             return Err(ResolutionError::WrongNumberOfValues {
                 expected: decl.fields.len(),
-                received: specs.values.len(),
+                received: base_values.values.len(),
             });
         }
 
-        let fields = decl
-            .fields
-            .iter()
-            .zip(specs.values.into_iter())
-            .map(|(decl_field, spec_field)| {
-                ConfigField::resolve(spec_field, &decl_field).map_err(|source| {
-                    ResolutionError::InvalidValue { key: decl_field.key.clone(), source }
-                })
-            })
-            .collect::<Result<Vec<ConfigField>, _>>()?;
+        // reject overrides which don't match any fields in the schema
+        if let Some(overrides) = parent_overrides {
+            for key in overrides.iter().map(|o| &o.key) {
+                if !decl.fields.iter().any(|f| &f.key == key) {
+                    return Err(ResolutionError::FieldDoesNotExist { key: key.to_owned() });
+                }
+            }
+        }
 
-        Ok(Self { fields, checksum: decl.checksum.clone() })
+        let mut resolved_fields = vec![];
+        for (decl_field, spec_field) in decl.fields.iter().zip(base_values.values.into_iter()) {
+            // see if the parent component provided a value
+            let mut from_parent = None;
+            if let Some(parent_overrides) = parent_overrides {
+                for o in parent_overrides {
+                    // parent overrides are resolved according to string key, not index
+                    if o.key == decl_field.key {
+                        if !decl_field.mutability.contains(ConfigMutability::PARENT) {
+                            return Err(ResolutionError::FieldIsNotMutable {
+                                key: decl_field.key.clone(),
+                            });
+                        }
+                        from_parent = Some(o.value.clone());
+                    }
+                }
+            }
+
+            // prefer parent-provided values over packaged values
+            let value = if let Some(v) = from_parent { v } else { spec_field.value };
+            let resolved_field = ConfigField::resolve(value, &decl_field).map_err(|source| {
+                ResolutionError::InvalidValue { key: decl_field.key.clone(), source }
+            })?;
+            resolved_fields.push(resolved_field);
+        }
+
+        Ok(Self { fields: resolved_fields, checksum: decl.checksum.clone() })
     }
 
     /// Encode the resolved fields as a FIDL struct with every field non-nullable.
@@ -167,13 +197,10 @@ pub struct ConfigField {
 impl ConfigField {
     /// Reconciles a config field schema from the manifest with a value from the value file.
     /// If the types and constraints don't match, an error is returned.
-    pub fn resolve(
-        spec_field: ConfigValueSpec,
-        decl_field: &ConfigFieldDecl,
-    ) -> Result<Self, ValueError> {
+    pub fn resolve(value: ConfigValue, decl_field: &ConfigFieldDecl) -> Result<Self, ValueError> {
         let key = decl_field.key.clone();
 
-        match (&spec_field.value, &decl_field.type_) {
+        match (&value, &decl_field.type_) {
             (ConfigValue::Single(ConfigSingleValue::Bool(_)), ConfigValueType::Bool)
             | (ConfigValue::Single(ConfigSingleValue::Uint8(_)), ConfigValueType::Uint8)
             | (ConfigValue::Single(ConfigSingleValue::Uint16(_)), ConfigValueType::Uint16)
@@ -242,7 +269,7 @@ impl ConfigField {
             }
         }
 
-        Ok(ConfigField { key, value: spec_field.value, mutability: decl_field.mutability })
+        Ok(ConfigField { key, value, mutability: decl_field.mutability })
     }
 }
 
@@ -261,7 +288,13 @@ pub enum ResolutionError {
     #[error("Value file has a different number of values ({received}) than declaration has fields ({expected}).")]
     WrongNumberOfValues { expected: usize, received: usize },
 
-    #[error("Value file has an invalid entry for `{key}`.")]
+    #[error("Provided a value for `{key}` which is not in the component's configuration schema.")]
+    FieldDoesNotExist { key: String },
+
+    #[error("Provided an override which is not mutable in the component's configuration schema.")]
+    FieldIsNotMutable { key: String },
+
+    #[error("Received invalid value for `{key}`.")]
     InvalidValue {
         key: String,
         #[source]
@@ -353,7 +386,7 @@ mod tests {
             Vector(StringVector(vec!["valid".into(), "valid".into()])),
         ];
 
-        let resolved = ConfigFields::resolve(&decl, specs).unwrap();
+        let resolved = ConfigFields::resolve(&decl, specs, None).unwrap();
         assert_eq!(
             resolved,
             ConfigFields {
@@ -511,7 +544,7 @@ mod tests {
             ConfigValue::Single(ConfigSingleValue::Bool(true)),
         ];
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::ChecksumFailure { expected, received }
         );
     }
@@ -528,7 +561,7 @@ mod tests {
             ConfigValue::Single(ConfigSingleValue::Bool(false)),
         ];
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::WrongNumberOfValues { expected: 1, received: 2 }
         );
     }
@@ -543,7 +576,7 @@ mod tests {
             ck@ decl.checksum.clone(),
         };
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::WrongNumberOfValues { expected: 1, received: 0 }
         );
     }
@@ -559,7 +592,7 @@ mod tests {
             ConfigValue::Single(ConfigSingleValue::String("hello, world!".into())),
         ];
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::InvalidValue {
                 key: "foo".to_string(),
                 source: ValueError::StringTooLong { max: 10, actual: 13 },
@@ -578,7 +611,7 @@ mod tests {
             ConfigValue::Vector(ConfigVectorValue::Uint8Vector(vec![1, 2, 3])),
         ];
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::InvalidValue {
                 key: "foo".to_string(),
                 source: ValueError::VectorTooLong { max: 2, actual: 3 },
@@ -600,7 +633,7 @@ mod tests {
             ])),
         ];
         assert_eq!(
-            ConfigFields::resolve(&decl, specs).unwrap_err(),
+            ConfigFields::resolve(&decl, specs, None).unwrap_err(),
             ResolutionError::InvalidValue {
                 key: "foo".to_string(),
                 source: ValueError::VectorElementInvalid {
@@ -608,6 +641,155 @@ mod tests {
                     source: Box::new(ValueError::StringTooLong { max: 5, actual: 7 })
                 },
             }
+        );
+    }
+
+    #[test]
+    fn parent_overrides_take_precedence() {
+        let overridden_key = "my_flag".to_string();
+        let defaulted_key = "my_other_flag".to_string();
+        let decl = cm_rust::ConfigDecl {
+            fields: vec![
+                cm_rust::ConfigField {
+                    key: overridden_key.clone(),
+                    type_: cm_rust::ConfigValueType::Bool,
+                    mutability: ConfigMutability::PARENT,
+                },
+                cm_rust::ConfigField {
+                    key: defaulted_key.clone(),
+                    type_: cm_rust::ConfigValueType::Bool,
+                    mutability: ConfigMutability::empty(),
+                },
+            ],
+            checksum: ConfigChecksum::Sha256([0; 32]),
+            value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
+        };
+
+        let packaged = values_data![
+            ck@ decl.checksum.clone(),
+            Single(Bool(false)),
+            Single(Bool(false)),
+        ];
+
+        let expected_value = Single(Bool(true));
+        let overrides =
+            vec![ConfigOverride { key: overridden_key.clone(), value: expected_value.clone() }];
+
+        assert_eq!(
+            ConfigFields::resolve(&decl, packaged, Some(&overrides)).unwrap(),
+            ConfigFields {
+                fields: vec![
+                    ConfigField {
+                        key: overridden_key.clone(),
+                        value: expected_value,
+                        mutability: ConfigMutability::PARENT,
+                    },
+                    ConfigField {
+                        key: defaulted_key.clone(),
+                        value: Single(Bool(false)),
+                        mutability: ConfigMutability::empty(),
+                    },
+                ],
+                checksum: decl.checksum.clone(),
+            }
+        );
+    }
+
+    #[test]
+    fn overrides_must_match_declared_fields() {
+        let decl = cm_rust::ConfigDecl {
+            fields: vec![cm_rust::ConfigField {
+                key: "my_flag".to_string(),
+                type_: cm_rust::ConfigValueType::Bool,
+                mutability: ConfigMutability::PARENT,
+            }],
+            checksum: ConfigChecksum::Sha256([0; 32]),
+            value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
+        };
+
+        let packaged = values_data![
+            ck@ decl.checksum.clone(),
+            Single(Bool(false)),
+        ];
+
+        let overridden_key = "not_my_flag".to_string();
+        let expected_value = Single(Bool(true));
+        let overrides =
+            vec![ConfigOverride { key: overridden_key.clone(), value: expected_value.clone() }];
+
+        assert_eq!(
+            ConfigFields::resolve(&decl, packaged, Some(&overrides)).unwrap_err(),
+            ResolutionError::FieldDoesNotExist { key: overridden_key.clone() },
+        );
+    }
+
+    #[test]
+    fn overrides_must_be_for_mutable_by_parent_fields() {
+        let overridden_key = "my_flag".to_string();
+        let defaulted_key = "my_other_flag".to_string();
+        let decl = cm_rust::ConfigDecl {
+            fields: vec![
+                cm_rust::ConfigField {
+                    key: overridden_key.clone(),
+                    type_: cm_rust::ConfigValueType::Bool,
+                    mutability: ConfigMutability::empty(),
+                },
+                // this field having parent mutability should not allow the other field to mutate
+                cm_rust::ConfigField {
+                    key: defaulted_key.clone(),
+                    type_: cm_rust::ConfigValueType::Bool,
+                    mutability: ConfigMutability::PARENT,
+                },
+            ],
+            checksum: ConfigChecksum::Sha256([0; 32]),
+            value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
+        };
+
+        let packaged = values_data![
+            ck@ decl.checksum.clone(),
+            Single(Bool(false)),
+            Single(Bool(false)),
+        ];
+
+        let overrides =
+            vec![ConfigOverride { key: overridden_key.clone(), value: Single(Bool(true)) }];
+
+        assert_eq!(
+            ConfigFields::resolve(&decl, packaged, Some(&overrides)).unwrap_err(),
+            ResolutionError::FieldIsNotMutable { key: overridden_key.clone() },
+        );
+    }
+
+    #[test]
+    fn overrides_must_match_declared_type_exactly() {
+        let overridden_key = "my_flag".to_string();
+        let decl = cm_rust::ConfigDecl {
+            fields: vec![cm_rust::ConfigField {
+                key: overridden_key.clone(),
+                type_: cm_rust::ConfigValueType::Bool,
+                mutability: ConfigMutability::PARENT,
+            }],
+            checksum: ConfigChecksum::Sha256([0; 32]),
+            value_source: cm_rust::ConfigValueSource::PackagePath("fake.cvf".to_string()),
+        };
+
+        let packaged = values_data![
+            ck@ decl.checksum.clone(),
+            Single(Bool(false)),
+        ];
+
+        let overrides =
+            vec![ConfigOverride { key: overridden_key.clone(), value: Single(Uint8(1)) }];
+
+        assert_eq!(
+            ConfigFields::resolve(&decl, packaged, Some(&overrides)).unwrap_err(),
+            ResolutionError::InvalidValue {
+                key: overridden_key.clone(),
+                source: ValueError::TypeMismatch {
+                    expected: "Bool".to_string(),
+                    received: "Single(Uint8(1))".to_string()
+                },
+            },
         );
     }
 
@@ -644,8 +826,7 @@ mod tests {
                     Vector(StringVector(vec![])),
                 ] {
                     let should_succeed = matches!(value, $valid_spec);
-                    let spec = ConfigValueSpec { value };
-                    match ConfigField::resolve(spec, &decl) {
+                    match ConfigField::resolve(value, &decl) {
                         Ok(..) if should_succeed => (),
                         Err(ValueError::TypeMismatch { .. }) if !should_succeed => (),
                         other => panic!(

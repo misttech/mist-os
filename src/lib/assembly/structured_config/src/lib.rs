@@ -206,7 +206,7 @@ pub fn validate_component(
                 .map_err(ValidationError::ParseConfig)?;
 
         // we have config, make sure it's compatible with the manifest which references it
-        config_encoder::ConfigFields::resolve(&config_decl, config_values)
+        config_encoder::ConfigFields::resolve(&config_decl, config_values, None)
             .map_err(ValidationError::ResolveConfig)?;
     }
     Ok(())

@@ -161,14 +161,16 @@ impl TryFrom<ResolvedComponent> for Component {
             decl,
             package,
             config_values,
+            config_parent_overrides,
             abi_revision,
         }: ResolvedComponent,
     ) -> Result<Self, Self::Error> {
         // Verify the component configuration, if it exists
         let config = if let Some(config_decl) = decl.config.as_ref() {
             let values = config_values.ok_or(StructuredConfigError::ConfigValuesMissing)?;
-            let config = ConfigFields::resolve(config_decl, values)
-                .map_err(StructuredConfigError::ConfigResolutionFailed)?;
+            let config =
+                ConfigFields::resolve(config_decl, values, config_parent_overrides.as_ref())
+                    .map_err(StructuredConfigError::ConfigResolutionFailed)?;
             Some(config)
         } else {
             None
@@ -348,6 +350,9 @@ pub struct ComponentInstance {
     /// destroyed.
     pub persistent_storage: bool,
 
+    /// Configuration overrides provided by the parent component.
+    config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
+
     /// The context this instance is under.
     pub context: Arc<ModelContext>,
 
@@ -380,6 +385,7 @@ impl ComponentInstance {
             component_url,
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
+            None,
             context,
             WeakExtendedInstance::AboveRoot(component_manager_instance),
             Arc::new(Hooks::new()),
@@ -389,12 +395,14 @@ impl ComponentInstance {
     }
 
     /// Instantiates a new component instance with the given contents.
+    // TODO(https://fxbug.dev/127057) convert this to a builder API
     pub fn new(
         environment: Arc<Environment>,
         instanced_moniker: InstancedAbsoluteMoniker,
         component_url: String,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
+        config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
         context: Arc<ModelContext>,
         parent: WeakExtendedInstance,
         hooks: Arc<Hooks>,
@@ -409,6 +417,7 @@ impl ComponentInstance {
             component_url,
             startup,
             on_terminate,
+            config_parent_overrides,
             context,
             parent,
             state: Mutex::new(InstanceState::New),
@@ -1081,6 +1090,10 @@ impl ComponentInstanceInterface for ComponentInstance {
         self.context.component_id_index()
     }
 
+    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+        self.config_parent_overrides.as_ref()
+    }
+
     fn try_get_parent(&self) -> Result<ExtendedInstance, ComponentInstanceError> {
         self.parent.upgrade()
     }
@@ -1519,6 +1532,7 @@ impl ResolvedInstanceState {
             child.url.clone(),
             child.startup,
             child.on_terminate.unwrap_or(fdecl::OnTerminate::None),
+            child.config_overrides.clone(),
             component.context.clone(),
             WeakExtendedInstance::Component(WeakComponentInstance::from(component)),
             component.hooks.clone(),
@@ -3078,6 +3092,7 @@ pub mod tests {
             "fuchsia-pkg://fuchsia.com/foo#at_root.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
+            None,
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstanceInterface::AboveRoot(Weak::new()),
             Arc::new(Hooks::new()),

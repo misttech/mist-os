@@ -14,7 +14,10 @@ use {
         model::resolver::{self, Resolver},
     },
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
+    ::routing::{
+        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
+        policy::ScopedPolicyChecker,
+    },
     anyhow::Error,
     async_trait::async_trait,
     cm_runner::Runner,
@@ -78,7 +81,7 @@ impl Resolver for RealmBuilderResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        _target: &Arc<ComponentInstance>,
+        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         let (component_url, some_context) = component_address.to_url_and_context();
         let fresolution::Component {
@@ -108,6 +111,7 @@ impl Resolver for RealmBuilderResolver {
             decl,
             package: package.map(|p| p.try_into()).transpose()?,
             config_values,
+            config_parent_overrides: target.config_parent_overrides().cloned(),
             abi_revision: abi_revision.map(Into::into),
         })
     }

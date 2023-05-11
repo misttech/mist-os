@@ -22,5 +22,9 @@
             max_size: 1024,
             mutability: [ "parent" ],
         },
+        not_parent_provided: {
+            type: "string",
+            max_size: 1024,
+        },
     },
 }

@@ -190,6 +190,11 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         self.policy_checker.clone()
     }
 
+    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+        // TODO(https://fxbug.dev/126578) ensure static parent overrides are captured
+        None
+    }
+
     fn component_id_index(&self) -> Arc<ComponentIdIndex> {
         Arc::clone(&self.component_id_index)
     }

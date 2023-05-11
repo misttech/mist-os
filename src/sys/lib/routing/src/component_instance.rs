@@ -48,6 +48,9 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     /// Returns a representation of this `ComponentInstanceInterface`'s environment.
     fn environment(&self) -> &dyn EnvironmentInterface<Self>;
 
+    /// Returns configuration overrides applied to this component by its parent.
+    fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>>;
+
     /// Returns the `GlobalPolicyChecker` for this component instance.
     fn policy_checker(&self) -> GlobalPolicyChecker;
 

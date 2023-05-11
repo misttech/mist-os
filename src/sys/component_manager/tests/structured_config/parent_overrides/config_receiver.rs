@@ -13,7 +13,7 @@ enum IncomingClient {
 
 #[fuchsia::main]
 async fn main() {
-    let Config { parent_provided } = Config::take_from_startup_handle();
+    let Config { parent_provided, .. } = Config::take_from_startup_handle();
 
     let mut service_fs = ServiceFs::new();
     service_fs.dir("svc").add_fidl_service(IncomingClient::Reporter);

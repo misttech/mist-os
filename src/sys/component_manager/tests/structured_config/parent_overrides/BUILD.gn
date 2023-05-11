@@ -47,6 +47,7 @@ fuchsia_structured_config_values("receiver_defaults") {
   cm_label = ":config_receiver_manifest"
   values = {
     parent_provided = "default value"
+    not_parent_provided = "default value which should not change"
   }
 }
 
@@ -58,10 +59,12 @@ rustc_test("parent_override_integration_test_bin") {
     ":test.config.parentoverrides_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//third_party/rust_crates:assert_matches",
   ]
 }
 

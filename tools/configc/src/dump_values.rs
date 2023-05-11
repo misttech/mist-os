@@ -38,7 +38,7 @@ impl DumpValues {
             unpersist(&cvf_bytes).context("decoding value file")?;
         let values = values.fidl_into_native();
 
-        let resolved = config_encoder::ConfigFields::resolve(&config_decl, values)
+        let resolved = config_encoder::ConfigFields::resolve(&config_decl, values, None)
             .context("resolving config values")?;
 
         let fields_map = resolved

@@ -8,6 +8,7 @@ use {
         model::component::ComponentInstance,
         model::resolver::{self, Resolver},
     },
+    ::routing::component_instance::ComponentInstanceInterface,
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl::endpoints::{ClientEnd, Proxy},
@@ -326,7 +327,7 @@ impl Resolver for FuchsiaBootResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        _target: &Arc<ComponentInstance>,
+        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         if component_address.is_relative_path() {
             return Err(ResolverError::UnexpectedRelativePath(component_address.url().to_string()));
@@ -352,6 +353,7 @@ impl Resolver for FuchsiaBootResolver {
             decl,
             package: package.map(|p| p.try_into()).transpose()?,
             config_values,
+            config_parent_overrides: target.config_parent_overrides().cloned(),
             abi_revision: abi_revision.map(Into::into),
         })
     }
@@ -581,7 +583,7 @@ mod tests {
         let config_values = config_values.unwrap();
 
         let observed_fields =
-            config_encoder::ConfigFields::resolve(&config_decl, config_values).unwrap();
+            config_encoder::ConfigFields::resolve(&config_decl, config_values, None).unwrap();
         let expected_fields = config_encoder::ConfigFields {
             fields: vec![config_encoder::ConfigField {
                 key: "foo".to_string(),

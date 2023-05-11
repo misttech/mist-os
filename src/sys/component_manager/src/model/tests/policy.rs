@@ -44,6 +44,7 @@ impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm
             "test:///bar".into(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
+            None,
             Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::default()),
             Arc::new(Hooks::new()),
