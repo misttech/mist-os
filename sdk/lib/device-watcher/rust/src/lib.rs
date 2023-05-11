@@ -30,17 +30,21 @@ pub async fn wait_for_device_with<T>(
         let predicate = &predicate;
         async move {
             let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+            let controller_filename = filename.to_owned() + "/device_controller";
 
             let (controller_proxy, server_end) =
                 fidl::endpoints::create_proxy::<ControllerMarker>()?;
-            let () = dev_dir
+            if dev_dir
                 .open(
                     fio::OpenFlags::NOT_DIRECTORY,
                     fio::ModeType::empty(),
-                    filename,
+                    &controller_filename,
                     server_end.into_channel().into(),
                 )
-                .with_context(|| format!("failed to open \"{}\"", filename))?;
+                .is_err()
+            {
+                return Ok(None);
+            }
 
             let topological_path = controller_proxy.get_topological_path().await;
             let topological_path = match topological_path {
@@ -220,10 +224,18 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn wait_for_device_by_topological_path() {
         let dir = vfs::pseudo_directory! {
-          "a" => create_controller_service("/dev/test0/a/dev".to_string()),
-          "1" => create_controller_service("/dev/test1/1/dev".to_string()),
-          "x" => create_controller_service("/dev/test2/x/dev".to_string()),
-          "y" => create_controller_service("/dev/test3/y/dev".to_string()),
+          "a" => vfs::pseudo_directory! {
+            "device_controller" => create_controller_service("/dev/test2/a/dev".to_string()),
+          },
+          "1" => vfs::pseudo_directory! {
+            "device_controller" => create_controller_service("/dev/test2/1/dev".to_string()),
+          },
+          "x" => vfs::pseudo_directory! {
+            "device_controller" => create_controller_service("/dev/test2/x/dev".to_string()),
+          },
+          "y" => vfs::pseudo_directory! {
+            "device_controller" => create_controller_service("/dev/test2/y/dev".to_string()),
+          },
         };
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -280,7 +292,9 @@ mod tests {
             "test2" => read_only("test file 2"),
           },
           "2" => read_only("file 2"),
-          "x" => create_controller_service("/dev/test2/x/dev".to_string()),
+          "x" => vfs::pseudo_directory! {
+            "device_controller" => create_controller_service("/dev/test2/x/dev".to_string()),
+          },
           "3" => read_only("file 3"),
         };
 
