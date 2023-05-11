@@ -1568,6 +1568,14 @@ migrated in-place to the specified format when fshost mounts it.
 
 From //src/storage/fshost/generated_fshost_config.gni:32
 
+### data_sharing_oobe_enabled
+
+Whether or not to provide the data sharing consent step in OOBE.
+
+**Current value (from the default):** `false`
+
+From //src/experiences/session_shells/ermine/login/BUILD.gn:13
+
 ### debian_guest_earlycon
 
 **Current value (from the default):** `false`
@@ -2645,7 +2653,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:79
+From //zircon/kernel/params.gni:78
 
 ### dont_profile_source_files
 
@@ -2723,7 +2731,7 @@ Enable kernel lock dependency tracking.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:38
+From //zircon/kernel/params.gni:37
 
 ### enable_lock_dep_tests
 
@@ -2734,7 +2742,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:151
+From //zircon/kernel/params.gni:150
 
 ### enable_mdns_trace
 
@@ -2992,7 +3000,42 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:103
+From //zircon/kernel/params.gni:102
+
+### ermine_app_entries
+
+Build arg that allows overriding the default set of application entries
+using '--args=ermine_app_entries="config/app_launch_entries.json"'
+
+**Current value (from the default):** `"config/app_launch_entries.json"`
+
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:16
+
+### ermine_manifest
+
+Build arg that allows overriding the default manifest for Ermine.
+TODO(fxbug.dev/120106): Remove this argument when we have a better way of
+overriding the manifest.
+
+**Current value (from the default):** `"meta/ermine.cml"`
+
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:21
+
+### ermine_start_screensaver
+
+Whether or not to launch screensaver.
+
+**Current value (from the default):** `false`
+
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:24
+
+### ermine_user_feedback_enabled
+
+Whether or not to allow user feedback report from the device.
+
+**Current value (from the default):** `false`
+
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:27
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -3303,6 +3346,16 @@ Non-product AOT
 
 From //build/flutter/config.gni:20
 
+### flutter_driver_enabled
+
+Enables/Disables flutter driver using '--args=flutter_driver_enabled=[true/false]'
+in fx set. (Disabled by default)
+This is effective only on debug builds.
+
+**Current value (from the default):** `false`
+
+From //build/testing/flutter_driver.gni:9
+
 ### flutter_force_aot
 
 Forces all Flutter apps to use an AOT runner regardless of whether the build is debug or
@@ -3583,7 +3636,7 @@ Enables kernel tracing of futex interactions
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:61
+From //zircon/kernel/params.gni:60
 
 ### fvm_emmc_partition_size
 
@@ -4286,31 +4339,31 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:120
+From //zircon/kernel/params.gni:119
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:121
+From //zircon/kernel/params.gni:120
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:121
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:123
+From //zircon/kernel/params.gni:122
 
 ### kernel_base
 
 **Current value (from the default):** `"0xffffffff00000000"`
 
-From //zircon/kernel/params.gni:29
+From //zircon/kernel/params.gni:28
 
 ### kernel_based_memory_attribution_enabled
 
@@ -4319,7 +4372,7 @@ on ProcessDispatcher creation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:127
+From //zircon/kernel/params.gni:126
 
 ### kernel_debug_level
 
@@ -4332,7 +4385,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:91
+From //zircon/kernel/params.gni:90
 
 ### kernel_debug_print_level
 
@@ -4344,7 +4397,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:98
+From //zircon/kernel/params.gni:97
 
 ### kernel_extra_defines
 
@@ -4353,7 +4406,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:83
+From //zircon/kernel/params.gni:82
 
 ### kernel_no_userabi
 
@@ -4361,7 +4414,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:130
+From //zircon/kernel/params.gni:129
 
 ### kernel_version_string
 
@@ -4661,7 +4714,7 @@ Enable lock contention tracing.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:41
+From //zircon/kernel/params.gni:40
 
 ### log_startup_sleep
 
@@ -5603,7 +5656,7 @@ in testing but disable for production.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/params.gni:143
+From //zircon/kernel/params.gni:142
 
 ### partitions_config_contents
 
@@ -5726,7 +5779,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:110
+From //zircon/kernel/params.gni:109
 
 ### platform_enable_user_pci
 
@@ -7480,7 +7533,7 @@ debugging changes to the scheduler's behavior.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:58
+From //zircon/kernel/params.gni:57
 
 ### scheduler_queue_tracing_enabled
 
@@ -7489,7 +7542,7 @@ analysis.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:54
+From //zircon/kernel/params.gni:53
 
 ### scheduler_tracing_level
 
@@ -7503,7 +7556,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:50
+From //zircon/kernel/params.gni:49
 
 ### scudo_default_options
 
@@ -7798,7 +7851,7 @@ From //third_party/perfetto/gn/perfetto.gni:336
 
 **Current value (from the default):** `16`
 
-From //zircon/kernel/params.gni:21
+From //zircon/kernel/params.gni:20
 
 ### spinel_platform_header
 
@@ -8321,7 +8374,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:133
+From //zircon/kernel/params.gni:132
 
 ### use_flatland_by_default
 
@@ -8404,6 +8457,14 @@ option in Product Assembly
 **Current value (from the default):** `false`
 
 From //src/connectivity/network/use_netstack3.gni:11
+
+### use_new_account_manager
+
+Whether or not to use the new AccountManager API for enrollment and authentication.
+
+**Current value (from the default):** `false`
+
+From //src/experiences/session_shells/ermine/login/BUILD.gn:16
 
 ### use_null_vulkan_on_host
 
@@ -8650,7 +8711,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:75
+From //zircon/kernel/params.gni:74
 
 ### vulkan_host_runtime_dir
 
@@ -8689,7 +8750,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:66
+From //zircon/kernel/params.gni:65
 
 ### warn_on_sdk_changes
 
