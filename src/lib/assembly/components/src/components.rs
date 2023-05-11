@@ -5,32 +5,34 @@
 use anyhow::{bail, Context, Result};
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
-use std::collections::BTreeSet;
 
 /// Builder for compiling a component out of cml shards.
 pub struct ComponentBuilder {
     /// The name of the component.
     name: String,
-    /// A list of component manifest shards to be merged
-    /// into the final component manifest.
-    manifest_shards: BTreeSet<Utf8PathBuf>,
+    /// A list of component manifest shards to be merged into the final
+    /// component manifest.  This keeps the order that shards are provided to
+    /// it.
+    manifest_shards: Vec<Utf8PathBuf>,
 }
 
 impl ComponentBuilder {
     /// Construct a new ComponentBuilder that uses the cmc |tool|.
     pub fn new(name: impl Into<String>) -> Self {
-        ComponentBuilder { name: name.into(), manifest_shards: BTreeSet::default() }
+        ComponentBuilder { name: name.into(), manifest_shards: Vec::default() }
     }
 
     /// Add a CML shard or the primary CML file for this component.
     pub fn add_shard(&mut self, path: impl AsRef<Utf8Path>) -> Result<&mut Self> {
-        let path = path.as_ref();
-        let added = self.manifest_shards.insert(path.to_path_buf());
+        let path = path.as_ref().to_path_buf();
 
-        if !added {
+        // Validate that the shard hasn't be previously added.
+        if self.manifest_shards.contains(&path) {
             bail!("Component shard path {} already added", path);
         }
 
+        // Add the shard.
+        self.manifest_shards.push(path);
         Ok(self)
     }
 
@@ -46,7 +48,7 @@ impl ComponentBuilder {
         let cmlfile = outdir.join(format!("{}.cml", &self.name));
         let mut args = vec!["merge".to_owned(), "--output".to_owned(), cmlfile.to_string()];
 
-        args.extend(self.manifest_shards.iter().map(|shard| shard.to_string()));
+        args.extend(self.manifest_shards.iter().map(Utf8PathBuf::to_string));
 
         cmc_tool
             .run(&args)
