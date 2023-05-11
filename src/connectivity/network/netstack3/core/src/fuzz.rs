@@ -34,16 +34,36 @@ use crate::{
 };
 
 mod print_on_panic {
-    use core::fmt::{self, Display, Formatter};
+    use core::fmt::Display;
     use std::sync::Mutex;
 
     use lazy_static::lazy_static;
-    use log::{Log, Metadata, Record};
+    use tracing::Subscriber;
+
+    use tracing_subscriber::{
+        filter::LevelFilter,
+        fmt::{
+            format::{self, FormatEvent, FormatFields},
+            FmtContext,
+        },
+        registry::LookupSpan,
+    };
 
     lazy_static! {
         pub static ref PRINT_ON_PANIC: PrintOnPanicLog = PrintOnPanicLog::new();
         static ref PRINT_ON_PANIC_LOGGER: PrintOnPanicLogger = PrintOnPanicLogger;
     }
+
+    /// LogLevel to output at configured at build time. Defaults to `LevelFilter::OFF`.
+    const MAX_LOG_LEVEL: LevelFilter = if cfg!(feature = "log_trace") {
+        LevelFilter::TRACE
+    } else if cfg!(feature = "log_debug") {
+        LevelFilter::DEBUG
+    } else if cfg!(feature = "log_info") {
+        LevelFilter::INFO
+    } else {
+        LevelFilter::OFF
+    };
 
     /// A simple log whose contents get printed to stdout on panic.
     ///
@@ -82,31 +102,40 @@ mod print_on_panic {
         }
     }
 
+    struct PrintOnPanicFormatter;
+    impl<S, N> FormatEvent<S, N> for PrintOnPanicFormatter
+    where
+        S: Subscriber + for<'a> LookupSpan<'a>,
+        N: for<'a> FormatFields<'a> + 'static,
+    {
+        fn format_event(
+            &self,
+            ctx: &FmtContext<'_, S, N>,
+            mut writer: format::Writer<'_>,
+            event: &tracing::Event<'_>,
+        ) -> std::fmt::Result {
+            let level = *event.metadata().level();
+            let path = event.metadata().module_path().unwrap_or("_unknown_");
+            write!(writer, "[{path}][{level}] ")?;
+            ctx.field_format().format_fields(writer.by_ref(), event)
+        }
+    }
+
     struct PrintOnPanicLogger;
-
-    impl Log for PrintOnPanicLogger {
-        fn enabled(&self, _metadata: &Metadata<'_>) -> bool {
-            true
+    impl std::io::Write for PrintOnPanicLogger {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            PRINT_ON_PANIC.record(&String::from_utf8_lossy(buf));
+            Ok(buf.len())
         }
 
-        fn log(&self, record: &Record<'_>) {
-            struct DisplayRecord<'a, 'b>(&'a Record<'b>);
-            impl<'a, 'b> Display for DisplayRecord<'a, 'b> {
-                fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                    let Self(record) = self;
-                    write!(
-                        f,
-                        "[{}][{}] {}",
-                        record.module_path().unwrap_or("_unknown_"),
-                        record.level(),
-                        record.args()
-                    )
-                }
-            }
-            PRINT_ON_PANIC.record(&DisplayRecord(record));
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
+    }
 
-        fn flush(&self) {}
+    /// Tests if the given `level` is enabled.
+    pub fn log_enabled(level: tracing::Level) -> bool {
+        MAX_LOG_LEVEL >= level
     }
 
     /// Initializes the [`log`] crate so that all logs at or above the given
@@ -114,25 +143,19 @@ mod print_on_panic {
     ///
     /// When
     pub fn initialize_logging() {
-        #[cfg(any(feature = "log_trace", feature = "log_debug", feature = "log_info"))]
-        {
-            const MAX_LOG_LEVEL: log::LevelFilter = if cfg!(feature = "log_trace") {
-                log::LevelFilter::Trace
-            } else if cfg!(feature = "log_debug") {
-                log::LevelFilter::Debug
-            } else {
-                log::LevelFilter::Info
-            };
+        if MAX_LOG_LEVEL != LevelFilter::OFF {
             static LOGGER_ONCE: core::sync::atomic::AtomicBool =
                 core::sync::atomic::AtomicBool::new(true);
 
             // This function gets called on every fuzz iteration, but we only need to set up logging the
             // first time.
             if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
-                let logger: &PrintOnPanicLogger = &PRINT_ON_PANIC_LOGGER;
-                log::set_logger(logger).expect("logging setup failed");
+                tracing_subscriber::fmt()
+                    .event_format(PrintOnPanicFormatter)
+                    .with_writer(|| PrintOnPanicLogger)
+                    .with_max_level(MAX_LOG_LEVEL)
+                    .init();
                 println!("Saving {:?} logs in case of panic", MAX_LOG_LEVEL);
-                log::set_max_level(MAX_LOG_LEVEL);
             };
         }
     }
@@ -292,7 +315,7 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
     // the value here will never be printed. `String::new()` does not allocate,
     // so use that to save CPU and memory when the value would otherwise be
     // thrown away.
-    let description = if log::log_enabled!(log::Level::Info) {
+    let description = if print_on_panic::log_enabled(tracing::Level::INFO) {
         format!("{:?} with body length {}", builder, body_len)
     } else {
         String::new()
@@ -348,9 +371,9 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
     );
     crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id.clone().into());
 
-    log::info!("Processing {} actions", actions.len());
+    tracing::info!("Processing {} actions", actions.len());
     for action in actions {
-        log::info!("{}", action);
+        tracing::info!("{}", action);
         dispatch(&mut ctx, &device_id, action);
     }
 

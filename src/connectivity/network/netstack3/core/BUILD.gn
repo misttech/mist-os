@@ -210,7 +210,8 @@ rustc_fuzzer("fuzz-single-device") {
            "//src/lib/network/packet",
            "//third_party/rust_crates:arbitrary",
            "//third_party/rust_crates:lazy_static",
-           "//third_party/rust_crates:log",
+           "//third_party/rust_crates:tracing",
+           "//third_party/rust_crates:tracing-subscriber",
          ]
 
   features = [
