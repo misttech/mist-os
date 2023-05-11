@@ -164,6 +164,13 @@ impl TryFrom<&str> for AbsoluteMoniker {
     }
 }
 
+impl std::str::FromStr for AbsoluteMoniker {
+    type Err = MonikerError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_str(s)
+    }
+}
+
 impl cmp::Ord for AbsoluteMoniker {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.compare(other)

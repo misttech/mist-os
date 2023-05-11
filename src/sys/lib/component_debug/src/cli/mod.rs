@@ -39,31 +39,3 @@ pub use {
     stop::stop_cmd,
     storage::{storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd},
 };
-
-use {
-    anyhow::{bail, format_err, Result},
-    fuchsia_url::AbsoluteComponentUrl,
-};
-
-/// Parses a string into an absolute component URL.
-pub(crate) fn parse_component_url(url: &str) -> Result<AbsoluteComponentUrl> {
-    let url = match AbsoluteComponentUrl::parse(url) {
-        Ok(url) => url,
-        Err(e) => bail!("URL parsing error: {:?}", e),
-    };
-
-    let manifest = url
-        .resource()
-        .split('/')
-        .last()
-        .ok_or(format_err!("Could not extract manifest filename from URL"))?;
-
-    if let Some(_) = manifest.strip_suffix(".cm") {
-        Ok(url)
-    } else {
-        bail!(
-            "{} is not a component manifest! Component manifests must end in the `cm` extension.",
-            manifest
-        )
-    }
-}

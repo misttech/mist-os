@@ -4,6 +4,8 @@
 
 use argh::FromArgs;
 use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
+use fuchsia_url::AbsoluteComponentUrl;
+use moniker::AbsoluteMoniker;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(
@@ -47,10 +49,10 @@ pub struct ShowArgs {
 #[argh(subcommand, name = "create", description = "Same as `ffx component create`")]
 pub struct CreateArgs {
     #[argh(positional)]
-    pub moniker: String,
+    pub moniker: AbsoluteMoniker,
 
     #[argh(positional)]
-    pub url: String,
+    pub url: AbsoluteComponentUrl,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -137,10 +139,10 @@ pub struct GraphArgs {
 #[argh(subcommand, name = "run", description = "Same as `ffx component run`")]
 pub struct RunArgs {
     #[argh(positional)]
-    pub moniker: String,
+    pub moniker: AbsoluteMoniker,
 
     #[argh(positional)]
-    pub url: String,
+    pub url: AbsoluteComponentUrl,
 
     #[argh(switch, short = 'r')]
     /// destroy and recreate the component instance if it already exists

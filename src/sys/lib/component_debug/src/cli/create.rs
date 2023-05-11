@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        cli::{format::format_create_error, parse_component_url},
-        lifecycle::create_instance_in_collection,
-    },
+    crate::{cli::format::format_create_error, lifecycle::create_instance_in_collection},
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
+    fuchsia_url::AbsoluteComponentUrl,
     moniker::{
         AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
         RelativeMonikerBase,
@@ -16,16 +14,11 @@ use {
 };
 
 pub async fn create_cmd<W: std::io::Write>(
-    url: String,
-    moniker: String,
+    url: AbsoluteComponentUrl,
+    moniker: AbsoluteMoniker,
     lifecycle_controller: fsys::LifecycleControllerProxy,
     mut writer: W,
 ) -> Result<()> {
-    let url = parse_component_url(&url)?;
-
-    let moniker = AbsoluteMoniker::parse_str(&moniker)
-        .map_err(|e| format_err!("Error: {} is not a valid moniker ({})", moniker, e))?;
-
     let parent = moniker
         .parent()
         .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
@@ -105,8 +98,8 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
         );
         let response = create_cmd(
-            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".to_string(),
-            "/core/ffx-laboratory:test".to_string(),
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
+            "/core/ffx-laboratory:test".try_into().unwrap(),
             lifecycle_controller,
             &mut output,
         )

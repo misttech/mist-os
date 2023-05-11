@@ -19,6 +19,10 @@ ffx_plugin("ffx_component_run") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/lib/fuchsia-url",
+    "//src/sys/lib/moniker",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

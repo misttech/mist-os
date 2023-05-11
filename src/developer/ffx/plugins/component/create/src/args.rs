@@ -4,6 +4,8 @@
 
 use argh::FromArgs;
 use ffx_core::ffx_command;
+use fuchsia_url::AbsoluteComponentUrl;
+use moniker::AbsoluteMoniker;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -22,9 +24,9 @@ pub struct CreateComponentCommand {
     /// moniker of a component instance in an existing collection. See https://fuchsia.dev/fuchsia-src/reference/components/moniker
     /// The component instance will be added to the collection if the command
     /// succeeds.
-    pub moniker: String,
+    pub moniker: AbsoluteMoniker,
 
     #[argh(positional)]
     /// url of the component to create.
-    pub url: String,
+    pub url: AbsoluteComponentUrl,
 }

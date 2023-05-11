@@ -4,11 +4,8 @@
 
 use {
     crate::{
-        cli::{
-            format::{
-                format_create_error, format_destroy_error, format_resolve_error, format_start_error,
-            },
-            parse_component_url,
+        cli::format::{
+            format_create_error, format_destroy_error, format_resolve_error, format_start_error,
         },
         lifecycle::{
             create_instance_in_collection, destroy_instance_in_collection, resolve_instance,
@@ -19,6 +16,7 @@ use {
     fidl::HandleBased,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess,
     fidl_fuchsia_sys2 as fsys,
+    fuchsia_url::AbsoluteComponentUrl,
     futures::AsyncReadExt,
     moniker::{
         AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
@@ -112,18 +110,13 @@ impl Stdio {
 }
 
 pub async fn run_cmd<W: std::io::Write>(
-    moniker: String,
-    url: String,
+    moniker: AbsoluteMoniker,
+    url: AbsoluteComponentUrl,
     recreate: bool,
     connect_stdio: bool,
     lifecycle_controller: fsys::LifecycleControllerProxy,
     mut writer: W,
 ) -> Result<()> {
-    let url = parse_component_url(&url)?;
-
-    let moniker = AbsoluteMoniker::parse_str(&moniker)
-        .map_err(|e| format_err!("Error: {} is not a valid moniker ({})", moniker, e))?;
-
     let parent = moniker
         .parent()
         .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
@@ -423,8 +416,8 @@ mod test {
             true,
         );
         let response = run_cmd(
-            "/some/collection:name".to_string(),
-            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".to_string(),
+            "/some/collection:name".try_into().unwrap(),
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
             lifecycle_controller,
@@ -447,8 +440,8 @@ mod test {
             false,
         );
         let response = run_cmd(
-            "/core/ffx-laboratory:foobar".to_string(),
-            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".to_string(),
+            "/core/ffx-laboratory:foobar".try_into().unwrap(),
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             false,
             false,
             lifecycle_controller,
@@ -469,8 +462,8 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
         );
         let response = run_cmd(
-            "/core/ffx-laboratory:test".to_string(),
-            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".to_string(),
+            "/core/ffx-laboratory:test".try_into().unwrap(),
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
             lifecycle_controller,
@@ -492,8 +485,8 @@ mod test {
             "./core/ffx-laboratory:test",
         );
         let response = run_cmd(
-            "/core/ffx-laboratory:test".to_string(),
-            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".to_string(),
+            "/core/ffx-laboratory:test".try_into().unwrap(),
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm".try_into().unwrap(),
             true,
             false,
             lifecycle_controller,
