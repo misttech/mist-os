@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 pub type c_void = ::std::ffi::c_void;
-pub type c_char = i8;
+
+// `char` is unsigned on arm64.
+pub type c_char = u8;
+
 pub type c_schar = i8;
 pub type c_uchar = u8;
 pub type c_short = i16;

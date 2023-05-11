@@ -110,9 +110,7 @@ impl FileOps for Arc<Framebuffer> {
             FBIOGET_FSCREENINFO => {
                 let info = self.info.read();
                 let finfo = fb_fix_screeninfo {
-                    id: unsafe {
-                        std::mem::transmute::<[u8; 16], [i8; 16]>(*b"Starnix\0\0\0\0\0\0\0\0\0")
-                    },
+                    id: zerocopy::FromBytes::read_from(&b"Starnix\0\0\0\0\0\0\0\0\0"[..]).unwrap(),
                     smem_start: 0,
                     smem_len: self.vmo_len,
                     type_: FB_TYPE_PACKED_PIXELS,
