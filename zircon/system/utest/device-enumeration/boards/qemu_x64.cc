@@ -11,7 +11,7 @@ TEST_F(DeviceEnumerationTest, QemuX64Test) {
       "sys/platform/00:00:1b/sysmem",
 
       "sys/platform/pt/acpi", "sys/platform/pt/acpi/acpi-pwrbtn",
-      "sys/platform/pt/PCI0/bus/00:1f.2_/00:1f.2/ahci",
+      "sys/platform/pt/PCI0/bus/00:1f.2/00:1f.2/ahci",
       // TODO(http://fxbug.dev/124283): Re-enable with new names after QEMU roll
       //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-keyboard",
       //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-mouse",

@@ -71,7 +71,7 @@ TEST_F(PciDriverTests, TestRunner) {
   // the final protocol test driver.
   std::array<char, 64> proto_driver_path = {};
   snprintf(proto_driver_path.data(), proto_driver_path.max_size(),
-           "sys/platform/%02x:%02x:%01x/%s/%02x:%02x.%1x_/%s", kDeviceEntry.vid, kDeviceEntry.pid,
+           "sys/platform/%02x:%02x:%01x/%s/%02x:%02x.%1x/%s", kDeviceEntry.vid, kDeviceEntry.pid,
            kDeviceEntry.did, kDeviceEntry.name, PCI_TEST_BUS_ID, PCI_TEST_DEV_ID, PCI_TEST_FUNC_ID,
            kProtocolTestDriverName);
   zx::result channel =

@@ -12,7 +12,7 @@
     },
     use: [
         {
-            // For /dev/class/gpu, /dev/class/gpu-performance-counters, and /dev/sys/platform/pt/PCI0/bus/00:02.0_/00:02.0/intel_i915/intel-gpu-core
+            // For /dev/class/gpu, /dev/class/gpu-performance-counters, and /dev/sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel_i915/intel-gpu-core
             directory: "dev-topological",
             rights: [ "r*" ],
             path: "/dev",

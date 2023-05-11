@@ -82,7 +82,7 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
 
   // Create an isolated devhost to load the proxy pci driver containing the PciProxy
   // instance which will talk to this device.
-  const auto name = std::string(device->config()->addr()) + "_";
+  const auto name = std::string(device->config()->addr());
   zx_status_t status = fidl_dev->DdkAdd(ddk::DeviceAddArgs(name.c_str())
                                             .set_props(pci_device_props)
                                             .set_flags(DEVICE_ADD_MUST_ISOLATE)

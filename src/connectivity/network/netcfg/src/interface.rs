@@ -81,10 +81,10 @@ impl Config {
     // At the time of writing, typical topological paths appear similar to:
     //
     // PCI:
-    // "/dev/sys/platform/pt/PCI0/bus/02:00.0_/02:00.0/e1000/ethernet"
+    // "/dev/sys/platform/pt/PCI0/bus/02:00.0/02:00.0/e1000/ethernet"
     //
     // USB:
-    // "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
+    // "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
     // 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
     //
     // SDIO
@@ -354,26 +354,26 @@ mod tests {
         let test_cases = vec![
             // usb interfaces
             TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanx1",
             },
             TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0_/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
                 mac: [0x02, 0x02, 0x02, 0x02, 0x02, 0x02],
                 interface_type: crate::InterfaceType::Ethernet,
                 want_name: "ethx2",
             },
             // pci intefaces
             TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/ethernet",
                 mac: [0x03, 0x03, 0x03, 0x03, 0x03, 0x03],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanp0014",
             },
             TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0_/00:14.0/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:14.0/ethernet",
                 mac: [0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
                 interface_type: crate::InterfaceType::Ethernet,
                 want_name: "ethp0015",
@@ -450,7 +450,7 @@ mod tests {
             },
             // Test case that labels iwilwifi as ethernet.
             FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0_/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Ethernet,
                 want_name: "ethp01",
@@ -460,7 +460,7 @@ mod tests {
             // The test should detect that the device class doesn't match the interface
             // name, and overwrite with the new interface name that does match.
             FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0_/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
                 mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
                 interface_type: crate::InterfaceType::Wlan,
                 want_name: "wlanp01",
