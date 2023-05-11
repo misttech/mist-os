@@ -4,73 +4,74 @@
 
 import("//build/rust/rustc_library.gni")
 
-if (is_host) {
-  rustc_library("lib") {
-    name = "ffx_config"
-    version = "0.1.0"
-    edition = "2021"
-    with_unit_tests = true
+rustc_library("lib") {
+  name = "ffx_config"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
 
-    deps = [
-      "macro:config-macros",
-      "//src/connectivity/overnet/lib/hoist",
-      "//src/developer/ffx/lib/buildid:lib",
-      "//src/developer/ffx/lib/errors:lib",
-      "//src/developer/ffx/lib/logging:lib",
-      "//src/developer/ffx/lib/sdk:lib",
-      "//src/developer/ffx/lib/version:lib",
-      "//src/lib/analytics/rust:lib",
-      "//src/lib/fuchsia-lockfile:lib",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:async-lock",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:home",
-      "//third_party/rust_crates:lazy_static",
-      "//third_party/rust_crates:rand",
-      "//third_party/rust_crates:regex",
-      "//third_party/rust_crates:serde",
-      "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:tracing",
-      "//third_party/rust_crates:tracing-subscriber",
-    ]
+  deps = [
+    "macro:config-macros",
+    "//src/connectivity/overnet/lib/hoist",
+    "//src/developer/ffx/lib/buildid:lib",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/logging:lib",
+    "//src/developer/ffx/lib/sdk:lib",
+    "//src/developer/ffx/lib/version:lib",
+    "//src/lib/analytics/rust:lib",
+    "//src/lib/fuchsia-lockfile:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-lock",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:home",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
+  ]
 
-    test_deps = [
-      "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:futures",
-    ]
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures",
+  ]
 
-    sources = [
-      "src/api/mod.rs",
-      "src/api/query.rs",
-      "src/api/value.rs",
-      "src/cache.rs",
-      "src/environment.rs",
-      "src/keys.rs",
-      "src/lib.rs",
-      "src/logging.rs",
-      "src/mapping/build.rs",
-      "src/mapping/cache.rs",
-      "src/mapping/config.rs",
-      "src/mapping/data.rs",
-      "src/mapping/env_var.rs",
-      "src/mapping/file_check.rs",
-      "src/mapping/filter.rs",
-      "src/mapping/flatten.rs",
-      "src/mapping/home.rs",
-      "src/mapping/mod.rs",
-      "src/mapping/runtime.rs",
-      "src/nested.rs",
-      "src/paths.rs",
-      "src/runtime.rs",
-      "src/storage.rs",
-    ]
-  }
+  sources = [
+    "src/api/mod.rs",
+    "src/api/query.rs",
+    "src/api/value.rs",
+    "src/cache.rs",
+    "src/environment.rs",
+    "src/keys.rs",
+    "src/lib.rs",
+    "src/logging.rs",
+    "src/mapping/build.rs",
+    "src/mapping/cache.rs",
+    "src/mapping/config.rs",
+    "src/mapping/data.rs",
+    "src/mapping/env_var.rs",
+    "src/mapping/file_check.rs",
+    "src/mapping/filter.rs",
+    "src/mapping/flatten.rs",
+    "src/mapping/home.rs",
+    "src/mapping/mod.rs",
+    "src/mapping/runtime.rs",
+    "src/nested.rs",
+    "src/paths.rs",
+    "src/runtime.rs",
+    "src/storage.rs",
+  ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_test($host_toolchain)" ]
+  deps = [
+    ":lib_test",
+    "domain:tests",
+  ]
 }
