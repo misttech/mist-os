@@ -25,4 +25,18 @@ TEST(PipeTest, NonBlockingPartialWrite) {
   ASSERT_GT(write_result, 0);
   ASSERT_LT(write_result, kBufferSize);
 }
+
+TEST(PipeTest, BlockingSmallWrites) {
+  // Create a pipe with size 4096, and fill all but 128 bytes of it.
+  int pipefd[2];
+  SAFE_SYSCALL(pipe2(pipefd, O_NONBLOCK));
+  SAFE_SYSCALL(fcntl(pipefd[1], F_SETPIPE_SZ, getpagesize()));
+  const int kWriteSize = getpagesize() - 128;
+  char buf[kWriteSize];
+  ASSERT_EQ(write(pipefd[1], buf, kWriteSize), kWriteSize);
+  // Trying to write 256 bytes must returns EAGAIN
+  ASSERT_EQ(write(pipefd[1], buf, 256), -1);
+  ASSERT_EQ(errno, EAGAIN);
+}
+
 }  // namespace

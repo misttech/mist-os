@@ -150,7 +150,13 @@ impl Pipe {
             return error!(EPIPE);
         }
 
-        self.messages.write_stream(data, None, &mut vec![])
+        // POSIX requires that a write smaller than PIPE_BUF be atomic, but requires no
+        // atomicity for writes larger than this.
+        if data.available() <= uapi::PIPE_BUF as usize {
+            self.messages.write_datagram(data, None, &mut vec![])
+        } else {
+            self.messages.write_stream(data, None, &mut vec![])
+        }
     }
 
     fn query_events(&self) -> FdEvents {
