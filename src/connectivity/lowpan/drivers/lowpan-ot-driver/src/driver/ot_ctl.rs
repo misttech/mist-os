@@ -40,7 +40,13 @@ impl OtCtl {
         let openthread_user_input_sender = self.cli_input_sender.clone();
         let (cli_output_sender, cli_output_receiver) = futures::channel::mpsc::unbounded();
         ot_instance.cli_init(move |c_str| {
-            cli_output_sender.unbounded_send(c_str.to_string_lossy().into_owned()).unwrap();
+            if !cli_output_sender.is_closed() {
+                if let Err(e) =
+                    cli_output_sender.unbounded_send(c_str.to_string_lossy().into_owned())
+                {
+                    warn!("OpenThread CLI API callback encountered error: {:?}", e);
+                }
+            }
         });
 
         let mut openthread_conole_output_receiver = cli_output_receiver;
@@ -136,7 +142,9 @@ impl OtCtl {
             },
         );
         fasync::Task::spawn(socket_future.map(|x| {
-            x.unwrap();
+            if let Err(e) = x {
+                warn!("ot_ctl terminated, reason: {:?}", e);
+            }
             Ok(())
         }))
     }
