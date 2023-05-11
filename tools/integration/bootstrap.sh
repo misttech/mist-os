@@ -87,7 +87,7 @@ main() {
 
   GOROOT_DIR="$FUCHSIA_ROOT/prebuilt/third_party/go/$(host_platform)"
   readonly go_bin="$GOROOT_DIR/bin/go"
-  GOCACHE="$GOCACHE_DIR" GOROOT="$GOROOT_DIR" GOPROXY=off $go_bin build \
+  GOCACHE="$GOCACHE_DIR" GOROOT="$GOROOT_DIR" GOPROXY=off CGO_ENABLED=0 $go_bin build \
     -o "$output" ./tools/integration/fint/cmd/fint
 }
 
