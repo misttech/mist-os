@@ -24,6 +24,12 @@ def normalize_platform(config, root_dir):
         return
 
     platform = config["platform"]
+    if "ui" in platform:
+        ui = platform["ui"]
+        if "sensor_config" in ui:
+            p = os.path.join(root_dir, ui["sensor_config"])
+            ui["sensor_config_sha1"] = file_sha1(p)
+            ui.pop("sensor_config")
 
     # When unset, set config_data to empty list for consistency, to avoid noisy
     # diff.

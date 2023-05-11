@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_schema::platform_config::ui_config::PlatformUiConfig;
+use assembly_config_schema::{platform_config::ui_config::PlatformUiConfig, FileEntry};
 
 pub(crate) struct UiSubsystem;
 
@@ -44,6 +44,16 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             *context.feature_set_level == FeatureSupportLevel::Minimal,
             "UI is only supported in the default feature set level"
         );
+
+        if let Some(sensor_config_path) = &ui_config.sensor_config {
+            // TODO(fxbug.dev/126530): Make an default empty sensor config once all clients are
+            // specifying the config in the product assembly config.
+            let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
+            config_dir.entry(FileEntry {
+                source: sensor_config_path.clone(),
+                destination: "config.json".into(),
+            })?;
+        }
         Ok(())
     }
 }

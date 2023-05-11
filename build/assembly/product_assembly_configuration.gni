@@ -308,11 +308,29 @@ template("product_assembly_configuration") {
     }
   }
 
+  _sensor_config = false
+  if (defined(invoker.platform)) {
+    _p = invoker.platform
+    if (defined(_p.ui)) {
+      _ui = _p.ui
+      if (defined(_ui.sensor_config)) {
+        _sensor_config = _ui.sensor_config
+      } else {
+        not_needed([ "_ui" ])
+      }
+    } else {
+      not_needed([ "_p" ])
+    }
+  }
+
   _assembly_config = {
     # Create the platform configuration section from the caller's argument
     platform = {
       if (defined(invoker.platform)) {
         forward_variables_from(invoker.platform, "*")
+      }
+      if (_sensor_config != false) {
+        ui.sensor_config = rebase_path(_sensor_config, root_build_dir)
       }
       assert(defined(build_type), "The platform build-type must be specified.")
     }
@@ -415,7 +433,7 @@ template("product_assembly_configuration") {
     deps = labels.board_driver_package_labels
   }
 
-  group(labels.target_name) {
+  group_with_inputs(labels.target_name) {
     forward_variables_from(invoker,
                            [
                              "deps",
@@ -426,7 +444,12 @@ template("product_assembly_configuration") {
     if (!defined(public_deps)) {
       public_deps = []
     }
+    inputs = []
     public_deps += [ ":${labels.assembly_config}" ]
+
+    if (_sensor_config != false) {
+      inputs += [ _sensor_config ]
+    }
 
     if (!defined(deps)) {
       deps = []

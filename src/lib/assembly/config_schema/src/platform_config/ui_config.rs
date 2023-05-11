@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the UI area.
@@ -16,4 +17,8 @@ pub struct PlatformUiConfig {
     /// TODO(fxbug.dev/124273): This will be deleted once legacy is removed.
     #[serde(default)]
     pub legacy: bool,
+
+    /// The sensor config to provide to the input pipeline.
+    #[serde(default)]
+    pub sensor_config: Option<Utf8PathBuf>,
 }
