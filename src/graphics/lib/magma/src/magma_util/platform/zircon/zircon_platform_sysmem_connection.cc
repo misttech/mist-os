@@ -235,6 +235,9 @@ class ZirconPlatformBufferConstraints : public PlatformBufferConstraints {
       case MAGMA_FORMAT_R8G8:
         constraints.pixel_format.type = PixelFormatType::kR8G8;
         break;
+      case MAGMA_FORMAT_RGB565:
+        constraints.pixel_format.type = PixelFormatType::kRgb565;
+        break;
       default:
         return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid format: %d",
                         format_constraints->image_format);
