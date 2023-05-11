@@ -14,8 +14,8 @@ pub fn declare_version_history(_tokens: TokenStream) -> TokenStream {
     let mut tokens = String::from("[");
     for version in versions {
         tokens.push_str(&format!(
-            "Version {{ api_level: {}, abi_revision: AbiRevision({}) }},",
-            version.api_level, version.abi_revision.value
+            "Version {{ api_level: {}, abi_revision: AbiRevision({}), status: Status::{:?} }},",
+            version.api_level, version.abi_revision.value, version.status
         ));
     }
     tokens.push_str("]");
@@ -29,8 +29,8 @@ pub fn latest_sdk_version(_tokens: TokenStream) -> TokenStream {
     let latest_version =
         versions.last().expect("version-history.json did not contain any versions");
     format!(
-        "Version {{ api_level: {}, abi_revision: AbiRevision({}) }}",
-        latest_version.api_level, latest_version.abi_revision.value
+        "Version {{ api_level: {}, abi_revision: AbiRevision({}), status: Status::{:?} }}",
+        latest_version.api_level, latest_version.abi_revision.value, latest_version.status
     )
     .parse()
     .unwrap()
@@ -49,8 +49,8 @@ pub fn get_supported_versions(_tokens: TokenStream) -> TokenStream {
     let mut tokens = String::from("[");
     for version in supported_versions {
         tokens.push_str(&format!(
-            "Version {{ api_level: {}, abi_revision: AbiRevision({}) }}",
-            version.api_level, version.abi_revision.value
+            "Version {{ api_level: {}, abi_revision: AbiRevision({}), status: Status::{:?} }}",
+            version.api_level, version.abi_revision.value, version.status
         ));
         tokens.push_str(",");
     }

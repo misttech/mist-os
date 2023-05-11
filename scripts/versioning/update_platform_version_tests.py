@@ -17,12 +17,13 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
         "name": "Platform version map",
         "type": "version_history",
         "api_levels": {
-            "1" : {
-                "abi_revision": "0x1"
+            "3" : {
+                "abi_revision": "0x1",
+                "status": "current"
             }
         }
     },
-    "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
 }
 """
 

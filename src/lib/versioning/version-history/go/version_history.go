@@ -16,13 +16,22 @@ import (
 var versionHistoryBytes []byte
 var versions []Version
 
-const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-3349aec7.json"
+const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-22rnd667.json"
 const versionHistoryName string = "Platform version map"
 const versionHistoryType string = "version_history"
+
+type Status string
+
+const (
+	InDevelopment Status = "in-development"
+	Supported     Status = "supported"
+	Unsupported   Status = "unsupported"
+)
 
 type Version struct {
 	APILevel    uint64
 	ABIRevision uint64
+	Status      Status
 }
 
 type versionHistory struct {
@@ -38,6 +47,7 @@ type versionHistoryData struct {
 
 type apiLevel struct {
 	ABIRevision string `json:"abi_revision"`
+	Status      Status `json:"status"`
 }
 
 func parseVersionHistory(b []byte) ([]Version, error) {
@@ -75,6 +85,7 @@ func parseVersionHistory(b []byte) ([]Version, error) {
 		vs = append(vs, Version{
 			APILevel:    apiLevel,
 			ABIRevision: uint64(abiRevision),
+			Status:      v.Status,
 		})
 	}
 

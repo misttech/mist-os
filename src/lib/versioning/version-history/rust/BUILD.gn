@@ -9,11 +9,11 @@ rustc_library("version-history") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ "proc-macro:version-history-macro" ]
-  test_deps = [
+  deps = [
+    "proc-macro:version-history-macro",
     "proc-macro/shared:version-history-shared",
-    "//third_party/rust_crates:proptest",
   ]
+  test_deps = [ "//third_party/rust_crates:proptest" ]
 
   sources = [ "src/lib.rs" ]
 

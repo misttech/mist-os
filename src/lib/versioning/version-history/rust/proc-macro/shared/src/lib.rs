@@ -10,7 +10,7 @@ use serde::{
 use std::collections::BTreeMap;
 
 const VERSION_HISTORY_BYTES: &[u8] = include_bytes!(env!("SDK_VERSION_HISTORY"));
-const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-3349aec7.json";
+const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-22rnd667.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
 
@@ -53,12 +53,33 @@ impl<'de> Deserialize<'de> for AbiRevision {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 struct ApiLevel {
     pub abi_revision: AbiRevision,
+    pub status: String,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Version {
-    pub abi_revision: AbiRevision,
     pub api_level: u64,
+    pub abi_revision: AbiRevision,
+    pub status: Status,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash)]
+pub enum Status {
+    #[serde(rename = "in-development")]
+    InDevelopment,
+    #[serde(rename = "supported")]
+    Supported,
+    #[serde(rename = "unsupported")]
+    Unsupported,
+}
+
+fn status_from_str(s: &str) -> Result<Status, String> {
+    match s {
+        "in-development" => Ok(Status::InDevelopment),
+        "supported" => Ok(Status::Supported),
+        "unsupported" => Ok(Status::Unsupported),
+        _ => Err(format!("Invalid status value: {}", s)),
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -107,7 +128,14 @@ fn parse_version_history(bytes: &[u8]) -> Result<Vec<Version>, serde_json::Error
             .parse()
             .map_err(|_| serde::de::Error::invalid_value(Unexpected::Str(&key), &"an integer"))?;
 
-        versions.push(Version { api_level, abi_revision: value.abi_revision });
+        let version_status = status_from_str(&value.status)
+            .map_err(|err| serde_json::Error::custom(format!("Error: {}", err)))?;
+
+        versions.push(Version {
+            api_level,
+            abi_revision: value.abi_revision,
+            status: version_status,
+        });
     }
 
     versions.sort_by_key(|s| s.api_level);
@@ -124,7 +152,11 @@ mod tests {
         let versions = version_history().unwrap();
         assert_eq!(
             versions[0],
-            Version { api_level: 4, abi_revision: AbiRevision::new(0x601665C5B1A89C7F) }
+            Version {
+                api_level: 4,
+                abi_revision: AbiRevision::new(0x601665C5B1A89C7F),
+                status: Status::Unsupported,
+            }
         )
     }
 
@@ -136,21 +168,31 @@ mod tests {
                 "type": "version_history",
                 "api_levels": {
                     "1":{
-                        "abi_revision":"10"
+                        "abi_revision":"10",
+                        "status":"supported"
                     },
                     "2":{
-                        "abi_revision":"0x20"
+                        "abi_revision":"0x20",
+                        "status":"in-development"
                     }
                 }
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
         }"#;
 
         assert_eq!(
             parse_version_history(&expected_bytes[..]).unwrap(),
             vec![
-                Version { api_level: 1, abi_revision: AbiRevision::new(10) },
-                Version { api_level: 2, abi_revision: AbiRevision::new(0x20) },
+                Version {
+                    api_level: 1,
+                    abi_revision: AbiRevision::new(10),
+                    status: Status::Supported
+                },
+                Version {
+                    api_level: 2,
+                    abi_revision: AbiRevision::new(0x20),
+                    status: Status::InDevelopment
+                },
             ],
         );
     }
@@ -168,7 +210,7 @@ mod tests {
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-22rnd667.json"
         );
     }
 
@@ -180,7 +222,7 @@ mod tests {
                 "type": "version_history",
                 "api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
         }"#;
 
         assert_eq!(
@@ -197,7 +239,7 @@ mod tests {
                 "type": "some-type",
                 "api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
         }"#;
 
         assert_eq!(
@@ -222,12 +264,12 @@ mod tests {
             (
                 "1",
                 "some-revision",
-                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 59",
+                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 58",
             ),
             (
                 "1",
                 "-1",
-                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 48",
+                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 47",
             ),
         ] {
             let expected_bytes = serde_json::to_vec(&serde_json::json!({
@@ -236,7 +278,8 @@ mod tests {
                     "type": VERSION_HISTORY_TYPE,
                     "api_levels": {
                         api_level:{
-                            "abi_revision": abi_revision
+                            "abi_revision": abi_revision,
+                            "status": Status::InDevelopment,
                         }
                     },
                 },

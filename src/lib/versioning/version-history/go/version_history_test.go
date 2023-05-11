@@ -30,8 +30,8 @@ func TestParseHistoryWorks(t *testing.T) {
 			Name: versionHistoryName,
 			Type: versionHistoryType,
 			APILevels: map[string]apiLevel{
-				"1": {ABIRevision: "1"},
-				"2": {ABIRevision: "0x2"},
+				"1": {ABIRevision: "1", Status: Supported},
+				"2": {ABIRevision: "0x2", Status: InDevelopment},
 			},
 		},
 	})
@@ -45,8 +45,8 @@ func TestParseHistoryWorks(t *testing.T) {
 	}
 
 	expected := []Version{
-		{APILevel: 1, ABIRevision: 1},
-		{APILevel: 2, ABIRevision: 2},
+		{APILevel: 1, ABIRevision: 1, Status: Supported},
+		{APILevel: 2, ABIRevision: 2, Status: InDevelopment},
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
@@ -113,10 +113,10 @@ func TestParseHistoryRejectsInvalidType(t *testing.T) {
 
 func TestParseHistoryRejectsInvalidVersions(t *testing.T) {
 	for k, v := range map[string]apiLevel{
-		"some-version": {ABIRevision: "1"},
-		"-1":           {ABIRevision: "1"},
-		"1":            {ABIRevision: "some-revision"},
-		"2":            {ABIRevision: "-1"},
+		"some-version": {ABIRevision: "1", Status: Unsupported},
+		"-1":           {ABIRevision: "1", Status: Unsupported},
+		"1":            {ABIRevision: "some-revision", Status: Supported},
+		"2":            {ABIRevision: "-1", Status: Supported},
 	} {
 		b, err := json.Marshal(&versionHistory{
 			SchemaId: versionHistorySchemaId,

@@ -123,7 +123,7 @@ sdk_atom("version_history") {
   meta = {
     dest = "version_history.json"
     source = "version_history.json"
-    schema = "version_history-3349aec7"
+    schema = "version_history-22rnd667"
     type = "version_history"
   }
 }

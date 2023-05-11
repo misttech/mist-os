@@ -54,7 +54,7 @@ impl ComponentResolver {
             // Assumes the platform does not support a u64::MAX ABI value.
             TargetAbi::Unsupported => Some(u64::MAX),
             // Assumes the latest version is supported.
-            TargetAbi::Supported => Some(version_history::LATEST_VERSION.abi_revision.into()),
+            TargetAbi::Supported => Some(*version_history::LATEST_VERSION.abi_revision),
             TargetAbi::Absent => None,
         }
     }
@@ -277,7 +277,7 @@ async fn resolve_components_against_allow_all_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            version_history::LATEST_VERSION.abi_revision.into()
+            *version_history::LATEST_VERSION.abi_revision
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());
@@ -338,7 +338,7 @@ async fn resolve_components_against_enforce_presence_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            version_history::LATEST_VERSION.abi_revision.into()
+            *version_history::LATEST_VERSION.abi_revision
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());
@@ -399,7 +399,7 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            version_history::LATEST_VERSION.abi_revision.into()
+            *version_history::LATEST_VERSION.abi_revision
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());

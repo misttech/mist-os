@@ -36,7 +36,15 @@
                 "abi_revision": {
                     "type": "string",
                     "pattern": "^0x[0-9A-F]+$"
-                }
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "supported",
+                        "in-development",
+                        "unsupported"
+                    ]
+                } 
             },
             "patternProperties": {
                 "^[1-9][0-9]*$": {}
@@ -44,6 +52,6 @@
         }
     },
     "description": "Specifies the mapping between the supported API levels and ABI revisons. See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning for details.",
-    "id": "https://fuchsia.dev/schema/version_history-3349aec7.json",
+    "id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
     "title": "Schema for Fuchsia platform version history"
 }

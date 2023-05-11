@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use version_history_shared::Status;
+
 use std::{
     array::TryFromSliceError,
     convert::{TryFrom, TryInto},
@@ -95,6 +97,9 @@ pub struct Version {
     /// The ABI revision denotes the semantics of the Fuchsia System Interface that an application
     /// expects the platform to provide.
     pub abi_revision: AbiRevision,
+
+    /// The Status denotes the current status of the API level, either unsupported, supported, in-development.
+    pub status: Status,
 }
 
 /// Returns true if the given abi_revision is listed in the VERSION_HISTORY of
@@ -147,6 +152,7 @@ mod tests {
             .map(|v| Version {
                 api_level: v.api_level,
                 abi_revision: AbiRevision::new(v.abi_revision.value),
+                status: v.status,
             })
             .collect::<Vec<_>>()
     }

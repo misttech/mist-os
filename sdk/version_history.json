@@ -4,33 +4,42 @@
         "type": "version_history",
         "api_levels": {
             "4": {
-                "abi_revision": "0x601665C5B1A89C7F"
+                "abi_revision": "0x601665C5B1A89C7F",
+                "status": "unsupported"
             },
             "5": {
-                "abi_revision": "0x1FA3D8DDFBEDC6C7"
+                "abi_revision": "0x1FA3D8DDFBEDC6C7",
+                "status": "unsupported"
             },
             "6": {
-                "abi_revision": "0xE9CACD17EA11859D"
+                "abi_revision": "0xE9CACD17EA11859D",
+                "status": "unsupported"
             },
             "7": {
-                "abi_revision": "0xECCEA2F70ACD6FC0"
+                "abi_revision": "0xECCEA2F70ACD6FC0",
+                "status": "unsupported"
             },
             "8": {
-                "abi_revision": "0xA56735A6690E09D8"
+                "abi_revision": "0xA56735A6690E09D8",
+                "status": "unsupported"
             },
             "9": {
-                "abi_revision": "0xECDB841C251A8CB9"
+                "abi_revision": "0xECDB841C251A8CB9",
+                "status": "unsupported"
             },
             "10": {
-                "abi_revision": "0xED74D73009C2B4E3"
+                "abi_revision": "0xED74D73009C2B4E3",
+                "status": "unsupported"
             },
             "11": {
-                "abi_revision": "0x406C7CA7EF077DB4"
+                "abi_revision": "0x406C7CA7EF077DB4",
+                "status": "supported"
             },
             "12": {
-                "abi_revision": "0x57904F5A17FA3B22"
+                "abi_revision": "0x57904F5A17FA3B22",
+                "status": "in-development"
             }
         }
     },
-    "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
 }

@@ -954,7 +954,7 @@ meta/schemas/product_bundle-6320eef1.json
 meta/schemas/product_bundle_container-32z5e391.json
 meta/schemas/product_bundle_container-76a5c104.json
 meta/schemas/sysroot.json
-meta/schemas/version_history-3349aec7.json
+meta/schemas/version_history-22rnd667.json
 meta/schemas/virtual_device-93A41932.json
 pkg/async-cpp/executor.cc
 pkg/async-cpp/include/lib/async/cpp/executor.h
