@@ -110,10 +110,14 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
 /// Returns the aggregate of all rights that are supported for [`io_test::Directory`] objects.
 ///
 /// Must support read, write, execute.
-fn get_supported_dir_rights(_config: &io_test::Io1Config) -> fio::OpenFlags {
+fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
     fio::OpenFlags::RIGHT_READABLE
         | fio::OpenFlags::RIGHT_WRITABLE
-        | fio::OpenFlags::RIGHT_EXECUTABLE
+        | if config.supports_executable_file.unwrap_or(false) {
+            fio::OpenFlags::RIGHT_EXECUTABLE
+        } else {
+            fio::OpenFlags::empty()
+        }
 }
 
 /// Returns the aggregate of all rights that are supported for [`io_test::File`] objects.
