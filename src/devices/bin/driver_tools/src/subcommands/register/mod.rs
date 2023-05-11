@@ -19,7 +19,11 @@ pub async fn register(
     driver_registrar_proxy: fdr::DriverRegistrarProxy,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
-    writeln!(writer, "Registering {}", cmd.url)?;
+    writeln!(
+        writer,
+        "Registering {}, restarting driver hosts, and attempting to bind to unbound nodes",
+        cmd.url
+    )?;
     let register_result =
         driver_registrar_proxy.register(&mut fpkg::PackageUrl { url: cmd.url.to_string() }).await?;
 
