@@ -163,7 +163,7 @@ mod tests {
         });
 
         let params = bredr::ScoConnectionParameters {
-            parameter_set: Some(bredr::HfpParameterSet::CvsdD1),
+            parameter_set: Some(bredr::HfpParameterSet::D1),
             air_coding_format: Some(bredr::CodingFormat::Cvsd),
             air_frame_size: Some(60),
             io_bandwidth: Some(16000),
@@ -184,7 +184,7 @@ mod tests {
             sco_connection: {
                 status: "Active",
                 parameters: {
-                    parameter_set: "CvsdD1",
+                    parameter_set: "D1",
                     air_coding_format: "Cvsd",
                     air_frame_size: 60u64,
                     io_bandwidth: 16000u64,

@@ -792,7 +792,7 @@ impl PeerTask {
     fn codec_for_parameter_set(&self, param_set: &bredr::HfpParameterSet) -> CodecId {
         use bredr::HfpParameterSet::*;
         match param_set {
-            MsbcT2 | MsbcT1 => CodecId::MSBC,
+            T2 | T1 => CodecId::MSBC,
             _ => CodecId::CVSD,
         }
     }
@@ -1825,7 +1825,7 @@ mod tests {
     ) -> Option<bredr::ScoConnectionRequestStream> {
         // All parameter sets accepted
         use bredr::HfpParameterSet::*;
-        let accept_parameter_sets = vec![MsbcT2, MsbcT1, CvsdS4, CvsdS1, CvsdD1, CvsdD0];
+        let accept_parameter_sets = vec![T2, T1, S4, S1, D1, D0];
         expect_sco_connection_with_parameters(
             profile_requests,
             expected_initiator,
@@ -2009,7 +2009,7 @@ mod tests {
         let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
 
         // First SCO connections fail (T2 and T1), causing a re-negotiation of the codec state.
-        let accepted_paramset = vec![bredr::HfpParameterSet::CvsdS4];
+        let accepted_paramset = vec![bredr::HfpParameterSet::S4];
         let (sco, run_fut) = run_while(
             &mut exec,
             run_fut,

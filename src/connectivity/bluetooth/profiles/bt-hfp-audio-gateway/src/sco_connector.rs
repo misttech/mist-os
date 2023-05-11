@@ -69,10 +69,9 @@ fn common_sco_params() -> bredr::ScoConnectionParameters {
 
 /// If all eSCO parameters fail to setup a connection, these parameters are required to be
 /// supported by all peers.  HFP 1.8 Section 5.7.1.
-
 fn sco_params_fallback() -> bredr::ScoConnectionParameters {
     bredr::ScoConnectionParameters {
-        parameter_set: Some(bredr::HfpParameterSet::CvsdD1),
+        parameter_set: Some(bredr::HfpParameterSet::D1),
         air_coding_format: Some(bredr::CodingFormat::Cvsd),
         // IO bandwidth to match an 8khz audio rate.
         io_bandwidth: Some(16000),
@@ -111,8 +110,8 @@ pub(crate) fn parameter_sets_for_codec(
                 ..params_with_data_path(common_sco_params(), in_band_sco)
             };
             // TODO(b/200305833): Disable MsbcT1 for now as it results in bad audio
-            //vec![params_fn(MsbcT2), params_fn(MsbcT1)]
-            vec![params_fn(MsbcT2)]
+            //vec![params_fn(T2), params_fn(T1)]
+            vec![params_fn(T2)]
         }
         // CVSD parameter sets
         _ => {
@@ -129,7 +128,7 @@ pub(crate) fn parameter_sets_for_codec(
                 io_coding_format,
                 ..params_with_data_path(sco_params_fallback(), in_band_sco)
             };
-            vec![params_fn(CvsdS4), params_fn(CvsdS1), params_fn(CvsdD1)]
+            vec![params_fn(S4), params_fn(S1), params_fn(D1)]
         }
     }
 }
@@ -259,19 +258,19 @@ pub(crate) mod tests {
             res,
             vec![
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::MsbcT2),
+                    parameter_set: Some(HfpParameterSet::T2),
                     air_coding_format: Some(bredr::CodingFormat::Msbc),
                     io_bandwidth: Some(32000),
                     path: Some(bredr::DataPath::Offload),
                     ..common_sco_params()
                 },
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::CvsdS4),
+                    parameter_set: Some(HfpParameterSet::S4),
                     path: Some(bredr::DataPath::Offload),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::CvsdS1),
+                    parameter_set: Some(HfpParameterSet::S1),
                     path: Some(bredr::DataPath::Offload),
                     ..sco_params_fallback()
                 },
@@ -290,21 +289,21 @@ pub(crate) mod tests {
             res,
             vec![
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::MsbcT2),
+                    parameter_set: Some(HfpParameterSet::T2),
                     air_coding_format: Some(bredr::CodingFormat::Transparent),
                     io_bandwidth: Some(16000),
                     path: Some(bredr::DataPath::Host),
                     ..common_sco_params()
                 },
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::CvsdS4),
+                    parameter_set: Some(HfpParameterSet::S4),
                     io_coding_format: Some(bredr::CodingFormat::Cvsd),
                     io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
-                    parameter_set: Some(HfpParameterSet::CvsdS1),
+                    parameter_set: Some(HfpParameterSet::S1),
                     io_coding_format: Some(bredr::CodingFormat::Cvsd),
                     io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),

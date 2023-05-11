@@ -1273,7 +1273,7 @@ mod tests {
         assert_data_tree!(inspect, root: {});
 
         let params = fidl_bredr::ScoConnectionParameters {
-            parameter_set: Some(fidl_bredr::HfpParameterSet::CvsdD1),
+            parameter_set: Some(fidl_bredr::HfpParameterSet::D1),
             air_coding_format: Some(fidl_bredr::CodingFormat::Cvsd),
             air_frame_size: Some(60),
             io_bandwidth: Some(16000),
@@ -1291,7 +1291,7 @@ mod tests {
         let _ = local.iattach(&inspect.root(), "state").expect("can attach inspect");
         assert_data_tree!(inspect, root: {
             state: {
-                parameter_set: "CvsdD1",
+                parameter_set: "D1",
                 air_coding_format: "Cvsd",
                 air_frame_size: 60u64,
                 io_bandwidth: 16000u64,

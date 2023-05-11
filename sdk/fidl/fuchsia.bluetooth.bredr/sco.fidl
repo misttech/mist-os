@@ -14,17 +14,19 @@ type ScoErrorCode = strict enum {
 
 /// Codec parameter sets defined in the Hands-Free Profile specification (v1.8, section 5.7).
 type HfpParameterSet = strict enum : uint8 {
-    MSBC_T1 = 1;
-    MSBC_T2 = 2;
-    CVSD_S1 = 3;
-    CVSD_S2 = 4;
-    CVSD_S3 = 5;
-    CVSD_S4 = 6;
-    CVSD_D0 = 7;
-    CVSD_D1 = 8;
+    T1 = 1;
+    T2 = 2;
+    S1 = 3;
+    S2 = 4;
+    S3 = 5;
+    S4 = 6;
+    D0 = 7;
+    D1 = 8;
 };
 
 /// The coding format used for synchronous connection data.
+/// Includes all coding formats in Bluetooth Assigned Numbers:
+/// https://www.bluetooth.com/specifications/assigned-numbers/
 type CodingFormat = strict enum : uint8 {
     MULAW = 1;
     ALAW = 2;
@@ -32,6 +34,8 @@ type CodingFormat = strict enum : uint8 {
     TRANSPARENT = 4;
     LINEAR_PCM = 5;
     MSBC = 6;
+    LC3 = 7;
+    G729A = 8;
 };
 
 /// Indicates the audio transport that should be used for the data on a synchronous
