@@ -1205,6 +1205,9 @@ impl CurrentTask {
             {
                 return error!(EISDIR);
             }
+            if flags.contains(OpenFlags::DIRECT) {
+                return error!(EINVAL);
+            }
         } else if context.must_be_directory {
             return error!(ENOTDIR);
         }

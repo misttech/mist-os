@@ -420,9 +420,6 @@
                 // network_namespace_test
                 "NetworkNamespaceTest.LoopbackExists",
 
-                // open_test
-                "OpenTest.DirectoryDirectFails",
-
                 // packet_socket_dgram_test
                 "BasicCookedPacketTest.WrongType",
                 "AllInetTests/CookedPacketTest.Receive/*",
