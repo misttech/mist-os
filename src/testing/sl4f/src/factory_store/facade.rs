@@ -185,10 +185,7 @@ mod tests {
                 factory_store_facade.list_files(json!({ "provider": provider })).await?;
 
             let mut file_list: Vec<String> = from_value(file_list_json_value)?;
-            #[allow(unknown_lints)] // TODO(fxbug.dev/126732)
             #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95034)
-            #[allow(renamed_and_removed_lints)] // TODO(fxbug.dev/126732)
-            #[allow(clippy::clone_double_ref)] // TODO(fxbug.dev/126732)
             let mut expected_file_list: Vec<&str> =
                 file_map.keys().map(|entry| entry.clone()).collect();
 

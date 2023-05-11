@@ -360,10 +360,7 @@ impl VDLFiles {
     /// Launches FEMU, opens an SSH session, and waits for the FEMU instance or SSH session to exit.
     pub async fn start_emulator(&mut self, start_command: &StartCommand) -> Result<i32> {
         self.check_start_command(&start_command)?;
-        #[allow(unknown_lints)] // TODO(fxbug.dev/126732)
         #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95079)
-        #[allow(renamed_and_removed_lints)] // TODO(fxbug.dev/126732)
-        #[allow(clippy::clone_double_ref)] // TODO(fxbug.dev/126732)
         let vdl_args: VDLArgs = start_command.clone().into();
 
         let mut gcs_image = vdl_args.gcs_image_archive;

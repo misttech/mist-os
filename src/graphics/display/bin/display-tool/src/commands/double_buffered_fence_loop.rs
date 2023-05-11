@@ -51,7 +51,6 @@ impl BouncingSquare {
 }
 
 pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()> {
-    #![allow(unknown_lints)] // TODO(fxbug.dev/126732)
     #![allow(suspicious_double_ref_op)] // TODO(fxbug.dev/126728)
 
     // Obtain the display resolution based on the display's preferred mode.
