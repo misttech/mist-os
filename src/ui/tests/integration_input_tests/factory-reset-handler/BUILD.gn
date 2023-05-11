@@ -45,7 +45,6 @@ rustc_test("factory_reset_handler_test") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:test-case",
   ]
 
   sources = [
@@ -74,7 +73,6 @@ fuchsia_test_package("factory-reset-handler-test") {
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/ui/a11y/testing:fake-a11y-manager",
     "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
-    "//src/ui/bin/input-pipeline:component-for-test",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
     "//src/ui/testing/ui_test_realm:scenic_only",
   ]
