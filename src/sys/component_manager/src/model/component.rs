@@ -141,19 +141,8 @@ pub struct Component {
     pub abi_revision: Option<AbiRevision>,
 }
 
-/// Package information possibly returned by the resolver.
-#[derive(Clone, Debug)]
-pub struct Package {
-    /// The URL of the package itself.
-    pub package_url: String,
-    /// The package that this resolved component belongs to
-    pub package_dir: fio::DirectoryProxy,
-}
-
-impl TryFrom<ResolvedComponent> for Component {
-    type Error = ResolveActionError;
-
-    fn try_from(
+impl Component {
+    pub fn resolve_with_config(
         ResolvedComponent {
             resolved_by: _,
             resolved_url,
@@ -161,16 +150,14 @@ impl TryFrom<ResolvedComponent> for Component {
             decl,
             package,
             config_values,
-            config_parent_overrides,
             abi_revision,
         }: ResolvedComponent,
-    ) -> Result<Self, Self::Error> {
-        // Verify the component configuration, if it exists
+        config_parent_overrides: Option<&Vec<cm_rust::ConfigOverride>>,
+    ) -> Result<Self, ResolveActionError> {
         let config = if let Some(config_decl) = decl.config.as_ref() {
             let values = config_values.ok_or(StructuredConfigError::ConfigValuesMissing)?;
-            let config =
-                ConfigFields::resolve(config_decl, values, config_parent_overrides.as_ref())
-                    .map_err(StructuredConfigError::ConfigResolutionFailed)?;
+            let config = ConfigFields::resolve(config_decl, values, config_parent_overrides)
+                .map_err(StructuredConfigError::ConfigResolutionFailed)?;
             Some(config)
         } else {
             None
@@ -179,6 +166,15 @@ impl TryFrom<ResolvedComponent> for Component {
         let package = package.map(|p| p.try_into()).transpose()?;
         Ok(Self { resolved_url, context_to_resolve_children, decl, package, config, abi_revision })
     }
+}
+
+/// Package information possibly returned by the resolver.
+#[derive(Clone, Debug)]
+pub struct Package {
+    /// The URL of the package itself.
+    pub package_url: String,
+    /// The package that this resolved component belongs to
+    pub package_dir: fio::DirectoryProxy,
 }
 
 impl TryFrom<ResolvedPackage> for Package {

@@ -5,11 +5,7 @@
 use {
     crate::{
         builtin::runner::BuiltinRunnerFactory,
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            resolver::Resolver,
-            routing::RouteRequest,
-        },
+        model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
     },
     ::routing::{
         capability_source::ComponentCapability,
@@ -236,7 +232,6 @@ impl MockResolver {
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
             config_values,
             abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
-            config_parent_overrides: None,
         })
     }
 
@@ -267,7 +262,6 @@ impl Resolver for MockResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        _target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         self.resolve_async(component_address.url().to_string()).await
     }

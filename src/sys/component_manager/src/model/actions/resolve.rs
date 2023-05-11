@@ -13,10 +13,9 @@ use {
         hooks::{Event, EventPayload},
         resolver::Resolver,
     },
-    ::routing::resolving::ComponentAddress,
+    ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::io::clone_dir,
-    std::convert::TryFrom,
     std::sync::Arc,
 };
 
@@ -77,10 +76,11 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                 }
             })?;
         let component_info =
-            component.environment.resolve(&component_address, component).await.map_err(|err| {
+            component.environment.resolve(&component_address).await.map_err(|err| {
                 ResolveActionError::ResolverError { url: component.component_url.clone(), err }
             })?;
-        let component_info = Component::try_from(component_info)?;
+        let component_info =
+            Component::resolve_with_config(component_info, component.config_parent_overrides())?;
         let policy = component.context.abi_revision_policy();
         policy.check_compatibility(&component.abs_moniker, component_info.abi_revision)?;
         if first_resolve {

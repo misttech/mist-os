@@ -148,17 +148,16 @@ impl Resolver for Environment {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         let parent = self.parent.upgrade().map_err(|_| {
             error!("error getting the component that created the environment");
             ResolverError::SchemeNotRegistered
         })?;
-        match self.resolver_registry.resolve(component_address, target).await {
+        match self.resolver_registry.resolve(component_address).await {
             Err(ResolverError::SchemeNotRegistered) => match &self.extends {
                 EnvironmentExtends::Realm => match parent {
                     ExtendedInstance::Component(parent) => {
-                        parent.environment.resolve(component_address, target).await
+                        parent.environment.resolve(component_address).await
                     }
                     ExtendedInstance::AboveRoot(_) => {
                         unreachable!("root env can't extend")

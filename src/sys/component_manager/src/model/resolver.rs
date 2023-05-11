@@ -26,7 +26,6 @@ pub trait Resolver: std::fmt::Debug {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError>;
 }
 
@@ -72,10 +71,9 @@ impl Resolver for ResolverRegistry {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         if let Some(resolver) = self.resolvers.get(component_address.scheme()) {
-            resolver.resolve(component_address, target).await
+            resolver.resolve(component_address).await
         } else {
             Err(ResolverError::SchemeNotRegistered)
         }
@@ -103,7 +101,6 @@ impl Resolver for RemoteResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fresolution::ResolverMarker>()
             .map_err(ResolverError::internal)?;
@@ -161,7 +158,6 @@ impl Resolver for RemoteResolver {
             decl,
             package: component.package.map(TryInto::try_into).transpose()?,
             config_values,
-            config_parent_overrides: target.config_parent_overrides().cloned(),
             abi_revision,
         })
     }
@@ -175,9 +171,8 @@ impl Resolver for BuiltinResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
-        self.0.resolve(component_address, target).await
+        self.0.resolve(component_address).await
     }
 }
 
@@ -237,7 +232,6 @@ mod tests {
         async fn resolve(
             &self,
             component_address: &ComponentAddress,
-            _target: &Arc<ComponentInstance>,
         ) -> Result<ResolvedComponent, ResolverError> {
             assert_eq!(self.expected_url.as_str(), component_address.url());
             Ok(ResolvedComponent {
@@ -250,7 +244,6 @@ mod tests {
                 package: None,
                 config_values: None,
                 abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
-                config_parent_overrides: None,
             })
         }
     }
@@ -271,7 +264,6 @@ mod tests {
         async fn resolve(
             &self,
             component_address: &ComponentAddress,
-            _target: &Arc<ComponentInstance>,
         ) -> Result<ResolvedComponent, ResolverError> {
             assert_eq!(self.expected_url, component_address.url());
             Err((self.error)(component_address.url()))
@@ -317,7 +309,6 @@ mod tests {
         async fn resolve(
             &self,
             component_address: &ComponentAddress,
-            _target: &Arc<ComponentInstance>,
         ) -> Result<ResolvedComponent, ResolverError> {
             let ResolveState {
                 expected_url,
@@ -339,7 +330,6 @@ mod tests {
                 package: None,
                 config_values: None,
                 abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
-                config_parent_overrides: None,
             })
         }
     }
@@ -373,7 +363,7 @@ mod tests {
 
         // Resolve known scheme that returns success.
         let component = registry
-            .resolve(&ComponentAddress::from_absolute_url("foo://url").unwrap(), &root)
+            .resolve(&ComponentAddress::from_absolute_url("foo://url").unwrap())
             .await
             .unwrap();
         assert_eq!("foo://resolved", component.resolved_url);
@@ -385,9 +375,7 @@ mod tests {
             format!("{:?}", expected_res),
             format!(
                 "{:?}",
-                registry
-                    .resolve(&ComponentAddress::from_absolute_url("bar://url").unwrap(), &root)
-                    .await
+                registry.resolve(&ComponentAddress::from_absolute_url("bar://url").unwrap()).await
             )
         );
 
@@ -399,7 +387,7 @@ mod tests {
             format!(
                 "{:?}",
                 registry
-                    .resolve(&ComponentAddress::from_absolute_url("unknown://url").unwrap(), &root)
+                    .resolve(&ComponentAddress::from_absolute_url("unknown://url").unwrap())
                     .await
             ),
         );
@@ -829,7 +817,7 @@ mod tests {
 
         let resolved = child
             .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?, &child)
+            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -908,10 +896,7 @@ mod tests {
 
         let resolved = child_two
             .environment
-            .resolve(
-                &ComponentAddress::from(&child_two.component_url, &child_two).await?,
-                &child_two,
-            )
+            .resolve(&ComponentAddress::from(&child_two.component_url, &child_two).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -970,7 +955,7 @@ mod tests {
 
         let resolved = child
             .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?, &child)
+            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -1029,7 +1014,7 @@ mod tests {
 
         let resolved = child
             .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?, &child)
+            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -1144,10 +1129,7 @@ mod tests {
 
         let resolved = child_two
             .environment
-            .resolve(
-                &ComponentAddress::from(&child_two.component_url, &child_two).await?,
-                &child_two,
-            )
+            .resolve(&ComponentAddress::from(&child_two.component_url, &child_two).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -1244,10 +1226,7 @@ mod tests {
 
         let resolved = child_three
             .environment
-            .resolve(
-                &ComponentAddress::from(&child_three.component_url, &child_three).await?,
-                &child_three,
-            )
+            .resolve(&ComponentAddress::from(&child_three.component_url, &child_three).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
@@ -1387,10 +1366,7 @@ mod tests {
 
         let resolved = child_four
             .environment
-            .resolve(
-                &ComponentAddress::from(&child_four.component_url, &child_four).await?,
-                &child_four,
-            )
+            .resolve(&ComponentAddress::from(&child_four.component_url, &child_four).await?)
             .await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);

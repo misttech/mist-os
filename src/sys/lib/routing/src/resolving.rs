@@ -43,7 +43,6 @@ pub struct ResolvedComponent {
     pub decl: cm_rust::ComponentDecl,
     pub package: Option<ResolvedPackage>,
     pub config_values: Option<cm_rust::ConfigValuesData>,
-    pub config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
     pub abi_revision: Option<AbiRevision>,
 }
 

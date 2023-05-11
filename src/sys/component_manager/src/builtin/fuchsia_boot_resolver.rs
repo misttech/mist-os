@@ -5,10 +5,8 @@
 use {
     crate::{
         builtin::capability::BuiltinCapability,
-        model::component::ComponentInstance,
         model::resolver::{self, Resolver},
     },
-    ::routing::component_instance::ComponentInstanceInterface,
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl::endpoints::{ClientEnd, Proxy},
@@ -327,7 +325,6 @@ impl Resolver for FuchsiaBootResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,
-        target: &Arc<ComponentInstance>,
     ) -> Result<ResolvedComponent, ResolverError> {
         if component_address.is_relative_path() {
             return Err(ResolverError::UnexpectedRelativePath(component_address.url().to_string()));
@@ -353,7 +350,6 @@ impl Resolver for FuchsiaBootResolver {
             decl,
             package: package.map(|p| p.try_into()).transpose()?,
             config_values,
-            config_parent_overrides: target.config_parent_overrides().cloned(),
             abi_revision: abi_revision.map(Into::into),
         })
     }
@@ -444,15 +440,8 @@ mod tests {
         let (_task, bootfs) = serve_vfs_dir(root);
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
-        let root = ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "fuchsia-boot:///#meta/root.cm".to_string(),
-        );
-
         let url = "fuchsia-boot:///#meta/hello-world-rust.cm";
-        let component = resolver.resolve(&ComponentAddress::from_absolute_url(url)?, &root).await?;
+        let component = resolver.resolve(&ComponentAddress::from_absolute_url(url)?).await?;
 
         // Check that both the returned component manifest and the component manifest in
         // the returned package dir match the expected value. This also tests that
@@ -516,8 +505,7 @@ mod tests {
             .expect("failed to open executable file");
 
         let url = "fuchsia-boot:///contains/a/package#meta/hello-world-rust.cm";
-        let err =
-            resolver.resolve(&ComponentAddress::from_absolute_url(url)?, &root).await.unwrap_err();
+        let err = resolver.resolve(&ComponentAddress::from_absolute_url(url)?).await.unwrap_err();
         assert_matches!(err, ResolverError::PackageNotFound { .. });
         Ok(())
     }
@@ -563,18 +551,9 @@ mod tests {
         let (_task, bootfs) = serve_vfs_dir(root);
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
-        let root = ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "fuchsia-boot:///#meta/root.cm".to_string(),
-        );
-
         let url = "fuchsia-boot:///#meta/has_config.cm";
-        let component = resolver
-            .resolve(&ComponentAddress::from_absolute_url(url).unwrap(), &root)
-            .await
-            .unwrap();
+        let component =
+            resolver.resolve(&ComponentAddress::from_absolute_url(url).unwrap()).await.unwrap();
 
         let ResolvedComponent { resolved_url, decl, config_values, .. } = component;
         assert_eq!(url, resolved_url);
@@ -633,18 +612,15 @@ mod tests {
         );
 
         let url = "fuchsia-boot:///#meta/has_config.cm";
-        let err = resolver
-            .resolve(&ComponentAddress::from(url, &root).await.unwrap(), &root)
-            .await
-            .unwrap_err();
+        let err =
+            resolver.resolve(&ComponentAddress::from(url, &root).await.unwrap()).await.unwrap_err();
         assert_matches!(err, ResolverError::ConfigValuesIo { .. });
     }
 
     macro_rules! test_resolve_error {
         ($resolver:ident, $url:expr, $target:ident, $resolver_error_expected:ident) => {
-            let res = $resolver
-                .resolve(&ComponentAddress::from($url, &$target).await.unwrap(), &$target)
-                .await;
+            let res =
+                $resolver.resolve(&ComponentAddress::from($url, &$target).await.unwrap()).await;
             match res.err().expect("unexpected success") {
                 ResolverError::$resolver_error_expected { .. } => {}
                 e => panic!("unexpected error {:?}", e),
