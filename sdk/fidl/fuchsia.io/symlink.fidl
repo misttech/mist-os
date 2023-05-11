@@ -15,6 +15,10 @@ type SymlinkInfo = table {
     /// The symbolic link has no meaning on the server; the client is free to interpret the
     /// target however it chooses.
     1: target SymlinkTarget;
+
+    /// Requested attributes for the symbolic link. This is only populated if requested.
+    @available(added=HEAD)
+    2: attributes NodeAttributes2;
 };
 
 /// A ['Node'] which contains a symbolic link.

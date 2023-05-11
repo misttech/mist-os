@@ -42,6 +42,10 @@ type FileInfo = resource table {
     /// faster than reading and writing the file using the Read and Write
     /// operations in the [`File`] protocol.
     3: stream zx.Handle:STREAM;
+
+    /// Requested attributes for the file. This is only populated if requested.
+    @available(added=HEAD)
+    4: attributes NodeAttributes2;
 };
 
 // TODO(https://fxbug.dev/105608): Use a generated constant.

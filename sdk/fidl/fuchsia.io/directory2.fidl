@@ -5,6 +5,12 @@ library fuchsia.io;
 
 using zx;
 
+type DirectoryInfo = table {
+    /// Requested attributes for the directory. This is only populated if requested.
+    @available(added=HEAD)
+    1: attributes NodeAttributes2;
+};
+
 protocol DirectoryIterator {
     /// Reads a collection of variably sized directory entries into a buffer.
     ///
@@ -191,6 +197,18 @@ protocol Directory2 {
                 /// If absent, inherits the rights from the requesting
                 /// connection.
                 4: rights Rights;
+
+                /// If the `GET_REPRESENTATION` flag is set, attributes to be
+                /// returned in [`Node.OnRepresentation`].
+                @available(added=HEAD)
+                5: attributes NodeAttributesQuery;
+
+                /// If an object is to be created, this specifies attributes
+                /// that should be stored with the object at creation time.
+                /// Servers might not support setting any or all attributes in
+                /// which case they will return `ZX_ERR_NOT_SUPPORTED`.
+                @available(added=HEAD)
+                6: create_attributes MutableNodeAttributes;
             };
         };
 

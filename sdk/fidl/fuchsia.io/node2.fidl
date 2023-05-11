@@ -34,12 +34,61 @@ type ExtendedAttributeValue = strict resource union {
     2: buffer zx.Handle:VMO;
 };
 
+type NodeAttributesQuery = strict bits : uint64 {
+    /// Requests [`NodeAttributes.protocols`].
+    PROTOCOLS = 0x1;
+
+    /// Requests [`NodeAttributes.abilities`].
+    ABILITIES = 0x2;
+
+    /// Requests [`NodeAttributes.content_size`].
+    CONTENT_SIZE = 0x4;
+
+    /// Requests [`NodeAttributes.storage_size`].
+    STORAGE_SIZE = 0x8;
+
+    /// Requests [`NodeAttributes.link_count`].
+    LINK_COUNT = 0x10;
+
+    /// Requests [`NodeAttributes.id`].
+    ID = 0x20;
+
+    /// Requests [`NodeAttributes.creation_time`].
+    CREATION_TIME = 0x40;
+
+    /// Requests [`NodeAttributes.modification_time`].
+    MODIFICATION_TIME = 0x80;
+
+    /// Posix attributes.
+    @available(added=HEAD)
+    MODE = 0x100;
+    @available(added=HEAD)
+    UID = 0x200;
+    @available(added=HEAD)
+    GID = 0x400;
+    @available(added=HEAD)
+    RDEV = 0x800;
+};
+
 type MutableNodeAttributes = table {
     /// Time of creation in nanoseconds since the Unix epoch, UTC.
     1: creation_time uint64;
 
     /// Time of last modification in nanoseconds since the Unix epoch, UTC.
     2: modification_time uint64;
+
+    /// POSIX compatibility attributes. Most filesystems will not support
+    /// these. Those that do must simply store and retrieve them (e.g. as
+    /// extended attributes) and not attempt to interpret them (e.g. by doing
+    /// permission checks or handling device opens specially).
+    @available(added=HEAD)
+    3: mode uint32; // mode_t
+    @available(added=HEAD)
+    4: uid uint32; // uid_t
+    @available(added=HEAD)
+    5: gid uint32; // gid_t
+    @available(added=HEAD)
+    6: rdev uint64; // dev_t
 };
 
 // TODO(https://fxbug.dev/105840): Inline this into its only reference when fidlgen_go is fixed.
@@ -51,6 +100,35 @@ type ConnectionInfo = resource table {
     /// `EXECUTE` ability, and hence cannot be executed. See
     /// [`ConnectionOptions.rights`].
     1: rights Rights;
+};
+
+type NodeAttributes2 = struct {
+    // TODO(https://fxbug.dev/47480): fostr does not escape C++ keywords.
+    // Drop the `_attributes` suffixes when fostr is fixed or retired.
+    mutable_attributes MutableNodeAttributes;
+    immutable_attributes @generated_name("ImmutableNodeAttributes") table {
+        /// Describes the kinds of representations supported by the node.
+        /// Note: This is not the result of the connection-time negotiation,
+        /// which is conveyed via `representation`.
+        1: protocols NodeProtocolKinds;
+
+        /// Describes the kinds of operations supported by the node.
+        /// Note: This is distinct from the rights used at connection time.
+        2: abilities Abilities;
+
+        /// Node size, in bytes.
+        3: content_size uint64;
+
+        /// Space needed to store the node (possibly larger than size), in bytes.
+        4: storage_size uint64;
+
+        /// Number of hard links to the node. It must be at least one.
+        5: link_count uint64;
+
+        /// An ID for the node. See [`Id`].
+        /// This `id` should be unique among all entries of a directory.
+        6: id Id;
+    };
 };
 
 // TODO(https://fxbug.dev/105608): Use a generated constant.
@@ -131,7 +209,7 @@ protocol Node2 {
         /// connection speaks the [`Directory`] protocol.
         ///
         /// See [`NodeProtocolKinds.DIRECTORY`].
-        2: directory @generated_name("DirectoryInfo") table {};
+        2: directory DirectoryInfo;
 
         /// Auxiliary data for the file representation of a node. The
         /// selection of this variant in [`Representation`] implies that the
@@ -186,59 +264,8 @@ protocol Node2 {
         /// Set the corresponding bit to one to query that particular attribute.
         ///
         /// The elements here correspond one-to-one with [`NodeAttributes`].
-        query @generated_name("NodeAttributesQuery") strict bits : uint64 {
-            /// Requests [`NodeAttributes.protocols`].
-            PROTOCOLS = 0x1;
-
-            /// Requests [`NodeAttributes.abilities`].
-            ABILITIES = 0x2;
-
-            /// Requests [`NodeAttributes.content_size`].
-            CONTENT_SIZE = 0x4;
-
-            /// Requests [`NodeAttributes.storage_size`].
-            STORAGE_SIZE = 0x8;
-
-            /// Requests [`NodeAttributes.link_count`].
-            LINK_COUNT = 0x10;
-
-            /// Requests [`NodeAttributes.id`].
-            ID = 0x20;
-
-            /// Requests [`NodeAttributes.creation_time`].
-            CREATION_TIME = 0x40;
-
-            /// Requests [`NodeAttributes.modification_time`].
-            MODIFICATION_TIME = 0x80;
-        };
-    }) -> (@generated_name("NodeAttributes2") struct {
-        // TODO(https://fxbug.dev/47480): fostr does not escape C++ keywords.
-        // Drop the `_attributes` suffixes when fostr is fixed or retired.
-        mutable_attributes MutableNodeAttributes;
-        immutable_attributes @generated_name("ImmutableNodeAttributes") table {
-            /// Describes the kinds of representations supported by the node.
-            /// Note: This is not the result of the connection-time negotiation,
-            /// which is conveyed via `representation`.
-            1: protocols NodeProtocolKinds;
-
-            /// Describes the kinds of operations supported by the node.
-            /// Note: This is distinct from the rights used at connection time.
-            2: abilities Abilities;
-
-            /// Node size, in bytes.
-            3: content_size uint64;
-
-            /// Space needed to store the node (possibly larger than size), in bytes.
-            4: storage_size uint64;
-
-            /// Number of hard links to the node. It must be at least one.
-            5: link_count uint64;
-
-            /// An ID for the node. See [`Id`].
-            /// This `id` should be unique among all entries of a directory.
-            6: id Id;
-        };
-    }) error zx.Status;
+        query NodeAttributesQuery;
+    }) -> (NodeAttributes2) error zx.Status;
 
     /// Updates information about the node.
     ///
