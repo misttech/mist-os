@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    fidl::AsHandleRef,
     fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, fuchsia_zircon as zx,
     io_conformance_util::{test_harness::TestHarness, *},
 };
@@ -169,33 +170,31 @@ async fn file_get_executable_memory_with_insufficient_rights() {
     }
 }
 
-// Ensure that passing VmoFlags::SHARED_BUFFER to GetBackingMemory returns a buffer that's
-// shared with the underlying file.
+// Ensure that passing VmoFlags::SHARED_BUFFER to GetBackingMemory returns the same KOID as the
+// backing VMO.
 #[fuchsia::test]
-async fn file_get_backing_memory_shared_buffer() {
+async fn file_get_backing_memory_exact_same_koid() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
 
-    let vmo = zx::Vmo::create(3).expect("Cannot create VMO");
+    let vmo = zx::Vmo::create(1).expect("Cannot create VMO");
+    let original_koid = vmo.get_koid();
     let vmofile_object = io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
         name: Some(TEST_FILE.to_string()),
         vmo: Some(vmo),
         ..Default::default()
     });
 
-    let (vmo, (_, vmo_file)) = create_file_and_get_backing_memory(
+    let (vmo, _) = create_file_and_get_backing_memory(
         vmofile_object,
         &harness,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
         fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER,
     )
     .await
     .expect("Failed to create file and obtain VMO");
 
-    // Write to the file and it should show up in the VMO.
-    fuchsia_fs::file::write(&vmo_file, "foo").await.expect("write failed");
-
-    assert_eq!(&vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"foo");
+    assert_eq!(original_koid, vmo.get_koid());
 }

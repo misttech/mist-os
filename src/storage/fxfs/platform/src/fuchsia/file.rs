@@ -288,7 +288,7 @@ impl File for FxFile {
                 child_options |= zx::VmoChildOptions::RESIZABLE;
                 rights |= zx::Rights::RESIZE;
             }
-            vmo.create_child(child_options, 0, vmo.get_content_size()?)?
+            vmo.create_child(child_options, 0, vmo.get_size()?)?
         } else {
             vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0)?
         };

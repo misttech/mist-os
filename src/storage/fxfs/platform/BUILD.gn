@@ -119,7 +119,6 @@ rustc_library("fxfs-testing") {
   visibility = [
     "//sdk/lib/zxio/tests/*",
     "//src/starnix/kernel/*",
-    "//src/storage/conformance/conformance_harness/fxfs/*",
     "//src/storage/fxfs/*",
   ]
 }

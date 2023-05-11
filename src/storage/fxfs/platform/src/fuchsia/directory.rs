@@ -374,8 +374,9 @@ impl MutableDirectory for FxDirectory {
             )
             .await
             .map_err(map_to_status)?;
+        let posix_attributes = PosixAttributes { mode: attrs.mode, ..Default::default() };
         self.directory
-            .update_attributes(&mut transaction, crtime, mtime, 0, None)
+            .update_attributes(&mut transaction, crtime, mtime, 0, Some(posix_attributes))
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;

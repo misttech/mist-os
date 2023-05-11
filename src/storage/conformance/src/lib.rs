@@ -79,7 +79,7 @@ pub async fn open_node<T: ProtocolMarker>(
 ) -> T::Proxy {
     open_node_status::<T>(dir, flags, path)
         .await
-        .unwrap_or_else(|e| panic!("open_node_status failed for {path} (flags={flags:?}): {e:?}"))
+        .unwrap_or_else(|e| panic!("open_node_status failed for {}: {:?}", path, e))
 }
 
 /// Helper function to open the desired node in the root folder.
