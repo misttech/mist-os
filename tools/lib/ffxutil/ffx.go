@@ -16,7 +16,6 @@ import (
 
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -207,15 +206,8 @@ func (f *FFXInstance) Stop() error {
 	// Use a new context for Stop() to give it time to complete.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := f.Run(ctx, "daemon", "stop")
-	// Wait to allow the daemon to complete shutdown before exiting this function
-	// because the ffx command returns after it has initiated the shutdown,
-	// but there may be some delay where the daemon can continue to output
-	// logs before it's completely shut down.
-	// TODO(fxbug.dev/92296): Remove this workaround when ffx can ensure that
-	// no more logs are written once the command returns.
-	clock.Sleep(f.ctx, time.Second)
-	return err
+	// Wait up to 4000ms for daemon to shut down.
+	return f.Run(ctx, "daemon", "stop", "-t", "4000")
 }
 
 // BootloaderBoot RAM boots the target.

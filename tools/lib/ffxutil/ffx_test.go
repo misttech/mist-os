@@ -89,5 +89,5 @@ func TestFFXInstance(t *testing.T) {
 
 	assertRunsExpectedCmd(ffx.RunWithTarget(ctx, "random", "cmd", "with", "args"), stdout, "--target target random cmd with args")
 
-	assertRunsExpectedCmd(ffx.Stop(), stdout, "daemon stop")
+	assertRunsExpectedCmd(ffx.Stop(), stdout, "daemon stop -t 4000")
 }
