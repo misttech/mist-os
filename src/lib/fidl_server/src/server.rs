@@ -77,6 +77,38 @@ where
     Ok(())
 }
 
+/// Serves all requests on `stream` concurrently using `handler`.
+///
+/// Stops and returns an error if a FIDL error occurs while reading a request,
+/// or if `handler` fails. The caller should log this error.
+pub async fn serve_async_concurrent<S, H>(
+    stream: S,
+    limit: impl Into<Option<usize>>,
+    handler: H,
+) -> Result<(), Error>
+where
+    S: RequestStream,
+    S::Ok: 'static + Send,
+    H: AsyncRequestHandler<S::Protocol> + 'static,
+{
+    let handler = std::sync::Arc::new(handler);
+
+    let fut = stream.try_for_each_concurrent(limit, |request| async {
+        handler
+            .clone()
+            .handle_request(request)
+            .await
+            .with_context(|| format!("error handling {} request", S::Protocol::DEBUG_NAME))
+            .unwrap();
+
+        Ok(())
+    });
+
+    fut.await.with_context(|| format!("error reading {} request", S::Protocol::DEBUG_NAME))?;
+
+    Ok(())
+}
+
 /// Runs the server in the background and logs the error if one occurs.
 ///
 /// This implements the most common case where FIDL service authors serve a

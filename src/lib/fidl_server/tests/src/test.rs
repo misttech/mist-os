@@ -9,6 +9,8 @@ use {
     fidl_fuchsia_examples::{EchoMarker, EchoRequest},
     fidl_server::*,
     fuchsia_async as fasync,
+    futures::{future::FutureExt, pin_mut, select},
+    std::sync::{mpsc, Arc, Mutex},
     tracing::info,
 };
 
@@ -33,6 +35,48 @@ fn handle_echo_request(request: EchoRequest) -> Result<(), Error> {
     let EchoRequest::EchoString { value, responder } = request else { panic!(); };
     responder.send(&value)?;
     Ok(())
+}
+
+// Holds a value from a "sender" request until the next "receiver" request takes the value.
+// To send a value, echo a non-empty string. To receive a value, echo the empty string.
+// This responds to senders with the empty string, and receivers with the most recently sent message.
+// This handler is used to test for concurrency: If a server handles requests in serial,
+// `RendezvousEchoHandler::handle_request` will block. If requests are handled concurrently,
+// they will successfully exchange values.
+#[derive(Clone)]
+struct RendezvousEchoHandler {
+    sender: Arc<mpsc::SyncSender<String>>,
+    receiver: Arc<Mutex<mpsc::Receiver<String>>>,
+}
+
+impl RendezvousEchoHandler {
+    fn new() -> Self {
+        // bound is 0 so that so that senders and recievers block one another without concurrency.
+        let (tx, rx) = mpsc::sync_channel(0);
+        Self { sender: Arc::new(tx), receiver: Arc::new(Mutex::new(rx)) }
+    }
+}
+
+#[async_trait]
+impl AsyncRequestHandler<EchoMarker> for RendezvousEchoHandler {
+    async fn handle_request(&self, request: EchoRequest) -> Result<(), Error> {
+        let EchoRequest::EchoString { value, responder } = request else { panic!(); };
+        if value == "" {
+            let receiver = self.receiver.clone();
+            let value = fasync::unblock(move || {
+                let receiver = receiver.lock().unwrap();
+                receiver.recv().unwrap()
+            })
+            .await;
+            responder.send(&value)?;
+        } else {
+            let sender = self.sender.clone();
+            fasync::unblock(move || sender.send(value).unwrap()).await;
+            responder.send("")?;
+        }
+
+        Ok(())
+    }
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -94,6 +138,32 @@ async fn should_serve_all_requests() -> Result<(), Error> {
         assert_eq!(client.echo_string("message 2").await.unwrap(), "message 2");
         assert_eq!(client.echo_string("message 3").await.unwrap(), "message 3");
     };
+    futures::join!(server_fut, client_fut);
+    Ok(())
+}
+
+// This test will hang indefinitely if requests are not handled concurrently.
+#[fasync::run_singlethreaded(test)]
+async fn should_serve_all_requests_concurrently() -> Result<(), Error> {
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let server_fut = async move {
+        serve_async_concurrent(stream, 0, RendezvousEchoHandler::new()).await.unwrap();
+    };
+
+    let client_fut = async move {
+        let recv_fut = client.echo_string("").fuse();
+        let send_fut = client.echo_string("the message").fuse();
+        pin_mut!(send_fut, recv_fut);
+
+        loop {
+            select! {
+                res = send_fut => assert_eq!(res.unwrap(), ""),
+                res = recv_fut => assert_eq!(res.unwrap(), "the message"),
+                complete => break,
+            };
+        }
+    };
+
     futures::join!(server_fut, client_fut);
     Ok(())
 }
