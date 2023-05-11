@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_inspect_args::{InspectCommand, InspectSubCommand};
-use fho::{deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::{
@@ -28,9 +28,7 @@ fho::embedded_plugin!(InspectTool);
 pub struct InspectTool {
     #[command]
     cmd: InspectCommand,
-    #[with(deferred(selector(
-        "bootstrap/archivist:expose:fuchsia.diagnostics.host.ArchiveAccessor"
-    )))]
+    #[with(deferred(moniker("bootstrap/archivist")))]
     remote_diagnostics_bridge: Deferred<ArchiveAccessorProxy>,
     rcs: Deferred<RemoteControlProxy>,
 }
