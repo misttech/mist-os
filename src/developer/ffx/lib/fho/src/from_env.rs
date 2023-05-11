@@ -225,9 +225,17 @@ impl<P: Proxy + 'static> TryFromEnvWith for WithSelector<P> {
                 break res;
             }
         }?;
-        rcs::connect_with_timeout(
+        // TODO(fxbug.dev/126721): remove this and just take monikers. For now we can take
+        // advantage of the fact that the selector has been parsed and validated already.
+        // So we can just extract the moniker out of it and remove selector-related escaping.
+        let mut parts = self.selector.split(":expose:");
+        let moniker = parts.next().unwrap().replace("\\:", ":");
+        let moniker = format!("/{moniker}");
+        let capability_name = parts.next().unwrap();
+        rcs::connect_with_timeout_at(
             self.timeout,
-            &self.selector,
+            &moniker,
+            &capability_name,
             &rcs_instance,
             server_end.into_channel(),
         )

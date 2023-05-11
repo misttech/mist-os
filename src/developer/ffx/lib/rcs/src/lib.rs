@@ -4,15 +4,15 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use errors;
-use fidl::prelude::*;
+use fidl::{endpoints::ProtocolMarker, prelude::*};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{
-    ConnectError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
+    ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
 };
+use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use futures::{StreamExt, TryFutureExt};
 use hoist::{Hoist, OvernetInstance};
-use selectors::VerboseError;
 use std::{
     hash::{Hash, Hasher},
     time::Duration,
@@ -109,7 +109,7 @@ pub enum KnockRcsError {
     #[error("Creating FIDL channel: {0:?}")]
     ChannelError(#[from] fidl::handle::Status),
     #[error("Connecting to RCS {0:?}")]
-    RcsConnectError(ConnectError),
+    RcsConnectCapabilityError(ConnectCapabilityError),
     #[error("Could not knock service from RCS")]
     FailedToKnock,
 }
@@ -128,7 +128,7 @@ pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::Target
             tracing::warn!("RCS connect channel err: {:?}", e);
             ffx::TargetConnectionError::FidlCommunicationError
         }
-        KnockRcsError::RcsConnectError(c) => {
+        KnockRcsError::RcsConnectCapabilityError(c) => {
             tracing::warn!("RCS failed connecting to itself for knocking: {:?}", c);
             ffx::TargetConnectionError::RcsConnectionError
         }
@@ -141,15 +141,14 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     let knock_client = fuchsia_async::Channel::from_channel(knock_client)?;
     let knock_client = fidl::client::Client::new(knock_client, "knock_client");
     rcs_proxy
-        .connect(
-            &selectors::parse_selector::<VerboseError>(
-                "core/remote-control:expose:fuchsia.developer.remotecontrol.RemoteControl",
-            )
-            .unwrap(),
+        .connect_capability(
+            "/core/remote-control",
+            RemoteControlMarker::PROTOCOL_NAME,
             knock_remote,
+            OpenFlags::RIGHT_READABLE,
         )
         .await?
-        .map_err(|e| KnockRcsError::RcsConnectError(e))?;
+        .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
     let mut event_receiver = knock_client.take_event_receiver();
     let res = timeout(KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {
@@ -158,19 +157,27 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     }
 }
 
-pub async fn connect_with_timeout(
+pub async fn connect_with_timeout_at(
     dur: Duration,
-    selector: &str,
+    moniker: &str,
+    capability_name: &str,
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    timeout::timeout(dur, rcs_proxy.connect(&selectors::parse_selector::<VerboseError>(selector)?, server_end)
+    let connect_capability_fut = rcs_proxy.connect_capability(
+        moniker,
+        capability_name,
+        server_end,
+        OpenFlags::RIGHT_READABLE,
+    );
+    timeout::timeout(dur, connect_capability_fut
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {
             fidl_result.map(|_| ()).map_err(|e| {
                     match e {
-                        ConnectError::NoMatchingServices => {
+                        ConnectCapabilityError::NoMatchingCapabilities => {
                             errors::ffx_error!(format!(
-"The plugin service selector '{}' did not match any services on the target.
+"The plugin service did not match any capabilities on the target for moniker '{moniker}' and
+capability '{capability_name}'.
 
 It is possible that the expected component is either not built into the system image, or that the
 package server has not been setup.
@@ -180,32 +187,33 @@ For users, ensure your Fuchsia device is registered with ffx. To do this you can
 $ ffx target repository register -r $IMAGE_TYPE --alias fuchsia.com
 
 For plugin developers, it may be possible that the moniker you're attempting to connect to is
-incorrect. You can use `ffx component select moniker '<selector>'` to explore the component topology
-of your target device to fix this selector if this is the case.
+incorrect.
+You can use `ffx component explore '<moniker>'` to explore the component topology
+of your target device to fix this moniker if this is the case.
 
 If you believe you have encountered a bug after walking through the above please report it at
-http://fxbug.dev/new/ffx+User+Bug",
-                            selector)).into()
-                        }
-                        ConnectError::MultipleMatchingServices => {
-                            errors::ffx_error!(
-                                format!(
-"Plugin service selectors must match exactly one service, but '{}' matched multiple services on the target.
-If you are not developing this plugin, then this is a bug. Please report it at http://fxbug.dev/new/ffx+User+Bug.
-
-Plugin developers: you can use `ffx component select moniker '{}'` to see which services matched the provided selector.",
-                                    selector, selector)).into()
+http://fxbug.dev/new/ffx+User+Bug")).into()
                         }
                         _ => {
                             anyhow::anyhow!(
-                                format!("This service dependency exists but connecting to it failed with error {:?}. Selector: {}.", e, selector)
+                                format!("This service dependency exists but connecting to it failed with error {e:?}. Moniker: {moniker}. Capability name: {capability_name}")
                             )
                         }
                     }
                 })
-        })).await.map_err(|_| errors::ffx_error!("Timed out connecting to service: '{}'.
+        })).await.map_err(|_| errors::ffx_error!("Timed out connecting to capability: '{capability_name}'
+with moniker: '{moniker}'.
 This is likely due to a sudden shutdown or disconnect of the target.
 If you have encountered what you think is a bug, Please report it at http://fxbug.dev/new/ffx+User+Bug
 
-To diagnose the issue, use `ffx doctor`.", selector).into()).and_then(|r| r)
+To diagnose the issue, use `ffx doctor`.").into()).and_then(|r| r)
+}
+
+pub async fn connect_with_timeout<P: ProtocolMarker>(
+    dur: Duration,
+    moniker: &str,
+    rcs_proxy: &RemoteControlProxy,
+    server_end: fidl::Channel,
+) -> Result<()> {
+    connect_with_timeout_at(dur, moniker, P::DEBUG_NAME, rcs_proxy, server_end).await
 }

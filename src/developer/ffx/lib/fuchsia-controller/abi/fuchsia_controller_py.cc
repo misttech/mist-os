@@ -117,13 +117,17 @@ PyObject *Context_open_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) 
                                handle);
 }
 
-PyObject *Context_open_device_proxy(Context *self, PyObject *moniker) {
+PyObject *Context_open_device_proxy(Context *self, PyObject *moniker, PyObject *capability_name) {
   const char *c_moniker = PyUnicode_AsUTF8(moniker);
   if (c_moniker == nullptr) {
     return nullptr;
   }
+  const char *c_capability_name = PyUnicode_AsUTF8(capability_name);
+  if (c_capability_name == nullptr) {
+    return nullptr;
+  }
   zx_handle_t handle;
-  if (ffx_open_device_proxy(self->env_context, c_moniker, &handle) != ZX_OK) {
+  if (ffx_open_device_proxy(self->env_context, c_moniker, c_capability_name, &handle) != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
   }

@@ -41,6 +41,7 @@ pub(crate) enum LibraryCommand {
     OpenDeviceProxy {
         env: Arc<EnvContext>,
         moniker: String,
+        capability_name: String,
         responder: Responder<CmdResult<zx_types::zx_handle_t>>,
     },
     OpenTargetProxy {
@@ -134,8 +135,8 @@ impl LibraryCommand {
                     }
                 }
             }
-            Self::OpenDeviceProxy { env, moniker, responder } => {
-                match env.open_device_proxy(moniker).await {
+            Self::OpenDeviceProxy { env, moniker, capability_name, responder } => {
+                match env.open_device_proxy(moniker, capability_name).await {
                     Ok(r) => {
                         responder.send(Ok(r)).unwrap();
                     }

@@ -92,10 +92,21 @@ impl EnvContext {
         Ok(res)
     }
 
-    pub async fn open_device_proxy(&self, moniker: String) -> Result<zx_types::zx_handle_t> {
+    pub async fn open_device_proxy(
+        &self,
+        moniker: String,
+        capability_name: String,
+    ) -> Result<zx_types::zx_handle_t> {
         let rcs_proxy = self.injector.remote_factory().await?;
         let (hdl, server) = fidl::Channel::create();
-        rcs::connect_with_timeout(Duration::from_secs(15), &moniker, &rcs_proxy, server).await?;
+        rcs::connect_with_timeout_at(
+            Duration::from_secs(15),
+            &moniker,
+            &capability_name,
+            &rcs_proxy,
+            server,
+        )
+        .await?;
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
         Ok(res)

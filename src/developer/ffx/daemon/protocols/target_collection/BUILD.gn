@@ -40,6 +40,7 @@ rustc_library("ffx_daemon_protocol_target_collection") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",

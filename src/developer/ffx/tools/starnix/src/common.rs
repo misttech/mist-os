@@ -67,11 +67,6 @@ async fn find_moniker(
     find_session_container(&rcs_proxy).await
 }
 
-fn moniker_to_selector(moniker: String) -> String {
-    let moniker = if moniker.starts_with('/') { &moniker[1..] } else { &moniker };
-    return format!("{}:expose:fuchsia.starnix.container.Controller", moniker.replace(":", "\\:"));
-}
-
 pub async fn connect_to_contoller(
     rcs_proxy: &rc::RemoteControlProxy,
     moniker: Option<String>,
@@ -79,8 +74,13 @@ pub async fn connect_to_contoller(
     let (controller_proxy, controller_server_end) =
         fidl::endpoints::create_proxy::<ControllerMarker>().context("failed to create proxy")?;
 
-    let selector = moniker_to_selector(find_moniker(&rcs_proxy, moniker).await?);
-    rcs::connect_with_timeout(TIMEOUT, &selector, &rcs_proxy, controller_server_end.into_channel())
-        .await?;
+    let moniker = find_moniker(&rcs_proxy, moniker).await?;
+    rcs::connect_with_timeout::<ControllerMarker>(
+        TIMEOUT,
+        &moniker,
+        &rcs_proxy,
+        controller_server_end.into_channel(),
+    )
+    .await?;
     Ok(controller_proxy)
 }

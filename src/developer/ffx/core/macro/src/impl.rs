@@ -574,9 +574,18 @@ fn generate_proxy_from_selector(
                 }
             }?;
 
-            ffx_core::macro_deps::rcs::connect_with_timeout(
+            // TODO(fxbug.dev/126721): remove this and just take monikers. For now we can take
+            // advantage of the fact that the selector has been parsed and validated already.
+            // So we can just extract the moniker out of it and remove selector-related escaping.
+            let mut parts = #mapping_lit.split(":expose:");
+            let moniker = parts.next().unwrap().replace("\\:", ":");
+            let moniker = format!("/{moniker}");
+            let capability_name = parts.next().unwrap();
+
+            ffx_core::macro_deps::rcs::connect_with_timeout_at(
                 std::time::Duration::from_secs(15),
-                #mapping_lit,
+                &moniker,
+                &capability_name,
                 &__remote_factory,
                 #server_end.into_channel()
             )

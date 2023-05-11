@@ -37,7 +37,7 @@ extern zx_status_t ffx_open_daemon_protocol(ffx_env_context_t* ctx, const char* 
 extern zx_status_t ffx_open_target_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
 extern zx_status_t ffx_open_remote_control_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
 extern zx_status_t ffx_open_device_proxy(ffx_env_context_t* ctx, const char* moniker,
-                                         zx_handle_t* out);
+                                         const char* capability_name, zx_handle_t* out);
 extern void ffx_close_handle(zx_handle_t handle);
 extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
                                      const char* out_buf, uint64_t out_len, zx_handle_t* hdls,

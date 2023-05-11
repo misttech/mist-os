@@ -237,6 +237,7 @@ mod tests {
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType};
     use fidl::prelude::*;
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
+    use fidl_fuchsia_io as fio;
     use fuchsia_async::Task;
     use hoist::{Hoist, OvernetInstance};
     use protocols::testing::FakeDaemonBuilder;
@@ -356,18 +357,21 @@ mod tests {
                                             }))
                                             .unwrap();
                                     }
-                                    fidl_rcs::RemoteControlRequest::Connect { selector, service_chan, responder } => {
-                                        if selector != selectors::parse_selector::<selectors::VerboseError>(
-                                            "core/remote-control:expose:fuchsia.developer.remotecontrol.RemoteControl",
-                                        ).unwrap() {
-                                            panic!("unsupported for this test");
-                                        }
-                                        knock_channels.push(service_chan);
-                                        responder.send(&mut Ok(fidl_rcs::ServiceMatch {
-                                            moniker: Vec::new(),
-                                            subdir: "".to_owned(),
-                                            service: "".to_owned()
-                                        })).unwrap();
+                                    fidl_rcs::RemoteControlRequest::ConnectCapability {
+                                        moniker,
+                                        capability_name,
+                                        server_chan,
+                                        flags,
+                                        responder,
+                                    } => {
+                                        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+                                        assert_eq!(moniker, "/core/remote-control");
+                                        assert_eq!(
+                                            capability_name,
+                                            "fuchsia.developer.remotecontrol.RemoteControl"
+                                        );
+                                        knock_channels.push(server_chan);
+                                        responder.send(&mut Ok(())).unwrap();
                                     }
                                     _ => panic!("unsupported for this test"),
                                 }

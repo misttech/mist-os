@@ -96,13 +96,22 @@ pub unsafe extern "C" fn ffx_open_daemon_protocol(
 pub unsafe extern "C" fn ffx_open_device_proxy(
     ctx: *mut EnvContext,
     moniker: *const i8,
+    capability_name: *const i8,
     handle: *mut zx_types::zx_handle_t,
 ) -> zx_status::Status {
-    let moniker =
-        unsafe { CStr::from_ptr(moniker) }.to_str().expect("valid selector string").to_owned();
+    let moniker = unsafe { CStr::from_ptr(moniker) }.to_str().expect("valid moniker").to_owned();
+    let capability_name = unsafe { CStr::from_ptr(capability_name) }
+        .to_str()
+        .expect("valid capability name")
+        .to_owned();
     let ctx = unsafe { get_arc(ctx) };
     let (responder, rx) = mpsc::sync_channel(1);
-    ctx.lib_ctx().run(LibraryCommand::OpenDeviceProxy { env: ctx.clone(), moniker, responder });
+    ctx.lib_ctx().run(LibraryCommand::OpenDeviceProxy {
+        env: ctx.clone(),
+        moniker,
+        capability_name,
+        responder,
+    });
     match rx.recv().unwrap() {
         Ok(h) => {
             unsafe { *handle = h };

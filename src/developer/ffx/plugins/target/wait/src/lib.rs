@@ -108,28 +108,20 @@ mod tests {
     use fidl_fuchsia_developer_ffx::{
         TargetCollectionMarker, TargetCollectionRequest, TargetRequest, TargetRequestStream,
     };
-    use fidl_fuchsia_developer_remotecontrol::{
-        RemoteControlRequest, RemoteControlRequestStream, ServiceMatch,
-    };
+    use fidl_fuchsia_developer_remotecontrol::{RemoteControlRequest, RemoteControlRequestStream};
     use futures::TryStreamExt;
 
     fn spawn_remote_control(mut rcs_stream: RemoteControlRequestStream) {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = rcs_stream.try_next().await {
                 match req {
-                    RemoteControlRequest::Connect { responder, service_chan, .. } => {
+                    RemoteControlRequest::ConnectCapability { responder, server_chan, .. } => {
                         fuchsia_async::Task::local(async move {
-                            let _service_chan = service_chan; // just hold the channel open to make the test succeed. No need to actually use it.
+                            let _service_chan = server_chan; // just hold the channel open to make the test succeed. No need to actually use it.
                             std::future::pending::<()>().await;
                         })
                         .detach();
-                        responder
-                            .send(&mut Ok(ServiceMatch {
-                                moniker: vec![],
-                                subdir: "foo".to_string(),
-                                service: "bar".to_string(),
-                            }))
-                            .unwrap();
+                        responder.send(&mut Ok(())).unwrap();
                     }
                     e => panic!("unexpected request: {:?}", e),
                 }
