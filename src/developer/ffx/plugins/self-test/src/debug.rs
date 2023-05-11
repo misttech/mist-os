@@ -19,7 +19,7 @@ use std::{
 pub mod include_target {
     use super::*;
 
-    pub(crate) async fn test_debug_run_crasher() -> Result<()> {
+    pub(crate) async fn test_debug_run_crasher() -> Result<Option<ffx_isolate::Isolate>> {
         // If the test is running on CI/CQ bots, it's isolated with only files listed as test_data
         // available. We have added zxdb and zxdb-meta.json in ffx-e2e-test-data but we have to
         // also provide an index file at host_x64/sdk/manifest/host_tools.internal.
@@ -84,7 +84,7 @@ pub mod include_target {
 
         let (sender, receiver) = channel();
 
-        unblock(move || {
+        let res: Result<_> = unblock(move || {
             let mut stdout_reader = BufReader::new(child.stdout.take().unwrap());
 
             loop {
@@ -113,21 +113,22 @@ pub mod include_target {
         })
         // ffx self-test has a per-case timeout of 12 seconds.
         .on_timeout(Duration::from_secs(11), || ffx_bail!("timeout after 11s"))
-        .await
-        .map_err(|e| {
+        .await;
+        res.map_err(|e| {
             while let Ok(line) = receiver.recv() {
                 eprint!("{}", line);
             }
             e
-        })
+        })?;
+        Ok(Some(isolate))
     }
 
-    pub(crate) async fn test_debug_limbo() -> Result<()> {
+    pub(crate) async fn test_debug_limbo() -> Result<Option<ffx_isolate::Isolate>> {
         // This test depends on //src/developer/forensics/crasher which is listed in
         // //src/developer/ffx:ffx-e2e-with-target.
+        let isolate = new_isolate("debug-limbo").await?;
 
         let target = get_target_nodename().await?;
-        let isolate = new_isolate("debug-limbo").await?;
 
         // Ensure limbo is active and clean.
         let output = isolate.ffx(&["--target", &target, "debug", "limbo", "disable"]).await?;
@@ -187,6 +188,6 @@ pub mod include_target {
             .await?;
         assert!(output.status.success(), "{:?}", output);
 
-        Ok(())
+        Ok(Some(isolate))
     }
 }

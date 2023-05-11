@@ -5,15 +5,10 @@
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use errors::ffx_bail;
 use ffx_config::global_env_context;
+use ffx_daemon::{DaemonConfig, SocketDetails};
 use fuchsia_async::TimeoutExt;
 use serde_json::Value;
-use std::{
-    future::Future,
-    io::Write,
-    pin::Pin,
-    process::{Command, Stdio},
-    time::Duration,
-};
+use std::{future::Future, io::Write, pin::Pin, time::Duration};
 use termion::is_tty;
 
 pub mod asserts;
@@ -48,6 +43,22 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     Ok(isolate)
 }
 
+const EXIT_WAIT_TIME_MS: u32 = 300;
+
+async fn cleanup_isolate(isolate: ffx_isolate::Isolate) -> Result<()> {
+    let socket_path = isolate.env_context().get_ascendd_path().await?;
+    let details = SocketDetails::new(socket_path.clone());
+    let pid = details.get_running_pid();
+    // Give isolate a chance to clean up
+    drop(isolate);
+    if let Some(pid) = pid {
+        // If the pid _was_ running, wait for it to exit, and kill it if it doesn't quit
+        // within EXIT_WAIT_TIME_MS
+        ffx_daemon::wait_for_daemon_to_exit(pid, EXIT_WAIT_TIME_MS).await?;
+    }
+    Ok(())
+}
+
 /// Get the target nodename we're expected to interact with in this test, or
 /// pick the first discovered target. If nodename is set via $FUCHSIA_NODENAME
 /// that is returned, if the nodename is not given, and zero targets are found,
@@ -66,6 +77,7 @@ pub async fn get_target_nodename() -> Result<String> {
     }
 
     let out = isolate.ffx(&["target", "list", "-f", "j"]).await.context("getting target list")?;
+    cleanup_isolate(isolate).await?;
 
     ensure!(out.status.success(), "Looking up a target name failed: {:?}", out);
 
@@ -90,54 +102,6 @@ pub async fn get_target_nodename() -> Result<String> {
         .ok_or(anyhow!("expected product state target to have a nodename"))
 }
 
-/// cleanup tries to give the daemon a chance to exit but eventually runs pkill to ensure nothing
-/// is left running.
-async fn cleanup() -> Result<()> {
-    let max_attempts = 4;
-    let daemon_start_arg = "(^|/)ffx (-.* )?daemon start$";
-
-    for attempt in 0..max_attempts {
-        let did_find_daemon = fuchsia_async::unblock(move || {
-            let mut cmd = Command::new("pgrep");
-            cmd.arg("-f")
-                .arg(daemon_start_arg)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null());
-            let status = cmd.status()?;
-            Ok::<_, anyhow::Error>(status.success())
-        })
-        .await?;
-
-        if did_find_daemon {
-            // Daemon stop waits 20ms before exiting so we try to avoid a race by waiting here.
-            // Based on max_attempts of 4 this will wait a maximum of 500ms.
-            fuchsia_async::Timer::new(Duration::from_millis(50 * (1 + attempt))).await;
-            continue;
-        } else {
-            return Ok(());
-        }
-    }
-
-    // Success here means that pkill was able to find something to kill so that means a daemon
-    // was still running that we did not expect to be running. We return an error here to make
-    // this a failure of the test suite as a whole to find out when this is happening.
-    let mut cmd = Command::new("pkill");
-    cmd.arg("-f")
-        .arg(daemon_start_arg)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    let did_kill_daemon = cmd.status()?.success();
-    if did_kill_daemon {
-        // We do not return an error here because that was causing flakes.
-        // I think we should still clean up here but we need a less racey shutdown path before we
-        // can return an error here to keep the flake rate down.
-        eprintln!("A daemon was killed that was not supposed to be running");
-    }
-    Ok(())
-}
-
 /// run runs the given set of tests printing results to stdout and exiting
 /// with 0 or 1 if the tests passed or failed, respectively.
 pub async fn run(tests: Vec<TestCase>, timeout: Duration, case_timeout: Duration) -> Result<()> {
@@ -160,10 +124,23 @@ pub async fn run(tests: Vec<TestCase>, timeout: Duration, case_timeout: Duration
                 .on_timeout(case_timeout, || ffx_bail!("timed out after {:?}", case_timeout))
                 .await
             {
-                Ok(()) => {
+                Ok(oi) => {
                     writeln!(&mut writer, "{green}ok{nocol}",)?;
+                    if let Some(isolate) = oi {
+                        cleanup_isolate(isolate).await?;
+                    }
                 }
                 Err(err) => {
+                    // Unfortunately we didn't get a chance to get back any
+                    // Isolate the test may have used, which means we can't
+                    // clean up the daemon. The hope is that this is not a big
+                    // deal -- when the Isolate drops(), it will remove the
+                    // daemon.socket file which should cause the daemon to exit
+                    // anyway -- this code was just a backstop to improve our
+                    // chances of having it exit. Plus, the failure path is when
+                    // we error out, which is the unusual case (and honestly,
+                    // if we can't pass our self-test, there are no guarantees
+                    // about the behavior anyway.)
                     writeln!(&mut writer, "{red}not ok{nocol}:\n{err:?}\n",)?;
                     num_errs = num_errs + 1;
                 }
@@ -181,9 +158,7 @@ pub async fn run(tests: Vec<TestCase>, timeout: Duration, case_timeout: Duration
     .on_timeout(timeout, || ffx_bail!("timed out after {:?}", timeout))
     .await;
 
-    let cleanup_result = cleanup().await;
-
-    test_result.and(cleanup_result)
+    test_result
 }
 
 fn green(color: bool) -> &'static str {
@@ -214,6 +189,8 @@ macro_rules! tests {
         {
             let mut temp_vec = Vec::new();
             $(
+                // We need to store a boxed, pinned future, so let's provide the closure that
+                // does that.
                 temp_vec.push($crate::test::TestCase::new(stringify!($x), move || Box::pin($x())));
             )*
             temp_vec
@@ -221,7 +198,10 @@ macro_rules! tests {
     };
 }
 
-pub type TestFn = fn() -> Pin<Box<dyn Future<Output = Result<()>>>>;
+// We need to store a boxed pinned future: boxed because we need it to be Sized since it's going
+// in a Vec; pinned because it's asynchronous.
+// Return an optional isolate, so that the runner can clean up our daemon if we created one.
+pub type TestFn = fn() -> Pin<Box<dyn Future<Output = Result<Option<ffx_isolate::Isolate>>>>>;
 
 pub struct TestCase {
     pub name: &'static str,

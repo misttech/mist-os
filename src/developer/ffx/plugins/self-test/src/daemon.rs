@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{assert_eq, test::*};
+use crate::{assert_eq, test::new_isolate};
 use anyhow::*;
 use fuchsia_async::Duration;
 
-pub(crate) async fn test_echo() -> Result<()> {
+pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-echo").await?;
     let out = isolate.ffx(&["daemon", "echo"]).await?;
 
     let want = "SUCCESS: received \"Ffx\"\n";
     assert_eq!(out.stdout, want);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_config_flag() -> Result<()> {
+pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-config-flag").await?;
     let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
 
@@ -49,20 +49,20 @@ pub(crate) async fn test_config_flag() -> Result<()> {
     let _out = isolate.ffx(&["daemon", "stop"]).await?;
     fuchsia_async::unblock(move || daemon.wait()).await?;
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_stop() -> Result<()> {
+pub(crate) async fn test_stop() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-stop").await?;
     let out = isolate.ffx(&["daemon", "stop", "-w"]).await?;
     let want = "Stopped daemon.\n";
 
     assert_eq!(out.stdout, want);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_no_autostart() -> Result<()> {
+pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-no-autostart").await?;
     let out = isolate.ffx(&["config", "set", "daemon.autostart", "false"]).await?;
     assert!(out.status.success());
@@ -87,9 +87,12 @@ pub(crate) async fn test_no_autostart() -> Result<()> {
     // Don't assert here -- it if fails, we still want to kill the daemon
     let echo_succeeded = out.status.success();
 
+    // Want to kill the daemon here, rather than in cleanup_isolate(), because since we
+    // forked it explicitly, we want to wait()
     let _ = daemon.kill();
+    daemon.wait().expect("Daemon wasn't running");
 
     assert!(echo_succeeded);
 
-    Ok(())
+    Ok(Some(isolate))
 }

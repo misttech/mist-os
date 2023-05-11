@@ -4,7 +4,6 @@
 
 // TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
 use anyhow as _;
-use anyhow::anyhow;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
@@ -13,7 +12,6 @@ use ffx_daemon_stop_args::StopCommand;
 use fho::{FfxContext, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::{Time, Timer};
-use nix::sys::signal;
 use std::io::Write;
 use std::time::Duration;
 
@@ -29,6 +27,8 @@ pub struct StopTool {
 
 fho::embedded_plugin!(StopTool);
 
+// Similar to ffx_daemon::wait_for_daemon_to_exit(), but this version also
+// provides status updates to the user.
 async fn wait_for_daemon_to_exit(
     writer: &mut SimpleWriter,
     context: &EnvironmentContext,
@@ -60,23 +60,8 @@ async fn wait_for_daemon_to_exit(
                 writeln!(writer, "Daemon did not exit after {timeout_ms} ms").bug()?;
                 writeln!(writer, "{details}").bug()?;
                 writeln!(writer, "Killing daemon (pid {pid})").bug()?;
-                // UNIX defines a pid as a _signed_ int -- who knew?
-                let nix_pid = nix::unistd::Pid::from_raw(pid as i32);
-                let res = signal::kill(nix_pid, Some(signal::Signal::SIGTERM));
-                match res {
-                    // No longer there
-                    Err(nix::errno::Errno::ESRCH) => return Ok(()),
-                    // Kill failed for some other reason
-                    Err(e) => ffx_bail!("Could not kill daemon: {e}"),
-                    // It worked, i.e. the process was still around
-                    _ => (),
-                }
-                Timer::new(STOP_WAIT_POLL_TIME).await;
-                // Check to see if it actually died
-                if nix::sys::signal::kill(nix_pid, None).is_err() {
-                    return Ok(());
-                }
-                ffx_bail!("** Daemon did not exit. Giving up **");
+                ffx_daemon::try_to_kill_pid(pid).await?;
+                return Ok(());
             }
         }
     }

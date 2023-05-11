@@ -8,9 +8,9 @@ use anyhow::*;
 pub mod include_target {
     use super::*;
 
-    pub(crate) async fn test_list() -> Result<()> {
-        let target_nodename = get_target_nodename().await?;
+    pub(crate) async fn test_list() -> Result<Option<ffx_isolate::Isolate>> {
         let isolate = new_isolate("component-list").await?;
+        let target_nodename = get_target_nodename().await?;
 
         let out = isolate.ffx(&["--target", &target_nodename, "component", "list"]).await?;
 
@@ -18,6 +18,6 @@ pub mod include_target {
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);
         ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
 
-        Ok(())
+        Ok(Some(isolate))
     }
 }

@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use daemonize::daemonize;
 use errors::{ffx_error, FfxError};
 use ffx_config::EnvironmentContext;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
+use fuchsia_async::{Time, Timer};
 use futures::prelude::*;
 use hoist::{Hoist, OvernetInstance};
+use nix::sys::signal;
 use std::{
     path::{Path, PathBuf},
     pin::Pin,
@@ -56,7 +58,7 @@ pub async fn get_daemon_proxy_single_link(
     let mut link = Box::pin(link);
     let find = find_next_daemon(hoist, exclusions).fuse();
     let mut find = Box::pin(find);
-    let mut timeout = fuchsia_async::Timer::new(Duration::from_secs(5)).fuse();
+    let mut timeout = Timer::new(Duration::from_secs(5)).fuse();
 
     let res = futures::select! {
         r = link => {
@@ -167,6 +169,52 @@ async fn daemon_cmd(context: &EnvironmentContext) -> Result<Command> {
     cmd.arg("start");
     cmd.arg("--path").arg(socket_path);
     Ok(cmd)
+}
+
+// Time between polling to see if process has exited
+const STOP_WAIT_POLL_TIME: Duration = Duration::from_millis(50);
+
+pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
+    // UNIX defines a pid as a _signed_ int -- who knew?
+    let nix_pid = nix::unistd::Pid::from_raw(pid as i32);
+    let res = signal::kill(nix_pid, Some(signal::Signal::SIGTERM));
+    match res {
+        // No longer there
+        Err(nix::errno::Errno::ESRCH) => return Ok(()),
+        // Kill failed for some other reason
+        Err(e) => bail!("Could not kill daemon: {e}"),
+        // The kill() worked, i.e. the process was still around
+        _ => (),
+    }
+    Timer::new(STOP_WAIT_POLL_TIME).await;
+    // Check to see if it actually died
+    let res = signal::kill(nix_pid, None);
+    match res {
+        // No longer there
+        Err(nix::errno::Errno::ESRCH) => return Ok(()),
+        // Kill failed for some other reason
+        Err(e) => bail!("Could not kill daemon: {e}"),
+        // The kill() worked, i.e. the process was still around
+        _ => bail!("Daemon did not exit. Giving up"),
+    }
+}
+
+// Similar to ffx_daemon::wait_for_daemon_to_exit(), but this version is
+// for non-interactive use.
+pub async fn wait_for_daemon_to_exit(pid: u32, timeout_ms: u32) -> Result<()> {
+    let start_time = Time::now();
+    let nix_pid = nix::unistd::Pid::from_raw(pid as i32);
+    loop {
+        if let Err(nix::errno::Errno::ESRCH) = signal::kill(nix_pid, None) {
+            // The pid has exited
+            return Ok(());
+        }
+
+        Timer::new(STOP_WAIT_POLL_TIME).await;
+        if Time::now() - start_time > Duration::from_millis(timeout_ms.into()) {
+            return try_to_kill_pid(pid).await;
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

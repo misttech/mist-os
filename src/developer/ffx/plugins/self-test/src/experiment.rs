@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test::*;
+use crate::test::new_isolate;
 use anyhow::*;
 
-pub(crate) async fn test_not_enabled() -> Result<()> {
+pub(crate) async fn test_not_enabled() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("experiment-not-enabled").await?;
-
     let out = isolate.ffx(&["self-test", "experiment"]).await?;
 
     ensure!(out.stdout.lines().count() == 0, "stdout unexpectedly contains output: {:?}", out);
@@ -15,12 +14,11 @@ pub(crate) async fn test_not_enabled() -> Result<()> {
     ensure!(out.stderr.contains("experimental subcommand"), "stderr is unexpected: {:?}", out);
     ensure!(out.stderr.contains("selftest.experiment"), "stderr is unexpected: {:?}", out);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_enabled() -> Result<()> {
+pub(crate) async fn test_enabled() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("experiment-enabled").await?;
-
     let _ = isolate.ffx(&["config", "set", "selftest.experiment", "true"]).await?;
 
     let out = isolate.ffx(&["self-test", "experiment"]).await?;
@@ -28,5 +26,5 @@ pub(crate) async fn test_enabled() -> Result<()> {
     ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
     ensure!(out.status.success());
 
-    Ok(())
+    Ok(Some(isolate))
 }

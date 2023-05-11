@@ -21,7 +21,6 @@ ffx_plugin("ffx_daemon_stop") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:nix",
   ]
   test_deps = [
     "//src/lib/fidl/rust/fidl",
