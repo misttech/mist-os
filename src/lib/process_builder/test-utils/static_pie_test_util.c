@@ -22,26 +22,20 @@
 
 typedef void (*zx_process_exit_t)(int64_t /*retcode*/);
 
-typedef zx_status_t (*zx_channel_write_t)(zx_handle_t /*handle*/,
-                                          uint32_t /*options*/,
-                                          const void* /*bytes*/,
-                                          uint32_t /*num_bytes*/,
-                                          const zx_handle_t* /*handles*/,
-                                          uint32_t /*num_handles*/);
+typedef zx_status_t (*zx_channel_write_t)(zx_handle_t /*handle*/, uint32_t /*options*/,
+                                          const void* /*bytes*/, uint32_t /*num_bytes*/,
+                                          const zx_handle_t* /*handles*/, uint32_t /*num_handles*/);
 
-typedef zx_status_t (*zx_channel_read_t)(
-    zx_handle_t /*handle*/, uint32_t /*options*/, void* /*bytes*/,
-    zx_handle_t* /*handles*/, uint32_t /*num_bytes*/, uint32_t /*num_handles*/,
-    uint32_t* /*actual_bytes*/, uint32_t* /*actual_handles*/);
+typedef zx_status_t (*zx_channel_read_t)(zx_handle_t /*handle*/, uint32_t /*options*/,
+                                         void* /*bytes*/, zx_handle_t* /*handles*/,
+                                         uint32_t /*num_bytes*/, uint32_t /*num_handles*/,
+                                         uint32_t* /*actual_bytes*/, uint32_t* /*actual_handles*/);
 
 // Get a memory load address from a base load address and unadjusted virtual
 // address.
-static void* laddr(const void* base, size_t vaddr) {
-  return (uint8_t*)base + vaddr;
-}
+static void* laddr(const void* base, size_t vaddr) { return (uint8_t*)base + vaddr; }
 
-static const Elf64_Dyn* search_dyn(const Elf64_Dyn* dyn_array,
-                                   Elf64_Sxword tag) {
+static const Elf64_Dyn* search_dyn(const Elf64_Dyn* dyn_array, Elf64_Sxword tag) {
   for (; dyn_array->d_tag != tag; ++dyn_array) {
     if (dyn_array->d_tag == DT_NULL) {
       return NULL;
@@ -95,10 +89,8 @@ static uint32_t gnu_hash(const char* name) {
   return hash;
 }
 
-static const Elf64_Sym* lookup_sym(const char* name,
-                                   const GnuHashTable* hashtab,
-                                   const Elf64_Sym* symtab,
-                                   const char* strtab) {
+static const Elf64_Sym* lookup_sym(const char* name, const GnuHashTable* hashtab,
+                                   const Elf64_Sym* symtab, const char* strtab) {
   // Not bothering with bloom filter, don't need best possible lookup speed.
 
   uint32_t lookup_hash = gnu_hash(name);
@@ -123,8 +115,7 @@ static const Elf64_Sym* lookup_sym(const char* name,
 }
 
 static const void* lookup_func(const char* name, const GnuHashTable* hashtab,
-                               const Elf64_Sym* symtab, const char* strtab,
-                               const void* base) {
+                               const Elf64_Sym* symtab, const char* strtab, const void* base) {
   const Elf64_Sym* sym = lookup_sym(name, hashtab, symtab, strtab);
   if (!sym || ELF64_ST_TYPE(sym->st_info) != STT_FUNC || !sym->st_value) {
     return NULL;
@@ -158,8 +149,7 @@ void _start(zx_handle_t bootstrap_chan, void* vdso_base) {
     return;
   }
 
-  const GnuHashTable hashtab =
-      read_gnu_hash_table(laddr(vdso_base, dyn_gnu_hash->d_un.d_val));
+  const GnuHashTable hashtab = read_gnu_hash_table(laddr(vdso_base, dyn_gnu_hash->d_un.d_val));
   const Elf64_Sym* symtab = laddr(vdso_base, dyn_symtab->d_un.d_val);
   const char* strtab = laddr(vdso_base, dyn_strtab->d_un.d_val);
 
@@ -177,14 +167,12 @@ void _start(zx_handle_t bootstrap_chan, void* vdso_base) {
   uint8_t read_msg[ZX_CHANNEL_MAX_MSG_BYTES];
   zx_handle_t read_handles[ZX_CHANNEL_MAX_MSG_HANDLES];
   uint32_t actual_bytes, actual_handles;
-  if (zx_channel_read(bootstrap_chan, 0, read_msg, read_handles,
-                      ARRAY_SIZE(read_msg), ARRAY_SIZE(read_handles),
-                      &actual_bytes, &actual_handles) != ZX_OK) {
+  if (zx_channel_read(bootstrap_chan, 0, read_msg, read_handles, ARRAY_SIZE(read_msg),
+                      ARRAY_SIZE(read_handles), &actual_bytes, &actual_handles) != ZX_OK) {
     return;
   }
   zx_proc_args_t* bootstrap_header = (zx_proc_args_t*)read_msg;
-  uint32_t* handle_info =
-      (uint32_t*)((uint8_t*)read_msg + bootstrap_header->handle_info_off);
+  uint32_t* handle_info = (uint32_t*)((uint8_t*)read_msg + bootstrap_header->handle_info_off);
   zx_handle_t user_chan = ZX_HANDLE_INVALID;
   for (uint32_t i = 0; i < actual_handles; ++i) {
     if (handle_info[i] == PA_HND(PA_USER0, 0)) {
@@ -199,13 +187,11 @@ void _start(zx_handle_t bootstrap_chan, void* vdso_base) {
   // Read a message from the PA_USER0 channel and echo it back. Note that
   // ZX_ERR_SHOULD_WAIT isn't handled here; the test should make sure to write
   // to the channel before starting us.
-  if (zx_channel_read(user_chan, 0, read_msg, read_handles,
-                      ARRAY_SIZE(read_msg), ARRAY_SIZE(read_handles),
-                      &actual_bytes, &actual_handles) != ZX_OK) {
+  if (zx_channel_read(user_chan, 0, read_msg, read_handles, ARRAY_SIZE(read_msg),
+                      ARRAY_SIZE(read_handles), &actual_bytes, &actual_handles) != ZX_OK) {
     return;
   }
-  zx_channel_write(user_chan, 0, read_msg, actual_bytes, read_handles,
-                   actual_handles);
+  zx_channel_write(user_chan, 0, read_msg, actual_bytes, read_handles, actual_handles);
 
   // Exit cleanly.
   zx_process_exit_t zx_process_exit =

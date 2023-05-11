@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Parses ELF files. For documentation on the format, see the ELF specification or
-//! /usr/include/elf.h
-
-#![allow(missing_docs)]
-
+//! Parses ELF files per the ELF specification in ulib/musl/include/elf.h
 use {
     bitflags::bitflags,
     fuchsia_zircon as zx,
@@ -20,7 +16,6 @@ use {
 };
 
 /// Possible errors that can occur during ELF parsing.
-#[allow(missing_docs)] // No docs on individual error variants.
 #[derive(Error, Debug)]
 pub enum ElfParseError {
     #[error("Failed to read ELF from VMO: {}", _0)]
@@ -488,9 +483,10 @@ mod tests {
 
     // These are specially crafted files that just contain a valid ELF64 file header but
     // nothing else.
-    static HEADER_DATA_X86_64: &'static [u8] = include_bytes!("../test/elf_x86-64_file-header.bin");
+    static HEADER_DATA_X86_64: &'static [u8] =
+        include_bytes!("../test-utils/elf_x86-64_file-header.bin");
     static HEADER_DATA_AARCH64: &'static [u8] =
-        include_bytes!("../test/elf_aarch64_file-header.bin");
+        include_bytes!("../test-utils/elf_aarch64_file-header.bin");
     #[cfg(target_arch = "x86_64")]
     static HEADER_DATA: &'static [u8] = HEADER_DATA_X86_64;
     #[cfg(target_arch = "aarch64")]

@@ -7,11 +7,6 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 
-group("tests") {
-  testonly = true
-  deps = [ ":process-builder-tests" ]
-}
-
 rustc_library("process_builder") {
   with_unit_tests = true
   edition = "2021"
@@ -46,13 +41,14 @@ rustc_library("process_builder") {
     "src/elf_load.rs",
     "src/elf_parse.rs",
     "src/lib.rs",
-    "src/processargs.rs",
+    "src/process_args.rs",
+    "src/process_builder.rs",
     "src/util.rs",
   ]
 
   inputs = [
-    "test/elf_aarch64_file-header.bin",
-    "test/elf_x86-64_file-header.bin",
+    "test-utils/elf_aarch64_file-header.bin",
+    "test-utils/elf_x86-64_file-header.bin",
   ]
 }
 
@@ -60,14 +56,14 @@ fidl("test-util-fidl") {
   testonly = true
   name = "test.processbuilder"
 
-  sources = [ "test_util.test.fidl" ]
+  sources = [ "test-utils/test_util.test.fidl" ]
 }
 
 rustc_binary("test_util") {
   testonly = true
   name = "process_builder_test_util"
   edition = "2021"
-  source_root = "test/test_util.rs"
+  source_root = "test-utils/test_util.rs"
 
   deps = [
     ":test-util-fidl_rust",
@@ -79,7 +75,7 @@ rustc_binary("test_util") {
     "//third_party/rust_crates:futures",
   ]
 
-  sources = [ "test/test_util.rs" ]
+  sources = [ "test-utils/test_util.rs" ]
 }
 
 # This is used to test the library's handling of statically linked PIE
@@ -90,7 +86,7 @@ executable("static_pie_test_util") {
   # TODO(fxbug.dev/60072): Support syslog backend here.
   disable_syslog_backend = true
 
-  sources = [ "test/static_pie_test_util.c" ]
+  sources = [ "test-utils/static_pie_test_util.c" ]
   configs += [
     "//build/config/fuchsia:no_cpp_standard_library",
     "//build/config/fuchsia:static-pie-config",
@@ -110,4 +106,9 @@ fuchsia_unittest_package("process-builder-tests") {
     ":test_util",
     "//src/sys/testing/elftest",
   ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":process-builder-tests" ]
 }

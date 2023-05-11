@@ -4,10 +4,6 @@
 
 // The constant and type definitions in this file must all match
 // //zircon/system/public/zircon/processargs.h
-//
-// TODO: Figure out a more foolproof way to keep these in sync, e.g. bindgen from the header
-// directly, or maybe a new Tricium linter like IfThisThenThat.
-
 use {
     fuchsia_runtime::HandleInfo,
     fuchsia_zircon as zx,
@@ -21,7 +17,6 @@ use {
 };
 
 /// Possible errors that can occur during processargs startup message construction
-#[allow(missing_docs)] // No docs on individual error variants.
 #[derive(Error, Debug)]
 pub enum ProcessargsError {
     TryFromInt(num::TryFromIntError),

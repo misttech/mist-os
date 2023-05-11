@@ -13,7 +13,6 @@ use {
 };
 
 /// Possible errors that can occur during ELF loading.
-#[allow(missing_docs)] // No docs on individual error variants.
 #[derive(Error, Debug)]
 pub enum ElfLoadError {
     #[error("ELF load segments were empty")]
