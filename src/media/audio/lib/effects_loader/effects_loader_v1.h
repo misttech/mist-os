@@ -58,9 +58,6 @@ class EffectsLoaderV1 {
   std::vector<fuchsia_audio_effects_description> effect_infos_;
 };
 
-// TODO(fxbug.dev/80067): delete after updating vendored code.
-using EffectsLoader = EffectsLoaderV1;
-
 }  // namespace media::audio
 
 #endif  // SRC_MEDIA_AUDIO_LIB_EFFECTS_LOADER_EFFECTS_LOADER_V1_H_

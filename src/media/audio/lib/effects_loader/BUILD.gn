@@ -8,7 +8,6 @@ source_set("effects_loader") {
   sources = [
     "effect_v1.cc",
     "effect_v1.h",
-    "effects_loader.h",
     "effects_loader_v1.cc",
     "effects_loader_v1.h",
     "effects_loader_v2.cc",
