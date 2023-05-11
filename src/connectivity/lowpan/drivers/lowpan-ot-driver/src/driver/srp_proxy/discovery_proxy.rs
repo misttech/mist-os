@@ -216,7 +216,8 @@ impl DiscoveryProxy {
                 // Due to fxbug.dev/99755, the subscription will close
                 // if the servicesubscriber that created it is closed.
                 // TODO(fxbug.dev/99755): Remove this line once fxbug.dev/99755 is fixed.
-                let _ = subscriber;
+                #[allow(clippy::redundant_clone)]
+                let _ = subscriber.clone();
 
                 error!(tag = "srp_discovery_proxy", "host_name_subscription: {:?}", err);
             });
@@ -324,7 +325,8 @@ impl DiscoveryProxy {
                 // if the servicesubscriber that created it is closed.
                 // The bug tracking the specific issue this fixes is <b/241818894>.
                 // TODO(fxbug.dev/99755): Remove this line once fxbug.dev/99755 is fixed.
-                let _ = subscriber;
+                #[allow(clippy::redundant_clone)]
+                let _ = subscriber.clone();
 
                 error!(tag = "srp_discovery_proxy", "service_subscription: {:?}", err);
             });
