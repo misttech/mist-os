@@ -195,14 +195,14 @@ static void motmot_uart_irq(void* arg) {
     if (isr & (1 << 2)) {       // txd
       pending_ack |= (1 << 2);  // clear txd
 
-      // Wake up any waiters in uart_dputs.
-      uart_dputc_event.Signal();
-
       // Mask the TX irq, uart_dputs will unmask if necessary.
       {
         Guard<MonitoredSpinLock, NoIrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
         motmot_uart_mask_tx();
       }
+
+      // Wake up any waiters in uart_dputs.
+      uart_dputc_event.Signal();
     }
   }
 

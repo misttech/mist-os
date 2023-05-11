@@ -144,17 +144,17 @@ static void pl011_uart_irq(void* arg) {
 
   const bool should_signal = isr & (1 << 5);
   if (should_signal) {
-    // It's important we're not holding the |uart_spinlock| while calling
-    // |Event::Signal|.  Otherwise we'd create an invalid lock dependency
-    // between |uart_spinlock| and any locks |Event::Signal| may acquire.
-    //
-    // Signal any waiting Tx and mask Tx interrupts once we wakeup any
-    // blocked threads.
-    uart_dputc_event.Signal();
+    // Mask the TX interrupt before signalling any blocked thread as there may
+    // be a race between masking TX here below and unmasking by the blocked
+    // thread.
     {
       Guard<MonitoredSpinLock, NoIrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
       pl011_mask_tx();
     }
+    // It's important we're not holding the |uart_spinlock| while calling
+    // |Event::Signal|.  Otherwise we'd create an invalid lock dependency
+    // between |uart_spinlock| and any locks |Event::Signal| may acquire.
+    uart_dputc_event.Signal();
   }
 }
 

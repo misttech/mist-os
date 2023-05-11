@@ -471,8 +471,6 @@ static void imx_uart_irq_handler(void* arg) {
 
   if ((UARTREG(imx_uart_base, UCR1) & UCR1_TRDYEN_MASK) &&
       (UARTREG(imx_uart_base, USR1) & USR1_TRDY_MASK)) {
-    // Signal if anyone is waiting to TX
-    uart_dputc_event.Signal();
     {
       // It's important we're not holding the |uart_spinlock| while calling
       // |Event::Signal|.  Otherwise we'd create an invalid lock dependency
@@ -481,6 +479,8 @@ static void imx_uart_irq_handler(void* arg) {
       // Mask the TX irq, imx_uart_dputs will unmask if necessary.
       imx_uart_mask_tx();
     }
+    // Signal if anyone is waiting to TX
+    uart_dputc_event.Signal();
   }
 }
 
