@@ -84,7 +84,7 @@ async fn start_provider(
     info!(%name, %url, "open exposed dir of BankAccount provider");
     realm
         .open_exposed_dir(
-            &mut fdecl::ChildRef {
+            &fdecl::ChildRef {
                 name: name.to_string(),
                 collection: Some(COLLECTION_NAME.to_string()),
             },

@@ -384,8 +384,8 @@ async fn send_command_and_expect_response(
 ) {
     // Serialize and send.
     let mut bytes = Vec::new();
-    let mut commands = vec![command];
-    at::Command::serialize(&mut bytes, &mut commands).expect("serialization should succeed");
+    let commands = vec![command];
+    at::Command::serialize(&mut bytes, &commands).expect("serialization should succeed");
     let _ = channel.as_ref().write(&bytes);
 
     // Expect the `expected` data as a response.

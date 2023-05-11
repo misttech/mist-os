@@ -51,7 +51,7 @@ async fn find_network_device(
         let device_proxy = &device_proxy;
         let client = netdevice_client::Client::new(Clone::clone(device_proxy));
 
-        let mut port_id = match client
+        let port_id = match client
             .device_port_event_stream()
             .expect("failed to get port event stream")
             .try_next()
@@ -69,7 +69,7 @@ async fn find_network_device(
         let (port, port_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
                 .expect("failed to create proxy");
-        device_proxy.get_port(&mut port_id, port_server).expect("failed to get port");
+        device_proxy.get_port(&port_id, port_server).expect("failed to get port");
         let (mac_addressing, mac_addressing_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
                 .expect("failed to create proxy");

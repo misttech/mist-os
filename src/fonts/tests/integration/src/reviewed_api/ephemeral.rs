@@ -15,9 +15,9 @@ async fn test_ephemeral() {
 async fn test_ephemeral_get_font_family_info(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_EPHEMERAL_CM).await?;
 
-    let mut family = fonts::FamilyName { name: "Ephemeral".to_string() };
+    let family = fonts::FamilyName { name: "Ephemeral".to_string() };
 
-    let response = font_provider.get_font_family_info(&mut family).await?;
+    let response = font_provider.get_font_family_info(&family).await?;
 
     assert_eq!(response.name, Some(family));
     Ok(())

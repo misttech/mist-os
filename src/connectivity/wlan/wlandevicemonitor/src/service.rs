@@ -48,10 +48,8 @@ pub(crate) async fn serve_monitor_requests(
 ) -> Result<(), Error> {
     while let Some(req) = req_stream.try_next().await.context("error running DeviceService")? {
         match req {
-            DeviceMonitorRequest::ListPhys { responder } => responder.send(&mut list_phys(&phys)),
-            DeviceMonitorRequest::ListIfaces { responder } => {
-                responder.send(&mut list_ifaces(&ifaces))
-            }
+            DeviceMonitorRequest::ListPhys { responder } => responder.send(&list_phys(&phys)),
+            DeviceMonitorRequest::ListIfaces { responder } => responder.send(&list_ifaces(&ifaces)),
             DeviceMonitorRequest::GetDevPath { phy_id, responder } => {
                 responder.send(get_dev_path(&phys, phy_id).as_deref())
             }
@@ -248,8 +246,8 @@ async fn set_country(phys: &PhyMap, req: fidl_svc::SetCountryRequest) -> zx::Sta
         Some(p) => p,
     };
 
-    let mut phy_req = fidl_dev::CountryCode { alpha2: req.alpha2 };
-    match phy.proxy.set_country(&mut phy_req).await {
+    let phy_req = fidl_dev::CountryCode { alpha2: req.alpha2 };
+    match phy.proxy.set_country(&phy_req).await {
         Ok(status) => zx::Status::from_raw(status),
         Err(e) => {
             error!("Error sending SetCountry set_country request to phy #{}: {}", phy_id, e);
@@ -353,7 +351,7 @@ async fn create_iface(
         zx::Status::INTERNAL
     })?;
 
-    let mut legacy_privacy_support = fidl_sme::LegacyPrivacySupport {
+    let legacy_privacy_support = fidl_sme::LegacyPrivacySupport {
         wep_supported: cfg.wep_supported,
         wpa1_supported: cfg.wpa1_supported,
     };
@@ -361,8 +359,7 @@ async fn create_iface(
     // Pipeline the GenericSme channel and the legacy privacy support configuration, via
     // the bootstrap channel. This request will be handled after our call to
     // create_iface in the phy proxy, so we cannot await the result yet.
-    let bootstrap_result =
-        usme_bootstrap_proxy.start(generic_sme_server, &mut legacy_privacy_support);
+    let bootstrap_result = usme_bootstrap_proxy.start(generic_sme_server, &legacy_privacy_support);
 
     // Send a CreateIfaceRequest. The vendor device will then spawn a USME device and pass
     // the bootstrap to it. The USME device will then read the config and GenericSme channel,
@@ -445,8 +442,8 @@ async fn destroy_iface(
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
     let phy_ownership = &iface.phy_ownership;
     let phy = phys.get(&phy_ownership.phy_id).ok_or(zx::Status::NOT_FOUND)?;
-    let mut phy_req = fidl_dev::DestroyIfaceRequest { id: phy_ownership.phy_assigned_id };
-    let destroy_iface_result = phy.proxy.destroy_iface(&mut phy_req).await.map_err(move |e| {
+    let phy_req = fidl_dev::DestroyIfaceRequest { id: phy_ownership.phy_assigned_id };
+    let destroy_iface_result = phy.proxy.destroy_iface(&phy_req).await.map_err(move |e| {
         error!("Error sending 'DestroyIface' request to phy {:?}: {}", phy_ownership, e);
         zx::Status::INTERNAL
     })?;
@@ -1593,7 +1590,7 @@ mod tests {
             [([0x0, 0x1, 0x2, 0x3, 0x4, 0x5], 123, 0), ([0x6, 0x7, 0x8, 0x9, 0xa, 0xb], 0x123, 1)]
         {
             let create_iface_fut =
-                test_values.monitor_proxy.create_iface(&mut fidl_svc::CreateIfaceRequest {
+                test_values.monitor_proxy.create_iface(&fidl_svc::CreateIfaceRequest {
                     phy_id,
                     role: fidl_wlan_common::WlanMacRole::Client,
                     sta_addr,
@@ -1997,7 +1994,7 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query { responder, .. }))) => {
-                responder.send(&mut fidl_sme::GenericSmeQuery {
+                responder.send(&fidl_sme::GenericSmeQuery {
                     role: fidl_common::WlanMacRole::Client,
                     sta_addr: [2; 6],
                 }).expect("Failed to send query response");

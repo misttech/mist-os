@@ -462,7 +462,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
         let (get_addrs_fut, get_addrs_poll) = {
             let () = control
                 .add_address(
-                    &mut net::Subnet {
+                    &net::Subnet {
                         addr: net::IpAddress::Ipv6(net::Ipv6Address {
                             addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
                         }),
@@ -566,7 +566,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
         assert_dad_success(&mut state_stream).await;
 
         let removed = control
-            .remove_address(&mut net::Subnet {
+            .remove_address(&net::Subnet {
                 addr: net::IpAddress::Ipv6(net::Ipv6Address {
                     addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
                 }),

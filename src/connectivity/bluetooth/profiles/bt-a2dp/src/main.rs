@@ -476,7 +476,7 @@ fn setup_profiles(
     }
 
     let mut profile =
-        ProfileClient::advertise(proxy, &mut service_defs[..], config.channel_parameters())?;
+        ProfileClient::advertise(proxy, &service_defs[..], config.channel_parameters())?;
 
     const ATTRS: [u16; 4] = [
         bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST,

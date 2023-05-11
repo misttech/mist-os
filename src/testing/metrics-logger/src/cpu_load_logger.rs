@@ -413,7 +413,7 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fkernel::StatsRequest::GetCpuStats { responder }) => {
-                        let _ = responder.send(&mut get_cpu_stats());
+                        let _ = responder.send(&get_cpu_stats());
                     }
                     _ => assert!(false),
                 }

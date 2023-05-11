@@ -731,8 +731,8 @@ async fn create_iface(
     sta_addr: MacAddr,
     telemetry_sender: &TelemetrySender,
 ) -> Result<u16, PhyManagerError> {
-    let mut request = fidl_service::CreateIfaceRequest { phy_id, role, sta_addr };
-    let create_iface_response = match proxy.create_iface(&mut request).await {
+    let request = fidl_service::CreateIfaceRequest { phy_id, role, sta_addr };
+    let create_iface_response = match proxy.create_iface(&request).await {
         Ok((status, iface_response)) => {
             if fuchsia_zircon::ok(status).is_err() || iface_response.is_none() {
                 telemetry_sender.send(TelemetryEvent::IfaceCreationFailure);
@@ -755,8 +755,8 @@ async fn destroy_iface(
     iface_id: u16,
     telemetry_sender: &TelemetrySender,
 ) -> Result<(), PhyManagerError> {
-    let mut request = fidl_service::DestroyIfaceRequest { iface_id };
-    match proxy.destroy_iface(&mut request).await {
+    let request = fidl_service::DestroyIfaceRequest { iface_id };
+    match proxy.destroy_iface(&request).await {
         Ok(status) => match status {
             fuchsia_zircon::sys::ZX_OK => Ok(()),
             ref e => {
@@ -808,7 +808,7 @@ async fn set_phy_country_code(
     country_code: [u8; REGION_CODE_LEN],
 ) -> Result<(), PhyManagerError> {
     let status = proxy
-        .set_country(&mut fidl_service::SetCountryRequest { phy_id, alpha2: country_code })
+        .set_country(&fidl_service::SetCountryRequest { phy_id, alpha2: country_code })
         .await
         .map_err(|e| {
             error!("Failed to set country code for PHY {}: {:?}", phy_id, e);
@@ -825,10 +825,8 @@ async fn clear_phy_country_code(
     proxy: &fidl_service::DeviceMonitorProxy,
     phy_id: u16,
 ) -> Result<(), PhyManagerError> {
-    let status = proxy
-        .clear_country(&mut fidl_service::ClearCountryRequest { phy_id })
-        .await
-        .map_err(|e| {
+    let status =
+        proxy.clear_country(&fidl_service::ClearCountryRequest { phy_id }).await.map_err(|e| {
             error!("Failed to clear country code for PHY {}: {:?}", phy_id, e);
             PhyManagerError::PhySetCountryFailure
         })?;
@@ -844,8 +842,8 @@ async fn set_power_save_mode(
     phy_id: u16,
     state: fidl_common::PowerSaveType,
 ) -> Result<i32, anyhow::Error> {
-    let mut req = fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode: state };
-    proxy.set_power_save_mode(&mut req).await.map_err(|e| e.into())
+    let req = fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode: state };
+    proxy.set_power_save_mode(&req).await.map_err(|e| e.into())
 }
 
 #[cfg(test)]
@@ -1000,7 +998,7 @@ mod tests {
                 match iface_id {
                     Some(iface_id) => responder.send(
                         ZX_OK,
-                        Some(&mut fidl_service::CreateIfaceResponse {
+                        Some(&fidl_service::CreateIfaceResponse {
                             iface_id,
                         })
                     )
@@ -3560,7 +3558,7 @@ mod tests {
 
         // Issue a create iface request
         let fut = create_iface(
-            &mut test_values.monitor_proxy,
+            &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
             NULL_MAC_ADDR,
@@ -3588,7 +3586,7 @@ mod tests {
 
         // Issue a create iface request
         let fut = create_iface(
-            &mut test_values.monitor_proxy,
+            &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
             NULL_MAC_ADDR,
@@ -3624,7 +3622,7 @@ mod tests {
 
         // Issue a create iface request
         let fut = create_iface(
-            &mut test_values.monitor_proxy,
+            &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
             NULL_MAC_ADDR,
@@ -3651,7 +3649,7 @@ mod tests {
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
-        let fut = destroy_iface(&mut test_values.monitor_proxy, 0, &test_values.telemetry_sender);
+        let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
         pin_mut!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
@@ -3673,7 +3671,7 @@ mod tests {
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
-        let fut = destroy_iface(&mut test_values.monitor_proxy, 0, &test_values.telemetry_sender);
+        let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
         pin_mut!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
@@ -3698,7 +3696,7 @@ mod tests {
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
-        let fut = destroy_iface(&mut test_values.monitor_proxy, 0, &test_values.telemetry_sender);
+        let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
         pin_mut!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
@@ -3732,7 +3730,7 @@ mod tests {
         drop(test_values.monitor_stream);
 
         // Issue a destroy iface request
-        let fut = destroy_iface(&mut test_values.monitor_proxy, 0, &test_values.telemetry_sender);
+        let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
         pin_mut!(fut);
 
         // The request should immediately fail.

@@ -329,7 +329,7 @@ async fn bridged_packet_test(name: &str) {
             .connect_to_protocol::<fnet_stack::StackMarker>()
             .expect("failed to connect to stack");
         let () = stack
-            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet: fnet::Subnet {
                     addr: fnet::IpAddress::Ipv4(NETWORK_ADDR),
                     prefix_len: PREFIX_LEN,

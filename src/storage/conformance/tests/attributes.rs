@@ -26,7 +26,7 @@ async fn set_attr_file_with_sufficient_rights() {
         let status = file
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
-                &mut fio::NodeAttributes {
+                &fio::NodeAttributes {
                     creation_time: 111,
                     modification_time: 222,
                     ..EMPTY_NODE_ATTRS
@@ -59,7 +59,7 @@ async fn set_attr_file_with_insufficient_rights() {
         let status = file
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
-                &mut fio::NodeAttributes {
+                &fio::NodeAttributes {
                     creation_time: 111,
                     modification_time: 222,
                     ..EMPTY_NODE_ATTRS
@@ -90,7 +90,7 @@ async fn set_attr_directory_with_sufficient_rights() {
         let status = dir
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
-                &mut fio::NodeAttributes {
+                &fio::NodeAttributes {
                     creation_time: 111,
                     modification_time: 222,
                     ..EMPTY_NODE_ATTRS
@@ -123,7 +123,7 @@ async fn set_attr_directory_with_insufficient_rights() {
         let status = dir
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
-                &mut fio::NodeAttributes {
+                &fio::NodeAttributes {
                     creation_time: 111,
                     modification_time: 222,
                     ..EMPTY_NODE_ATTRS

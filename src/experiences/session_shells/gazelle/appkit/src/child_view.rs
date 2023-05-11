@@ -47,7 +47,7 @@ pub struct ChildView {
 impl Drop for ChildView {
     fn drop(&mut self) {
         // Release the childview's viewport.
-        let _fut = self.flatland.release_viewport(&mut self.viewport_content_id);
+        let _fut = self.flatland.release_viewport(&self.viewport_content_id);
     }
 }
 

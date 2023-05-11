@@ -104,10 +104,10 @@ impl ProvisionCommand {
     }
 
     pub async fn exec(&self, context: &mut LowpanCtlContext) -> Result<(), Error> {
-        let mut provision_args = self.get_provisioning_params()?;
+        let provision_args = self.get_provisioning_params()?;
         let device = context.get_default_device().await.context("Unable to get device instance")?;
         device
-            .provision_network(&mut provision_args)
+            .provision_network(&provision_args)
             .await
             .context("Unable to send provision network command")?;
         Ok(())

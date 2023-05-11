@@ -846,7 +846,7 @@ impl InnerState {
         let mut next = block.next_extent()?;
         while next != BlockIndex::EMPTY {
             let next_block = self.heap.container.block_at(next);
-            content.extend_from_slice(&mut next_block.extent_contents()?);
+            content.extend_from_slice(&next_block.extent_contents()?);
             next = next_block.next_extent()?;
         }
 

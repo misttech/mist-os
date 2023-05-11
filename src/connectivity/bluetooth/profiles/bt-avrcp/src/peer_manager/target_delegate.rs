@@ -257,12 +257,12 @@ impl TargetDelegate {
 
     pub async fn send_set_addressed_player_command(
         &self,
-        mut player_id: AddressedPlayerId,
+        player_id: AddressedPlayerId,
     ) -> Result<(), TargetAvcError> {
         let target_handler =
             self.target_handler().ok_or(TargetAvcError::RejectedNoAvailablePlayers)?;
         target_handler
-            .set_addressed_player(&mut player_id)
+            .set_addressed_player(&player_id)
             .await
             .map_err(|_| TargetAvcError::RejectedNoAvailablePlayers)?
     }

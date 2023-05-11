@@ -110,7 +110,7 @@ async fn test_register_driver() -> Result<()> {
 
     // Register the driver through a package url.
     driver_registrar
-        .register(&mut fpkg::PackageUrl { url: EPHEMERAL_FAKE_DRIVER_URL.to_string() })
+        .register(&fpkg::PackageUrl { url: EPHEMERAL_FAKE_DRIVER_URL.to_string() })
         .await
         .map_err(|e| anyhow!("Failed to call register driver: {}", e))?
         .map_err(|e| anyhow!("Failed to register driver with err: {}", e))?;

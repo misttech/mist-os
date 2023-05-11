@@ -158,11 +158,8 @@ async fn test_add_and_remove_profile(profile: ProfileHarness) {
 #[test_harness::run_singlethreaded_test]
 async fn test_connect_unknown_peer(profile: ProfileHarness) {
     let fut = profile.aux().profile.connect(
-        &mut PeerId(0xDEAD).into(),
-        &mut ConnectParameters::L2cap(L2capParameters {
-            psm: Some(PSM_AVDTP),
-            ..Default::default()
-        }),
+        &PeerId(0xDEAD).into(),
+        &ConnectParameters::L2cap(L2capParameters { psm: Some(PSM_AVDTP), ..Default::default() }),
     );
     match fut.await {
         Ok(Err(ErrorCode::Failed)) => (),

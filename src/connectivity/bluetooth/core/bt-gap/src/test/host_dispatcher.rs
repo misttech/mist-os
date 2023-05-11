@@ -301,7 +301,7 @@ async fn test_notify_host_watcher_of_active_hosts() {
     assert_eq!(hosts[1].active, Some(false));
 
     // Setting host 1 to active should set host 0 to inactive.
-    assert_matches!(host_watcher_proxy.set_active(&mut host_id_1.into()).await, Ok(_));
+    assert_matches!(host_watcher_proxy.set_active(&host_id_1.into()).await, Ok(_));
     let mut hosts = host_watcher_proxy
         .watch()
         .map_err(|e| Error::from(e))

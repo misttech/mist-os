@@ -19,7 +19,7 @@ impl FidlProtocol for Echo {
     async fn handle(&self, _cx: &Context, req: ffx::EchoRequest) -> Result<()> {
         match req {
             ffx::EchoRequest::EchoString { value, responder } => {
-                responder.send(&mut String::from(value)).map_err(Into::into)
+                responder.send(&String::from(value)).map_err(Into::into)
             }
         }
     }

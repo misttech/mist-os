@@ -15,9 +15,9 @@ async fn test_get_typefaces_by_family() {
 
 async fn test_get_typefaces_by_family_basic(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_SMALL_CM).await?;
-    let mut family = fonts::FamilyName { name: String::from("Roboto") };
+    let family = fonts::FamilyName { name: String::from("Roboto") };
 
-    let response = font_provider.get_typefaces_by_family(&mut family).await?;
+    let response = font_provider.get_typefaces_by_family(&family).await?;
     let faces = response.unwrap().results.unwrap();
 
     assert_eq!(faces.len(), 3);
@@ -29,11 +29,11 @@ async fn test_get_typefaces_by_family_basic(factory: &ProviderFactory) -> Result
 
 async fn test_get_typefaces_by_family_alias(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_SMALL_CM).await?;
-    let mut family = fonts::FamilyName { name: String::from("Material Design Icons") };
-    let mut alias = fonts::FamilyName { name: String::from("MaterialIcons") };
+    let family = fonts::FamilyName { name: String::from("Material Design Icons") };
+    let alias = fonts::FamilyName { name: String::from("MaterialIcons") };
 
-    let by_family = font_provider.get_typefaces_by_family(&mut family).await?;
-    let by_alias = font_provider.get_typefaces_by_family(&mut alias).await?;
+    let by_family = font_provider.get_typefaces_by_family(&family).await?;
+    let by_alias = font_provider.get_typefaces_by_family(&alias).await?;
 
     let by_family_faces = by_family.unwrap().results.unwrap();
     let by_alias_faces = by_alias.unwrap().results.unwrap();
@@ -46,8 +46,8 @@ async fn test_get_typefaces_by_family_alias(factory: &ProviderFactory) -> Result
 
 async fn test_get_typefaces_by_family_not_found(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_SMALL_CM).await?;
-    let mut family = fonts::FamilyName { name: String::from("NoSuchFont") };
-    let response = font_provider.get_typefaces_by_family(&mut family).await?;
+    let family = fonts::FamilyName { name: String::from("NoSuchFont") };
+    let response = font_provider.get_typefaces_by_family(&family).await?;
     assert_eq!(response.unwrap_err(), fonts_exp::Error::NotFound);
     Ok(())
 }

@@ -45,8 +45,8 @@ impl WlanDeprecatedConfigurationFacade {
         let inner_guard = self.inner.read();
         let controller = &inner_guard.controller;
 
-        let mut mac = fidl_fuchsia_net::MacAddress { octets: mac.to_array() };
-        let result = controller.suggest_access_point_mac_address(&mut mac).await?;
+        let mac = fidl_fuchsia_net::MacAddress { octets: mac.to_array() };
+        let result = controller.suggest_access_point_mac_address(&mac).await?;
         result.map_err(|e| format_err!("could not set preferred MAC: {:?}", e))
     }
 

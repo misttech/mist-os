@@ -573,7 +573,7 @@ mod tests {
         let bn1 = bn("1000000000000000000000");
         let bn2 = bn("1000000000001234567890");
         let m = bn("2000000000000000000000");
-        let value = bn1.mod_add(&bn2, &m, &mut ctx).unwrap();
+        let value = bn1.mod_add(&bn2, &m, &ctx).unwrap();
         assert_eq!(value, bn("1234567890"));
     }
 

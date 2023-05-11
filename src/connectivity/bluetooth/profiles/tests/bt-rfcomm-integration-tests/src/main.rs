@@ -241,11 +241,11 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
         .expect("observer event");
 
     // Client #2 can now connect via RFCOMM to Client #1.
-    let mut params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
+    let params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
         channel: Some(rfcomm_channel_number.into()),
         ..Default::default()
     });
-    let connect_fut = other_rfcomm_proxy.connect(&mut this_rfcomm.peer_id().into(), &mut params);
+    let connect_fut = other_rfcomm_proxy.connect(&this_rfcomm.peer_id().into(), &params);
     pin_mut!(connect_fut);
 
     // Each client should be delivered one end of the RFCOMM channel.
@@ -341,8 +341,8 @@ async fn passthrough_search_discovers_advertisement() {
     // `client` and `test_driven_peer`.
     let _client_channel = profile
         .connect(
-            &mut test_driven_peer.peer_id().into(),
-            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+            &test_driven_peer.peer_id().into(),
+            &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
                 psm: Some(bredr::PSM_AVDTP),
                 ..Default::default()
             }),

@@ -150,7 +150,7 @@ async fn handle_client_request(
         Some(Ok(SnoopRequest::Start { follow, host_device, responder })) => {
             // Return early if the client has already issued a `Start` request.
             if subscribers.is_registered(&id) {
-                responder.send(&mut bt_fidl_status!(
+                responder.send(&bt_fidl_status!(
                     Already,
                     "Cannot issue `Start` request more than once."
                 ))?;
@@ -166,23 +166,23 @@ async fn handle_client_request(
 
             if let Some(ref device) = host_device {
                 if let Some(log) = packet_logs.get(device) {
-                    responder.send(&mut bt_fidl_status!())?;
+                    responder.send(&bt_fidl_status!())?;
                     for packet in log.lock().await.iter_mut() {
                         control_handle
-                            .send_on_packet(device, &mut packet.to_fidl(utc_xform.as_ref()))?;
+                            .send_on_packet(device, &packet.to_fidl(utc_xform.as_ref()))?;
                     }
                 } else {
-                    responder.send(&mut bt_fidl_status!(NotFound, "Unrecognized device name."))?;
+                    responder.send(&bt_fidl_status!(NotFound, "Unrecognized device name."))?;
                     return Ok(());
                 }
             } else {
-                responder.send(&mut bt_fidl_status!())?;
+                responder.send(&bt_fidl_status!())?;
                 let device_ids: Vec<_> = packet_logs.device_ids().cloned().collect();
                 for device in &device_ids {
                     if let Some(log) = packet_logs.get(device) {
                         for packet in log.lock().await.iter_mut() {
                             control_handle
-                                .send_on_packet(device, &mut packet.to_fidl(utc_xform.as_ref()))?;
+                                .send_on_packet(device, &packet.to_fidl(utc_xform.as_ref()))?;
                         }
                     }
                 }

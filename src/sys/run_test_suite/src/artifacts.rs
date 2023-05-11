@@ -227,12 +227,12 @@ async fn copy_file_to_writer<T: Write>(
         vector.push_back(file.read(READ_SIZE));
     }
     loop {
-        let mut buf =
+        let buf =
             vector.pop_front().unwrap().await?.map_err(fuchsia_zircon_status::Status::from_raw)?;
         if buf.is_empty() {
             break;
         }
-        output.write_all(&mut buf)?;
+        output.write_all(&buf)?;
         vector.push_back(file.read(READ_SIZE));
     }
     Ok(())

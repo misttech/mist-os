@@ -426,7 +426,7 @@ enum DestroyChildError {
 /// The `connector` connects to the desired realm. A `not_running_error` will be
 /// returned if the provided `child_ref` does not exist.
 async fn destroy_child(
-    mut child_ref: fdecl::ChildRef,
+    child_ref: fdecl::ChildRef,
     connector: &impl Connector,
 ) -> Result<(), DestroyChildError> {
     let realm_proxy = connector
@@ -434,7 +434,7 @@ async fn destroy_child(
         .map_err(|_e| DestroyChildError::Internal)?;
 
     realm_proxy
-        .destroy_child(&mut child_ref)
+        .destroy_child(&child_ref)
         .await
         .map_err(|e| {
             error!("destroy_child failed: {:?}", e);

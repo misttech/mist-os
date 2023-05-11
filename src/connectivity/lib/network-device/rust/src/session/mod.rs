@@ -94,7 +94,7 @@ impl Session {
         //
         // The dyn borrow in the signature of `proxy.attach` seems to be the
         // cause of the compiler's confusion.
-        let fut = self.inner()?.proxy.attach(&mut port.into(), rx_frames);
+        let fut = self.inner()?.proxy.attach(&port.into(), rx_frames);
         let () = fut.await?.map_err(|raw| Error::Attach(port, zx::Status::from_raw(raw)))?;
         Ok(())
     }
@@ -104,7 +104,7 @@ impl Session {
         let () = self
             .inner()?
             .proxy
-            .detach(&mut port.into())
+            .detach(&port.into())
             .await?
             .map_err(|raw| Error::Detach(port, zx::Status::from_raw(raw)))?;
         Ok(())

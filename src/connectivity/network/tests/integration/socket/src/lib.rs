@@ -438,8 +438,8 @@ async fn udp_send_msg_preflight_fidl_setup<I: net_types::ip::Ip + UdpSendMsgPref
     .await;
     assert_eq!(successful_preflights, []);
 
-    let mut connected_addr = I::REACHABLE_ADDR1;
-    socket.connect(&mut connected_addr).await.expect("connect fidl error").expect("connect failed");
+    let connected_addr = I::REACHABLE_ADDR1;
+    socket.connect(&connected_addr).await.expect("connect fidl error").expect("connect failed");
 
     // We deliberately repeat an address here to ensure that the preflight can
     // be called > 1 times with the same address.
@@ -511,9 +511,9 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
 
     match invalidation_reason {
         UdpCacheInvalidationReason::ConnectCalled => {
-            let mut connected_addr = I::REACHABLE_ADDR2;
+            let connected_addr = I::REACHABLE_ADDR2;
             let () = socket
-                .connect(&mut connected_addr)
+                .connect(&connected_addr)
                 .await
                 .expect("connect fidl error")
                 .expect("connect failed");
@@ -830,9 +830,9 @@ async fn udp_send_msg_preflight_fidl_ndp(
 
 async fn connect_socket_and_validate_preflight(
     socket: &fposix_socket::DatagramSocketProxy,
-    mut addr: fnet::SocketAddress,
+    addr: fnet::SocketAddress,
 ) -> fposix_socket::DatagramSocketSendMsgPreflightResponse {
-    socket.connect(&mut addr).await.expect("call connect").expect("connect socket");
+    socket.connect(&addr).await.expect("call connect").expect("connect socket");
 
     let response = socket
         .send_msg_preflight(&fposix_socket::DatagramSocketSendMsgPreflightRequest::default())
@@ -1421,10 +1421,7 @@ async fn tcp_socket_send_recv<
         // Echo the bytes back the already closed sender, the sender is already
         // closed and it should not cause any panic.
         assert_eq!(
-            receiver
-                .write(&mut buf[..read_count])
-                .await
-                .expect("write to tcp server stream failed"),
+            receiver.write(&buf[..read_count]).await.expect("write to tcp server stream failed"),
             read_count
         );
     }
@@ -1756,7 +1753,7 @@ async fn install_ip_device(
     let installer = realm.connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>().unwrap();
     let stack = realm.connect_to_protocol::<fnet_stack::StackMarker>().unwrap();
 
-    let mut port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
+    let port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
     let device = {
         let (device, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
@@ -1774,7 +1771,7 @@ async fn install_ip_device(
         let (control, server_end) =
             fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
         let () = device_control
-            .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
+            .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
             .expect("create interface");
         control
     };
@@ -1809,7 +1806,7 @@ async fn install_ip_device(
 
             // NB: add_address above does NOT create a subnet route.
             let add_forwarding_entry_fut = stack
-                .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                     subnet: fnet_ext::apply_subnet_mask(subnet.clone()),
                     device_id: id,
                     next_hop: None,

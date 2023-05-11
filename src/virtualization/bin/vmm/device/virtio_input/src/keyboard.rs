@@ -383,8 +383,8 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
     fn handle_keyboard_listener_request(&mut self, request: KeyboardListenerRequest) {
         match request {
             KeyboardListenerRequest::OnKeyEvent { event, responder } => {
-                let key_status = if let Some(mut events) = translate_keyboard_event(event) {
-                    if let Err(e) = self.input_device.write_events_to_queue(&mut events) {
+                let key_status = if let Some(events) = translate_keyboard_event(event) {
+                    if let Err(e) = self.input_device.write_events_to_queue(&events) {
                         tracing::warn!("Failed to write events to the event queue: {}", e);
                         fidl_fuchsia_ui_input3::KeyEventStatus::NotHandled
                     } else {

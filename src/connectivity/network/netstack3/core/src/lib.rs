@@ -440,20 +440,20 @@ pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
 
 /// Set the IP address and subnet for a device.
 pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr_sub: AddrSubnetEither,
 ) -> Result<(), error::ExistsError> {
     map_addr_version!(
         addr_sub: AddrSubnetEither;
-        crate::device::add_ip_addr_subnet(&mut sync_ctx, ctx, device, addr_sub)
+        crate::device::add_ip_addr_subnet(&sync_ctx, ctx, device, addr_sub)
     )
 }
 
 /// Delete an IP address on a device.
 pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr: SpecifiedAddr<IpAddr>,
@@ -461,7 +461,7 @@ pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
     let addr = addr.into();
     map_addr_version!(
         addr: IpAddr;
-        crate::device::del_ip_addr(&mut sync_ctx, ctx, device, &addr)
+        crate::device::del_ip_addr(&sync_ctx, ctx, device, &addr)
     )
 }
 
@@ -521,15 +521,15 @@ mod tests {
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
-        let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let device = crate::device::add_ethernet_device(
-            &mut sync_ctx,
+            &sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
 
         let ip: IpAddr = I::get_other_ip_address(1).get().into();
         let prefix = config.subnet.prefix();
@@ -542,8 +542,7 @@ mod tests {
         );
 
         // Add IP (OK).
-        let () =
-            add_ip_addr_subnet(&mut sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap();
+        let () = add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap();
         assert_eq!(
             get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             Some(addr_subnet)
@@ -551,7 +550,7 @@ mod tests {
 
         // Add IP again (already exists).
         assert_eq!(
-            add_ip_addr_subnet(&mut sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap_err(),
+            add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap_err(),
             error::ExistsError
         );
         assert_eq!(
@@ -562,7 +561,7 @@ mod tests {
         // Add IP with different subnet (already exists).
         let wrong_addr_subnet = AddrSubnetEither::new(ip, prefix - 1).unwrap();
         assert_eq!(
-            add_ip_addr_subnet(&mut sync_ctx, &mut non_sync_ctx, &device, wrong_addr_subnet)
+            add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, wrong_addr_subnet)
                 .unwrap_err(),
             error::ExistsError
         );
@@ -573,7 +572,7 @@ mod tests {
 
         let ip = SpecifiedAddr::new(ip).unwrap();
         // Del IP (ok).
-        let () = del_ip_addr(&mut sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap();
+        let () = del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap();
         assert_eq!(
             get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             None
@@ -581,7 +580,7 @@ mod tests {
 
         // Del IP again (not found).
         assert_eq!(
-            del_ip_addr(&mut sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap_err(),
+            del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap_err(),
             error::NotFoundError
         );
         assert_eq!(
@@ -604,7 +603,7 @@ mod tests {
     #[test_case(false; "without_specified_device")]
     #[test_case(true; "with_specified_device")]
     fn add_gateway_route<I: Ip + TestIpExt>(should_specify_device: bool) {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
@@ -627,7 +626,7 @@ mod tests {
         // gateway.
         assert_eq!(
             crate::add_route(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
@@ -642,7 +641,7 @@ mod tests {
         // Then, add a route to the gateway, and try again, expecting success.
         assert_eq!(
             crate::add_route(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
                     I::FAKE_CONFIG.subnet.into(),
@@ -654,7 +653,7 @@ mod tests {
         );
         assert_eq!(
             crate::add_route(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
@@ -669,21 +668,21 @@ mod tests {
 
     #[ip_test]
     fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
-        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
         let metric = RawMetric(9999);
         //let device_id = sync_ctx.state.device.add_ethernet_device(
         let device_id = crate::device::add_ethernet_device(
-            &mut sync_ctx,
+            &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             metric,
         );
         assert_eq!(
             crate::add_route(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
                     I::FAKE_CONFIG.subnet.into(),

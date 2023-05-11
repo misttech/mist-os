@@ -57,7 +57,7 @@ pub async fn open_child_component_exposed_dir(
     collection_name: &str,
     realm: &fcomponent::RealmProxy,
 ) -> Result<fio::DirectoryProxy, fcomponent::Error> {
-    let mut child_ref = fdecl::ChildRef {
+    let child_ref = fdecl::ChildRef {
         name: child_name.to_string(),
         collection: Some(collection_name.to_string()),
     };
@@ -65,7 +65,7 @@ pub async fn open_child_component_exposed_dir(
     let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
         .map_err(|_| fcomponent::Error::Internal)?;
     realm
-        .open_exposed_dir(&mut child_ref, server_end)
+        .open_exposed_dir(&child_ref, server_end)
         .await
         .map_err(|_| fcomponent::Error::Internal)??;
 
@@ -87,12 +87,12 @@ pub async fn destroy_child_component(
     collection_name: &str,
     realm: &fcomponent::RealmProxy,
 ) -> Result<(), fcomponent::Error> {
-    let mut child_ref = fdecl::ChildRef {
+    let child_ref = fdecl::ChildRef {
         name: child_name.to_string(),
         collection: Some(collection_name.to_string()),
     };
 
-    realm.destroy_child(&mut child_ref).await.map_err(|_| fcomponent::Error::Internal)??;
+    realm.destroy_child(&child_ref).await.map_err(|_| fcomponent::Error::Internal)??;
 
     Ok(())
 }

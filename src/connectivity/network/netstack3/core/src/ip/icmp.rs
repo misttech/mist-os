@@ -3217,21 +3217,21 @@ mod tests {
 
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             I::FAKE_CONFIG.into_builder().build_with_modifications(modify_stack_state_builder);
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, I>(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
             IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 FrameDestination::Individual { local: true },
                 buffer,
             ),
             IpVersion::V6 => receive_ip_packet::<_, _, Ipv6>(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 FrameDestination::Individual { local: true },
@@ -3818,7 +3818,7 @@ mod tests {
         let loopback_device_id =
             net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx: _ }| {
                 crate::device::add_loopback_device(
-                    &mut &*sync_ctx,
+                    &&*sync_ctx,
                     Mtu::new(u16::MAX as u32),
                     DEFAULT_INTERFACE_METRIC,
                 )
@@ -3828,11 +3828,7 @@ mod tests {
 
         let echo_body = vec![1, 2, 3, 4];
         let conn = net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::testutil::enable_device(
-                &mut &*sync_ctx,
-                non_sync_ctx,
-                &loopback_device_id,
-            );
+            crate::device::testutil::enable_device(&&*sync_ctx, non_sync_ctx, &loopback_device_id);
 
             let conn = I::new_icmp_connection(
                 sync_ctx,
@@ -3860,7 +3856,7 @@ mod tests {
         net.run_until_idle(
             crate::device::testutil::receive_frame,
             |Ctx { sync_ctx, non_sync_ctx }, _, id| {
-                crate::handle_timer(&mut &*sync_ctx, non_sync_ctx, id);
+                crate::handle_timer(&&*sync_ctx, non_sync_ctx, id);
                 handle_queued_rx_packets(sync_ctx, non_sync_ctx);
             },
         );

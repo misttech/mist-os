@@ -544,7 +544,7 @@ async fn set_up_package_repository(
             let repo_spec =
                 RepositorySpec::Pm { path: repo_path.try_into()?, aliases: BTreeSet::new() };
             repos
-                .add_repository(&repo_name, &mut repo_spec.into())
+                .add_repository(&repo_name, &repo_spec.into())
                 .await
                 .context("communicating with ffx daemon")?
                 .map_err(RepositoryError::from)

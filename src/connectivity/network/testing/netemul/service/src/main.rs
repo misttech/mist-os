@@ -1333,7 +1333,7 @@ mod tests {
 
         let name = "ep";
         let (status, endpoint) = endpoint_mgr
-            .create_endpoint(&name, &mut fnetemul_network::EndpointConfig { mtu: 1500, mac: None })
+            .create_endpoint(&name, &fnetemul_network::EndpointConfig { mtu: 1500, mac: None })
             .await
             .expect("calling create endpoint");
         let () = zx::Status::ok(status).expect("endpoint creation");
@@ -1827,7 +1827,7 @@ mod tests {
     async fn create_endpoint(
         sandbox: &fnetemul::SandboxProxy,
         name: &str,
-        mut config: fnetemul_network::EndpointConfig,
+        config: fnetemul_network::EndpointConfig,
     ) -> fnetemul_network::EndpointProxy {
         let (network_ctx, server) =
             fidl::endpoints::create_proxy::<fnetemul_network::NetworkContextMarker>()
@@ -1838,7 +1838,7 @@ mod tests {
                 .expect("failed to create endpoint manager proxy");
         let () = network_ctx.get_endpoint_manager(server).expect("calling get endpoint manager");
         let (status, endpoint) =
-            endpoint_mgr.create_endpoint(name, &mut config).await.expect("calling create endpoint");
+            endpoint_mgr.create_endpoint(name, &config).await.expect("calling create endpoint");
         let () = zx::Status::ok(status).expect("endpoint creation");
         endpoint.expect("endpoint creation").into_proxy().expect("failed to create endpoint proxy")
     }
@@ -2005,11 +2005,10 @@ mod tests {
             let () = realm_b.get_devfs(server).expect("calling get devfs");
             devfs
         };
-        let (status, mut buf) =
-            devfs_b.read_dirents(fio::MAX_BUF).await.expect("calling read dirents");
+        let (status, buf) = devfs_b.read_dirents(fio::MAX_BUF).await.expect("calling read dirents");
         let () = zx::Status::ok(status).expect("failed reading directory entries");
         assert_eq!(
-            fuchsia_fs::directory::parse_dir_entries(&mut buf)
+            fuchsia_fs::directory::parse_dir_entries(&buf)
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
                 .expect("failed parsing directory entries"),
@@ -2380,11 +2379,11 @@ mod tests {
         let () = counter
             .open_in_namespace(&path, fio::OpenFlags::RIGHT_READABLE, server_end.into_channel())
             .unwrap_or_else(|e| panic!("failed to connect to {} through counter: {:?}", path, e));
-        let (status, mut buf) =
+        let (status, buf) =
             ethernet.read_dirents(fio::MAX_BUF).await.expect("calling read dirents");
         let () = zx::Status::ok(status).expect("failed reading directory entries");
         assert_eq!(
-            fuchsia_fs::directory::parse_dir_entries(&mut buf)
+            fuchsia_fs::directory::parse_dir_entries(&buf)
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
                 .expect("failed parsing directory entries"),

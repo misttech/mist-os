@@ -225,11 +225,11 @@ impl Coordinator {
                     }
                     LayerConfig::Primary {
                         image_id,
-                        mut image_config,
+                        image_config,
                         unblock_event,
                         retirement_event,
                     } => {
-                        proxy.set_layer_primary_config(layer.id.0, &mut image_config)?;
+                        proxy.set_layer_primary_config(layer.id.0, &image_config)?;
                         proxy.set_layer_image(
                             layer.id.0,
                             image_id.0,
@@ -277,7 +277,7 @@ impl Coordinator {
             proxy
                 .set_buffer_collection_constraints(
                     id.0,
-                    &mut display::ImageConfig { width: 0, height: 0, type_: 0 },
+                    &display::ImageConfig { width: 0, height: 0, type_: 0 },
                 )
                 .await?,
         )?;
@@ -294,9 +294,9 @@ impl Coordinator {
         &self,
         collection_id: CollectionId,
         image_id: ImageId,
-        mut config: display::ImageConfig,
+        config: display::ImageConfig,
     ) -> Result<()> {
-        let result = self.proxy().import_image(&mut config, collection_id.0, image_id.0, 0).await?;
+        let result = self.proxy().import_image(&config, collection_id.0, image_id.0, 0).await?;
         zx::Status::ok(result)?;
         Ok(())
     }

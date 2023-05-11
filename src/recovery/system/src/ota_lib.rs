@@ -99,13 +99,13 @@ impl OtaManager for OtaComponent {
     }
 
     async fn stop(&self) -> Result<(), Error> {
-        let mut child_ref = ChildRef {
+        let child_ref = ChildRef {
             name: String::from(CHILD_NAME),
             collection: Some(String::from(COLLECTION_NAME)),
         };
 
         self.realm
-            .destroy_child(&mut child_ref)
+            .destroy_child(&child_ref)
             .await
             .expect("destroy_child failed")
             .map_err(|e| format_err!("failed to destroy OTA child: {:?}", e))?;
@@ -480,7 +480,7 @@ mod tests {
                 log_listener
                     .into_proxy()
                     .expect("create log_listener proxy")
-                    .log(&mut flog::LogMessage {
+                    .log(&flog::LogMessage {
                         pid: 0,
                         tid: 0,
                         time: 0,

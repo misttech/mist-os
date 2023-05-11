@@ -166,7 +166,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
 
         if has_default_ipv4_route {
             stack
-                .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                     subnet: fidl_subnet!("0.0.0.0/0"),
                     device_id: id,
                     next_hop: None,
@@ -179,7 +179,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
 
         if has_default_ipv6_route {
             stack
-                .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                     subnet: fidl_subnet!("::/0"),
                     device_id: id,
                     next_hop: None,
@@ -378,7 +378,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
         IpVersion::V6 => fidl_subnet!("::/0"),
     };
     stack
-        .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
             subnet: route.clone(),
             device_id: id,
             next_hop: None,
@@ -396,7 +396,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
 
     // Remove the default route and watch for its removal.
     stack
-        .del_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+        .del_forwarding_entry(&fnet_stack::ForwardingEntry {
             subnet: route,
             device_id: id,
             next_hop: None,
@@ -1404,14 +1404,14 @@ async fn watcher(name: &str) {
 
     // Add a default route.
     let () = assert_blocked(&mut blocking_stream).await;
-    let mut default_v4_entry = fnet_stack::ForwardingEntry {
+    let default_v4_entry = fnet_stack::ForwardingEntry {
         subnet: fidl_subnet!("0.0.0.0/0"),
         device_id: 0,
         next_hop: Some(Box::new(fidl_ip!("192.168.255.254"))),
         metric: 0,
     };
     let () = stack
-        .add_forwarding_entry(&mut default_v4_entry)
+        .add_forwarding_entry(&default_v4_entry)
         .await
         .squash_result()
         .expect("add default route");
@@ -1427,7 +1427,7 @@ async fn watcher(name: &str) {
     // Remove the default route.
     let () = assert_blocked(&mut blocking_stream).await;
     let () = stack
-        .del_forwarding_entry(&mut default_v4_entry)
+        .del_forwarding_entry(&default_v4_entry)
         .await
         .squash_result()
         .expect("delete default route");

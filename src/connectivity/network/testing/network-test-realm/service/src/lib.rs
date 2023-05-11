@@ -61,13 +61,13 @@ pub async fn has_stub(realm_proxy: &fcomponent::RealmProxy) -> Result<bool> {
 /// Returns true if the `realm_proxy` contains the `expected_child_ref` within
 /// the provided `collection_ref`.
 async fn has_running_child(
-    mut collection_ref: fdecl::CollectionRef,
+    collection_ref: fdecl::CollectionRef,
     expected_child_ref: &fdecl::ChildRef,
     realm_proxy: &fcomponent::RealmProxy,
 ) -> Result<bool> {
     let (iterator_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
     let list_children_result = realm_proxy
-        .list_children(&mut collection_ref, server_end)
+        .list_children(&collection_ref, server_end)
         .await
         .context("failed to list_children")?;
 

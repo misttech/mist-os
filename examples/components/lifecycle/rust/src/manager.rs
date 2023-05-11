@@ -94,13 +94,13 @@ async fn destroy_dynamic_child() {
     let realm = client::connect_to_protocol::<RealmMarker>()
         .expect("failed to connect to fuchsia.component.Realm");
 
-    let mut child_ref = ChildRef {
+    let child_ref = ChildRef {
         name: String::from("lifecycle_dynamic"),
         collection: Some(String::from("echo")),
     };
 
     realm
-        .destroy_child(&mut child_ref)
+        .destroy_child(&child_ref)
         .await
         .expect("destroy_child failed")
         .expect("failed to destroy child");

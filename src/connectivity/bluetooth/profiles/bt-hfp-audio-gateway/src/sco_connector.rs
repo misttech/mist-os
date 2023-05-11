@@ -154,7 +154,7 @@ impl ScoConnector {
         let (client, mut requests) =
             fidl::endpoints::create_request_stream::<bredr::ScoConnectionReceiverMarker>()?;
         proxy.connect_sco(
-            &mut peer_id.into(),
+            &peer_id.into(),
             /* initiate = */ role == ScoInitiatorRole::Initiate,
             &params,
             client,

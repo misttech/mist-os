@@ -144,8 +144,8 @@ async fn connect_peer(
 ) -> Result<Channel, Error> {
     info!(%id, "Connecting to peer");
     let connect_fut = proxy.connect(
-        &mut id.into(),
-        &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+        &id.into(),
+        &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(bredr::PSM_AVDTP),
             parameters: Some(channel_params),
             ..Default::default()
@@ -834,7 +834,7 @@ mod tests {
             match exec.run_until_stalled(&mut remote_requests.next()) {
                 Poll::Ready(Some(Ok(avdtp::Request::GetCapabilities { responder, .. }))) => {
                     responder
-                        .send(&vec![avdtp::ServiceCapability::MediaTransport, sbc_codec.clone()])
+                        .send(&[avdtp::ServiceCapability::MediaTransport, sbc_codec.clone()])
                         .expect("respond succeeds");
                 }
                 Poll::Ready(x) => panic!("Got unexpected request: {:?}", x),
@@ -896,7 +896,7 @@ mod tests {
                         x => panic!("Got unexpected get_capabilities seid {:?}", x),
                     };
                     responder
-                        .send(&vec![avdtp::ServiceCapability::MediaTransport, codec])
+                        .send(&[avdtp::ServiceCapability::MediaTransport, codec])
                         .expect("respond succeeds");
                 }
                 x => panic!("Expected a ready get capabilities request, got {:?}", x),
@@ -978,7 +978,7 @@ mod tests {
                         x => panic!("Got unexpected get_capabilities seid {:?}", x),
                     };
                     responder
-                        .send(&vec![avdtp::ServiceCapability::MediaTransport, codec])
+                        .send(&[avdtp::ServiceCapability::MediaTransport, codec])
                         .expect("respond succeeds");
                 }
                 x => panic!("Expected a ready get capabilities request, got {:?}", x),
@@ -1045,7 +1045,7 @@ mod tests {
                         x => panic!("Got unexpected get_capabilities seid {:?}", x),
                     };
                     responder
-                        .send(&vec![avdtp::ServiceCapability::MediaTransport, codec])
+                        .send(&[avdtp::ServiceCapability::MediaTransport, codec])
                         .expect("respond succeeds");
                 }
                 x => panic!("Expected a ready get capabilities request, got {:?}", x),

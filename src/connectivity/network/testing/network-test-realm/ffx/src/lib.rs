@@ -83,21 +83,21 @@ async fn handle_command(
             name,
             wait_any_ip_address,
         }) => (
-            controller.add_interface(&mut mac_address.into(), &name, wait_any_ip_address).await,
+            controller.add_interface(&mac_address.into(), &name, wait_any_ip_address).await,
             "add_interface",
         ),
         ntr_args::Subcommand::JoinMulticastGroup(ntr_args::JoinMulticastGroup {
             address,
             interface_id,
         }) => (
-            controller.join_multicast_group(&mut address.into(), interface_id).await,
+            controller.join_multicast_group(&address.into(), interface_id).await,
             "join_multicast_group",
         ),
         ntr_args::Subcommand::LeaveMulticastGroup(ntr_args::LeaveMulticastGroup {
             address,
             interface_id,
         }) => (
-            controller.leave_multicast_group(&mut address.into(), interface_id).await,
+            controller.leave_multicast_group(&address.into(), interface_id).await,
             "leave_multicast_group",
         ),
         ntr_args::Subcommand::Ping(ntr_args::Ping {
@@ -107,7 +107,7 @@ async fn handle_command(
             interface_name,
         }) => (
             controller
-                .ping(&mut target.into(), payload_length, interface_name.as_deref(), timeout)
+                .ping(&target.into(), payload_length, interface_name.as_deref(), timeout)
                 .await,
             "ping",
         ),
@@ -120,7 +120,7 @@ async fn handle_command(
             async move {
                 controller
                     .poll_udp(
-                        &mut fnet_ext::SocketAddress(target).into(),
+                        &fnet_ext::SocketAddress(target).into(),
                         payload.as_bytes(),
                         timeout,
                         num_retries,

@@ -187,7 +187,7 @@ impl PeerTask {
     }
 
     /// Make a connection to the peer only if there is not an existing connection.
-    async fn connect(&mut self, mut params: bredr::ConnectParameters) -> Result<(), anyhow::Error> {
+    async fn connect(&mut self, params: bredr::ConnectParameters) -> Result<(), anyhow::Error> {
         if self.connection.connected() {
             info!("Already connected to peer: {}.", self.id);
             return Ok(());
@@ -195,7 +195,7 @@ impl PeerTask {
         info!("Initiating connection to peer: {}", self.id);
         let channel = self
             .profile_proxy
-            .connect(&mut self.id.into(), &mut params)
+            .connect(&self.id.into(), &params)
             .await?
             .map_err(|e| format_err!("Profile connection request error: {:?}", e))?;
         self.connection.connect(channel.try_into()?);
@@ -527,7 +527,7 @@ impl PeerTask {
             })?;
         }
 
-        match handler.request_outgoing_call(&mut call_action.into()).await {
+        match handler.request_outgoing_call(&call_action.into()).await {
             Ok(Ok(())) => Ok(()),
             err => {
                 warn!(peer = %self.id, ?err, "Error initiating outgoing call");

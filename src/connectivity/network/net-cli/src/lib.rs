@@ -579,14 +579,14 @@ async fn do_if<C: NetCliDepsConnector>(
                 if !no_subnet_route {
                     let stack: fstack::StackProxy =
                         connect_with_context::<fstack::StackMarker, _>(connector).await?;
-                    let mut forwarding_entry = fstack::ForwardingEntry {
+                    let forwarding_entry = fstack::ForwardingEntry {
                         subnet: fnet_ext::apply_subnet_mask(subnet.into()),
                         device_id: id,
                         next_hop: None,
                         metric: 0,
                     };
                     let () = fstack_ext::exec_fidl!(
-                        stack.add_forwarding_entry(&mut forwarding_entry),
+                        stack.add_forwarding_entry(&forwarding_entry),
                         "error adding forwarding entry"
                     )?;
                     info!("Added forwarding entry {:?}", forwarding_entry);
@@ -706,18 +706,18 @@ async fn do_route<C: NetCliDepsConnector>(
         opts::RouteEnum::Add(route) => {
             let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
-            let mut entry = route.into_route_table_entry(nicid);
+            let entry = route.into_route_table_entry(nicid);
             let () = fstack_ext::exec_fidl!(
-                stack.add_forwarding_entry(&mut entry),
+                stack.add_forwarding_entry(&entry),
                 "error adding next-hop forwarding entry"
             )?;
         }
         opts::RouteEnum::Del(route) => {
             let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
-            let mut entry = route.into_route_table_entry(nicid);
+            let entry = route.into_route_table_entry(nicid);
             let () = fstack_ext::exec_fidl!(
-                stack.del_forwarding_entry(&mut entry),
+                stack.del_forwarding_entry(&entry),
                 "error removing forwarding entry"
             )?;
         }
@@ -1013,7 +1013,7 @@ async fn do_neigh_add(
     controller: fneighbor::ControllerProxy,
 ) -> Result<(), Error> {
     controller
-        .add_entry(interface, &mut neighbor.into(), &mut mac.into())
+        .add_entry(interface, &neighbor.into(), &mac.into())
         .await
         .context("FIDL error adding neighbor entry")?
         .map_err(zx::Status::from_raw)
@@ -1039,7 +1039,7 @@ async fn do_neigh_del(
     controller: fneighbor::ControllerProxy,
 ) -> Result<(), Error> {
     controller
-        .remove_entry(interface, &mut neighbor.into())
+        .remove_entry(interface, &neighbor.into())
         .await
         .context("FIDL error removing neighbor entry")?
         .map_err(zx::Status::from_raw)
@@ -1270,14 +1270,14 @@ async fn do_dhcpd_set(set_arg: opts::dhcpd::Set, server: fdhcp::Server_Proxy) ->
     match set_arg.arg {
         opts::dhcpd::SetArg::Option(opts::dhcpd::OptionArg { name }) => {
             let () = server
-                .set_option(&mut name.clone().into())
+                .set_option(&name.clone().into())
                 .await?
                 .map_err(zx::Status::from_raw)
                 .with_context(|| format!("set_option({:?}) failed", name))?;
         }
         opts::dhcpd::SetArg::Parameter(opts::dhcpd::ParameterArg { name }) => {
             let () = server
-                .set_parameter(&mut name.clone().into())
+                .set_parameter(&name.clone().into())
                 .await?
                 .map_err(zx::Status::from_raw)
                 .with_context(|| format!("set_parameter({:?}) failed", name))?;
@@ -1876,7 +1876,7 @@ mod tests {
                     let mut watcher_request_stream: finterfaces::WatcherRequestStream =
                         server_end.into_stream().expect("watcher FIDL error");
 
-                    for mut event in interfaces
+                    for event in interfaces
                         .into_iter()
                         .map(finterfaces::Event::Existing)
                         .chain(std::iter::once(finterfaces::Event::Idle(finterfaces::Empty)))
@@ -1888,7 +1888,7 @@ mod tests {
                             .expect("watcher request stream should not have ended")
                             .into_watch()
                             .expect("request should be of type Watch")
-                            .send(&mut event)
+                            .send(&event)
                             .expect("responder.send should succeed");
                     }
 
@@ -2309,7 +2309,7 @@ mac             -
             futures::stream::iter(interfaces.into_iter().map(Some).chain(std::iter::once(None)));
         let watcher_fut = watcher_stream.zip(interfaces).for_each(|(req, properties)| match req {
             finterfaces::WatcherRequest::Watch { responder } => {
-                let mut event = properties.map_or(
+                let event = properties.map_or(
                     finterfaces::Event::Idle(finterfaces::Empty),
                     |finterfaces_ext::Properties {
                          id,
@@ -2343,7 +2343,7 @@ mac             -
                         })
                     },
                 );
-                let () = responder.send(&mut event).expect("send watcher event");
+                let () = responder.send(&event).expect("send watcher event");
                 futures::future::ready(())
             }
         });

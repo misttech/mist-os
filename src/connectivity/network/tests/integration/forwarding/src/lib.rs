@@ -136,7 +136,7 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
         let stack =
             realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
         stack
-            .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                 subnet: fnet::Subnet { addr: unspecified_address, prefix_len: 0 },
                 device_id: interface.id(),
                 next_hop: Some(Box::new(gateway)),

@@ -783,7 +783,7 @@ async fn neigh_add_remove_entry(name: &str) {
     // Add and remove entry not supported on loopback.
     assert_eq!(
         controller
-            .add_entry(alice.loopback_id, &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+            .add_entry(alice.loopback_id, &BOB_IP, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -791,7 +791,7 @@ async fn neigh_add_remove_entry(name: &str) {
     );
     assert_eq!(
         controller
-            .remove_entry(alice.loopback_id, &mut BOB_IP.clone())
+            .remove_entry(alice.loopback_id, &BOB_IP)
             .await
             .expect("add_entry FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -800,7 +800,7 @@ async fn neigh_add_remove_entry(name: &str) {
     // Add entry and remove entry return not found on non-existing interface.
     assert_eq!(
         controller
-            .add_entry(alice.ep.id() + 100, &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+            .add_entry(alice.ep.id() + 100, &BOB_IP, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -808,7 +808,7 @@ async fn neigh_add_remove_entry(name: &str) {
     );
     assert_eq!(
         controller
-            .remove_entry(alice.ep.id() + 100, &mut BOB_IP.clone())
+            .remove_entry(alice.ep.id() + 100, &BOB_IP)
             .await
             .expect("add_entry FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -817,7 +817,7 @@ async fn neigh_add_remove_entry(name: &str) {
     // Remove entry returns not found for non-existing entry.
     assert_eq!(
         controller
-            .remove_entry(alice.ep.id(), &mut BOB_IP.clone())
+            .remove_entry(alice.ep.id(), &BOB_IP)
             .await
             .expect("add_entry FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -826,13 +826,13 @@ async fn neigh_add_remove_entry(name: &str) {
 
     // Add static entries and verify that they're listable.
     let () = controller
-        .add_entry(alice.ep.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+        .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
         .expect("add_entry failed");
     let () = controller
-        .add_entry(alice.ep.id(), &mut bob.ipv6.clone(), &mut BOB_MAC.clone())
+        .add_entry(alice.ep.id(), &bob.ipv6, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -871,13 +871,13 @@ async fn neigh_add_remove_entry(name: &str) {
 
     // Remove both entries and check that the list is empty afterwards.
     let () = controller
-        .remove_entry(alice.ep.id(), &mut BOB_IP.clone())
+        .remove_entry(alice.ep.id(), &BOB_IP)
         .await
         .expect("remove_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
         .expect("remove_entry failed");
     let () = controller
-        .remove_entry(alice.ep.id(), &mut bob.ipv6.clone())
+        .remove_entry(alice.ep.id(), &bob.ipv6)
         .await
         .expect("remove_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -1210,13 +1210,13 @@ async fn channel_is_closed_if_not_polled(name: &str) {
     let create_entries = async {
         loop {
             controller
-                .add_entry(alice.ep.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+                .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
                 .await
                 .expect("add_entry FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw)
                 .expect("add_entry failed");
             controller
-                .remove_entry(alice.ep.id(), &mut BOB_IP.clone())
+                .remove_entry(alice.ep.id(), &BOB_IP)
                 .await
                 .expect("remove_entry FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw)
@@ -1255,7 +1255,7 @@ async fn remove_device_clears_neighbors(name: &str) {
         .expect("failed to connect to Controller");
 
     controller
-        .add_entry(ep.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+        .add_entry(ep.id(), &BOB_IP, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -1330,14 +1330,14 @@ async fn neighbor_with_many_addresses_disconnects(name: &str) {
             // Compute the addr at offset `host_bits` within the subnet.
             let network_u32 = u32::from_be_bytes(subnet.addr.addr);
             let addr_u32 = u32::checked_add(network_u32, host_bits).unwrap();
-            let mut addr = fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
+            let addr = fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
                 addr: addr_u32.to_be_bytes(),
             });
             assert!(all_addrs.insert(addr.clone()));
 
             // Add the addr as a static neighbor associated with BOB's MAC.
             controller
-                .add_entry(ep.id(), &mut addr, &mut BOB_MAC.clone())
+                .add_entry(ep.id(), &addr, &BOB_MAC)
                 .await
                 .expect("add_entry FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw)

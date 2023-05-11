@@ -31,7 +31,7 @@ async fn connect_to_stressor() -> fstress::StressorProxy {
     }
     let (proxy, server) = create_proxy::<fstress::StressorMarker>().expect("create proxy");
     service_consumer_proxy
-        .connect_to_service(&mut peer_id.unwrap(), PROTOCOL_NAME, server.into_channel())
+        .connect_to_service(&peer_id.unwrap(), PROTOCOL_NAME, server.into_channel())
         .expect("connect over overnet");
     proxy
 }

@@ -57,7 +57,7 @@ async fn serve_generic_sme(
                         let (info_responder, info_receiver) = crate::responder::Responder::new();
                         mlme_sink.send(crate::MlmeRequest::QueryDeviceInfo(info_responder));
                         let info = info_receiver.await?;
-                        responder.send(&mut fidl_sme::GenericSmeQuery {
+                        responder.send(&fidl_sme::GenericSmeQuery {
                             role: info.role,
                             sta_addr: info.sta_addr,
                         })

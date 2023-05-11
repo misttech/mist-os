@@ -277,7 +277,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
 ///
 /// Maintains the utc clock using updates received over the `fuchsia.time.external` protocols.
 async fn maintain_utc<R: 'static, D: 'static>(
-    mut primary: PrimaryTrack,
+    primary: PrimaryTrack,
     optional_monitor: Option<MonitorTrack>,
     optional_rtc: Option<R>,
     diagnostics: Arc<D>,
@@ -293,7 +293,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     if let Some(rtc) = optional_rtc.as_ref() {
         match initial_clock_state {
             InitialClockState::NotSet => {
-                set_clock_from_rtc(rtc, &mut primary.clock, Arc::clone(&diagnostics)).await;
+                set_clock_from_rtc(rtc, &primary.clock, Arc::clone(&diagnostics)).await;
             }
             InitialClockState::PreviouslySet => {
                 diagnostics.record(Event::InitializeRtc {

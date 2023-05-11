@@ -2181,21 +2181,21 @@ root ->
         local.apply(&create_string_property!(parent: 1, id: 2, name: "prop1", value: "foo"))?;
         remote.apply(&create_node!(parent: 0, id: 1, name: "node"))?;
         remote.apply(&create_string_property!(parent: 1, id: 2, name: "prop1", value: "bar"))?;
-        match local.compare(&mut remote, DiffType::Diff) {
+        match local.compare(&remote, DiffType::Diff) {
             Err(error) => {
                 let error_string = format!("{:?}", error);
                 assert_eq!("Trees differ:\n".to_string() + DIFF_STRING, error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),
         }
-        match local.compare(&mut remote, DiffType::Full) {
+        match local.compare(&remote, DiffType::Full) {
             Err(error) => {
                 let error_string = format!("{:?}", error);
                 assert_eq!("Trees differ:\n".to_string() + FULL_STRING, error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),
         }
-        match local.compare(&mut remote, DiffType::Both) {
+        match local.compare(&remote, DiffType::Both) {
             Err(error) => {
                 let error_string = format!("{:?}", error);
                 assert_eq!(

@@ -18,12 +18,12 @@ pub fn spawn_inspect_server(mut stream: InspectRequestStream, node: NodeObject) 
                     InspectRequest::ReadData { responder } => {
                         let metrics = get_metrics(&node);
                         let properties = get_properties(&node);
-                        let mut object = fidl_inspect::Object {
+                        let object = fidl_inspect::Object {
                             name: node.get_node_name(),
                             properties,
                             metrics,
                         };
-                        responder.send(&mut object)?;
+                        responder.send(&object)?;
                     }
                     InspectRequest::ListChildren { responder } => {
                         let names = get_children_names(&node);

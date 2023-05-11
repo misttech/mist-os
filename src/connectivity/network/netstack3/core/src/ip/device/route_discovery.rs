@@ -759,14 +759,9 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(
-            &mut &*sync_ctx,
-            non_sync_ctx,
-            &device_id,
-            |config| {
-                config.ip_config.ip_enabled = true;
-            },
-        )
+        crate::device::update_ipv6_configuration(&&*sync_ctx, non_sync_ctx, &device_id, |config| {
+            config.ip_config.ip_enabled = true;
+        })
         .unwrap();
 
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
@@ -841,7 +836,7 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
 
         add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
 
@@ -866,7 +861,7 @@ mod tests {
         // Do nothing as router with no valid lifetime has not been discovered
         // yet and prefix does not make on-link determination.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -878,7 +873,7 @@ mod tests {
         // Discover a default router only as on-link prefix has no valid
         // lifetime.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -899,7 +894,7 @@ mod tests {
         // Discover an on-link prefix and update valid lifetime for default
         // router.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -918,7 +913,7 @@ mod tests {
 
         // Discover more-specific route.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -948,7 +943,7 @@ mod tests {
         // Invalidate default router and more specific route, and update valid
         // lifetime for on-link prefix.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -966,7 +961,7 @@ mod tests {
         // Do nothing as prefix does not make on-link determination and router
         // with valid lifetime is not discovered.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -980,7 +975,7 @@ mod tests {
 
         // Invalidate on-link prefix.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1003,7 +998,7 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
 
         add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
 
@@ -1034,7 +1029,7 @@ mod tests {
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1053,7 +1048,7 @@ mod tests {
         let router_lifetime_secs = u16::MAX - 1;
         let prefix_lifetime_secs = u32::MAX - 1;
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1079,7 +1074,7 @@ mod tests {
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1098,7 +1093,7 @@ mod tests {
         let router_lifetime_secs = 0;
         let prefix_lifetime_secs = 0;
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1121,7 +1116,7 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
 
         add_link_local_route(sync_ctx, &mut non_sync_ctx, &device_id);
 
@@ -1137,7 +1132,7 @@ mod tests {
 
         // Discover both an on-link prefix and default router.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
@@ -1161,7 +1156,7 @@ mod tests {
 
         // Disable the interface.
         crate::device::update_ipv6_configuration(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             |config| {

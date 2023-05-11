@@ -271,7 +271,7 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                     .expect("failed to detach from bridge interface address state provider");
 
                 let () = switch_stack
-                    .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+                    .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                         subnet: fidl_fuchsia_net_ext::apply_subnet_mask(fidl_fuchsia_net::Subnet {
                             addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
                             prefix_len,

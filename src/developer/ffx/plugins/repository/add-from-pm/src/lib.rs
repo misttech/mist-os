@@ -28,7 +28,7 @@ pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) 
         aliases: cmd.aliases.into_iter().collect(),
     };
 
-    match repos.add_repository(repo_name, &mut repo_spec.into()).await? {
+    match repos.add_repository(repo_name, &repo_spec.into()).await? {
         Ok(()) => {
             println!("added repository {}", repo_name);
             Ok(())

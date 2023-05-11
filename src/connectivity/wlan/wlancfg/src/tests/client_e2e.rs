@@ -360,7 +360,7 @@ fn prepare_client_interface(
         })) => {
             assert!(responder.send(
                 zx::sys::ZX_OK,
-                Some(&mut fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: TEST_CLIENT_IFACE_ID})
+                Some(&fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: TEST_CLIENT_IFACE_ID})
             ).is_ok());
         }
     );
@@ -766,7 +766,7 @@ fn save_and_connect(
         }
     );
     connect_txn_handle
-        .send_on_connect_result(&mut fidl_sme::ConnectResult {
+        .send_on_connect_result(&fidl_sme::ConnectResult {
             code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
             is_credential_rejected: false,
             is_reconnect: false,
@@ -1118,8 +1118,7 @@ fn test_connect_to_new_network() {
     assert_variant!(save_fut_resp, Ok(Ok(())));
 
     // Send a request to connect to the second network.
-    let connect_fut =
-        test_values.external_interfaces.client_controller.connect(&mut network_id.clone());
+    let connect_fut = test_values.external_interfaces.client_controller.connect(&network_id);
     pin_mut!(connect_fut);
 
     // Check that connect request was acknowledged.
@@ -1247,7 +1246,7 @@ fn test_connect_to_new_network() {
         }
     );
     connect_txn_handle
-        .send_on_connect_result(&mut fidl_sme::ConnectResult {
+        .send_on_connect_result(&fidl_sme::ConnectResult {
             code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
             is_credential_rejected: false,
             is_reconnect: false,
@@ -1494,7 +1493,7 @@ fn test_autoconnect_to_saved_network() {
         }
     );
     connect_txn_handle
-        .send_on_connect_result(&mut fidl_sme::ConnectResult {
+        .send_on_connect_result(&fidl_sme::ConnectResult {
             code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
             is_credential_rejected: false,
             is_reconnect: false,
@@ -1722,7 +1721,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fidl_sme::ConnectResult {
+            .send_on_connect_result(&fidl_sme::ConnectResult {
                 code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
                 is_credential_rejected: false,
                 is_reconnect: false,

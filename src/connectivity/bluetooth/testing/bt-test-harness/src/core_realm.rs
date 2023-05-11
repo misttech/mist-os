@@ -92,7 +92,7 @@ impl CoreRealm {
                     stateless_mock_responder::<SnoopMarker, _>(handles, |req| {
                         let (_, _, responder) =
                             req.into_start().ok_or(format_err!("got unexpected SnoopRequest"))?;
-                        Ok(responder.send(&mut fbt::Status { error: None })?)
+                        Ok(responder.send(&fbt::Status { error: None })?)
                     })
                     .boxed()
                 },

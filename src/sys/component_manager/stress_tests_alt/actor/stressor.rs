@@ -88,18 +88,16 @@ impl Stressor {
         collection: String,
         child_name: String,
     ) -> Result<()> {
-        let mut child = fdecl::ChildRef { name: child_name.clone(), collection: Some(collection) };
-        self.lifecycle_controller
-            .destroy_instance(parent_moniker, &mut child)
-            .await
-            .unwrap()
-            .map_err(|e| {
+        let child = fdecl::ChildRef { name: child_name.clone(), collection: Some(collection) };
+        self.lifecycle_controller.destroy_instance(parent_moniker, &child).await.unwrap().map_err(
+            |e| {
                 format_err!(
                     "Could not destroy child (parent: {})(child: {}): {:?}",
                     parent_moniker,
                     child_name,
                     e
                 )
-            })
+            },
+        )
     }
 }

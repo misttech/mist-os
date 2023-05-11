@@ -399,7 +399,7 @@ impl TestSetupBuilder {
 
             for (ep_name, addr) in stack_cfg.endpoints.into_iter() {
                 // get the endpoint from the sandbox config:
-                let (endpoint, mut port_id) = setup.get_endpoint(&ep_name).await?;
+                let (endpoint, port_id) = setup.get_endpoint(&ep_name).await?;
 
                 let installer = stack.connect_interfaces_installer();
 
@@ -416,7 +416,7 @@ impl TestSetupBuilder {
                     fidl::endpoints::create_proxy().context("create proxy")?;
                 device_control
                     .create_interface(
-                        &mut port_id,
+                        &port_id,
                         server_end,
                         &fidl_fuchsia_net_interfaces_admin::Options::default(),
                     )
@@ -467,7 +467,7 @@ impl TestSetupBuilder {
 
                     let stack = stack.connect_stack().context("connect stack")?;
                     stack
-                        .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+                        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                             subnet: subnet.into_fidl(),
                             device_id: if_id.get(),
                             next_hop: None,
@@ -531,7 +531,7 @@ async fn test_add_device_routes() {
     let stack = test_stack.connect_stack().unwrap();
     let if_id = test_stack.get_endpoint_id(1);
 
-    let mut fwd_entry1 = fidl_net_stack::ForwardingEntry {
+    let fwd_entry1 = fidl_net_stack::ForwardingEntry {
         subnet: fidl_net::Subnet {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
             prefix_len: 24,
@@ -540,7 +540,7 @@ async fn test_add_device_routes() {
         next_hop: None,
         metric: 0,
     };
-    let mut fwd_entry2 = fidl_net_stack::ForwardingEntry {
+    let fwd_entry2 = fidl_net_stack::ForwardingEntry {
         subnet: fidl_net::Subnet {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
             prefix_len: 24,
@@ -551,19 +551,19 @@ async fn test_add_device_routes() {
     };
 
     let () = stack
-        .add_forwarding_entry(&mut fwd_entry1)
+        .add_forwarding_entry(&fwd_entry1)
         .await
         .squash_result()
         .expect("Add forwarding entry succeeds");
     let () = stack
-        .add_forwarding_entry(&mut fwd_entry2)
+        .add_forwarding_entry(&fwd_entry2)
         .await
         .squash_result()
         .expect("Add forwarding entry succeeds");
 
     // finally, check that bad routes will fail:
     // a duplicate entry should fail with AlreadyExists:
-    let mut bad_entry = fidl_net_stack::ForwardingEntry {
+    let bad_entry = fidl_net_stack::ForwardingEntry {
         subnet: fidl_net::Subnet {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
             prefix_len: 24,
@@ -573,11 +573,11 @@ async fn test_add_device_routes() {
         metric: 0,
     };
     assert_eq!(
-        stack.add_forwarding_entry(&mut bad_entry).await.unwrap().unwrap_err(),
+        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::AlreadyExists
     );
     // an entry with an invalid subnet should fail with Invalidargs:
-    let mut bad_entry = fidl_net_stack::ForwardingEntry {
+    let bad_entry = fidl_net_stack::ForwardingEntry {
         subnet: fidl_net::Subnet {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
             prefix_len: 64,
@@ -587,11 +587,11 @@ async fn test_add_device_routes() {
         metric: 0,
     };
     assert_eq!(
-        stack.add_forwarding_entry(&mut bad_entry).await.unwrap().unwrap_err(),
+        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::InvalidArgs
     );
     // an entry with a bad devidce id should fail with NotFound:
-    let mut bad_entry = fidl_net_stack::ForwardingEntry {
+    let bad_entry = fidl_net_stack::ForwardingEntry {
         subnet: fidl_net::Subnet {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
             prefix_len: 24,
@@ -601,7 +601,7 @@ async fn test_add_device_routes() {
         metric: 0,
     };
     assert_eq!(
-        stack.add_forwarding_entry(&mut bad_entry).await.unwrap().unwrap_err(),
+        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::NotFound
     );
 }
@@ -654,7 +654,7 @@ async fn test_list_del_routes() {
         netstack3_core::add_route(sync_ctx, non_sync_ctx, route3).unwrap();
     });
 
-    let mut route1_fwd_entry = fidl_net_stack::ForwardingEntry {
+    let route1_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: sub1.into_ext(),
         device_id: if_id.get(),
         next_hop: None,
@@ -754,13 +754,13 @@ async fn test_list_del_routes() {
 
     // delete route1:
     let () = stack
-        .del_forwarding_entry(&mut route1_fwd_entry)
+        .del_forwarding_entry(&route1_fwd_entry)
         .await
         .squash_result()
         .expect("can delete device forwarding entry");
     // can't delete again:
     assert_eq!(
-        stack.del_forwarding_entry(&mut route1_fwd_entry).await.unwrap().unwrap_err(),
+        stack.del_forwarding_entry(&route1_fwd_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::NotFound
     );
 
@@ -788,7 +788,7 @@ async fn test_add_remote_routes() {
         addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
         prefix_len: 24,
     };
-    let mut fwd_entry = fidl_net_stack::ForwardingEntry {
+    let fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet,
         device_id: 0,
         next_hop: Some(Box::new(fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address {
@@ -799,28 +799,28 @@ async fn test_add_remote_routes() {
 
     // Cannot add gateway route without device set or on-link route to gateway.
     assert_eq!(
-        stack.add_forwarding_entry(&mut fwd_entry).await.unwrap(),
+        stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
         Err(fidl_net_stack::Error::BadState)
     );
-    let mut device_fwd_entry = fidl_net_stack::ForwardingEntry {
+    let device_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: fwd_entry.subnet,
         device_id,
         next_hop: None,
         metric: 0,
     };
     let () = stack
-        .add_forwarding_entry(&mut device_fwd_entry)
+        .add_forwarding_entry(&device_fwd_entry)
         .await
         .squash_result()
         .expect("add device route");
 
     let () =
-        stack.add_forwarding_entry(&mut fwd_entry).await.squash_result().expect("add device route");
+        stack.add_forwarding_entry(&fwd_entry).await.squash_result().expect("add device route");
 
     // finally, check that bad routes will fail:
     // a duplicate entry should fail with AlreadyExists:
     assert_eq!(
-        stack.add_forwarding_entry(&mut fwd_entry).await.unwrap(),
+        stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
         Err(fidl_net_stack::Error::AlreadyExists)
     );
 }
@@ -853,7 +853,7 @@ async fn test_ipv6_slaac_secret_stable() {
         .build()
         .await
         .unwrap();
-    let (endpoint, mut port_id) = t.get_endpoint(ENDPOINT).await.expect("has endpoint");
+    let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await.expect("has endpoint");
 
     let test_stack = t.get(0);
     let installer = test_stack.connect_interfaces_installer();
@@ -863,7 +863,7 @@ async fn test_ipv6_slaac_secret_stable() {
     let (interface_control, server_end) = fidl::endpoints::create_proxy().unwrap();
     device_control
         .create_interface(
-            &mut port_id,
+            &port_id,
             server_end,
             &fidl_fuchsia_net_interfaces_admin::Options::default(),
         )

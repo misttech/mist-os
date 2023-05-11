@@ -174,12 +174,12 @@ impl ProfileRegistrar {
             return Ok(());
         }
 
-        let mut connect_params = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+        let connect_params = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(bredr::PSM_RFCOMM),
             ..Default::default()
         });
         let l2cap_channel =
-            match self.profile_upstream.connect(&mut peer_id.into(), &mut connect_params).await {
+            match self.profile_upstream.connect(&peer_id.into(), &connect_params).await {
                 Ok(Ok(channel)) => channel.try_into().unwrap(),
                 Ok(Err(e)) => {
                     return Err(e);
@@ -200,7 +200,7 @@ impl ProfileRegistrar {
     async fn handle_outgoing_connection(
         &mut self,
         peer_id: PeerId,
-        mut connection: bredr::ConnectParameters,
+        connection: bredr::ConnectParameters,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
         trace!(%peer_id, "Making outgoing connection request {connection:?}");
@@ -211,7 +211,7 @@ impl ProfileRegistrar {
             bredr::ConnectParameters::L2cap { .. } => {
                 let mut result = self
                     .profile_upstream
-                    .connect(&mut peer_id.into(), &mut connection)
+                    .connect(&peer_id.into(), &connection)
                     .await
                     .unwrap_or_else(|_fidl_error| Err(ErrorCode::Failed));
                 let _ = responder.send(&mut result);
@@ -430,11 +430,8 @@ impl ProfileRegistrar {
                 // Simply forward over the search to the Profile server.
                 let _ = self.profile_upstream.search(service_uuid, &attr_ids, results);
             }
-            bredr::ProfileRequest::ConnectSco {
-                mut peer_id, initiator, params, receiver, ..
-            } => {
-                let _ =
-                    self.profile_upstream.connect_sco(&mut peer_id, initiator, &params, receiver);
+            bredr::ProfileRequest::ConnectSco { peer_id, initiator, params, receiver, .. } => {
+                let _ = self.profile_upstream.connect_sco(&peer_id, initiator, &params, receiver);
             }
         }
         None
@@ -587,7 +584,7 @@ mod tests {
 
         assert!(profile_proxy
             .connect_sco(
-                &mut PeerId(1).into(),
+                &PeerId(1).into(),
                 /*initiator=*/ true,
                 &[bredr::ScoConnectionParameters::default()],
                 receiver_client
@@ -623,8 +620,8 @@ mod tests {
         psm: u16,
     ) -> impl Future<Output = Result<Result<bredr::Channel, ErrorCode>, fidl::Error>> {
         client.connect(
-            &mut peer_id.into(),
-            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+            &peer_id.into(),
+            &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
                 psm: Some(psm),
                 ..Default::default()
             }),
@@ -1173,9 +1170,7 @@ mod tests {
         // Upstream server gives us a connection.
         let id = PeerId(123);
         let protocol = &[];
-        assert!(connect_client
-            .connected(&mut id.into(), bredr::Channel::default(), protocol)
-            .is_ok());
+        assert!(connect_client.connected(&id.into(), bredr::Channel::default(), protocol).is_ok());
 
         // Run the relay fut - should still be running.
         exec.run_until_stalled(&mut relay_fut)

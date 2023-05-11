@@ -153,7 +153,7 @@ pub async fn activate_fake_host(
         .1
         .id; // We can safely unwrap here as this is guarded by the previous expectation
 
-    let fut = host_watcher.aux().set_active(&mut host.into());
+    let fut = host_watcher.aux().set_active(&host.into());
     fut.await?
         .or_else(zx::Status::ok)
         .map_err(|e| format_err!("failed to set active host to emulator: {}", e))?;

@@ -5601,7 +5601,7 @@ pub(crate) mod testutil {
         // The client should select the server that sent the best advertise and
         // transition to Requesting.
         let actions = client.handle_message_receive(msg, now);
-        let mut buf = assert_matches!(
+        let buf = assert_matches!(
             &actions[..],
            [
                 Action::CancelTimer(ClientTimerType::Retransmission),
@@ -5613,7 +5613,7 @@ pub(crate) mod testutil {
            }
         );
         testutil::assert_outgoing_stateful_message(
-            &mut buf,
+            &buf,
             v6::MessageType::Request,
             &client_id,
             Some(&server_id),
@@ -6051,7 +6051,7 @@ pub(crate) mod testutil {
         }: RenewRebindTestState,
     ) -> ClientStateMachine<Instant, R> {
         let actions = client.handle_timeout(timer_type, now);
-        let mut buf = assert_matches!(
+        let buf = assert_matches!(
             &actions[..],
             [
                 Action::SendMessage(buf),
@@ -6095,7 +6095,7 @@ pub(crate) mod testutil {
             )
             .collect();
         testutil::assert_outgoing_stateful_message(
-            &mut buf,
+            &buf,
             message_type,
             &client_id,
             expect_server_id.then(|| &server_id),
@@ -9131,7 +9131,7 @@ mod tests {
 
         // Assert renew is retransmitted on retransmission timeout.
         let actions = client.handle_timeout(ClientTimerType::Retransmission, time);
-        let mut buf = assert_matches!(
+        let buf = assert_matches!(
             &actions[..],
             [
                 Action::SendMessage(buf),
@@ -9177,7 +9177,7 @@ mod tests {
             )
             .collect();
         testutil::assert_outgoing_stateful_message(
-            &mut buf,
+            &buf,
             message_type,
             &CLIENT_ID,
             expect_server_id.then(|| &SERVER_ID[0]),
@@ -10448,7 +10448,7 @@ mod tests {
             assert_eq!(*server_id, SERVER_ID[0]);
             assert_eq!(*solicit_max_rt, MAX_SOLICIT_TIMEOUT);
         }
-        let mut buf = assert_matches!(
+        let buf = assert_matches!(
             &actions[..],
             [
                 // TODO(https://fxbug.dev/96674): should include action to
@@ -10464,7 +10464,7 @@ mod tests {
         // Expect that the Request message contains both the assigned address
         // and the address to request.
         testutil::assert_outgoing_stateful_message(
-            &mut buf,
+            &buf,
             v6::MessageType::Request,
             &CLIENT_ID,
             Some(&SERVER_ID[0]),

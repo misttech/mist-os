@@ -178,7 +178,7 @@ impl BufferSetFactory {
         // default, or sysmem will not give us buffer handles.
         let has_constraints = true;
         collection_client
-            .set_constraints(has_constraints, &mut collection_constraints)
+            .set_constraints(has_constraints, &collection_constraints)
             .context("Sending buffer constraints to sysmem")?;
 
         Ok((

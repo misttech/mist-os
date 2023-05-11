@@ -119,7 +119,7 @@ impl Display {
     }
 
     pub fn set_mode(&mut self, mode_idx: usize) -> Result<(), Error> {
-        self.coordinator.set_display_mode(self.info.id, &mut self.info.modes[mode_idx])?;
+        self.coordinator.set_display_mode(self.info.id, &self.info.modes[mode_idx])?;
         self.mode_idx = mode_idx;
         Ok(())
     }
@@ -316,10 +316,7 @@ impl DisplayDirectViewStrategy {
 
         let coordinator_token = buffer_allocator.duplicate_token().await?;
         display.coordinator.import_buffer_collection(collection_id, coordinator_token).await?;
-        display
-            .coordinator
-            .set_buffer_collection_constraints(collection_id, &mut image_config)
-            .await?;
+        display.coordinator.set_buffer_collection_constraints(collection_id, &image_config).await?;
 
         let buffers = buffer_allocator
             .allocate_buffers(true)
@@ -354,7 +351,7 @@ impl DisplayDirectViewStrategy {
             let image_id = next_image_id();
             let status = display
                 .coordinator
-                .import_image(&mut image_config, collection_id, image_id, uindex)
+                .import_image(&image_config, collection_id, image_id, uindex)
                 .await
                 .context("coordinator import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);
@@ -370,7 +367,7 @@ impl DisplayDirectViewStrategy {
 
         let frame_set = FrameSet::new(collection_id as u64, image_ids);
 
-        display.coordinator.set_layer_primary_config(display.layer_id, &mut image_config)?;
+        display.coordinator.set_layer_primary_config(display.layer_id, &image_config)?;
 
         Ok(DisplayResources { context, image_indexes, frame_set, wait_events, signal_events })
     }

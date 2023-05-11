@@ -124,7 +124,7 @@ impl Resolver for RemoteResolver {
                 ResolverError::RelativeUrlMissingContext(component_url.to_string())
             })?;
             proxy
-                .resolve_with_context(component_url, &mut context.into())
+                .resolve_with_context(component_url, &context.into())
                 .await
                 .map_err(ResolverError::fidl_error)??
         } else {

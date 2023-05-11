@@ -14,7 +14,7 @@ fn register(
     let service_definition = service_definitions::audio_gateway(features);
     let mut profile = ProfileClient::advertise(
         proxy,
-        &mut vec![service_definition],
+        &[service_definition],
         bredr::ChannelParameters::default(),
     )?;
 

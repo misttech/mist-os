@@ -276,14 +276,14 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         value = echo
-                            .echo_named_struct(&mut value, "")
+                            .echo_named_struct(&value, "")
                             .await
                             .context("Error calling echo_named_struct on proxy")?;
                     }
-                    responder.send(&mut value).context("Error responding")?;
+                    responder.send(&value).context("Error responding")?;
                 }
                 EchoRequest::EchoNamedStructWithError {
-                    mut value,
+                    value,
                     result_err,
                     forward_to_server,
                     result_variant,
@@ -292,12 +292,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut result = echo
-                            .echo_named_struct_with_error(
-                                &mut value,
-                                result_err,
-                                "",
-                                result_variant,
-                            )
+                            .echo_named_struct_with_error(&value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_named_struct_with_error on proxy")?;
                         responder.send(&mut result).context("Error responding")?;
@@ -317,7 +312,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                 } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        echo.echo_named_struct_no_ret_val(&mut value, "")
+                        echo.echo_named_struct_no_ret_val(&value, "")
                             .context("Error sending echo_named_struct_no_ret_val to proxy")?;
                         let mut event_stream = echo.take_event_stream();
                         if let EchoEvent::OnEchoNamedEvent { value: response_val } = event_stream
@@ -332,7 +327,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                         }
                     }
                     control_handle
-                        .send_on_echo_named_event(&mut value)
+                        .send_on_echo_named_event(&value)
                         .context("Error responding with event")?;
                 }
 
@@ -414,15 +409,15 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     match forward_to_server {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
-                            let mut resp = echo
+                            let resp = echo
                                 .echo_table_request_composed(&payload)
                                 .await
                                 .context("Error calling echo_table_payload on proxy")?;
-                            responder.send(&mut resp).context("Error responding")?;
+                            responder.send(&resp).context("Error responding")?;
                         }
                         None => {
                             responder
-                                .send(&mut SimpleStruct { f1: true, f2: payload.value.unwrap() })
+                                .send(&SimpleStruct { f1: true, f2: payload.value.unwrap() })
                                 .context("Error responding")?;
                         }
                     }
@@ -440,13 +435,13 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     };
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        let mut resp = echo
-                            .echo_union_payload(&mut payload)
+                        let resp = echo
+                            .echo_union_payload(&payload)
                             .await
                             .context("Error calling echo_union_payload on proxy")?;
-                        responder.send(&mut resp).context("Error responding")?
+                        responder.send(&resp).context("Error responding")?
                     } else {
-                        let mut resp = match payload {
+                        let resp = match payload {
                             RequestUnion::Unsigned(unsigned) => {
                                 ResponseUnion::Unsigned(unsigned.value.clone())
                             }
@@ -457,7 +452,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                                 return Err(format_err!("Unknown union variant"))
                             }
                         };
-                        responder.send(&mut resp).context("Error responding")?;
+                        responder.send(&resp).context("Error responding")?;
                     }
                 }
                 EchoRequest::EchoUnionPayloadWithError { mut payload, responder } => {
@@ -473,7 +468,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut res = echo
-                            .echo_union_payload_with_error(&mut payload)
+                            .echo_union_payload_with_error(&payload)
                             .await
                             .context("Error calling echo_union_payload_with_error on proxy")?;
                         responder.send(&mut res).context("Error responding")?;
@@ -516,24 +511,23 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     };
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        echo.echo_union_payload_no_ret_val(&mut payload)
+                        echo.echo_union_payload_no_ret_val(&payload)
                             .context("Error sending echo_union_payload_no_ret_val to proxy")?;
                         let mut event_stream = echo.take_event_stream();
-                        if let EchoEvent::OnEchoUnionPayloadEvent { payload: mut resp } =
-                            event_stream
-                                .try_next()
-                                .await
-                                .context("Error getting event response from proxy")?
-                                .ok_or_else(|| format_err!("Proxy sent no events"))?
+                        if let EchoEvent::OnEchoUnionPayloadEvent { payload: resp } = event_stream
+                            .try_next()
+                            .await
+                            .context("Error getting event response from proxy")?
+                            .ok_or_else(|| format_err!("Proxy sent no events"))?
                         {
                             control_handle
-                                .send_on_echo_union_payload_event(&mut resp)
+                                .send_on_echo_union_payload_event(&resp)
                                 .context("Error responding with event")?;
                         } else {
                             panic!("Unexpected event type");
                         }
                     } else {
-                        let mut resp = match payload {
+                        let resp = match payload {
                             RequestUnion::Unsigned(unsigned) => {
                                 ResponseUnion::Unsigned(unsigned.value.clone())
                             }
@@ -545,7 +539,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                             }
                         };
                         control_handle
-                            .send_on_echo_union_payload_event(&mut resp)
+                            .send_on_echo_union_payload_event(&resp)
                             .context("Error responding with event")?;
                     }
                 }

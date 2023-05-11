@@ -386,7 +386,7 @@ impl AvdtpFacade {
         while let Some(evt) = stream.next().await {
             match evt {
                 Ok(e) => match e {
-                    PeerManagerEvent::OnPeerConnected { mut peer_id } => {
+                    PeerManagerEvent::OnPeerConnected { peer_id } => {
                         let (client, server) = create_endpoints::<PeerControllerMarker>();
                         let peer =
                             client.into_proxy().expect("Error: Couldn't obtain peer client proxy");
@@ -401,7 +401,7 @@ impl AvdtpFacade {
                             }
                         };
                         // Establish channel with the given peer_id and server endpoint.
-                        let _ = avdtp_svc.get_peer(&mut peer_id, server);
+                        let _ = avdtp_svc.get_peer(&peer_id, server);
                         info!("Getting peer with peer_id: {}", peer_id.value);
                     }
                 },

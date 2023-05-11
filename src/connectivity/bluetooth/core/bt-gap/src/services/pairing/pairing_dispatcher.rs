@@ -76,7 +76,7 @@ impl Drop for PairingDispatcher {
         self.hosts = IndexedStreams::empty();
         for (_, reqs) in self.inflight_requests.take_all_requests().into_iter() {
             for peer_id in reqs.into_iter() {
-                let _ignored = self.upstream.on_pairing_complete(&mut peer_id.into(), false);
+                let _ignored = self.upstream.on_pairing_complete(&peer_id.into(), false);
             }
         }
     }
@@ -144,7 +144,7 @@ impl PairingDispatcher {
                     StreamItem::Epitaph(host) => {
                         if let Some(reqs) = self.inflight_requests.remove_host_requests(host) {
                             for peer_id in reqs {
-                                if let Err(e) = self.upstream.on_pairing_complete(&mut peer_id.into(), false) {
+                                if let Err(e) = self.upstream.on_pairing_complete(&peer_id.into(), false) {
                                     // If we receive an error communicating with upstream,
                                     // terminate
                                     warn!("Error notifying upstream when downstream closed: {}", e);
@@ -240,8 +240,8 @@ impl PairingDispatcher {
                 }
                 false
             }
-            OnPairingComplete { mut id, success, control_handle: _ } => {
-                if self.upstream.on_pairing_complete(&mut id, success).is_err() {
+            OnPairingComplete { id, success, control_handle: _ } => {
+                if self.upstream.on_pairing_complete(&id, success).is_err() {
                     warn!(
                         "Failed to propagate OnPairingComplete for peer {}; upstream cancelled",
                         PeerId::from(id)
@@ -251,8 +251,8 @@ impl PairingDispatcher {
                     false
                 }
             }
-            OnRemoteKeypress { mut id, keypress, control_handle: _ } => {
-                if self.upstream.on_remote_keypress(&mut id, keypress).is_err() {
+            OnRemoteKeypress { id, keypress, control_handle: _ } => {
+                if self.upstream.on_remote_keypress(&id, keypress).is_err() {
                     warn!(
                         "Failed to propagate OnRemoteKeypress for peer {}; upstream cancelled",
                         PeerId::from(id)

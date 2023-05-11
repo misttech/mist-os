@@ -133,7 +133,7 @@ impl OtCliCommand {
                 // If there is a command ready for send out, write it to socket.
                 while !outbound_buffer_received_bytes.is_empty() {
                     match Pin::new(&mut client_socket)
-                        .poll_write(cx, &mut outbound_buffer_received_bytes)
+                        .poll_write(cx, &outbound_buffer_received_bytes)
                     {
                         Poll::Ready(Ok(bytes_written)) => {
                             let _ = outbound_buffer_received_bytes.drain(..bytes_written);

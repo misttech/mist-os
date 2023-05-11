@@ -30,7 +30,7 @@ pub struct Content {
 
 impl Drop for Content {
     fn drop(&mut self) {
-        self.flatland.borrow().proxy().release_image(&mut self.id.clone()).expect("fidl error");
+        self.flatland.borrow().proxy().release_image(&self.id).expect("fidl error");
     }
 }
 

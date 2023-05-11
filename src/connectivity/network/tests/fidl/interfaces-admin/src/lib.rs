@@ -405,14 +405,14 @@ async fn add_address_offline<N: Netstack>(name: &str) {
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
     // Adding a valid address and observing the address removal.
-    let mut address = fidl_subnet!("5.5.5.5/32");
+    let address = fidl_subnet!("5.5.5.5/32");
 
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
     >()
     .expect("create AddressStateProvider proxy");
     let () = control
-        .add_address(&mut address, &valid_address_parameters, server)
+        .add_address(&address, &valid_address_parameters, server)
         .expect("Control.AddAddress FIDL error");
 
     let state_stream = fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
@@ -1382,7 +1382,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
                             .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
                             .expect("connect to protocol");
                         let () = stack
-                            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+                            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                                 subnet: SUBNET,
                                 device_id: iface_id,
                                 next_hop: None,

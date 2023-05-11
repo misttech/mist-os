@@ -184,9 +184,9 @@ impl WlanPolicyFacade {
             .as_ref()
             .ok_or(format_err!("client controller has not been initialized"))?;
 
-        let mut network_id = fidl_policy::NetworkIdentifier { ssid: target_ssid, type_ };
+        let network_id = fidl_policy::NetworkIdentifier { ssid: target_ssid, type_ };
         let response = controller
-            .connect(&mut network_id)
+            .connect(&network_id)
             .await
             .map_err(|e| format_err!("Connect: failed to connect: {}", e))?;
         Ok(Self::request_status_as_string(response))

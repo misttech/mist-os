@@ -237,7 +237,7 @@ where
         install_plan: &FuchsiaInstallPlan,
     ) -> Result<(), FuchsiaInstallError> {
         let proxy = self.cup_connector.connect().map_err(FuchsiaInstallError::Connect)?;
-        let mut url = fpkg::PackageUrl { url: url.to_string() };
+        let url = fpkg::PackageUrl { url: url.to_string() };
         let rm = install_plan
             .request_metadata
             .as_ref()
@@ -250,7 +250,7 @@ where
             signature: install_plan.ecdsa_signature.as_ref().cloned(),
             ..Default::default()
         };
-        proxy.write(&mut url, &cup_data).await?.map_err(FuchsiaInstallError::CupWrite)
+        proxy.write(&url, &cup_data).await?.map_err(FuchsiaInstallError::CupWrite)
     }
 }
 
@@ -612,7 +612,7 @@ mod tests {
                         .unwrap();
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
-                        .on_state(&mut State::Stage(fidl_fuchsia_update_installer::StageData {
+                        .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
                                 download_size: Some(1000),
                                 ..Default::default()
@@ -627,7 +627,7 @@ mod tests {
                         .await
                         .unwrap();
                     let () = monitor
-                        .on_state(&mut State::WaitToReboot(
+                        .on_state(&State::WaitToReboot(
                             fidl_fuchsia_update_installer::WaitToRebootData {
                                 info: Some(UpdateInfo {
                                     download_size: Some(1000),
@@ -713,7 +713,7 @@ mod tests {
                         .unwrap();
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
-                        .on_state(&mut State::Stage(fidl_fuchsia_update_installer::StageData {
+                        .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
                                 download_size: Some(1000),
                                 ..Default::default()
@@ -728,7 +728,7 @@ mod tests {
                         .await
                         .unwrap();
                     let () = monitor
-                        .on_state(&mut State::WaitToReboot(
+                        .on_state(&State::WaitToReboot(
                             fidl_fuchsia_update_installer::WaitToRebootData {
                                 info: Some(UpdateInfo {
                                     download_size: Some(1000),
@@ -853,7 +853,7 @@ mod tests {
 
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
-                        .on_state(&mut State::FailPrepare(FailPrepareData {
+                        .on_state(&State::FailPrepare(FailPrepareData {
                             reason: Some(
                                 fidl_fuchsia_update_installer::PrepareFailureReason::OutOfSpace,
                             ),
@@ -890,13 +890,13 @@ mod tests {
 
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
-                        .on_state(&mut State::Prepare(
+                        .on_state(&State::Prepare(
                             fidl_fuchsia_update_installer::PrepareData::default(),
                         ))
                         .await
                         .unwrap();
                     let () = monitor
-                        .on_state(&mut State::Fetch(fidl_fuchsia_update_installer::FetchData {
+                        .on_state(&State::Fetch(fidl_fuchsia_update_installer::FetchData {
                             info: Some(UpdateInfo { download_size: None, ..Default::default() }),
                             progress: Some(InstallationProgress {
                                 fraction_completed: Some(0.0),

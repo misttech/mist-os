@@ -313,7 +313,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
     // Get controller for mock peer
     let (_c_client, c_server) = create_endpoints::<ControllerMarker>();
     let _ = avrcp_svc
-        .get_controller_for_target(&mut tf.mock_peer.peer_id().into(), c_server)
+        .get_controller_for_target(&tf.mock_peer.peer_id().into(), c_server)
         .await
         .unwrap();
     // Create absolute volume handler, register with AVRCP
@@ -396,7 +396,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
     // Get controller for mock peer
     let (c_proxy, c_server) = create_proxy::<ControllerMarker>().unwrap();
     avrcp_svc
-        .get_controller_for_target(&mut tf.mock_peer.peer_id().into(), c_server)
+        .get_controller_for_target(&tf.mock_peer.peer_id().into(), c_server)
         .await
         .unwrap()
         .expect("Failed to get controller for mock peer");

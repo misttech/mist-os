@@ -64,7 +64,7 @@ async fn commit_transaction_succeeds() {
     let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = make_rule();
-    let () = edit_transaction.add(&mut rule.clone().into()).await.unwrap().unwrap();
+    let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
 
     edit_transaction.commit().await.unwrap().unwrap();
     assert_eq!(get_rules(&env.proxies.rewrite_engine).await, vec![rule]);
@@ -85,7 +85,7 @@ async fn commit_transaction_fails_if_disabled() {
 
     let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
-    let () = edit_transaction.add(&mut make_rule().into()).await.unwrap().unwrap();
+    let () = edit_transaction.add(&make_rule().into()).await.unwrap().unwrap();
 
     assert_eq!(
         Status::from_raw(edit_transaction.commit().await.unwrap().unwrap_err()),
@@ -144,7 +144,7 @@ async fn dynamic_rewrites_disabled_if_missing_config() {
 
     let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
-    let () = edit_transaction.add(&mut make_rule().into()).await.unwrap().unwrap();
+    let () = edit_transaction.add(&make_rule().into()).await.unwrap().unwrap();
 
     assert_eq!(
         Status::from_raw(edit_transaction.commit().await.unwrap().unwrap_err()),

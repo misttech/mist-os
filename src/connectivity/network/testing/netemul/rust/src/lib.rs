@@ -191,12 +191,12 @@ impl TestSandbox {
     pub async fn create_endpoint_with<'a>(
         &'a self,
         name: impl Into<Cow<'a, str>>,
-        mut config: fnetemul_network::EndpointConfig,
+        config: fnetemul_network::EndpointConfig,
     ) -> Result<TestEndpoint<'a>> {
         let name = name.into();
         let epm = self.get_endpoint_manager()?;
         let (status, endpoint) =
-            epm.create_endpoint(&name, &mut config).await.context("create_endpoint FIDL error")?;
+            epm.create_endpoint(&name, &config).await.context("create_endpoint FIDL error")?;
         let () = zx::Status::ok(status).context("create_endpoint failed")?;
         let endpoint = endpoint
             .ok_or_else(|| anyhow::anyhow!("create_endpoint didn't return a valid endpoint"))?
@@ -469,13 +469,13 @@ impl<'a> TestRealm<'a> {
     pub async fn raw_socket(
         &self,
         domain: fposix_socket::Domain,
-        mut association: fposix_socket_raw::ProtocolAssociation,
+        association: fposix_socket_raw::ProtocolAssociation,
     ) -> Result<socket2::Socket> {
         let socket_provider = self
             .connect_to_protocol::<fposix_socket_raw::ProviderMarker>()
             .context("failed to connect to socket provider")?;
         let sock = socket_provider
-            .socket(domain, &mut association)
+            .socket(domain, &association)
             .await
             .context("failed to call socket")?
             .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
@@ -621,14 +621,14 @@ impl<'a> TestRealm<'a> {
     pub async fn add_neighbor_entry(
         &self,
         interface: u64,
-        mut addr: fnet::IpAddress,
-        mut mac: fnet::MacAddress,
+        addr: fnet::IpAddress,
+        mac: fnet::MacAddress,
     ) -> Result {
         let controller = self
             .connect_to_protocol::<fnet_neighbor::ControllerMarker>()
             .context("connect to protocol")?;
         controller
-            .add_entry(interface, &mut addr, &mut mac)
+            .add_entry(interface, &addr, &mac)
             .await
             .context("add_entry")?
             .map_err(zx::Status::from_raw)
@@ -861,7 +861,7 @@ impl<'a> TestEndpoint<'a> {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
                 .to_string()
         });
-        let (device, mut port_id) = self.get_netdevice().await?;
+        let (device, port_id) = self.get_netdevice().await?;
         let installer = realm
             .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
             .context("connect to protocol")?;
@@ -876,7 +876,7 @@ impl<'a> TestEndpoint<'a> {
             fnet_interfaces_ext::admin::Control::create_endpoints().context("create endpoints")?;
         let () = device_control
             .create_interface(
-                &mut port_id,
+                &port_id,
                 server_end,
                 &fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
@@ -1012,11 +1012,11 @@ impl<'a> TestInterface<'a> {
     /// Delete a direct route from the interface to the given subnet.
     pub async fn del_subnet_route(&self, subnet: fnet::Subnet) -> Result<()> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
-        let mut entry =
+        let entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
         self.connect_stack()
             .context("connect stack")?
-            .del_forwarding_entry(&mut entry)
+            .del_forwarding_entry(&entry)
             .await
             .squash_result()
             .with_context(|| {
@@ -1046,10 +1046,10 @@ impl<'a> TestInterface<'a> {
         self.add_route(entry).await
     }
 
-    async fn add_route(&self, mut entry: fnet_stack::ForwardingEntry) -> Result<()> {
+    async fn add_route(&self, entry: fnet_stack::ForwardingEntry) -> Result<()> {
         self.connect_stack()
             .context("connect stack")?
-            .add_forwarding_entry(&mut entry)
+            .add_forwarding_entry(&entry)
             .await
             .squash_result()
             .with_context(|| {
@@ -1312,12 +1312,12 @@ impl<'a> TestInterface<'a> {
         mut addr_with_prefix: fnet::Subnet,
     ) -> Result<bool> {
         let subnet = fnet_ext::apply_subnet_mask(addr_with_prefix);
-        let mut entry =
+        let entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
         let () = self
             .connect_stack()
             .context("connect stack")?
-            .del_forwarding_entry(&mut entry)
+            .del_forwarding_entry(&entry)
             .await
             .squash_result()
             .with_context(|| {

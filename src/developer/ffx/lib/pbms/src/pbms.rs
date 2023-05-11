@@ -208,7 +208,7 @@ where
         &url,
         local_repo_dir,
         auth_flow,
-        &mut |_d, _f| Ok(ProgressResponse::Continue),
+        &|_d, _f| Ok(ProgressResponse::Continue),
         ui,
         client,
     )
@@ -611,7 +611,7 @@ mod tests {
             &url,
             &Path::new("unused"),
             &AuthFlowChoice::Default,
-            &mut |_d, _f| Ok(ProgressResponse::Continue),
+            &|_d, _f| Ok(ProgressResponse::Continue),
             &ui,
             &client,
         )
@@ -629,7 +629,7 @@ mod tests {
             &url,
             &Path::new("unused"),
             &AuthFlowChoice::Default,
-            &mut |_d, _f| Ok(ProgressResponse::Continue),
+            &|_d, _f| Ok(ProgressResponse::Continue),
             &ui,
             &client,
         )

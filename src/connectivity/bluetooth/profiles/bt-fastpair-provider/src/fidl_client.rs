@@ -49,7 +49,7 @@ impl FastPairConnectionManager {
 
     pub fn notify_pairing_complete(&self, id: PeerId) {
         if let Some(watcher) = &self.watcher {
-            if let Err(e) = watcher.on_pairing_complete(&mut id.into()).check() {
+            if let Err(e) = watcher.on_pairing_complete(&id.into()).check() {
                 warn!("Couldn't notify upstream client of pairing complete: {:?}", e);
             }
         }

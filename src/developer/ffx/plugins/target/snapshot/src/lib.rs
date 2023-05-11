@@ -251,7 +251,7 @@ mod test {
                         }
                     }
                     fio::FileRequest::GetAttr { responder } => {
-                        let mut attrs = fio::NodeAttributes {
+                        let attrs = fio::NodeAttributes {
                             mode: 0,
                             id: 0,
                             content_size: data.len() as u64,
@@ -260,7 +260,7 @@ mod test {
                             creation_time: 0,
                             modification_time: 0,
                         };
-                        responder.send(0, &mut attrs).expect("sending attributes");
+                        responder.send(0, &attrs).expect("sending attributes");
                     }
                     e => panic!("not supported {:?}", e),
                 }

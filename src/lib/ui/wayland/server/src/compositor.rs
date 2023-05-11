@@ -68,7 +68,7 @@ struct SurfaceNode {
 impl SurfaceNode {
     pub fn new(flatland: FlatlandPtr) -> Self {
         let transform_id = flatland.borrow_mut().alloc_transform_id();
-        flatland.borrow().proxy().create_transform(&mut transform_id.clone()).expect("fidl error");
+        flatland.borrow().proxy().create_transform(&transform_id).expect("fidl error");
         Self { flatland, transform_id }
     }
 }
@@ -514,11 +514,11 @@ impl Surface {
             node.flatland
                 .borrow()
                 .proxy()
-                .set_content(&mut node.transform_id.clone(), &mut image_content.id.clone())
+                .set_content(&node.transform_id, &image_content.id)
                 .expect("fidl error");
 
             // Set image sample region based on current crop params.
-            let mut sample_region = self.crop_params.map_or(
+            let sample_region = self.crop_params.map_or(
                 RectF {
                     x: 0.0,
                     y: 0.0,
@@ -530,18 +530,18 @@ impl Surface {
             node.flatland
                 .borrow()
                 .proxy()
-                .set_image_sample_region(&mut image_content.id.clone(), &mut sample_region)
+                .set_image_sample_region(&image_content.id, &sample_region)
                 .expect("fidl error");
 
             // Set destination size based on current scale params.
-            let mut destination_size = self.scale_params.map_or(
+            let destination_size = self.scale_params.map_or(
                 SizeU { width: image_size.width as u32, height: image_size.height as u32 },
                 |scale| SizeU { width: scale.width as u32, height: scale.height as u32 },
             );
             node.flatland
                 .borrow()
                 .proxy()
-                .set_image_destination_size(&mut image_content.id.clone(), &mut destination_size)
+                .set_image_destination_size(&image_content.id, &destination_size)
                 .expect("fidl error");
 
             // Update surface size. This is used to determine window geometry and blend mode.
@@ -573,11 +573,11 @@ impl Surface {
             node.flatland
                 .borrow()
                 .proxy()
-                .set_image_blending_function(&mut image_content.id.clone(), blend_mode)
+                .set_image_blending_function(&image_content.id, blend_mode)
                 .expect("fidl error");
         }
 
-        let mut translation = if let Some(window_geometry) = self.window_geometry.as_ref() {
+        let translation = if let Some(window_geometry) = self.window_geometry.as_ref() {
             Vec_ { x: self.position.0 - window_geometry.x, y: self.position.1 - window_geometry.y }
         } else {
             Vec_ { x: self.position.0, y: self.position.1 }
@@ -585,7 +585,7 @@ impl Surface {
         node.flatland
             .borrow()
             .proxy()
-            .set_translation(&mut node.transform_id.clone(), &mut translation)
+            .set_translation(&node.transform_id, &translation)
             .expect("fidl error");
 
         // Create and register a release fence to release the last buffer unless

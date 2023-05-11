@@ -390,8 +390,8 @@ impl Peer {
             info!(%peer_id, "Connecting transport channel");
             let channel = profile
                 .connect(
-                    &mut peer_id.into(),
-                    &mut ConnectParameters::L2cap(Self::transport_channel_params()),
+                    &peer_id.into(),
+                    &ConnectParameters::L2cap(Self::transport_channel_params()),
                 )
                 .await
                 .context("FIDL error: {}")?

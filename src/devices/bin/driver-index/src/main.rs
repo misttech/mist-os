@@ -3316,9 +3316,8 @@ mod tests {
             fasync::Timer::new(std::time::Duration::from_millis(100)).await;
 
             // Register the ephemeral driver.
-            let mut pkg_url =
-                fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
-            registrar_proxy.register(&mut pkg_url).await.unwrap().unwrap();
+            let pkg_url = fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
+            registrar_proxy.register(&pkg_url).await.unwrap().unwrap();
 
             // Now that it's registered we should find it.
             let driver_infos =
@@ -3389,9 +3388,8 @@ mod tests {
             run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
         let test_task = async move {
             // Try to register the driver.
-            let mut pkg_url =
-                fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
-            let register_result = registrar_proxy.register(&mut pkg_url).await.unwrap();
+            let pkg_url = fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
+            let register_result = registrar_proxy.register(&pkg_url).await.unwrap();
 
             // The register should have failed.
             assert_eq!(fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());
@@ -3455,9 +3453,8 @@ mod tests {
             run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
         let test_task = async move {
             // Try to register the driver.
-            let mut pkg_url =
-                fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
-            let register_result = registrar_proxy.register(&mut pkg_url).await.unwrap();
+            let pkg_url = fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
+            let register_result = registrar_proxy.register(&pkg_url).await.unwrap();
 
             // The register should have failed.
             assert_eq!(fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());

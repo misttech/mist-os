@@ -1518,19 +1518,15 @@ mod tests {
             cfg;
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         let loopback_device_id = crate::device::add_loopback_device(
-            &mut sync_ctx,
+            &sync_ctx,
             Mtu::new(u16::MAX as u32),
             DEFAULT_INTERFACE_METRIC,
         )
         .expect("create the loopback interface")
         .into();
-        crate::device::testutil::enable_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &loopback_device_id,
-        );
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &loopback_device_id);
 
         let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
             test_case;
@@ -1546,12 +1542,12 @@ mod tests {
             AddressType::Remote => (remote_ip, Some(remote_ip)),
             AddressType::Unspecified { can_select } => {
                 if !can_select {
-                    remove_all_local_addrs::<I>(&mut sync_ctx, &mut non_sync_ctx);
+                    remove_all_local_addrs::<I>(&sync_ctx, &mut non_sync_ctx);
                 }
                 (local_ip, None)
             }
             AddressType::Unroutable => {
-                remove_all_local_addrs::<I>(&mut sync_ctx, &mut non_sync_ctx);
+                remove_all_local_addrs::<I>(&sync_ctx, &mut non_sync_ctx);
                 (local_ip, Some(local_ip))
             }
         };
@@ -1563,7 +1559,7 @@ mod tests {
                 panic!("remote_ip_type cannot be unspecified")
             }
             AddressType::Unroutable => {
-                crate::del_route(&mut sync_ctx, &mut non_sync_ctx, subnet.into()).unwrap();
+                crate::del_route(&sync_ctx, &mut non_sync_ctx, subnet.into()).unwrap();
                 remote_ip
             }
         };
@@ -1646,23 +1642,23 @@ mod tests {
         let device_idx = builder.add_device(local_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::device::add_ip_addr_subnet(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             AddrSubnet::new(remote_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::add_route(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
                 subnet.into(),
@@ -1673,17 +1669,13 @@ mod tests {
         .unwrap();
 
         let loopback_device_id = crate::device::add_loopback_device(
-            &mut sync_ctx,
+            &sync_ctx,
             Mtu::new(u16::MAX as u32),
             DEFAULT_INTERFACE_METRIC,
         )
         .expect("create the loopback interface")
         .into();
-        crate::device::testutil::enable_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &loopback_device_id,
-        );
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &loopback_device_id);
 
         let (expected_from_ip, from_ip) = match from_addr_type {
             AddressType::LocallyOwned => (local_ip, Some(local_ip)),
@@ -1918,9 +1910,9 @@ mod tests {
         let device_idx = builder.add_device(local_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
@@ -1930,7 +1922,7 @@ mod tests {
         // Use multicast remote addresses since unicast addresses would trigger
         // ARP/NDP requests.
         crate::add_route(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
@@ -2043,16 +2035,16 @@ mod tests {
         let eth_device_id = device_ids[device_idx].clone();
         core::mem::drop(device_ids);
         let device_id: DeviceId<_> = eth_device_id.clone().into();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::add_route(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
@@ -2076,7 +2068,7 @@ mod tests {
         let expected = if remove_device {
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
-            crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, eth_device_id);
+            crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, eth_device_id);
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(

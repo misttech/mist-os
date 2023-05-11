@@ -81,9 +81,9 @@ pub async fn set_server_settings(
 ) {
     let parameters = futures::stream::iter(parameters.into_iter()).for_each_concurrent(
         None,
-        |mut parameter| async move {
+        |parameter| async move {
             dhcp_server
-                .set_parameter(&mut parameter)
+                .set_parameter(&parameter)
                 .await
                 .expect("failed to call dhcp/Server.SetParameter")
                 .map_err(zx::Status::from_raw)
@@ -92,18 +92,16 @@ pub async fn set_server_settings(
                 })
         },
     );
-    let options = futures::stream::iter(options.into_iter()).for_each_concurrent(
-        None,
-        |mut option| async move {
+    let options =
+        futures::stream::iter(options.into_iter()).for_each_concurrent(None, |option| async move {
             dhcp_server
-                .set_option(&mut option)
+                .set_option(&option)
                 .await
                 .expect("failed to call dhcp/Server.SetOption")
                 .map_err(zx::Status::from_raw)
                 .unwrap_or_else(|e| {
                     panic!("dhcp/Server.SetOption({:?}) returned error: {:?}", option, e)
                 })
-        },
-    );
+        });
     let ((), ()) = futures::future::join(parameters, options).await;
 }

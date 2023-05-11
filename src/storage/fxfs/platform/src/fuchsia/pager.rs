@@ -735,7 +735,7 @@ mod tests {
 
         // If `file2` did not replace `file1` or `file1` removed the registration of `file2` then
         // the pager packets will be dropped and the write call will hang.
-        file2.vmo().write(&mut [0, 1, 2, 3, 4], 0).unwrap();
+        file2.vmo().write(&[0, 1, 2, 3, 4], 0).unwrap();
 
         pager.unregister_file(file2.as_ref());
         pager.terminate().await;
@@ -793,7 +793,7 @@ mod tests {
             was_mark_dirty_checked: AtomicBool::new(false),
         });
         assert_eq!(pager.register_file(&file), PAGER_KEY);
-        file.vmo().write(&mut [0, 1, 2, 3, 4], 0).unwrap();
+        file.vmo().write(&[0, 1, 2, 3, 4], 0).unwrap();
         pager.unregister_file(file.as_ref());
         pager.terminate().await;
 
@@ -970,7 +970,7 @@ mod tests {
         // The VMO hasn't been modified yet.
         assert!(!stats.was_vmo_modified());
 
-        file.vmo().write(&mut [0, 1, 2, 3, 4], 0).unwrap();
+        file.vmo().write(&[0, 1, 2, 3, 4], 0).unwrap();
         let stats = pager.query_vmo_stats(file.vmo(), PagerVmoStatsOptions::empty()).unwrap();
         assert!(stats.was_vmo_modified());
 

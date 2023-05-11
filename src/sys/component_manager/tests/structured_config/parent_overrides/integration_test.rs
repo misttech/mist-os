@@ -26,7 +26,7 @@ async fn realm_api_overrides() {
     let field_name = String::from("parent_provided");
     let override_value = String::from("config value for dynamic child launched by realm api");
 
-    let mut collection_ref = CollectionRef { name: collection_name.clone() };
+    let collection_ref = CollectionRef { name: collection_name.clone() };
     let child_decl = Child {
         name: Some(child_name.clone()),
         url: Some(String::from(RECEIVER_URL)),
@@ -40,7 +40,7 @@ async fn realm_api_overrides() {
     };
 
     realm
-        .create_child(&mut collection_ref, &child_decl, CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();
@@ -63,7 +63,7 @@ async fn realm_api_refuses_to_override_immutable_config() {
     let field_name = String::from("not_parent_provided");
     let override_value = String::from("config value for dynamic child launched by realm api");
 
-    let mut collection_ref = CollectionRef { name: collection_name.clone() };
+    let collection_ref = CollectionRef { name: collection_name.clone() };
     let child_decl = Child {
         name: Some(child_name.clone()),
         url: Some(String::from(RECEIVER_URL)),
@@ -77,18 +77,18 @@ async fn realm_api_refuses_to_override_immutable_config() {
     };
 
     realm
-        .create_child(&mut collection_ref, &child_decl, CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();
 
     // open the child's exposed directory to start resolving it
-    let mut child_ref = ChildRef { name: child_name, collection: Some(collection_name) };
+    let child_ref = ChildRef { name: child_name, collection: Some(collection_name) };
     let (_exposed_dir, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     assert_matches!(
         realm
-            .open_exposed_dir(&mut child_ref, exposed_dir_server)
+            .open_exposed_dir(&child_ref, exposed_dir_server)
             .await
             .expect("FIDL syscalls succeed"),
         Err(fcomp::Error::InstanceCannotResolve)

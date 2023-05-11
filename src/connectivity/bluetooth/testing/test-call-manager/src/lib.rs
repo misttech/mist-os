@@ -1076,7 +1076,7 @@ mod tests {
 
         // requesting an outgoing call should complete successfully
         let result =
-            proxy.request_outgoing_call(&mut CallAction::DialFromNumber("123".to_string())).await;
+            proxy.request_outgoing_call(&CallAction::DialFromNumber("123".to_string())).await;
         assert!(result.is_ok());
     }
 }

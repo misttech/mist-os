@@ -170,8 +170,7 @@ impl CryptService {
     async fn new(data_key: Aes256Key, metadata_key: Aes256Key) -> Result<Self, Error> {
         static INSTANCE: AtomicU64 = AtomicU64::new(1);
 
-        let mut collection_ref =
-            fdecl::CollectionRef { name: FXFS_CRYPT_COLLECTION_NAME.to_string() };
+        let collection_ref = fdecl::CollectionRef { name: FXFS_CRYPT_COLLECTION_NAME.to_string() };
 
         let component_name = format!("fxfs-crypt.{}", INSTANCE.fetch_add(1, Ordering::SeqCst));
 
@@ -185,7 +184,7 @@ impl CryptService {
         let realm_proxy = connect_to_protocol::<RealmMarker>()?;
 
         realm_proxy
-            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await?
             .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
 
@@ -221,7 +220,7 @@ impl CryptService {
 impl Drop for CryptService {
     fn drop(&mut self) {
         if let Ok(realm_proxy) = connect_to_protocol::<RealmMarker>() {
-            let _ = realm_proxy.destroy_child(&mut fdecl::ChildRef {
+            let _ = realm_proxy.destroy_child(&fdecl::ChildRef {
                 name: self.component_name.clone(),
                 collection: Some(FXFS_CRYPT_COLLECTION_NAME.to_string()),
             });

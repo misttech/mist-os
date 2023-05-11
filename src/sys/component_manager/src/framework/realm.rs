@@ -525,14 +525,14 @@ mod tests {
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
 
         // Create children "a", "b", and "<long_name>" in collection. Expect a Discovered event for each.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         for (name, moniker) in
             [("a", "coll:a"), ("b", "coll:b"), (long_name, &format!("coll:{}", long_name))]
         {
             // Create a child
             test.realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )
@@ -588,7 +588,7 @@ mod tests {
 
         // Invalid arguments.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".to_string()),
                 url: None,
@@ -598,18 +598,14 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InvalidArguments);
         }
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".to_string()),
                 url: Some("test:///a".to_string()),
@@ -619,11 +615,7 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -633,7 +625,7 @@ mod tests {
         {
             // Name exceeds MAX_NAME_LENGTH when `allow_long_names` is not set.
             // The FIDL call succeeds but the server responds with an error.
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".repeat(cm_types::MAX_NAME_LENGTH + 1).to_string()),
                 url: None,
@@ -643,11 +635,7 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -656,7 +644,7 @@ mod tests {
             // Name length exceeds the MAX_LONG_NAME_LENGTH when `allow_long_names` is set.
             // In this case the FIDL call fails to encode because the name field
             // is defined in the FIDL library as `string:MAX_LONG_NAME_LENGTH`.
-            let mut collection_ref = fdecl::CollectionRef { name: "pcoll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "pcoll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".repeat(cm_types::MAX_LONG_NAME_LENGTH + 1).to_string()),
                 url: None,
@@ -666,11 +654,7 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect_err("unexpected success");
             // When exceeding the long max name length, the FIDL call itself
@@ -680,21 +664,21 @@ mod tests {
 
         // Instance already exists.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let res = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await;
             res.expect("fidl call failed").expect("failed to create child a");
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
@@ -706,11 +690,11 @@ mod tests {
 
         // Collection not found.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "nonexistent".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "nonexistent".to_string() };
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
@@ -722,7 +706,7 @@ mod tests {
 
         // Unsupported.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -732,11 +716,7 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -755,7 +735,7 @@ mod tests {
 
         // Disallowed dynamic offers specified.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -766,7 +746,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Parent(
@@ -783,7 +763,7 @@ mod tests {
 
         // Malformed dynamic offers specified.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -794,7 +774,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -815,7 +795,7 @@ mod tests {
 
         // Dynamic offer source is a static component that doesn't exist.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -826,7 +806,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
@@ -846,7 +826,7 @@ mod tests {
 
         // Source is a collection that doesn't exist (and using a Service).
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -857,7 +837,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![fdecl::Offer::Service(fdecl::OfferService {
@@ -879,7 +859,7 @@ mod tests {
 
         // Source is a component in the same collection that doesn't exist.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -890,7 +870,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
@@ -910,7 +890,7 @@ mod tests {
 
         // Source is the component itself... which doesn't exist... yet.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -921,7 +901,7 @@ mod tests {
             let err = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
@@ -942,7 +922,7 @@ mod tests {
         // Instance died.
         {
             test.drop_component();
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("b".to_string()),
                 url: Some("test:///b".to_string()),
@@ -952,11 +932,7 @@ mod tests {
             };
             let err = test
                 .realm_proxy
-                .create_child(
-                    &mut collection_ref,
-                    &child_decl,
-                    fcomponent::CreateChildArgs::default(),
-                )
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -984,24 +960,24 @@ mod tests {
 
         // Create children "a" and "b" in collection, and start them.
         for name in &["a", "b"] {
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let res = test
                 .realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await;
             res.expect("fidl call failed")
                 .unwrap_or_else(|_| panic!("failed to create child {}", name));
-            let mut child_ref =
+            let child_ref =
                 fdecl::ChildRef { name: name.to_string(), collection: Some("coll".to_string()) };
             let (exposed_dir, server_end) =
                 endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let () = test
                 .realm_proxy
-                .open_exposed_dir(&mut child_ref, server_end)
+                .open_exposed_dir(&child_ref, server_end)
                 .await
                 .expect("OpenExposedDir FIDL")
                 .expect("OpenExposedDir Error");
@@ -1018,9 +994,9 @@ mod tests {
 
         // Destroy "a". "a" is no longer live from the client's perspective, although it's still
         // being destroyed.
-        let mut child_ref =
+        let child_ref =
             fdecl::ChildRef { name: "a".to_string(), collection: Some("coll".to_string()) };
-        let (f, destroy_handle) = test.realm_proxy.destroy_child(&mut child_ref).remote_handle();
+        let (f, destroy_handle) = test.realm_proxy.destroy_child(&child_ref).remote_handle();
         fasync::Task::spawn(f).detach();
 
         // The component should be stopped (shut down) before it is destroyed.
@@ -1050,7 +1026,7 @@ mod tests {
 
         // Recreate "a" and verify "a" is back (but it's a different "a"). The old "a" is gone
         // from the client's point of view, but it hasn't been cleaned up yet.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let child_decl = fdecl::Child {
             name: Some("a".to_string()),
             url: Some("test:///a_alt".to_string()),
@@ -1060,7 +1036,7 @@ mod tests {
         };
         let res = test
             .realm_proxy
-            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await;
         res.expect("fidl call failed").expect("failed to recreate child a");
 
@@ -1083,23 +1059,19 @@ mod tests {
         .await;
 
         // Create child "a" in collection.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let res = test
             .realm_proxy
-            .create_child(
-                &mut collection_ref,
-                &child_decl("a"),
-                fcomponent::CreateChildArgs::default(),
-            )
+            .create_child(&collection_ref, &child_decl("a"), fcomponent::CreateChildArgs::default())
             .await;
         res.expect("fidl call failed").expect("failed to create child a");
 
         // Invalid arguments.
         {
-            let mut child_ref = fdecl::ChildRef { name: "a".to_string(), collection: None };
+            let child_ref = fdecl::ChildRef { name: "a".to_string(), collection: None };
             let err = test
                 .realm_proxy
-                .destroy_child(&mut child_ref)
+                .destroy_child(&child_ref)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1108,11 +1080,11 @@ mod tests {
 
         // Instance not found.
         {
-            let mut child_ref =
+            let child_ref =
                 fdecl::ChildRef { name: "b".to_string(), collection: Some("coll".to_string()) };
             let err = test
                 .realm_proxy
-                .destroy_child(&mut child_ref)
+                .destroy_child(&child_ref)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1122,11 +1094,11 @@ mod tests {
         // Instance died.
         {
             test.drop_component();
-            let mut child_ref =
+            let child_ref =
                 fdecl::ChildRef { name: "a".to_string(), collection: Some("coll".to_string()) };
             let err = test
                 .realm_proxy
-                .destroy_child(&mut child_ref)
+                .destroy_child(&child_ref)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1152,13 +1124,9 @@ mod tests {
             .await;
 
         // Create child "a" in collection. Expect a Started event.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         test.realm_proxy
-            .create_child(
-                &mut collection_ref,
-                &child_decl("a"),
-                fcomponent::CreateChildArgs::default(),
-            )
+            .create_child(&collection_ref, &child_decl("a"), fcomponent::CreateChildArgs::default())
             .await
             .unwrap()
             .unwrap();
@@ -1201,11 +1169,11 @@ mod tests {
 
         // Collection not found.
         {
-            let mut collection_ref = fdecl::CollectionRef { name: "nonexistent".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "nonexistent".to_string() };
             let (_, server_end) = endpoints::create_proxy().unwrap();
             let err = test
                 .realm_proxy
-                .list_children(&mut collection_ref, server_end)
+                .list_children(&collection_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1215,11 +1183,11 @@ mod tests {
         // Instance died.
         {
             test.drop_component();
-            let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let (_, server_end) = endpoints::create_proxy().unwrap();
             let err = test
                 .realm_proxy
-                .list_children(&mut collection_ref, server_end)
+                .list_children(&collection_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1257,9 +1225,9 @@ mod tests {
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Open exposed directory of child.
-        let mut child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
+        let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
         let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let res = test.realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
+        let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
@@ -1323,11 +1291,11 @@ mod tests {
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Add "system" to collection.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let res = test
             .realm_proxy
             .create_child(
-                &mut collection_ref,
+                &collection_ref,
                 &child_decl("system"),
                 fcomponent::CreateChildArgs::default(),
             )
@@ -1335,10 +1303,10 @@ mod tests {
         res.expect("fidl call failed").expect("failed to create child system");
 
         // Open exposed directory of child.
-        let mut child_ref =
+        let child_ref =
             fdecl::ChildRef { name: "system".to_string(), collection: Some("coll".to_owned()) };
         let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let res = test.realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
+        let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
@@ -1395,11 +1363,11 @@ mod tests {
 
         // Instance not found.
         {
-            let mut child_ref = fdecl::ChildRef { name: "missing".to_string(), collection: None };
+            let child_ref = fdecl::ChildRef { name: "missing".to_string(), collection: None };
             let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let err = test
                 .realm_proxy
-                .open_exposed_dir(&mut child_ref, server_end)
+                .open_exposed_dir(&child_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1408,12 +1376,11 @@ mod tests {
 
         // Instance cannot resolve.
         {
-            let mut child_ref =
-                fdecl::ChildRef { name: "unresolvable".to_string(), collection: None };
+            let child_ref = fdecl::ChildRef { name: "unresolvable".to_string(), collection: None };
             let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let err = test
                 .realm_proxy
-                .open_exposed_dir(&mut child_ref, server_end)
+                .open_exposed_dir(&child_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
@@ -1422,11 +1389,10 @@ mod tests {
 
         // Instance can't run.
         {
-            let mut child_ref =
-                fdecl::ChildRef { name: "unrunnable".to_string(), collection: None };
+            let child_ref = fdecl::ChildRef { name: "unrunnable".to_string(), collection: None };
             let (dir_proxy, server_end) =
                 endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            let res = test.realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
+            let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
             res.expect("fidl call failed").expect("open_exposed_dir() failed");
             let echo_proxy = client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(
                 &dir_proxy, "hippo",
@@ -1439,11 +1405,11 @@ mod tests {
         // Instance died.
         {
             test.drop_component();
-            let mut child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
+            let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
             let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let err = test
                 .realm_proxy
-                .open_exposed_dir(&mut child_ref, server_end)
+                .open_exposed_dir(&child_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");

@@ -206,10 +206,10 @@ impl Window {
         &mut self,
         add_to_parent: Option<&mut ui_comp::TransformId>,
     ) -> Result<ui_comp::TransformId, Error> {
-        let mut transform = self.next_transform_id();
-        self.get_flatland().create_transform(&mut transform)?;
+        let transform = self.next_transform_id();
+        self.get_flatland().create_transform(&transform)?;
         if let Some(parent_transform) = add_to_parent {
-            self.get_flatland().add_child(parent_transform, &mut transform)?;
+            self.get_flatland().add_child(parent_transform, &transform)?;
         }
         Ok(transform)
     }
@@ -225,10 +225,10 @@ impl Window {
 
     pub fn set_content(
         &self,
-        mut transform_id: ui_comp::TransformId,
-        mut content_id: ui_comp::ContentId,
+        transform_id: ui_comp::TransformId,
+        content_id: ui_comp::ContentId,
     ) -> Result<(), Error> {
-        self.get_flatland().set_content(&mut transform_id, &mut content_id)?;
+        self.get_flatland().set_content(&transform_id, &content_id)?;
         Ok(())
     }
 
@@ -265,7 +265,7 @@ impl Window {
         }
 
         for shortcut in &shortcuts {
-            if let Err(error) = registry.register_shortcut(&mut shortcut.clone()).await {
+            if let Err(error) = registry.register_shortcut(&shortcut).await {
                 error!("Encountered error {:?} registering shortcut: {:?}", error, shortcut);
             }
         }
@@ -322,12 +322,8 @@ impl Window {
             .protocol_connector
             .connect_to_flatland()
             .expect("Failed to connect to fuchsia.ui.comp.Flatland");
-        flatland
-            .create_transform(&mut ROOT_TRANSFORM_ID.clone())
-            .expect("Failed to create transform");
-        flatland
-            .set_root_transform(&mut ROOT_TRANSFORM_ID.clone())
-            .expect("Failed to set root transform");
+        flatland.create_transform(&ROOT_TRANSFORM_ID).expect("Failed to create transform");
+        flatland.set_root_transform(&ROOT_TRANSFORM_ID).expect("Failed to set root transform");
 
         let presenter = Arc::new(Mutex::new(Presenter::new(flatland.clone())));
 

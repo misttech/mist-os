@@ -97,11 +97,11 @@ pub async fn create_fvm_volume(
         }
         None => 1,
     };
-    let mut type_guid = FidlGuid { value: type_guid.clone() };
-    let mut instance_guid = FidlGuid { value: instance_guid.clone() };
+    let type_guid = FidlGuid { value: type_guid.clone() };
+    let instance_guid = FidlGuid { value: instance_guid.clone() };
 
     let status = volume_manager
-        .allocate_partition(slice_count, &mut type_guid, &mut instance_guid, name, flags)
+        .allocate_partition(slice_count, &type_guid, &instance_guid, name, flags)
         .await?;
     zx::ok(status).context("error allocating partition")
 }

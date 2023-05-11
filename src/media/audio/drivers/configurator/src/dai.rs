@@ -73,13 +73,13 @@ impl DaiInterface {
     /// Create ring buffer.
     pub async fn create_ring_buffer(
         &self,
-        mut dai_format: DaiFormat,
+        dai_format: DaiFormat,
         ring_buffer_format: Format,
         ring_buffer: fidl::endpoints::ServerEnd<RingBufferMarker>,
     ) -> Result<(), Error> {
         self.get_proxy()?
             .clone()
-            .create_ring_buffer(&mut dai_format, &ring_buffer_format, ring_buffer)
+            .create_ring_buffer(&dai_format, &ring_buffer_format, ring_buffer)
             .map_err(|e| anyhow!("FIDL error creating ring buffer {:?}", e))
     }
 }

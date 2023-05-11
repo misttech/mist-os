@@ -705,9 +705,9 @@ macro_rules! routing_table_controller_impl {
                 addresses: UnicastSourceAndMulticastDestination,
                 route: fnet_multicast_admin::Route,
             ) -> Result<(), AddRouteError> {
-                let mut fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
+                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
                 self.controller
-                    .add_route(&mut fidl_addresses, &route)
+                    .add_route(&fidl_addresses, &route)
                     .await
                     .expect("add_route failed")
                     .map_err(Into::into)
@@ -717,9 +717,9 @@ macro_rules! routing_table_controller_impl {
                 &self,
                 addresses: UnicastSourceAndMulticastDestination,
             ) -> Result<(), DelRouteError> {
-                let mut fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
+                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
                 self.controller
-                    .del_route(&mut fidl_addresses)
+                    .del_route(&fidl_addresses)
                     .await
                     .expect("del_route failed")
                     .map_err(Into::into)
@@ -729,9 +729,9 @@ macro_rules! routing_table_controller_impl {
                 &self,
                 addresses: UnicastSourceAndMulticastDestination,
             ) -> Result<fnet_multicast_admin::RouteStats, GetRouteStatsError> {
-                let mut fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
+                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
                 self.controller
-                    .get_route_stats(&mut fidl_addresses)
+                    .get_route_stats(&fidl_addresses)
                     .await
                     .expect("get_route_stats failed")
                     .map_err(Into::into)

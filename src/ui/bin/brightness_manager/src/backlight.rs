@@ -344,10 +344,7 @@ impl Backlight {
             backlight_on
         );
         self.backlight_proxy
-            .set_state_normalized(&mut BacklightCommand {
-                backlight_on,
-                brightness: regulated_value,
-            })
+            .set_state_normalized(&BacklightCommand { backlight_on, brightness: regulated_value })
             .await?
             .map_err(|e| zx::Status::from_raw(e))
             .context("Failed to set backlight state")

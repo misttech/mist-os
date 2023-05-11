@@ -57,7 +57,7 @@ impl Puppet {
             line: 9001,
             record: Record { arguments: vec![], severity: Severity::Info, timestamp: 0 },
         };
-        let mut spec: PrintfRecordSpec = PrintfRecordSpec {
+        let spec: PrintfRecordSpec = PrintfRecordSpec {
             record,
             printf_arguments: vec![
                 PrintfValue::IntegerValue(5),
@@ -66,7 +66,7 @@ impl Puppet {
             ],
             msg: "Test printf int %i string %s double %f".to_string(),
         };
-        self._proxy.emit_printf_log(&mut spec).await?;
+        self._proxy.emit_printf_log(&spec).await?;
         info!("Got init message -- waiting for printf");
 
         loop {

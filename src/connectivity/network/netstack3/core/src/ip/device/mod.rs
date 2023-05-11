@@ -1904,7 +1904,7 @@ mod tests {
     fn enable_disable_ipv4() {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
         let device_id = crate::device::add_ethernet_device(
@@ -1917,7 +1917,7 @@ mod tests {
 
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
         })
         .unwrap();
@@ -1930,7 +1930,7 @@ mod tests {
             })]
         );
 
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
         })
         .unwrap();
@@ -1959,7 +1959,7 @@ mod tests {
             })]
         );
 
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
         })
         .unwrap();
@@ -1978,13 +1978,13 @@ mod tests {
             ]
         );
         // Verify that a redundant "enable" does not generate any events.
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
         })
         .unwrap();
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
         })
         .unwrap();
@@ -2003,7 +2003,7 @@ mod tests {
             ]
         );
         // Verify that a redundant "disable" does not generate any events.
-        update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
         })
         .unwrap();
@@ -2053,7 +2053,7 @@ mod tests {
         )
         .into();
         let ll_addr = local_mac.to_ipv6_link_local();
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.gmp_enabled = true;
 
             // Doesn't matter as long as we perform DAD and router
@@ -2291,7 +2291,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.dad_transmits = NonZeroU8::new(1);
 
             config.ip_config.gmp_enabled = true;

@@ -20,10 +20,10 @@ impl UnregisterOnMeshNetCommand {
     pub async fn exec(&self, context: &mut LowpanCtlContext) -> Result<(), Error> {
         let device_route = context.get_default_device_route_proxy().await?;
         let prefix_len = 64;
-        let mut subnet = Ipv6Subnet { addr: Ipv6Address { addr: self.addr.octets() }, prefix_len };
+        let subnet = Ipv6Subnet { addr: Ipv6Address { addr: self.addr.octets() }, prefix_len };
 
         device_route
-            .unregister_on_mesh_prefix(&mut subnet)
+            .unregister_on_mesh_prefix(&subnet)
             .await
             .context("Unable to send unregister_on_mesh_prefix command")
     }

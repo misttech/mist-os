@@ -518,7 +518,7 @@ mod tests {
 
         let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>().unwrap();
         let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>().unwrap();
-        let reg_fut = client.register_peer(&mut id.into(), mock_peer_server, observer);
+        let reg_fut = client.register_peer(&id.into(), mock_peer_server, observer);
         pin_mut!(reg_fut);
 
         exec.run_until_stalled(&mut reg_fut).expect_pending("registration waiting for server");

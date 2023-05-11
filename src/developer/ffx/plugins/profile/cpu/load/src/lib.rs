@@ -178,7 +178,7 @@ mod tests {
                 match req {
                     fstats::StatsRequest::GetCpuLoad { duration, responder } => {
                         duration_request_sender.try_send(duration).unwrap();
-                        let _ = responder.send(&vec![]); // returned values don't matter for this test
+                        let _ = responder.send(&[]); // returned values don't matter for this test
                     }
                     request => panic!("Unexpected request: {:?}", request),
                 }

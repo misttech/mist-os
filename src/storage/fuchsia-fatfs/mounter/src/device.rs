@@ -197,10 +197,7 @@ pub mod test {
                 match req {
                     PartitionRequest::GetTypeGuid { responder } => {
                         responder
-                            .send(
-                                zx::Status::OK.into_raw(),
-                                Some(&mut Guid { value: self.type_guid }),
-                            )
+                            .send(zx::Status::OK.into_raw(), Some(&Guid { value: self.type_guid }))
                             .expect("Send succeeds");
                     }
                     _ => panic!("Unsupported request!"),

@@ -632,7 +632,7 @@ mod tests {
         let (_dir, proxy) = fs
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let mut attrs = fio::NodeAttributes {
+        let attrs = fio::NodeAttributes {
             mode: 0,
             id: 0,
             content_size: 0,
@@ -644,7 +644,7 @@ mod tests {
         let status = proxy
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                &mut attrs,
+                &attrs,
             )
             .await
             .unwrap();

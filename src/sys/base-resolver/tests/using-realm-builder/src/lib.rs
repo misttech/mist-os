@@ -165,12 +165,12 @@ impl TestEnv {
     async fn resolve_with_context_package(
         &self,
         url: &str,
-        mut in_context: fpkg::ResolutionContext,
+        in_context: fpkg::ResolutionContext,
     ) -> Result<(fio::DirectoryProxy, fpkg::ResolutionContext), fpkg::ResolveError> {
         let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
         let out_context = self
             .package_resolver()
-            .resolve_with_context(url, &mut in_context, package_server_end)
+            .resolve_with_context(url, &in_context, package_server_end)
             .await
             .unwrap()?;
         Ok((package, out_context))
@@ -193,9 +193,9 @@ impl TestEnv {
     async fn resolve_with_context_component(
         &self,
         url: &str,
-        mut context: fcomponent_resolution::Context,
+        context: fcomponent_resolution::Context,
     ) -> Result<fcomponent_resolution::Component, fcomponent_resolution::ResolverError> {
-        self.component_resolver().resolve_with_context(url, &mut context).await.unwrap()
+        self.component_resolver().resolve_with_context(url, &context).await.unwrap()
     }
 
     fn shell_commands_bin(&self) -> fio::DirectoryProxy {

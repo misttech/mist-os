@@ -169,9 +169,9 @@ async fn open_hermetic_network_realm_exposed_directory(
         .expect("failed to connect to realm protocol");
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
         .expect("failed to create Directory proxy");
-    let mut child_ref = network_test_realm::create_hermetic_network_realm_child_ref();
+    let child_ref = network_test_realm::create_hermetic_network_realm_child_ref();
     realm_proxy
-        .open_exposed_dir(&mut child_ref, server_end)
+        .open_exposed_dir(&child_ref, server_end)
         .await
         .expect("open_exposed_dir failed")
         .expect("open_exposed_dir error");
@@ -264,7 +264,7 @@ async fn add_address_to_hermetic_interface(
         let stack_proxy =
             connect_to_hermetic_network_realm_protocol::<fstack::StackMarker>(&realm).await;
         stack_proxy
-            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet: fnet_ext::apply_subnet_mask(subnet),
                 device_id: id,
                 next_hop: None,
@@ -306,11 +306,7 @@ async fn join_network_with_hermetic_netstack<'a>(
         .expect("join_network failed");
 
     network_test_realm
-        .add_interface(
-            &mut mac_address.clone(),
-            interface_name,
-            /* wait_any_ip_address= */ false,
-        )
+        .add_interface(&mac_address, interface_name, /* wait_any_ip_address= */ false)
         .await
         .expect("add_interface failed")
         .expect("add_interface error");
@@ -367,7 +363,7 @@ async fn start_hermetic_network_realm_replaces_existing_realm(
 
     network_test_realm
         .add_interface(
-            &mut INTERFACE1_MAC_ADDRESS.clone(),
+            &INTERFACE1_MAC_ADDRESS,
             EXPECTED_INTERFACE_NAME,
             /* wait_any_ip_address= */ false,
         )
@@ -439,11 +435,7 @@ async fn add_interface(
         connect_to_hermetic_network_realm_protocol::<fnet_interfaces::StateMarker>(&realm).await;
 
     network_test_realm
-        .add_interface(
-            &mut INTERFACE1_MAC_ADDRESS.clone(),
-            EXPECTED_INTERFACE_NAME,
-            wait_any_ip_address,
-        )
+        .add_interface(&INTERFACE1_MAC_ADDRESS, EXPECTED_INTERFACE_NAME, wait_any_ip_address)
         .await
         .expect("add_interface failed")
         .expect("add_interface error");
@@ -519,7 +511,7 @@ async fn add_interface_already_exists(name: &str, sub_name: &str, netstack: fntr
 
     network_test_realm
         .add_interface(
-            &mut INTERFACE1_MAC_ADDRESS.clone(),
+            &INTERFACE1_MAC_ADDRESS,
             INTERFACE1_NAME,
             /* wait_any_ip_address= */ false,
         )
@@ -530,7 +522,7 @@ async fn add_interface_already_exists(name: &str, sub_name: &str, netstack: fntr
     assert_eq!(
         network_test_realm
             .add_interface(
-                &mut INTERFACE2_MAC_ADDRESS.clone(),
+                &INTERFACE2_MAC_ADDRESS,
                 INTERFACE1_NAME,
                 /* wait_any_ip_address= */ false
             )
@@ -569,11 +561,11 @@ async fn add_interface_with_no_matching_interface(
 
     // `non_matching_mac_address` doesn't match any of the MAC addresses for
     // interfaces owned by the system's Netstack.
-    let mut non_matching_mac_address = fidl_mac!("aa:bb:cc:dd:ee:ff");
+    let non_matching_mac_address = fidl_mac!("aa:bb:cc:dd:ee:ff");
     assert_eq!(
         network_test_realm
             .add_interface(
-                &mut non_matching_mac_address,
+                &non_matching_mac_address,
                 EXPECTED_INTERFACE_NAME,
                 /* wait_any_ip_address= */ false
             )
@@ -613,7 +605,7 @@ async fn add_interface_with_no_matching_interface_in_netstack(
     assert_eq!(
         network_test_realm
             .add_interface(
-                &mut INTERFACE1_MAC_ADDRESS.clone(),
+                &INTERFACE1_MAC_ADDRESS,
                 EXPECTED_INTERFACE_NAME,
                 /* wait_any_ip_address= */ false
             )
@@ -646,7 +638,7 @@ async fn stop_hermetic_network_realm(name: &str, sub_name: &str, netstack: fntr:
 
     network_test_realm
         .add_interface(
-            &mut INTERFACE1_MAC_ADDRESS.clone(),
+            &INTERFACE1_MAC_ADDRESS,
             EXPECTED_INTERFACE_NAME,
             /* wait_any_ip_address= */ false,
         )
@@ -757,13 +749,13 @@ async fn poll_udp(
     assert!(has_stub(&realm).await, "expected has_stub(&realm) to be true");
 
     let payload = "hello".as_bytes();
-    let mut poll_addr = fnet_ext::SocketAddress(match domain {
+    let poll_addr = fnet_ext::SocketAddress(match domain {
         fposix_socket::Domain::Ipv4 => unreliable_echo::socket_addr_v4(),
         fposix_socket::Domain::Ipv6 => unreliable_echo::socket_addr_v6(),
     })
     .into();
     let response = network_test_realm
-        .poll_udp(&mut poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 6000)
+        .poll_udp(&poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 6000)
         .await
         .expect("poll_udp FIDL error")
         .expect("poll_udp error");
@@ -774,7 +766,7 @@ async fn poll_udp(
     assert!(!has_stub(&realm).await, "expected has_stub(&realm) to be false");
 
     let response = network_test_realm
-        .poll_udp(&mut poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 100)
+        .poll_udp(&poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 100)
         .await
         .expect("poll_udp FIDL error");
     assert_eq!(response, Err(fntr::Error::TimeoutExceeded));
@@ -800,11 +792,11 @@ async fn poll_udp_unreachable(name: &str, sub_name: &str, netstack: fntr::Netsta
 
     // 203.0.113.0/24 is reserved for documentation only, so no address in this subnet
     // should be routable/reachable. See https://www.rfc-editor.org/rfc/rfc5737.html.
-    let mut poll_addr = fidl_socket_addr!("203.0.113.1:10000");
+    let poll_addr = fidl_socket_addr!("203.0.113.1:10000");
 
     let response = network_test_realm
         .poll_udp(
-            &mut poll_addr,
+            &poll_addr,
             "test payload".as_bytes(),
             zx::Duration::from_millis(10).into_nanos(),
             100,
@@ -1331,7 +1323,7 @@ async fn ping(
 ) {
     // TODO(https://fxbug.dev/95457): Destructure these types in the parameter
     // definition.
-    let PingAddressConfig { source_subnet, mut target_subnet } = address_config;
+    let PingAddressConfig { source_subnet, target_subnet } = address_config;
     let PingOptions { interface_name, payload_length, timeout, disable_target_interface } = options;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     // Create a realm that contains a system Netstack and the Network Test
@@ -1395,7 +1387,7 @@ async fn ping(
 
     network_test_realm
         .add_interface(
-            &mut INTERFACE1_MAC_ADDRESS.clone(),
+            &INTERFACE1_MAC_ADDRESS,
             INTERFACE1_NAME,
             /* wait_any_ip_address= */ false,
         )
@@ -1408,7 +1400,7 @@ async fn ping(
     assert_eq!(
         network_test_realm
             .ping(
-                &mut target_subnet.addr,
+                &target_subnet.addr,
                 payload_length,
                 interface_name.as_deref(),
                 timeout.into_nanos(),
@@ -1429,10 +1421,10 @@ async fn ping_with_no_hermetic_network_realm() {
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
-    let mut target_ip = DEFAULT_IPV4_TARGET_SUBNET.addr;
+    let target_ip = DEFAULT_IPV4_TARGET_SUBNET.addr;
     assert_eq!(
         network_test_realm
-            .ping(&mut target_ip, DEFAULT_PAYLOAD_LENGTH, None, NO_WAIT_TIMEOUT.into_nanos())
+            .ping(&target_ip, DEFAULT_PAYLOAD_LENGTH, None, NO_WAIT_TIMEOUT.into_nanos())
             .await
             .expect("ping failed"),
         Err(fntr::Error::HermeticNetworkRealmNotRunning),
@@ -1457,10 +1449,10 @@ async fn ping_with_no_added_interface(name: &str, sub_name: &str, netstack: fntr
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let mut target_ip = DEFAULT_IPV4_TARGET_SUBNET.addr;
+    let target_ip = DEFAULT_IPV4_TARGET_SUBNET.addr;
     assert_eq!(
         network_test_realm
-            .ping(&mut target_ip, DEFAULT_PAYLOAD_LENGTH, None, NO_WAIT_TIMEOUT.into_nanos())
+            .ping(&target_ip, DEFAULT_PAYLOAD_LENGTH, None, NO_WAIT_TIMEOUT.into_nanos())
             .await
             .expect("ping failed"),
         Err(fntr::Error::PingFailed),
@@ -1704,7 +1696,7 @@ async fn join_multicast_group(
 
     network_test_realm
         .join_multicast_group(
-            &mut multicast_address,
+            &multicast_address,
             expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await,
         )
         .await
@@ -1783,7 +1775,7 @@ async fn join_multicast_group_after_stop(
 
     network_test_realm
         .join_multicast_group(
-            &mut multicast_address,
+            &multicast_address,
             expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await,
         )
         .await
@@ -1815,7 +1807,7 @@ async fn join_multicast_group_after_stop(
 
     network_test_realm
         .join_multicast_group(
-            &mut second_multicast_address,
+            &second_multicast_address,
             expect_hermetic_interface_id(INTERFACE2_NAME, &realm).await,
         )
         .await
@@ -1888,13 +1880,13 @@ async fn leave_multicast_group(
     let id = expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await;
 
     network_test_realm
-        .join_multicast_group(&mut multicast_address, id)
+        .join_multicast_group(&multicast_address, id)
         .await
         .expect("join_multicast_group failed")
         .expect("join_multicast_group error");
 
     network_test_realm
-        .leave_multicast_group(&mut multicast_address, id)
+        .leave_multicast_group(&multicast_address, id)
         .await
         .expect("leave_multicast_group failed")
         .expect("leave_multicast_group error");
@@ -1916,7 +1908,7 @@ async fn join_multicast_group_with_no_hermetic_network_realm() {
     assert_eq!(
         network_test_realm
             .join_multicast_group(
-                &mut fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+                &fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
                 DEFAULT_INTERFACE_ID
             )
             .await
@@ -1956,7 +1948,7 @@ async fn join_multicast_group_with_non_existent_interface(
     assert_eq!(
         network_test_realm
             .join_multicast_group(
-                &mut fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+                &fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
                 // This interface id does not exist. As a result, an error
                 // should be returned.
                 DEFAULT_INTERFACE_ID
@@ -2022,11 +2014,11 @@ async fn join_multicast_group_with_non_multicast_address(
 
     // `address` is not within the multicast address range. Therefore, an error
     // should be returned.
-    let mut address = subnet.addr;
+    let address = subnet.addr;
     assert_eq!(
         network_test_realm
             .join_multicast_group(
-                &mut address,
+                &address,
                 expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await
             )
             .await
@@ -2096,7 +2088,7 @@ async fn join_same_multicast_group_multiple_times(
 
     let id = expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await;
     network_test_realm
-        .join_multicast_group(&mut multicast_address, id)
+        .join_multicast_group(&multicast_address, id)
         .await
         .expect("join_multicast_group failed")
         .expect("join_multicast_group error");
@@ -2105,7 +2097,7 @@ async fn join_same_multicast_group_multiple_times(
     // joined multiple times.
     assert_eq!(
         network_test_realm
-            .join_multicast_group(&mut multicast_address, id)
+            .join_multicast_group(&multicast_address, id)
             .await
             .expect("duplicate join_multicast_group failed"),
         Err(fntr::Error::AddressInUse)
@@ -2126,7 +2118,7 @@ async fn leave_multicast_group_with_no_hermetic_network_realm() {
     assert_eq!(
         network_test_realm
             .leave_multicast_group(
-                &mut fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+                &fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
                 DEFAULT_INTERFACE_ID
             )
             .await
@@ -2190,11 +2182,11 @@ async fn leave_multicast_group_with_non_multicast_address(
 
     // `address` is not within the multicast address range. Therefore, an error
     // should be returned.
-    let mut address = subnet.addr;
+    let address = subnet.addr;
     assert_eq!(
         network_test_realm
             .leave_multicast_group(
-                &mut address,
+                &address,
                 expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await
             )
             .await
@@ -2266,7 +2258,7 @@ async fn leave_unjoined_multicast_group(
     assert_eq!(
         network_test_realm
             .leave_multicast_group(
-                &mut multicast_address,
+                &multicast_address,
                 expect_hermetic_interface_id(INTERFACE1_NAME, &realm).await
             )
             .await

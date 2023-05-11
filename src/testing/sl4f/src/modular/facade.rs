@@ -86,7 +86,7 @@ impl ModularFacade {
         self.lifecycle_controller
             .destroy_instance(
                 SESSION_PARENT_MONIKER,
-                &mut fdecl::ChildRef {
+                &fdecl::ChildRef {
                     name: SESSION_CHILD_NAME.to_string(),
                     collection: Some(SESSION_COLLECTION_NAME.to_string()),
                 },

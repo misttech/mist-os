@@ -62,7 +62,7 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
     loop {
         let peers = svc.list_peers().await?;
         tracing::info!(node_id = overnet.node_id().0, "Got peers: {:?}", peers);
-        for mut peer in peers {
+        for peer in peers {
             if peer.description.services.is_none() {
                 continue;
             }
@@ -77,7 +77,7 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
                 continue;
             }
             let (s, p) = fidl::Channel::create();
-            svc.connect_to_service(&mut peer.id, echo::EchoMarker::PROTOCOL_NAME, s).unwrap();
+            svc.connect_to_service(&peer.id, echo::EchoMarker::PROTOCOL_NAME, s).unwrap();
             let proxy =
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
             let cli = echo::EchoProxy::new(proxy);

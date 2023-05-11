@@ -21,7 +21,7 @@ async fn test_get_font_family_info_basic(factory: &ProviderFactory) -> Result<()
     let font_provider = factory.get_provider(FONTS_SMALL_CM).await?;
 
     let font_family_info = font_provider
-        .get_font_family_info(&mut fonts::FamilyName { name: "materialicons".to_string() })
+        .get_font_family_info(&fonts::FamilyName { name: "materialicons".to_string() })
         .await?;
 
     assert!(font_family_info != fonts::FontFamilyInfo::default());
@@ -42,8 +42,7 @@ async fn test_get_font_family_info_aliases(factory: &ProviderFactory) -> Result<
         known_aliases
             .into_iter()
             .map(|alias| {
-                font_provider
-                    .get_font_family_info(&mut fonts::FamilyName { name: alias.to_string() })
+                font_provider.get_font_family_info(&fonts::FamilyName { name: alias.to_string() })
             })
             .collect_vec(),
     )

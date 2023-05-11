@@ -178,10 +178,10 @@ async fn realm_user(
     dynamic_offers: Vec<fdecl::Offer>,
 ) -> Result<(), Error> {
     let realm_proxy = handles.connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
-    let mut collection_ref = fdecl::CollectionRef { name: "dynamic_children".to_string() };
+    let collection_ref = fdecl::CollectionRef { name: "dynamic_children".to_string() };
     realm_proxy
         .create_child(
-            &mut collection_ref,
+            &collection_ref,
             &fdecl::Child {
                 name: Some("child_realm".to_string()),
                 url: Some(child_realm_url),
@@ -196,14 +196,14 @@ async fn realm_user(
         .await
         .expect("FIDL error for create child")
         .expect("component manager error for create child");
-    let mut child_ref = fdecl::ChildRef {
+    let child_ref = fdecl::ChildRef {
         name: "child_realm".to_string(),
         collection: Some("dynamic_children".to_string()),
     };
     let (exposed_proxy, exposed_server_end) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     realm_proxy
-        .open_exposed_dir(&mut child_ref, exposed_server_end)
+        .open_exposed_dir(&child_ref, exposed_server_end)
         .await
         .expect("FIDL error for open exposed directory")
         .expect("component manager error for open exposed directory");

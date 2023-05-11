@@ -148,7 +148,7 @@ async fn run_closed_target_server(
                     }
                 };
                 responder
-                    .send(&mut ClosedTargetTwoWayUnionPayloadResponse::V(v))
+                    .send(&ClosedTargetTwoWayUnionPayloadResponse::V(v))
                     .expect("failed to send two way payload response");
             }
             ClosedTargetRequest::TwoWayResult { payload, responder } => {
@@ -411,13 +411,13 @@ async fn run_large_message_target_server(
                 responder.send(&bytes).expect(EXPECT_REPLY_FAILED);
             }
             LargeMessageTargetRequest::EncodeSemiBoundedBelievedToBeSmall {
-                mut payload,
+                payload,
                 responder,
             } => {
-                responder.send(&mut payload).expect(EXPECT_REPLY_FAILED);
+                responder.send(&payload).expect(EXPECT_REPLY_FAILED);
             }
-            LargeMessageTargetRequest::EncodeSemiBoundedMaybeLarge { mut payload, responder } => {
-                responder.send(&mut payload).expect(EXPECT_REPLY_FAILED);
+            LargeMessageTargetRequest::EncodeSemiBoundedMaybeLarge { payload, responder } => {
+                responder.send(&payload).expect(EXPECT_REPLY_FAILED);
             }
             LargeMessageTargetRequest::EncodeUnboundedMaybeLargeValue { bytes, responder } => {
                 responder.send(&bytes).expect(EXPECT_REPLY_FAILED);

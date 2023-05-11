@@ -204,8 +204,8 @@ mod tests {
 
         // Issue a request to set the MAC address.
         let octets = [1, 2, 3, 4, 5, 6];
-        let mut mac = MacAddress { octets };
-        let mut suggest_fut = configurator_proxy.suggest_access_point_mac_address(&mut mac);
+        let mac = MacAddress { octets };
+        let mut suggest_fut = configurator_proxy.suggest_access_point_mac_address(&mac);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Verify that the MAC has been set on the PhyManager

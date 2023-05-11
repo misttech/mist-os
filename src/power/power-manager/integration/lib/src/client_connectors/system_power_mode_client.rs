@@ -53,7 +53,7 @@ impl SystemModeClient {
             .expect("Missing client configuration");
         config.default_level = level;
         self.configurator_proxy
-            .set(client_type, &mut config)
+            .set(client_type, &config)
             .await
             .expect("Failed to set client configuration");
     }

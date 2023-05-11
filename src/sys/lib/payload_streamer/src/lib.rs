@@ -97,7 +97,7 @@ impl ReaderPayloadStreamer {
             }
             PayloadStreamRequest::ReadData { responder } => {
                 if unwrapped.dest_buf.is_none() || unwrapped.dest_size == 0 {
-                    responder.send(&mut ReadResult::Err { 0: zx::sys::ZX_ERR_BAD_STATE })?;
+                    responder.send(&ReadResult::Err { 0: zx::sys::ZX_ERR_BAD_STATE })?;
                     return Ok(());
                 }
 
@@ -106,21 +106,21 @@ impl ReaderPayloadStreamer {
                 let mut buf: Vec<u8> = vec![0; data_to_read];
                 let read = unwrapped.src.read(&mut buf);
                 if let Err(e) = read {
-                    responder.send(&mut ReadResult::Err {
+                    responder.send(&ReadResult::Err {
                         0: e.raw_os_error().unwrap_or(zx::sys::ZX_ERR_INTERNAL),
                     })?;
                     return Ok(());
                 }
                 let read = read?;
                 if read == 0 {
-                    responder.send(&mut ReadResult::Eof { 0: true })?;
+                    responder.send(&ReadResult::Eof { 0: true })?;
                     return Ok(());
                 }
 
                 unwrapped.dest_buf.as_ref().unwrap().write(&buf);
 
                 unwrapped.src_read += read;
-                responder.send(&mut ReadResult::Info {
+                responder.send(&ReadResult::Info {
                     0: ReadInfo { offset: 0, size: data_to_read as u64 },
                 })?;
 
@@ -241,14 +241,14 @@ impl BlockDevicePayloadStreamer {
             }
             PayloadStreamRequest::ReadData { responder } => {
                 if unwrapped.dest_buf.is_none() || unwrapped.dest_size == 0 {
-                    responder.send(&mut ReadResult::Err { 0: zx::sys::ZX_ERR_BAD_STATE })?;
+                    responder.send(&ReadResult::Err { 0: zx::sys::ZX_ERR_BAD_STATE })?;
                     return Ok(());
                 }
 
                 let data_left = unwrapped.device_size - unwrapped.device_read;
 
                 if data_left == 0 {
-                    responder.send(&mut ReadResult::Eof { 0: true })?;
+                    responder.send(&ReadResult::Eof { 0: true })?;
                     return Ok(());
                 }
 
@@ -266,9 +266,8 @@ impl BlockDevicePayloadStreamer {
                     if let Err(e) =
                         unwrapped.device.read_at(buffer_slice, unwrapped.device_read as u64).await
                     {
-                        responder.send(&mut ReadResult::Err {
-                            0: e.downcast::<zx::Status>()?.into_raw(),
-                        })?;
+                        responder
+                            .send(&ReadResult::Err { 0: e.downcast::<zx::Status>()?.into_raw() })?;
                         return Ok(());
                     }
                     unwrapped.device_vmo_read = 0;
@@ -285,7 +284,7 @@ impl BlockDevicePayloadStreamer {
                 unwrapped.device_vmo_read += data_to_return;
                 unwrapped.device_read += data_to_return;
 
-                responder.send(&mut ReadResult::Info {
+                responder.send(&ReadResult::Info {
                     0: ReadInfo { offset: 0, size: data_to_return as u64 },
                 })?;
 

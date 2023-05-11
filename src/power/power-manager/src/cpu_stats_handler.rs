@@ -369,8 +369,8 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fstats::StatsRequest::GetCpuStats { responder }) => {
-                        let mut cpu_stats = idle_times_to_cpu_stats(&get_idle_times());
-                        let _ = responder.send(&mut cpu_stats);
+                        let cpu_stats = idle_times_to_cpu_stats(&get_idle_times());
+                        let _ = responder.send(&cpu_stats);
                     }
                     _ => assert!(false),
                 }

@@ -77,7 +77,7 @@ impl AvrcpFacade {
         };
         let (cont_client, cont_server) = create_endpoints::<ControllerMarker>();
         let _status = avrcp_service_proxy
-            .get_controller_for_target(&mut PeerId { value: id }, cont_server)
+            .get_controller_for_target(&PeerId { value: id }, cont_server)
             .await?;
         self.inner.write().controller_proxy =
             Some(cont_client.into_proxy().expect("Error obtaining controller client proxy"));

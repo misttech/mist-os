@@ -114,9 +114,9 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_expect_disconnect() {
         let (proxy, mut mock) = AccessMock::new(timeout_duration()).expect("failed to create mock");
-        let mut peer_id = PeerId { value: 1 };
+        let peer_id = PeerId { value: 1 };
 
-        let disconnect = proxy.disconnect(&mut peer_id);
+        let disconnect = proxy.disconnect(&peer_id);
         let expect = mock.expect_disconnect(peer_id, Ok(()));
 
         let (disconnect_result, expect_result) = join!(disconnect, expect);
@@ -127,9 +127,9 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_expect_forget() {
         let (proxy, mut mock) = AccessMock::new(timeout_duration()).expect("failed to create mock");
-        let mut peer_id = PeerId { value: 1 };
+        let peer_id = PeerId { value: 1 };
 
-        let forget = proxy.forget(&mut peer_id);
+        let forget = proxy.forget(&peer_id);
         let expect = mock.expect_forget(peer_id, Ok(()));
 
         let (forget_result, expect_result) = join!(forget, expect);

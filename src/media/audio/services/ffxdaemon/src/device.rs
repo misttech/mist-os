@@ -405,7 +405,7 @@ pub async fn get_entries(
             .map_err(|e| anyhow::anyhow!("Could not create fasync channel: {}", e))?,
     );
 
-    let (status, mut buf) = directory_proxy
+    let (status, buf) = directory_proxy
         .read_dirents(fio::MAX_BUF)
         .await
         .map_err(|e| anyhow::anyhow!("Failure calling read dirents: {}", e))?;
@@ -414,7 +414,7 @@ pub async fn get_entries(
         return Err(anyhow::anyhow!("Unable to call read dirents, status returned: {}", status));
     }
 
-    let entry_names = fuchsia_fs::directory::parse_dir_entries(&mut buf);
+    let entry_names = fuchsia_fs::directory::parse_dir_entries(&buf);
     let full_paths = entry_names.into_iter().filter_map(|s| match s {
         Ok(entry) => match entry.kind {
             fio::DirentType::Directory => {

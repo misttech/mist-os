@@ -22,7 +22,7 @@ async fn disable_updates_at(engine: EngineProxy) -> Result<(), Error> {
 
     engine.start_edit_transaction(server).context("starting edit transaction")?;
 
-    let mut rule = Rule::Literal(LiteralRule {
+    let rule = Rule::Literal(LiteralRule {
         host_match: "fuchsia.com".to_owned(),
         host_replacement: "url.invalid".to_owned(),
         path_prefix_match: "/update".to_owned(),
@@ -30,7 +30,7 @@ async fn disable_updates_at(engine: EngineProxy) -> Result<(), Error> {
     });
 
     edit_transaction
-        .add(&mut rule)
+        .add(&rule)
         .await
         .context("send adding rule to edit transaction")?
         .map_err(zx::Status::from_raw)

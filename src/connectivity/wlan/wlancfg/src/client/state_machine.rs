@@ -416,14 +416,14 @@ async fn connecting_state<'a>(
     // Send a connect request to the SME.
     let (connect_txn, remote) = create_proxy()
         .map_err(|e| ExitReason(Err(format_err!("Failed to create proxy: {:?}", e))))?;
-    let mut sme_connect_request = fidl_sme::ConnectRequest {
+    let sme_connect_request = fidl_sme::ConnectRequest {
         ssid: options.connect_selection.target.network.ssid.to_vec(),
         bss_description,
         multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
         authentication: options.connect_selection.target.authenticator.clone().into(),
         deprecated_scan_type: fidl_fuchsia_wlan_common::ScanType::Active,
     };
-    common_options.proxy.connect(&mut sme_connect_request, Some(remote)).map_err(|e| {
+    common_options.proxy.connect(&sme_connect_request, Some(remote)).map_err(|e| {
         ExitReason(Err(format_err!("Failed to send command to wlanstack: {:?}", e)))
     })?;
     let start_time = fasync::Time::now();
@@ -925,19 +925,19 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send some unexpected response
-        let mut ind = fidl_internal::SignalReportIndication { rssi_dbm: -20, snr_db: 25 };
-        request_handle.send_on_signal_report(&mut ind).unwrap();
+        let ind = fidl_internal::SignalReportIndication { rssi_dbm: -20, snr_db: 25 };
+        request_handle.send_on_signal_report(&ind).unwrap();
 
         // Future should still be waiting for OnConnectResult event
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send expected ConnectResult response
-        let mut sme_result = fidl_sme::ConnectResult {
+        let sme_result = fidl_sme::ConnectResult {
             code: fidl_ieee80211::StatusCode::Success,
             is_credential_rejected: false,
             is_reconnect: false,
         };
-        request_handle.send_on_connect_result(&mut sme_result).unwrap();
+        request_handle.send_on_connect_result(&sme_result).unwrap();
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
             assert_eq!(sme_result, response);
         });
@@ -1016,7 +1016,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Check for a connecting update
@@ -1137,7 +1137,7 @@ mod tests {
 
         // Respond with a SignalReport, which should not unblock connecting_state
         connect_txn_handle
-            .send_on_signal_report(&mut fidl_internal::SignalReportIndication {
+            .send_on_signal_report(&fidl_internal::SignalReportIndication {
                 rssi_dbm: -25,
                 snr_db: 30,
             })
@@ -1202,7 +1202,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Check for a connecting update
@@ -1272,9 +1272,9 @@ mod tests {
 
         // Send a disconnect and check that the connection data is correctly recorded
         let is_sme_reconnecting = false;
-        let mut fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
-            .send_on_disconnect(&mut fidl_disconnect_info)
+            .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -1334,12 +1334,12 @@ mod tests {
                 ctrl
             }
         );
-        let mut connect_result = fidl_sme::ConnectResult {
+        let connect_result = fidl_sme::ConnectResult {
             code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
             ..fake_successful_connect_result()
         };
         connect_txn_handle
-            .send_on_connect_result(&mut connect_result)
+            .send_on_connect_result(&connect_result)
             .expect("failed to send connection completion");
 
         // Check for a connecting update
@@ -1401,9 +1401,9 @@ mod tests {
                 ctrl
             }
         );
-        let mut connect_result = fake_successful_connect_result();
+        let connect_result = fake_successful_connect_result();
         connect_txn_handle
-            .send_on_connect_result(&mut connect_result)
+            .send_on_connect_result(&connect_result)
             .expect("failed to send connection completion");
 
         // Progress the state machine
@@ -1520,12 +1520,12 @@ mod tests {
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
-                let mut connect_result = fidl_sme::ConnectResult {
+                let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     ..fake_successful_connect_result()
                 };
                 ctrl
-                    .send_on_connect_result(&mut connect_result)
+                    .send_on_connect_result(&connect_result)
                     .expect("failed to send connection completion");
             }
         );
@@ -1634,13 +1634,13 @@ mod tests {
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
-                let mut connect_result = fidl_sme::ConnectResult {
+                let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     is_credential_rejected: true,
                     ..fake_successful_connect_result()
                 };
                 ctrl
-                    .send_on_connect_result(&mut connect_result)
+                    .send_on_connect_result(&connect_result)
                     .expect("failed to send connection completion");
             }
         );
@@ -1743,7 +1743,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Progress the state machine
@@ -1957,9 +1957,9 @@ mod tests {
 
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = false;
-        let mut fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
-            .send_on_disconnect(&mut fidl_disconnect_info)
+            .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2040,9 +2040,9 @@ mod tests {
 
         // SME notifies Policy of disconnection with SME-initiated reconnect
         let is_sme_reconnecting = true;
-        let mut fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
-            .send_on_disconnect(&mut fidl_disconnect_info)
+            .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2055,10 +2055,10 @@ mod tests {
 
         // SME notifies Policy of reconnection successful
         exec.set_fake_time(fasync::Time::after(1.second()));
-        let mut connect_result =
+        let connect_result =
             fidl_sme::ConnectResult { is_reconnect: true, ..fake_successful_connect_result() };
         connect_txn_handle
-            .send_on_connect_result(&mut connect_result)
+            .send_on_connect_result(&connect_result)
             .expect("failed to send connect result event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2070,9 +2070,9 @@ mod tests {
         // SME notifies Policy of another disconnection
         exec.set_fake_time(fasync::Time::after(2.hours()));
         let is_sme_reconnecting = false;
-        let mut fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
-            .send_on_disconnect(&mut fidl_disconnect_info)
+            .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2129,7 +2129,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
@@ -2138,7 +2138,7 @@ mod tests {
         exec.set_fake_time(disconnect_time);
         let is_sme_reconnecting = false;
         connect_txn_handle
-            .send_on_disconnect(&mut generate_disconnect_info(is_sme_reconnecting))
+            .send_on_disconnect(&generate_disconnect_info(is_sme_reconnecting))
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
@@ -2284,7 +2284,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
         // Progress the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2423,7 +2423,7 @@ mod tests {
         // SME notifies Policy of disconnection.
         let is_sme_reconnecting = false;
         connect_txn_handle
-            .send_on_disconnect(&mut generate_disconnect_info(is_sme_reconnecting))
+            .send_on_disconnect(&generate_disconnect_info(is_sme_reconnecting))
             .expect("failed to send disconnection event");
 
         // Run the state machine
@@ -2474,17 +2474,17 @@ mod tests {
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;
         connect_txn_handle
-            .send_on_disconnect(&mut generate_disconnect_info(is_sme_reconnecting))
+            .send_on_disconnect(&generate_disconnect_info(is_sme_reconnecting))
             .expect("failed to send disconnection event");
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy that reconnects succeeds
-        let mut connect_result =
+        let connect_result =
             fidl_sme::ConnectResult { is_reconnect: true, ..fake_successful_connect_result() };
         connect_txn_handle
-            .send_on_connect_result(&mut connect_result)
+            .send_on_connect_result(&connect_result)
             .expect("failed to send reconnection result");
 
         // Run the state machine
@@ -2535,20 +2535,20 @@ mod tests {
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;
         connect_txn_handle
-            .send_on_disconnect(&mut generate_disconnect_info(is_sme_reconnecting))
+            .send_on_disconnect(&generate_disconnect_info(is_sme_reconnecting))
             .expect("failed to send disconnection event");
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy that reconnects fails
-        let mut connect_result = fidl_sme::ConnectResult {
+        let connect_result = fidl_sme::ConnectResult {
             code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
             is_reconnect: true,
             ..fake_successful_connect_result()
         };
         connect_txn_handle
-            .send_on_connect_result(&mut connect_result)
+            .send_on_connect_result(&connect_result)
             .expect("failed to send reconnection result");
 
         // Run the state machine
@@ -2637,10 +2637,10 @@ mod tests {
         // Send the first signal report from SME
         let rssi_1 = -50;
         let snr_1 = 25;
-        let mut fidl_signal_report =
+        let fidl_signal_report =
             fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
         connect_txn_handle
-            .send_on_signal_report(&mut fidl_signal_report)
+            .send_on_signal_report(&fidl_signal_report)
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2684,10 +2684,10 @@ mod tests {
         // Send a second signal report with higher RSSI and SNR than the previous reports.
         let rssi_1 = -30;
         let snr_1 = 35;
-        let mut fidl_signal_report =
+        let fidl_signal_report =
             fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
         connect_txn_handle
-            .send_on_signal_report(&mut fidl_signal_report)
+            .send_on_signal_report(&fidl_signal_report)
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2768,10 +2768,10 @@ mod tests {
         // Send a signal report indicating the connection is weak.
         let rssi_1 = -90;
         let snr_1 = 25;
-        let mut fidl_signal_report =
+        let fidl_signal_report =
             fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
         connect_txn_handle
-            .send_on_signal_report(&mut fidl_signal_report)
+            .send_on_signal_report(&fidl_signal_report)
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2820,9 +2820,9 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        let mut channel_switch_info = fidl_internal::ChannelSwitchInfo { new_channel: 10 };
+        let channel_switch_info = fidl_internal::ChannelSwitchInfo { new_channel: 10 };
         connect_txn_handle
-            .send_on_channel_switched(&mut channel_switch_info)
+            .send_on_channel_switched(&channel_switch_info)
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2836,9 +2836,9 @@ mod tests {
         // Have SME notify Policy of disconnection so we can see whether the channel in the
         // BssDescription has changed.
         let is_sme_reconnecting = false;
-        let mut fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
-            .send_on_disconnect(&mut fidl_disconnect_info)
+            .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2969,7 +2969,7 @@ mod tests {
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
                 ctrl
-                    .send_on_connect_result(&mut fake_successful_connect_result())
+                    .send_on_connect_result(&fake_successful_connect_result())
                     .expect("failed to send connection completion");
             }
         );
@@ -3143,7 +3143,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 

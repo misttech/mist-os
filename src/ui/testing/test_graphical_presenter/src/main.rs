@@ -134,31 +134,31 @@ impl TestGraphicalPresenter {
                                 //   2) Since we'll present a configuration without a view, having
                                 //      a fixed background color will provide deterministic signal
                                 //      if any part of the view isn't covered by a client view.
-                                self.flatland.create_transform(&mut ROOT_TRANSFORM_ID.clone())
+                                self.flatland.create_transform(&ROOT_TRANSFORM_ID)
                                     .context("Failed to create root transform")?;
-                                self.flatland.create_filled_rect(&mut ROOT_CONTENT_ID.clone())
+                                self.flatland.create_filled_rect(&ROOT_CONTENT_ID)
                                     .context("Failed to create filled rect")?;
-                                self.flatland.set_solid_fill(&mut ROOT_CONTENT_ID.clone(),
-                                    &mut BACKGROUND_COLOR.clone(),
-                                    &mut self.root_layout_info.logical_size.unwrap().clone())
+                                self.flatland.set_solid_fill(&ROOT_CONTENT_ID,
+                                    &BACKGROUND_COLOR,
+                                    &self.root_layout_info.logical_size.unwrap())
                                     .context("Failed to set solid fill")?;
                                 self.flatland.set_content(
-                                    &mut ROOT_TRANSFORM_ID.clone(),
-                                    &mut ROOT_CONTENT_ID.clone())
+                                    &ROOT_TRANSFORM_ID,
+                                    &ROOT_CONTENT_ID)
                                     .context("Failed to set root content")?;
 
                                 // Add an empty child (for now) to hold the attached viewport.
                                 // We'll attach content to this child once we have a view to
                                 // attach.
-                                self.flatland.create_transform(&mut VIEWPORT_TRANSFORM_ID.clone())
+                                self.flatland.create_transform(&VIEWPORT_TRANSFORM_ID)
                                     .context("Failed to create viewport transform")?;
                                 self.flatland.add_child(
-                                    &mut ROOT_TRANSFORM_ID.clone(),
-                                    &mut VIEWPORT_TRANSFORM_ID.clone())
+                                    &ROOT_TRANSFORM_ID,
+                                    &VIEWPORT_TRANSFORM_ID)
                                     .context("Failed to add child transform")?;
 
                                 // Perform the initial present.
-                                self.flatland.set_root_transform(&mut ROOT_TRANSFORM_ID.clone())
+                                self.flatland.set_root_transform(&ROOT_TRANSFORM_ID)
                                     .context("Failed to set root transform")?;
                                 self.try_present()?;
 
@@ -254,16 +254,13 @@ impl TestGraphicalPresenter {
                 // If we have a view already, first detach and destroy the viewport.
                 if let Some(_) = self.child_view.take() {
                     self.flatland
-                        .set_content(
-                            &mut VIEWPORT_TRANSFORM_ID.clone(),
-                            &mut NULL_CONTENT_ID.clone(),
-                        )
+                        .set_content(&VIEWPORT_TRANSFORM_ID, &NULL_CONTENT_ID)
                         .context("Failed to remove root content")?;
                     // The returns the viewport creation token, but that response will not come
                     // until we present so we can't await here.
                     //
                     // Since we don't need the token we just ignore the future.
-                    let _ = self.flatland.release_viewport(&mut VIEWPORT_CONTENT_ID.clone());
+                    let _ = self.flatland.release_viewport(&VIEWPORT_CONTENT_ID);
                 }
 
                 // Attach the new view.

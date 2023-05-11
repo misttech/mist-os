@@ -100,7 +100,7 @@ impl FormCommand {
     }
 
     pub async fn exec(&self, context: &mut LowpanCtlContext) -> Result<(), Error> {
-        let mut provision_args = self.get_provisioning_params()?;
+        let provision_args = self.get_provisioning_params()?;
         let device_extra = context
             .get_default_experimental_device_extra()
             .await
@@ -108,7 +108,7 @@ impl FormCommand {
         let (client_end, server_end) = create_endpoints::<ProvisioningMonitorMarker>();
         let monitor = client_end.into_proxy()?;
         device_extra
-            .form_network(&mut provision_args, server_end)
+            .form_network(&provision_args, server_end)
             .context("Unable to send form command")?;
         loop {
             match monitor.watch_progress().await? {

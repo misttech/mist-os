@@ -1056,7 +1056,7 @@ mod tests {
         // Peer responds positively to successfully finish pairing.
         let _ = mock_pairing
             .downstream_delegate_client
-            .on_pairing_complete(&mut PEER_ID.into(), true)
+            .on_pairing_complete(&PEER_ID.into(), true)
             .expect("valid FIDL request");
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("main loop still active");
 

@@ -435,7 +435,7 @@ async fn open2_directory_unsupported() {
     dir_proxy
         .open2(
             ".",
-            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
+            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
             open2_server.into_channel(),
         )
         .unwrap();

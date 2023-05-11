@@ -116,8 +116,8 @@ mod tests {
         // Send a request using the wrong protocol to the server end.
         let _ = proxy
             .connect(
-                &mut fidl_fuchsia_bluetooth::PeerId { value: 1 },
-                &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
+                &fidl_fuchsia_bluetooth::PeerId { value: 1 },
+                &bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
             )
             .check()
             .expect("request to be sent");

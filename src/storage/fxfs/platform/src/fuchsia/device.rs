@@ -164,7 +164,7 @@ impl BlockServer {
     async fn handle_blockio_write(&self, request: &BlockFifoRequest) -> Result<(), Error> {
         let block_size = self.file.get_block_size();
 
-        let mut data = {
+        let data = {
             let vmos = self.vmos.lock().unwrap();
             let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
             let mut buffer = vec![0u8; (request.length as u64 * block_size) as usize];
@@ -172,7 +172,7 @@ impl BlockServer {
             buffer
         };
 
-        self.file.write_at_uncached(request.dev_offset * block_size as u64, &mut data[..]).await?;
+        self.file.write_at_uncached(request.dev_offset * block_size as u64, &data[..]).await?;
 
         Ok(())
     }
@@ -407,22 +407,18 @@ impl BlockServer {
                             round_up(allocated_bytes, DEVICE_VOLUME_SLICE_SIZE).unwrap();
                         let unallocated_bytes =
                             round_down(unallocated_bytes, DEVICE_VOLUME_SLICE_SIZE);
-                        let mut manager = volume::VolumeManagerInfo {
+                        let manager = volume::VolumeManagerInfo {
                             slice_size: DEVICE_VOLUME_SLICE_SIZE,
                             slice_count: allocated_slices + unallocated_bytes,
                             assigned_slice_count: allocated_slices,
                             maximum_slice_count: allocated_slices + unallocated_bytes,
                             max_virtual_slice: allocated_slices + unallocated_bytes,
                         };
-                        let mut volume_info = volume::VolumeInfo {
+                        let volume_info = volume::VolumeInfo {
                             partition_slice_count: allocated_slices,
                             slice_limit: 0,
                         };
-                        responder.send(
-                            zx::sys::ZX_OK,
-                            Some(&mut manager),
-                            Some(&mut volume_info),
-                        )?;
+                        responder.send(zx::sys::ZX_OK, Some(&manager), Some(&volume_info))?;
                     }
                     Err(e) => {
                         responder.send(e.into_raw(), None, None)?;
@@ -481,10 +477,10 @@ impl BlockServer {
                 match self.file.get_attrs().await {
                     Ok(mut attrs) => {
                         attrs.mode = fio::MODE_TYPE_BLOCK_DEVICE;
-                        responder.send(zx::sys::ZX_OK, &mut attrs)?;
+                        responder.send(zx::sys::ZX_OK, &attrs)?;
                     }
                     Err(e) => {
-                        let mut attrs = fio::NodeAttributes {
+                        let attrs = fio::NodeAttributes {
                             mode: 0,
                             id: fio::INO_UNKNOWN,
                             content_size: 0,
@@ -493,7 +489,7 @@ impl BlockServer {
                             creation_time: 0,
                             modification_time: 0,
                         };
-                        responder.send(e.into_raw(), &mut attrs)?;
+                        responder.send(e.into_raw(), &attrs)?;
                     }
                 };
             }
@@ -535,7 +531,7 @@ impl BlockServer {
             }
             VolumeAndNodeRequest::QueryFilesystem { responder } => {
                 match self.file.query_filesystem() {
-                    Ok(mut info) => responder.send(zx::sys::ZX_OK, Some(&mut info))?,
+                    Ok(info) => responder.send(zx::sys::ZX_OK, Some(&info))?,
                     Err(e) => responder.send(e.into_raw(), None)?,
                 }
             }

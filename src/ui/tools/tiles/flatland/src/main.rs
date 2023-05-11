@@ -181,24 +181,20 @@ impl Service {
         })
         .detach();
 
-        session.create_transform(&mut ROOT_TRANSFORM_ID.clone()).expect("fidl error");
-        session.set_root_transform(&mut ROOT_TRANSFORM_ID.clone()).expect("fidl error");
+        session.create_transform(&ROOT_TRANSFORM_ID).expect("fidl error");
+        session.set_root_transform(&ROOT_TRANSFORM_ID).expect("fidl error");
 
-        session.create_transform(&mut BG_TRANSFORM_ID.clone()).expect("fidl error");
-        session.create_filled_rect(&mut BG_CONTENT_ID.clone()).expect("fidl_error");
+        session.create_transform(&BG_TRANSFORM_ID).expect("fidl error");
+        session.create_filled_rect(&BG_CONTENT_ID).expect("fidl_error");
         session
             .set_solid_fill(
-                &mut BG_CONTENT_ID.clone(),
-                &mut ui_comp::ColorRgba { alpha: 1.0, red: 1.0, blue: 0.882, green: 0.894 },
-                &mut fmath::SizeU { width: 5000, height: 5000 },
+                &BG_CONTENT_ID,
+                &ui_comp::ColorRgba { alpha: 1.0, red: 1.0, blue: 0.882, green: 0.894 },
+                &fmath::SizeU { width: 5000, height: 5000 },
             )
             .expect("fidl_error");
-        session
-            .set_content(&mut BG_TRANSFORM_ID.clone(), &mut BG_CONTENT_ID.clone())
-            .expect("fidl_error");
-        session
-            .add_child(&mut ROOT_TRANSFORM_ID.clone(), &mut BG_TRANSFORM_ID.clone())
-            .expect("fidl_error");
+        session.set_content(&BG_TRANSFORM_ID, &BG_CONTENT_ID).expect("fidl_error");
+        session.add_child(&ROOT_TRANSFORM_ID, &BG_TRANSFORM_ID).expect("fidl_error");
 
         Service {
             next_id: 1,

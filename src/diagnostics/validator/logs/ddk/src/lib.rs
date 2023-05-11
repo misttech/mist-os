@@ -65,8 +65,8 @@ impl Puppet {
             severity: Severity::Error,
             timestamp: 0,
         };
-        let mut spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
-        self.proxy.emit_log(&mut spec).await?;
+        let spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
+        self.proxy.emit_log(&spec).await?;
         info!("Sent message");
         loop {
             let log_entry = self.logs.next().await.unwrap();
@@ -99,8 +99,8 @@ impl Puppet {
             severity: Severity::Info,
             timestamp: 0,
         };
-        let mut spec = RecordSpec { file: test_file, line: test_line_32, record };
-        self.proxy.emit_log(&mut spec).await?;
+        let spec = RecordSpec { file: test_file, line: test_line_32, record };
+        self.proxy.emit_log(&spec).await?;
         info!("Sent message");
         loop {
             let log_entry = self.logs.next().await.unwrap();
@@ -126,8 +126,8 @@ impl Puppet {
             severity: Severity::Trace,
             timestamp: 0,
         };
-        let mut spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
-        self.proxy.emit_log(&mut spec).await?;
+        let spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
+        self.proxy.emit_log(&spec).await?;
 
         let _ = self
             .device_proxy
@@ -143,8 +143,8 @@ impl Puppet {
             severity: Severity::Trace,
             timestamp: 0,
         };
-        let mut spec = RecordSpec { file: test_file, line: test_line_32, record };
-        self.proxy.emit_log(&mut spec).await?;
+        let spec = RecordSpec { file: test_file, line: test_line_32, record };
+        self.proxy.emit_log(&spec).await?;
         info!("Sent message");
         loop {
             let log_entry = self.logs.next().await.unwrap();

@@ -174,8 +174,8 @@ impl KeyEventSender {
         let task = fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 let KeyWatcherRequest::Next { responder } = req;
-                let mut event = receiver.next().await.unwrap();
-                responder.send(&mut event)?;
+                let event = receiver.next().await.unwrap();
+                responder.send(&event)?;
             }
             *clone.lock().await = true;
             Ok(receiver)
@@ -491,7 +491,7 @@ mod tests {
 
         async fn add_key(&mut self, key: &str) -> Result<(), zx::Status> {
             self.manager_proxy
-                .add_key(&mut SshAuthorizedKeyEntry { key: key.to_owned() })
+                .add_key(&SshAuthorizedKeyEntry { key: key.to_owned() })
                 .await
                 .unwrap()
                 .map_err(zx::Status::from_raw)?;

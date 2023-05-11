@@ -1312,7 +1312,7 @@ mod tests {
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
         crate::device::add_ip_addr_subnet(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             AddrSubnet::new(MY_ADDR.get(), 24).unwrap(),

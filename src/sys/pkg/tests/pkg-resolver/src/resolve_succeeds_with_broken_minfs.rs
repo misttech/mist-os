@@ -321,8 +321,8 @@ impl FailingWriteFileStreamHandler {
                         self.handle_write(data, responder).await
                     }
                     fio::FileRequest::GetAttr { responder } => {
-                        let (status, mut attrs) = self.backing_file.get_attr().await.unwrap();
-                        responder.send(status, &mut attrs).unwrap();
+                        let (status, attrs) = self.backing_file.get_attr().await.unwrap();
+                        responder.send(status, &attrs).unwrap();
                     }
                     fio::FileRequest::Read { count, responder } => {
                         let mut result = self.backing_file.read(count).await.unwrap();
@@ -413,8 +413,8 @@ impl OpenRequestHandler for RenameFailOrTempFs {
             while let Some(req) = stream.next().await {
                 match req.unwrap() {
                     fio::DirectoryRequest::GetAttr { responder } => {
-                        let (status, mut attrs) = tempdir_proxy.get_attr().await.unwrap();
-                        responder.send(status, &mut attrs).unwrap();
+                        let (status, attrs) = tempdir_proxy.get_attr().await.unwrap();
+                        responder.send(status, &attrs).unwrap();
                     }
                     fio::DirectoryRequest::Close { responder } => {
                         let mut result = tempdir_proxy.close().await.unwrap();
@@ -556,7 +556,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
     let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = Rule::new("should-be-rewritten", "example.com", "/", "/").unwrap();
-    let () = edit_transaction.add(&mut rule.clone().into()).await.unwrap().unwrap();
+    let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
     let () = edit_transaction.commit().await.unwrap().unwrap();
 
     // Verify we can resolve the package with a broken MinFs, and that rewrite rules do not
@@ -576,7 +576,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
     let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
     let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
-    let () = edit_transaction.add(&mut rule.clone().into()).await.unwrap().unwrap();
+    let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
     let () = edit_transaction.commit().await.unwrap().unwrap();
     let (package_dir, _resolved_context) =
         env.resolve_package("fuchsia-pkg://should-be-rewritten/just_meta_far").await.unwrap();

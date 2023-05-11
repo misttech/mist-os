@@ -48,11 +48,11 @@ async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> 
                 // "administrative chanel" that would allow calling "shutdown" on a mount.
                 let scope = ExecutionScope::new();
 
-                let mut res = serve_vmo(scope, source, flags, root);
+                let res = serve_vmo(scope, source, flags, root);
 
                 // If the connection was already closed when we tried to send the result, there is
                 // nothing we can do.
-                let _ = responder.send(&mut res);
+                let _ = responder.send(&res);
             }
         }
     }

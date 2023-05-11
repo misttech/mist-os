@@ -133,12 +133,12 @@ impl<'a> Guest<'a> {
             .expect("failed to create endpoint on host realm connected to guest");
         let () = ep.set_link_up(true).await.expect("failed to enable endpoint");
 
-        let (device, mut port_id) = ep.get_netdevice().await.expect("failed to get netdevice");
+        let (device, port_id) = ep.get_netdevice().await.expect("failed to get netdevice");
         let device =
             device.into_proxy().expect("fuchsia.hardware.network/Device into_proxy failed");
         let (port, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
-        let () = device.get_port(&mut port_id, server_end).expect("get_port");
+        let () = device.get_port(&port_id, server_end).expect("get_port");
 
         let (interface_proxy, server_end) =
             fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>()
@@ -176,7 +176,7 @@ fn create_bridged_network(
             .expect("failed to create fuchsia.net.virtualization/Network proxy");
     virtualization_control
         .create_network(
-            &mut fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged::default()),
+            &fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged::default()),
             server_end,
         )
         .expect("create network");

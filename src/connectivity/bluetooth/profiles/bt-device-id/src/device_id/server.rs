@@ -145,7 +145,7 @@ impl DeviceIdServer {
             Ok(defs) => defs,
         };
 
-        match self.validate_service(&mut service) {
+        match self.validate_service(&service) {
             Ok(true) => {
                 let _ = service.maybe_update_primary();
             }

@@ -372,15 +372,15 @@ mod test {
         extend_sample_set(&mut samples, 49, 1.hour() + 1.second(), 0.998);
 
         let config = make_test_config();
-        let mut estimator = FrequencyEstimator::new(&mut samples.remove(0), config);
+        let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
 
         // We should receive a frequency of exactly 0.099 after each of the first two days.
         // In the second two days the frequency should converge towards the updated value.
         for (day, expected_freq) in vec![(1, 0.999), (2, 0.999), (3, 0.99875), (4, 0.9985625)] {
             for _ in 0..23 {
-                assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+                assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
             }
-            assert_estimator_update(&mut estimator, &mut samples.remove(0), expected_freq, day);
+            assert_estimator_update(&mut estimator, &samples.remove(0), expected_freq, day);
         }
 
         assert_eq!(estimator.window_count(), 4);
@@ -394,18 +394,18 @@ mod test {
         extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
 
         let config = make_test_config();
-        let mut estimator = FrequencyEstimator::new(&mut samples.remove(0), config);
+        let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
 
         // Feed the first 12 samples then mark the 13th as disjoint, causing the first samples to
         // be ignored.
         for _ in 0..11 {
-            assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+            assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
         }
-        estimator.update_disjoint(&mut samples.remove(0));
+        estimator.update_disjoint(&samples.remove(0));
         for _ in 0..23 {
-            assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+            assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
         }
-        assert_estimator_update(&mut estimator, &mut samples.remove(0), 0.999, 1);
+        assert_estimator_update(&mut estimator, &samples.remove(0), 0.999, 1);
     }
 
     #[fuchsia::test]
@@ -416,19 +416,19 @@ mod test {
         extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
 
         let config = make_test_config();
-        let mut estimator = FrequencyEstimator::new(&mut samples.remove(0), config);
+        let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
 
         for _ in 0..5 {
-            assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+            assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
         }
         assert_eq!(
-            estimator.update(&mut samples.remove(0)),
+            estimator.update(&samples.remove(0)),
             Err(FrequencyDiscardReason::InsufficientSamples)
         );
         for _ in 0..23 {
-            assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+            assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
         }
-        assert_estimator_update(&mut estimator, &mut samples.remove(0), 0.999, 1);
+        assert_estimator_update(&mut estimator, &samples.remove(0), 0.999, 1);
     }
 
     #[fuchsia::test]
@@ -437,12 +437,12 @@ mod test {
         extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
 
         let config = make_test_config();
-        let mut estimator = FrequencyEstimator::new(&mut samples.remove(0), config);
+        let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
         for _ in 0..23 {
-            assert_eq!(estimator.update(&mut samples.remove(0)), Ok(None));
+            assert_eq!(estimator.update(&samples.remove(0)), Ok(None));
         }
         assert_eq!(
-            estimator.update(&mut samples.remove(0)),
+            estimator.update(&samples.remove(0)),
             Err(FrequencyDiscardReason::PotentialLeapSecond)
         );
     }

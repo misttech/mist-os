@@ -181,7 +181,7 @@ pub async fn handle_connect(
     security_type: Option<wlan_policy::SecurityType>,
 ) -> Result<(), Error> {
     // Use the exact security type if provided, or try to find the intended NetworkIdentifier
-    let mut network_id = if let Some(type_) = security_type {
+    let network_id = if let Some(type_) = security_type {
         wlan_policy::NetworkIdentifier { ssid: ssid.into_bytes(), type_ }
     } else {
         let mut saved_networks = handle_get_saved_networks(&client_controller)
@@ -200,7 +200,7 @@ pub async fn handle_connect(
         }
     };
 
-    let result = run_proxy_command(Box::pin(client_controller.connect(&mut network_id))).await?;
+    let result = run_proxy_command(Box::pin(client_controller.connect(&network_id))).await?;
     handle_request_status(result)?;
 
     while let Some(update_request) = server_stream.try_next().await? {
@@ -689,8 +689,8 @@ pub async fn handle_suggest_ap_mac(
     configurator: wlan_deprecated::DeprecatedConfiguratorProxy,
     mac: MacAddress,
 ) -> Result<(), Error> {
-    let mut mac = fidl_fuchsia_net::MacAddress { octets: mac.to_array() };
-    let result = configurator.suggest_access_point_mac_address(&mut mac).await?;
+    let mac = fidl_fuchsia_net::MacAddress { octets: mac.to_array() };
+    let result = configurator.suggest_access_point_mac_address(&mac).await?;
     result.map_err(|e| format_err!("suggesting MAC failed: {:?}", e))
 }
 

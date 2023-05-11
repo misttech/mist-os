@@ -177,7 +177,7 @@ pub async fn connect(
         bss: BssDescription::try_from(target_bss_desc.clone())?,
         unparsed_credential_bytes: target_pwd,
     })?;
-    let mut req = fidl_sme::ConnectRequest {
+    let req = fidl_sme::ConnectRequest {
         ssid: target_ssid.clone().into(),
         bss_description: target_bss_desc,
         authentication,
@@ -185,7 +185,7 @@ pub async fn connect(
         multiple_bss_candidates: false, // only used for metrics, select an arbitrary value
     };
 
-    let _result = iface_sme_proxy.connect(&mut req, Some(connection_remote))?;
+    let _result = iface_sme_proxy.connect(&req, Some(connection_remote))?;
 
     let connection_result_code = handle_connect_transaction(connection_proxy).await?;
 
@@ -311,7 +311,7 @@ pub async fn passive_scan(
     iface_sme_proxy: &fidl_sme::ClientSmeProxy,
 ) -> Result<Vec<fidl_sme::ScanResult>, Error> {
     iface_sme_proxy
-        .scan(&mut fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
+        .scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
         .await
         .context("error sending scan request")?
         .map_err(|scan_error_code| format_err!("Scan error: {:?}", scan_error_code))
@@ -439,18 +439,18 @@ mod tests {
         // Send appropriate status response
         match status {
             StatusResponse::Idle => {
-                let mut response = fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty {});
-                responder.send(&mut response).expect("Failed to send StatusResponse.");
+                let response = fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty {});
+                responder.send(&response).expect("Failed to send StatusResponse.");
             }
             StatusResponse::Connected => {
                 let serving_ap_info =
                     create_serving_ap_info_using_ssid(Ssid::try_from([1, 2, 3, 4]).unwrap());
-                let mut response = fidl_sme::ClientStatusResponse::Connected(serving_ap_info);
-                responder.send(&mut response).expect("Failed to send StatusResponse.");
+                let response = fidl_sme::ClientStatusResponse::Connected(serving_ap_info);
+                responder.send(&response).expect("Failed to send StatusResponse.");
             }
             StatusResponse::Connecting => {
-                let mut response = fidl_sme::ClientStatusResponse::Connecting(vec![1, 2, 3, 4]);
-                responder.send(&mut response).expect("Failed to send StatusResponse.");
+                let response = fidl_sme::ClientStatusResponse::Connecting(vec![1, 2, 3, 4]);
+                responder.send(&response).expect("Failed to send StatusResponse.");
             }
         }
     }
@@ -741,7 +741,7 @@ mod tests {
     fn send_iface_list_response(
         exec: &mut TestExecutor,
         server: &mut StreamFuture<wlan_service::DeviceMonitorRequestStream>,
-        mut ifaces: Vec<u16>,
+        ifaces: Vec<u16>,
     ) {
         let responder = match poll_device_monitor_req(exec, server) {
             Poll::Ready(DeviceMonitorRequest::ListIfaces { responder }) => responder,
@@ -750,7 +750,7 @@ mod tests {
         };
 
         // now send the response back
-        let _result = responder.send(&mut ifaces[..]);
+        let _result = responder.send(&ifaces[..]);
     }
 
     fn send_phy_list_response(
@@ -1024,7 +1024,7 @@ mod tests {
             .expect("failed to create a connect transaction stream")
             .control_handle();
         connect_transaction
-            .send_on_connect_result(&mut fidl_sme::ConnectResult {
+            .send_on_connect_result(&fidl_sme::ConnectResult {
                 code: connect_result,
                 is_credential_rejected: false,
                 is_reconnect: false,
@@ -1160,7 +1160,7 @@ mod tests {
             _ => panic!("Expected a StatusRequest"),
         };
 
-        let mut response = match (connected_to_ssid, connecting_to_ssid) {
+        let response = match (connected_to_ssid, connecting_to_ssid) {
             (Some(_), Some(_)) => panic!("SME cannot simultaneously be Connected and Connecting."),
             (Some(ssid), None) => {
                 let serving_ap_info = create_serving_ap_info_using_ssid(ssid);
@@ -1170,7 +1170,7 @@ mod tests {
             (None, None) => fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty {}),
         };
 
-        rsp.send(&mut response).expect("Failed to send StatusResponse.");
+        rsp.send(&response).expect("Failed to send StatusResponse.");
     }
 
     #[test]

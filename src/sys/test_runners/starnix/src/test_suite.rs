@@ -127,7 +127,7 @@ pub async fn handle_suite_requests(
     }
 
     realm
-        .destroy_child(&mut fdecl::ChildRef {
+        .destroy_child(&fdecl::ChildRef {
             name: kernel_name,
             collection: Some(RUNNERS_COLLECTION.into()),
         })

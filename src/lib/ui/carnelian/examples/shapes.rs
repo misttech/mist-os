@@ -301,7 +301,7 @@ impl ViewAssistant for ShapeDropViewAssistant {
         match &pointer_event.phase {
             input::pointer::Phase::Down(touch_location) => {
                 let scene_details = self.scene_details.as_mut().expect("scene_details");
-                let mut t = TouchHandler::new(&mut self.shapes, &mut scene_details.scene);
+                let mut t = TouchHandler::new(&self.shapes, &mut scene_details.scene);
                 t.update(context, &touch_location, &mut scene_details.scene);
                 self.touch_handlers.insert(pointer_event.pointer_id.clone(), t);
                 context.request_render();

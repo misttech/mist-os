@@ -190,10 +190,9 @@ fn send_handle_sync_helper<'a>(
         });
     });
 
-    let mut proxy =
-        SendHandleProtocolSynchronousProxy::new(transformable_channel.take_client_end());
+    let proxy = SendHandleProtocolSynchronousProxy::new(transformable_channel.take_client_end());
     let ev = Event::create();
-    send_fn(&mut proxy, ev).unwrap();
+    send_fn(&proxy, ev).unwrap();
     transformable_channel.transform();
     receiver_fifo.recv().unwrap();
 }
@@ -351,14 +350,13 @@ fn echo_handle_sync_helper<'a>(
         });
     });
 
-    let mut proxy =
-        EchoHandleProtocolSynchronousProxy::new(transformable_channel.take_client_end());
+    let proxy = EchoHandleProtocolSynchronousProxy::new(transformable_channel.take_client_end());
     let th = std::thread::spawn(move || {
         transformable_channel.transform();
         transformable_channel.reversed_transform();
     });
     let ev = Event::create();
-    let h_response = send_fn(&mut proxy, ev, Time::INFINITE).unwrap();
+    let h_response = send_fn(&proxy, ev, Time::INFINITE).unwrap();
 
     let info = h_response.as_handle_ref().basic_info().unwrap();
     assert_eq!(ObjectType::EVENT, info.object_type);

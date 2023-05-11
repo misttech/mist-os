@@ -29,7 +29,7 @@ async fn main() {
             create_proxy().expect("failed to create proxy");
         realm
             .open_exposed_dir(
-                &mut ChildRef { name: "base-subpackaged-component".into(), collection: None },
+                &ChildRef { name: "base-subpackaged-component".into(), collection: None },
                 server_end,
             )
             .await

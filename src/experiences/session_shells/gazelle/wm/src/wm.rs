@@ -146,10 +146,10 @@ impl WindowManager {
         window.create_view()?;
 
         let flatland = window.get_flatland();
-        let mut background = window.next_content_id();
-        flatland.create_filled_rect(&mut background)?;
+        let background = window.next_content_id();
+        flatland.create_filled_rect(&background)?;
         let mut root_transform_id = window.get_root_transform_id();
-        flatland.set_content(&mut root_transform_id, &mut background)?;
+        flatland.set_content(&root_transform_id, &background)?;
 
         let shortcuts_image_transform = window.create_transform(Some(&mut root_transform_id))?;
         let child_views_layer = window.create_transform(Some(&mut root_transform_id))?;
@@ -377,7 +377,7 @@ impl WindowManager {
 
         let flatland = self.window.get_flatland();
         flatland.set_image_blending_function(
-            &mut shortcuts_image.get_content_id(),
+            &shortcuts_image.get_content_id(),
             ui_comp::BlendMode::SrcOver,
         )?;
 
@@ -394,13 +394,13 @@ impl WindowManager {
         // Resize the background.
         let flatland = self.window.get_flatland();
         flatland.set_solid_fill(
-            &mut self.background_content,
-            &mut BACKGROUND_COLOR.clone(),
+            &self.background_content,
+            &BACKGROUND_COLOR,
             // TODO(fxbug.dev/110653): Mysteriously, Scenic blows up when
             // you make a rectangle the size of the viewport, under very
             // specific circumstances. When that bug is fixed, change this
             // to just width and height.
-            &mut fmath::SizeU {
+            &fmath::SizeU {
                 width: width.saturating_sub(1).clamp(1, u32::MAX),
                 height: height.saturating_sub(1).clamp(1, u32::MAX),
             },
@@ -408,8 +408,8 @@ impl WindowManager {
 
         // Position shortcuts image to bottom-right of the screen, above app launcher.
         flatland.set_translation(
-            &mut self.shortcuts_image_transform,
-            &mut fmath::Vec_ {
+            &self.shortcuts_image_transform,
+            &fmath::Vec_ {
                 x: (width - SHORTCUTS_IMAGE_WIDTH) as i32,
                 y: (height - SHORTCUTS_IMAGE_HEIGHT) as i32,
             },
@@ -435,9 +435,9 @@ impl WindowManager {
     fn layout(&mut self) -> Result<(), Error> {
         let flatland = self.window.get_flatland();
         for child_view_frame in self.layout.iter() {
-            let mut child_view_transform = child_view_frame.get_frame_transform();
-            flatland.remove_child(&mut self.child_views_layer, &mut child_view_transform)?;
-            flatland.add_child(&mut self.child_views_layer, &mut child_view_transform)?;
+            let child_view_transform = child_view_frame.get_frame_transform();
+            flatland.remove_child(&self.child_views_layer, &child_view_transform)?;
+            flatland.add_child(&self.child_views_layer, &child_view_transform)?;
         }
         self.refocus()?;
 
@@ -472,19 +472,19 @@ impl WindowManager {
         )?;
 
         let shell_view_id = shell_view.id();
-        let mut shell_view_content_id = shell_view.get_content_id();
+        let shell_view_content_id = shell_view.get_content_id();
 
         let flatland = self.window.get_flatland();
-        let mut shell_view_transform = self.window.next_transform_id();
+        let shell_view_transform = self.window.next_transform_id();
 
-        flatland.create_transform(&mut shell_view_transform)?;
+        flatland.create_transform(&shell_view_transform)?;
         flatland.set_translation(
-            &mut shell_view_transform,
-            &mut fmath::Vec_ { x: 16, y: self.height as i32 - APP_LAUNCHER_HEIGHT as i32 - 16 },
+            &shell_view_transform,
+            &fmath::Vec_ { x: 16, y: self.height as i32 - APP_LAUNCHER_HEIGHT as i32 - 16 },
         )?;
 
-        flatland.add_child(&mut self.shell_views_layer, &mut shell_view_transform)?;
-        flatland.set_content(&mut shell_view_transform, &mut shell_view_content_id)?;
+        flatland.add_child(&self.shell_views_layer, &shell_view_transform)?;
+        flatland.set_content(&shell_view_transform, &shell_view_content_id)?;
 
         self.shell_views.insert(shell_view_id, (shell_view, kind));
 
@@ -519,8 +519,8 @@ impl WindowManager {
 
             // Add the frame's transform to the window manager's `child_views_layer`.
             let flatland = self.window.get_flatland();
-            let mut child_view_transform = child_view_frame.get_frame_transform();
-            flatland.add_child(&mut self.child_views_layer, &mut child_view_transform)?;
+            let child_view_transform = child_view_frame.get_frame_transform();
+            flatland.add_child(&self.child_views_layer, &child_view_transform)?;
 
             self.notify(Notification::AddedChildView { id: child_view_id })?;
         }
@@ -533,10 +533,10 @@ impl WindowManager {
         if let Some(child_view_frame) = self.layout.get_frame(child_view_id) {
             // Remove the frame's transform from the window manager's `child_views_layer`.
             let flatland = self.window.get_flatland();
-            let mut child_view_transform = child_view_frame.get_frame_transform();
+            let child_view_transform = child_view_frame.get_frame_transform();
 
-            flatland.remove_child(&mut self.child_views_layer, &mut child_view_transform)?;
-            flatland.release_transform(&mut child_view_transform)?;
+            flatland.remove_child(&self.child_views_layer, &child_view_transform)?;
+            flatland.release_transform(&child_view_transform)?;
 
             // Remove the child view, by it's id from the layout and update the wm's layout.
             self.layout.remove(child_view_id)?;

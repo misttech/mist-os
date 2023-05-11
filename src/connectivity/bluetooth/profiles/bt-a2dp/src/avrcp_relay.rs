@@ -431,8 +431,8 @@ async fn connect_avrcp(
     let (controller, server) = endpoints::create_proxy()?;
     let (browse_controller, browse_server) = endpoints::create_proxy()?;
 
-    let _ = avrcp.get_controller_for_target(&mut peer_id.into(), server).await?;
-    let _ = avrcp.get_browse_controller_for_target(&mut peer_id.into(), browse_server).await?;
+    let _ = avrcp.get_controller_for_target(&peer_id.into(), server).await?;
+    let _ = avrcp.get_browse_controller_for_target(&peer_id.into(), browse_server).await?;
 
     controller.set_notification_filter(
         avrcp::Notifications::PLAYBACK_STATUS

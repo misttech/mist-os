@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn write_ie_body_too_long() {
         let mut buf = vec![];
-        let mut f = || write_ie!(&mut buf, Id::SSID, &[0u8; 256][..]);
+        let mut f = || write_ie!(buf, Id::SSID, &[0u8; 256][..]);
         assert_eq!(
             Err(FrameWriteError::new_invalid_data(
                 "Element body length 256 exceeds max of 255".to_string()
@@ -362,7 +362,7 @@ mod tests {
     fn write_ie_buffer_too_small() {
         let mut buf = [7u8; 5];
         let mut writer = BufferWriter::new(&mut buf[..]);
-        let mut f = || write_ie!(&mut writer, Id::SSID, &[1u8, 2, 3, 4][..]);
+        let mut f = || write_ie!(writer, Id::SSID, &[1u8, 2, 3, 4][..]);
         assert_eq!(Err(FrameWriteError::BufferTooSmall), f());
         // Expect the buffer to be left untouched
         assert_eq!(&[7, 7, 7, 7, 7], &buf[..]);
@@ -372,7 +372,7 @@ mod tests {
     fn write_ie_buffer_exactly_long_enough() {
         let mut buf = [0u8; 5];
         let mut writer = BufferWriter::new(&mut buf[..]);
-        let mut f = || write_ie!(&mut writer, Id::SSID, &[1u8, 2, 3][..]);
+        let mut f = || write_ie!(writer, Id::SSID, &[1u8, 2, 3][..]);
         assert_eq!(Ok(()), f());
         assert_eq!(&[0, 3, 1, 2, 3], &buf[..]);
     }

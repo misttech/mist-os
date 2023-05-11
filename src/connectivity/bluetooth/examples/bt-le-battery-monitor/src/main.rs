@@ -116,20 +116,20 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     // Read the GATT services offered by the peer.
     let uuids = &[BATTERY_SERVICE_UUID.into()];
     let (added, _) = gatt_client.watch_services(uuids).await?;
-    let mut service_handle = read_services(added)?;
+    let service_handle = read_services(added)?;
     let (remote_client, remote_server) =
         fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>()?;
-    gatt_client.connect_to_service(&mut service_handle, remote_server)?;
+    gatt_client.connect_to_service(&service_handle, remote_server)?;
 
     // Discover the characteristics provided by the service.
     let characteristics = remote_client.discover_characteristics().await?;
-    let (mut battery_level_handle, notifications) = read_characteristics(characteristics)?;
+    let (battery_level_handle, notifications) = read_characteristics(characteristics)?;
 
     // Read the current battery level and listen for updates if notifications are supported.
     let read_response = remote_client
         .read_characteristic(
-            &mut battery_level_handle,
-            &mut gatt::ReadOptions::ShortRead(gatt::ShortReadOptions),
+            &battery_level_handle,
+            &gatt::ReadOptions::ShortRead(gatt::ShortReadOptions),
         )
         .await?
         .map_err(|e| format_err!("{e:?}"))?;
@@ -142,7 +142,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
         let (notification_client, notification_server) =
             fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>()?;
         remote_client
-            .register_characteristic_notifier(&mut battery_level_handle, notification_client)
+            .register_characteristic_notifier(&battery_level_handle, notification_client)
             .await?
             .map_err(|e| format_err! {"{e:?}"})?;
         Some(fasync::Task::local(watch_battery_level(id, notification_server)))

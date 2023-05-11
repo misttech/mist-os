@@ -197,7 +197,7 @@ mod tests {
                 params: vec![DataElement::Uint8(1)],
             },
         ];
-        connect_proxy.connected(&mut id.into(), local.try_into().unwrap(), protocol).unwrap();
+        connect_proxy.connected(&id.into(), local.try_into().unwrap(), protocol).unwrap();
 
         // Expect the MessageStream to produce the connected event.
         let connected_id = message_stream.select_next_some().await;

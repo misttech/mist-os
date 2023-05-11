@@ -115,16 +115,10 @@ async fn multiple_clients_ap() {
                 .on_debug_name("ap")
                 .on_tx(|tx_args: &wlantap::TxArgs| {
                     client1_proxy
-                        .rx(
-                            &tx_args.packet.data,
-                            &mut create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0),
-                        )
+                        .rx(&tx_args.packet.data, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
                         .expect("client 1 rx failed");
                     client2_proxy
-                        .rx(
-                            &tx_args.packet.data,
-                            &mut create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0),
-                        )
+                        .rx(&tx_args.packet.data, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
                         .expect("client 2 rx failed");
                 })
                 .build(),
@@ -175,10 +169,7 @@ async fn multiple_clients_ap() {
                 ))
                 .on_tx(|tx_args: &wlantap::TxArgs| {
                     ap_proxy
-                        .rx(
-                            &tx_args.packet.data,
-                            &mut create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0),
-                        )
+                        .rx(&tx_args.packet.data, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
                         .expect("ap rx failed")
                 })
                 .build(),
@@ -229,10 +220,7 @@ async fn multiple_clients_ap() {
                 ))
                 .on_tx(|tx_args: &wlantap::TxArgs| {
                     ap_proxy
-                        .rx(
-                            &tx_args.packet.data,
-                            &mut create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0),
-                        )
+                        .rx(&tx_args.packet.data, &create_rx_info(&WLANCFG_DEFAULT_AP_CHANNEL, 0))
                         .expect("ap rx failed")
                 })
                 .build(),

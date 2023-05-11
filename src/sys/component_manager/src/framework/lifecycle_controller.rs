@@ -524,7 +524,7 @@ mod tests {
             lifecycle_proxy
                 .create_instance(
                     "./",
-                    &mut CollectionRef { name: "coll".to_string() },
+                    &CollectionRef { name: "coll".to_string() },
                     &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
@@ -546,10 +546,7 @@ mod tests {
             lifecycle_proxy
                 .destroy_instance(
                     "./",
-                    &mut ChildRef {
-                        name: "child".to_string(),
-                        collection: Some("coll".to_string()),
-                    }
+                    &ChildRef { name: "child".to_string(), collection: Some("coll".to_string()) }
                 )
                 .await
                 .unwrap(),
@@ -596,7 +593,7 @@ mod tests {
             lifecycle_proxy
                 .create_instance(
                     "&#^$%",
-                    &mut CollectionRef { name: "coll".to_string() },
+                    &CollectionRef { name: "coll".to_string() },
                     &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
@@ -616,7 +613,7 @@ mod tests {
             lifecycle_proxy
                 .create_instance(
                     "./does_not_exist",
-                    &mut CollectionRef { name: "coll".to_string() },
+                    &CollectionRef { name: "coll".to_string() },
                     &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
@@ -636,7 +633,7 @@ mod tests {
             lifecycle_proxy
                 .create_instance(
                     "./",
-                    &mut CollectionRef { name: "not_coll".to_string() },
+                    &CollectionRef { name: "not_coll".to_string() },
                     &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
@@ -656,7 +653,7 @@ mod tests {
             lifecycle_proxy
                 .create_instance(
                     "./",
-                    &mut CollectionRef { name: "coll".to_string() },
+                    &CollectionRef { name: "coll".to_string() },
                     &fdecl::Child {
                         name: Some("&*^%&@#$".to_string()),
                         url: Some("test:///child".to_string()),

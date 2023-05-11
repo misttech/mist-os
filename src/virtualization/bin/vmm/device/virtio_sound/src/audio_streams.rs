@@ -261,7 +261,7 @@ struct AudioOutputBgJob {
 
 #[async_trait(?Send)]
 impl<'a> AudioStream<'a> for AudioOutput<'a> {
-    async fn connect(&self, mut params: AudioStreamParams) -> Result<(), Error> {
+    async fn connect(&self, params: AudioStreamParams) -> Result<(), Error> {
         // Allocate a payload buffer.
         let (payload_buffer, payload_vmo) =
             PayloadBuffer::new(params.buffer_bytes, params.period_bytes, "AudioRendererBuffer")
@@ -273,7 +273,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         self.audio.create_audio_renderer(server_end)?;
         let fidl_proxy = client_end.into_proxy()?;
         fidl_proxy.set_usage(fidl_fuchsia_media::AudioRenderUsage::Media)?;
-        fidl_proxy.set_pcm_stream_type(&mut params.stream_type)?;
+        fidl_proxy.set_pcm_stream_type(&params.stream_type)?;
         fidl_proxy.enable_min_lead_time_events(true)?;
         fidl_proxy.add_payload_buffer(0, payload_vmo)?;
 
@@ -495,7 +495,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         );
 
         // Send this packet.
-        let resp_fut = conn.fidl_proxy.send_packet(&mut fidl_fuchsia_media::StreamPacket {
+        let resp_fut = conn.fidl_proxy.send_packet(&fidl_fuchsia_media::StreamPacket {
             pts: fidl_fuchsia_media::NO_TIMESTAMP,
             payload_buffer_id: 0,
             payload_offset: packet_range.start as u64,
@@ -620,7 +620,7 @@ struct AudioInputInner {
 
 #[async_trait(?Send)]
 impl<'a> AudioStream<'a> for AudioInput<'a> {
-    async fn connect(&self, mut params: AudioStreamParams) -> Result<(), Error> {
+    async fn connect(&self, params: AudioStreamParams) -> Result<(), Error> {
         // Allocate a payload buffer.
         let (payload_buffer, payload_vmo) =
             PayloadBuffer::new(params.buffer_bytes, params.period_bytes, "AudioCapturerBuffer")
@@ -633,7 +633,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
         self.audio.create_audio_capturer(server_end, false /* not loopback */)?;
         let fidl_proxy = client_end.into_proxy()?;
         fidl_proxy.set_usage(fidl_fuchsia_media::AudioCaptureUsage::Foreground)?;
-        fidl_proxy.set_pcm_stream_type(&mut params.stream_type)?;
+        fidl_proxy.set_pcm_stream_type(&params.stream_type)?;
         fidl_proxy.add_payload_buffer(0, payload_vmo)?;
 
         let (lead_time_send, lead_time_recv) =

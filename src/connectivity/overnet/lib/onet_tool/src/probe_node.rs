@@ -11,10 +11,10 @@ use {
 
 pub use fidl_fuchsia_overnet_protocol::ProbeSelector as Selector;
 
-pub async fn probe_node(mut node_id: NodeId, probe_bits: Selector) -> Result<ProbeResult, Error> {
+pub async fn probe_node(node_id: NodeId, probe_bits: Selector) -> Result<ProbeResult, Error> {
     let (s, p) = fidl::Channel::create();
     hoist().connect_as_service_consumer()?.connect_to_service(
-        &mut node_id,
+        &node_id,
         DiagnosticMarker::PROTOCOL_NAME,
         s,
     )?;

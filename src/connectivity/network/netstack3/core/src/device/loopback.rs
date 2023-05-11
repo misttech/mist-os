@@ -636,12 +636,11 @@ mod tests {
     #[test]
     fn loopback_mtu() {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
-        let device =
-            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-                .expect("error adding loopback device")
-                .into();
-        crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
+        let sync_ctx = &sync_ctx;
+        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+            .expect("error adding loopback device")
+            .into();
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
 
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
@@ -660,12 +659,11 @@ mod tests {
             IpDeviceStateContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
-        let device =
-            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-                .expect("error adding loopback device")
-                .into();
-        crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
+        let sync_ctx = &sync_ctx;
+        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+            .expect("error adding loopback device")
+            .into();
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
 
         let get_addrs = || {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_ip_device_addresses(
@@ -706,12 +704,11 @@ mod tests {
     #[ip_test]
     fn loopback_sends_ethernet<I: Ip + TestIpExt>() {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
-        let device =
-            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-                .expect("error adding loopback device");
+        let sync_ctx = &sync_ctx;
+        let device = crate::device::add_loopback_device(&sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+            .expect("error adding loopback device");
         crate::device::testutil::enable_device(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device.clone().into(),
         );

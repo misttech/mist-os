@@ -62,10 +62,10 @@ async fn build_test_realm(vmm_url: &'static str) -> Result<RealmInstance, Error>
 
 async fn list_realm_children(test_realm: &RealmInstance) -> Result<Vec<cdecl::ChildRef>, Error> {
     let realm = test_realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>()?;
-    let mut collection_ref = cdecl::CollectionRef { name: "virtual_machine_managers".to_string() };
+    let collection_ref = cdecl::CollectionRef { name: "virtual_machine_managers".to_string() };
     let (child_iterator, child_iterator_server_end) =
         fidl::endpoints::create_proxy::<ChildIteratorMarker>().unwrap();
-    realm.list_children(&mut collection_ref, child_iterator_server_end).await.unwrap().unwrap();
+    realm.list_children(&collection_ref, child_iterator_server_end).await.unwrap().unwrap();
 
     let mut result: Vec<cdecl::ChildRef> = Vec::new();
     while let Ok(mut children) = child_iterator.next().await {

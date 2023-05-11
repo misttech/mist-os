@@ -64,8 +64,8 @@ mod tests {
         let uuid = Uuid::new16(0x180d);
         let result: RemoteServiceReadByTypeResult = Ok(vec![]);
 
-        let mut fidl_uuid: FidlUuid = uuid.clone().into();
-        let read_by_type = proxy.read_by_type(&mut fidl_uuid);
+        let fidl_uuid: FidlUuid = uuid.clone().into();
+        let read_by_type = proxy.read_by_type(&fidl_uuid);
         let expect = mock.expect_read_by_type(uuid, result);
 
         let (read_by_type_result, expect_result) = join!(read_by_type, expect);

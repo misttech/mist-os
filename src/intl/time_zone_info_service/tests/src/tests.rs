@@ -85,9 +85,9 @@ mod tests {
         let (realm, svc) = connect_to_service().await?;
 
         let absolute_time = 1629073062 * NANOS_PER_SECOND + 123_456_789;
-        let mut tz_id = TimeZoneId { id: TZ_NYC.to_string() };
+        let tz_id = TimeZoneId { id: TZ_NYC.to_string() };
 
-        let actual = svc.absolute_to_civil_time(&mut tz_id, absolute_time).await?;
+        let actual = svc.absolute_to_civil_time(&tz_id, absolute_time).await?;
         realm.destroy().await?;
 
         let expected = Ok(fable! {
@@ -115,9 +115,9 @@ mod tests {
         let (realm, svc) = connect_to_service().await?;
 
         let absolute_time = 1629073062 * NANOS_PER_SECOND + 123_456_789;
-        let mut tz_id = TimeZoneId { id: TZ_NYC.to_string() };
+        let tz_id = TimeZoneId { id: TZ_NYC.to_string() };
 
-        let actual = svc.get_time_zone_info(&mut tz_id, absolute_time).await?;
+        let actual = svc.get_time_zone_info(&tz_id, absolute_time).await?;
         realm.destroy().await?;
 
         let expected = Ok(fable! {

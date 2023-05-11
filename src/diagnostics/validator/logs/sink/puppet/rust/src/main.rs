@@ -72,12 +72,12 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
                 responder.send().unwrap();
             }
             LogSinkPuppetRequest::GetInfo { responder } => {
-                let mut info = PuppetInfo {
+                let info = PuppetInfo {
                     tag: None,
                     pid: rt::process_self().get_koid().unwrap().raw_koid(),
                     tid: rt::thread_self().get_koid().unwrap().raw_koid(),
                 };
-                responder.send(&mut info).unwrap();
+                responder.send(&info).unwrap();
             }
             LogSinkPuppetRequest::EmitLog {
                 responder,

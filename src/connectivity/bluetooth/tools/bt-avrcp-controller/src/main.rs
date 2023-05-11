@@ -77,7 +77,7 @@ async fn get_folder_items_with_attrs<'a>(
 
     let start_index = args[0].to_string().parse::<u32>()?;
     let end_index = args[1].to_string().parse::<u32>()?;
-    let mut attr_request = if args.len() == 3 {
+    let attr_request = if args.len() == 3 {
         let arg = args[2].to_string();
         match arg.as_str() {
             "All" => AttributeRequestOption::GetAll(true),
@@ -102,19 +102,13 @@ async fn get_folder_items_with_attrs<'a>(
 
     match cmd {
         Cmd::GetVirtualFileSystem => {
-            match controller
-                .get_file_system_items(start_index, end_index, &mut attr_request)
-                .await?
-            {
+            match controller.get_file_system_items(start_index, end_index, &attr_request).await? {
                 Ok(items) => Ok(format!("File system: {:#?}", items)),
                 Err(e) => Err(format_err!("Error fetching file system: {:?}", e)),
             }
         }
         Cmd::GetNowPlaying => {
-            match controller
-                .get_now_playing_items(start_index, end_index, &mut attr_request)
-                .await?
-            {
+            match controller.get_now_playing_items(start_index, end_index, &attr_request).await? {
                 Ok(items) => Ok(format!("Now playing: {:#?}", items)),
                 Err(e) => Err(format_err!("Error fetching now playing: {:?}", e)),
             }
@@ -317,14 +311,14 @@ async fn change_path<'a>(
     if args.len() < 1 {
         return Ok(format!("usage: {}", Cmd::ChangePath.cmd_help()));
     }
-    let mut path = match args[0] {
+    let path = match args[0] {
         ".." | "up" => fidl_avrcp::Path::Parent(fidl_avrcp::Parent {}),
         uid => {
             let folder_uid = uid.to_string().parse::<u64>()?;
             fidl_avrcp::Path::ChildFolderUid(folder_uid)
         }
     };
-    match controller.change_path(&mut path).await? {
+    match controller.change_path(&path).await? {
         Ok(num_of_items) => {
             Ok(format!("Changed path successfully. Current directory has {:?} items", num_of_items))
         }
@@ -574,7 +568,7 @@ async fn main() -> Result<(), Error> {
     // Create a channel for our Request<TestController> to live
     let (t_client, t_server) = create_endpoints::<ControllerExtMarker>();
 
-    let _status = test_avrcp_svc.get_controller_for_target(&mut device_id.into(), t_server).await?;
+    let _status = test_avrcp_svc.get_controller_for_target(&device_id.into(), t_server).await?;
     eprintln!(
         "Test controller obtained to device \"{device}\" AVRCP remote target service",
         device = &device_id,
@@ -584,7 +578,7 @@ async fn main() -> Result<(), Error> {
     let (tb_client, tb_server) = create_endpoints::<BrowseControllerExtMarker>();
 
     let _status =
-        test_avrcp_svc.get_browse_controller_for_target(&mut device_id.into(), tb_server).await?;
+        test_avrcp_svc.get_browse_controller_for_target(&device_id.into(), tb_server).await?;
     eprintln!(
         "Test browse controller obtained to device \"{device}\" AVRCP remote target service",
         device = &device_id,
@@ -598,7 +592,7 @@ async fn main() -> Result<(), Error> {
     // Create a channel for our Request<Controller> to live
     let (c_client, c_server) = create_endpoints::<ControllerMarker>();
 
-    let _status = avrcp_svc.get_controller_for_target(&mut device_id.into(), c_server).await?;
+    let _status = avrcp_svc.get_controller_for_target(&device_id.into(), c_server).await?;
     eprintln!(
         "Controller obtained to device \"{device}\" AVRCP remote target service",
         device = &device_id,
@@ -607,8 +601,7 @@ async fn main() -> Result<(), Error> {
     // Create a channel for our Request<Controller> to live
     let (bc_client, bc_server) = create_endpoints::<BrowseControllerMarker>();
 
-    let _status =
-        avrcp_svc.get_browse_controller_for_target(&mut device_id.into(), bc_server).await?;
+    let _status = avrcp_svc.get_browse_controller_for_target(&device_id.into(), bc_server).await?;
     eprintln!(
         "Browse controller obtained to device \"{device}\" AVRCP remote target service",
         device = &device_id,

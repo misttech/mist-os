@@ -226,7 +226,7 @@ async fn test_eager_resolve_package_while_updating() {
     let cup_proxy = env.proxies.cup.clone();
     let cup_write_task = fasync::Task::spawn(async move {
         cup_proxy
-            .write(&mut fpkg::PackageUrl { url: new_pkg_url.to_string() }, &new_cup_data.into())
+            .write(&fpkg::PackageUrl { url: new_pkg_url.to_string() }, &new_cup_data.into())
             .await
             .unwrap()
             .unwrap()

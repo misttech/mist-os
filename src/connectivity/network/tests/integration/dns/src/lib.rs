@@ -244,7 +244,7 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
     .await;
 
     let () = dhcp_server
-        .set_option(&mut net_dhcp::Option_::DomainNameServer(vec![DHCP_DNS_SERVER]))
+        .set_option(&net_dhcp::Option_::DomainNameServer(vec![DHCP_DNS_SERVER]))
         .await
         .expect("Failed to set DNS option")
         .map_err(zx::Status::from_raw)
@@ -679,7 +679,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
         .take_until(lookup_fut)
         .for_each(|()| async {
             let () = fake_clock
-                .advance(&mut ftesting::Increment::Determined(
+                .advance(&ftesting::Increment::Determined(
                     // Advance the fake clock by a larger amount than the real time we are waiting
                     // in order to speed up the test run-time.
                     zx::Duration::from_seconds(1).into_nanos(),
@@ -1168,7 +1168,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         // Advance the clock in order to trigger the timeout on the first batch of
         // queries.
         fake_clock
-            .advance(&mut ftesting::Increment::Determined(QUERY_TIMEOUT.into_nanos()))
+            .advance(&ftesting::Increment::Determined(QUERY_TIMEOUT.into_nanos()))
             .await
             .expect("call advance")
             .expect("advance fake clock");

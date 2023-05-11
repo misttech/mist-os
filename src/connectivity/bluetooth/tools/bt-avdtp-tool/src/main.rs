@@ -30,7 +30,7 @@ async fn peer_manager_listener(
     while let Some(evt) = stream.try_next().await? {
         print!("{}", CLEAR_LINE);
         match evt {
-            PeerManagerEvent::OnPeerConnected { mut peer_id } => {
+            PeerManagerEvent::OnPeerConnected { peer_id } => {
                 let (client, server) = create_endpoints::<PeerControllerMarker>();
                 let peer = client.into_proxy().expect("Error: Couldn't obtain peer client proxy");
 
@@ -48,7 +48,7 @@ async fn peer_manager_listener(
                     }
                 };
                 // Establish channel with the given peer_id and server endpoint.
-                let _ = avdtp_svc.get_peer(&mut peer_id, server);
+                let _ = avdtp_svc.get_peer(&peer_id, server);
                 info!("Getting peer with peer_id: {}", peer_id.value.to_string());
             }
         }

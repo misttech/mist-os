@@ -531,10 +531,9 @@ pub(crate) mod tests {
             exec.run_singlethreaded(setup_gatt_service());
 
         // Simulate a peer's read request for the Model ID.
-        let mut handle = MODEL_ID_CHARACTERISTIC_HANDLE.clone();
         let read_request_fut = upstream_service_client.read_value(
-            &mut PeerId(123).into(),
-            &mut handle,
+            &PeerId(123).into(),
+            &MODEL_ID_CHARACTERISTIC_HANDLE,
             /* offset */ 0,
         );
         pin_mut!(read_request_fut);
@@ -564,10 +563,9 @@ pub(crate) mod tests {
             exec.run_singlethreaded(setup_gatt_service());
 
         // Simulate a peer's read request for the Model ID.
-        let mut handle = FIRMWARE_REVISION_CHARACTERISTIC_HANDLE.clone();
         let read_request_fut = upstream_service_client.read_value(
-            &mut PeerId(123).into(),
-            &mut handle,
+            &PeerId(123).into(),
+            &FIRMWARE_REVISION_CHARACTERISTIC_HANDLE,
             /* offset */ 0,
         );
         pin_mut!(read_request_fut);
@@ -598,8 +596,8 @@ pub(crate) mod tests {
 
         // Simulate a peer's read request for a random, unsupported, characteristic.
         let read_request_fut = upstream_service_client.read_value(
-            &mut PeerId(123).into(),
-            &mut Handle { value: 999 },
+            &PeerId(123).into(),
+            &Handle { value: 999 },
             /* offset */ 0,
         );
         pin_mut!(read_request_fut);

@@ -31,8 +31,8 @@ async fn handle_request(
     match req {
         deprecated::DeprecatedClientRequest::Status { responder } => {
             debug!("Deprecated WLAN client API used for status request");
-            let mut r = status(&iface).await;
-            responder.send(&mut r)
+            let r = status(&iface).await;
+            responder.send(&r)
         }
     }
 }
@@ -166,7 +166,7 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut test_values.sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
-                responder.send(&mut fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty{})).expect("could not send sme response")
+                responder.send(&fidl_sme::ClientStatusResponse::Idle(fidl_sme::Empty{})).expect("could not send sme response")
             }
         );
 
@@ -193,7 +193,7 @@ mod tests {
         assert_variant!(
                     exec.run_until_stalled(&mut test_values.sme_stream.next()),
                     Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
-                        responder.send(&mut fidl_sme::ClientStatusResponse::Connecting("test_ssid".as_bytes().to_vec()))
+                        responder.send(&fidl_sme::ClientStatusResponse::Connecting("test_ssid".as_bytes().to_vec()))
         .expect("could not send sme response")
                     }
                 );
@@ -223,7 +223,7 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut test_values.sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { responder }))) => {
-                responder.send(&mut fidl_sme::ClientStatusResponse::Connected(
+                responder.send(&fidl_sme::ClientStatusResponse::Connected(
                     fidl_sme::ServingApInfo{
                         bssid: [0, 0, 0, 0, 0, 0],
                         ssid: ssid.as_bytes().to_vec(),

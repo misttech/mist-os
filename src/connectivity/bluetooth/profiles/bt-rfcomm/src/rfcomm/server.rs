@@ -114,7 +114,7 @@ impl Clients {
         }
         client
             .connection_receiver
-            .connected(&mut peer_id.into(), bredr::Channel::try_from(channel).unwrap(), &protocol)
+            .connected(&peer_id.into(), bredr::Channel::try_from(channel).unwrap(), &protocol)
             .map_err(|e| format_err!("{e:?}"))
     }
 }
@@ -503,8 +503,8 @@ mod tests {
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let mut profile_stream = Box::pin(profile_server.next());
         let connect_request = profile.connect(
-            &mut id.into(),
-            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
+            &id.into(),
+            &bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
         );
         let responder = match exec.run_until_stalled(&mut profile_stream) {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Connect { responder, .. }))) => responder,

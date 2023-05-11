@@ -75,9 +75,9 @@ impl MockCoordinator {
     /// Sends a single OnVsync event to the client. The vsync event will appear to be sent from the
     /// given `display_id` even if a corresponding fake display has not been assigned by a call to
     /// `assign_displays`.
-    pub fn emit_vsync_event(&self, display_id: u64, mut stamp: display::ConfigStamp) -> Result<()> {
+    pub fn emit_vsync_event(&self, display_id: u64, stamp: display::ConfigStamp) -> Result<()> {
         self.control_handle
-            .send_on_vsync(display_id, zx::Time::get_monotonic().into_nanos() as u64, &mut stamp, 0)
+            .send_on_vsync(display_id, zx::Time::get_monotonic().into_nanos() as u64, &stamp, 0)
             .map_err(MockCoordinatorError::from)
     }
 }

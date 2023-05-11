@@ -344,10 +344,7 @@ async fn open_exposed_directory(
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     realm
         .open_exposed_dir(
-            &mut fdecl::ChildRef {
-                name: child_name.into(),
-                collection: Some(collection_name.into()),
-            },
+            &fdecl::ChildRef { name: child_name.into(), collection: Some(collection_name.into()) },
             server_end,
         )
         .await?

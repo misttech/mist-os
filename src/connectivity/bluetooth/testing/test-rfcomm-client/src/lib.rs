@@ -303,7 +303,7 @@ impl RfcommManager {
         // Send the disconnect request via the `RfcommTest` API and clean up local state.
         let _ = self
             .get_rfcomm_test_proxy()?
-            .disconnect(&mut id.into())
+            .disconnect(&id.into())
             .map_err::<fidl::Error, _>(Into::into)?;
 
         let mut inner = self.inner.lock();
@@ -337,8 +337,8 @@ impl RfcommManager {
         let channel = self
             .get_profile_proxy()?
             .connect(
-                &mut id.into(),
-                &mut bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
+                &id.into(),
+                &bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
                     channel: Some(server_channel.into()),
                     ..Default::default()
                 }),
@@ -360,7 +360,7 @@ impl RfcommManager {
             // Send a fixed Framing error status.
             let status = rfcomm::Status::FramingError;
             let _ = rfcomm_test_proxy
-                .remote_line_status(&mut id.into(), server_channel.into(), status)
+                .remote_line_status(&id.into(), server_channel.into(), status)
                 .map_err::<fidl::Error, _>(Into::into)?;
             Ok(())
         } else {
@@ -528,7 +528,7 @@ mod tests {
             build_rfcomm_protocol(random_channel_number).iter().map(Into::into).collect();
         assert_matches!(
             connect_proxy.connected(
-                &mut remote_id.into(),
+                &remote_id.into(),
                 local_channel.try_into().unwrap(),
                 &protocol,
             ),

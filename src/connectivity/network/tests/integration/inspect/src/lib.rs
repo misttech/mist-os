@@ -189,7 +189,7 @@ async fn inspect_nic<N: Netstack>(name: &str) {
     let () = realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller")
-        .add_entry(netdev.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+        .add_entry(netdev.id(), &BOB_IP, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(zx::Status::from_raw)

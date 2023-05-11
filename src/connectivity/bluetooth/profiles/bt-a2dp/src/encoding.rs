@@ -250,7 +250,7 @@ mod tests {
             let len = (locked.ready_bytes / std::mem::size_of::<u16>()) as u16;
             let mut vec = Vec::with_capacity(locked.ready_bytes);
             for i in 0..len {
-                vec.extend_from_slice(&mut locked.next.wrapping_add(i).to_be_bytes());
+                vec.extend_from_slice(&locked.next.wrapping_add(i).to_be_bytes());
             }
             locked.next = locked.next.wrapping_add(len);
             locked.ready_bytes = 0;

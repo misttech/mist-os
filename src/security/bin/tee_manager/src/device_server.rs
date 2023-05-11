@@ -15,7 +15,7 @@ const STORAGE_DIR: &str = "/data";
 /// Serves a `fuchsia.tee.Application` protocol request by passing it through the
 /// `TeeDeviceConnection` and specifying the application UUID.
 pub async fn serve_application_passthrough(
-    mut uuid: fuchsia_tee::Uuid,
+    uuid: fuchsia_tee::Uuid,
     device_connector: DeviceConnectorProxy,
     server: ServerEnd<fuchsia_tee::ApplicationMarker>,
 ) -> Result<(), Error> {
@@ -24,7 +24,7 @@ pub async fn serve_application_passthrough(
     let (client, stream) = fidl::endpoints::create_request_stream()?;
 
     let () = device_connector
-        .connect_to_application(&mut uuid, Some(client), server)
+        .connect_to_application(&uuid, Some(client), server)
         .context("Could not connect to fuchsia.tee.Application over DeviceConnectorProxy")?;
 
     provider.serve(stream).await

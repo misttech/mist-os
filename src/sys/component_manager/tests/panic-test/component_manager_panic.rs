@@ -13,7 +13,7 @@ async fn test() {
     // Start the component manager component.
     let realm_svc = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("Could not connect to Realm service");
-    let mut child = fdecl::ChildRef { name: "component_manager".to_string(), collection: None };
+    let child = fdecl::ChildRef { name: "component_manager".to_string(), collection: None };
 
     // Create endpoints for the fuchsia.io.Directory protocol.
     // Component manager will connect us to the exposed directory of the component we bound to.
@@ -21,7 +21,7 @@ async fn test() {
     let (exposed_dir, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     realm_svc
-        .open_exposed_dir(&mut child, exposed_dir_server)
+        .open_exposed_dir(&child, exposed_dir_server)
         .await
         .expect("Could not send open_exposed_dir command")
         .expect("open_exposed_dir command did not succeed");

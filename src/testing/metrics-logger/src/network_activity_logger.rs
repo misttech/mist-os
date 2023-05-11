@@ -65,11 +65,10 @@ async fn watch_and_update_ports(
             }
         }
         // When watcher was created, ports might already exist.
-        fhwnet::DevicePortEvent::Added(mut port_id)
-        | fhwnet::DevicePortEvent::Existing(mut port_id) => {
+        fhwnet::DevicePortEvent::Added(port_id) | fhwnet::DevicePortEvent::Existing(port_id) => {
             let (port, port_server_end) =
                 fidl::endpoints::create_proxy::<fhwnet::PortMarker>().unwrap();
-            device.get_port(&mut port_id, port_server_end).unwrap();
+            device.get_port(&port_id, port_server_end).unwrap();
 
             match port.get_info().await {
                 Ok(fhwnet::PortInfo { id: _, base_info, .. }) => {

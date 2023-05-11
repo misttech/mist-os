@@ -412,10 +412,8 @@ impl PairingManager {
 
     /// Notifies the upstream `sys.Pairing` client of Fast Pair completion.
     pub fn notify_pairing_complete(&self, id: PeerId) {
-        if let Err(e) = self
-            .upstream_client
-            .delegate
-            .on_pairing_complete(&mut id.into(), /* success */ true)
+        if let Err(e) =
+            self.upstream_client.delegate.on_pairing_complete(&id.into(), /* success */ true)
         {
             warn!(%id, "Couldn't notify `sys.Pairing` client: {e:}");
         }
@@ -625,11 +623,11 @@ impl PairingManager {
                     };
                 let _ = responder.send(accept, entered_passkey);
             }
-            PairingDelegateRequest::OnPairingComplete { mut id, success, .. } => {
-                let _ = proxy.on_pairing_complete(&mut id, success);
+            PairingDelegateRequest::OnPairingComplete { id, success, .. } => {
+                let _ = proxy.on_pairing_complete(&id, success);
             }
-            PairingDelegateRequest::OnRemoteKeypress { mut id, keypress, .. } => {
-                let _ = proxy.on_remote_keypress(&mut id, keypress);
+            PairingDelegateRequest::OnRemoteKeypress { id, keypress, .. } => {
+                let _ = proxy.on_remote_keypress(&id, keypress);
             }
         }
     }
@@ -1020,7 +1018,7 @@ pub(crate) mod tests {
 
         // OnPairingComplete propagated to upstream.
         mock.downstream_delegate_client
-            .on_pairing_complete(&mut PeerId(123).into(), true)
+            .on_pairing_complete(&PeerId(123).into(), true)
             .expect("fidl request");
         let _event = mock
             .upstream_delegate_server
@@ -1032,7 +1030,7 @@ pub(crate) mod tests {
 
         // OnRemoteKeypress propagated to upstream.
         mock.downstream_delegate_client
-            .on_remote_keypress(&mut PeerId(123).into(), PairingKeypress::DigitEntered)
+            .on_remote_keypress(&PeerId(123).into(), PairingKeypress::DigitEntered)
             .expect("fidl request");
         let _event = mock
             .upstream_delegate_server
@@ -1053,7 +1051,7 @@ pub(crate) mod tests {
 
         // Keypress event is irrelevant in Fast Pair mode. No stream item.
         mock.downstream_delegate_client
-            .on_remote_keypress(&mut PeerId(123).into(), PairingKeypress::DigitEntered)
+            .on_remote_keypress(&PeerId(123).into(), PairingKeypress::DigitEntered)
             .expect("fidl request");
         assert_matches!(manager.next().now_or_never(), None);
     }
@@ -1105,7 +1103,7 @@ pub(crate) mod tests {
         // Downstream server signals pairing completion.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut id.into(), true)
+            .on_pairing_complete(&id.into(), true)
             .expect("valid fidl request");
         // Expect a Pairing Manager stream item indicating completion of pairing with the peer.
         let result = manager.select_next_some().await;
@@ -1196,7 +1194,7 @@ pub(crate) mod tests {
         // Peer rejects pairing via the downstream `sys.Pairing` server.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut id.into(), false)
+            .on_pairing_complete(&id.into(), false)
             .expect("valid fidl request");
         let manager_fut = manager.select_next_some();
         // There are no active pairing procedures so pairing is handed back to upstream.
@@ -1298,7 +1296,7 @@ pub(crate) mod tests {
         // Put the procedure in the `PairingComplete` state.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut id.into(), true)
+            .on_pairing_complete(&id.into(), true)
             .expect("valid fidl request");
         let result = manager.select_next_some().await;
         assert_eq!(result, id);
@@ -1387,7 +1385,7 @@ pub(crate) mod tests {
         // Downstream server signals pairing completion.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut id1.into(), true)
+            .on_pairing_complete(&id1.into(), true)
             .expect("valid fidl request");
         // Expect a Pairing Manager stream item indicating completion of pairing with the peer.
         let result = manager.select_next_some().await;
@@ -1426,7 +1424,7 @@ pub(crate) mod tests {
 
         // Pairing Requests are routed upstream.
         mock.downstream_delegate_client
-            .on_pairing_complete(&mut PeerId(123).into(), true)
+            .on_pairing_complete(&PeerId(123).into(), true)
             .expect("fidl request");
         assert_matches!(manager.next().now_or_never(), None);
         let _event = mock
@@ -1562,7 +1560,7 @@ pub(crate) mod tests {
         // Downstream server signals pairing completion.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut bredr_id.into(), true)
+            .on_pairing_complete(&bredr_id.into(), true)
             .expect("valid fidl request");
         // Expect a Pairing Manager stream item indicating completion of pairing with the peer. The
         // LE PeerId associated with this peer is used.
@@ -1631,7 +1629,7 @@ pub(crate) mod tests {
         // Downstream server signals pairing completion - expect the stream item with `id`.
         let _ = mock
             .downstream_delegate_client
-            .on_pairing_complete(&mut id.into(), true)
+            .on_pairing_complete(&id.into(), true)
             .expect("valid fidl request");
         let finished_id = exec.run_until_stalled(&mut manager.next()).expect("stream item");
         assert_eq!(finished_id, Some(id));

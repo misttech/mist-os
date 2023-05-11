@@ -89,8 +89,8 @@ async fn set_active_host<'a>(
     }
     println!("Setting active adapter");
     let host_id = HostId::from_str(args[0])?;
-    let mut fidl_host_id: FidlHostId = host_id.into();
-    match host_svc.set_active(&mut fidl_host_id).await {
+    let fidl_host_id: FidlHostId = host_id.into();
+    match host_svc.set_active(&fidl_host_id).await {
         Ok(_) => Ok(String::new()),
         Err(err) => Ok(format!("Error setting active host: {}", err)),
     }
@@ -120,7 +120,7 @@ async fn set_device_class<'a>(
 ) -> Result<String, Error> {
     let mut args = args.iter();
     println!("Setting device class of the active adapter");
-    let mut device_class = DeviceClass {
+    let device_class = DeviceClass {
         major: args
             .next()
             .map(|arg| TryInto::try_into(&**arg))
@@ -133,7 +133,7 @@ async fn set_device_class<'a>(
     }
     .into();
 
-    match access_svc.set_device_class(&mut device_class) {
+    match access_svc.set_device_class(&device_class) {
         Ok(_) => Ok(format!("Set device class to 0x{:x}", device_class.value)),
         Err(err) => Ok(format!("Error setting device class: {}", err)),
     }
@@ -263,7 +263,7 @@ async fn connect<'a>(
         Some(id) => id,
         None => return Ok(format!("Unable to connect: Unknown address {}", args[0])),
     };
-    if let Err(e) = access_proxy.connect(&mut peer_id.into()).await? {
+    if let Err(e) = access_proxy.connect(&peer_id.into()).await? {
         return Ok(format!("connect error: {:?}", e));
     }
 
@@ -298,7 +298,7 @@ fn parse_disconnect<'a>(args: &'a [&'a str], state: &'a Mutex<State>) -> Result<
 }
 
 async fn handle_disconnect(id: PeerId, access_svc: &AccessProxy) -> Result<String, Error> {
-    let response = access_svc.disconnect(&mut id.into()).await?;
+    let response = access_svc.disconnect(&id.into()).await?;
     match response {
         Ok(_) => Ok(String::new()),
         Err(err) => Ok(format!("Disconnect error: {:?}", err)),
@@ -454,7 +454,7 @@ async fn forget<'a>(
         Some(id) => id,
         None => return Ok(format!("Unable to forget: Unknown address {}", args[0])),
     };
-    match access_svc.forget(&mut peer_id.into()).await? {
+    match access_svc.forget(&peer_id.into()).await? {
         Ok(_) => {
             println!("Peer has been removed");
             Ok(String::new())

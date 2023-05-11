@@ -342,9 +342,9 @@ mod tests {
     async fn test_empty_template() -> Result<()> {
         // Fails because empty templates can't be rendered.
         let empty_template = "";
-        let mut emu_config = EmulatorConfiguration::default();
+        let emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(empty_template, &mut emu_config);
+        let flags = process_flag_template_inner(empty_template, &emu_config);
         assert!(flags.is_err());
 
         Ok(())
@@ -369,7 +369,7 @@ mod tests {
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.runtime.addl_kernel_args = vec!["b=c".to_string()];
 
-        let flags = process_flag_template_inner(addl_kernel_args, &mut emu_config);
+        let flags = process_flag_template_inner(addl_kernel_args, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         // Kernel args from the command line should be after any others, so they take precedence.
         // Neither should have the text modified due to character escaping.
@@ -391,9 +391,9 @@ mod tests {
             "kernel_args": [],
             "options": []
         }"#;
-        let mut emu_config = EmulatorConfiguration::default();
+        let emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(empty_vectors_template, &mut emu_config);
+        let flags = process_flag_template_inner(empty_vectors_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -415,9 +415,9 @@ mod tests {
             "kernel_args": []
             {{! It's missing the options field }}
         }"#;
-        let mut emu_config = EmulatorConfiguration::default();
+        let emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(invalid_template, &mut emu_config);
+        let flags = process_flag_template_inner(invalid_template, &emu_config);
         assert!(flags.is_err());
 
         Ok(())
@@ -434,9 +434,9 @@ mod tests {
             "kernel_args": [],
             "options": ["value"]
         }"#;
-        let mut emu_config = EmulatorConfiguration::default();
+        let emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(ok_template, &mut emu_config);
+        let flags = process_flag_template_inner(ok_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 1);
@@ -463,7 +463,7 @@ mod tests {
         }"#;
         let mut emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(substitution_template, &mut emu_config);
+        let flags = process_flag_template_inner(substitution_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 1);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -474,7 +474,7 @@ mod tests {
 
         emu_config.device.audio.model = AudioModel::Hda;
 
-        let flags = process_flag_template_inner(substitution_template, &mut emu_config);
+        let flags = process_flag_template_inner(substitution_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 1);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -502,7 +502,7 @@ mod tests {
 
         emu_config.runtime.headless = false;
 
-        let flags = process_flag_template_inner(conditional_template, &mut emu_config);
+        let flags = process_flag_template_inner(conditional_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -513,7 +513,7 @@ mod tests {
 
         emu_config.runtime.headless = true;
 
-        let flags = process_flag_template_inner(conditional_template, &mut emu_config);
+        let flags = process_flag_template_inner(conditional_template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -541,7 +541,7 @@ mod tests {
 
         let mut emu_config = EmulatorConfiguration::default();
 
-        let flags = process_flag_template_inner(template, &mut emu_config);
+        let flags = process_flag_template_inner(template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -552,7 +552,7 @@ mod tests {
 
         emu_config.device.storage.units = DataUnits::Megabytes;
 
-        let flags = process_flag_template_inner(template, &mut emu_config);
+        let flags = process_flag_template_inner(template, &emu_config);
         assert!(flags.is_ok(), "{:?}", flags);
         assert_eq!(flags.as_ref().unwrap().args.len(), 0);
         assert_eq!(flags.as_ref().unwrap().envs.len(), 0);
@@ -633,9 +633,9 @@ mod tests {
                 .to_string(),
             ),
         ];
-        let mut emu_config = EmulatorConfiguration::default();
+        let emu_config = EmulatorConfiguration::default();
         for (expected_ok, name, template) in templates.iter() {
-            let flags = process_flag_template_inner(template, &mut emu_config);
+            let flags = process_flag_template_inner(template, &emu_config);
             if *expected_ok {
                 assert!(flags.is_ok(), "Processing {}: {:?}", name, flags);
             } else {

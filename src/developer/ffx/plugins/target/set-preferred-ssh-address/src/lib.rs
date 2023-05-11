@@ -32,7 +32,7 @@ pub async fn set_preferred_ssh_address(
     };
 
     target_proxy
-        .set_preferred_ssh_address(&mut ffx::TargetIp { ip, scope_id })
+        .set_preferred_ssh_address(&ffx::TargetIp { ip, scope_id })
         .await
         .context("set_preferred_ssh_address failed")?
         .map_err(|e| anyhow::anyhow!("set_preferred_ssh_address error: {:?}", e))

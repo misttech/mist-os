@@ -336,7 +336,7 @@ impl RemoteControlService {
                 spawn_forward_traffic(stream, local);
 
                 // Send the socket to the client.
-                if let Err(e) = client.forward(remote, &mut SocketAddressExt(addr).into()) {
+                if let Err(e) = client.forward(remote, &SocketAddressExt(addr).into()) {
                     // The client has gone away, so stop the task.
                     if let fidl::Error::ClientChannelClosed { .. } = e {
                         warn!("tunnel client channel closed while forwarding socket");
@@ -674,7 +674,7 @@ async fn forward_traffic(
                             return Ok(());
                         }
 
-                        zx_write.write_all(&mut buf[..num_bytes]).await.context("write zx socket")?;
+                        zx_write.write_all(&buf[..num_bytes]).await.context("write zx socket")?;
                         zx_write.flush().await.context("flush zx socket")?;
                     }
                     _ = zx_closed => {
@@ -703,7 +703,7 @@ async fn forward_traffic(
                     if num_bytes == 0 {
                         return Ok(());
                     }
-                    tcp_write.write_all(&mut buf[..num_bytes]).await.context("write tcp socket")?;
+                    tcp_write.write_all(&buf[..num_bytes]).await.context("write tcp socket")?;
                     tcp_write.flush().await.context("flush tcp socket")?;
                 }
                 _ = tcp_closed_rx => {
@@ -822,7 +822,7 @@ mod tests {
                         while let Ok(Some(req)) = stream.try_next().await {
                             match req {
                                 fnet_interfaces::WatcherRequest::Watch { responder } => {
-                                    let mut event = if first {
+                                    let event = if first {
                                         first = false;
                                         fnet_interfaces::Event::Existing(
                                             fnet_interfaces::Properties {
@@ -869,7 +869,7 @@ mod tests {
                                     } else {
                                         fnet_interfaces::Event::Idle(fnet_interfaces::Empty {})
                                     };
-                                    let () = responder.send(&mut event).unwrap();
+                                    let () = responder.send(&event).unwrap();
                                 }
                             }
                         }

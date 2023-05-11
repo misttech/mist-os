@@ -52,7 +52,7 @@ async fn freerun_time_fast(fake_clock: &FakeClockController) {
     fake_clock
         .resume_with_increments(
             zx::Duration::from_millis(1).into_nanos(),
-            &mut Increment::Determined(zx::Duration::from_minutes(1).into_nanos()),
+            &Increment::Determined(zx::Duration::from_minutes(1).into_nanos()),
         )
         .await
         .expect("Failed to resume time")

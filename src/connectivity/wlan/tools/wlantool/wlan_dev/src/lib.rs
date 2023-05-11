@@ -235,24 +235,22 @@ async fn do_phy(cmd: opts::PhyCmd, monitor_proxy: DeviceMonitor) -> Result<(), E
 
             let mut alpha2 = [0u8; 2];
             alpha2.copy_from_slice(country.as_bytes());
-            let mut req = wlan_service::SetCountryRequest { phy_id, alpha2 };
+            let req = wlan_service::SetCountryRequest { phy_id, alpha2 };
             let response =
-                monitor_proxy.set_country(&mut req).await.context("error setting country")?;
+                monitor_proxy.set_country(&req).await.context("error setting country")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
         opts::PhyCmd::ClearCountry { phy_id } => {
-            let mut req = wlan_service::ClearCountryRequest { phy_id };
+            let req = wlan_service::ClearCountryRequest { phy_id };
             let response =
-                monitor_proxy.clear_country(&mut req).await.context("error clearing country")?;
+                monitor_proxy.clear_country(&req).await.context("error clearing country")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
         opts::PhyCmd::SetPowerSaveMode { phy_id, mode } => {
             println!("SetPSMode: phy_id {:?} ps_mode {:?}", phy_id, mode);
-            let mut req = wlan_service::SetPowerSaveModeRequest { phy_id, ps_mode: mode.into() };
-            let response = monitor_proxy
-                .set_power_save_mode(&mut req)
-                .await
-                .context("error setting ps mode")?;
+            let req = wlan_service::SetPowerSaveModeRequest { phy_id, ps_mode: mode.into() };
+            let response =
+                monitor_proxy.set_power_save_mode(&req).await.context("error setting ps mode")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
         opts::PhyCmd::GetPowerSaveMode { phy_id } => {
@@ -297,17 +295,17 @@ async fn do_iface(cmd: opts::IfaceCmd, monitor_proxy: DeviceMonitor) -> Result<(
                 None => NULL_MAC_ADDR,
             };
 
-            let mut req = wlan_service::CreateIfaceRequest { phy_id, role: role.into(), sta_addr };
+            let req = wlan_service::CreateIfaceRequest { phy_id, role: role.into(), sta_addr };
 
             let response =
-                monitor_proxy.create_iface(&mut req).await.context("error getting response")?;
+                monitor_proxy.create_iface(&req).await.context("error getting response")?;
             println!("response: {:?}", response);
         }
         opts::IfaceCmd::Delete { iface_id } => {
-            let mut req = wlan_service::DestroyIfaceRequest { iface_id };
+            let req = wlan_service::DestroyIfaceRequest { iface_id };
 
             let response =
-                monitor_proxy.destroy_iface(&mut req).await.context("error destroying iface")?;
+                monitor_proxy.destroy_iface(&req).await.context("error destroying iface")?;
             match zx_status::Status::ok(response) {
                 Ok(()) => println!("destroyed iface {:?}", iface_id),
                 Err(s) => println!("error destroying iface: {:?}", s),
@@ -385,14 +383,14 @@ async fn do_client_connect(
     let opts::ClientConnectCmd { iface_id, ssid, password, psk, scan_type } = cmd;
     let ssid = Ssid::try_from(ssid)?;
     let sme = get_client_sme(monitor_proxy, iface_id).await?;
-    let mut req = match scan_type {
+    let req = match scan_type {
         ScanTypeArg::Active => fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
             ssids: vec![ssid.to_vec()],
             channels: vec![],
         }),
         ScanTypeArg::Passive => fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}),
     };
-    let scan_result = sme.scan(&mut req).await.context("error sending scan request")?;
+    let scan_result = sme.scan(&req).await.context("error sending scan request")?;
     let bss_description = try_get_bss_desc(scan_result, &ssid).await?;
     let authentication = match fidl_security::Authentication::try_from(SecurityContext {
         unparsed_password_text: password,
@@ -406,14 +404,14 @@ async fn do_client_connect(
         }
     };
     let (local, remote) = endpoints::create_proxy()?;
-    let mut req = fidl_sme::ConnectRequest {
+    let req = fidl_sme::ConnectRequest {
         ssid: ssid.to_vec(),
         bss_description,
         authentication,
         deprecated_scan_type: scan_type.into(),
         multiple_bss_candidates: false, // only used for metrics, select arbitrary value
     };
-    sme.connect(&mut req, Some(remote)).context("error sending connect request")?;
+    sme.connect(&req, Some(remote)).context("error sending connect request")?;
     handle_connect_transaction(local).await
 }
 
@@ -434,14 +432,14 @@ async fn do_client_scan(
 ) -> Result<(), Error> {
     let opts::ClientScanCmd { iface_id, scan_type } = cmd;
     let sme = get_client_sme(monitor_proxy, iface_id).await?;
-    let mut req = match scan_type {
+    let req = match scan_type {
         ScanTypeArg::Passive => fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}),
         ScanTypeArg::Active => fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
             ssids: vec![],
             channels: vec![],
         }),
     };
-    let scan_result = sme.scan(&mut req).await.context("error sending scan request")?;
+    let scan_result = sme.scan(&req).await.context("error sending scan request")?;
     print_scan_result(scan_result);
     Ok(())
 }
@@ -565,7 +563,7 @@ async fn do_ap(cmd: opts::ApCmd, monitor_proxy: DeviceMonitor) -> Result<(), Err
     match cmd {
         opts::ApCmd::Start { iface_id, ssid, password, channel } => {
             let sme = get_ap_sme(monitor_proxy, iface_id).await?;
-            let mut config = fidl_sme::ApConfig {
+            let config = fidl_sme::ApConfig {
                 ssid: ssid.as_bytes().to_vec(),
                 password: password.map_or(vec![], |p| p.as_bytes().to_vec()),
                 radio_cfg: fidl_sme::RadioConfig {
@@ -577,7 +575,7 @@ async fn do_ap(cmd: opts::ApCmd, monitor_proxy: DeviceMonitor) -> Result<(), Err
                     },
                 },
             };
-            println!("{:?}", sme.start(&mut config).await?);
+            println!("{:?}", sme.start(&config).await?);
         }
         opts::ApCmd::Stop { iface_id } => {
             let sme = get_ap_sme(monitor_proxy, iface_id).await?;

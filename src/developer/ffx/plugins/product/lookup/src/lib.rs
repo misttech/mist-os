@@ -34,8 +34,8 @@ pub async fn pb_lookup(cmd: LookupCommand) -> Result<()> {
     let mut input = stdin();
     let mut output = stdout();
     let mut err_out = stderr();
-    let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_lookup_impl(&cmd.auth, &cmd.base_url, &cmd.name, &cmd.version, &mut ui).await?;
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    pb_lookup_impl(&cmd.auth, &cmd.base_url, &cmd.name, &cmd.version, &ui).await?;
     Ok(())
 }
 

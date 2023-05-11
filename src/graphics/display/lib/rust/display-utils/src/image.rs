@@ -211,7 +211,7 @@ async fn allocate_image_buffer_helper(
     };
 
     // Set local constraints and allocate buffers.
-    collection.set_constraints(true, &mut buffer_collection_constraints(params))?;
+    collection.set_constraints(true, &buffer_collection_constraints(params))?;
     let collection_info = {
         let (status, info) = collection.wait_for_buffers_allocated().await?;
         let _ = zx::Status::ok(status)?;

@@ -1552,9 +1552,9 @@ mod tests {
     fn create_remove() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let mut bound = SocketHandler::create(&mut sync_ctx, Default::default());
+        let bound = SocketHandler::create(&mut sync_ctx, Default::default());
         assert_eq!(
-            SocketHandler::get_info(&mut sync_ctx, &mut bound),
+            SocketHandler::get_info(&mut sync_ctx, &bound),
             SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
         );
 
@@ -1566,10 +1566,10 @@ mod tests {
     fn set_device(device: TargetDevice<&MultipleDevicesId>) {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let mut bound = SocketHandler::create(&mut sync_ctx, Default::default());
-        SocketHandler::set_device(&mut sync_ctx, &mut bound, device.clone());
+        let bound = SocketHandler::create(&mut sync_ctx, Default::default());
+        SocketHandler::set_device(&mut sync_ctx, &bound, device.clone());
         assert_eq!(
-            SocketHandler::get_info(&mut sync_ctx, &mut bound),
+            SocketHandler::get_info(&mut sync_ctx, &bound),
             SocketInfo { device: device.with_weak_id(), protocol: None }
         );
 
@@ -1585,11 +1585,11 @@ mod tests {
     fn update_device() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let mut bound = SocketHandler::create(&mut sync_ctx, Default::default());
+        let bound = SocketHandler::create(&mut sync_ctx, Default::default());
 
         SocketHandler::set_device(
             &mut sync_ctx,
-            &mut bound,
+            &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::A),
         );
 
@@ -1597,11 +1597,11 @@ mod tests {
         // one device's list.
         SocketHandler::set_device(
             &mut sync_ctx,
-            &mut bound,
+            &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::B),
         );
         assert_eq!(
-            SocketHandler::get_info(&mut sync_ctx, &mut bound),
+            SocketHandler::get_info(&mut sync_ctx, &bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None
@@ -1657,13 +1657,13 @@ mod tests {
     fn change_device_after_removal() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let mut bound = SocketHandler::create(&mut sync_ctx, Default::default());
+        let bound = SocketHandler::create(&mut sync_ctx, Default::default());
         // Set the device for the socket before removing the device state
         // entirely.
         const DEVICE_TO_REMOVE: MultipleDevicesId = MultipleDevicesId::A;
         SocketHandler::set_device(
             &mut sync_ctx,
-            &mut bound,
+            &bound,
             TargetDevice::SpecificDevice(&DEVICE_TO_REMOVE),
         );
 
@@ -1676,11 +1676,11 @@ mod tests {
         // earlier-bound device is now gone.
         SocketHandler::set_device(
             &mut sync_ctx,
-            &mut bound,
+            &bound,
             TargetDevice::SpecificDevice(&MultipleDevicesId::B),
         );
         assert_eq!(
-            SocketHandler::get_info(&mut sync_ctx, &mut bound),
+            SocketHandler::get_info(&mut sync_ctx, &bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None,
@@ -1725,16 +1725,16 @@ mod tests {
         protocol: Option<Protocol>,
         state: C::SocketState,
     ) -> SC::SocketId {
-        let mut id = SocketHandler::create(sync_ctx, state);
+        let id = SocketHandler::create(sync_ctx, state);
         let device = match &device {
             TargetDevice::AnyDevice => TargetDevice::AnyDevice,
             TargetDevice::SpecificDevice(d) => TargetDevice::SpecificDevice(d),
         };
         match protocol {
             Some(protocol) => {
-                SocketHandler::set_device_and_protocol(sync_ctx, &mut id, device, protocol)
+                SocketHandler::set_device_and_protocol(sync_ctx, &id, device, protocol)
             }
-            None => SocketHandler::set_device(sync_ctx, &mut id, device),
+            None => SocketHandler::set_device(sync_ctx, &id, device),
         };
         id
     }
@@ -1964,11 +1964,11 @@ mod tests {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let mut id = SocketHandler::create(&mut sync_ctx, Default::default());
+        let id = SocketHandler::create(&mut sync_ctx, Default::default());
         if let Some(bind_device) = bind_device {
             SocketHandler::set_device(
                 &mut sync_ctx,
-                &mut id,
+                &id,
                 TargetDevice::SpecificDevice(&bind_device),
             );
         }

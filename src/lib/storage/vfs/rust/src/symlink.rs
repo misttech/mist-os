@@ -178,8 +178,8 @@ impl Connection {
                 responder.send(&mut Ok(()))?;
             }
             fio::SymlinkRequest::GetAttr { responder } => match self.handle_get_attr().await {
-                Ok(mut attrs) => responder.send(zx::Status::OK.into_raw(), &mut attrs)?,
-                Err(status) => responder.send(status.into_raw(), &mut null_node_attributes())?,
+                Ok(attrs) => responder.send(zx::Status::OK.into_raw(), &attrs)?,
+                Err(status) => responder.send(status.into_raw(), &null_node_attributes())?,
             },
             fio::SymlinkRequest::SetAttr { responder, .. } => {
                 responder.send(zx::Status::ACCESS_DENIED.into_raw())?;

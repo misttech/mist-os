@@ -206,8 +206,8 @@ pub async fn fvm_allocate_partition(
     let status = fvm_proxy
         .allocate_partition(
             slice_count,
-            &mut Guid { value: type_guid },
-            &mut Guid { value: instance_guid },
+            &Guid { value: type_guid },
+            &Guid { value: instance_guid },
             name,
             flags,
         )
@@ -271,12 +271,12 @@ mod tests {
                 match request {
                     Ok(PartitionRequest::GetTypeGuid { responder }) => {
                         responder
-                            .send(zx::sys::ZX_OK, Some(&mut Guid { value: VALID_TYPE_GUID }))
+                            .send(zx::sys::ZX_OK, Some(&Guid { value: VALID_TYPE_GUID }))
                             .unwrap();
                     }
                     Ok(PartitionRequest::GetInstanceGuid { responder }) => {
                         responder
-                            .send(zx::sys::ZX_OK, Some(&mut Guid { value: VALID_INSTANCE_GUID }))
+                            .send(zx::sys::ZX_OK, Some(&Guid { value: VALID_INSTANCE_GUID }))
                             .unwrap();
                     }
                     Ok(PartitionRequest::GetName { responder }) => {

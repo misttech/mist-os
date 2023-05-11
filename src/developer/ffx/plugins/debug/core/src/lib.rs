@@ -173,14 +173,14 @@ async fn copy_as_temp_file(file: &fio::FileProxy) -> Result<TempPath> {
     let mut temp_file = NamedTempFile::new()?;
 
     loop {
-        let mut bytes = file
+        let bytes = file
             .read(fio::MAX_BUF)
             .await?
             .map_err(|s| anyhow!("Failed to read: {}", Status::from_raw(s)))?;
         if bytes.is_empty() {
             break;
         }
-        temp_file.write_all(&mut bytes)?;
+        temp_file.write_all(&bytes)?;
     }
 
     Ok(temp_file.into_temp_path())

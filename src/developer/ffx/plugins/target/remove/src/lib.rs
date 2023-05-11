@@ -17,8 +17,8 @@ pub async fn remove_impl<W: std::io::Write>(
     cmd: RemoveCommand,
     err_writer: &mut W,
 ) -> Result<()> {
-    let RemoveCommand { mut name_or_addr, .. } = cmd;
-    if target_collection.remove_target(&mut name_or_addr).await? {
+    let RemoveCommand { name_or_addr, .. } = cmd;
+    if target_collection.remove_target(&name_or_addr).await? {
         writeln!(err_writer, "Removed.")?;
     } else {
         writeln!(err_writer, "No matching target found.")?;

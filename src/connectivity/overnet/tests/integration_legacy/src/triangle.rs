@@ -172,8 +172,7 @@ fn connect_peer(
     node_id: NodeId,
 ) -> Result<triangle::ConscriptProxy, Error> {
     let (s, p) = fidl::Channel::create();
-    svc.connect_to_service(&mut node_id.into(), triangle::ConscriptMarker::PROTOCOL_NAME, s)
-        .unwrap();
+    svc.connect_to_service(&node_id.into(), triangle::ConscriptMarker::PROTOCOL_NAME, s).unwrap();
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
     Ok(triangle::ConscriptProxy::new(proxy))
 }

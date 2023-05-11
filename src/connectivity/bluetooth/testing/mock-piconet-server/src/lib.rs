@@ -198,10 +198,10 @@ impl PiconetMember {
     pub async fn make_connection(
         &self,
         peer_id: bt_types::PeerId,
-        mut params: bredr::ConnectParameters,
+        params: bredr::ConnectParameters,
     ) -> Result<bredr::Channel, Error> {
         self.profile_svc
-            .connect(&mut peer_id.into(), &mut params)
+            .connect(&peer_id.into(), &params)
             .await?
             .map_err(|e| format_err!("{:?}", e))
     }
@@ -563,7 +563,7 @@ async fn register_piconet_member(
         f_end::create_request_stream::<bredr::PeerObserverMarker>()?;
 
     profile_test_proxy
-        .register_peer(&mut id.into(), server, observer_client)
+        .register_peer(&id.into(), server, observer_client)
         .await
         .context("registering peer failed!")?;
     Ok((client, observer_server))
@@ -588,7 +588,7 @@ async fn fwd_observer_callbacks(
     {
         match req {
             bredr::PeerObserverRequest::ServiceFound {
-                mut peer_id,
+                peer_id,
                 protocol,
                 attributes,
                 responder,
@@ -598,14 +598,12 @@ async fn fwd_observer_callbacks(
                     None => vec![],
                 };
 
-                observer.service_found(&mut peer_id, Some(&proto), &attributes).await.or_else(
-                    |e| {
-                        handle_fidl_err(
-                            e,
-                            format!("unexpected error forwarding observer event for: {}", id),
-                        )
-                    },
-                )?;
+                observer.service_found(&peer_id, Some(&proto), &attributes).await.or_else(|e| {
+                    handle_fidl_err(
+                        e,
+                        format!("unexpected error forwarding observer event for: {}", id),
+                    )
+                })?;
 
                 responder.send().or_else(|e| {
                     handle_fidl_err(
@@ -615,8 +613,8 @@ async fn fwd_observer_callbacks(
                 })?;
             }
 
-            bredr::PeerObserverRequest::PeerConnected { mut peer_id, protocol, responder } => {
-                observer.peer_connected(&mut peer_id, &protocol).await.or_else(|e| {
+            bredr::PeerObserverRequest::PeerConnected { peer_id, protocol, responder } => {
+                observer.peer_connected(&peer_id, &protocol).await.or_else(|e| {
                     handle_fidl_err(
                         e,
                         format!("unexpected error forwarding observer event for: {}", id),

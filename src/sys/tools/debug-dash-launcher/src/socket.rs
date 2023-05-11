@@ -72,7 +72,7 @@ pub async fn spawn_pty_forwarder(
     // Assume that the terminal is 1024 x 768. When using a socket, we cannot find out the
     // terminal dimensions.
     let status_window_size = server
-        .set_window_size(&mut pty::WindowSize { width: 1024, height: 768 })
+        .set_window_size(&pty::WindowSize { width: 1024, height: 768 })
         .await
         .map_err(|_| LauncherError::Pty)?;
 

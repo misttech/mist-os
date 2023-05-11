@@ -105,11 +105,11 @@ impl BuiltinCapability for KernelStats {
                             ..Default::default()
                         });
                     }
-                    let mut stats = fkernel::CpuStats {
+                    let stats = fkernel::CpuStats {
                         actual_num_cpus: per_cpu_stats.len() as u64,
                         per_cpu_stats: Some(per_cpu_stats),
                     };
-                    responder.send(&mut stats)?;
+                    responder.send(&stats)?;
                 }
                 fkernel::StatsRequest::GetCpuLoad { duration, responder } => {
                     if duration <= 0 {

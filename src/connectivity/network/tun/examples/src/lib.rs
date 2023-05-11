@@ -643,7 +643,7 @@ mod helpers {
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
                 .expect("failed to connect to stack");
         let () = stack
-            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet: fidl_fuchsia_net_ext::apply_subnet_mask(subnet),
                 device_id: interface_id,
                 next_hop: None,

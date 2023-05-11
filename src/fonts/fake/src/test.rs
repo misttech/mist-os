@@ -14,7 +14,7 @@ async fn test_stable_api() -> Result<(), Error> {
     let font_provider = client::connect_to_protocol::<fonts::ProviderMarker>()
         .context("connecting to stable server")?;
 
-    let mut req = fonts::Request {
+    let req = fonts::Request {
         family: None,
         weight: 400,
         width: 5,
@@ -24,7 +24,7 @@ async fn test_stable_api() -> Result<(), Error> {
         fallback_group: fonts::FallbackGroup::None,
         flags: 0,
     };
-    let res = font_provider.get_font(&mut req).await?;
+    let res = font_provider.get_font(&req).await?;
     assert_matches!(res, None);
 
     let res = font_provider.get_family_info("Roboto").await?;
@@ -34,7 +34,7 @@ async fn test_stable_api() -> Result<(), Error> {
     assert_eq!(res, fonts::TypefaceResponse::default());
 
     let res = font_provider
-        .get_font_family_info(&mut fonts::FamilyName { name: "Roboto".to_string() })
+        .get_font_family_info(&fonts::FamilyName { name: "Roboto".to_string() })
         .await?;
     assert_eq!(res, fonts::FontFamilyInfo::default());
 
@@ -56,7 +56,7 @@ async fn test_experimental_api() -> Result<(), Error> {
     assert_matches!(res, Err(fonts_exp::Error::NotFound));
 
     let res = font_provider
-        .get_typefaces_by_family(&mut fonts::FamilyName { name: "Roboto".to_string() })
+        .get_typefaces_by_family(&fonts::FamilyName { name: "Roboto".to_string() })
         .await?;
     assert_matches!(res, Err(fonts_exp::Error::NotFound));
 

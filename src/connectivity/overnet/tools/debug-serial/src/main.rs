@@ -212,7 +212,7 @@ mod test {
         assert_eq!(
             test_proxy()?
                 .proxy
-                .set_config(&mut Config {
+                .set_config(&Config {
                     character_width: CharacterWidth::Bits8,
                     stop_width: StopWidth::Bits1,
                     parity: Parity::Even,

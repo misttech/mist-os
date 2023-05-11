@@ -176,7 +176,7 @@ where
             &repo_url,
             &output_dir.join(pb_dir_name(&repo_url)),
             auth_flow,
-            &mut |_d, _f| Ok(ProgressResponse::Continue),
+            &|_d, _f| Ok(ProgressResponse::Continue),
             ui,
             client,
         )
@@ -202,7 +202,7 @@ where
         &product_url,
         output_dir,
         &auth_flow,
-        &mut |_d, _f| Ok(ProgressResponse::Continue),
+        &|_d, _f| Ok(ProgressResponse::Continue),
         ui,
         client,
     )

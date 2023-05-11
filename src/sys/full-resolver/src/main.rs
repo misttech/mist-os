@@ -110,7 +110,7 @@ async fn resolve_component_with_context(
     let outgoing_context = package_resolver
         .resolve_with_context(
             &component_url.package_url().to_string(),
-            &mut fpkg::ResolutionContext { bytes: incoming_context.bytes.clone() },
+            &fpkg::ResolutionContext { bytes: incoming_context.bytes.clone() },
             dir_server_end,
         )
         .await

@@ -1463,10 +1463,10 @@ pub mod capability_util {
             &path.basename.to_string(),
         )
         .expect("failed to open realm service");
-        let mut child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
+        let child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
 
         let (_, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let res = realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
+        let res = realm_proxy.open_exposed_dir(&child_ref, server_end).await;
         // Check for side effects: realm service should have received the `open_exposed_dir` call.
         res.expect("failed to send fidl message").expect("failed to use realm service");
         let bind_url =
@@ -1488,9 +1488,9 @@ pub mod capability_util {
         .expect("no realm service");
         let realm_proxy =
             connect_to_svc_in_namespace::<fcomponent::RealmMarker>(namespace, &path).await;
-        let mut collection_ref = fdecl::CollectionRef { name: collection.to_string() };
+        let collection_ref = fdecl::CollectionRef { name: collection.to_string() };
         let child_decl = child_decl.native_into_fidl();
-        let res = realm_proxy.create_child(&mut collection_ref, &child_decl, args).await;
+        let res = realm_proxy.create_child(&collection_ref, &child_decl, args).await;
         res.expect("failed to send fidl message").expect("failed to create child");
     }
 

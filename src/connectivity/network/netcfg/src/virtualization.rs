@@ -178,7 +178,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                     .await
                     .context("get port info")
                     .map_err(errors::Error::NonFatal)?;
-                let mut port_id = port_id
+                let port_id = port_id
                     .context("port id not included in port info")
                     .map_err(errors::Error::NonFatal)?;
                 let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
@@ -186,7 +186,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                     .map_err(errors::Error::NonFatal)?;
                 device_control
                     .create_interface(
-                        &mut port_id,
+                        &port_id,
                         server_end,
                         &fnet_interfaces_admin::Options::default(),
                     )

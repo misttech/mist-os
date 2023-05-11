@@ -117,7 +117,7 @@ mod tests {
 
     fn test_matching_iface_id<F: Fn(&QueryIfaceResponse) -> bool>(
         filter: F,
-        mut list_response: Vec<u16>,
+        list_response: Vec<u16>,
         query_responses: Vec<QueryIfaceResponse>,
         expected_id: Option<u16>,
     ) {
@@ -136,7 +136,7 @@ mod tests {
         let responder = assert_variant!(exec.run_singlethreaded(&mut request_stream.next()),
                                          Some(Ok(DeviceMonitorRequest::ListIfaces{responder})) => responder);
         // The fake response is sent.
-        responder.send(&mut list_response[..]).expect("sending list ifaces response");
+        responder.send(&list_response[..]).expect("sending list ifaces response");
 
         for query_resp in query_responses {
             // This line advances the future to the point where it calls query_iface(id) and waits

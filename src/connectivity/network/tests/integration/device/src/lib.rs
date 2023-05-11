@@ -338,12 +338,12 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
     );
 
     let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
-    let mut port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
+    let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
     device_control
-        .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
 
     // Read the interface ID to make sure device install succeeded.
@@ -395,12 +395,12 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
         netstack_testing_common::devices::create_eth_tun_port(&tun, 1, SOURCE_MAC_ADDRESS).await;
 
     let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
-    let mut port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
+    let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
     device_control
-        .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
     assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
     tun_port.set_online(true).await.expect("can set online");

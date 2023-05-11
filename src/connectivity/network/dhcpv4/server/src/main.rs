@@ -849,9 +849,7 @@ mod tests {
         run_with_server(|proxy| async move {
             assert_eq!(
                 proxy
-                    .set_option(&mut fidl_fuchsia_net_dhcp::Option_::SubnetMask(fidl_ip_v4!(
-                        "0.0.0.0"
-                    )))
+                    .set_option(&fidl_fuchsia_net_dhcp::Option_::SubnetMask(fidl_ip_v4!("0.0.0.0")))
                     .await
                     .expect("set_option failed"),
                 Ok(())
@@ -865,7 +863,7 @@ mod tests {
         run_with_server(|proxy| async move {
             assert_eq!(
                 proxy
-                    .set_parameter(&mut fidl_fuchsia_net_dhcp::Parameter::Lease(
+                    .set_parameter(&fidl_fuchsia_net_dhcp::Parameter::Lease(
                         fidl_fuchsia_net_dhcp::LeaseLength {
                             default: None,
                             max: None,
@@ -1075,7 +1073,7 @@ mod tests {
             // SetParameter disallowed when the server is enabled.
             assert_eq!(
                 proxy
-                    .set_parameter(&mut fidl_fuchsia_net_dhcp::Parameter::Lease(
+                    .set_parameter(&fidl_fuchsia_net_dhcp::Parameter::Lease(
                         fidl_fuchsia_net_dhcp::LeaseLength {
                             default: None,
                             max: None,

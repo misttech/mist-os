@@ -87,7 +87,7 @@ async fn handle_fidl_request(
             disconnect(sme, reason, responder);
             Ok(())
         }
-        ClientSmeRequest::Status { responder } => responder.send(&mut status(sme)),
+        ClientSmeRequest::Status { responder } => responder.send(&status(sme)),
         ClientSmeRequest::WmmStatus { responder } => wmm_status(sme, responder).await,
     }
 }
@@ -188,17 +188,17 @@ async fn serve_connect_txn_stream(
             match connect_txn_stream.next().fuse().await {
                 Some(event) => filter_out_peer_closed(match event {
                     ConnectTransactionEvent::OnConnectResult { result, is_reconnect } => {
-                        let mut connect_result = convert_connect_result(&result, is_reconnect);
-                        handle.send_on_connect_result(&mut connect_result)
+                        let connect_result = convert_connect_result(&result, is_reconnect);
+                        handle.send_on_connect_result(&connect_result)
                     }
-                    ConnectTransactionEvent::OnDisconnect { mut info } => {
-                        handle.send_on_disconnect(&mut info)
+                    ConnectTransactionEvent::OnDisconnect { info } => {
+                        handle.send_on_disconnect(&info)
                     }
-                    ConnectTransactionEvent::OnSignalReport { mut ind } => {
-                        handle.send_on_signal_report(&mut ind)
+                    ConnectTransactionEvent::OnSignalReport { ind } => {
+                        handle.send_on_signal_report(&ind)
                     }
-                    ConnectTransactionEvent::OnChannelSwitched { mut info } => {
-                        handle.send_on_channel_switched(&mut info)
+                    ConnectTransactionEvent::OnChannelSwitched { info } => {
+                        handle.send_on_channel_switched(&info)
                     }
                 })?,
                 // SME has dropped the ConnectTransaction endpoint, likely due to a disconnect.
@@ -394,7 +394,7 @@ mod tests {
             client_sme_proxy: &fidl_sme::ClientSmeProxy,
         ) -> fidl_sme::ClientSmeScanResult {
             client_sme_proxy
-                .scan(&mut fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
+                .scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
                 .await
                 .expect("FIDL request failed")
         }

@@ -348,7 +348,7 @@ mod tests {
                         let finterfaces::WatcherRequest::Watch { responder } =
                             into_stream.next().await.unwrap().unwrap();
                         let () = responder
-                            .send(&mut finterfaces::Event::Idle(finterfaces::Empty {}))
+                            .send(&finterfaces::Event::Idle(finterfaces::Empty {}))
                             .unwrap();
                     }
                     err => panic!("Error in request handler: {:?}", err),
@@ -364,7 +364,7 @@ mod tests {
                 .collect();
             self.push_state(move |req| match req {
                 finterfaces::WatcherRequest::Watch { responder } => responder
-                    .send(&mut finterfaces::Event::Existing(finterfaces::Properties {
+                    .send(&finterfaces::Event::Existing(finterfaces::Properties {
                         addresses: Some(addresses),
                         ..Default::default()
                     }))

@@ -241,7 +241,7 @@ async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(
     lifecycle_controller_proxy
         .destroy_instance(
             &parent_moniker,
-            &mut fdecl::ChildRef {
+            &fdecl::ChildRef {
                 name: child_name.to_string(),
                 collection: Some(ACCOUNT_PROVIDERS_COLLECTION.to_string()),
             },

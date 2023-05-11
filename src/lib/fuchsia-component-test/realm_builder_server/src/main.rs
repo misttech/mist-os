@@ -2250,12 +2250,12 @@ mod tests {
         async fn add_route_or_panic(
             &self,
             capabilities: Vec<ftest::Capability>,
-            mut from: fcdecl::Ref,
+            from: fcdecl::Ref,
             tos: Vec<fcdecl::Ref>,
         ) {
             let () = self
                 .realm_proxy
-                .add_route(&capabilities, &mut from, &tos)
+                .add_route(&capabilities, &from, &tos)
                 .await
                 .expect("failed to make Realm.AddRoute call")
                 .expect("failed to add route");
@@ -3679,7 +3679,7 @@ mod tests {
                     availability: Some(fcdecl::Availability::SameAsTarget),
                     ..Default::default()
                 })],
-                &mut fcdecl::Ref::Parent(fcdecl::ParentRef {}),
+                &fcdecl::Ref::Parent(fcdecl::ParentRef {}),
                 &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await
@@ -4260,7 +4260,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_route_error(
         capabilities: Vec<ftest::Capability>,
-        mut from: fcdecl::Ref,
+        from: fcdecl::Ref,
         to: Vec<fcdecl::Ref>,
         expected_err: ftest::RealmBuilderError,
     ) {
@@ -4271,7 +4271,7 @@ mod tests {
 
         let err = realm_and_builder_task
             .realm_proxy
-            .add_route(&capabilities, &mut from, &to)
+            .add_route(&capabilities, &from, &to)
             .await
             .expect("failed to call AddRoute")
             .expect_err("AddRoute succeeded unexpectedly");

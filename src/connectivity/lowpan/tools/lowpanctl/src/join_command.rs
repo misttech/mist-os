@@ -145,16 +145,14 @@ impl JoinCommand {
     }
 
     pub async fn exec(&self, context: &mut LowpanCtlContext) -> Result<(), Error> {
-        let mut join_args = self.get_join_params()?;
+        let join_args = self.get_join_params()?;
         let device_extra = context
             .get_default_experimental_device_extra()
             .await
             .context("Unable to get device instance")?;
         let (client_end, server_end) = create_endpoints::<ProvisioningMonitorMarker>();
         let monitor = client_end.into_proxy()?;
-        device_extra
-            .join_network(&mut join_args, server_end)
-            .context("Unable to send join command")?;
+        device_extra.join_network(&join_args, server_end).context("Unable to send join command")?;
         loop {
             match monitor.watch_progress().await? {
                 Ok(ProvisioningProgress::Progress(x)) => {

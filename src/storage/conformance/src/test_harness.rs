@@ -86,11 +86,11 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
         .expect("Cannot connect to Realm service");
     let realm = fcomponent::RealmSynchronousProxy::new(client);
     // fs_test is the name of the child component defined in the manifest.
-    let mut child_ref = fdecl::ChildRef { name: "fs_test".to_string(), collection: None };
+    let child_ref = fdecl::ChildRef { name: "fs_test".to_string(), collection: None };
     let (client, server) = zx::Channel::create();
     realm
         .open_exposed_dir(
-            &mut child_ref,
+            &child_ref,
             fidl::endpoints::ServerEnd::<fio::DirectoryMarker>::new(server),
             zx::Time::INFINITE,
         )

@@ -102,7 +102,7 @@ async fn handle_fidl_request<'a>(
             error!("GetMeshPathTable not implemented");
             responder.send(
                 fidl_sme::GetMeshPathTableResultCode::InternalError,
-                &mut fidl_mesh::MeshPathTable { paths: Vec::new() },
+                &fidl_mesh::MeshPathTable { paths: Vec::new() },
             )
         }
     }

@@ -55,8 +55,8 @@ async fn create_instance(
         .expect("Failure creating view");
 
     let mut root_transform = flatland::TransformId { value: get_next_global_id() };
-    flatland_instance.create_transform(&mut root_transform).expect("fidl error");
-    flatland_instance.set_root_transform(&mut root_transform).expect("fidl error");
+    flatland_instance.create_transform(&root_transform).expect("fidl error");
+    flatland_instance.set_root_transform(&root_transform).expect("fidl error");
 
     create_and_attach_rect(&flatland_instance, &mut root_transform);
 
@@ -68,13 +68,13 @@ async fn create_instance(
 fn create_viewport(
     proxy: &flatland::FlatlandProxy,
     token: fviews::ViewportCreationToken,
-    mut viewport_id: flatland::ContentId,
+    viewport_id: flatland::ContentId,
 ) {
     let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>()
         .expect("failed to create ChildViewWatcher endpoints");
     proxy
         .create_viewport(
-            &mut viewport_id,
+            &viewport_id,
             token,
             &flatland::ViewportProperties {
                 logical_size: Some(fmath::SizeU {
@@ -94,17 +94,17 @@ fn create_and_attach_rect(
     proxy: &flatland::FlatlandProxy,
     root_transform_id: &mut flatland::TransformId,
 ) {
-    let mut rect_transform_id = flatland::TransformId { value: get_next_global_id() };
-    proxy.create_transform(&mut rect_transform_id).expect("fidl error");
-    let mut rect_content_id = flatland::ContentId { value: get_next_global_id() };
-    proxy.create_filled_rect(&mut rect_content_id).expect("fidl error");
-    proxy.set_content(&mut rect_transform_id, &mut rect_content_id).expect("fidl error");
-    proxy.add_child(root_transform_id, &mut rect_transform_id).expect("fidl error");
+    let rect_transform_id = flatland::TransformId { value: get_next_global_id() };
+    proxy.create_transform(&rect_transform_id).expect("fidl error");
+    let rect_content_id = flatland::ContentId { value: get_next_global_id() };
+    proxy.create_filled_rect(&rect_content_id).expect("fidl error");
+    proxy.set_content(&rect_transform_id, &rect_content_id).expect("fidl error");
+    proxy.add_child(root_transform_id, &rect_transform_id).expect("fidl error");
     proxy
         .set_solid_fill(
-            &mut rect_content_id,
-            &mut flatland::ColorRgba { red: 0.0, blue: 1.0, green: 0.0, alpha: 1.0 },
-            &mut fmath::SizeU { width: DISPLAY_WIDTH as u32, height: DISPLAY_HEIGHT as u32 },
+            &rect_content_id,
+            &flatland::ColorRgba { red: 0.0, blue: 1.0, green: 0.0, alpha: 1.0 },
+            &fmath::SizeU { width: DISPLAY_WIDTH as u32, height: DISPLAY_HEIGHT as u32 },
         )
         .expect("fidl error");
 }
@@ -206,7 +206,7 @@ impl FlatlandInstance {
                 .expect("Failure setting the display");
         }
 
-        let (root_instance, root_view_ref, mut root_transform_id) =
+        let (root_instance, root_view_ref, root_transform_id) =
             create_instance(root_view_creation_token, &realm).await;
 
         // Set up the input injection target view.
@@ -217,7 +217,7 @@ impl FlatlandInstance {
             .expect("failed to create token pair");
         let (target_instance, target_view_ref, target_root_transform) =
             create_instance(target_view_creation_token, &realm).await;
-        let mut viewport_content_id = flatland::ContentId { value: get_next_global_id() };
+        let viewport_content_id = flatland::ContentId { value: get_next_global_id() };
         create_viewport(
             &root_instance,
             target_viewport_creation_token,
@@ -225,9 +225,7 @@ impl FlatlandInstance {
         );
 
         // Attach target view to root.
-        root_instance
-            .set_content(&mut root_transform_id, &mut viewport_content_id)
-            .expect("fidl error");
+        root_instance.set_content(&root_transform_id, &viewport_content_id).expect("fidl error");
 
         // Make initial present calls and set up autopresenters.
         let mut root_stream = root_instance.take_event_stream();
@@ -279,9 +277,9 @@ impl FlatlandInstance {
             .create_view2(view_creation_token, view_identity, protocols, parent_viewport_watcher)
             .expect("Failure creating view");
 
-        let mut root_transform = flatland::TransformId { value: get_next_global_id() };
-        flatland_instance.create_transform(&mut root_transform).expect("fidl error");
-        flatland_instance.set_root_transform(&mut root_transform).expect("fidl error");
+        let root_transform = flatland::TransformId { value: get_next_global_id() };
+        flatland_instance.create_transform(&root_transform).expect("fidl error");
+        flatland_instance.set_root_transform(&root_transform).expect("fidl error");
 
         let mut stream = flatland_instance.take_event_stream();
         let flatland_instance = Arc::new(flatland_instance);
@@ -316,14 +314,12 @@ impl FlatlandInstance {
             }
         };
 
-        let mut viewport_content_id = flatland::ContentId { value: get_next_global_id() };
-        let mut viewport_transform_id = flatland::TransformId { value: get_next_global_id() };
+        let viewport_content_id = flatland::ContentId { value: get_next_global_id() };
+        let viewport_transform_id = flatland::TransformId { value: get_next_global_id() };
         create_viewport(&*instance, viewport_creation_token, viewport_content_id.clone());
-        instance.create_transform(&mut viewport_transform_id).expect("fidl error");
-        instance.add_child(root_transform, &mut viewport_transform_id).expect("fidl error");
-        instance
-            .set_content(&mut viewport_transform_id, &mut viewport_content_id)
-            .expect("fidl error");
+        instance.create_transform(&viewport_transform_id).expect("fidl error");
+        instance.add_child(root_transform, &viewport_transform_id).expect("fidl error");
+        instance.set_content(&viewport_transform_id, &viewport_content_id).expect("fidl error");
         child_instances.push((child, viewport_content_id));
     }
 
@@ -338,8 +334,8 @@ impl FlatlandInstance {
 
         let num_sessions = children.len();
         let index = rng.gen_range(0..num_sessions);
-        let (_child_instance, mut viewport_content_id) = children.remove(index);
-        instance.release_viewport(&mut viewport_content_id).await.expect("fidl error");
+        let (_child_instance, viewport_content_id) = children.remove(index);
+        instance.release_viewport(&viewport_content_id).await.expect("fidl error");
     }
 
     pub fn has_children(&self) -> bool {

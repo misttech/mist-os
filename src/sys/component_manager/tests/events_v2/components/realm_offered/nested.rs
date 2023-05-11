@@ -25,12 +25,12 @@ async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) {
 
         let realm = connect_to_protocol::<fcomponent::RealmMarker>().expect("connect to realm");
         for id in &["a", "b", "c"] {
-            let mut child_ref = fdecl::ChildRef { name: format!("child_{}", id), collection: None };
+            let child_ref = fdecl::ChildRef { name: format!("child_{}", id), collection: None };
 
             let (exposed_dir, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             realm
-                .open_exposed_dir(&mut child_ref, server_end)
+                .open_exposed_dir(&child_ref, server_end)
                 .await
                 .expect("failed to open exposed dir")
                 .unwrap();

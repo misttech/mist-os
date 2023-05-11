@@ -1334,10 +1334,9 @@ mod tests {
         /// The reports provided by the `InputDevice`.
         pub(super) async fn get_input_reports(
             input_device: Box<InputDevice>,
-            mut input_device_proxy: InputDeviceProxy,
+            input_device_proxy: InputDeviceProxy,
         ) -> Vec<InputReport> {
-            let input_reports_reader_proxy =
-                make_input_reports_reader_proxy(&mut input_device_proxy);
+            let input_reports_reader_proxy = make_input_reports_reader_proxy(&input_device_proxy);
             let input_device_server_fut = input_device.flush();
             let input_reports_fut = input_reports_reader_proxy.read_input_reports();
             std::mem::drop(input_reports_reader_proxy); // Close channel to `input_reports_reader_server_end`

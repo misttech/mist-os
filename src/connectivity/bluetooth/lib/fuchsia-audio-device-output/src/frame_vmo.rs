@@ -198,11 +198,11 @@ impl FrameVmo {
             let start_time = self.start_time.unwrap();
             let end_frame_time = start_time + self.duration_from_frames(frame);
             let notify_frame_bytes = self.frame_idx(frame) * self.bytes_per_frame;
-            let mut info = RingBufferPositionInfo {
+            let info = RingBufferPositionInfo {
                 timestamp: end_frame_time.into_nanos(),
                 position: notify_frame_bytes as u32,
             };
-            if let Some(Ok(())) = self.position_responder.take().map(|t| t.send(&mut info)) {
+            if let Some(Ok(())) = self.position_responder.take().map(|t| t.send(&info)) {
                 self.next_notify_frame += self.frames_between_notifications;
             }
         }

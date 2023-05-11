@@ -110,13 +110,9 @@ impl Scanout for FlatlandScanout {
             // In practice for single scanout configurations drivers usually provide precisely
             // sized resources.
             let content_id = self.get_or_create_resource(resource)?;
-            self.flatland
-                .set_content(&mut self.content_transform_id.clone(), &mut content_id.clone())?;
+            self.flatland.set_content(&self.content_transform_id, &content_id)?;
         } else {
-            self.flatland.set_content(
-                &mut self.content_transform_id.clone(),
-                &mut NULL_CONTENT_ID.clone(),
-            )?;
+            self.flatland.set_content(&self.content_transform_id, &NULL_CONTENT_ID)?;
         }
         Ok(())
     }
@@ -135,9 +131,9 @@ impl Scanout for FlatlandScanout {
         // Update our background node
         let result = (|| -> Result<(), Error> {
             self.flatland.set_solid_fill(
-                &mut self.root_content_id.clone(),
-                &mut BACKGROUND_COLOR.clone(),
-                &mut self.layout_info.logical_size.unwrap().clone(),
+                &self.root_content_id,
+                &BACKGROUND_COLOR,
+                &self.layout_info.logical_size.unwrap(),
             )?;
             self.present()?;
             Ok(())
@@ -155,16 +151,15 @@ impl Scanout for FlatlandScanout {
         resource: Option<&Resource2D<'a>>,
         _cursor_hotspot: (u32, u32),
     ) -> Result<(), Error> {
-        let mut content_id = if let Some(resource) = resource {
+        let content_id = if let Some(resource) = resource {
             let content_id = self.get_or_create_resource(resource)?;
-            self.flatland
-                .set_image_blending_function(&mut content_id.clone(), BlendMode::SrcOver)?;
+            self.flatland.set_image_blending_function(&content_id, BlendMode::SrcOver)?;
             content_id
         } else {
             NULL_CONTENT_ID.clone()
         };
 
-        self.flatland.set_content(&mut self.cursor_transform_id.clone(), &mut content_id)?;
+        self.flatland.set_content(&self.cursor_transform_id, &content_id)?;
 
         Ok(())
     }
@@ -177,8 +172,7 @@ impl Scanout for FlatlandScanout {
         // the cursor resource.
         let x = pos.x.get() as i32;
         let y = pos.y.get() as i32;
-        self.flatland
-            .set_translation(&mut self.cursor_transform_id.clone(), &mut fmath::Vec_ { x, y })?;
+        self.flatland.set_translation(&self.cursor_transform_id, &fmath::Vec_ { x, y })?;
         self.present()?;
         Ok(())
     }
@@ -247,23 +241,23 @@ impl FlatlandScanout {
         // resource_id. We start at 1 because 0 is not a valid id.
         let mut next_flatland_id = 1u64;
         let root_transform_id = new_transform_id(&mut next_flatland_id);
-        flatland.create_transform(&mut root_transform_id.clone())?;
+        flatland.create_transform(&root_transform_id)?;
 
         // Create a root transform node that is just a solid color.
         let root_content_id = new_content_id(&mut next_flatland_id);
-        flatland.create_filled_rect(&mut root_content_id.clone())?;
-        flatland.set_content(&mut root_transform_id.clone(), &mut root_content_id.clone())?;
-        flatland.set_root_transform(&mut root_transform_id.clone())?;
+        flatland.create_filled_rect(&root_content_id)?;
+        flatland.set_content(&root_transform_id, &root_content_id)?;
+        flatland.set_root_transform(&root_transform_id)?;
 
         // Add a content node that will hold any attached resources.
         let content_transform_id = new_transform_id(&mut next_flatland_id);
-        flatland.create_transform(&mut content_transform_id.clone())?;
-        flatland.add_child(&mut root_transform_id.clone(), &mut content_transform_id.clone())?;
+        flatland.create_transform(&content_transform_id)?;
+        flatland.add_child(&root_transform_id, &content_transform_id)?;
 
         // Add a cursor node on top of the scanout content.
         let cursor_transform_id = new_transform_id(&mut next_flatland_id);
-        flatland.create_transform(&mut cursor_transform_id.clone())?;
-        flatland.add_child(&mut root_transform_id.clone(), &mut cursor_transform_id.clone())?;
+        flatland.create_transform(&cursor_transform_id)?;
+        flatland.add_child(&root_transform_id, &cursor_transform_id)?;
 
         // Wait for an initial layout. We don't bother attaching a scanout until we have an initial
         // size so that we can report the size of this scanout to the driver.
@@ -287,9 +281,9 @@ impl FlatlandScanout {
 
         // Perform an initial present.
         flatland.set_solid_fill(
-            &mut root_content_id.clone(),
-            &mut BACKGROUND_COLOR.clone(),
-            &mut initial_layout.logical_size.unwrap().clone(),
+            &root_content_id,
+            &BACKGROUND_COLOR,
+            &initial_layout.logical_size.unwrap(),
         )?;
         flatland.present(PresentArgs::default())?;
 

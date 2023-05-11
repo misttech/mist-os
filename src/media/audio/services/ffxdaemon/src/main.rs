@@ -110,7 +110,7 @@ impl AudioDaemon {
                     break;
                 }
                 match event {
-                    fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { mut packet } => {
+                    fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { packet } => {
                         packets_so_far += 1;
 
                         let mut data = vec![0u8; packet.payload_size as usize];
@@ -119,12 +119,12 @@ impl AudioDaemon {
                             .map_err(|e| anyhow::anyhow!("Failed to read vmo {e}"))?;
 
                         async_stdout_writer
-                            .write_all(&mut data)
+                            .write_all(&data)
                             .await
                             .map_err(|e| anyhow::anyhow!("Error writing to stdout socket: {e}"))?;
 
                         capturer_proxy
-                            .release_packet(&mut packet)
+                            .release_packet(&packet)
                             .map_err(|e| anyhow::anyhow!("Release packet error: {}", e))?;
 
                         if let Some(packets_to_capture) = packets_to_capture {
@@ -213,7 +213,7 @@ impl AudioDaemon {
     async fn create_capturer_from_location(
         location: RecordLocation,
         format: &format_utils::Format,
-        mut stream_type: AudioStreamType,
+        stream_type: AudioStreamType,
         gain_settings: Option<GainSettings>,
     ) -> Result<AudioCapturerProxy, Error> {
         let (client_end, server_end) =
@@ -229,7 +229,7 @@ impl AudioDaemon {
 
                     audio_component.create_audio_capturer(server_end, false)?;
                     let capturer_proxy = client_end.into_proxy()?;
-                    capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
+                    capturer_proxy.set_pcm_stream_type(&stream_type)?;
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_client_end, gain_control_server_end) =
@@ -288,7 +288,7 @@ impl AudioDaemon {
                 audio_component.create_audio_capturer(server_end, true)?;
 
                 let capturer_proxy = client_end.into_proxy()?;
-                capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
+                capturer_proxy.set_pcm_stream_type(&stream_type)?;
                 Ok(capturer_proxy)
             }
             _ => Err(anyhow::anyhow!("Unsupported RecordLocation")),
@@ -346,7 +346,7 @@ impl AudioDaemon {
                         audio_renderer_proxy.set_usage(usage)?;
                     }
 
-                    audio_renderer_proxy.set_pcm_stream_type(&mut AudioStreamType::from(format))?;
+                    audio_renderer_proxy.set_pcm_stream_type(&AudioStreamType::from(format))?;
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_client_end, gain_control_server_end) =
@@ -390,16 +390,15 @@ impl AudioDaemon {
             }
             vmo.write(&buf[..total_bytes_read], payload_offset)?;
 
-            let packet_fut =
-                audio_renderer_proxy.send_packet(&mut fidl_fuchsia_media::StreamPacket {
-                    pts: fidl_fuchsia_media::NO_TIMESTAMP,
-                    payload_buffer_id: 0,
-                    payload_offset: payload_offset,
-                    payload_size: total_bytes_read as u64,
-                    flags: 0,
-                    buffer_config: 0,
-                    stream_segment_id: 0,
-                });
+            let packet_fut = audio_renderer_proxy.send_packet(&fidl_fuchsia_media::StreamPacket {
+                pts: fidl_fuchsia_media::NO_TIMESTAMP,
+                payload_buffer_id: 0,
+                payload_offset: payload_offset,
+                payload_size: total_bytes_read as u64,
+                flags: 0,
+                buffer_config: 0,
+                stream_segment_id: 0,
+            });
 
             if payload_offset == 0 && iteration == 1 {
                 audio_renderer_proxy

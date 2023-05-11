@@ -34,7 +34,7 @@ async fn main() -> Result<(), Error> {
             .with_context(|| format!("Failed to load {path}"))?;
         let res = store
             // [START diff_2]
-            .write_item(&mut Item {
+            .write_item(&Item {
                 key: key.clone(),
                 value: Some(Box::new(Value::Bytes(value.into_bytes()))),
             })
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Error> {
 
         // Send the `NestedStore`, represented as a vector of values.
         let res = store
-            .write_item(&mut Item {
+            .write_item(&Item {
                 key: key.to_string(),
                 value: Some(Box::new(Value::Store(nested_store))),
             })
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Error> {
 
     // Each entry in this list is a null value in the store.
     for key in config.write_null.into_iter() {
-        match store.write_item(&mut Item { key: key.to_string(), value: None }).await? {
+        match store.write_item(&Item { key: key.to_string(), value: None }).await? {
             Ok(_) => println!("WriteItem Success at key: {}", key),
             Err(err) => println!("WriteItem Error: {}", err.into_primitive()),
         }

@@ -2027,7 +2027,7 @@ impl<'a> NetCfg<'a> {
 
         let subnet = fidl_fuchsia_net_ext::apply_subnet_mask(addr);
         let () = stack
-            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet,
                 device_id: interface_id.get(),
                 next_hop: None,
@@ -2073,7 +2073,7 @@ impl<'a> NetCfg<'a> {
         let v = vec![ipv4];
         debug!("setting DHCP IpAddrs parameter to {:?}", v);
         let () = dhcp_server
-            .set_parameter(&mut fnet_dhcp::Parameter::IpAddrs(v))
+            .set_parameter(&fnet_dhcp::Parameter::IpAddrs(v))
             .await
             .context("error sending set DHCP IpAddrs parameter request")
             .map_err(errors::Error::NonFatal)?
@@ -2084,7 +2084,7 @@ impl<'a> NetCfg<'a> {
         let v = vec![name];
         debug!("setting DHCP BoundDeviceNames parameter to {:?}", v);
         let () = dhcp_server
-            .set_parameter(&mut fnet_dhcp::Parameter::BoundDeviceNames(v))
+            .set_parameter(&fnet_dhcp::Parameter::BoundDeviceNames(v))
             .await
             .context("error sending set DHCP BoundDeviceName parameter request")
             .map_err(errors::Error::NonFatal)?
@@ -2099,7 +2099,7 @@ impl<'a> NetCfg<'a> {
         };
         debug!("setting DHCP LeaseLength parameter to {:?}", v);
         let () = dhcp_server
-            .set_parameter(&mut fnet_dhcp::Parameter::Lease(v))
+            .set_parameter(&fnet_dhcp::Parameter::Lease(v))
             .await
             .context("error sending set DHCP LeaseLength parameter request")
             .map_err(errors::Error::NonFatal)?
@@ -2128,7 +2128,7 @@ impl<'a> NetCfg<'a> {
         };
         debug!("setting DHCP AddressPool parameter to {:?}", v);
         dhcp_server
-            .set_parameter(&mut fnet_dhcp::Parameter::AddressPool(v))
+            .set_parameter(&fnet_dhcp::Parameter::AddressPool(v))
             .await
             .context("error sending set DHCP AddressPool parameter request")
             .map_err(errors::Error::NonFatal)?

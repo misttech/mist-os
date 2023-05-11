@@ -284,7 +284,7 @@ pub(super) fn maybe_send_watch_prefix_response(
 
     if let Some(responder) = watch_prefix_responder.take() {
         responder
-            .send(&mut new_prefix.map_or(
+            .send(&new_prefix.map_or(
                 fnet_dhcpv6::PrefixEvent::Unassigned(fnet_dhcpv6::Empty),
                 |PrefixOnInterface { interface_id: _, prefix, lifetimes }| {
                     fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {

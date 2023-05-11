@@ -105,9 +105,9 @@ async fn discover_characteristics(
 }
 
 async fn read_characteristic(svc: &RemoteServiceProxy, id: u64) -> Result<(), Error> {
-    let mut options = ReadOptions::ShortRead(ShortReadOptions {});
+    let options = ReadOptions::ShortRead(ShortReadOptions {});
     let value: ReadValue = svc
-        .read_characteristic(&mut Handle { value: id }, &mut options)
+        .read_characteristic(&Handle { value: id }, &options)
         .await
         .map_err(|e| format_err!("Failed to read characteristic: {e:?}"))?
         .map_err(|e| format_err!("Failed to read characteristic: {:?}", e))?;
@@ -125,14 +125,14 @@ async fn read_long_characteristic(
     offset: u16,
     max_bytes: u16,
 ) -> Result<(), Error> {
-    let mut options = ReadOptions::LongRead(LongReadOptions {
+    let options = ReadOptions::LongRead(LongReadOptions {
         offset: Some(offset),
         max_bytes: Some(max_bytes),
         ..Default::default()
     });
 
     let value: ReadValue = svc
-        .read_characteristic(&mut Handle { value: id }, &mut options)
+        .read_characteristic(&Handle { value: id }, &options)
         .await
         .map_err(|e| format_err!("Failed to read characteristic: {e:?}"))?
         .map_err(|e| format_err!("Failed to read characteristic: {:?}", e))?;
@@ -191,8 +191,8 @@ async fn read_long_descriptor(
 ) -> Result<(), Error> {
     let value: ReadValue = svc
         .read_descriptor(
-            &mut Handle { value: id },
-            &mut ReadOptions::LongRead(LongReadOptions {
+            &Handle { value: id },
+            &ReadOptions::LongRead(LongReadOptions {
                 offset: Some(offset),
                 max_bytes: Some(max_bytes),
                 ..Default::default()
@@ -217,7 +217,7 @@ async fn write_descriptor(
     value: Vec<u8>,
 ) -> Result<(), Error> {
     svc.write_descriptor(
-        &mut Handle { value: id },
+        &Handle { value: id },
         &value,
         &WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() },
     )
@@ -254,7 +254,7 @@ async fn do_connect<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> Resul
         Ok(i) => i,
     };
 
-    let mut svc_handle = match client.read().services.get(index) {
+    let svc_handle = match client.read().services.get(index) {
         None => {
             println!("index out of bounds! ({})", index);
             return Ok(());
@@ -269,7 +269,7 @@ async fn do_connect<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> Resul
     // First close the connection to the currently active service.
     let _ = client.write().active_service.take();
 
-    client.read().proxy.connect_to_service(&mut svc_handle, server)?;
+    client.read().proxy.connect_to_service(&svc_handle, server)?;
     let chrcs = discover_characteristics(&proxy).await?;
 
     client.write().active_index = index;
@@ -605,9 +605,9 @@ async fn do_read_by_type<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> 
         Ok(u) => u,
     };
 
-    let mut fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
+    let fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
     match &client.read().active_service {
-        Some(svc) => match svc.proxy.read_by_type(&mut fidl_uuid).await {
+        Some(svc) => match svc.proxy.read_by_type(&fidl_uuid).await {
             Ok(Ok(results)) => {
                 if results.len() == 0 {
                     println!("No results received.");
@@ -669,7 +669,7 @@ async fn do_enable_notify<'a>(args: &'a [&'a str], client: &'a GattClientPtr) ->
         endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
     let proxy = client.read().try_clone_proxy().unwrap();
     proxy
-        .register_characteristic_notifier(&mut Handle { value: id }, notifier_client)
+        .register_characteristic_notifier(&Handle { value: id }, notifier_client)
         .await
         .context("Failed to register characteristic notifier")?
         .map_err(|e| format_err!("Failed to register characteristic notifier: {:?}", e))?;

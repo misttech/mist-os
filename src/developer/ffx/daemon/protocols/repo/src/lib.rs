@@ -1266,7 +1266,7 @@ impl<
                     ServerState::Disabled => ServerStatus::Disabled,
                 };
 
-                responder.send(&mut status.into())?;
+                responder.send(&status.into())?;
 
                 Ok(())
             }
@@ -2320,7 +2320,7 @@ mod tests {
     async fn add_repo(proxy: &ffx::RepositoryRegistryProxy, repo_name: &str) {
         let spec = pm_repo_spec();
         proxy
-            .add_repository(repo_name, &mut spec.into())
+            .add_repository(repo_name, &spec.into())
             .await
             .expect("communicated with proxy")
             .expect("adding repository to succeed");
@@ -3080,7 +3080,7 @@ mod tests {
             let runtime_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
 
             proxy
-                .server_start(Some(&mut SocketAddress(runtime_address).into()))
+                .server_start(Some(&SocketAddress(runtime_address).into()))
                 .await
                 .unwrap()
                 .unwrap();
@@ -3151,7 +3151,7 @@ mod tests {
             }
 
             proxy
-                .add_repository(REPO_NAME, &mut spec.clone())
+                .add_repository(REPO_NAME, &spec)
                 .await
                 .expect("communicated with proxy")
                 .expect("adding repository to succeed");

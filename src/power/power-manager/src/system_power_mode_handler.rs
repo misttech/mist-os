@@ -807,10 +807,10 @@ mod tests {
             &self,
             executor: &mut fasync::TestExecutor,
             client_type: ClientType,
-            mut config: ClientConfig,
+            config: ClientConfig,
         ) {
             assert_matches!(
-                executor.run_singlethreaded(self.proxy.set(client_type, &mut config)),
+                executor.run_singlethreaded(self.proxy.set(client_type, &config)),
                 Ok(())
             );
         }

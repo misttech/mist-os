@@ -509,7 +509,7 @@ impl BluetoothSysFacade {
         let tag = "BluetoothSysFacade::forget";
         match &self.inner.read().access_proxy {
             Some(proxy) => {
-                let resp = proxy.forget(&mut PeerId { value: id }).await?;
+                let resp = proxy.forget(&PeerId { value: id }).await?;
                 if let Err(err) = resp {
                     let err_msg = format_err!("Error: {:?}", err);
                     fx_err_and_bail!(&with_line!(tag), err_msg)
@@ -531,7 +531,7 @@ impl BluetoothSysFacade {
         let tag = "BluetoothSysFacade::connect";
         match &self.inner.read().access_proxy {
             Some(proxy) => {
-                let resp = proxy.connect(&mut PeerId { value: id }).await?;
+                let resp = proxy.connect(&PeerId { value: id }).await?;
                 if let Err(err) = resp {
                     let err_msg = format_err!("Error: {:?}", err);
                     fx_err_and_bail!(&with_line!(tag), err_msg)
@@ -617,7 +617,7 @@ impl BluetoothSysFacade {
             ),
         };
         let fut = async move {
-            let result = proxy.pair(&mut PeerId { value: id }, &pairing_options).await;
+            let result = proxy.pair(&PeerId { value: id }, &pairing_options).await;
             if let Err(err) = result {
                 error!(tag = &with_line!("BluetoothSysFacade::pair"), ?err, "Failed to pair with",);
             }
@@ -634,7 +634,7 @@ impl BluetoothSysFacade {
         let tag = "BluetoothSysFacade::disconnect";
         match &self.inner.read().access_proxy {
             Some(proxy) => {
-                let resp = proxy.disconnect(&mut PeerId { value: id }).await?;
+                let resp = proxy.disconnect(&PeerId { value: id }).await?;
                 if let Err(err) = resp {
                     let err_msg = format_err!("Error: {:?}", err);
                     fx_err_and_bail!(&with_line!(tag), err_msg)

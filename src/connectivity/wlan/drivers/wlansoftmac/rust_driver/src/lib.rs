@@ -384,12 +384,12 @@ mod tests {
             .take()
             .unwrap()
             .into_proxy()?;
-        let mut legacy_privacy_support =
+        let legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
         let (generic_sme_proxy, generic_sme_server) =
             fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()?;
 
-        let start_fut = usme_client_proxy.start(generic_sme_server, &mut legacy_privacy_support);
+        let start_fut = usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
         let handle = exec.run_singlethreaded(handle_fut)?;
         exec.run_singlethreaded(start_fut).expect("USME boostrap failed");
 
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn wlansoftmac_bad_mac_role_fails_startup_with_bad_features() {
         let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&mut exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device_state.lock().unwrap().mac_sublayer_support.device.is_synthetic = true;
         fake_device_state.lock().unwrap().mac_sublayer_support.device.mac_implementation_type =
             banjo_common::MacImplementationType::FULLMAC;
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn wlansoftmac_startup_fails_on_bad_bootstrap() {
         let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&mut exec);
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
         let handle_fut = start_wlansoftmac_async(fake_device.clone(), fake_buf_provider);
         pin_mut!(handle_fut);

@@ -63,7 +63,7 @@ impl AudioConsumerSink {
     ) -> Result<AudioConsumerSink, Error> {
         let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy()?;
 
-        let mut audio_stream_type = AudioStreamType {
+        let audio_stream_type = AudioStreamType {
             sample_format: AudioSampleFormat::Signed16,
             channels: 2, // Stereo
             frames_per_second,
@@ -87,7 +87,7 @@ impl AudioConsumerSink {
 
         audio_consumer.create_stream_sink(
             vmos_for_sink,
-            &mut audio_stream_type,
+            &audio_stream_type,
             compression.as_ref(),
             stream_sink_server,
         )?;
@@ -155,7 +155,7 @@ impl AudioConsumerSink {
         self.tx_count += 1;
         trace::flow_begin!("stream-sink", "SendPacket", self.tx_count.into());
 
-        let mut packet = StreamPacket {
+        let packet = StreamPacket {
             pts: NO_TIMESTAMP,
             payload_buffer_id: buffer_index as u32,
             payload_offset: 0,
@@ -171,7 +171,7 @@ impl AudioConsumerSink {
             self.audio_consumer.start(AudioConsumerStartFlags::SUPPLY_DRIVEN, 0, NO_TIMESTAMP)?;
         }
 
-        let send_fut = self.stream_sink.send_packet(&mut packet);
+        let send_fut = self.stream_sink.send_packet(&packet);
         self.send_futures.push(send_fut.map_ok(Box::new(move |_| buffer_index)));
         Ok(())
     }

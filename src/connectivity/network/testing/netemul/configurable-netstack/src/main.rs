@@ -296,7 +296,7 @@ async fn configure_interface(
             let stack =
                 connect_to_protocol::<fnet_stack::StackMarker>().context("connect to protocol")?;
             stack
-                .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                     subnet,
                     device_id: nicid,
                     next_hop: None,
@@ -318,7 +318,7 @@ async fn configure_interface(
         let stack =
             connect_to_protocol::<fnet_stack::StackMarker>().context("connect to protocol")?;
         stack
-            .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                 subnet: fnet::Subnet { addr: unspecified_address, prefix_len: 0 },
                 device_id: nicid,
                 next_hop: Some(Box::new(gateway)),

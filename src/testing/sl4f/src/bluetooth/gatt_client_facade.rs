@@ -229,7 +229,7 @@ impl GattClientFacade {
             format_err!("Not connected to peer")
         })?;
         let (proxy, server) = endpoints::create_proxy()?;
-        client_proxy.connect_to_service(&mut ServiceHandle { value: service_id }, server)?;
+        client_proxy.connect_to_service(&ServiceHandle { value: service_id }, server)?;
         let event_stream = proxy.take_event_stream();
         let event_task = fasync::Task::spawn(GattClientFacade::active_remote_service_event_task(
             self.inner.clone(),
@@ -260,13 +260,13 @@ impl GattClientFacade {
         write_value: Vec<u8>,
         mode: WriteMode,
     ) -> Result<(), Error> {
-        let mut handle = Handle { value: id };
+        let handle = Handle { value: id };
         let options =
             WriteOptions { offset: Some(offset), write_mode: Some(mode), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("No active service"))?
-            .write_characteristic(&mut handle, &write_value, &options);
+            .write_characteristic(&handle, &write_value, &options);
         write_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -304,13 +304,13 @@ impl GattClientFacade {
     async fn gattc_read_char_internal(
         &self,
         id: u64,
-        mut options: ReadOptions,
+        options: ReadOptions,
     ) -> Result<Vec<u8>, Error> {
-        let mut handle = Handle { value: id };
+        let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
-            .read_characteristic(&mut handle, &mut options);
+            .read_characteristic(&handle, &options);
         let read_value = read_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -345,11 +345,11 @@ impl GattClientFacade {
     ) -> Result<Vec<SerializableReadByTypeResult>, Error> {
         let uuid = Uuid::from_str(&raw_uuid)
             .map_err(|e| format_err!("Unable to convert to Uuid: {:?}", e))?;
-        let mut fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
+        let fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
         let read_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
-            .read_by_type(&mut fidl_uuid);
+            .read_by_type(&fidl_uuid);
         let results = read_fut
             .await
             .map_err(|err| format_err!("FIDL error: {:?}", err))?
@@ -364,13 +364,13 @@ impl GattClientFacade {
     async fn gattc_read_desc_internal(
         &self,
         id: u64,
-        mut options: ReadOptions,
+        options: ReadOptions,
     ) -> Result<Vec<u8>, Error> {
-        let mut handle = Handle { value: id };
+        let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
-            .read_descriptor(&mut handle, &mut options);
+            .read_descriptor(&handle, &options);
         let read_value = read_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -409,12 +409,12 @@ impl GattClientFacade {
         offset: u16,
         write_value: Vec<u8>,
     ) -> Result<(), Error> {
-        let mut handle = Handle { value: id };
+        let handle = Handle { value: id };
         let options = WriteOptions { offset: Some(offset), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
-            .write_descriptor(&mut handle, &write_value, &options);
+            .write_descriptor(&handle, &write_value, &options);
         write_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -466,9 +466,8 @@ impl GattClientFacade {
 
             let (client_end, request_stream) =
                 fidl::endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
-            let register_fut = service
-                .proxy
-                .register_characteristic_notifier(&mut Handle { value: id }, client_end);
+            let register_fut =
+                service.proxy.register_characteristic_notifier(&Handle { value: id }, client_end);
 
             (register_fut, request_stream)
         };
@@ -628,7 +627,7 @@ impl GattClientFacade {
             .as_ref()
             .unwrap()
             .proxy
-            .connect(&mut peer_id.clone().into(), &options, conn_server_end)
+            .connect(&peer_id.clone().into(), &options, conn_server_end)
             .map_err(|_| format_err!("FIDL error when trying to connect()"))?;
 
         let (client_proxy, client_server_end) = fidl::endpoints::create_proxy()?;

@@ -399,10 +399,9 @@ mod test {
             }
         }
 
-        let mut connector = ErrorConnector { proxy: RefCell::new(Some(proxy)) };
+        let connector = ErrorConnector { proxy: RefCell::new(Some(proxy)) };
 
-        let parse_ip_fut =
-            parse_ip_addr_with_provider(&mut connector, "[fe80::1:2:3:4%25lo]", 8080);
+        let parse_ip_fut = parse_ip_addr_with_provider(&connector, "[fe80::1:2:3:4%25lo]", 8080);
 
         // Join the two futures to make sure they both complete.
         let ((), res) = future::join(provider_fut, parse_ip_fut).await;

@@ -95,7 +95,7 @@ impl ComponentFacade {
         // wait for the component's `Stopped` event, and exit this command.
         let mut event_stream = EventStream::open().await.unwrap();
         let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()?;
-        let mut collection_ref = fcdecl::CollectionRef { name: collection_name.to_string() };
+        let collection_ref = fcdecl::CollectionRef { name: collection_name.to_string() };
         let child_decl = fcdecl::Child {
             name: Some(child_name.to_string()),
             url: Some(url.to_string()),
@@ -105,17 +105,17 @@ impl ComponentFacade {
         };
         let child_args =
             fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
-        if let Err(err) = realm.create_child(&mut collection_ref, &child_decl, child_args).await? {
+        if let Err(err) = realm.create_child(&collection_ref, &child_decl, child_args).await? {
             fx_err_and_bail!(&with_line!(tag), format_err!("Failed to create CFv2 child: {err:?}"));
         }
 
-        let mut child_ref = fcdecl::ChildRef {
+        let child_ref = fcdecl::ChildRef {
             name: child_name.to_string(),
             collection: Some(collection_name.to_string()),
         };
 
         let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-        if let Err(err) = realm.open_exposed_dir(&mut child_ref, server_end).await? {
+        if let Err(err) = realm.open_exposed_dir(&child_ref, server_end).await? {
             fx_err_and_bail!(
                 &with_line!(tag),
                 format_err!("Failed to open exposed directory for CFv2 child: {err:?}")
@@ -136,7 +136,7 @@ impl ComponentFacade {
                 .await
                 .context(format!("failed to observe {child_name} Stopped event"))?;
 
-            if let Err(err) = realm.destroy_child(&mut child_ref).await? {
+            if let Err(err) = realm.destroy_child(&child_ref).await? {
                 fx_err_and_bail!(
                     &with_line!(tag),
                     format_err!("Failed to destroy CFv2 child: {err:?}")

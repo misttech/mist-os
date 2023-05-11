@@ -40,14 +40,14 @@ pub async fn run_serial_link_handlers(
                                 DeviceProxy_Marker::PROTOCOL_NAME
                             ))?;
                     }
-                    Descriptor::Device { ref path, mut config } => {
+                    Descriptor::Device { ref path, config } => {
                         fdio::service_connect(
                             path.to_str()
                                 .ok_or_else(|| format_err!("path not utf8 encoded: {:?}", path))?,
                             svr.into_channel(),
                         )
                         .with_context(|| format!("Error connecting to service path: {:?}", path))?;
-                        zx::Status::ok(cli.set_config(&mut config).await?)?;
+                        zx::Status::ok(cli.set_config(&config).await?)?;
                     }
                 }
                 let (rx, tx) = Dev::new(cli).split();

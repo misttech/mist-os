@@ -176,14 +176,14 @@ impl NetworkDeviceInstance {
                         fhwnet::DevicePortEvent::Removed(port_id) => {
                             let _: fhwnet::PortId = port_id;
                         }
-                        fhwnet::DevicePortEvent::Added(mut port_id)
-                        | fhwnet::DevicePortEvent::Existing(mut port_id) => {
+                        fhwnet::DevicePortEvent::Added(port_id)
+                        | fhwnet::DevicePortEvent::Existing(port_id) => {
                             let (port, port_server_end) =
                                 fidl::endpoints::create_proxy::<fhwnet::PortMarker>()
                                     .context("create port endpoints")
                                     .map_err(errors::Error::NonFatal)?;
                             let () = device
-                                .get_port(&mut port_id, port_server_end)
+                                .get_port(&port_id, port_server_end)
                                 .context("calling Device get_port")
                                 .map_err(errors::Error::NonFatal)?;
                             break Ok(Some((
@@ -259,7 +259,7 @@ impl NetworkDeviceInstance {
 
         let () = device_control
             .create_interface(
-                &mut port_id.clone(),
+                &port_id,
                 control_server_end,
                 &fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(name),

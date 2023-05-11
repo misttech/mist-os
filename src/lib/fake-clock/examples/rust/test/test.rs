@@ -32,7 +32,7 @@ async fn test_pause_advance() {
     let long_timeout = zx::Time::from_nanos(now_1) + ONE_DAY;
     let long_wait_fut = example.wait_until(long_timeout.into_nanos());
     let () = fake_time
-        .advance(&mut Increment::Determined(ONE_DAY.into_nanos()))
+        .advance(&Increment::Determined(ONE_DAY.into_nanos()))
         .await
         .expect("advance failed")
         .expect("advance returned error");
@@ -46,14 +46,14 @@ async fn test_pause_advance() {
     // First, we set a stop point to detect when a timer is set, then resume time.
     let (deadline_set_event, deadline_set_server) = zx::EventPair::create();
     let () = fake_time
-        .add_stop_point(&mut DEADLINE_NAME.into(), DeadlineEventType::Set, deadline_set_server)
+        .add_stop_point(&DEADLINE_NAME.into(), DeadlineEventType::Set, deadline_set_server)
         .await
         .expect("add_stop_point failed")
         .expect("add_stop_point returned error");
     let () = fake_time
         .resume_with_increments(
             ONE_MILLIS.into_nanos(),
-            &mut Increment::Determined(ONE_MILLIS.into_nanos()),
+            &Increment::Determined(ONE_MILLIS.into_nanos()),
         )
         .await
         .expect("resume_with_increments failed")
@@ -77,18 +77,14 @@ async fn test_pause_advance() {
     // We now register a stop point to trigger when the timer expires, and run time fast.
     let (deadline_expire_event, deadline_expire_server) = zx::EventPair::create();
     let () = fake_time
-        .add_stop_point(
-            &mut DEADLINE_NAME.into(),
-            DeadlineEventType::Expired,
-            deadline_expire_server,
-        )
+        .add_stop_point(&DEADLINE_NAME.into(), DeadlineEventType::Expired, deadline_expire_server)
         .await
         .expect("add_stop_point failed")
         .expect("add_stop_point returned error");
     let () = fake_time
         .resume_with_increments(
             ONE_MILLIS.into_nanos(),
-            &mut Increment::Determined(ONE_HOUR.into_nanos()),
+            &Increment::Determined(ONE_HOUR.into_nanos()),
         )
         .await
         .expect("resume_with_increments failed")

@@ -436,7 +436,7 @@ mod test {
                     };
                     let mut array = [0; 18];
                     array.copy_from_slice(descriptor.as_bytes());
-                    responder.send(&mut array)?;
+                    responder.send(&array)?;
                 }
                 fidl_fuchsia_hardware_usb_device::DeviceRequest::GetConfigurationDescriptor {
                         config: _, responder} => {
@@ -484,7 +484,7 @@ mod test {
                     vec.extend_from_slice(interface_one.as_bytes());
                     vec.extend_from_slice(interface_two.as_bytes());
 
-                    responder.send(0, &mut vec)?;
+                    responder.send(0, &vec)?;
                 }
                 fidl_fuchsia_hardware_usb_device::DeviceRequest::GetStringDescriptor {
                         desc_id: _, lang_id: _, responder} => {

@@ -2060,7 +2060,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Run the state machine future again so that it acks the oneshot.
@@ -2305,7 +2305,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Run the state machine future again so that it acks the oneshot.
@@ -5112,7 +5112,7 @@ mod tests {
             }
         );
         connect_txn_handle
-            .send_on_connect_result(&mut fake_successful_connect_result())
+            .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
 
         // Verify that the state machine future is still alive.

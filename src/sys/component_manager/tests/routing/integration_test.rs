@@ -14,10 +14,10 @@ async fn routing() {
         .expect("could not connect to Realm service");
 
     // Bind to `echo_client`, causing it to execute.
-    let mut child_ref = fdecl::ChildRef { name: "echo_client".to_string(), collection: None };
+    let child_ref = fdecl::ChildRef { name: "echo_client".to_string(), collection: None };
     let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     realm
-        .open_exposed_dir(&mut child_ref, server_end)
+        .open_exposed_dir(&child_ref, server_end)
         .await
         .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
         .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));

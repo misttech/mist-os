@@ -190,7 +190,7 @@ mod tests {
                 while let Some(req) = stream.try_next().await? {
                     match req {
                         InspectRequest::ReadData { responder } => {
-                            responder.send(&mut object.object.clone())?;
+                            responder.send(&object.object)?;
                         }
                         InspectRequest::ListChildren { responder } => {
                             responder.send(&object.children.iter().cloned().collect::<Vec<_>>())?;

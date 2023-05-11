@@ -958,7 +958,7 @@ mod tests {
     }
 
     async fn set_attrs_checked(file: &fio::FileProxy, crtime: Option<u64>, mtime: Option<u64>) {
-        let mut attributes = fio::NodeAttributes {
+        let attributes = fio::NodeAttributes {
             mode: 0,
             id: 0,
             content_size: 0,
@@ -976,7 +976,7 @@ mod tests {
             mask |= fio::NodeAttributeFlags::MODIFICATION_TIME;
         }
 
-        let status = file.set_attr(mask, &mut attributes).await.expect("FIDL call failed");
+        let status = file.set_attr(mask, &attributes).await.expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");
     }
 

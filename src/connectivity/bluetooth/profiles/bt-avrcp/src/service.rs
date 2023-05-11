@@ -365,8 +365,8 @@ mod tests {
         );
         pin_mut!(handler_fut);
 
-        let request_fut = peer_manager_proxy
-            .get_controller_for_target(&mut PeerId(123).into(), controller_server);
+        let request_fut =
+            peer_manager_proxy.get_controller_for_target(&PeerId(123).into(), controller_server);
         pin_mut!(request_fut);
 
         // Make the request.
@@ -390,7 +390,7 @@ mod tests {
         );
 
         let request_fut = peer_manager_proxy
-            .get_browse_controller_for_target(&mut PeerId(123).into(), bcontroller_server);
+            .get_browse_controller_for_target(&PeerId(123).into(), bcontroller_server);
         pin_mut!(request_fut);
 
         // Make the request.
@@ -451,7 +451,7 @@ mod tests {
         pin_mut!(handler_fut);
 
         let request_fut = peer_manager_ext_proxy
-            .get_controller_for_target(&mut PeerId(123).into(), controller_server);
+            .get_controller_for_target(&PeerId(123).into(), controller_server);
         pin_mut!(request_fut);
 
         // Make the request.
@@ -475,7 +475,7 @@ mod tests {
         );
 
         let request_fut = peer_manager_ext_proxy
-            .get_browse_controller_for_target(&mut PeerId(123).into(), bcontroller_server);
+            .get_browse_controller_for_target(&PeerId(123).into(), bcontroller_server);
         pin_mut!(request_fut);
 
         // Make the request.
@@ -758,14 +758,13 @@ mod tests {
 
         let (controller_proxy, controller_server) = create_proxy().unwrap();
         let get_controller_fut = peer_manager_proxy
-            .get_controller_for_target(&mut fake_peer_id.into(), controller_server)
+            .get_controller_for_target(&fake_peer_id.into(), controller_server)
             .fuse();
         pin_mut!(get_controller_fut);
 
         let (controller_ext_proxy, controller_ext_server) = create_proxy().unwrap();
-        let get_test_controller_fut = ext_proxy
-            .get_controller_for_target(&mut fake_peer_id.into(), controller_ext_server)
-            .fuse();
+        let get_test_controller_fut =
+            ext_proxy.get_controller_for_target(&fake_peer_id.into(), controller_ext_server).fuse();
         pin_mut!(get_test_controller_fut);
 
         let is_connected_fut = controller_ext_proxy.is_connected().fuse();

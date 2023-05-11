@@ -28,7 +28,7 @@ async fn create_remote_component(
     url: &str,
     moniker: &str,
 ) -> Result<()> {
-    let mut collection = fdecl::CollectionRef { name: COLLECTION_NAME.to_string() };
+    let collection = fdecl::CollectionRef { name: COLLECTION_NAME.to_string() };
     let decl = fdecl::Child {
         name: Some(name.to_string()),
         url: Some(url.to_string()),
@@ -37,12 +37,7 @@ async fn create_remote_component(
         ..Default::default()
     };
     let create_result = lifecycle_controller
-        .create_instance(
-            PARENT_MONIKER,
-            &mut collection,
-            &decl,
-            fcomponent::CreateChildArgs::default(),
-        )
+        .create_instance(PARENT_MONIKER, &collection, &decl, fcomponent::CreateChildArgs::default())
         .await
         .map_err(|e| ffx_error!("FIDL error while creating component instance: {:?}", e))?;
 
@@ -51,13 +46,13 @@ async fn create_remote_component(
             println!("Component instance already exists: {}", moniker);
             println!("  Restarting component: {}", moniker);
             // This component already exists, but the user has asked it to be recreated.
-            let mut child = fdecl::ChildRef {
+            let child = fdecl::ChildRef {
                 name: name.to_string(),
                 collection: Some(COLLECTION_NAME.to_string()),
             };
             println!("  Destroying prior instance of component: {}", moniker);
             let destroy_result =
-                lifecycle_controller.destroy_instance(PARENT_MONIKER, &mut child).await.map_err(
+                lifecycle_controller.destroy_instance(PARENT_MONIKER, &child).await.map_err(
                     |e| ffx_error!("FIDL error while destroying component instance: {:?}", e),
                 )?;
 
@@ -69,7 +64,7 @@ async fn create_remote_component(
             let create_result = lifecycle_controller
                 .create_instance(
                     PARENT_MONIKER,
-                    &mut collection,
+                    &collection,
                     &decl,
                     fcomponent::CreateChildArgs::default(),
                 )

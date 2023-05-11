@@ -240,7 +240,7 @@ fn test_handle_client_request() {
     let mut client_fut = proxy.start(true, Some(""));
     let _ = exec.run_until_stalled(&mut client_fut);
     let request = pump_request_stream(&mut exec, request_stream, ClientId(0));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
     assert!(response.error.is_some());
     assert_eq!(subscribers.number_of_subscribers(), 0);
@@ -251,7 +251,7 @@ fn test_handle_client_request() {
     let mut client_fut = proxy.start(true, Some(""));
     let _ = exec.run_until_stalled(&mut client_fut);
     let request = pump_request_stream(&mut exec, request_stream, ClientId(1));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
     assert!(response.error.is_none());
     assert_eq!(subscribers.number_of_subscribers(), 1);
@@ -261,7 +261,7 @@ fn test_handle_client_request() {
     let mut client_fut = proxy.start(true, None);
     let _ = exec.run_until_stalled(&mut client_fut);
     let request = pump_request_stream(&mut exec, request_stream, ClientId(2));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
     assert!(response.error.is_none());
     assert_eq!(subscribers.number_of_subscribers(), 2);
@@ -271,7 +271,7 @@ fn test_handle_client_request() {
     let mut client_fut = proxy.start(true, None);
     let _ = exec.run_until_stalled(&mut client_fut);
     let request = pump_request_stream(&mut exec, request_stream, ClientId(2));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
     assert!(response.error.is_some());
     assert_eq!(subscribers.number_of_subscribers(), 2);
@@ -281,7 +281,7 @@ fn test_handle_client_request() {
     let mut client_fut = proxy.start(false, None);
     let _ = exec.run_until_stalled(&mut client_fut);
     let request = pump_request_stream(&mut exec, request_stream, ClientId(3));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
     assert!(response.error.is_none());
     assert_eq!(subscribers.number_of_subscribers(), 2);
@@ -289,7 +289,7 @@ fn test_handle_client_request() {
 
 #[test]
 fn test_handle_bad_client_request() {
-    let (mut exec, mut _snoopers, mut logs, mut subscribers, mut requests, _inspect) = setup();
+    let (mut exec, mut _snoopers, logs, mut subscribers, mut requests, _inspect) = setup();
 
     let id = ClientId(0);
     let err = Some(Err(FidlError::Invalid));
@@ -298,7 +298,7 @@ fn test_handle_bad_client_request() {
     let request = (id, (err, req_stream));
     subscribers.register(id, handle, None, None).unwrap();
     assert!(subscribers.is_registered(&id));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     assert!(!subscribers.is_registered(&id));
 
     let id = ClientId(1);
@@ -308,6 +308,6 @@ fn test_handle_bad_client_request() {
     let request = (id, (err, req_stream));
     subscribers.register(id, handle, None, None).unwrap();
     assert!(subscribers.is_registered(&id));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &mut logs);
+    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
     assert!(!subscribers.is_registered(&id));
 }

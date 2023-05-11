@@ -53,11 +53,11 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
     let (Ctx { sync_ctx, mut non_sync_ctx }, idx_to_device_id) =
         FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
             .build_with(StackStateBuilder::default());
-    let mut sync_ctx = &sync_ctx;
+    let sync_ctx = &sync_ctx;
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
     crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
-        &mut sync_ctx,
+        &sync_ctx,
         &mut non_sync_ctx,
         &device,
         true,
@@ -107,7 +107,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             iters += 1;
         }
         black_box(receive_frame(
-            black_box(&mut sync_ctx),
+            black_box(&sync_ctx),
             black_box(&mut non_sync_ctx),
             black_box(&eth_device),
             black_box(Buf::new(&mut buf[..], range.clone())),

@@ -364,8 +364,8 @@ async fn starting_state(
             .map_err(|e| ExitReason(Err(e)))?;
     }
 
-    let mut ap_config = fidl_sme::ApConfig::from(req.clone());
-    let start_result = match deps.proxy.start(&mut ap_config).await {
+    let ap_config = fidl_sme::ApConfig::from(req.clone());
+    let start_result = match deps.proxy.start(&ap_config).await {
         Ok(fidl_sme::StartApResultCode::Success) => Ok(()),
         Ok(code) => {
             // Log a metric indicating that starting the AP failed.
@@ -671,10 +671,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 
@@ -734,10 +734,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 
@@ -788,10 +788,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 
@@ -871,10 +871,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 6, num_clients: 0 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 
@@ -925,10 +925,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 1 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 
@@ -1474,10 +1474,10 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
                 let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let mut response = fidl_sme::ApStatusResponse {
+                let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
-                responder.send(&mut response).expect("could not send AP status response");
+                responder.send(&response).expect("could not send AP status response");
             }
         );
 

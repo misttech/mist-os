@@ -26,14 +26,14 @@ async fn main() {
     fs.dir("svc").add_fidl_service(IncomingRequest::Puppet);
     fs.take_and_serve_directory_handle().unwrap();
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
-        let mut receiver_config = receiver_config.clone();
+        let receiver_config = receiver_config.clone();
         async move {
             match request {
                 IncomingRequest::Puppet(mut reqs) => {
                     while let Some(Ok(req)) = reqs.next().await {
                         match req {
                             ConfigReceiverPuppetRequest::GetConfig { responder } => {
-                                responder.send(&mut receiver_config).unwrap()
+                                responder.send(&receiver_config).unwrap()
                             }
                         }
                     }

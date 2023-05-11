@@ -230,8 +230,8 @@ mod tests {
         let (delegate_client, host_dispatcher) = setup_generic_access_service();
         let expected_device_name = delegate_client
             .read_value(
-                &mut PeerId { value: 1 },
-                &mut gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID },
+                &PeerId { value: 1 },
+                &gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID },
                 0,
             )
             .await
@@ -245,8 +245,8 @@ mod tests {
             .unwrap_err();
         let expected_device_name = delegate_client
             .read_value(
-                &mut PeerId { value: 1 },
-                &mut gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID },
+                &PeerId { value: 1 },
+                &gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID },
                 0,
             )
             .await
@@ -260,8 +260,8 @@ mod tests {
         let (service_client, _host_dispatcher) = setup_generic_access_service();
         let read_device_appearance = service_client
             .read_value(
-                &mut PeerId { value: 1 },
-                &mut gatt::Handle { value: GENERIC_ACCESS_APPEARANCE_ID },
+                &PeerId { value: 1 },
+                &gatt::Handle { value: GENERIC_ACCESS_APPEARANCE_ID },
                 0,
             )
             .await
@@ -307,8 +307,8 @@ mod tests {
         }))
         .detach();
         let _ignored_fut = service_client.read_value(
-            &mut PeerId { value: 1 },
-            &mut gatt::Handle { value: GENERIC_ACCESS_APPEARANCE_ID },
+            &PeerId { value: 1 },
+            &gatt::Handle { value: GENERIC_ACCESS_APPEARANCE_ID },
             0,
         );
         let proxied_request = generic_access_req_stream.next().await.unwrap();

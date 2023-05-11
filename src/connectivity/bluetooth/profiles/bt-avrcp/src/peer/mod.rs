@@ -395,13 +395,13 @@ impl RemotePeer {
             conn_type.connect_parameters(&self.controller_descriptor, &self.target_descriptor)
         });
 
-        let mut peer_id = self.peer_id.into();
+        let peer_id = self.peer_id.into();
         let proxy = self.profile_proxy.clone();
         async move {
-            let Some(mut params) = connect_parameters else {
+            let Some(params) = connect_parameters else {
                 return Ok(Err(fidl_fuchsia_bluetooth::ErrorCode::BadState));
             };
-            proxy.connect(&mut peer_id, &mut params).await
+            proxy.connect(&peer_id, &params).await
         }
     }
 

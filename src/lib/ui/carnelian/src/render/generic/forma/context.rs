@@ -168,9 +168,9 @@ impl FormaContext {
             )
             .expect("failed to bind shared collection");
         let buffer_collection = BufferCollectionSynchronousProxy::new(collection_client);
-        let mut constraints = buffer_collection_constraints(size.width, size.height);
+        let constraints = buffer_collection_constraints(size.width, size.height);
         buffer_collection
-            .set_constraints(true, &mut constraints)
+            .set_constraints(true, &constraints)
             .expect("failed to set constraints on sysmem buffer");
 
         Self {

@@ -136,10 +136,7 @@ async fn open_exposed_directory(
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     realm
         .open_exposed_dir(
-            &mut fdecl::ChildRef {
-                name: child_name.into(),
-                collection: Some(collection_name.into()),
-            },
+            &fdecl::ChildRef { name: child_name.into(), collection: Some(collection_name.into()) },
             server_end,
         )
         .await?
@@ -174,7 +171,7 @@ async fn serve_component_controller(
                 let realm = connect_to_protocol::<fcomponent::RealmMarker>()
                     .expect("Failed to connect to realm.");
                 let _ = realm
-                    .destroy_child(&mut fdecl::ChildRef {
+                    .destroy_child(&fdecl::ChildRef {
                         name: kernel_name.to_string(),
                         collection: Some(KERNEL_COLLECTION.to_string()),
                     })

@@ -229,8 +229,8 @@ async fn connect_l2cap(
 
     let channel = match profile_svc
         .connect(
-            &mut peer_id.into(),
-            &mut ConnectParameters::L2cap(L2capParameters {
+            &peer_id.into(),
+            &ConnectParameters::L2cap(L2capParameters {
                 psm: Some(psm),
                 parameters: Some(params),
                 ..Default::default()

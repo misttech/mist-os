@@ -106,10 +106,10 @@ pub async fn set_partition_max_bytes(
     let info = info.ok_or(anyhow!("Expected info"))?;
     let slice_size = info.slice_size;
     let max_slice_count = (max_byte_size + slice_size - 1) / slice_size;
-    let mut instance_guid =
+    let instance_guid =
         Guid { value: *device.partition_instance().await.context("Expected partition instance")? };
     let status = fvm_proxy
-        .set_partition_limit(&mut instance_guid, max_slice_count)
+        .set_partition_limit(&instance_guid, max_slice_count)
         .await
         .context("Transport error on set_partition_limit")?;
     zx::Status::ok(status).context("set_partition_limit failed")?;
@@ -158,7 +158,7 @@ mod tests {
                         responder
                             .send(
                                 zx::sys::ZX_OK,
-                                Some(&mut VolumeManagerInfo {
+                                Some(&VolumeManagerInfo {
                                     slice_size: SLICE_SIZE,
                                     slice_count: SLICE_COUNT,
                                     assigned_slice_count: assigned_slice_count,

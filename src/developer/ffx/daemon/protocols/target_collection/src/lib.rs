@@ -919,9 +919,7 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy
-            .add_target(&mut target_addr.into(), &ffx::AddTargetConfig::default(), client)
-            .unwrap();
+        proxy.add_target(&target_addr.into(), &ffx::AddTargetConfig::default(), client).unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -942,7 +940,7 @@ mod tests {
             .build();
         let target_addr = TargetAddr::from_str("[::1]:0").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
-        proxy.add_ephemeral_target(&mut target_addr.into(), 3600).await.unwrap();
+        proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
         assert_eq!(target.addrs().len(), 1);
@@ -965,9 +963,7 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy
-            .add_target(&mut target_addr.into(), &ffx::AddTargetConfig::default(), client)
-            .unwrap();
+        proxy.add_target(&target_addr.into(), &ffx::AddTargetConfig::default(), client).unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -988,7 +984,7 @@ mod tests {
             .build();
         let target_addr = TargetAddr::from_str("[::1]:8022").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
-        proxy.add_ephemeral_target(&mut target_addr.into(), 3600).await.unwrap();
+        proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
         assert_eq!(target.addrs().len(), 1);
@@ -1013,7 +1009,7 @@ mod tests {
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         proxy
             .add_target(
-                &mut ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                &ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
                     ip: IpAddress::Ipv6(Ipv6Address {
                         addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                     }),
@@ -1047,7 +1043,7 @@ mod tests {
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         proxy
             .add_ephemeral_target(
-                &mut ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                &ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
                     ip: IpAddress::Ipv6(Ipv6Address {
                         addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                     }),

@@ -162,8 +162,8 @@ async fn {{ .Name }}_echo_call_server_thread(server_end: zx::Channel) {
     const MAX_CONCURRENT: usize = 10;
     stream.for_each_concurrent(MAX_CONCURRENT, |request| {
         match request {
-            Ok({{ .ValueType }}EchoCallRequest::Echo { {{ if not .IsResource }}mut{{ end }} val, responder }) => {
-                responder.send({{ if not .IsResource }}&mut{{ end }} val).unwrap();
+            Ok({{ .ValueType }}EchoCallRequest::Echo { val, responder }) => {
+                responder.send({{ if not .IsResource }}&{{ end }} val).unwrap();
             },
             Err(_) => {
                 panic!("unexpected err request")

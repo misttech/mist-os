@@ -141,8 +141,8 @@ impl Future for Watcher {
             let next_request = self.as_mut().stream.poll_next_unpin(cx)?;
             match ready!(next_request) {
                 Some(WatcherRequest::Watch { responder }) => match self.events.pop_front() {
-                    Some(mut e) => {
-                        responder_send!(responder, &mut e)
+                    Some(e) => {
+                        responder_send!(responder, &e)
                     }
                     None => match &self.responder {
                         Some(existing) => {
@@ -163,10 +163,10 @@ impl Future for Watcher {
 }
 
 impl Watcher {
-    fn push(&mut self, mut event: finterfaces::Event) {
+    fn push(&mut self, event: finterfaces::Event) {
         let Self { stream, events, responder } = self;
         if let Some(responder) = responder.take() {
-            match responder.send(&mut event) {
+            match responder.send(&event) {
                 Ok(()) => (),
                 Err(e) if e.is_closed() => (),
                 Err(e) => log::error!("error sending event {:?} to watcher: {:?}", event, e),

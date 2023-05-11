@@ -79,8 +79,8 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
             // After acquiring the lock, this is where we would draw the actual lines. Since this is
             // just an example, we'll avoid doing the actual rendering, and simply send the bounding
             // box to the client instead.
-            let mut bounds = state.bounding_box;
-            match control_handle.send_on_drawn(&mut bounds.top_left, &mut bounds.bottom_right) {
+            let bounds = state.bounding_box;
+            match control_handle.send_on_drawn(&bounds.top_left, &bounds.bottom_right) {
                 Ok(_) => println!(
                     "OnDrawn event sent: top_left: {:?}, bottom_right: {:?}",
                     bounds.top_left, bounds.bottom_right

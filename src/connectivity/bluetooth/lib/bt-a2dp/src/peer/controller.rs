@@ -336,7 +336,7 @@ impl ControllerPoolInner {
         let peer_id = peer.key().clone();
         drop(self.peers.insert(peer_id, peer));
         if let Some(handle) = self.control_handle.as_ref() {
-            if let Err(e) = handle.send_on_peer_connected(&mut peer_id.into()) {
+            if let Err(e) = handle.send_on_peer_connected(&peer_id.into()) {
                 info!("Peer connected callback failed: {:?}", e);
             }
         }
@@ -491,7 +491,7 @@ mod tests {
         // Client connects to controller by sending `get_peer`.
         let (client, server) = create_endpoints::<PeerControllerMarker>();
         let client_proxy = client.into_proxy().expect("Couldn't obtain client proxy");
-        let res = pm_proxy.get_peer(&mut fake_peer_id.into(), server);
+        let res = pm_proxy.get_peer(&fake_peer_id.into(), server);
         assert_eq!(Ok(()), res.map_err(|e| e.to_string()));
 
         // Spawn task that acts as remote end and replies with simple responses.

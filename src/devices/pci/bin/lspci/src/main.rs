@@ -56,14 +56,14 @@ async fn handle_subcommands<'a>(proxies: &'a Vec<BusProxy>, args: Args) -> Resul
                 ));
             }
 
-            let mut bdf = Address {
+            let bdf = Address {
                 bus: options.device.bus,
                 device: options.device.dev.unwrap(),
                 function: options.device.func.unwrap(),
             };
 
             let bytes = bus
-                .read_bar(&mut bdf, options.bar_id, options.offset, options.size)
+                .read_bar(&bdf, options.bar_id, options.offset, options.size)
                 .await
                 .context("failed to call read")?
                 .map_err(Status::from_raw)

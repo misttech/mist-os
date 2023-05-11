@@ -35,7 +35,7 @@ pub async fn pb_get(cmd: GetCommand) -> Result<()> {
     let mut input = stdin();
     let mut output = stdout();
     let mut err_out = stderr();
-    let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
     let client = Client::initial()?;
     pb_get_impl(
         &cmd.auth,
@@ -46,7 +46,7 @@ pub async fn pb_get(cmd: GetCommand) -> Result<()> {
         &cmd.product_name,
         &cmd.version,
         &client,
-        &mut ui,
+        &ui,
     )
     .await
 }

@@ -107,9 +107,9 @@ async fn test_set_local_name(harness: HostDriverHarness) {
 // Tests that the device class assigned to a bt-host gets propagated down to the controller.
 #[test_harness::run_singlethreaded_test]
 async fn test_set_device_class(harness: HostDriverHarness) {
-    let mut device_class = DeviceClass { value: MAJOR_DEVICE_CLASS_TOY + 4 };
+    let device_class = DeviceClass { value: MAJOR_DEVICE_CLASS_TOY + 4 };
     let proxy = harness.aux().host.clone();
-    let result = proxy.set_device_class(&mut device_class).await.unwrap();
+    let result = proxy.set_device_class(&device_class).await.unwrap();
     assert_eq!(Ok(()), result);
 
     let _ = harness
@@ -276,15 +276,15 @@ async fn test_connect(harness: HostDriverHarness) {
         .unwrap()
         .0
         .clone();
-    let mut success_id: fbt::PeerId = success_id.into();
-    let mut failure_id: fbt::PeerId = failure_id.into();
+    let success_id: fbt::PeerId = success_id.into();
+    let failure_id: fbt::PeerId = failure_id.into();
 
     // Connecting to the failure peer should result in an error.
-    let status = proxy.connect(&mut failure_id).await.unwrap();
+    let status = proxy.connect(&failure_id).await.unwrap();
     assert_eq!(Err(fsys::Error::Failed), status);
 
     // Connecting to the success peer should return success and the peer should become connected.
-    let status = proxy.connect(&mut success_id).await.unwrap();
+    let status = proxy.connect(&success_id).await.unwrap();
     assert_eq!(Ok(()), status);
 
     let connected = peer::identifier(success_id.into()).and(peer::connected(true));
@@ -324,8 +324,8 @@ async fn wait_for_test_peer(
 /// Disconnecting from an unknown device should succeed
 #[test_harness::run_singlethreaded_test]
 async fn test_disconnect_unknown_device(harness: HostDriverHarness) {
-    let mut unknown_id = PeerId(0).into();
-    let fut = harness.aux().host.disconnect(&mut unknown_id);
+    let unknown_id = PeerId(0).into();
+    let fut = harness.aux().host.disconnect(&unknown_id);
     let status = fut.await.unwrap();
     assert_eq!(Ok(()), status);
 }
@@ -335,8 +335,8 @@ async fn test_disconnect_unknown_device(harness: HostDriverHarness) {
 async fn test_disconnect_unconnected_device(harness: HostDriverHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();
-    let mut id = id.into();
-    let fut = harness.aux().host.disconnect(&mut id);
+    let id = id.into();
+    let fut = harness.aux().host.disconnect(&id);
     let status = fut.await.unwrap();
     assert_eq!(Ok(()), status);
 }
@@ -346,17 +346,17 @@ async fn test_disconnect_unconnected_device(harness: HostDriverHarness) {
 async fn test_disconnect_connected_device(harness: HostDriverHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();
-    let mut id = id.into();
+    let id = id.into();
     let proxy = harness.aux().host.clone();
 
-    let status = proxy.connect(&mut id).await.unwrap();
+    let status = proxy.connect(&id).await.unwrap();
     assert_eq!(Ok(()), status);
 
     let connected = peer::address(address).and(peer::connected(true));
     let disconnected = peer::address(address).and(peer::connected(false));
 
     let _ = host_expectation::peer(&harness, connected).await.unwrap();
-    let status = proxy.disconnect(&mut id).await.unwrap();
+    let status = proxy.disconnect(&id).await.unwrap();
     assert_eq!(Ok(()), status);
 
     let _ = host_expectation::peer(&harness, disconnected).await.unwrap();
@@ -366,7 +366,7 @@ async fn test_disconnect_connected_device(harness: HostDriverHarness) {
 async fn test_forget(harness: HostDriverHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();
-    let mut id = id.into();
+    let id = id.into();
     let proxy = harness.aux().host.clone();
 
     // Wait for fake peer to be discovered (`wait_for_test_peer` starts discovery).
@@ -374,14 +374,14 @@ async fn test_forget(harness: HostDriverHarness) {
     let _ = host_expectation::peer(&harness, expected_peer.clone()).await.unwrap();
 
     // Connecting to the peer should return success and the peer should become connected.
-    let status = proxy.connect(&mut id).await.unwrap();
+    let status = proxy.connect(&id).await.unwrap();
     assert_eq!(Ok(()), status);
     let _ = host_expectation::peer(&harness, expected_peer.and(expectation::peer::connected(true)))
         .await
         .unwrap();
 
     // Forgetting the peer should result in its removal.
-    let status = proxy.forget(&mut id).await.unwrap();
+    let status = proxy.forget(&id).await.unwrap();
     assert_eq!(Ok(()), status);
     host_expectation::no_peer(&harness, id.into()).await.unwrap();
 

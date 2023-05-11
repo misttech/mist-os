@@ -152,9 +152,8 @@ mod test {
                 let req = req.context("failed to get next pty request from RequestStream")?;
                 match req {
                     fpty::DeviceRequest::GetWindowSize { responder } => {
-                        let mut window_size = DEFAULT_WIN_SIZE.clone();
                         responder
-                            .send(0, &mut window_size)
+                            .send(0, &DEFAULT_WIN_SIZE)
                             .context("failed to send GetWindowSize response")?;
                     }
                     fpty::DeviceRequest::ClrSetFeature { clr, set, responder } => {

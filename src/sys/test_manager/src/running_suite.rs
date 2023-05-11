@@ -124,7 +124,7 @@ impl RunningSuite {
             .root
             .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
             .map_err(|e| LaunchTestError::ConnectToTestSuite(e))?;
-        let mut collection_ref = fdecl::CollectionRef { name: TEST_ROOT_COLLECTION.into() };
+        let collection_ref = fdecl::CollectionRef { name: TEST_ROOT_COLLECTION.into() };
         let child_decl = fdecl::Child {
             name: Some(TEST_ROOT_REALM_NAME.into()),
             url: Some(test_url.into()),
@@ -133,7 +133,7 @@ impl RunningSuite {
             ..Default::default()
         };
         test_realm_proxy
-            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
@@ -390,13 +390,13 @@ impl RunningSuite {
     pub(crate) async fn connect_to_suite(&self) -> Result<ftest::SuiteProxy, LaunchTestError> {
         let (exposed_dir, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let mut child_ref = fdecl::ChildRef {
+        let child_ref = fdecl::ChildRef {
             name: TEST_ROOT_REALM_NAME.into(),
             collection: Some(TEST_ROOT_COLLECTION.into()),
         };
         let () = self
             .test_realm_proxy
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .map_err(|e| LaunchTestError::ConnectToTestSuite(e.into()))?
             .map_err(|e| {
@@ -445,12 +445,12 @@ impl RunningSuite {
         // completes, it guarantees that any of its service providers (archivist, storage,
         // debugdata) have received all outgoing requests from the test such as log connections,
         // etc.
-        let mut child_ref = fdecl::ChildRef {
+        let child_ref = fdecl::ChildRef {
             name: TEST_ROOT_REALM_NAME.into(),
             collection: Some(TEST_ROOT_COLLECTION.into()),
         };
         self.test_realm_proxy
-            .destroy_child(&mut child_ref)
+            .destroy_child(&child_ref)
             .map_err(|e| Error::from(e).context("call to destroy test failed"))
             // This should not hang, but wrap it in a timeout just in case.
             .on_timeout(TEARDOWN_TIMEOUT, || Err(anyhow!("Timeout waiting for test to destroy")))

@@ -487,8 +487,8 @@ async fn sort_preferred_addresses(
             // Drain addresses from addrs, but keep it alive so we don't need to
             // reallocate.
             .drain(..)
-            .map(|mut addr| async move {
-                let source_addr = match routes.resolve(&mut addr).await? {
+            .map(|addr| async move {
+                let source_addr = match routes.resolve(&addr).await? {
                     Ok(fnet_routes::Resolved::Direct(fnet_routes::Destination {
                         source_address,
                         ..
@@ -1320,9 +1320,9 @@ mod tests {
     async fn test_lookuphostname_localhost() {
         let (proxy, fut) = setup_namelookup_service().await;
         let ((), ()) = futures::future::join(fut, async move {
-            let mut hostname = IPV4_LOOPBACK;
+            let hostname = IPV4_LOOPBACK;
             assert_eq!(
-                proxy.lookup_hostname(&mut hostname).await.expect("lookup_hostname").as_deref(),
+                proxy.lookup_hostname(&hostname).await.expect("lookup_hostname").as_deref(),
                 Ok(LOCAL_HOST)
             );
         })
@@ -1744,7 +1744,7 @@ mod tests {
             .run_lookup(|proxy| async move {
                 assert_eq!(
                     proxy
-                        .lookup_hostname(&mut map_ip(IPV4_HOST))
+                        .lookup_hostname(&map_ip(IPV4_HOST))
                         .await
                         .expect("lookup_hostname")
                         .as_deref(),
@@ -1762,7 +1762,7 @@ mod tests {
             .run_lookup(|proxy| async move {
                 assert_eq!(
                     proxy
-                        .lookup_hostname(&mut map_ip(IPV6_HOST))
+                        .lookup_hostname(&map_ip(IPV6_HOST))
                         .await
                         .expect("lookup_hostname")
                         .as_deref(),

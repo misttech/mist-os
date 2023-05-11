@@ -414,7 +414,7 @@ impl DefaultConfigurator {
             product,
             codec_dai_format
         );
-        if let Err(e) = proxy.set_dai_format(&mut codec_dai_format).await {
+        if let Err(e) = proxy.set_dai_format(&codec_dai_format).await {
             return Err(anyhow!("Error when setting the DAI format: {:?}", e));
         }
         Ok(())

@@ -42,10 +42,10 @@ async fn main() {
     let event_stream = EventStream::open().await.expect("conenct to event source");
 
     // Destroy the parent component.
-    let mut child_ref =
+    let child_ref =
         fdecl::ChildRef { name: "parent".to_string(), collection: Some("coll".to_string()) };
     realm
-        .destroy_child(&mut child_ref)
+        .destroy_child(&child_ref)
         .await
         .expect("destroy_child failed")
         .expect("failed to destroy child");

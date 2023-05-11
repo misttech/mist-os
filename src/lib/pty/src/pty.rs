@@ -111,11 +111,11 @@ impl ServerPty {
     }
 
     /// Sends a message to the shell that the window has been resized.
-    pub async fn resize(&self, mut window_size: WindowSize) -> Result<(), Error> {
+    pub async fn resize(&self, window_size: WindowSize) -> Result<(), Error> {
         ftrace::duration!("pty", "Pty:resize");
         let Self { proxy } = self;
         let () = proxy
-            .set_window_size(&mut window_size)
+            .set_window_size(&window_size)
             .await
             .map(zx::Status::ok)
             .context("unable to call resize window")?

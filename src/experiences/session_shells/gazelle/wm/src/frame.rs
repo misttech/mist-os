@@ -48,30 +48,30 @@ impl WindowFrame {
         let frame_background_transform = window.create_transform(Some(&mut frame_transform))?;
 
         // Create a solid fill frame background.
-        let mut frame_background = window.next_content_id();
-        flatland.create_filled_rect(&mut frame_background)?;
+        let frame_background = window.next_content_id();
+        flatland.create_filled_rect(&frame_background)?;
         window.set_content(frame_background_transform, frame_background)?;
 
         // Create the child titlebar transform and add to frame transform.
         let titlebar_transform = window.create_transform(Some(&mut frame_transform))?;
 
         // Create a solid fill titlebar background.
-        let mut titlebar_background = window.next_content_id();
-        flatland.create_filled_rect(&mut titlebar_background)?;
+        let titlebar_background = window.next_content_id();
+        flatland.create_filled_rect(&titlebar_background)?;
         window.set_content(titlebar_transform, titlebar_background)?;
 
         // Create the child view transform and add to frame transform.
-        let mut child_view_transform = window.create_transform(Some(&mut frame_transform))?;
+        let child_view_transform = window.create_transform(Some(&mut frame_transform))?;
         flatland.set_translation(
-            &mut child_view_transform,
-            &mut fmath::Vec_ { x: 0, y: WindowFrame::TITLEBAR_HEIGHT as i32 },
+            &child_view_transform,
+            &fmath::Vec_ { x: 0, y: WindowFrame::TITLEBAR_HEIGHT as i32 },
         )?;
 
         // Finally, create a hit-region transform that covers the child_view_transform.
-        let mut hit_region_transform = window.create_transform(Some(&mut frame_transform))?;
+        let hit_region_transform = window.create_transform(Some(&mut frame_transform))?;
         flatland.set_translation(
-            &mut hit_region_transform,
-            &mut fmath::Vec_ { x: 0, y: WindowFrame::TITLEBAR_HEIGHT as i32 },
+            &hit_region_transform,
+            &fmath::Vec_ { x: 0, y: WindowFrame::TITLEBAR_HEIGHT as i32 },
         )?;
 
         Ok(WindowFrame {
@@ -104,44 +104,40 @@ impl WindowFrame {
     }
 
     pub fn set_child_view(&mut self, child_view: ChildView) -> Result<(), Error> {
-        self.flatland
-            .set_content(&mut self.child_view_transform, &mut child_view.get_content_id())?;
+        self.flatland.set_content(&self.child_view_transform, &child_view.get_content_id())?;
         self.child_view = Some(child_view);
         Ok(())
     }
 
     fn draw(&mut self) -> Result<LayoutChange, Error> {
         // Title bar.
-        let mut titlebar_color = if self.active {
+        let titlebar_color = if self.active {
             TITLEBAR_ACTIVE_COLOR.clone()
         } else {
             TITLEBAR_INACTIVE_COLOR.clone()
         };
 
         self.flatland.set_solid_fill(
-            &mut self.titlebar_background,
-            &mut titlebar_color,
-            &mut fmath::SizeU {
-                width: self.bounds.width as u32,
-                height: WindowFrame::TITLEBAR_HEIGHT,
-            },
+            &self.titlebar_background,
+            &titlebar_color,
+            &fmath::SizeU { width: self.bounds.width as u32, height: WindowFrame::TITLEBAR_HEIGHT },
         )?;
 
         // Frame background.
         if self.resizing {
             // Inflate frame background to surround the frame with a border.
             self.flatland.set_translation(
-                &mut self.frame_background_transform,
-                &mut fmath::Vec_ {
+                &self.frame_background_transform,
+                &fmath::Vec_ {
                     x: -WindowFrame::BORDER_THICKNESS,
                     y: -WindowFrame::BORDER_THICKNESS,
                 },
             )?;
 
             self.flatland.set_solid_fill(
-                &mut self.frame_background,
-                &mut FRAME_BACKGROUND_COLOR.clone(),
-                &mut fmath::SizeU {
+                &self.frame_background,
+                &FRAME_BACKGROUND_COLOR,
+                &fmath::SizeU {
                     width: self.bounds.width as u32
                         + 2 * WindowFrame::BORDER_THICKNESS.abs() as u32,
                     height: self.bounds.height as u32
@@ -149,15 +145,13 @@ impl WindowFrame {
                 },
             )?;
         } else {
-            self.flatland.set_translation(
-                &mut self.frame_background_transform,
-                &mut fmath::Vec_ { x: 0, y: 0 },
-            )?;
+            self.flatland
+                .set_translation(&self.frame_background_transform, &fmath::Vec_ { x: 0, y: 0 })?;
 
             self.flatland.set_solid_fill(
-                &mut self.frame_background,
-                &mut FRAME_BACKGROUND_COLOR.clone(),
-                &mut fmath::SizeU {
+                &self.frame_background,
+                &FRAME_BACKGROUND_COLOR,
+                &fmath::SizeU {
                     width: self.bounds.width as u32,
                     height: self.bounds.height as u32,
                 },
@@ -173,8 +167,8 @@ impl WindowFrame {
 
         // Clip bounds.
         self.flatland.set_clip_boundary(
-            &mut self.child_view_transform,
-            Some(&mut fmath::Rect {
+            &self.child_view_transform,
+            Some(&fmath::Rect {
                 x: 0,
                 y: 0,
                 width: self.bounds.width as i32,
@@ -219,8 +213,8 @@ impl Frame<ChildViewId> for WindowFrame {
 
             self.flatland
                 .set_translation(
-                    &mut self.frame_transform,
-                    &mut fmath::Vec_ { x: rect.x as i32, y: rect.y as i32 },
+                    &self.frame_transform,
+                    &fmath::Vec_ { x: rect.x as i32, y: rect.y as i32 },
                 )
                 .map_err(|source| LayoutError::<ChildViewId>::Failed { source: source.into() })?;
         }
@@ -247,11 +241,11 @@ impl Frame<ChildViewId> for WindowFrame {
         // to the window manager's fullscreen view transform.
         if let FrameState::Fullscreen = state {
             self.flatland
-                .set_content(&mut self.child_view_transform, &mut ui_comp::ContentId { value: 0 })
+                .set_content(&self.child_view_transform, &ui_comp::ContentId { value: 0 })
                 .map_err(|source| LayoutError::<ChildViewId>::Failed { source: source.into() })?;
         } else if let Some(child_view) = self.child_view.as_mut() {
             self.flatland
-                .set_content(&mut self.child_view_transform, &mut child_view.get_content_id())
+                .set_content(&self.child_view_transform, &child_view.get_content_id())
                 .map_err(|source| LayoutError::<ChildViewId>::Failed { source: source.into() })?;
             self.draw()
                 .map_err(|source| LayoutError::<ChildViewId>::Failed { source: source.into() })?;
@@ -264,16 +258,16 @@ impl Frame<ChildViewId> for WindowFrame {
             self.active = active;
 
             // Set the size and color of the titlebar.
-            let mut titlebar_color = if active {
+            let titlebar_color = if active {
                 TITLEBAR_ACTIVE_COLOR.clone()
             } else {
                 TITLEBAR_INACTIVE_COLOR.clone()
             };
             self.flatland
                 .set_solid_fill(
-                    &mut self.titlebar_background,
-                    &mut titlebar_color,
-                    &mut fmath::SizeU {
+                    &self.titlebar_background,
+                    &titlebar_color,
+                    &fmath::SizeU {
                         width: self.bounds.width as u32,
                         height: WindowFrame::TITLEBAR_HEIGHT,
                     },
@@ -283,14 +277,14 @@ impl Frame<ChildViewId> for WindowFrame {
             // Also enable/disable interaction based on active state.
             if active {
                 // Remove the hittest region above the child view to make it interactive.
-                self.flatland.set_hit_regions(&mut self.hit_region_transform, &[]).map_err(
+                self.flatland.set_hit_regions(&self.hit_region_transform, &[]).map_err(
                     |source| LayoutError::<ChildViewId>::Failed { source: source.into() },
                 )?;
             } else {
                 // Add a hittest region above the child view to prevent interaction with it.
                 self.flatland
                     .set_infinite_hit_region(
-                        &mut self.hit_region_transform,
+                        &self.hit_region_transform,
                         ui_comp::HitTestInteraction::Default,
                     )
                     .map_err(|source| LayoutError::<ChildViewId>::Failed {

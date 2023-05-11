@@ -57,7 +57,7 @@ impl Client {
         port: Port,
         server_end: fidl::endpoints::ServerEnd<netdev::PortMarker>,
     ) -> Result<()> {
-        Ok(self.device.get_port(&mut port.into(), server_end)?)
+        Ok(self.device.get_port(&port.into(), server_end)?)
     }
 
     /// Retrieves information about the underlying network device.

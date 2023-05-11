@@ -1240,11 +1240,11 @@ mod tests {
         model.start().await;
 
         // Create two children in the collection, each exposing `my_service` with two instances.
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".into() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".into() };
         for name in &["child_a", "child_b"] {
             realm_proxy
                 .create_child(
-                    &mut collection_ref,
+                    &collection_ref,
                     &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )

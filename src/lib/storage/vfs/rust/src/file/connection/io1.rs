@@ -782,8 +782,8 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttr");
-                let (status, mut attrs) = self.handle_get_attr().await;
-                responder.send(status.into_raw(), &mut attrs)?;
+                let (status, attrs) = self.handle_get_attr().await;
+                responder.send(status.into_raw(), &attrs)?;
             }
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
                 fuchsia_trace::duration!("storage", "File::SetAttr");
@@ -895,7 +895,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 fuchsia_trace::duration!("storage", "File::QueryFilesystem");
                 match self.file.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
-                    Ok(mut info) => responder.send(0, Some(&mut info))?,
+                    Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
         }
@@ -1694,7 +1694,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_set_attrs() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
-        let mut set_attrs = fio::NodeAttributes {
+        let set_attrs = fio::NodeAttributes {
             mode: 0,
             id: 0,
             content_size: 0,
@@ -1707,7 +1707,7 @@ mod tests {
             .proxy
             .set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                &mut set_attrs,
+                &set_attrs,
             )
             .await
             .unwrap();

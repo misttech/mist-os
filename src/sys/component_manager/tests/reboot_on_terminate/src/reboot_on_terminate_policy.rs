@@ -19,10 +19,7 @@ async fn main() {
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     realm_proxy
         .open_exposed_dir(
-            &mut fdecl::ChildRef {
-                name: "critical_child_not_allowlisted".into(),
-                collection: None,
-            },
+            &fdecl::ChildRef { name: "critical_child_not_allowlisted".into(), collection: None },
             server_end,
         )
         .await

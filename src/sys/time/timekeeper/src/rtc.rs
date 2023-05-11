@@ -133,7 +133,7 @@ impl Rtc for RtcImpl {
         let fractional_second = zx::Duration::from_nanos(value.into_nanos() % NANOS_PER_SECOND);
         // The RTC API only accepts integer seconds but we really need higher accuracy, particularly
         // for the kernel clock set by the RTC driver...
-        let mut fidl_time = if fractional_second < WAIT_THRESHOLD {
+        let fidl_time = if fractional_second < WAIT_THRESHOLD {
             // ...if we are being asked to set a time at or near the bottom of the second, truncate
             // the time and set the RTC immediately...
             zx_time_to_fidl_time(value)
@@ -145,7 +145,7 @@ impl Rtc for RtcImpl {
         };
         let status = self
             .proxy
-            .set(&mut fidl_time)
+            .set(&fidl_time)
             .map_err(|err| anyhow!("FIDL error: {}", err))
             .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on set")))
             .await?;

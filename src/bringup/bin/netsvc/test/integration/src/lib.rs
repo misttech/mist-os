@@ -111,9 +111,9 @@ where
                         });
                         let log_listener = &log_listener;
                         futures::stream::iter(messages_gen)
-                            .for_each(|mut msg| async move {
+                            .for_each(|msg| async move {
                                 let () = log_listener
-                                    .log(&mut msg)
+                                    .log(&msg)
                                     .await
                                     .expect("failed to send log to listener");
                             })

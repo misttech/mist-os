@@ -288,7 +288,7 @@ mod test {
         );
         actions.insert("file".to_string(), action_file);
         let no_data = Vec::new();
-        let mut context = StructuredActionContext::new(&metrics, &mut actions, &no_data, None);
+        let mut context = StructuredActionContext::new(&metrics, &actions, &no_data, None);
         let results = context.process();
         assert_eq!(
             cast!(results.actions.get("file").unwrap().get("do_true").unwrap(), Action::Alert)
@@ -378,7 +378,7 @@ mod test {
         insert_gauge!("gauge_s9", None);
         actions.insert("file".to_string(), action_file);
         let no_data = Vec::new();
-        let mut context = StructuredActionContext::new(&metrics, &mut actions, &no_data, None);
+        let mut context = StructuredActionContext::new(&metrics, &actions, &no_data, None);
 
         let results = context.process();
 
@@ -584,7 +584,7 @@ mod test {
         );
         actions.insert("file".to_string(), action_file);
         let no_data = Vec::new();
-        let mut context = StructuredActionContext::new(&metrics, &mut actions, &no_data, None);
+        let mut context = StructuredActionContext::new(&metrics, &actions, &no_data, None);
         context.process();
 
         // Ensure Alert caches correctly

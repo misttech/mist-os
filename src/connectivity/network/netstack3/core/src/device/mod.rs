@@ -2222,18 +2222,15 @@ mod tests {
 
     #[test]
     fn test_no_default_routes() {
-        let Ctx { mut sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
 
-        let _loopback_device: LoopbackDeviceId<_> = crate::device::add_loopback_device(
-            &mut sync_ctx,
-            Mtu::new(55),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("error adding loopback device");
+        let _loopback_device: LoopbackDeviceId<_> =
+            crate::device::add_loopback_device(&sync_ctx, Mtu::new(55), DEFAULT_INTERFACE_METRIC)
+                .expect("error adding loopback device");
 
         assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
         let _ethernet_device: EthernetDeviceId<_> = crate::device::add_ethernet_device(
-            &mut sync_ctx,
+            &sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::MIN,
             DEFAULT_INTERFACE_METRIC,
@@ -2243,10 +2240,10 @@ mod tests {
 
     #[test]
     fn remove_ethernet_device_disables_timers() {
-        let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
 
         let ethernet_device = crate::device::add_ethernet_device(
-            &mut sync_ctx,
+            &sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
             DEFAULT_INTERFACE_METRIC,
@@ -2257,7 +2254,7 @@ mod tests {
             // Enable the device, turning on a bunch of features that install
             // timers.
             crate::device::update_ipv4_configuration(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 |state| {
@@ -2267,7 +2264,7 @@ mod tests {
             )
             .unwrap();
             crate::device::update_ipv6_configuration(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 |state| {
@@ -2280,7 +2277,7 @@ mod tests {
             .unwrap();
         }
 
-        crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, ethernet_device);
+        crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, ethernet_device);
         assert_eq!(non_sync_ctx.timer_ctx().timers(), &[]);
     }
 
@@ -2367,24 +2364,19 @@ mod tests {
 
         if with_tx_queue {
             crate::device::set_tx_queue_configuration(
-                &mut sync_ctx,
+                &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 TransmitQueueConfiguration::Fifo,
             );
         }
 
-        crate::device::update_ipv6_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &device,
-            |state| {
-                state.ip_config.ip_enabled = true;
-                // Enable DAD so that the auto-generated address triggers a DAD
-                // message immediately on interface enable.
-                state.dad_transmits = Some(nonzero!(1u8));
-            },
-        )
+        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |state| {
+            state.ip_config.ip_enabled = true;
+            // Enable DAD so that the auto-generated address triggers a DAD
+            // message immediately on interface enable.
+            state.dad_transmits = Some(nonzero!(1u8));
+        })
         .unwrap();
 
         if with_tx_queue {
@@ -2393,7 +2385,7 @@ mod tests {
                 core::mem::take(&mut non_sync_ctx.state_mut().tx_available),
                 [device.clone()]
             );
-            crate::device::transmit_queued_tx_frames(&mut sync_ctx, &mut non_sync_ctx, &device)
+            crate::device::transmit_queued_tx_frames(&sync_ctx, &mut non_sync_ctx, &device)
                 .unwrap();
         }
 

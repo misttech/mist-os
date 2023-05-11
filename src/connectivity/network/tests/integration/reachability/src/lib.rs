@@ -332,17 +332,17 @@ async fn configure_interface<'a>(
     let device_id = iface.id();
 
     // Add neighbor table entries for the gateway addresses.
-    let mut gateway_v4 = fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: gateway_v4.ipv4_bytes() });
-    let mut gateway_v6 = fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: gateway_v6.ipv6_bytes() });
-    let mut gateway_mac = fnet::MacAddress { octets: gateway_mac.bytes() };
+    let gateway_v4 = fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: gateway_v4.ipv4_bytes() });
+    let gateway_v6 = fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: gateway_v6.ipv6_bytes() });
+    let gateway_mac = fnet::MacAddress { octets: gateway_mac.bytes() };
     let () = controller
-        .add_entry(device_id, &mut gateway_v6, &mut gateway_mac)
+        .add_entry(device_id, &gateway_v6, &gateway_mac)
         .await
         .expect("neighbor add_entry FIDL error")
         .map_err(zx::Status::from_raw)
         .expect("add IPv6 gateway neighbor table entry failed");
     let () = controller
-        .add_entry(device_id, &mut gateway_v4, &mut gateway_mac)
+        .add_entry(device_id, &gateway_v4, &gateway_mac)
         .await
         .expect("neighbor add_entry FIDL error")
         .map_err(zx::Status::from_raw)
@@ -350,7 +350,7 @@ async fn configure_interface<'a>(
 
     // Add default routes.
     let () = stack
-        .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
             subnet: fidl_subnet!("0.0.0.0/0"),
             device_id,
             next_hop: Some(Box::new(gateway_v4)),
@@ -360,7 +360,7 @@ async fn configure_interface<'a>(
         .expect("add IPv4 default route FIDL error")
         .expect("add IPv4 default route error");
     let () = stack
-        .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
             subnet: fidl_subnet!("::/0"),
             device_id,
             next_hop: Some(Box::new(gateway_v6)),
@@ -489,7 +489,7 @@ async fn initialize_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     // Pause the fake clock and ignore the FIDL timeout named deadline.
     fake_clock.pause().await.expect("failed to pause the clock");
     fake_clock
-        .ignore_named_deadline(&mut FIDL_TIMEOUT_ID.into())
+        .ignore_named_deadline(&FIDL_TIMEOUT_ID.into())
         .await
         .expect("ignore named deadline failed");
 
@@ -497,7 +497,7 @@ async fn initialize_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     fake_clock
         .resume_with_increments(
             zx::Duration::from_millis(1).into_nanos(),
-            &mut ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
+            &ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
         )
         .await
         .expect("resume with increment failed")
@@ -514,7 +514,7 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     fake_clock
         .resume_with_increments(
             zx::Duration::from_millis(1).into_nanos(),
-            &mut ftesting::Increment::Determined(zx::Duration::from_millis(5).into_nanos()),
+            &ftesting::Increment::Determined(zx::Duration::from_millis(5).into_nanos()),
         )
         .await
         .expect("resume with increment failed")

@@ -570,7 +570,7 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
                 if frame_control.is_data() {
                     let needs_reliability =
                         (flags & banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0) != 0;
-                    peer.get_tx_vector_idx(needs_reliability, &mut self.probe_sequence)
+                    peer.get_tx_vector_idx(needs_reliability, &self.probe_sequence)
                 } else {
                     peer.best_erp_for_reliability
                 }

@@ -378,7 +378,7 @@ struct DynamicComponentInstance {
 impl Drop for DynamicComponentInstance {
     fn drop(&mut self) {
         if let Ok(realm_proxy) = connect_to_protocol::<RealmMarker>() {
-            let _ = realm_proxy.destroy_child(&mut fdecl::ChildRef {
+            let _ = realm_proxy.destroy_child(&fdecl::ChildRef {
                 name: self.name.clone(),
                 collection: Some(self.collection.clone()),
             });

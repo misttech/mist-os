@@ -154,11 +154,11 @@ impl ServiceGroup {
     /// Relays the connection parameters to the client.
     pub fn relay_connected(
         &self,
-        mut peer_id: PeerId,
+        peer_id: PeerId,
         channel: bredr::Channel,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
-        self.receiver.connected(&mut peer_id, channel, &protocol).map_err(|e| e.into())
+        self.receiver.connected(&peer_id, channel, &protocol).map_err(|e| e.into())
     }
 
     pub fn set_responder(&mut self, responder: bredr::ProfileAdvertiseResponder) {

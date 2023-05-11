@@ -65,9 +65,9 @@ impl ImeState {
         let keyboard_event: uii::KeyboardEvent =
             key_event.try_into().context("error converting key event to keyboard event")?;
 
-        let mut state = idx::text_state_byte_to_codeunit(self.text_state.clone());
+        let state = idx::text_state_byte_to_codeunit(self.text_state.clone());
         self.client
-            .did_update_state(&mut state, Some(&mut uii::InputEvent::Keyboard(keyboard_event)))
+            .did_update_state(&state, Some(&uii::InputEvent::Keyboard(keyboard_event)))
             .with_context(|| {
                 format!(
                     "ImeState::forward_event: error sending state update to ImeClient: {:?}",
@@ -86,8 +86,8 @@ impl ImeState {
         self.text_points = HashMap::new();
 
         if call_did_update_state {
-            let mut state = idx::text_state_byte_to_codeunit(self.text_state.clone());
-            self.client.did_update_state(&mut state, None).unwrap_or_else(|e| {
+            let state = idx::text_state_byte_to_codeunit(self.text_state.clone());
+            self.client.did_update_state(&state, None).unwrap_or_else(|e| {
                 tracing::warn!(
                     "ImeState::increment_revision: error sending state update to ImeClient: {:?}",
                     e

@@ -331,7 +331,7 @@ mod tests {
 
         // Get a single item by specifying the extra.
         let result = item_service
-            .get2(zbi_type.into_raw(), Some(&mut fidl_fuchsia_boot::Extra { n: extra2 }))
+            .get2(zbi_type.into_raw(), Some(&fidl_fuchsia_boot::Extra { n: extra2 }))
             .await
             .expect("failed to query item service")
             .expect("failed to retrieve items");

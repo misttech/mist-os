@@ -17,10 +17,7 @@ async fn base_resolver_test() {
         connect_to_protocol::<RealmMarker>().expect("failed to connect to fuchsia.component.Realm");
     let (exposed_dir, server_end) = create_proxy().expect("failed to create proxy");
     realm
-        .open_exposed_dir(
-            &mut ChildRef { name: "base-component".into(), collection: None },
-            server_end,
-        )
+        .open_exposed_dir(&ChildRef { name: "base-component".into(), collection: None }, server_end)
         .await
         .expect("failed to call open_exposed_dir FIDL")
         .expect("failed to open exposed dir of child");
@@ -36,7 +33,7 @@ async fn base_resolver_resolves_subpackages() {
     let (exposed_dir, server_end) = create_proxy().expect("failed to create proxy");
     realm
         .open_exposed_dir(
-            &mut ChildRef { name: "base-superpackage-component".into(), collection: None },
+            &ChildRef { name: "base-superpackage-component".into(), collection: None },
             server_end,
         )
         .await

@@ -156,14 +156,14 @@ impl SysmemAllocation {
     pub fn bind(
         allocator: AllocatorProxy,
         token: ClientEnd<BufferCollectionTokenMarker>,
-        mut constraints: BufferCollectionConstraints,
+        constraints: BufferCollectionConstraints,
     ) -> Result<Self, Error> {
         let (buffer_collection, collection_request) =
             fidl::endpoints::create_proxy::<BufferCollectionMarker>()?;
         allocator.bind_shared_collection(token, collection_request)?;
 
         buffer_collection
-            .set_constraints(true, &mut constraints)
+            .set_constraints(true, &constraints)
             .context("sending constraints to sysmem")?;
 
         Ok(Self::WaitingForSync {
@@ -481,7 +481,7 @@ mod tests {
         sysmem_client.bind_shared_collection(token, buffer_collection_requests).expect("bind okay");
 
         buffer_collection_client
-            .set_constraints(true, &mut buffer_constraints)
+            .set_constraints(true, &buffer_constraints)
             .expect("constraints should send okay");
 
         let allocation_fut = buffer_collection_client.wait_for_buffers_allocated();

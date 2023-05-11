@@ -41,7 +41,7 @@ impl Forward {
     async fn port_forward_task(
         cx: Context,
         target: String,
-        mut target_address: SocketAddress,
+        target_address: SocketAddress,
         listener: TcpListener,
         tasks: Arc<tasks::TaskManager>,
     ) {
@@ -65,7 +65,7 @@ impl Forward {
 
             let (socket, remote) = fidl::Socket::create_stream();
 
-            match target.forward_tcp(&mut target_address, remote).await {
+            match target.forward_tcp(&target_address, remote).await {
                 Ok(Ok(())) => (),
                 Ok(Err(e)) => {
                     tracing::error!("Error forwarding port: {:?}", e);
@@ -110,7 +110,7 @@ impl Forward {
                 if bytes == 0 {
                     break Ok(());
                 }
-                conn_write.write_all(&mut buf[..bytes]).await?;
+                conn_write.write_all(&buf[..bytes]).await?;
                 conn_write.flush().await?;
             }
         };
@@ -122,7 +122,7 @@ impl Forward {
                 if bytes == 0 {
                     break Ok(()) as Result<(), std::io::Error>;
                 }
-                socket_write.write_all(&mut buf[..bytes]).await?;
+                socket_write.write_all(&buf[..bytes]).await?;
                 socket_write.flush().await?;
             }
         };
@@ -188,12 +188,7 @@ impl FidlProtocol for Forward {
                 responder.send(&mut Ok(())).context("error sending response")?;
                 Ok(())
             }
-            ffx::TunnelRequest::ReversePort {
-                target,
-                host_address,
-                mut target_address,
-                responder,
-            } => {
+            ffx::TunnelRequest::ReversePort { target, host_address, target_address, responder } => {
                 let target = match cx.open_remote_control(Some(target)).await {
                     Ok(t) => t,
                     Err(e) => {
@@ -206,7 +201,7 @@ impl FidlProtocol for Forward {
 
                 let (client, mut event_stream) =
                     fidl::endpoints::create_request_stream::<rcs::ForwardCallbackMarker>()?;
-                match target.reverse_tcp(&mut target_address, client).await? {
+                match target.reverse_tcp(&target_address, client).await? {
                     Ok(()) => (),
                     Err(e) => {
                         tracing::error!("Could not establish reverse TCP forward: {:?}", e);
@@ -411,8 +406,8 @@ mod tests {
             .unwrap()
             .reverse_port(
                 "dummy_target",
-                &mut SocketAddressExt("127.0.0.1:1234".parse().unwrap()).into(),
-                &mut SocketAddressExt("127.0.0.1:5678".parse().unwrap()).into(),
+                &SocketAddressExt("127.0.0.1:1234".parse().unwrap()).into(),
+                &SocketAddressExt("127.0.0.1:5678".parse().unwrap()).into(),
             )
             .await
             .unwrap()

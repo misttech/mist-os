@@ -52,7 +52,7 @@ impl Backlight {
             .context("Failed to get current backlight state")?;
         println!("Current panel backlight state: {:?}", backlight_state);
 
-        let mut new_state = backlight::State {
+        let new_state = backlight::State {
             backlight_on: args.set_power.unwrap_or(backlight_state.backlight_on),
             brightness: args.set_brightness.unwrap_or(backlight_state.brightness),
         };
@@ -65,7 +65,7 @@ impl Backlight {
         }
 
         tracing::trace!("Setting new backlight state");
-        utils::flatten_zx_error(self.device.set_state_normalized(&mut new_state).await)
+        utils::flatten_zx_error(self.device.set_state_normalized(&new_state).await)
             .context("Failed to apply new backlight settings")?;
 
         println!("New panel backlight state: {:?}", new_state);

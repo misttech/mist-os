@@ -54,8 +54,8 @@ async fn handle_fidl_request(
             responder.send(r)?;
         }
         fidl_sme::ApSmeRequest::Status { responder } => {
-            let mut r = status(sme);
-            responder.send(&mut r)?;
+            let r = status(sme);
+            responder.send(&r)?;
         }
     }
     Ok(())

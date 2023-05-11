@@ -399,8 +399,8 @@ impl FshostEnvironment {
                 zx::Status::ok(
                     volume_manager
                         .activate(
-                            &mut Guid { value: old_instance_guid },
-                            &mut Guid { value: new_instance_guid },
+                            &Guid { value: old_instance_guid },
+                            &Guid { value: new_instance_guid },
                         )
                         .await?,
                 )?;

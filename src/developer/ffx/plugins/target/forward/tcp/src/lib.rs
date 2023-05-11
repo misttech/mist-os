@@ -25,9 +25,9 @@ pub async fn forward_tcp(forward_port: ffx::TunnelProxy, cmd: TcpCommand) -> Res
 pub async fn forward_tcp_impl(
     target: &str,
     forward_port: ffx::TunnelProxy,
-    mut cmd: TcpCommand,
+    cmd: TcpCommand,
 ) -> Result<()> {
-    match forward_port.forward_port(target, &mut cmd.host_address, &mut cmd.target_address).await? {
+    match forward_port.forward_port(target, &cmd.host_address, &cmd.target_address).await? {
         Ok(()) => Ok(()),
         Err(ffx::TunnelError::CouldNotListen) => {
             ffx_bail!("Could not listen on address {:?}", cmd.host_address)

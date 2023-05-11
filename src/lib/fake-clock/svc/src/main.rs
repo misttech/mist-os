@@ -974,7 +974,7 @@ mod tests {
             fake_clock_control_proxy.pause().await.expect("failed to pause the clock");
 
             fake_clock_control_proxy
-                .ignore_named_deadline(&mut DEADLINE_ID.into())
+                .ignore_named_deadline(&DEADLINE_ID.into())
                 .await
                 .expect("failed to ignore deadline");
 
@@ -982,7 +982,7 @@ mod tests {
             let deadline_time_millis = 10;
             let deadline = fake_clock_proxy
                 .create_named_deadline(
-                    &mut DEADLINE_ID.into(),
+                    &DEADLINE_ID.into(),
                     deadline_time_millis.millis().into_nanos(),
                 )
                 .await

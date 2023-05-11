@@ -114,7 +114,7 @@ mod tests {
             create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
         let expected_name = "TEST".to_string();
 
-        let _ = proxy.set_device_class(&mut DeviceClass { value: 0 });
+        let _ = proxy.set_device_class(&DeviceClass { value: 0 });
         let mock_result = expect_set_local_name(stream, expected_name).await;
         assert!(mock_result.is_err());
     }
@@ -136,7 +136,7 @@ mod tests {
             create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
         let expected_name = "TEST".to_string();
 
-        let _ = proxy.set_device_class(&mut DeviceClass { value: 0 });
+        let _ = proxy.set_device_class(&DeviceClass { value: 0 });
         let _ = proxy.set_local_name(&expected_name);
         let mock_result = expect_set_local_name(stream, expected_name.clone()).await;
         assert!(mock_result.is_ok());

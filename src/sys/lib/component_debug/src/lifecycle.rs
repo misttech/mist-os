@@ -115,11 +115,11 @@ pub async fn destroy_instance_in_collection(
     collection: &str,
     child_name: &str,
 ) -> Result<(), DestroyError> {
-    let mut child =
+    let child =
         fdecl::ChildRef { name: child_name.to_string(), collection: Some(collection.to_string()) };
 
     lifecycle_controller
-        .destroy_instance(&parent.to_string(), &mut child)
+        .destroy_instance(&parent.to_string(), &child)
         .await
         .map_err(|e| ActionError::Fidl(e))?
         .map_err(|e| match e {

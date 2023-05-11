@@ -208,8 +208,8 @@ impl TestService {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
                 .on_state_changed(
-                    &mut Usage::RenderUsage(usage),
-                    &mut UsageState::Muted(UsageStateMuted::default()),
+                    &Usage::RenderUsage(usage),
+                    &UsageState::Muted(UsageStateMuted::default()),
                 )
                 .await
                 .expect("Sending interruption start to service under test");
@@ -222,8 +222,8 @@ impl TestService {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
                 .on_state_changed(
-                    &mut Usage::RenderUsage(usage),
-                    &mut UsageState::Unadjusted(UsageStateUnadjusted::default()),
+                    &Usage::RenderUsage(usage),
+                    &UsageState::Unadjusted(UsageStateUnadjusted::default()),
                 )
                 .await
                 .expect("Sending interruption stop to service under test");

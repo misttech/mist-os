@@ -3051,11 +3051,7 @@ mod tests {
 
         // Check that socket options set on the listener are propagated to the
         // connected socket.
-        assert!(SocketHandler::get_udp_posix_reuse_port(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            conn.into()
-        ));
+        assert!(SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, conn.into()));
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
                 .multicast_memberships(),
@@ -3132,7 +3128,7 @@ mod tests {
         // that were set on it before attempting to connect were preserved.
         assert!(SocketHandler::get_udp_posix_reuse_port(
             &mut sync_ctx,
-            &mut non_sync_ctx,
+            &non_sync_ctx,
             listener.into()
         ));
         assert_eq!(
@@ -4989,22 +4985,14 @@ where {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
         assert_eq!(
-            SocketHandler::get_udp_posix_reuse_port(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                unbound.into()
-            ),
+            SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, unbound.into()),
             false,
         );
 
         SocketHandler::set_udp_posix_reuse_port(&mut sync_ctx, &mut non_sync_ctx, unbound, true);
 
         assert_eq!(
-            SocketHandler::get_udp_posix_reuse_port(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                unbound.into()
-            ),
+            SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, unbound.into()),
             true
         );
 
@@ -5017,11 +5005,7 @@ where {
         )
         .expect("listen failed");
         assert_eq!(
-            SocketHandler::get_udp_posix_reuse_port(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                listen.into()
-            ),
+            SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, listen.into()),
             true
         );
         let _: ListenerInfo<_, _> =
@@ -5039,7 +5023,7 @@ where {
         .expect("connect failed");
 
         assert_eq!(
-            SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &mut non_sync_ctx, conn.into()),
+            SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, conn.into()),
             true
         );
     }
@@ -5051,7 +5035,7 @@ where {
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
 
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, unbound.into()),
             None
         );
 
@@ -5062,7 +5046,7 @@ where {
             Some(&FakeDeviceId),
         );
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, unbound.into()),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }
@@ -5088,7 +5072,7 @@ where {
         )
         .expect("failed to listen");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, listen.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listen.into()),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
@@ -5100,7 +5084,7 @@ where {
         )
         .expect("failed to set device");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, listen.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listen.into()),
             None
         );
     }
@@ -5126,13 +5110,13 @@ where {
         )
         .expect("failed to connect");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, conn.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
         SocketHandler::set_conn_udp_device(&mut sync_ctx, &mut non_sync_ctx, conn.into(), None)
             .expect("failed to set device");
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, conn.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
             None
         );
     }
@@ -5325,7 +5309,7 @@ where {
         .expect("listen failed");
 
         assert_eq!(
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, listener.into()),
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
             Some(FakeWeakDeviceId(MultipleDevicesId::A))
         );
 
@@ -5497,8 +5481,7 @@ where {
             REMOTE_PORT,
         )
         .map(|id: ConnId<_>| {
-            SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, id.into())
-                .unwrap()
+            SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, id.into()).unwrap()
         })
         .map_err(|(e, _id): (_, ListenerId<_>)| e);
         assert_eq!(result, expected);

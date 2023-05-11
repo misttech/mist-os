@@ -56,14 +56,14 @@ async fn add_route_table_entry(
     subnet: fidl_fuchsia_net::Subnet,
     nicid: u64,
 ) -> Result<(), Error> {
-    let mut entry = fidl_fuchsia_net_stack::ForwardingEntry {
+    let entry = fidl_fuchsia_net_stack::ForwardingEntry {
         subnet,
         device_id: nicid,
         next_hop: None,
         metric: ENTRY_METRICS,
     };
     stack_proxy
-        .add_forwarding_entry(&mut entry)
+        .add_forwarding_entry(&entry)
         .await
         .with_context(|| format!("failed to send add fowrarding entry {:?}", entry))?
         .map_err(|e: fidl_fuchsia_net_stack::Error| {

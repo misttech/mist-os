@@ -202,7 +202,7 @@ where
             }
             fio::DirectoryRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttr");
-                let (mut attrs, status) = match self.directory.get_attrs().await {
+                let (attrs, status) = match self.directory.get_attrs().await {
                     Ok(attrs) => (attrs, zx::Status::OK.into_raw()),
                     Err(status) => (
                         fio::NodeAttributes {
@@ -217,7 +217,7 @@ where
                         status.into_raw(),
                     ),
                 };
-                responder.send(status, &mut attrs)?;
+                responder.send(status, &attrs)?;
             }
             fio::DirectoryRequest::GetAttributes { query: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttributes");
@@ -341,7 +341,7 @@ where
                 fuchsia_trace::duration!("storage", "Directory::QueryFilesystem");
                 match self.directory.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
-                    Ok(mut info) => responder.send(0, Some(&mut info))?,
+                    Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {

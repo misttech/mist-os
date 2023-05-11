@@ -359,11 +359,11 @@ impl Puppet {
 
     async fn run_spec(
         &self,
-        mut spec: RecordSpec,
+        spec: RecordSpec,
         new_file_line_rules: bool,
     ) -> Result<(TestRecord, Range<zx::Time>), Error> {
         let before = zx::Time::get_monotonic();
-        self.proxy.emit_log(&mut spec).await?;
+        self.proxy.emit_log(&spec).await?;
         let after = zx::Time::get_monotonic();
 
         // read until we get to a non-ignored record
@@ -420,7 +420,7 @@ where
 {
     macro_rules! send_log_with_severity {
         ($severity:ident) => {
-            let mut record = RecordSpec {
+            let record = RecordSpec {
                 file: "test_file.cc".to_string(),
                 line: 9001,
                 record: Record {
@@ -434,7 +434,7 @@ where
                     timestamp: 0,
                 },
             };
-            puppet.proxy.emit_log(&mut record).await?;
+            puppet.proxy.emit_log(&record).await?;
         };
     }
     let interest = Interest { min_severity: Some(Severity::Warn), ..Default::default() };
@@ -530,7 +530,7 @@ where
 }
 
 async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> Result<(), Error> {
-    let mut record = RecordSpec {
+    let record = RecordSpec {
         file: "../../test_file.cc".to_string(),
         line: 9001,
         record: Record {
@@ -542,7 +542,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
             timestamp: 0,
         },
     };
-    puppet.proxy.emit_log(&mut record).await?;
+    puppet.proxy.emit_log(&record).await?;
     info!("Waiting for dot message");
     assert_eq!(
         puppet
@@ -577,12 +577,12 @@ async fn assert_printf_record(puppet: &mut Puppet, new_file_line_rules: bool) ->
             timestamp: 0,
         },
     };
-    let mut spec: PrintfRecordSpec = PrintfRecordSpec {
+    let spec: PrintfRecordSpec = PrintfRecordSpec {
         record: record,
         printf_arguments: args,
         msg: "Test printf int %i string %s double %f".to_string(),
     };
-    puppet.proxy.emit_printf_log(&mut spec).await?;
+    puppet.proxy.emit_printf_log(&spec).await?;
     info!("Waiting for printf");
     assert_eq!(
         puppet

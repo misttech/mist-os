@@ -393,7 +393,7 @@ impl<InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write> Client<Interfa
         let mut response = [0; MAX_PACKET_SIZE];
         let len = interface.read(&mut response)?;
 
-        Ok(protocol::parse_parameter_value(&mut &response[0..len])?)
+        Ok(protocol::parse_parameter_value(&&response[0..len])?)
     }
 
     /// Retrieves every ParameterValue from the provided Zedmon interface.

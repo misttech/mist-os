@@ -47,10 +47,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_no_payload().await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -58,12 +58,12 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_struct_payload().await {
                         Ok(some_field) => responder
-                            .send(&mut NonEmptyResultClassification::Success(NonEmptyPayload {
+                            .send(&NonEmptyResultClassification::Success(NonEmptyPayload {
                                 some_field,
                             }))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut NonEmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&NonEmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -71,10 +71,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_table_payload().await {
                         Ok(payload) => responder
-                            .send(&mut TableResultClassification::Success(payload))
+                            .send(&TableResultClassification::Success(payload))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut TableResultClassification::FidlError(classify_error(err)))
+                            .send(&TableResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -82,10 +82,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_union_payload().await {
                         Ok(payload) => responder
-                            .send(&mut UnionResultClassification::Success(payload))
+                            .send(&UnionResultClassification::Success(payload))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut UnionResultClassification::FidlError(classify_error(err)))
+                            .send(&UnionResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -93,17 +93,17 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_struct_payload_err().await {
                         Ok(Ok(some_field)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::Success(
+                            .send(&NonEmptyResultWithErrorClassification::Success(
                                 NonEmptyPayload { some_field },
                             ))
                             .context("sending response failed"),
                         Ok(Err(application_err)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::ApplicationError(
+                            .send(&NonEmptyResultWithErrorClassification::ApplicationError(
                                 application_err,
                             ))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::FidlError(
+                            .send(&NonEmptyResultWithErrorClassification::FidlError(
                                 classify_error(err),
                             ))
                             .context("sending response failed"),
@@ -113,10 +113,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_struct_request(request.some_field).await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -124,21 +124,21 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.two_way_table_request(&request).await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
-                RunnerRequest::CallTwoWayUnionRequest { target, mut request, responder } => {
+                RunnerRequest::CallTwoWayUnionRequest { target, request, responder } => {
                     let client = target.into_proxy().context("creating proxy failed")?;
-                    match client.two_way_union_request(&mut request).await {
+                    match client.two_way_union_request(&request).await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -146,10 +146,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.one_way_no_request() {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -157,10 +157,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.one_way_struct_request(request.some_field) {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -168,21 +168,21 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.one_way_table_request(&request) {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
-                RunnerRequest::CallOneWayUnionRequest { target, mut request, responder } => {
+                RunnerRequest::CallOneWayUnionRequest { target, request, responder } => {
                     let client = target.into_proxy().context("creating proxy failed")?;
-                    match client.one_way_union_request(&mut request) {
+                    match client.one_way_union_request(&request) {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -191,10 +191,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.strict_one_way() {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -202,10 +202,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.flexible_one_way() {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -213,10 +213,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.strict_two_way().await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -224,12 +224,12 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.strict_two_way_fields().await {
                         Ok(some_field) => responder
-                            .send(&mut NonEmptyResultClassification::Success(NonEmptyPayload {
+                            .send(&NonEmptyResultClassification::Success(NonEmptyPayload {
                                 some_field,
                             }))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut NonEmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&NonEmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -237,17 +237,17 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.strict_two_way_err().await {
                         Ok(Ok(())) => responder
-                            .send(&mut EmptyResultWithErrorClassification::Success(Empty))
+                            .send(&EmptyResultWithErrorClassification::Success(Empty))
                             .context("sending response failed"),
                         Ok(Err(application_err)) => responder
-                            .send(&mut EmptyResultWithErrorClassification::ApplicationError(
+                            .send(&EmptyResultWithErrorClassification::ApplicationError(
                                 application_err,
                             ))
                             .context("sending response failed"),
                         Err(fidl_err) => responder
-                            .send(&mut EmptyResultWithErrorClassification::FidlError(
-                                classify_error(fidl_err),
-                            ))
+                            .send(&EmptyResultWithErrorClassification::FidlError(classify_error(
+                                fidl_err,
+                            )))
                             .context("sending response failed"),
                     }
                 }
@@ -255,17 +255,17 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.strict_two_way_fields_err().await {
                         Ok(Ok(some_field)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::Success(
+                            .send(&NonEmptyResultWithErrorClassification::Success(
                                 NonEmptyPayload { some_field },
                             ))
                             .context("sending response failed"),
                         Ok(Err(application_err)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::ApplicationError(
+                            .send(&NonEmptyResultWithErrorClassification::ApplicationError(
                                 application_err,
                             ))
                             .context("sending response failed"),
                         Err(fidl_err) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::FidlError(
+                            .send(&NonEmptyResultWithErrorClassification::FidlError(
                                 classify_error(fidl_err),
                             ))
                             .context("sending response failed"),
@@ -275,10 +275,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.flexible_two_way().await {
                         Ok(()) => responder
-                            .send(&mut EmptyResultClassification::Success(Empty))
+                            .send(&EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut EmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&EmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -286,12 +286,12 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.flexible_two_way_fields().await {
                         Ok(some_field) => responder
-                            .send(&mut NonEmptyResultClassification::Success(NonEmptyPayload {
+                            .send(&NonEmptyResultClassification::Success(NonEmptyPayload {
                                 some_field,
                             }))
                             .context("sending response failed"),
                         Err(err) => responder
-                            .send(&mut NonEmptyResultClassification::FidlError(classify_error(err)))
+                            .send(&NonEmptyResultClassification::FidlError(classify_error(err)))
                             .context("sending response failed"),
                     }
                 }
@@ -299,17 +299,17 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.flexible_two_way_err().await {
                         Ok(Ok(())) => responder
-                            .send(&mut EmptyResultWithErrorClassification::Success(Empty))
+                            .send(&EmptyResultWithErrorClassification::Success(Empty))
                             .context("sending response failed"),
                         Ok(Err(application_err)) => responder
-                            .send(&mut EmptyResultWithErrorClassification::ApplicationError(
+                            .send(&EmptyResultWithErrorClassification::ApplicationError(
                                 application_err,
                             ))
                             .context("sending response failed"),
                         Err(fidl_err) => responder
-                            .send(&mut EmptyResultWithErrorClassification::FidlError(
-                                classify_error(fidl_err),
-                            ))
+                            .send(&EmptyResultWithErrorClassification::FidlError(classify_error(
+                                fidl_err,
+                            )))
                             .context("sending response failed"),
                     }
                 }
@@ -317,17 +317,17 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     let client = target.into_proxy().context("creating proxy failed")?;
                     match client.flexible_two_way_fields_err().await {
                         Ok(Ok(some_field)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::Success(
+                            .send(&NonEmptyResultWithErrorClassification::Success(
                                 NonEmptyPayload { some_field },
                             ))
                             .context("sending response failed"),
                         Ok(Err(application_err)) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::ApplicationError(
+                            .send(&NonEmptyResultWithErrorClassification::ApplicationError(
                                 application_err,
                             ))
                             .context("sending response failed"),
                         Err(fidl_err) => responder
-                            .send(&mut NonEmptyResultWithErrorClassification::FidlError(
+                            .send(&NonEmptyResultWithErrorClassification::FidlError(
                                 classify_error(fidl_err),
                             ))
                             .context("sending response failed"),
@@ -342,29 +342,27 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                         while let Some(event) = client.take_event_stream().next().await {
                             let report_result = match event {
                                 Ok(ClosedTargetEvent::OnEventNoPayload {}) => reporter
-                                    .report_event(&mut ClosedTargetEventReport::OnEventNoPayload(
+                                    .report_event(&ClosedTargetEventReport::OnEventNoPayload(
                                         Empty {},
                                     )),
                                 Ok(ClosedTargetEvent::OnEventStructPayload { some_field }) => {
                                     reporter.report_event(
-                                        &mut ClosedTargetEventReport::OnEventStructPayload(
+                                        &ClosedTargetEventReport::OnEventStructPayload(
                                             NonEmptyPayload { some_field },
                                         ),
                                     )
                                 }
                                 Ok(ClosedTargetEvent::OnEventTablePayload { payload }) => reporter
-                                    .report_event(
-                                        &mut ClosedTargetEventReport::OnEventTablePayload(payload),
-                                    ),
+                                    .report_event(&ClosedTargetEventReport::OnEventTablePayload(
+                                        payload,
+                                    )),
                                 Ok(ClosedTargetEvent::OnEventUnionPayload { payload }) => reporter
-                                    .report_event(
-                                        &mut ClosedTargetEventReport::OnEventUnionPayload(payload),
-                                    ),
-                                Err(fidl_err) => {
-                                    reporter.report_event(&mut ClosedTargetEventReport::FidlError(
-                                        classify_error(fidl_err),
-                                    ))
-                                }
+                                    .report_event(&ClosedTargetEventReport::OnEventUnionPayload(
+                                        payload,
+                                    )),
+                                Err(fidl_err) => reporter.report_event(
+                                    &ClosedTargetEventReport::FidlError(classify_error(fidl_err)),
+                                ),
                             };
                             match report_result {
                                 // Report succeeded. Wait for another event or
@@ -390,11 +388,11 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                         while let Some(event) = client.take_event_stream().next().await {
                             let report_result = match event {
                                 Ok(AjarTargetEvent::_UnknownEvent { ordinal, .. }) => reporter
-                                    .report_event(&mut AjarTargetEventReport::UnknownEvent(
+                                    .report_event(&AjarTargetEventReport::UnknownEvent(
                                         UnknownEvent { ordinal },
                                     )),
                                 Err(fidl_err) => reporter.report_event(
-                                    &mut AjarTargetEventReport::FidlError(classify_error(fidl_err)),
+                                    &AjarTargetEventReport::FidlError(classify_error(fidl_err)),
                                 ),
                             };
                             match report_result {
@@ -421,15 +419,15 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                         while let Some(event) = client.take_event_stream().next().await {
                             let report_result = match event {
                                 Ok(OpenTargetEvent::StrictEvent {}) => reporter
-                                    .report_event(&mut OpenTargetEventReport::StrictEvent(Empty)),
+                                    .report_event(&OpenTargetEventReport::StrictEvent(Empty)),
                                 Ok(OpenTargetEvent::FlexibleEvent {}) => reporter
-                                    .report_event(&mut OpenTargetEventReport::FlexibleEvent(Empty)),
+                                    .report_event(&OpenTargetEventReport::FlexibleEvent(Empty)),
                                 Ok(OpenTargetEvent::_UnknownEvent { ordinal, .. }) => reporter
-                                    .report_event(&mut OpenTargetEventReport::UnknownEvent(
+                                    .report_event(&OpenTargetEventReport::UnknownEvent(
                                         UnknownEvent { ordinal },
                                     )),
                                 Err(fidl_err) => reporter.report_event(
-                                    &mut OpenTargetEventReport::FidlError(classify_error(fidl_err)),
+                                    &OpenTargetEventReport::FidlError(classify_error(fidl_err)),
                                 ),
                             };
                             match report_result {

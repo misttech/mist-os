@@ -181,7 +181,7 @@ mod tests {
                 vertical_size_mm: 0,
                 using_fallback_size: false,
             }];
-            coordinator_control.send_on_displays_changed(added_displays, &mut []).unwrap();
+            coordinator_control.send_on_displays_changed(added_displays, &[]).unwrap();
 
             match coordinator_request_stream.next().await.unwrap() {
                 Ok(display::CoordinatorRequest::SetDisplayPower {
@@ -229,7 +229,7 @@ mod tests {
 
             let (_, coordinator_control) =
                 coordinator_server.into_stream_and_control_handle().unwrap();
-            coordinator_control.send_on_displays_changed(&[], &mut []).unwrap();
+            coordinator_control.send_on_displays_changed(&[], &[]).unwrap();
         };
         futures::join!(test_future, provider_service_future);
     }

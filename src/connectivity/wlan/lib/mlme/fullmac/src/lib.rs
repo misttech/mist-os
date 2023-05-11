@@ -722,10 +722,7 @@ mod tests {
             let usme_bootstrap_result = if bootstrap {
                 Some(usme_bootstrap_proxy.start(
                     generic_sme_server_end,
-                    &mut fidl_sme::LegacyPrivacySupport {
-                        wep_supported: false,
-                        wpa1_supported: false,
-                    },
+                    &fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false },
                 ))
             } else {
                 None

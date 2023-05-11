@@ -1266,7 +1266,7 @@ mod tests {
 
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         let device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
@@ -1274,7 +1274,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true;
         })
         .unwrap();
@@ -1307,25 +1307,25 @@ mod tests {
         // First receive a Router Advertisement without the source link layer
         // and make sure no new neighbor gets added.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
             ra_packet_buf(&[][..]),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, Default::default());
 
         // RA with a source link layer option should create a new entry.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
             ra_packet_buf(&options[..]),
         );
         assert_neighbors::<Ipv6, _>(
-            &mut sync_ctx,
+            &sync_ctx,
             &link_device_id,
             HashMap::from([(
                 {
@@ -1358,7 +1358,7 @@ mod tests {
 
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         let link_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
@@ -1366,13 +1366,13 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = link_device_id.clone().into();
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true;
         })
         .unwrap();
         // Set DAD config after enabling the device so that the default address
         // does not perform DAD.
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.dad_transmits = dad_transmits;
         })
         .unwrap();
@@ -1417,7 +1417,7 @@ mod tests {
         let snmc = target_addr.to_solicited_node_address();
         let dst_ip = snmc.get();
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
@@ -1482,7 +1482,7 @@ mod tests {
             HashMap::default()
         };
 
-        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, expected_neighbors);
+        assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, expected_neighbors);
     }
 
     #[test]
@@ -1497,7 +1497,7 @@ mod tests {
 
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
@@ -1505,7 +1505,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true;
         })
         .unwrap();
@@ -1544,22 +1544,22 @@ mod tests {
         // NeighborAdvertisements should not create a new entry even if
         // the advertisement has both the solicited and override flag set.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(false, false),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, Default::default());
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(true, true),
         );
-        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, Default::default());
 
         assert_eq!(non_sync_ctx.take_frames(), []);
 
@@ -1600,7 +1600,7 @@ mod tests {
             }
         );
         assert_neighbors::<Ipv6, _>(
-            &mut sync_ctx,
+            &sync_ctx,
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
@@ -1613,14 +1613,14 @@ mod tests {
 
         // A Neighbor advertisement should now update the entry.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(true, true),
         );
         assert_neighbors::<Ipv6, _>(
-            &mut sync_ctx,
+            &sync_ctx,
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
@@ -1641,11 +1641,11 @@ mod tests {
         assert_eq!(payload, body);
 
         // Disabling the device should clear the neighbor table.
-        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false;
         })
         .unwrap();
-        assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, HashMap::new());
+        assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, HashMap::new());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }
 }

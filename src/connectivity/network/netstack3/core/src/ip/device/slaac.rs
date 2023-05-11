@@ -2671,7 +2671,7 @@ mod tests {
         )
         .into();
         crate::device::update_ipv6_configuration(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             |config| {
@@ -2701,7 +2701,7 @@ mod tests {
 
         // Generate stable and temporary SLAAC addresses.
         receive_ip_packet::<_, _, Ipv6>(
-            &mut sync_ctx,
+            &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
             FrameDestination::Multicast,

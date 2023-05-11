@@ -833,7 +833,7 @@ pub mod sync {
             if OVERFLOWABLE {
                 maybe_overflowing_after_encode(&mut write_bytes, &mut write_handles)?;
             }
-            match self.channel.write_etc(&mut write_bytes, &mut write_handles) {
+            match self.channel.write_etc(&write_bytes, &mut write_handles) {
                 Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
                 Err(e) => Err(Error::ClientWrite(e)),
             }

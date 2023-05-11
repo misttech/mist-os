@@ -229,7 +229,7 @@ impl Client {
         P: AsRef<Path>,
     {
         let mut file = File::create(output.as_ref())?;
-        self.write(bucket, object, &mut file, &mut |_| Ok(ProgressResponse::Continue)).await?;
+        self.write(bucket, object, &mut file, &|_| Ok(ProgressResponse::Continue)).await?;
         Ok(())
     }
 
@@ -360,7 +360,7 @@ mod test {
         // Write the same data.
         let mut written = Vec::new();
         client
-            .write("fuchsia", "development/LATEST_LINUX", &mut written, &mut |_| {
+            .write("fuchsia", "development/LATEST_LINUX", &mut written, &|_| {
                 Ok(ProgressResponse::Continue)
             })
             .await

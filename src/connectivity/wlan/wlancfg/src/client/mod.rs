@@ -792,7 +792,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
+        let connect_fut = controller.connect(&fidl_policy::NetworkIdentifier {
             ssid: ssid.to_vec(),
             type_: fidl_policy::SecurityType::None,
         });
@@ -837,7 +837,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -874,7 +874,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_password.clone());
+        let connect_fut = controller.connect(&test_values.net_id_wpa2_w_password);
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -911,7 +911,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_psk.clone());
+        let connect_fut = controller.connect(&test_values.net_id_wpa2_w_psk);
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -960,12 +960,12 @@ mod tests {
         );
 
         // Issue connect request to a WPA3 network.
-        let mut net_id = fidl_policy::NetworkIdentifier {
+        let net_id = fidl_policy::NetworkIdentifier {
             ssid: b"foobar".to_vec(),
             type_: fidl_policy::SecurityType::Wpa3,
         };
         // Check that connect request fails because WPA3 is not supported.
-        let connect_fut = controller.connect(&mut net_id);
+        let connect_fut = controller.connect(&net_id);
         pin_mut!(connect_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -997,7 +997,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Save the network so it can be found to connect.
-        let mut net_id = fidl_policy::NetworkIdentifier {
+        let net_id = fidl_policy::NetworkIdentifier {
             ssid: b"foobar".to_vec(),
             type_: fidl_policy::SecurityType::Wpa3,
         };
@@ -1007,7 +1007,7 @@ mod tests {
         assert!(exec.run_singlethreaded(&mut save_fut).expect("Failed to save network").is_none());
 
         // Issue connect request to a WPA3 network.
-        let connect_fut = controller.connect(&mut net_id);
+        let connect_fut = controller.connect(&net_id);
         pin_mut!(connect_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -1055,7 +1055,7 @@ mod tests {
         });
 
         // Perform a connect operation.
-        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_password.clone());
+        let connect_fut = controller.connect(&test_values.net_id_wpa2_w_password);
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -1629,7 +1629,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure first controller is operable. Issue connect request.
-        let connect_fut = controller1.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller1.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.
@@ -1641,7 +1641,7 @@ mod tests {
         );
 
         // Ensure second controller is not operable. Issue connect request.
-        let connect_fut = controller2.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller2.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request from second controller. Verify failure.
@@ -1663,7 +1663,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure third controller is operable. Issue connect request.
-        let connect_fut = controller3.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller3.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request from third controller. Verify success.
@@ -1815,7 +1815,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.
@@ -1947,7 +1947,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Ensure the new controller works by issuing a connect request.
-        let connect_fut = controller2.connect(&mut test_values.net_id_open.clone());
+        let connect_fut = controller2.connect(&test_values.net_id_open);
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.

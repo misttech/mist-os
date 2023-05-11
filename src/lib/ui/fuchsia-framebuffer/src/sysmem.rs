@@ -219,7 +219,7 @@ impl BufferCollectionAllocator {
         collection_client: fidl_fuchsia_sysmem::BufferCollectionProxy,
         set_constraints: bool,
     ) -> Result<fidl_fuchsia_sysmem::BufferCollectionInfo2, Error> {
-        let mut buffer_collection_constraints = crate::sysmem::buffer_collection_constraints(
+        let buffer_collection_constraints = crate::sysmem::buffer_collection_constraints(
             self.width,
             self.height,
             self.pixel_type,
@@ -227,7 +227,7 @@ impl BufferCollectionAllocator {
             self.usage,
         );
         collection_client
-            .set_constraints(set_constraints, &mut buffer_collection_constraints)
+            .set_constraints(set_constraints, &buffer_collection_constraints)
             .context("Sending buffer constraints to sysmem")?;
 
         let (status, buffers) = collection_client.wait_for_buffers_allocated().await?;

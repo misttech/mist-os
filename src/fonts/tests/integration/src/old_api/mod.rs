@@ -38,7 +38,7 @@ async fn get_font_info(
     character: char,
 ) -> Result<FontInfo, Error> {
     let font = font_provider
-        .get_font(&mut fonts::Request {
+        .get_font(&fonts::Request {
             family: name.clone(),
             weight: 400,
             width: 5,

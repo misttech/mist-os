@@ -32,8 +32,8 @@ async fn main() -> Result<(), Error> {
     let mut expected = vec![];
     let mut actual = vec![];
     for f in &arr {
-        let mut test_case = (f)();
-        let result = proxy.encode(&mut test_case.1).await?.expect("Unable to get Record");
+        let test_case = (f)();
+        let result = proxy.encode(&test_case.1).await?.expect("Unable to get Record");
         let size = result.size;
         let vmo = result.vmo;
         let test_name = test_case.0;

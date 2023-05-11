@@ -168,9 +168,7 @@ impl View {
                 parent_viewport_watcher_request,
             )
             .expect("failed to create view");
-        flatland
-            .set_root_transform(&mut root_transform_id.clone())
-            .expect("failed to set root transform");
+        flatland.set_root_transform(&root_transform_id).expect("failed to set root transform");
         request_present(&presentation_sender).await;
 
         let this = Rc::new(RefCell::new(Self {

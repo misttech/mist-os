@@ -810,7 +810,7 @@ mod tests {
                 time: u64,
             ) -> Result<(), Error> {
                 self.fidl_proxy
-                    .dispatch_report(&mut InputReport {
+                    .dispatch_report(&InputReport {
                         event_time: time,
                         keyboard: None,
                         media_buttons: Some(Box::new(MediaButtonsReport {
@@ -836,7 +836,7 @@ mod tests {
 
             fn key_press_raw(&mut self, keyboard: KeyboardReport, time: u64) -> Result<(), Error> {
                 self.fidl_proxy
-                    .dispatch_report(&mut InputReport {
+                    .dispatch_report(&InputReport {
                         event_time: time,
                         keyboard: Some(Box::new(keyboard)),
                         media_buttons: None,
@@ -885,7 +885,7 @@ mod tests {
                 time: u64,
             ) -> Result<(), Error> {
                 self.fidl_proxy
-                    .dispatch_report(&mut InputReport {
+                    .dispatch_report(&InputReport {
                         event_time: time,
                         keyboard: None,
                         media_buttons: None,
@@ -905,7 +905,7 @@ mod tests {
 
             fn mouse(&mut self, report: MouseInputReport, time: u64) -> Result<(), Error> {
                 self.fidl_proxy
-                    .dispatch_report(&mut InputReport {
+                    .dispatch_report(&InputReport {
                         event_time: time,
                         keyboard: None,
                         media_buttons: None,

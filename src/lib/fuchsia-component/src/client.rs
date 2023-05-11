@@ -323,8 +323,8 @@ pub async fn open_childs_exposed_directory(
 ) -> Result<fio::DirectoryProxy, Error> {
     let realm_proxy = connect_to_protocol::<RealmMarker>()?;
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let mut child_ref = ChildRef { name: child_name.into(), collection: collection_name };
-    realm_proxy.open_exposed_dir(&mut child_ref, server_end).await?.map_err(|e| {
+    let child_ref = ChildRef { name: child_name.into(), collection: collection_name };
+    realm_proxy.open_exposed_dir(&child_ref, server_end).await?.map_err(|e| {
         let ChildRef { name, collection } = child_ref;
         format_err!("failed to bind to child {} in collection {:?}: {:?}", name, collection, e)
     })?;

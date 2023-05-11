@@ -62,7 +62,7 @@ impl SearchInfo {
         let response = record.to_service_found_response()?;
 
         let _ = self.proxy.service_found(
-            &mut response.id.into(),
+            &response.id.into(),
             response.protocol.as_deref(),
             &response.attributes,
         );

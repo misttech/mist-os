@@ -43,7 +43,7 @@ pub async fn setup_ime(
     state.selection.base = base;
     state.selection.extent = extent;
 
-    ime.set_state(&mut state).map_err(Into::into)
+    ime.set_state(&state).map_err(Into::into)
 }
 
 // Bind a new IME to the service.
@@ -57,7 +57,7 @@ pub fn bind_editor(
     ime_service.get_input_method_editor(
         ui_input::KeyboardType::Text,
         ui_input::InputMethodAction::Done,
-        &mut default_state(),
+        &default_state(),
         editor_client_end,
         ime_server_end,
     )?;

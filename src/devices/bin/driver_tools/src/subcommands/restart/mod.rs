@@ -17,7 +17,7 @@ pub async fn restart(
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     writeln!(writer, "Restarting driver hosts containing {}", cmd.driver_path)?;
-    match driver_development_proxy.restart_driver_hosts(&mut cmd.driver_path.to_string()).await? {
+    match driver_development_proxy.restart_driver_hosts(&cmd.driver_path.to_string()).await? {
         Ok(n) => {
             if n == 0 {
                 writeln!(

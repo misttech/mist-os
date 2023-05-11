@@ -256,7 +256,7 @@ async fn filtered_service_through_collection_test() {
     };
 
     create_dynamic_service_provider(dynamic_child_provider_name).await;
-    let mut dynamic_provider_child_ref = fdecl::ChildRef {
+    let dynamic_provider_child_ref = fdecl::ChildRef {
         name: dynamic_child_provider_name.to_string(),
         collection: Some(TEST_COLLECTION_NAME.to_string()),
     };
@@ -267,7 +267,7 @@ async fn filtered_service_through_collection_test() {
     let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("could not connect to Realm service");
     let _ = realm
-        .open_exposed_dir(&mut dynamic_provider_child_ref, provider_server)
+        .open_exposed_dir(&dynamic_provider_child_ref, provider_server)
         .await
         .expect("OpenExposedDir FIDL failed.");
 

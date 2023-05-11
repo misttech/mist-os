@@ -2676,14 +2676,14 @@ mod tests {
 
         // Pass a bad domain.
         let res = proxy
-            .connect(&mut A::DifferentDomain::create(A::DifferentDomain::LOCAL_ADDR, 1010))
+            .connect(&A::DifferentDomain::create(A::DifferentDomain::LOCAL_ADDR, 1010))
             .await
             .unwrap()
             .expect_err("connect fails");
         assert_eq!(res, fposix::Errno::Eafnosupport);
 
         // Pass a zero port. UDP disallows it, ICMP allows it.
-        let res = proxy.connect(&mut A::create(A::LOCAL_ADDR, 0)).await.unwrap();
+        let res = proxy.connect(&A::create(A::LOCAL_ADDR, 0)).await.unwrap();
         match proto {
             fposix_socket::DatagramSocketProtocol::Udp => {
                 assert_eq!(res, Err(fposix::Errno::Econnrefused));
@@ -2695,7 +2695,7 @@ mod tests {
 
         // Pass an unreachable address (tests error forwarding from `create_connection`).
         let res = proxy
-            .connect(&mut A::create(A::UNREACHABLE_ADDR, 1010))
+            .connect(&A::create(A::UNREACHABLE_ADDR, 1010))
             .await
             .unwrap()
             .expect_err("connect fails");
@@ -2710,14 +2710,14 @@ mod tests {
     async fn connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (_t, proxy, _event) = prepare_test::<A>(proto).await;
         let () = proxy
-            .connect(&mut A::create(A::REMOTE_ADDR, 200))
+            .connect(&A::create(A::REMOTE_ADDR, 200))
             .await
             .unwrap()
             .expect("connect succeeds");
 
         // Can connect again to a different remote should succeed.
         let () = proxy
-            .connect(&mut A::create(A::REMOTE_ADDR_2, 200))
+            .connect(&A::create(A::REMOTE_ADDR_2, 200))
             .await
             .unwrap()
             .expect("connect suceeds");
@@ -2731,7 +2731,7 @@ mod tests {
     async fn connect_loopback<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (_t, proxy, _event) = prepare_test::<A>(proto).await;
         let () = proxy
-            .connect(&mut A::create(
+            .connect(&A::create(
                 <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
                 200,
             ))
@@ -2749,7 +2749,7 @@ mod tests {
 
         const PORT: u16 = 1010;
         let () = proxy
-            .connect(&mut A::create(<A::AddrType as IpAddress>::Version::UNSPECIFIED_ADDRESS, PORT))
+            .connect(&A::create(<A::AddrType as IpAddress>::Version::UNSPECIFIED_ADDRESS, PORT))
             .await
             .unwrap()
             .unwrap();
@@ -2769,23 +2769,21 @@ mod tests {
         let (mut t, socket, _event) = prepare_test::<A>(proto).await;
         let stack = t.get(0);
         // Can bind to local address.
-        let () =
-            socket.bind(&mut A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind succeeds");
+        let () = socket.bind(&A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind succeeds");
 
         // Can't bind again (to another port).
         let res =
-            socket.bind(&mut A::create(A::LOCAL_ADDR, 201)).await.unwrap().expect_err("bind fails");
+            socket.bind(&A::create(A::LOCAL_ADDR, 201)).await.unwrap().expect_err("bind fails");
         assert_eq!(res, fposix::Errno::Einval);
 
         // Can bind another socket to a different port.
         let socket = get_socket::<A>(stack, proto).await;
-        let () =
-            socket.bind(&mut A::create(A::LOCAL_ADDR, 201)).await.unwrap().expect("bind succeeds");
+        let () = socket.bind(&A::create(A::LOCAL_ADDR, 201)).await.unwrap().expect("bind succeeds");
 
         // Can bind to unspecified address in a different port.
         let socket = get_socket::<A>(stack, proto).await;
         let () = socket
-            .bind(&mut A::create(<A::AddrType as IpAddress>::Version::UNSPECIFIED_ADDRESS, 202))
+            .bind(&A::create(<A::AddrType as IpAddress>::Version::UNSPECIFIED_ADDRESS, 202))
             .await
             .unwrap()
             .expect("bind succeeds");
@@ -2798,11 +2796,10 @@ mod tests {
     async fn bind_then_connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (_t, socket, _event) = prepare_test::<A>(proto).await;
         // Can bind to local address.
-        let () =
-            socket.bind(&mut A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind suceeds");
+        let () = socket.bind(&A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind suceeds");
 
         let () = socket
-            .connect(&mut A::create(A::REMOTE_ADDR, 1010))
+            .connect(&A::create(A::REMOTE_ADDR, 1010))
             .await
             .unwrap()
             .expect("connect succeeds");
@@ -2819,7 +2816,7 @@ mod tests {
         let (_t, socket, _event) = prepare_test::<A>(proto).await;
 
         let remote_addr = A::create(A::REMOTE_ADDR, 1010);
-        let () = socket.connect(&mut remote_addr.clone()).await.unwrap().expect("connect succeeds");
+        let () = socket.connect(&remote_addr).await.unwrap().expect("connect succeeds");
 
         assert_eq!(
             socket.get_peer_name().await.unwrap().expect("get_peer_name should suceed"),
@@ -2877,7 +2874,7 @@ mod tests {
         // Setup Alice as a server, bound to LOCAL_ADDR:200
         println!("Configuring alice...");
         let () = alice_socket
-            .bind(&mut A::create(A::LOCAL_ADDR, 200))
+            .bind(&A::create(A::LOCAL_ADDR, 200))
             .await
             .unwrap()
             .expect("alice bind suceeds");
@@ -2915,7 +2912,7 @@ mod tests {
         let bob = t.get(1);
         let (bob_socket, bob_events) = get_socket_and_event::<A>(bob, proto).await;
         let () = bob_socket
-            .bind(&mut A::create(A::REMOTE_ADDR, 300))
+            .bind(&A::create(A::REMOTE_ADDR, 300))
             .await
             .unwrap()
             .expect("bob bind suceeds");
@@ -2938,7 +2935,7 @@ mod tests {
         // Connect Bob to Alice on LOCAL_ADDR:200
         println!("Connecting bob to alice...");
         let () = bob_socket
-            .connect(&mut A::create(A::LOCAL_ADDR, 200))
+            .connect(&A::create(A::LOCAL_ADDR, 200))
             .await
             .unwrap()
             .expect("Connect succeeds");
@@ -3146,7 +3143,7 @@ mod tests {
         let _: zx::EventPair = alice_event.expect("Describe call returns event");
 
         let () = alice_socket
-            .bind(&mut A::create(A::LOCAL_ADDR, 200))
+            .bind(&A::create(A::LOCAL_ADDR, 200))
             .await
             .unwrap()
             .expect("failed to bind for alice");
@@ -3159,7 +3156,7 @@ mod tests {
         let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get(1), proto).await;
         let bob_cloned = socket_clone(&bob_socket).expect("failed to clone socket");
         let () = bob_cloned
-            .bind(&mut A::create(A::REMOTE_ADDR, 200))
+            .bind(&A::create(A::REMOTE_ADDR, 200))
             .await
             .unwrap()
             .expect("failed to bind for bob");
@@ -3173,7 +3170,7 @@ mod tests {
         assert_eq!(
             alice_socket
                 .send_msg(
-                    Some(&mut A::create(A::REMOTE_ADDR, 200)),
+                    Some(&A::create(A::REMOTE_ADDR, 200)),
                     &body,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
@@ -3219,7 +3216,7 @@ mod tests {
         assert_eq!(
             bob_cloned
                 .send_msg(
-                    Some(&mut A::create(A::LOCAL_ADDR, 200)),
+                    Some(&A::create(A::LOCAL_ADDR, 200)),
                     &body,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
@@ -3430,8 +3427,8 @@ mod tests {
             .await
             .unwrap();
         let (socket, events) = get_socket_and_event::<A>(t.get(0), proto).await;
-        let mut local = A::create(A::LOCAL_ADDR, 200);
-        let mut remote = A::create(A::REMOTE_ADDR, 300);
+        let local = A::create(A::LOCAL_ADDR, 200);
+        let remote = A::create(A::REMOTE_ADDR, 300);
         assert_eq!(
             socket
                 .shutdown(fposix_socket::ShutdownMode::WRITE)
@@ -3440,7 +3437,7 @@ mod tests {
                 .expect_err("should not shutdown an unconnected socket"),
             fposix::Errno::Enotconn,
         );
-        let () = socket.bind(&mut local).await.unwrap().expect("failed to bind");
+        let () = socket.bind(&local).await.unwrap().expect("failed to bind");
         assert_eq!(
             socket
                 .shutdown(fposix_socket::ShutdownMode::WRITE)
@@ -3449,7 +3446,7 @@ mod tests {
                 .expect_err("should not shutdown an unconnected socket"),
             fposix::Errno::Enotconn,
         );
-        let () = socket.connect(&mut remote).await.unwrap().expect("failed to connect");
+        let () = socket.connect(&remote).await.unwrap().expect("failed to connect");
         assert_eq!(
             socket
                 .shutdown(fposix_socket::ShutdownMode::empty())
@@ -3479,9 +3476,9 @@ mod tests {
                 .expect_err("writing to an already-shutdown socket should fail"),
             fposix::Errno::Epipe,
         );
-        let mut invalid_addr = A::create(A::REMOTE_ADDR, 0);
+        let invalid_addr = A::create(A::REMOTE_ADDR, 0);
         assert_eq!(
-            socket.send_msg(Some(&mut invalid_addr), &body, &fposix_socket::DatagramSocketSendControlData::default(), fposix_socket::SendMsgFlags::empty()).await.unwrap().expect_err(
+            socket.send_msg(Some(&invalid_addr), &body, &fposix_socket::DatagramSocketSendControlData::default(), fposix_socket::SendMsgFlags::empty()).await.unwrap().expect_err(
                 "writing to an invalid address (port 0) should fail with EINVAL instead of EPIPE"
             ),
             fposix::Errno::Einval,
@@ -3546,16 +3543,16 @@ mod tests {
             TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await.unwrap();
 
         let (socket, _events) = get_socket_and_event::<A>(t.get(0), proto).await;
-        let mut addr =
+        let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 200);
-        socket.bind(&mut addr).await.unwrap().expect("bind should succeed");
+        socket.bind(&addr).await.unwrap().expect("bind should succeed");
 
         const SENT_PACKETS: u8 = 10;
         for i in 0..SENT_PACKETS {
             let buf = [i; MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE];
             let sent = socket
                 .send_msg(
-                    Some(&mut addr),
+                    Some(&addr),
                     &buf,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty(),
@@ -3632,11 +3629,11 @@ mod tests {
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
         let (_t, proxy, _event) = prepare_test::<A>(proto).await;
-        let mut addr =
+        let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 100);
 
-        let () = proxy.bind(&mut addr).await.unwrap().expect("bind succeeds");
-        let () = proxy.connect(&mut addr).await.unwrap().expect("connect succeeds");
+        let () = proxy.bind(&addr).await.unwrap().expect("bind succeeds");
+        let () = proxy.connect(&addr).await.unwrap().expect("connect succeeds");
 
         const DATA: &[u8] = &[1, 2, 3, 4, 5];
         assert_eq!(
@@ -3700,14 +3697,14 @@ mod tests {
 
         match mcast_addr.into() {
             IpAddr::V4(mcast_addr) => {
-                proxy.add_ip_membership(&mut fposix_socket::IpMulticastMembership {
+                proxy.add_ip_membership(&fposix_socket::IpMulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
                     iface: id.get(),
                     local_addr: fnet::Ipv4Address { addr: [0; 4] },
                 })
             }
             IpAddr::V6(mcast_addr) => {
-                proxy.add_ipv6_membership(&mut fposix_socket::Ipv6MulticastMembership {
+                proxy.add_ipv6_membership(&fposix_socket::Ipv6MulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
                     iface: id.get(),
                 })
@@ -3721,7 +3718,7 @@ mod tests {
         const DATA: &[u8] = &[1, 2, 3, 4, 5];
 
         let () = proxy
-            .bind(&mut A::create(
+            .bind(&A::create(
                 <<A::AddrType as IpAddress>::Version as Ip>::UNSPECIFIED_ADDRESS,
                 PORT,
             ))
@@ -3732,7 +3729,7 @@ mod tests {
         assert_eq!(
             proxy
                 .send_msg(
-                    Some(&mut A::create(mcast_addr, PORT)),
+                    Some(&A::create(mcast_addr, PORT)),
                     DATA,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
@@ -3768,8 +3765,8 @@ mod tests {
 
         const HOP_LIMIT: u8 = 200;
         match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-            IpVersion::V4 => proxy.set_ip_multicast_ttl(&mut Some(HOP_LIMIT).into_fidl()),
-            IpVersion::V6 => proxy.set_ipv6_multicast_hops(&mut Some(HOP_LIMIT).into_fidl()),
+            IpVersion::V4 => proxy.set_ip_multicast_ttl(&Some(HOP_LIMIT).into_fidl()),
+            IpVersion::V6 => proxy.set_ipv6_multicast_hops(&Some(HOP_LIMIT).into_fidl()),
         }
         .await
         .unwrap()
@@ -3799,8 +3796,8 @@ mod tests {
 
         const HOP_LIMIT: u8 = 200;
         match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-            IpVersion::V4 => proxy.set_ip_ttl(&mut Some(HOP_LIMIT).into_fidl()),
-            IpVersion::V6 => proxy.set_ipv6_unicast_hops(&mut Some(HOP_LIMIT).into_fidl()),
+            IpVersion::V4 => proxy.set_ip_ttl(&Some(HOP_LIMIT).into_fidl()),
+            IpVersion::V6 => proxy.set_ipv6_unicast_hops(&Some(HOP_LIMIT).into_fidl()),
         }
         .await
         .unwrap()
@@ -3834,8 +3831,8 @@ mod tests {
         const HOP_LIMIT: u8 = 200;
         assert_matches!(
             match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.set_ipv6_multicast_hops(&mut Some(HOP_LIMIT).into_fidl()),
-                IpVersion::V6 => proxy.set_ip_multicast_ttl(&mut Some(HOP_LIMIT).into_fidl()),
+                IpVersion::V4 => proxy.set_ipv6_multicast_hops(&Some(HOP_LIMIT).into_fidl()),
+                IpVersion::V6 => proxy.set_ip_multicast_ttl(&Some(HOP_LIMIT).into_fidl()),
             }
             .await
             .unwrap(),
@@ -3844,8 +3841,8 @@ mod tests {
 
         assert_matches!(
             match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
-                IpVersion::V4 => proxy.set_ipv6_unicast_hops(&mut Some(HOP_LIMIT).into_fidl()),
-                IpVersion::V6 => proxy.set_ip_ttl(&mut Some(HOP_LIMIT).into_fidl()),
+                IpVersion::V4 => proxy.set_ipv6_unicast_hops(&Some(HOP_LIMIT).into_fidl()),
+                IpVersion::V6 => proxy.set_ip_ttl(&Some(HOP_LIMIT).into_fidl()),
             }
             .await
             .unwrap(),

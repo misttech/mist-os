@@ -40,7 +40,7 @@ impl Client {
         let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
 
         let () =
-            self.proxy.open(&mut meta_far_blob.into(), pkg_dir_server_end).await?.map_err(|s| {
+            self.proxy.open(&meta_far_blob.into(), pkg_dir_server_end).await?.map_err(|s| {
                 match Status::from_raw(s) {
                     Status::NOT_FOUND => OpenError::NotFound,
                     s => OpenError::UnexpectedResponse(s),
@@ -58,7 +58,7 @@ impl Client {
         let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
 
         let get_fut = self.proxy.get(
-            &mut meta_far_blob.into(),
+            &meta_far_blob.into(),
             needed_blobs_server_end,
             Some(pkg_dir_server_end),
         );
@@ -148,9 +148,7 @@ async fn open_blob(
 
     let open_fut = match kind {
         OpenKind::Meta => needed_blobs.open_meta_blob(blob_server_end, blob_type),
-        OpenKind::Content(hash) => {
-            needed_blobs.open_blob(&mut hash.into(), blob_server_end, blob_type)
-        }
+        OpenKind::Content(hash) => needed_blobs.open_blob(&hash.into(), blob_server_end, blob_type),
     };
     match open_fut.await {
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => {

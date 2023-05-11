@@ -132,12 +132,12 @@ impl HostDevice {
         &self.0.device_path
     }
 
-    pub fn set_name(&self, mut name: String) -> impl Future<Output = types::Result<()>> {
-        self.0.proxy.set_local_name(&mut name).map(from_fidl_result)
+    pub fn set_name(&self, name: String) -> impl Future<Output = types::Result<()>> {
+        self.0.proxy.set_local_name(&name).map(from_fidl_result)
     }
 
-    pub fn set_device_class(&self, mut dc: DeviceClass) -> impl Future<Output = types::Result<()>> {
-        self.0.proxy.set_device_class(&mut dc).map(from_fidl_result)
+    pub fn set_device_class(&self, dc: DeviceClass) -> impl Future<Output = types::Result<()>> {
+        self.0.proxy.set_device_class(&dc).map(from_fidl_result)
     }
 
     pub fn establish_discovery_session(
@@ -148,13 +148,13 @@ impl HostDevice {
     }
 
     pub fn connect(&self, id: PeerId) -> impl Future<Output = types::Result<()>> {
-        let mut id: fbt::PeerId = id.into();
-        self.0.proxy.connect(&mut id).map(from_fidl_result)
+        let id: fbt::PeerId = id.into();
+        self.0.proxy.connect(&id).map(from_fidl_result)
     }
 
     pub fn disconnect(&self, id: PeerId) -> impl Future<Output = types::Result<()>> {
-        let mut id: fbt::PeerId = id.into();
-        self.0.proxy.disconnect(&mut id).map(from_fidl_result)
+        let id: fbt::PeerId = id.into();
+        self.0.proxy.disconnect(&id).map(from_fidl_result)
     }
 
     pub fn pair(
@@ -167,8 +167,8 @@ impl HostDevice {
     }
 
     pub fn forget(&self, id: PeerId) -> impl Future<Output = types::Result<()>> {
-        let mut id: fbt::PeerId = id.into();
-        self.0.proxy.forget(&mut id).map(from_fidl_result)
+        let id: fbt::PeerId = id.into();
+        self.0.proxy.forget(&id).map(from_fidl_result)
     }
 
     pub fn close(&self) -> types::Result<()> {

@@ -720,9 +720,7 @@ impl ProfileServerFacade {
                     }),
                     ..Default::default()
                 };
-                server
-                    .connect(&mut peer_id.into(), &mut ConnectParameters::L2cap(l2cap_params))
-                    .await?
+                server.connect(&peer_id.into(), &ConnectParameters::L2cap(l2cap_params)).await?
             }
             None => fx_err_and_bail!(&with_line!(tag), "No Server Proxy created."),
         };

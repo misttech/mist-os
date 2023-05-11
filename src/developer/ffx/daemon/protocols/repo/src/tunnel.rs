@@ -95,7 +95,7 @@ async fn create_tunnel_stream(
 
         let (tunnel_client, tunnel_server) = fidl::endpoints::create_endpoints();
 
-        match rc.reverse_tcp(&mut SocketAddressExt(tunnel_addr).into(), tunnel_client).await? {
+        match rc.reverse_tcp(&SocketAddressExt(tunnel_addr).into(), tunnel_client).await? {
             Ok(()) => {
                 let tunnel_stream = tunnel_server.into_stream().with_context(|| {
                     format!("getting tunnel stream for target {:?}", target_nodename)

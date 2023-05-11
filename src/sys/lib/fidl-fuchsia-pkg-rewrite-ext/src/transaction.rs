@@ -50,7 +50,7 @@ impl EditTransaction {
     /// API will prioritize it over other rules.
     pub async fn add(&self, rule: Rule) -> Result<(), EditTransactionError> {
         self.transaction
-            .add(&mut rule.into())
+            .add(&rule.into())
             .await?
             .map_err(|err| EditTransactionError::AddError(zx::Status::from_raw(err)))
     }

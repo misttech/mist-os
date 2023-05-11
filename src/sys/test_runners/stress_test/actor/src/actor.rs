@@ -107,14 +107,13 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
                         // error message.
                         let chain: Vec<String> = e.chain().map(|c| c.to_string()).collect();
                         let chain = chain.join(" -> ");
-                        responder.send(Some(&mut Error::ErrorString(chain)))?;
+                        responder.send(Some(&Error::ErrorString(chain)))?;
                     } else {
                         // The action succeeded
                         responder.send(None)?;
                     }
                 } else {
-                    responder
-                        .send(Some(&mut Error::ErrorString("Invalid action name".to_string())))?;
+                    responder.send(Some(&Error::ErrorString("Invalid action name".to_string())))?;
                 }
             }
         }

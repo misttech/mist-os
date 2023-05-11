@@ -133,7 +133,7 @@ impl EnclosingEnvironment {
             host_directory: Some(additional_svc_client),
         };
 
-        let mut opts = fv1sys::EnvironmentOptions {
+        let opts = fv1sys::EnvironmentOptions {
             inherit_parent_services: false,
             use_parent_runners: false,
             kill_on_oom: true,
@@ -151,7 +151,7 @@ impl EnclosingEnvironment {
                 env_controller_server_end,
                 &name,
                 Some(service_list),
-                &mut opts,
+                &opts,
             )
             .context("Cannot create nested env")?;
         env_proxy.get_directory(directory_request).context("cannot get env directory")?;
@@ -216,7 +216,7 @@ impl EnclosingEnvironment {
                     controller,
                     label,
                     additional_services,
-                    mut options,
+                    options,
                     control_handle,
                 } => {
                     if let Err(e) = self.env_proxy.create_nested_environment(
@@ -224,7 +224,7 @@ impl EnclosingEnvironment {
                         controller,
                         &label,
                         additional_services.map(|x| *x),
-                        &mut options,
+                        &options,
                     ) {
                         warn!("CreateNestedEnvironment failed: {}", e);
                         control_handle.shutdown();

@@ -48,15 +48,15 @@ impl Image {
     }
 
     pub fn set_size(&self, width: u32, height: u32) -> Result<(), Error> {
-        let mut content_id = self.get_content_id();
-        let mut size = fmath::SizeU { width, height };
-        self.flatland.set_image_destination_size(&mut content_id, &mut size)?;
+        let content_id = self.get_content_id();
+        let size = fmath::SizeU { width, height };
+        self.flatland.set_image_destination_size(&content_id, &size)?;
         Ok(())
     }
 
     pub fn set_blend_mode(&self, blend_mode: ui_comp::BlendMode) -> Result<(), Error> {
-        let mut content_id = self.get_content_id();
-        self.flatland.set_image_blending_function(&mut content_id, blend_mode)?;
+        let content_id = self.get_content_id();
+        self.flatland.set_image_blending_function(&content_id, blend_mode)?;
         Ok(())
     }
 }
@@ -143,7 +143,7 @@ pub async fn load_image_from_bytes_using_allocators(
 
     // Set buffer constraints.
     buffer_collection
-        .set_constraints(true, &mut buffer_collection_constraints(width, height, pixel_format))?;
+        .set_constraints(true, &buffer_collection_constraints(width, height, pixel_format))?;
 
     // Register buffers with [ui_comp::Allocator].
     let buffer_collection_token_pair = BufferCollectionTokenPair::new();

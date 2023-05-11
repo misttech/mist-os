@@ -103,7 +103,7 @@ impl IO<'_> for SocketWriter {
         fut_ctx: &mut Context<'_>,
     ) -> Poll<Result<(), zx_status::Status>> {
         while !msg.0.is_empty() {
-            let n = ready!(Pin::new(&mut &socket.socket).poll_write(fut_ctx, &mut msg.0))?;
+            let n = ready!(Pin::new(&mut &socket.socket).poll_write(fut_ctx, &msg.0))?;
             msg.0.drain(..n);
         }
         Poll::Ready(Ok(()))

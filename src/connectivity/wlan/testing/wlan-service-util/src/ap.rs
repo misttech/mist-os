@@ -54,7 +54,7 @@ pub async fn start(
     target_pwd: Vec<u8>,
     channel: u8,
 ) -> Result<fidl_sme::StartApResultCode, Error> {
-    let mut config = fidl_sme::ApConfig {
+    let config = fidl_sme::ApConfig {
         ssid: target_ssid.into(),
         password: target_pwd,
         radio_cfg: fidl_sme::RadioConfig {
@@ -66,7 +66,7 @@ pub async fn start(
             },
         },
     };
-    let start_ap_result_code = iface_sme_proxy.start(&mut config).await;
+    let start_ap_result_code = iface_sme_proxy.start(&config).await;
 
     match start_ap_result_code {
         Ok(result_code) => Ok(result_code),

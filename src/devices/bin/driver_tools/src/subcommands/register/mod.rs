@@ -25,7 +25,7 @@ pub async fn register(
         cmd.url
     )?;
     let register_result =
-        driver_registrar_proxy.register(&mut fpkg::PackageUrl { url: cmd.url.to_string() }).await?;
+        driver_registrar_proxy.register(&fpkg::PackageUrl { url: cmd.url.to_string() }).await?;
 
     match register_result {
         Ok(_) => {}

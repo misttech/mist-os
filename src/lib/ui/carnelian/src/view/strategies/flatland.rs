@@ -242,8 +242,8 @@ impl FlatlandViewStrategy {
             );
         }
 
-        flatland.create_transform(&mut TRANSFORM_ID.clone())?;
-        flatland.set_root_transform(&mut TRANSFORM_ID.clone())?;
+        flatland.create_transform(&TRANSFORM_ID)?;
+        flatland.set_root_transform(&TRANSFORM_ID)?;
         setup_handle_flatland_events(flatland.take_event_stream(), key, app_sender.clone());
         let allocator = connect_to_protocol::<flatland::AllocatorMarker>()?;
         Self::create_parent_viewport_watcher(
@@ -615,10 +615,8 @@ impl FlatlandViewStrategy {
             .detach();
             self.current_present_release_event = Some(release_event);
 
-            let mut image_id = flatland::ContentId { value: available };
-            self.flatland
-                .set_content(&mut TRANSFORM_ID.clone(), &mut image_id)
-                .expect("fidl error");
+            let image_id = flatland::ContentId { value: available };
+            self.flatland.set_content(&TRANSFORM_ID, &image_id).expect("fidl error");
 
             // Image is guaranteed to be presented at this point.
             plumber.frame_set.mark_presented(available);

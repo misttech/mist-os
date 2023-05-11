@@ -479,7 +479,7 @@ mod tests {
         setup_fake_target_proxy(move |req| match req {
             TargetRequest::GetSshAddress { responder, .. } => {
                 responder
-                    .send(&mut TargetAddrInfo::Ip(TargetIp {
+                    .send(&TargetAddrInfo::Ip(TargetIp {
                         ip: IpAddress::Ipv4(Ipv4Address { addr: IPV4_ADDR }),
                         scope_id: 1,
                     }))

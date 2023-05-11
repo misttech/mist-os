@@ -455,7 +455,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
         .expect("connect to protocol");
     let dst_ip_fidl: <I::Addr as NetTypesIpAddressExt>::Fidl = dst_ip.into_ext();
     let () = neighbor_controller
-        .add_entry(iface2.id(), &mut dst_ip_fidl.into_ext(), &mut MAC.clone())
+        .add_entry(iface2.id(), &dst_ip_fidl.into_ext(), &MAC)
         .await
         .expect("add_entry FIDL error")
         .expect("error adding static entry");

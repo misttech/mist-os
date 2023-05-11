@@ -32,10 +32,10 @@ use netstack_testing_macros::netstack_test;
 
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,
-    mut remote: fidl_fuchsia_net::IpAddress,
+    remote: fidl_fuchsia_net::IpAddress,
 ) -> fidl_fuchsia_net_routes::Resolved {
     routes
-        .resolve(&mut remote)
+        .resolve(&remote)
         .await
         .expect("routes/State.Resolve FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -127,10 +127,10 @@ async fn resolve_route<N: Netstack>(name: &str) {
         .expect("failed to connect to routes/State");
     let routes = &routes;
 
-    let resolve_fails = move |mut remote: fidl_fuchsia_net::IpAddress| async move {
+    let resolve_fails = move |remote: fidl_fuchsia_net::IpAddress| async move {
         assert_eq!(
             routes
-                .resolve(&mut remote)
+                .resolve(&remote)
                 .await
                 .expect("resolve FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw),
@@ -198,7 +198,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
 
         // Install a default route and try to resolve through the gateway.
         let () = host_stack
-            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet: fidl_fuchsia_net::Subnet { addr: unspecified, prefix_len: 0 },
                 device_id: interface_id,
                 next_hop: Some(Box::new(gateway)),
@@ -259,7 +259,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
         .expect("failed to connect to routes/State");
 
     let resolved = routes
-        .resolve(&mut fidl_ip!("0.0.0.0"))
+        .resolve(&fidl_ip!("0.0.0.0"))
         .await
         .expect("routes/State.Resolve FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw);
@@ -288,7 +288,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to neighbor API");
     let () = neigh
-        .add_entry(ep.id(), &mut GATEWAY_ADDR.clone(), &mut GATEWAY_MAC.clone())
+        .add_entry(ep.id(), &GATEWAY_ADDR, &GATEWAY_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -296,7 +296,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
 
     // Install a default route and try to resolve through the gateway.
     let () = stack
-        .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
             subnet: fidl_fuchsia_net::Subnet { addr: UNSPECIFIED_IP, prefix_len: 0 },
             device_id: ep.id(),
             next_hop: Some(Box::new(GATEWAY_ADDR)),
@@ -307,7 +307,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
         .expect("add route");
 
     let resolved = routes
-        .resolve(&mut UNSPECIFIED_IP.clone())
+        .resolve(&UNSPECIFIED_IP)
         .await
         .expect("routes/State.Resolve FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw);
@@ -333,7 +333,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
     interface.set_link_up(true).await.expect("bring device up");
     assert!(interface.control().enable().await.expect("send enable").expect("enable interface"));
 
-    let (local, mut remote, subnet) = match I::VERSION {
+    let (local, remote, subnet) = match I::VERSION {
         IpVersion::V4 => {
             (fidl_ip!("192.0.2.1"), fidl_ip!("192.0.2.2"), fidl_subnet!("192.0.2.0/24"))
         }
@@ -348,7 +348,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to netstack");
     let () = stack
-        .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
             subnet,
             device_id: interface.id(),
             next_hop: None,
@@ -371,7 +371,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
                 .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
                 .expect("failed to connect to neighbor API");
             neigh
-                .add_entry(interface.id(), &mut remote, &mut REMOTE_MAC.clone())
+                .add_entry(interface.id(), &remote, &REMOTE_MAC)
                 .await
                 .expect("add_entry FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw)
@@ -387,7 +387,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
     // Verify that resolving the route fails.
     assert_eq!(
         routes
-            .resolve(&mut remote)
+            .resolve(&remote)
             .await
             .expect("resolve FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -402,7 +402,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
 
     // Verify that resolving the route succeeds.
     assert_eq!(
-        routes.resolve(&mut remote).await.expect("resolve FIDL error").expect("resolve failed"),
+        routes.resolve(&remote).await.expect("resolve FIDL error").expect("resolve failed"),
         fidl_fuchsia_net_routes::Resolved::Direct(fidl_fuchsia_net_routes::Destination {
             address: Some(remote),
             mac: expected_mac,

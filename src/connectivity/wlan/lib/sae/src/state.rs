@@ -444,7 +444,7 @@ impl<E> SaeAccepted<E> {
         sink: &mut SaeUpdateSink,
         confirm_msg: &ConfirmMsg,
     ) -> Result<(), RejectReason> {
-        check_sync(&mut self.0.sync)?;
+        check_sync(&self.0.sync)?;
         // We use u16::max_value() where IEEE specifies 2^16 - 1.
         if confirm_msg.send_confirm <= self.0.rc || confirm_msg.send_confirm == u16::max_value() {
             return Ok(());

@@ -32,7 +32,7 @@ impl Interrupter {
         }
 
         let (usage_watcher, usage_watcher_requests) = create_request_stream()?;
-        self.usage_reporter.watch(&mut Usage::RenderUsage(usage), usage_watcher)?;
+        self.usage_reporter.watch(&Usage::RenderUsage(usage), usage_watcher)?;
 
         self.usage_watcher_requests.insert(usage, usage_watcher_requests);
         Ok(())
@@ -139,7 +139,7 @@ mod test {
         let (mut interrupter, mut usage_reporter_requests) = test_interrupter();
 
         interrupter.watch_usage(AudioRenderUsage::Media).await.expect("Watching media usage");
-        let (mut usage, media_watcher, _) = usage_reporter_requests
+        let (usage, media_watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
@@ -148,10 +148,8 @@ mod test {
             .expect("Reading watch request");
         assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Media));
         let media_watcher = media_watcher.into_proxy().expect("Creating media watcher proxy");
-        let media_send_fut = media_watcher.on_state_changed(
-            &mut usage,
-            &mut UsageState::Muted(UsageStateMuted::default().clone()),
-        );
+        let media_send_fut =
+            media_watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
 
         let (send, interruption) = future::join(media_send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");
@@ -161,7 +159,7 @@ mod test {
         );
 
         interrupter.watch_usage(AudioRenderUsage::Background).await.expect("Watching media usage");
-        let (mut usage, background_watcher, _) = usage_reporter_requests
+        let (usage, background_watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
@@ -171,10 +169,8 @@ mod test {
         assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Background));
         let background_watcher =
             background_watcher.into_proxy().expect("Creating background watcher proxy");
-        let background_send_fut = background_watcher.on_state_changed(
-            &mut usage,
-            &mut UsageState::Unadjusted(UsageStateUnadjusted::default()),
-        );
+        let background_send_fut = background_watcher
+            .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(background_send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");
@@ -192,7 +188,7 @@ mod test {
         let (mut interrupter, mut usage_reporter_requests) = test_interrupter();
 
         interrupter.watch_usage(AudioRenderUsage::Media).await.expect("Watching media usage");
-        let (mut usage, watcher, _) = usage_reporter_requests
+        let (usage, watcher, _) = usage_reporter_requests
             .try_next()
             .await
             .expect("Reading usage reporter request")
@@ -203,8 +199,8 @@ mod test {
 
         let watcher = watcher.into_proxy().expect("Creating watcher proxy");
 
-        let send_fut = watcher
-            .on_state_changed(&mut usage, &mut UsageState::Muted(UsageStateMuted::default()));
+        let send_fut =
+            watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
 
         let (send, interruption) = future::join(send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");
@@ -213,10 +209,8 @@ mod test {
             Some(Interruption { usage: AudioRenderUsage::Media, stage: InterruptionStage::Begin })
         );
 
-        let send_fut = watcher.on_state_changed(
-            &mut usage,
-            &mut UsageState::Unadjusted(UsageStateUnadjusted::default()),
-        );
+        let send_fut = watcher
+            .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");

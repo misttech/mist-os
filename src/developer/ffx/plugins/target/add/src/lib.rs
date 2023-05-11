@@ -33,7 +33,7 @@ pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand
         IpAddr::V6(i) => net::IpAddress::Ipv6(net::Ipv6Address { addr: i.octets().into() }),
         IpAddr::V4(i) => net::IpAddress::Ipv4(net::Ipv4Address { addr: i.octets().into() }),
     };
-    let mut addr = if let Some(port) = port {
+    let addr = if let Some(port) = port {
         ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, port, scope_id })
     } else {
         ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
@@ -41,7 +41,7 @@ pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand
 
     let (client, server) = fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy.add_target(
-        &mut addr,
+        &addr,
         &ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
         client,
     )?;

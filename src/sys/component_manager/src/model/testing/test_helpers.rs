@@ -501,7 +501,7 @@ impl ActionsTest {
         name: &str,
         args: fcomponent::CreateChildArgs,
     ) -> Result<(), fcomponent::Error> {
-        let mut collection_ref = fdecl::CollectionRef { name: coll.to_string() };
+        let collection_ref = fdecl::CollectionRef { name: coll.to_string() };
         let child_decl = ChildDecl {
             name: name.to_string(),
             url: format!("test:///{}", name),
@@ -515,7 +515,7 @@ impl ActionsTest {
             .realm_proxy
             .as_ref()
             .expect("realm service not started")
-            .create_child(&mut collection_ref, &child_decl, args)
+            .create_child(&collection_ref, &child_decl, args)
             .await;
         res.expect("failed to create child")
     }

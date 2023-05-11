@@ -226,12 +226,12 @@ impl Frame {
         index: u32,
         collection_id: u64,
     ) -> Result<u64, Error> {
-        let mut image_config = Self::create_image_config(image_type, config);
+        let image_config = Self::create_image_config(image_type, config);
 
         let image_id = framebuffer.next_image_id();
         let status = framebuffer
             .coordinator
-            .import_image(&mut image_config, collection_id, image_id, index)
+            .import_image(&image_config, collection_id, image_id, index)
             .await
             .context("coordinator import_image")?;
 
@@ -604,8 +604,8 @@ impl FrameBuffer {
     }
 
     pub fn configure_layer(&mut self, config: &Config, image_type: u32) -> Result<(), Error> {
-        let mut image_config = Frame::create_image_config(image_type, config);
-        self.coordinator.set_layer_primary_config(self.layer_id, &mut image_config)?;
+        let image_config = Frame::create_image_config(image_type, config);
+        self.coordinator.set_layer_primary_config(self.layer_id, &image_config)?;
         self.coordinator.set_display_layers(config.display_id, &[self.layer_id])?;
         Ok(())
     }
@@ -633,9 +633,9 @@ impl FrameBuffer {
         image_type: u32,
         config: &Config,
     ) -> Result<(), Error> {
-        let mut image_config = Frame::create_image_config(image_type, config);
+        let image_config = Frame::create_image_config(image_type, config);
         self.coordinator
-            .set_buffer_collection_constraints(buffer_collection_id, &mut image_config)
+            .set_buffer_collection_constraints(buffer_collection_id, &image_config)
             .await?;
 
         Ok(())

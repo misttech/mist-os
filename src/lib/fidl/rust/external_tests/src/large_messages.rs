@@ -53,7 +53,7 @@ fn validate_handle_array(handles: &[Option<fidl::Handle>; MAX_HANDLES], present:
     }
 }
 
-fn server_runner(mut expected_str: &'static str, server_end: Channel) {
+fn server_runner(expected_str: &'static str, server_end: Channel) {
     fasync::LocalExecutor::new().run_singlethreaded(async move {
         let mut stream =
             ServerEnd::<OverflowingProtocolMarker>::new(server_end).into_stream().unwrap();
@@ -80,7 +80,7 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                 Ok(OverflowingProtocolRequest::TwoWayBothRequestAndResponse { str, responder }) => {
                     assert_eq!(&str, expected_str);
 
-                    responder.send(&mut expected_str).unwrap();
+                    responder.send(&expected_str).unwrap();
                 }
                 Ok(OverflowingProtocolRequest::OneWayCall { payload, control_handle }) => {
                     assert_eq!(&payload.str.unwrap().as_str(), &expected_str);

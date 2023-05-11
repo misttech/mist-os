@@ -35,7 +35,7 @@ pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -
 
         let repo_name = repo_url.host();
 
-        match repos.add_repository(repo_name, &mut repository.spec().into()).await? {
+        match repos.add_repository(repo_name, &repository.spec().into()).await? {
             Ok(()) => {
                 println!("added repository {}", repo_name);
             }

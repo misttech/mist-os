@@ -294,9 +294,7 @@ impl<'a> AppModel<'a> {
 
         renderer.render_rgba(buffer_index, colors);
 
-        self.flatland
-            .set_content(&mut TRANSFORM_ID.clone(), &mut IMAGE_IDS[buffer_index].clone())
-            .expect("fidl error");
+        self.flatland.set_content(&TRANSFORM_ID, &IMAGE_IDS[buffer_index]).expect("fidl error");
 
         self.sched_lib.request_present();
     }
@@ -304,7 +302,7 @@ impl<'a> AppModel<'a> {
     fn on_relayout(&mut self, width: u32, height: u32) {
         for &id in IMAGE_IDS.iter() {
             self.flatland
-                .set_image_destination_size(&mut id.clone(), &mut fmath::SizeU { width, height })
+                .set_image_destination_size(&id, &fmath::SizeU { width, height })
                 .expect("fidl error");
         }
         self.sched_lib.request_present();

@@ -54,9 +54,9 @@ pub async fn get_phy_list(monitor_proxy: &DeviceMonitorProxy) -> Result<Vec<u16>
 }
 
 pub async fn destroy_iface(monitor_proxy: &DeviceMonitorProxy, iface_id: u16) -> Result<(), Error> {
-    let mut req = DestroyIfaceRequest { iface_id };
+    let req = DestroyIfaceRequest { iface_id };
 
-    let response = monitor_proxy.destroy_iface(&mut req).await.context("Error destroying iface")?;
+    let response = monitor_proxy.destroy_iface(&req).await.context("Error destroying iface")?;
     zx::Status::ok(response).context("Destroy iface returned non-OK status")?;
     Ok(tracing::info!("Destroyed iface {:?}", iface_id))
 }
@@ -111,14 +111,14 @@ mod tests {
     pub fn respond_to_query_iface_list_request(
         exec: &mut TestExecutor,
         req_stream: &mut DeviceMonitorRequestStream,
-        mut ifaces: Vec<u16>,
+        ifaces: Vec<u16>,
     ) {
         let req = exec.run_until_stalled(&mut req_stream.next());
         let responder = assert_variant !(
             req,
             Poll::Ready(Some(Ok(DeviceMonitorRequest::ListIfaces{responder})))
             => responder);
-        responder.send(&mut ifaces[..]).expect("fake query iface list response: send failed")
+        responder.send(&ifaces[..]).expect("fake query iface list response: send failed")
     }
 
     pub fn respond_to_query_iface_request(

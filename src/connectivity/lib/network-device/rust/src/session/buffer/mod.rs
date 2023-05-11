@@ -623,7 +623,7 @@ mod tests {
             descriptor.initialize(ChainLength::ZERO, HEAD_LEN, DATA_LEN, TAIL_LEN);
         }
 
-        let got = descriptors.borrow(&mut tx[0]);
+        let got = descriptors.borrow(&tx[0]);
         assert_eq!(got.chain_length().unwrap(), ChainLength::ZERO);
         assert_eq!(got.offset(), 0);
         assert_eq!(got.head_length(), HEAD_LEN);

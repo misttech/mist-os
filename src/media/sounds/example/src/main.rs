@@ -60,14 +60,14 @@ async fn main() -> Result<()> {
 
     let duration = std::time::Duration::from_secs(1);
 
-    let (buffer, mut stream_type) = sound_in_buffer(-8, 0.5, 0.9, duration)?;
-    player_proxy.add_sound_buffer(1, buffer, &mut stream_type)?;
+    let (buffer, stream_type) = sound_in_buffer(-8, 0.5, 0.9, duration)?;
+    player_proxy.add_sound_buffer(1, buffer, &stream_type)?;
 
-    let (buffer, mut stream_type) = sound_in_buffer(-17, 0.5, 0.9, duration)?;
-    player_proxy.add_sound_buffer(2, buffer, &mut stream_type)?;
+    let (buffer, stream_type) = sound_in_buffer(-17, 0.5, 0.9, duration)?;
+    player_proxy.add_sound_buffer(2, buffer, &stream_type)?;
 
-    let (buffer, mut stream_type) = sound_in_buffer(-12, 0.5, 0.9, duration)?;
-    player_proxy.add_sound_buffer(3, buffer, &mut stream_type)?;
+    let (buffer, stream_type) = sound_in_buffer(-12, 0.5, 0.9, duration)?;
+    player_proxy.add_sound_buffer(3, buffer, &stream_type)?;
 
     // Play the file-based sound.
     player_proxy

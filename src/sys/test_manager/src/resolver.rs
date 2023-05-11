@@ -109,7 +109,7 @@ async fn serve_resolver(
             }
             fresolution::ResolverRequest::ResolveWithContext {
                 component_url,
-                mut context,
+                context,
                 responder,
             } => {
                 // We don't need to worry about validating context because it should have
@@ -126,7 +126,7 @@ async fn serve_resolver(
                 } else {
                     let subscriber = subscriber.clone();
                     full_resolver
-                        .resolve_with_context(&component_url, &mut context)
+                        .resolve_with_context(&component_url, &context)
                         .await
                         .unwrap_or_else(|err| {
                             tracing::subscriber::with_default(subscriber, || {
@@ -363,17 +363,17 @@ mod tests {
                 .unwrap(),
             Ok(fresolution::Component::default())
         );
-        let mut mock_context = fresolution::Context { bytes: vec![0] };
+        let mock_context = fresolution::Context { bytes: vec![0] };
         assert_eq!(
             hermetic_resolver_proxy
-                .resolve_with_context("name#resource", &mut mock_context)
+                .resolve_with_context("name#resource", &mock_context)
                 .await
                 .unwrap(),
             Ok(fresolution::Component::default())
         );
         assert_eq!(
             hermetic_resolver_proxy
-                .resolve_with_context("name#not_found", &mut mock_context)
+                .resolve_with_context("name#not_found", &mock_context)
                 .await
                 .unwrap(),
             Err(fresolution::ResolverError::PackageNotFound)
@@ -382,7 +382,7 @@ mod tests {
             hermetic_resolver_proxy
                 .resolve_with_context(
                     "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm",
-                    &mut mock_context
+                    &mock_context
                 )
                 .await
                 .unwrap(),
@@ -430,12 +430,12 @@ mod tests {
                 .unwrap(),
             Err(fresolution::ResolverError::PackageNotFound)
         );
-        let mut mock_context = fresolution::Context { bytes: vec![0] };
+        let mock_context = fresolution::Context { bytes: vec![0] };
         assert_eq!(
             hermetic_resolver_proxy
                 .resolve_with_context(
                     "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm",
-                    &mut mock_context
+                    &mock_context
                 )
                 .await
                 .unwrap(),

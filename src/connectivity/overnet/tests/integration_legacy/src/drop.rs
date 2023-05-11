@@ -66,7 +66,7 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
             let chan = {
                 let svc = a.connect_as_service_consumer()?;
                 'retry: loop {
-                    for mut peer in svc.list_peers().await? {
+                    for peer in svc.list_peers().await? {
                         if peer
                             .description
                             .services
@@ -78,7 +78,7 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
                             continue;
                         }
                         let (s, p) = fidl::Channel::create();
-                        svc.connect_to_service(&mut peer.id, "test", s)?;
+                        svc.connect_to_service(&peer.id, "test", s)?;
                         break 'retry p;
                     }
                 }

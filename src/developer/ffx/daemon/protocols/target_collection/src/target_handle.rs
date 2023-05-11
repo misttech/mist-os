@@ -81,8 +81,8 @@ impl TargetHandleInner {
                 // SSH address is written to the target.
                 let poll_duration = Duration::from_millis(15);
                 loop {
-                    if let Some(mut addr) = self.target.ssh_address_info() {
-                        return responder.send(&mut addr).map_err(Into::into);
+                    if let Some(addr) = self.target.ssh_address_info() {
+                        return responder.send(&addr).map_err(Into::into);
                     }
                     fuchsia_async::Timer::new(poll_duration).await;
                 }
@@ -448,7 +448,7 @@ mod tests {
             .connect_as_service_consumer()
             .unwrap()
             .connect_to_service(
-                &mut hoist2.node().node_id().into(),
+                &hoist2.node().node_id().into(),
                 fidl_rcs::RemoteControlMarker::PROTOCOL_NAME,
                 server,
             )

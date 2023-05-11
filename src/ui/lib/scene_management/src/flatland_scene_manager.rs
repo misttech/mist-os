@@ -90,8 +90,8 @@ impl FlatlandInstance {
         )?;
 
         let root_transform_id = id_generator.next_transform_id();
-        flatland.create_transform(&mut root_transform_id.clone())?;
-        flatland.set_root_transform(&mut root_transform_id.clone())?;
+        flatland.create_transform(&root_transform_id)?;
+        flatland.set_root_transform(&root_transform_id)?;
 
         Ok(FlatlandInstance {
             flatland: Arc::new(Mutex::new(flatland)),
@@ -311,7 +311,7 @@ impl SceneManager for FlatlandSceneManager {
                 position_logical.y.round() as i32 - physical_cursor_size(CURSOR_HOTSPOT.1) as i32;
             let flatland = self.root_flatland.flatland.lock();
             flatland
-                .set_translation(&mut cursor_transform_id.clone(), &mut fmath::Vec_ { x, y })
+                .set_translation(&cursor_transform_id, &fmath::Vec_ { x, y })
                 .expect("fidl error");
             self.root_flatland_presentation_sender
                 .unbounded_send(PresentationMessage::RequestPresent)
@@ -326,17 +326,11 @@ impl SceneManager for FlatlandSceneManager {
                 let flatland = self.root_flatland.flatland.lock();
                 if visible {
                     flatland
-                        .add_child(
-                            &mut self.root_flatland.root_transform_id.clone(),
-                            &mut cursor_transform_id.clone(),
-                        )
+                        .add_child(&self.root_flatland.root_transform_id, &cursor_transform_id)
                         .expect("failed to add cursor to scene");
                 } else {
                     flatland
-                        .remove_child(
-                            &mut self.root_flatland.root_transform_id.clone(),
-                            &mut cursor_transform_id.clone(),
-                        )
+                        .remove_child(&self.root_flatland.root_transform_id, &cursor_transform_id)
                         .expect("failed to remove cursor from scene");
                 }
                 self.root_flatland_presentation_sender
@@ -417,7 +411,7 @@ impl FlatlandSceneManager {
             None,
         );
 
-        display.set_device_pixel_ratio(&mut fmath::VecF {
+        display.set_device_pixel_ratio(&fmath::VecF {
             x: display_metrics.pixels_per_pip(),
             y: display_metrics.pixels_per_pip(),
         })?;
@@ -486,18 +480,16 @@ impl FlatlandSceneManager {
         // Create the pointerinjector view and embed it as a child of the root view.
         {
             let flatland = root_flatland.flatland.lock();
-            flatland.create_transform(&mut pointerinjector_viewport_transform_id.clone())?;
+            flatland.create_transform(&pointerinjector_viewport_transform_id)?;
             flatland.add_child(
-                &mut root_flatland.root_transform_id.clone(),
-                &mut pointerinjector_viewport_transform_id.clone(),
+                &root_flatland.root_transform_id,
+                &pointerinjector_viewport_transform_id,
             )?;
-            flatland.set_orientation(
-                &mut pointerinjector_viewport_transform_id.clone(),
-                display_rotation_enum,
-            )?;
+            flatland
+                .set_orientation(&pointerinjector_viewport_transform_id, display_rotation_enum)?;
             flatland.set_translation(
-                &mut pointerinjector_viewport_transform_id.clone(),
-                &mut injector_viewport_translation.clone(),
+                &pointerinjector_viewport_transform_id,
+                &injector_viewport_translation,
             )?;
 
             let link_properties = ui_comp::ViewportProperties {
@@ -509,14 +501,14 @@ impl FlatlandSceneManager {
                 create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
 
             flatland.create_viewport(
-                &mut pointerinjector_viewport_content_id.clone(),
+                &pointerinjector_viewport_content_id,
                 pointerinjector_view_creation_pair.viewport_creation_token,
                 &link_properties,
                 child_view_watcher_request,
             )?;
             flatland.set_content(
-                &mut pointerinjector_viewport_transform_id.clone(),
-                &mut pointerinjector_viewport_content_id.clone(),
+                &pointerinjector_viewport_transform_id,
+                &pointerinjector_viewport_content_id,
             )?;
         }
 
@@ -527,10 +519,10 @@ impl FlatlandSceneManager {
             create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
         {
             let flatland = pointerinjector_flatland.flatland.lock();
-            flatland.create_transform(&mut &mut a11y_viewport_transform_id.clone())?;
+            flatland.create_transform(&a11y_viewport_transform_id)?;
             flatland.add_child(
-                &mut pointerinjector_flatland.root_transform_id.clone(),
-                &mut a11y_viewport_transform_id.clone(),
+                &pointerinjector_flatland.root_transform_id,
+                &a11y_viewport_transform_id,
             )?;
 
             let link_properties = ui_comp::ViewportProperties {
@@ -539,15 +531,12 @@ impl FlatlandSceneManager {
             };
 
             flatland.create_viewport(
-                &mut a11y_viewport_content_id.clone(),
+                &a11y_viewport_content_id,
                 a11y_view_creation_pair.viewport_creation_token,
                 &link_properties,
                 a11y_view_watcher_request,
             )?;
-            flatland.set_content(
-                &mut a11y_viewport_transform_id.clone(),
-                &mut a11y_viewport_content_id.clone(),
-            )?;
+            flatland.set_content(&a11y_viewport_transform_id, &a11y_viewport_content_id)?;
         }
 
         // Request for the a11y manager to create its view.
@@ -641,16 +630,11 @@ impl FlatlandSceneManager {
         if let Some(ids) = &self.scene_root_viewport_ids {
             let locked = self.scene_flatland.flatland.lock();
             locked
-                .set_content(&mut ids.transform_id.clone(), &mut ContentId { value: 0 })
+                .set_content(&ids.transform_id, &ContentId { value: 0 })
                 .context("could not set content")?;
-            locked.remove_child(
-                &mut self.scene_flatland.root_transform_id.clone(),
-                &mut ids.transform_id.clone(),
-            )?;
-            locked
-                .release_transform(&mut ids.transform_id.clone())
-                .context("could not release transform")?;
-            let _ = locked.release_viewport(&mut ids.content_id.clone());
+            locked.remove_child(&self.scene_flatland.root_transform_id, &ids.transform_id)?;
+            locked.release_transform(&ids.transform_id).context("could not release transform")?;
+            let _ = locked.release_viewport(&ids.content_id);
             self.scene_root_viewport_ids = None;
         }
 
@@ -669,20 +653,15 @@ impl FlatlandSceneManager {
                 ..Default::default()
             };
             locked.create_viewport(
-                &mut ids.content_id.clone(),
+                &ids.content_id,
                 viewport_creation_token,
                 &viewport_properties,
                 child_view_watcher_request,
             )?;
+            locked.create_transform(&ids.transform_id).context("could not create transform")?;
+            locked.add_child(&self.scene_flatland.root_transform_id, &ids.transform_id)?;
             locked
-                .create_transform(&mut ids.transform_id.clone())
-                .context("could not create transform")?;
-            locked.add_child(
-                &mut self.scene_flatland.root_transform_id.clone(),
-                &mut ids.transform_id.clone(),
-            )?;
-            locked
-                .set_content(&mut ids.transform_id.clone(), &mut ids.content_id.clone())
+                .set_content(&ids.transform_id, &ids.content_id)
                 .context("could not set content #2")?;
         }
         self.scene_root_viewport_ids = Some(ids);

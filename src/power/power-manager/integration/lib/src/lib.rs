@@ -340,7 +340,7 @@ async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
     fake_clock_control
         .resume_with_increments(
             fuchsia_zircon::Duration::from_millis(1).into_nanos(),
-            &mut ftesting::Increment::Determined(
+            &ftesting::Increment::Determined(
                 fuchsia_zircon::Duration::from_millis(scale.into()).into_nanos(),
             ),
         )

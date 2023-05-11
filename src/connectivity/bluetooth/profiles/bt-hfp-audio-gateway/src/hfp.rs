@@ -313,7 +313,7 @@ impl CallManager {
         }
 
         if let Some(proxy) = &self.proxy {
-            if let Err(e) = proxy.peer_connected(&mut peer_id.into(), handle).await {
+            if let Err(e) = proxy.peer_connected(&peer_id.into(), handle).await {
                 if e.is_closed() {
                     info!("CallManager channel closed.");
                     self.inspect.set_disconnected();
@@ -478,7 +478,7 @@ mod tests {
             .receiver
             .as_ref()
             .unwrap()
-            .connected(&mut bt::PeerId { value: 1 }, chan, &proto)
+            .connected(&bt::PeerId { value: 1 }, chan, &proto)
             .expect("succeed");
         assert!(exec.run_until_stalled(&mut call_manager).is_ready());
     }
@@ -625,7 +625,7 @@ mod tests {
         }];
 
         let service_found_fut = server.results.as_ref().unwrap().service_found(
-            &mut PeerId(1).into(),
+            &PeerId(1).into(),
             None,
             audio_gateway_service_class_attrs,
         );
@@ -676,7 +676,7 @@ mod tests {
             .results
             .as_ref()
             .unwrap()
-            .service_found(&mut bt::PeerId { value: 1 }, Some(&proto), &[])
+            .service_found(&bt::PeerId { value: 1 }, Some(&proto), &[])
             .await?;
 
         match server.stream.next().await {

@@ -365,7 +365,7 @@ impl Cr50 {
                     Err(e) => {
                         warn!("Physical presence check failed: {:?}", e);
                         handle
-                            .send_on_change(&mut PhysicalPresenceEvent::Err(
+                            .send_on_change(&PhysicalPresenceEvent::Err(
                                 zx::Status::INTERNAL.into_raw(),
                             ))
                             .unwrap_or_else(|e| warn!("Error sending on change: {:?}", e));
@@ -375,7 +375,7 @@ impl Cr50 {
                 if Some(pp.get_state()) != last_pp {
                     last_pp = Some(pp.get_state());
                     handle
-                        .send_on_change(&mut PhysicalPresenceEvent::State(pp.get_state()))
+                        .send_on_change(&PhysicalPresenceEvent::State(pp.get_state()))
                         .unwrap_or_else(|e| warn!("Error sending on change: {:?}", e));
                 }
 

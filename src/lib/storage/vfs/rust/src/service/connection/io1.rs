@@ -146,7 +146,7 @@ impl Connection {
                 responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::GetAttr { responder } => {
-                let mut attrs = fio::NodeAttributes {
+                let attrs = fio::NodeAttributes {
                     mode: fio::MODE_TYPE_SERVICE | self.posix_protection_attributes(),
                     id: fio::INO_UNKNOWN,
                     content_size: 0,
@@ -155,7 +155,7 @@ impl Connection {
                     creation_time: 0,
                     modification_time: 0,
                 };
-                responder.send(ZX_OK, &mut attrs)?;
+                responder.send(ZX_OK, &attrs)?;
             }
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(ZX_ERR_NOT_SUPPORTED)?;

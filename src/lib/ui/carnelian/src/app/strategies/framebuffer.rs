@@ -416,14 +416,14 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         &mut self,
         display_id: u64,
         gamma_table_id: u64,
-        mut r: BoxedGammaValues,
-        mut g: BoxedGammaValues,
-        mut b: BoxedGammaValues,
+        r: BoxedGammaValues,
+        g: BoxedGammaValues,
+        b: BoxedGammaValues,
     ) {
         let display_coordinator = self.display_coordinator.as_ref().expect("display_coordinator");
         display_coordinator
             .coordinator
-            .import_gamma_table(gamma_table_id, &mut r, &mut g, &mut b)
+            .import_gamma_table(gamma_table_id, &r, &g, &b)
             .expect("import_gamma_table");
         display_coordinator
             .coordinator

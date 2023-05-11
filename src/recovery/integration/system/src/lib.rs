@@ -81,7 +81,7 @@ async fn test_startup() -> Result<(), Error> {
     fasync::Task::local(async move {
         let (listener_client, listener_server) = fidl::endpoints::create_request_stream().unwrap();
         let log_proxy = connect_to_protocol::<LogMarker>().unwrap();
-        let mut filter = LogFilterOptions {
+        let filter = LogFilterOptions {
             filter_by_pid: false,
             pid: 0,
             min_severity: LogLevelFilter::None,
@@ -91,7 +91,7 @@ async fn test_startup() -> Result<(), Error> {
             tags: vec![String::from("system_recovery")],
         };
 
-        log_proxy.listen_safe(listener_client, Some(&mut filter)).unwrap();
+        log_proxy.listen_safe(listener_client, Some(&filter)).unwrap();
         setup_log_listener(listener_server, sender).await.unwrap();
     })
     .detach();

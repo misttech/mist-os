@@ -51,7 +51,7 @@ pub async fn publish(port: u16, node_id: NodeId) -> Result<(), Error> {
         PublicationResponder_RequestStream::from_channel(server).map_err(Into::into).try_for_each(
             |PublicationResponder_Request::OnPublication { responder, .. }| async move {
                 responder
-                    .send(Some(&mut Publication {
+                    .send(Some(&Publication {
                         port,
                         text: vec![],
                         srv_priority: fidl_fuchsia_net_mdns::DEFAULT_SRV_PRIORITY,

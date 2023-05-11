@@ -77,10 +77,10 @@ pub async fn open_exposed_dir(
     realm: &fcomponent::RealmProxy,
     name: &str,
 ) -> Result<fio::DirectoryProxy, fcomponent::Error> {
-    let mut child_ref = fdecl::ChildRef { name: name.to_string(), collection: None };
+    let child_ref = fdecl::ChildRef { name: name.to_string(), collection: None };
     let (exposed_dir, server_end) = create_proxy().unwrap();
     realm
-        .open_exposed_dir(&mut child_ref, server_end)
+        .open_exposed_dir(&child_ref, server_end)
         .await
         .expect("open_exposed_dir failed")
         .map(|_| exposed_dir)

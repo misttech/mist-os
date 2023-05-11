@@ -144,7 +144,7 @@ async fn add_pure_ip_interface(
     interface_name: &str,
 ) -> fnet_interfaces_admin::ControlProxy {
     let fhardware_network::PortInfo { id, .. } = network_port.get_info().await.expect("get info");
-    let mut port_id = id.expect("port id");
+    let port_id = id.expect("port id");
 
     let (admin_control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
@@ -152,7 +152,7 @@ async fn add_pure_ip_interface(
 
     let () = admin_device_control
         .create_interface(
-            &mut port_id,
+            &port_id,
             server_end,
             &fnet_interfaces_admin::Options {
                 name: Some(interface_name.to_string()),

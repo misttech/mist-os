@@ -216,7 +216,7 @@ impl AccessCheckRequest {
             // process does not create more executable packages. Non NOT_FOUND errors fail the test
             // to help catch misconfigurations of the test environment.
             match pkg_cache_proxy
-                .open(&mut package_blob_id.clone(), package_directory_server_end)
+                .open(&package_blob_id, package_directory_server_end)
                 .await
                 .unwrap()
             {

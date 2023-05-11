@@ -44,7 +44,7 @@ fn send_tx_status_report(
     proxy: &WlantapPhyProxy,
 ) -> Result<(), Error> {
     let result = if is_successful { WlanTxResult::Success } else { WlanTxResult::Failed };
-    let mut ts = WlanTxStatus {
+    let ts = WlanTxStatus {
         peer_addr: bssid.0,
         result,
         tx_status_entry: [
@@ -58,7 +58,7 @@ fn send_tx_status_report(
             create_wlan_tx_status_entry(0),
         ],
     };
-    proxy.report_tx_status(&mut ts)?;
+    proxy.report_tx_status(&ts)?;
     Ok(())
 }
 

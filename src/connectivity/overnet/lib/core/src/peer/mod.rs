@@ -909,7 +909,7 @@ async fn client_handshake(
     match &mut conn {
         RawConnection::Quic(writer, _) => {
             writer
-                .send(&mut [0, 0, 0, fidl::encoding::MAGIC_NUMBER_INITIAL], false)
+                .send(&[0, 0, 0, fidl::encoding::MAGIC_NUMBER_INITIAL], false)
                 .on_timeout(QUIC_CONNECTION_TIMEOUT, || {
                     Err(format_err!("timeout initializing quic connection"))
                 })
@@ -1197,7 +1197,7 @@ async fn server_handshake(
                 svrpeer = ?node_id,
                 "send fidl header"
             );
-            writer.send(&mut [0, 0, 0, fidl::encoding::MAGIC_NUMBER_INITIAL], false).await?;
+            writer.send(&[0, 0, 0, fidl::encoding::MAGIC_NUMBER_INITIAL], false).await?;
             (
                 FramedStreamReader::from_quic(reader, node_id),
                 FramedStreamWriter::from_quic(writer, node_id),

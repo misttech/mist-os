@@ -76,7 +76,7 @@ mod tests {
                     sender.take().unwrap().send(()).unwrap();
                     responder
                         .send(
-                            &mut ServerStatus::Running { address: (Ipv4Addr::LOCALHOST, 0).into() }
+                            &ServerStatus::Running { address: (Ipv4Addr::LOCALHOST, 0).into() }
                                 .into(),
                         )
                         .unwrap()
@@ -101,7 +101,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStatus { responder } => {
                     sender.take().unwrap().send(()).unwrap();
-                    responder.send(&mut ServerStatus::Disabled.into()).unwrap()
+                    responder.send(&ServerStatus::Disabled.into()).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -129,7 +129,7 @@ mod tests {
                     sender.take().unwrap().send(()).unwrap();
                     responder
                         .send(
-                            &mut ServerStatus::Running { address: (Ipv4Addr::LOCALHOST, 0).into() }
+                            &ServerStatus::Running { address: (Ipv4Addr::LOCALHOST, 0).into() }
                                 .into(),
                         )
                         .unwrap()

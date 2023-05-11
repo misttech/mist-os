@@ -102,7 +102,7 @@ impl SubscriptionManager {
 
         // Send events to all clients that have registered interest in this device
         for (id, handle, utc_xform) in subscribers {
-            if let Err(e) = handle.send_on_packet(device, &mut packet.to_fidl(utc_xform.as_ref())) {
+            if let Err(e) = handle.send_on_packet(device, &packet.to_fidl(utc_xform.as_ref())) {
                 warn!("Subscriber {} failed with {}. Removing.", id, e);
                 to_cleanup.push(*id);
             } else {

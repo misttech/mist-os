@@ -57,18 +57,14 @@ impl<'a> AppModel<'a> {
 
     async fn init_scene(&mut self) {
         // Create a rectangle that will fill the whole screen.
-        self.flatland.create_filled_rect(&mut IMAGE_ID.clone()).expect("fidl error");
-        self.flatland
-            .set_solid_fill(&mut IMAGE_ID.clone(), &mut self.color, &mut self.size)
-            .expect("fidl error");
+        self.flatland.create_filled_rect(&IMAGE_ID).expect("fidl error");
+        self.flatland.set_solid_fill(&IMAGE_ID, &self.color, &self.size).expect("fidl error");
 
         // Populate the rest of the Flatland scene. There is a single transform which is set as the
         // root transform; the newly-created image is set as the content of that transform.
-        self.flatland.create_transform(&mut TRANSFORM_ID.clone()).expect("fidl error");
-        self.flatland.set_root_transform(&mut TRANSFORM_ID.clone()).expect("fidl error");
-        self.flatland
-            .set_content(&mut TRANSFORM_ID.clone(), &mut IMAGE_ID.clone())
-            .expect("fidl error");
+        self.flatland.create_transform(&TRANSFORM_ID).expect("fidl error");
+        self.flatland.set_root_transform(&TRANSFORM_ID).expect("fidl error");
+        self.flatland.set_content(&TRANSFORM_ID, &IMAGE_ID).expect("fidl error");
     }
 
     async fn create_view(&mut self) {
@@ -156,9 +152,7 @@ impl<'a> AppModel<'a> {
 
     fn on_relayout(&mut self, size: fmath::SizeU) {
         self.size = size;
-        self.flatland
-            .set_solid_fill(&mut IMAGE_ID.clone(), &mut self.color, &mut self.size)
-            .expect("fidl error");
+        self.flatland.set_solid_fill(&IMAGE_ID, &self.color, &self.size).expect("fidl error");
     }
 
     fn next_color(&mut self) {
@@ -168,9 +162,7 @@ impl<'a> AppModel<'a> {
             blue: (self.color.blue + 0.25) % 1.0,
             alpha: self.color.alpha,
         };
-        self.flatland
-            .set_solid_fill(&mut IMAGE_ID.clone(), &mut self.color, &mut self.size)
-            .expect("fidl error");
+        self.flatland.set_solid_fill(&IMAGE_ID, &self.color, &self.size).expect("fidl error");
     }
 }
 

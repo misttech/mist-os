@@ -46,7 +46,7 @@ async fn exec_client() -> Result<(), Error> {
     loop {
         let peers = svc.list_peers().await?;
         println!("Got peers: {:?}", peers);
-        for mut peer in peers {
+        for peer in peers {
             if peer.description.services.is_none() {
                 continue;
             }
@@ -62,7 +62,7 @@ async fn exec_client() -> Result<(), Error> {
             }
             let (s, p) = fidl::Channel::create();
             if let Err(e) =
-                svc.connect_to_service(&mut peer.id, event_pair::ExampleMarker::PROTOCOL_NAME, s)
+                svc.connect_to_service(&peer.id, event_pair::ExampleMarker::PROTOCOL_NAME, s)
             {
                 println!("{:?}", e);
                 continue;

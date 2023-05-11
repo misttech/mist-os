@@ -145,7 +145,7 @@ pub async fn setup_masquerade_nat_network<'a>(
             .expect("failed to connect to netstack");
         let fnet::Subnet { addr: next_hop, prefix_len: _ } = router_addr;
         let () = stack
-            .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
                 subnet: fnet_ext::apply_subnet_mask(other_subnet),
                 device_id: 0,
                 next_hop: Some(Box::new(next_hop)),

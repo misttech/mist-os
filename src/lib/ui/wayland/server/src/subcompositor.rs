@@ -172,7 +172,7 @@ impl Subsurface {
         flatland
             .borrow()
             .proxy()
-            .add_child(&mut parent_transform.clone(), &mut child_transform.clone())
+            .add_child(&parent_transform, &child_transform)
             .expect("fidl error");
 
         Ok(())
@@ -188,7 +188,7 @@ impl Subsurface {
                 flatland
                     .borrow()
                     .proxy()
-                    .remove_child(&mut parent_transform.clone(), &mut child_transform.clone())
+                    .remove_child(&parent_transform, &child_transform)
                     .expect("fidl error");
             }
         }
