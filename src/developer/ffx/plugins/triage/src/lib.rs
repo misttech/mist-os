@@ -5,9 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use errors::FfxError;
 use ffx_triage_args::TriageCommand;
-use fho::{
-    deferred, selector, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO,
-};
+use fho::{deferred, moniker, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
     analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
@@ -25,7 +23,7 @@ pub(crate) type Writer = MachineWriter<TriageOutput>;
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("triage.enabled"))]
 pub struct TriageTool {
-    #[with(deferred(selector("core/feedback:expose:fuchsia.feedback.DataProvider")))]
+    #[with(deferred(moniker("/core/feedback")))]
     data_provider_proxy: Deferred<DataProviderProxy>,
     #[command]
     cmd: TriageCommand,
