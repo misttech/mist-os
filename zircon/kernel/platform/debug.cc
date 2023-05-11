@@ -221,12 +221,16 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
 
       static constexpr auto tx_irq_handler = [](auto& spinlock, auto& waiter,
                                                 auto&& mask_tx_interrupts) {
+        // Mask the TX interrupt before signalling any blocked thread as there may
+        // be a race between masking TX here below and unmasking by the blocked
+        // thread.
+        {
+          Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
+          mask_tx_interrupts();
+        }
         // Do not signal the event while holding the sync capability, this could lead
         // to invalid lock dependencies.
         waiter.Wake();
-
-        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
-        mask_tx_interrupts();
       };
 
       constexpr auto irq_handler = [](void* driver_ptr) {
