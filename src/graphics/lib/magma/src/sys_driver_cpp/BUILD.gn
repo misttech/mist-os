@@ -93,6 +93,7 @@ source_set("magma_driver_base") {
   public_deps = [
     ":sys_driver_cpp",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/inspect/component/cpp:inspect_component_cpp",

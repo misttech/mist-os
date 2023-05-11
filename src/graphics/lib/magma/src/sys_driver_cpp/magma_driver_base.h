@@ -6,12 +6,15 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/component/cpp/lifecycle.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/component/cpp/service.h>
+#include <threads.h>
+#include <zircon/threads.h>
 
 #include "magma_util/macros.h"
 #include "performance_counters_server.h"
@@ -32,6 +35,10 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
   zx::result<> Start() override {
     teardown_logger_callback_ =
         magma::InitializePlatformLoggerForDFv2(&logger(), std::string(name()));
+
+    if (zx::result result = InitializeProfileProvider(); result.is_error()) {
+      return result.take_error();
+    }
 
     if (zx::result result = MagmaStart(); result.is_error()) {
       node().reset();
@@ -147,8 +154,26 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
       return;
     }
 
-    magma_system_device_->StartConnectionThread(std::move(connection),
-                                                [](const char* role_name) {});
+    magma_system_device_->StartConnectionThread(std::move(connection), [this](
+                                                                           const char* role_name) {
+      zx::unowned_thread original_thread{thrd_get_zx_handle(thrd_current())};
+      zx::thread duplicate_thread;
+      zx_status_t status = original_thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_thread);
+      if (status != ZX_OK) {
+        MAGMA_DMESSAGE("Failed to duplicate thread handle: %s", zx_status_get_string(status));
+        return;
+      }
+      auto result = profile_provider_->SetProfileByRole(std::move(duplicate_thread),
+                                                        fidl::StringView::FromExternal(role_name));
+      if (!result.ok()) {
+        MAGMA_DMESSAGE("Failed profile provider request %s", result.status_string());
+        return;
+      }
+      if (result->status != ZX_OK) {
+        MAGMA_DMESSAGE("Failed profile provider status: %s", zx_status_get_string(result->status));
+        return;
+      }
+    });
   }
 
   void DumpState(typename fws::DumpStateRequestView request,
@@ -245,6 +270,18 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
     return zx::ok();
   }
 
+  zx::result<> InitializeProfileProvider() {
+    auto profile_provider =
+        context().incoming()->template Connect<fuchsia_scheduler::ProfileProvider>();
+
+    if (profile_provider.is_error()) {
+      MAGMA_DMESSAGE("Error requesting profile provider: %s", profile_provider.status_string());
+      return profile_provider.take_error();
+    }
+    profile_provider_ = fidl::WireSyncClient(std::move(*profile_provider));
+    return zx::ok();
+  }
+
   // Node representing this device; given from the parent.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_client_;
 
@@ -257,6 +294,8 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_node_controller_;
+
+  fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
 
   PerformanceCountersServer perf_counter_;
 };

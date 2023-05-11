@@ -143,6 +143,7 @@ source_set("parent_device_dfv2") {
   public_deps = [
     ":src",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
   ]
