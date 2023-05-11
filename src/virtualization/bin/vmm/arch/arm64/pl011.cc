@@ -62,6 +62,11 @@ zx_status_t Pl011::Read(uint64_t addr, IoValue* value) {
     case Pl011Register::IMSC:
       value->u16 = 0;
       return ZX_OK;
+    case Pl011Register::LCR: {
+      std::lock_guard<std::mutex> lock(mutex_);
+      value->u16 = lcr_;
+      return ZX_OK;
+    }
     default:
       FX_LOGS(ERROR) << "Unhandled PL011 address read 0x" << std::hex << addr;
       return ZX_ERR_IO;
@@ -78,12 +83,16 @@ zx_status_t Pl011::Write(uint64_t addr, const IoValue& value) {
     case Pl011Register::DR:
       Print(value.u8);
       return ZX_OK;
+    case Pl011Register::LCR: {
+      std::lock_guard<std::mutex> lock(mutex_);
+      lcr_ = value.u16;
+      return ZX_OK;
+    }
     case Pl011Register::IBRD:
     case Pl011Register::FBRD:
     case Pl011Register::ICR:
     case Pl011Register::IFLS:
     case Pl011Register::IMSC:
-    case Pl011Register::LCR:
       return ZX_OK;
     default:
       FX_LOGS(ERROR) << "Unhandled PL011 address write 0x" << std::hex << addr;

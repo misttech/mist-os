@@ -37,8 +37,8 @@ class Pl011 : public IoHandler, public PlatformDevice {
 
   uint8_t tx_buffer_[kBufferSize] __TA_GUARDED(mutex_) = {};
   uint16_t tx_offset_ __TA_GUARDED(mutex_) = 0;
-
   uint16_t control_ __TA_GUARDED(mutex_) = 0;
+  uint16_t lcr_ __TA_GUARDED(mutex_) = 0;
 
   void Print(uint8_t ch);
 };
