@@ -5,6 +5,7 @@
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_MAGMA_DRIVER_BASE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.gpu.magma/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/component/cpp/lifecycle.h>
@@ -13,6 +14,7 @@
 #include <lib/inspect/component/cpp/service.h>
 
 #include "magma_util/macros.h"
+#include "performance_counters_server.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "sys_driver_cpp/magma_driver.h"
@@ -43,6 +45,14 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
     node_client_.Bind(std::move(node()));
 
     auto defer_teardown = fit::defer([this]() { node_client_ = {}; });
+
+    if (zx::result result = perf_counter_.Create(node_client_); result.is_error()) {
+      return result.take_error();
+    }
+    {
+      std::lock_guard lock(magma_mutex_);
+      magma_system_device_->set_perf_count_access_token_id(perf_counter_.GetEventKoid());
+    }
 
     if (zx::result result = CreateDevfsNode(); result.is_error()) {
       return result.take_error();
@@ -247,6 +257,8 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_node_controller_;
+
+  PerformanceCountersServer perf_counter_;
 };
 
 class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice> {

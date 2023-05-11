@@ -84,7 +84,11 @@ source_set("device_impl") {
 }
 
 source_set("magma_driver_base") {
-  sources = [ "magma_driver_base.h" ]
+  sources = [
+    "magma_driver_base.h",
+    "performance_counters_server.cc",
+    "performance_counters_server.h",
+  ]
 
   public_deps = [
     ":sys_driver_cpp",
