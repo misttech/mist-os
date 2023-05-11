@@ -24,6 +24,7 @@ group("tests_no_e2e") {
     "developer:tests",
     "devices:tests",
     "diagnostics:tests",
+    "experiences:tests",
     "factory:tests",
     "firmware:tests",
     "fonts:tests",

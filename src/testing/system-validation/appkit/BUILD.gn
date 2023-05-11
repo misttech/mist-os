@@ -1,0 +1,40 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  name = "appkit_app_instrumentor"
+  testonly = true
+  edition = "2018"
+  source_root = "src/appkit_app_instrumentor.rs"
+  sources = [ "src/appkit_app_instrumentor.rs" ]
+  deps = [
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/testing/system-validation:system_validation_lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_component("bouncing_box_system_validation_component") {
+  testonly = true
+  component_name = "bouncing_box_system_validation"
+  manifest = "tests/meta/bouncing_box_system_validation.cml"
+  deps = [ ":bin" ]
+}
+
+# To run tests:
+# fx test bouncing_box_system_validation
+# or
+# fx test fuchsia-pkg://fuchsia.com/appkit_system_validation#meta/bouncing_box_system_validation.cm
+fuchsia_test_package("appkit_system_validation_test_pkg") {
+  package_name = "appkit_system_validation"
+  test_components = [ ":bouncing_box_system_validation_component" ]
+  subpackages = [
+    "//src/experiences/session_shells/gazelle/examples/bouncing_box",
+    "//src/ui/bin/tiles-session",
+  ]
+}
