@@ -56,10 +56,6 @@ inferior("inlined_crasher") {
   sources = [ "inlined_crasher.cc" ]
 }
 
-inferior("bitfield") {
-  sources = [ "bitfield.cc" ]
-}
-
 inferior("loop") {
   sources = [ "loop.cc" ]
 
@@ -104,7 +100,6 @@ inferior("rust_functions") {
 fuchsia_package("zxdb_e2e_inferiors") {
   deps = [
     ":async_rust",
-    ":bitfield",
     ":cpp_functions",
     ":inlined_crasher",
     ":loop",

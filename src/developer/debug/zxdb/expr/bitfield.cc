@@ -4,8 +4,6 @@
 
 #include "src/developer/debug/zxdb/expr/bitfield.h"
 
-#include <cstdint>
-
 #include "src/developer/debug/zxdb/common/int128_t.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
 #include "src/developer/debug/zxdb/expr/found_member.h"
@@ -41,6 +39,13 @@ ErrOrValue ResolveBitfieldMember(const fxl::RefPtr<EvalContext>& context, const 
   const DataMember* data_member = found_member.data_member();
   FX_DCHECK(data_member->is_bitfield());
 
+  if (data_member->data_bit_offset()) {
+    // All of our compilers currently use bit_offset instead.
+    return Err(
+        "DW_AT_data_bit_offset is used for this bitfield but is not supported.\n"
+        "Please file a bug with information about your compiler and build configuration.");
+  }
+
   // Use the FoundMember's offset (not DataMember's) because FoundMember's takes into account base
   // classes and their offsets.
   // TODO(bug 41503) handle virtual inheritance.
@@ -51,30 +56,7 @@ ErrOrValue ResolveBitfieldMember(const fxl::RefPtr<EvalContext>& context, const 
         "classes (bug 41503) or static members.");
   }
 
-  // The actual size of the bitfield.
-  uint32_t bit_size = data_member->bit_size();
-
-  // The offset into the base struct, rounded to bytes.
-  uint32_t byte_offset = *opt_byte_offset;
-
-  // The bit offset in addition to byte_offset, should be in range [0, 7].
-  uint32_t bit_offset = data_member->data_bit_offset();
-
-  // DWARF 2 (byte_size, bit_offset, member_location) combination is used. Convert it to bit_offset.
-  if (data_member->byte_size()) {
-    bit_offset = data_member->byte_size() * 8 - data_member->bit_offset() - data_member->bit_size();
-  }
-
-  // Spill the bit_offset into byte_offset, so we could support arbitrary large bit_offset.
-  byte_offset += bit_offset / 8;
-  bit_offset = bit_offset % 8;
-
-  // Round up bit_size to byte size. Note that it's possible for a bitfield of 10 bits to span
-  // across 3 bytes, i.e., 1 bit + 8 bits + 1 bit.
-  uint32_t byte_size = (bit_offset + bit_size + 7) / 8;
-
-  // Check whether the bitfield can be fit in a uint128_t.
-  if (byte_size > sizeof(uint128_t)) {
+  if (data_member->bit_size() + data_member->bit_offset() > sizeof(uint128_t) * 8) {
     // If the total coverage of this bitfield is more than out number size we can't do the
     // operations and need to rewrite this code to manually do shifts on bytes rather than using
     // numeric operations in C.
@@ -90,30 +72,44 @@ ErrOrValue ResolveBitfieldMember(const fxl::RefPtr<EvalContext>& context, const 
 
   uint128_t bits = 0;
 
-  if (base.data().size() < byte_offset + byte_size ||
-      !base.data().RangeIsValid(byte_offset, byte_size))
+  // Copy bytes to out bitfield as long as they're in the structure and will mask the valid ones
+  // later. This is because the bit offset can actually be negative to indicate it's starting at a
+  // higher bit than byte_size (see below). Copyting everything we have means we don't have to worry
+  // about that reading off the end of byte_size() and can just do the masking math.
+  //
+  // This computation assumes little-endian.
+  size_t bytes_to_use = std::min<size_t>(sizeof(bits), base.data().size() - *opt_byte_offset);
+  if (!base.data().RangeIsValid(*opt_byte_offset, bytes_to_use))
     return Err::OptimizedOut();
+  memcpy(&bits, &base.data().bytes()[*opt_byte_offset], bytes_to_use);
 
-  // Copy bytes to out bitfield.
-  memcpy(&bits, &base.data().bytes()[byte_offset], byte_size);
+  // Bits count from the high bit within byte_size(). Current compilers seem to always write
+  // byte_size == sizeof(declared type) and count the high bit of the result from the high bit of
+  // this field (read from memory as little-endian). If bit offsets push the high bit of the
+  // result onto a later bit (say it's a 31-bit bitfield and a 32-bit underlying type, starting at
+  // a 3 bit offset will make the number cover 5 bytes) the bit offset will actually be negative!
+  //
+  // So offset 6 in an 8-bit byte_size() selects 0b0000`0010 and we want to shift one bit. This
+  // identifies the high bit in the result and we need to shift until the low bit is at the low
+  // position.
+  uint32_t shift_amount =
+      data_member->byte_size() * 8 - data_member->bit_offset() - data_member->bit_size();
+  bits >>= shift_amount;
 
-  // Shift.
-  bits >>= bit_offset;
-
-  // Mask.
-  uint128_t valid_bit_mask = (static_cast<uint128_t>(1) << bit_size) - 1;
+  uint128_t valid_bit_mask = (static_cast<uint128_t>(1) << data_member->bit_size()) - 1;
   bits &= valid_bit_mask;
 
-  if (NeedsSignExtension(context, concrete_dest_type.get(), bits, bit_size)) {
+  if (NeedsSignExtension(context, concrete_dest_type.get(), bits, data_member->bit_size())) {
     // Set non-masked bits to 1.
     bits |= ~valid_bit_mask;
   }
 
-  ExprValueSource source = base.source().GetOffsetInto(byte_offset, bit_size, bit_offset);
+  ExprValueSource source =
+      base.source().GetOffsetInto(*opt_byte_offset, data_member->bit_size(), shift_amount);
 
   // Save the data back to the desired size (assume little-endian so truncation from the right is
   // correct).
-  std::vector<uint8_t> new_data(concrete_dest_type->byte_size());
+  std::vector<uint8_t> new_data(data_member->byte_size());
   memcpy(new_data.data(), &bits, new_data.size());
   return ExprValue(RefPtrTo(dest_type), std::move(new_data), source);
 }
