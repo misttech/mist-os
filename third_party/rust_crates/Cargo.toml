@@ -136,6 +136,9 @@ memoffset = "0.5.3"
 miniz_oxide = "0.3.6"
 # TODO(fxbug.dev/66092) limit to tests
 mockall = "0.9"
+netlink-packet-core = "0.5.0"
+netlink-packet-route = "0.15.0"
+netlink-packet-utils = "0.5.2"
 nix = "0.26.2"
 nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
 nom_locate = "2.0.0"

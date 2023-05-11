@@ -468,6 +468,18 @@ group("mockall") {
   public_deps = [ ":mockall-v0_9_0" ]
 }
 
+group("netlink-packet-core") {
+  public_deps = [ ":netlink-packet-core-v0_5_0" ]
+}
+
+group("netlink-packet-route") {
+  public_deps = [ ":netlink-packet-route-v0_15_0" ]
+}
+
+group("netlink-packet-utils") {
+  public_deps = [ ":netlink-packet-utils-v0_5_2" ]
+}
+
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
 
 group("nix") {
@@ -6074,6 +6086,83 @@ rust_library("multimap-v0_8_3") {
     "--edition=2015",
     "-Cmetadata=60f5095b2d01969a",
     "-Cextra-filename=-60f5095b2d01969a",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("netlink-packet-core-v0_5_0") {
+  crate_name = "netlink_packet_core"
+  crate_root =
+      "//third_party/rust_crates/vendor/netlink-packet-core-0.5.0/src/lib.rs"
+  output_name = "netlink_packet_core-4e717aad4a69254f"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_57" ]
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":libc-v0_2_142" ]
+  deps += [ ":netlink-packet-utils-v0_5_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=4e717aad4a69254f",
+    "-Cextra-filename=-4e717aad4a69254f",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("netlink-packet-route-v0_15_0") {
+  crate_name = "netlink_packet_route"
+  crate_root =
+      "//third_party/rust_crates/vendor/netlink-packet-route-0.15.0/src/lib.rs"
+  output_name = "netlink_packet_route-c34624435c7ce69e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_57" ]
+  deps += [ ":bitflags-v1_3_2" ]
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":libc-v0_2_142" ]
+  deps += [ ":netlink-packet-core-v0_5_0" ]
+  deps += [ ":netlink-packet-utils-v0_5_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=c34624435c7ce69e",
+    "-Cextra-filename=-c34624435c7ce69e",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("netlink-packet-utils-v0_5_2") {
+  crate_name = "netlink_packet_utils"
+  crate_root =
+      "//third_party/rust_crates/vendor/netlink-packet-utils-0.5.2/src/lib.rs"
+  output_name = "netlink_packet_utils-77b6e0ba4c9d7397"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_57" ]
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":thiserror-v1_0_23" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=77b6e0ba4c9d7397",
+    "-Cextra-filename=-77b6e0ba4c9d7397",
   ]
 
   visibility = [ ":*" ]
