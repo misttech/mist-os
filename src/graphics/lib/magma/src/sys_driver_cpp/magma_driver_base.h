@@ -16,6 +16,7 @@
 #include <threads.h>
 #include <zircon/threads.h>
 
+#include "dependency_injection_server.h"
 #include "magma_util/macros.h"
 #include "performance_counters_server.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
@@ -23,7 +24,9 @@
 #include "sys_driver_cpp/magma_driver.h"
 
 template <typename FidlDeviceType>
-class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDeviceType> {
+class MagmaDriverBase : public fdf::DriverBase,
+                        public fidl::WireServer<FidlDeviceType>,
+                        DependencyInjectionServer::Owner {
  public:
   using fws = fidl::WireServer<FidlDeviceType>;
 
@@ -59,6 +62,10 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
     {
       std::lock_guard lock(magma_mutex_);
       magma_system_device_->set_perf_count_access_token_id(perf_counter_.GetEventKoid());
+    }
+
+    if (zx::result result = dependency_injection_.Create(node_client_); result.is_error()) {
+      return result.take_error();
     }
 
     if (zx::result result = CreateDevfsNode(); result.is_error()) {
@@ -282,6 +289,13 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
     return zx::ok();
   }
 
+  // DependencyInjection::Owner implementation.
+  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override {
+    std::lock_guard lock(magma_mutex_);
+    MAGMA_DASSERT(magma_system_device_);
+    magma_system_device_->SetMemoryPressureLevel(level);
+  }
+
   // Node representing this device; given from the parent.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_client_;
 
@@ -298,6 +312,7 @@ class MagmaDriverBase : public fdf::DriverBase, public fidl::WireServer<FidlDevi
   fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
 
   PerformanceCountersServer perf_counter_;
+  DependencyInjectionServer dependency_injection_{this};
 };
 
 class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice> {
