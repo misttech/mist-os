@@ -28,7 +28,7 @@
 // __USE_MISC determines whether these types are defined for linux-arm64.
 // Only define these if they're not already defined.
 #ifndef __USE_MISC
-#define uint unsigned int
+typedef unsigned int uint;
 #endif
 
 // CRC32 Related Definitions
