@@ -140,7 +140,7 @@ impl ProfileClient {
             return Ok(Self::new(proxy));
         }
         let (connect_client, connection_receiver) = create_request_stream()?;
-        let advertisement = proxy.advertise(services, channel_params, connect_client).check()?;
+        let advertisement = proxy.advertise(services, &channel_params, connect_client).check()?;
         Ok(Self {
             advertisement: Some(advertisement),
             connection_receiver: Some(connection_receiver),

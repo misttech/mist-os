@@ -67,7 +67,7 @@ impl ConnectedProtocol for CobaltConnectedService {
 
             metric_event_logger_factory
                 .create_metric_event_logger(
-                    ProjectSpec { project_id: Some(PROJECT_ID), ..Default::default() },
+                    &ProjectSpec { project_id: Some(PROJECT_ID), ..Default::default() },
                     server_end,
                 )
                 .await?

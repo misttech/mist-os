@@ -41,7 +41,7 @@ async fn register(
 
     match repos
         .register_target(
-            RepositoryTarget {
+            &RepositoryTarget {
                 repo_name: Some(repo_name.clone()),
                 target_identifier: target_str,
                 aliases: Some(cmd.alias),

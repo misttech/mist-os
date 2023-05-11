@@ -68,7 +68,7 @@ impl<T, E: std::fmt::Debug> ResultExt<T> for Result<T, E> {
 /// The `port_id` and `device_proxy` correspond to a system netdevice.
 async fn install_netdevice(
     name: &str,
-    mut port_id: fhwnet::PortId,
+    port_id: fhwnet::PortId,
     device_proxy: fhwnet::DeviceProxy,
     wait_any_ip_address: bool,
     connector: &HermeticNetworkConnector,
@@ -104,9 +104,9 @@ async fn install_netdevice(
 
     device_control
         .create_interface(
-            &mut port_id,
+            &port_id,
             control_server_end,
-            fnet_interfaces_admin::Options {
+            &fnet_interfaces_admin::Options {
                 name: Some(name.to_string()),
                 metric: Some(DEFAULT_METRIC),
                 ..Default::default()
@@ -376,14 +376,14 @@ fn create_child_decl(child_name: &str, url: &str) -> fdecl::Child {
 /// The `url` corresponds to the URL of the component to add. The `connector`
 /// connects to the desired realm.
 async fn create_child(
-    mut collection_ref: fdecl::CollectionRef,
+    collection_ref: fdecl::CollectionRef,
     child: fdecl::Child,
     connector: &impl Connector,
 ) -> Result<(), fntr::Error> {
     let realm_proxy = connector.connect_to_protocol::<fcomponent::RealmMarker>()?;
 
     realm_proxy
-        .create_child(&mut collection_ref, child, fcomponent::CreateChildArgs::default())
+        .create_child(&collection_ref, &child, fcomponent::CreateChildArgs::default())
         .await
         .map_err(|e| {
             error!("create_child failed: {:?}", e);
@@ -1024,7 +1024,7 @@ impl Controller {
             })?;
         client_provider
             .new_client(
-                fnet_dhcpv6::NewClientParams {
+                &fnet_dhcpv6::NewClientParams {
                     interface_id: Some(interface_id),
                     address: Some(fnet::Ipv6SocketAddress {
                         address: address,

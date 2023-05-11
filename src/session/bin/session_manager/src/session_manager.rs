@@ -473,7 +473,7 @@ mod tests {
         let (launcher, _restarter) = serve_session_manager_services(session_manager);
 
         assert!(launcher
-            .launch(LaunchConfiguration {
+            .launch(&LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
                 ..Default::default()
             })
@@ -521,7 +521,7 @@ mod tests {
         let (launcher, restarter) = serve_session_manager_services(session_manager);
 
         assert!(launcher
-            .launch(LaunchConfiguration {
+            .launch(&LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
                 ..Default::default()
             })

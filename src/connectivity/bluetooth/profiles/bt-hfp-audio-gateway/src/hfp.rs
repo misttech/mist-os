@@ -831,7 +831,7 @@ mod tests {
         let fidl_request = {
             let behavior =
                 hfp_test::ConnectionBehavior { autoconnect: Some(false), ..Default::default() };
-            proxy.set_connection_behavior(behavior).unwrap();
+            proxy.set_connection_behavior(&behavior).unwrap();
             stream.next().await.unwrap().unwrap()
         };
 

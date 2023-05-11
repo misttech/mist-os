@@ -35,8 +35,8 @@ impl From<SessionObserverWatchStatusResponder> for WatchStatusResponder {
 impl WatchStatusResponder {
     fn send(self, status: SessionInfoDelta) -> std::result::Result<(), fidl::Error> {
         match self {
-            WatchStatusResponder::SessionControl(responder) => responder.send(status),
-            WatchStatusResponder::SessionObserver(responder) => responder.send(status),
+            WatchStatusResponder::SessionControl(responder) => responder.send(&status),
+            WatchStatusResponder::SessionObserver(responder) => responder.send(&status),
         }
     }
 }

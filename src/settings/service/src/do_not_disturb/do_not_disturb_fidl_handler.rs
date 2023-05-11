@@ -49,7 +49,7 @@ impl watch::Responder<DoNotDisturbSettings, fuchsia_zircon::Status> for DoNotDis
     fn respond(self, response: Result<DoNotDisturbSettings, fuchsia_zircon::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);

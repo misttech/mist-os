@@ -315,7 +315,7 @@ impl MigrationManager {
 
         for file in files {
             self.dir_proxy
-                .unlink(&file, UnlinkOptions::default())
+                .unlink(&file, &UnlinkOptions::default())
                 .await
                 .context("failed to remove old file from file system")
                 .map_err(|e| (Some(new_last_migration), e.into()))?

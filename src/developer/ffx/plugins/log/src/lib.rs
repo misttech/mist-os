@@ -596,7 +596,7 @@ async fn log_internal(
     if !proactive_enabled {
         if rcs_proxy.is_none() {
             let (client, server) = create_proxy()?;
-            bridge_proxy.open_target(TargetQuery::default(), server).await??;
+            bridge_proxy.open_target(&TargetQuery::default(), server).await??;
             let (rcs_client, rcs_server) = create_proxy()?;
             client.open_remote_control(rcs_server).await??;
             rcs_proxy = Some(rcs_client);

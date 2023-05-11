@@ -43,7 +43,7 @@ impl DeviceInfoServer {
         match request {
             DeviceRequest::GetInfo { responder } => {
                 responder
-                    .send(self.device_info_table.read().unwrap().clone().into())
+                    .send(&self.device_info_table.read().unwrap().clone().into())
                     .context("error sending response")?;
             }
         };
@@ -74,7 +74,7 @@ impl BoardInfoServer {
         match request {
             BoardRequest::GetInfo { responder } => {
                 responder
-                    .send(self.board_info_table.read().unwrap().clone().into())
+                    .send(&self.board_info_table.read().unwrap().clone().into())
                     .context("error sending response")?;
             }
         };
@@ -105,7 +105,7 @@ impl ProductInfoServer {
         match request {
             ProductRequest::GetInfo { responder } => {
                 responder
-                    .send(self.product_info_table.read().unwrap().clone().into())
+                    .send(&self.product_info_table.read().unwrap().clone().into())
                     .context("error sending response")?;
             }
         };

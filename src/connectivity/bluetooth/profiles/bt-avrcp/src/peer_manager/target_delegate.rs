@@ -195,7 +195,7 @@ impl TargetDelegate {
             self.target_handler().ok_or(TargetAvcError::RejectedAddressedPlayerChanged)?;
         // if we have a FIDL error, send that the players changed
         target_handler
-            .watch_notification(event, current_value, pos_change_interval)
+            .watch_notification(event, &current_value, pos_change_interval)
             .await
             .map_err(|_| TargetAvcError::RejectedAddressedPlayerChanged)?
     }
@@ -239,7 +239,7 @@ impl TargetDelegate {
         let target_handler =
             self.target_handler().ok_or(TargetAvcError::RejectedNoAvailablePlayers)?;
         target_handler
-            .set_player_application_settings(requested_settings)
+            .set_player_application_settings(&requested_settings)
             .await
             .map_err(|_| TargetAvcError::RejectedNoAvailablePlayers)?
     }

@@ -161,7 +161,7 @@ async fn run_test_case(
 
     debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(
-        test,
+        &test,
         ftest::StdHandles {
             out: Some(stdout_client),
             err: Some(stderr_client),
@@ -175,7 +175,7 @@ async fn run_test_case(
 
     let result = read_result(component_controller.take_event_stream()).await;
     debug!(?result, "notifying client test case finished");
-    case_listener_proxy.finished(result)?;
+    case_listener_proxy.finished(&result)?;
 
     Ok(())
 }

@@ -544,7 +544,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(PlayerInfoDelta::default())?;
+        info_change_responder.send(&PlayerInfoDelta::default())?;
 
         let mut player_stream = Pin::new(&mut player);
         let (_, event) = player_stream.next().await.expect("Polling player event").applicant;
@@ -593,7 +593,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(PlayerInfoDelta {
+        info_change_responder.send(&PlayerInfoDelta {
             player_capabilities: Some(PlayerCapabilities::default()),
             ..Default::default()
         })?;
@@ -636,7 +636,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(delta)?;
+        info_change_responder.send(&delta)?;
 
         let _ = player.next().await.expect("Polling player event");
 

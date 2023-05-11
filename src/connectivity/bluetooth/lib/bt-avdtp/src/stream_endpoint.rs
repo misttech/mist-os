@@ -1027,7 +1027,7 @@ mod tests {
                     Some(StreamEndpoint::SRC_FLUSH_TIMEOUT.into_nanos()),
                     request.flush_timeout
                 );
-                responder.send(request).expect("response to send cleanly");
+                responder.send(&request).expect("response to send cleanly");
             }
             x => panic!("Expected a item to be ready on the request stream, got {:?}", x),
         };

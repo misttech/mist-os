@@ -176,7 +176,7 @@ impl Channel {
                 flush_timeout: duration.clone().map(zx::Duration::into_nanos),
                 ..Default::default()
             };
-            let new_params = proxy.request_parameters(parameters).await?;
+            let new_params = proxy.request_parameters(&parameters).await?;
             let new_timeout = new_params.flush_timeout.map(zx::Duration::from_nanos);
             *(flush_timeout.lock().unwrap()) = new_timeout.clone();
             Ok(new_timeout)
@@ -504,7 +504,7 @@ mod tests {
                         flush_timeout: Some(50_000_000), // 50ms
                         ..Default::default()
                     };
-                    responder.send(params).expect("response to send cleanly");
+                    responder.send(&params).expect("response to send cleanly");
                 }
                 x => panic!("Expected a item to be ready on the request stream, got {:?}", x),
             };

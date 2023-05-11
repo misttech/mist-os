@@ -547,7 +547,7 @@ impl Router {
                 .connect(
                     service_name,
                     chan,
-                    ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
+                    &ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
                 )
                 .await
         } else {
@@ -1277,7 +1277,7 @@ mod tests {
             fn connect_to_service(
                 &self,
                 chan: fidl::Channel,
-                connection_info: fidl_fuchsia_overnet::ConnectionInfo,
+                connection_info: &fidl_fuchsia_overnet::ConnectionInfo,
             ) -> std::result::Result<(), fidl::Error> {
                 println!("{} got request", self.1);
                 self.0

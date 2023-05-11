@@ -261,7 +261,7 @@ async fn serves_update_verify<N: Netstack>(name: &str) {
         .expect("connect to protocol");
 
     let response = verifier
-        .verify(fidl_fuchsia_update_verify::VerifyOptions::default())
+        .verify(&fidl_fuchsia_update_verify::VerifyOptions::default())
         .await
         .expect("call succeeded");
     assert_eq!(response, Ok(()));

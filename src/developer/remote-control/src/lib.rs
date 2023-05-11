@@ -753,7 +753,7 @@ mod tests {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     hwinfo::DeviceRequest::GetInfo { responder } => {
-                        let _ = responder.send(hwinfo::DeviceInfo {
+                        let _ = responder.send(&hwinfo::DeviceInfo {
                             serial_number: Some(String::from(SERIAL)),
                             ..Default::default()
                         });
@@ -773,7 +773,7 @@ mod tests {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     buildinfo::ProviderRequest::GetBuildInfo { responder } => {
-                        let _ = responder.send(buildinfo::BuildInfo {
+                        let _ = responder.send(&buildinfo::BuildInfo {
                             board_config: Some(String::from(BOARD_CONFIG)),
                             product_config: Some(String::from(PRODUCT_CONFIG)),
                             ..Default::default()

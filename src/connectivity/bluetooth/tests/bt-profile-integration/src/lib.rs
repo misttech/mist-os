@@ -67,8 +67,11 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
     let (connect_client, connect_requests) =
         create_request_stream().context("ConnectionReceiver creation")?;
 
-    let _ =
-        profile.aux().profile.advertise(service_defs, ChannelParameters::default(), connect_client);
+    let _ = profile.aux().profile.advertise(
+        service_defs,
+        &ChannelParameters::default(),
+        connect_client,
+    );
     Ok(connect_requests)
 }
 
@@ -83,7 +86,7 @@ async fn create_bredr_peer(proxy: &HciEmulatorProxy, address: Address) -> Result
 
     let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = proxy
-        .add_bredr_peer(peer_params, remote)
+        .add_bredr_peer(&peer_params, remote)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
     Ok(peer)

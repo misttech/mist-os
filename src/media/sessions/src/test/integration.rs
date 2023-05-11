@@ -180,7 +180,7 @@ impl TestService {
 
     fn new_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
-        self.discovery.watch_sessions(watch_options, watcher_client)?;
+        self.discovery.watch_sessions(&watch_options, watcher_client)?;
         Ok(TestWatcher {
             watcher: watcher_server.into_stream().context("Turning watcher into stream")?,
         })
@@ -188,7 +188,7 @@ impl TestService {
 
     fn new_observer_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
-        self.observer_discovery.watch_sessions(watch_options, watcher_client)?;
+        self.observer_discovery.watch_sessions(&watch_options, watcher_client)?;
         Ok(TestWatcher {
             watcher: watcher_server
                 .into_stream()
@@ -295,7 +295,7 @@ impl TestPlayer {
             .publisher
             .publish(
                 player_client,
-                PlayerRegistration { domain: Some(test_domain()), ..Default::default() },
+                &PlayerRegistration { domain: Some(test_domain()), ..Default::default() },
             )
             .await
             .context("Registering new player")?;
@@ -304,7 +304,7 @@ impl TestPlayer {
 
     async fn emit_delta(&mut self, delta: PlayerInfoDelta) -> Result<()> {
         match self.requests.try_next().await? {
-            Some(PlayerRequest::WatchInfoChange { responder }) => responder.send(delta)?,
+            Some(PlayerRequest::WatchInfoChange { responder }) => responder.send(&delta)?,
             _ => {
                 return Err(anyhow::anyhow!("Expected status change request."));
             }

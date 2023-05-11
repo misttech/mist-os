@@ -616,7 +616,7 @@ impl PairingManager {
                 responder,
             } => {
                 let (accept, entered_passkey) =
-                    match proxy.on_pairing_request(peer, method, displayed_passkey).await {
+                    match proxy.on_pairing_request(&peer, method, displayed_passkey).await {
                         Ok((a, p)) => (a, p),
                         Err(e) => {
                             warn!("FIDL error when handling OnPairingRequest: {:?}", e);
@@ -951,7 +951,7 @@ pub(crate) mod tests {
             passkey: u32,
         ) -> QueryResponseFut<(bool, u32)> {
             let delegate = self.downstream_delegate_client.clone();
-            delegate.on_pairing_request(example_peer(id), method, passkey)
+            delegate.on_pairing_request(&example_peer(id), method, passkey)
         }
     }
 

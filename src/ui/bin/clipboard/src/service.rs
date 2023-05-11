@@ -157,7 +157,7 @@ impl<T: ServiceDependencies> Service<T> {
     ) -> Result<(), Error> {
         let mut stream = HangingGetStream::new(focus_provider_proxy, |ref proxy| {
             proxy.watch_focus_koid_chain(
-                focus::FocusChainProviderWatchFocusKoidChainRequest::default(),
+                &focus::FocusChainProviderWatchFocusKoidChainRequest::default(),
             )
         });
 

@@ -127,7 +127,7 @@ async fn process_audio_requests(
         }
         match request.unwrap() {
             StreamConfigRequest::GetHealthState { responder } => {
-                responder.send(HealthState::default())?;
+                responder.send(&HealthState::default())?;
             }
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
@@ -148,7 +148,7 @@ async fn process_audio_requests(
                     ..Default::default()
                 };
 
-                responder.send(prop)?;
+                responder.send(&prop)?;
             }
             StreamConfigRequest::GetSupportedFormats { responder } => {
                 let formats_vector = &[SupportedFormats {
@@ -172,7 +172,7 @@ async fn process_audio_requests(
                     gain_db: Some(0.0f32),
                     ..Default::default()
                 };
-                responder.send(gain_state)?;
+                responder.send(&gain_state)?;
                 gain_state_replied = true;
             }
             StreamConfigRequest::SetGain { target_state, .. } => {
@@ -191,7 +191,7 @@ async fn process_audio_requests(
                     plug_state_time: Some(time.into_nanos() as i64),
                     ..Default::default()
                 };
-                responder.send(plug_state)?;
+                responder.send(&plug_state)?;
                 plug_state_replied = true;
             }
         }
@@ -380,7 +380,7 @@ mod tests {
             pcm_format: Some(SUPPORTED_PCM_FORMAT.clone()),
             ..Default::default()
         };
-        stream_proxy.create_ring_buffer(format, server_end).expect("setup ring buffer okay");
+        stream_proxy.create_ring_buffer(&format, server_end).expect("setup ring buffer okay");
 
         let start_time = rb_proxy.start().await;
         assert!(start_time.is_ok());
@@ -411,7 +411,7 @@ mod tests {
 
         // Set gain state is ignored.  Shouldn't wake us up.
         let _ = stream_proxy
-            .set_gain(GainState { muted: Some(true), ..Default::default() })
+            .set_gain(&GainState { muted: Some(true), ..Default::default() })
             .expect("set gain");
         assert!(Pin::new(&mut gain_state_fut)
             .poll(&mut Context::from_waker(futures::task::noop_waker_ref()))

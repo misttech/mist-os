@@ -62,7 +62,7 @@ async fn handle_stream_stable(mut stream: fonts::ProviderRequestStream) -> Resul
             }
             GetFontFamilyInfo { family: _, responder } => {
                 responder
-                    .send(fonts::FontFamilyInfo::default())
+                    .send(&fonts::FontFamilyInfo::default())
                     .context("send GetFontFamilyInfo")?;
             }
             RegisterFontSetEventListener { listener: _, responder: _ } => {

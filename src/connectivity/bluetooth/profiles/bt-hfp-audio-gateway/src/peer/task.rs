@@ -1041,7 +1041,7 @@ mod tests {
             match result {
                 Some(Ok(PeerHandlerRequest::WatchNetworkInformation { responder })) => {
                     responder
-                        .send(NetworkInformation::default())
+                        .send(&NetworkInformation::default())
                         .expect("Successfully send network information");
                 }
                 x => panic!("Expected watch network information request: {:?}", x),
@@ -1176,7 +1176,7 @@ mod tests {
 
         // Send the first network update - should be relayed to the peer.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        responder.unwrap().send(network_update_1).expect("Successfully send network information");
+        responder.unwrap().send(&network_update_1).expect("Successfully send network information");
         let ((), run_fut) = run_while(
             &mut exec,
             run_fut,
@@ -1185,7 +1185,7 @@ mod tests {
 
         // Send the second network update - should be relayed to the peer.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        responder.unwrap().send(network_update_2).expect("Successfully send network information");
+        responder.unwrap().send(&network_update_2).expect("Successfully send network information");
         let ((), mut run_fut) = run_while(
             &mut exec,
             run_fut,
@@ -1279,7 +1279,7 @@ mod tests {
         match stream.next().await {
             Some(Ok(PeerHandlerRequest::WatchNetworkInformation { responder })) => {
                 responder
-                    .send(NetworkInformation::default())
+                    .send(&NetworkInformation::default())
                     .expect("Successfully send network information");
             }
             x => panic!("Expected watch network information request: {:?}", x),
@@ -1870,7 +1870,7 @@ mod tests {
                             .unwrap_or(false)
                     });
                     if let Some(connect_params) = accepted_params {
-                        proxy.connected(client, connect_params).unwrap();
+                        proxy.connected(client, &connect_params).unwrap();
                         return Some(request_stream);
                     } else {
                         proxy.error(bredr::ScoErrorCode::ParametersRejected).unwrap();

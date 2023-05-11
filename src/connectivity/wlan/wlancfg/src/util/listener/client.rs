@@ -91,7 +91,7 @@ impl Listener<fidl_policy::ClientStateSummary> for fidl_policy::ClientStateUpdat
         update: fidl_policy::ClientStateSummary,
     ) -> BoxFuture<'static, Option<Box<Self>>> {
         let fut =
-            async move { self.on_client_state_update(update).await.ok().map(|()| Box::new(self)) };
+            async move { self.on_client_state_update(&update).await.ok().map(|()| Box::new(self)) };
         fut.boxed()
     }
 }

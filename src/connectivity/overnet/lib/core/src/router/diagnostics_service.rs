@@ -104,7 +104,7 @@ async fn handle_diagnostic_requests(
         .try_for_each_concurrent(None, |req| async move {
             match req {
                 DiagnosticRequest::Probe { selector, responder } => {
-                    let res = responder.send(ProbeResult {
+                    let res = responder.send(&ProbeResult {
                         node_description: if_probe_has_bit(
                             selector,
                             ProbeSelector::NODE_DESCRIPTION,

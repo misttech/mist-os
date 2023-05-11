@@ -63,7 +63,7 @@ impl EnergyScanCommand {
         let result_stream = client_end.into_proxy()?;
         println!("{:?}", energy_scan_marker);
         energy_scan
-            .start_energy_scan(energy_scan_marker, server_end)
+            .start_energy_scan(&energy_scan_marker, server_end)
             .context("Unable to send start energy scan command")?;
         println!("result(s):");
         println!("|-----------------+------------+------------|");

@@ -129,36 +129,27 @@ impl<'a> AppModel<'a> {
             size: Some(fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT }),
             ..Default::default()
         };
-        // TODO(fxbug.dev/76640): generated FIDL methods currently expect "&mut" args.  This will
-        // change; according to fxbug.dev/65845 the generated FIDL will use "&" instead (at least
-        // for POD structs like these).  When this lands we can remove the ".clone()" from the call
-        //  sites below.
         for image_index in 0..IMAGE_COUNT {
             self.flatland
                 .create_image(
-                    &mut IMAGE_IDS[image_index].clone(),
+                    &IMAGE_IDS[image_index],
                     renderer.duplicate_buffer_collection_import_token(),
                     image_index as u32,
-                    image_props.clone(),
+                    &image_props,
                 )
                 .expect("fidl error");
 
             // The rendered pixels are opaque, so don't waste time blending them.
             self.flatland
-                .set_image_blending_function(
-                    &mut IMAGE_IDS[image_index].clone(),
-                    fland::BlendMode::Src,
-                )
+                .set_image_blending_function(&IMAGE_IDS[image_index], fland::BlendMode::Src)
                 .expect("fidl error");
         }
 
         // Populate the rest of the Flatland scene.  There is a single transform which is set as the
         // root transform; the newly-created image is set as the content of that transform.
-        self.flatland.create_transform(&mut TRANSFORM_ID.clone()).expect("fidl error");
-        self.flatland.set_root_transform(&mut TRANSFORM_ID.clone()).expect("fidl error");
-        self.flatland
-            .set_content(&mut TRANSFORM_ID.clone(), &mut IMAGE_IDS[0].clone())
-            .expect("fidl error");
+        self.flatland.create_transform(&TRANSFORM_ID).expect("fidl error");
+        self.flatland.set_root_transform(&TRANSFORM_ID).expect("fidl error");
+        self.flatland.set_content(&TRANSFORM_ID, &IMAGE_IDS[0]).expect("fidl error");
 
         renderer
     }

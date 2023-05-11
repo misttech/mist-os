@@ -1796,16 +1796,8 @@ impl XdgSurfaceView {
             Self::compute_absolute_offset(&parent, &physical_size, &local_offset, &geometry);
         let root_transform = flatland.borrow_mut().alloc_transform_id();
         let container_transform = flatland.borrow_mut().alloc_transform_id();
-        flatland
-            .borrow()
-            .proxy()
-            .create_transform(&mut root_transform.clone())
-            .expect("fidl error");
-        flatland
-            .borrow()
-            .proxy()
-            .create_transform(&mut container_transform.clone())
-            .expect("fidl error");
+        flatland.borrow().proxy().create_transform(&root_transform).expect("fidl error");
+        flatland.borrow().proxy().create_transform(&container_transform).expect("fidl error");
         let view_controller = XdgSurfaceView {
             flatland,
             root_transform: Some(root_transform),
@@ -1866,7 +1858,7 @@ impl XdgSurfaceView {
         self.flatland
             .borrow()
             .proxy()
-            .add_child(&mut self.container_transform.clone(), &mut surface_transform.clone())
+            .add_child(&self.container_transform, &surface_transform)
             .expect("fidl error");
         Ok(())
     }
@@ -1874,27 +1866,23 @@ impl XdgSurfaceView {
     fn setup_scene(&self) {
         ftrace::duration!("wayland", "XdgSurfaceView::setup_scene");
         self.root_transform.as_ref().map(|root_transform| {
-            self.flatland
-                .borrow()
-                .proxy()
-                .set_root_transform(&mut root_transform.clone())
-                .expect("fidl error");
+            self.flatland.borrow().proxy().set_root_transform(&root_transform).expect("fidl error");
             // TODO(fxbug.dev/90666): Add background color if there's no parent.
             self.flatland
                 .borrow()
                 .proxy()
-                .add_child(&mut root_transform.clone(), &mut self.container_transform.clone())
+                .add_child(&root_transform, &self.container_transform)
                 .expect("fidl error");
         });
     }
 
     fn update(&mut self) {
         ftrace::duration!("wayland", "XdgSurfaceView::update");
-        let mut translation = Vec_ { x: self.absolute_offset.0, y: self.absolute_offset.1 };
+        let translation = Vec_ { x: self.absolute_offset.0, y: self.absolute_offset.1 };
         self.flatland
             .borrow()
             .proxy()
-            .set_translation(&mut self.container_transform.clone(), &mut translation)
+            .set_translation(&self.container_transform, &translation)
             .expect("fidl error");
     }
 
@@ -1945,24 +1933,20 @@ impl XdgSurfaceView {
             }),
             ..Default::default()
         };
-        let mut child_transform = TransformId { value: id.into() };
-        let mut link = ContentId { value: id.into() };
-        self.flatland.borrow().proxy().create_transform(&mut child_transform).expect("fidl error");
+        let child_transform = TransformId { value: id.into() };
+        let link = ContentId { value: id.into() };
+        self.flatland.borrow().proxy().create_transform(&child_transform).expect("fidl error");
         self.flatland
             .borrow()
             .proxy()
-            .create_viewport(&mut link, viewport_creation_token, viewport_properties, server_end)
+            .create_viewport(&link, viewport_creation_token, &viewport_properties, server_end)
             .expect("fidl error");
-        self.flatland
-            .borrow()
-            .proxy()
-            .set_content(&mut child_transform, &mut link)
-            .expect("fidl error");
+        self.flatland.borrow().proxy().set_content(&child_transform, &link).expect("fidl error");
         self.root_transform.as_ref().map(|root_transform| {
             self.flatland
                 .borrow()
                 .proxy()
-                .add_child(&mut root_transform.clone(), &mut child_transform)
+                .add_child(&root_transform.clone(), &child_transform)
                 .expect("fidl error");
         });
         self.children.insert(id);
@@ -1973,19 +1957,19 @@ impl XdgSurfaceView {
         ftrace::duration!("wayland", "XdgSurfaceView::handle_view_disconnected");
         if self.children.remove(&id) {
             self.root_transform.as_ref().map(|root_transform| {
-                let mut child_transform = TransformId { value: id.into() };
+                let child_transform = TransformId { value: id.into() };
                 self.flatland
                     .borrow()
                     .proxy()
-                    .remove_child(&mut root_transform.clone(), &mut child_transform)
+                    .remove_child(&root_transform, &child_transform)
                     .expect("fidl error");
                 self.flatland
                     .borrow()
                     .proxy()
-                    .release_transform(&mut child_transform)
+                    .release_transform(&child_transform)
                     .expect("fidl error");
-                let mut link = ContentId { value: id.into() };
-                let _ = self.flatland.borrow().proxy().release_viewport(&mut link);
+                let link = ContentId { value: id.into() };
+                let _ = self.flatland.borrow().proxy().release_viewport(&link);
             });
         }
         self.update_and_present();
@@ -1999,11 +1983,11 @@ impl XdgSurfaceView {
             }),
             ..Default::default()
         };
-        let mut link = ContentId { value: id.into() };
+        let link = ContentId { value: id.into() };
         self.flatland
             .borrow()
             .proxy()
-            .set_viewport_properties(&mut link, viewport_properties)
+            .set_viewport_properties(&link, &viewport_properties)
             .expect("fidl error");
     }
 }

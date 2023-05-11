@@ -205,7 +205,7 @@ impl Connection {
             }
             fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder
-                    .send(fio::SymlinkInfo { target: Some(target), ..Default::default() })?,
+                    .send(&fio::SymlinkInfo { target: Some(target), ..Default::default() })?,
                 Err(status) => {
                     self.control_handle.shutdown_with_epitaph(status);
                     return Ok(true);

@@ -28,7 +28,7 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
     fasync::Task::spawn(async move {
         if let Err(err) = logger_factory
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(metrics::PROJECT_ID), ..Default::default() },
+                &ProjectSpec { project_id: Some(metrics::PROJECT_ID), ..Default::default() },
                 server_end,
             )
             .await

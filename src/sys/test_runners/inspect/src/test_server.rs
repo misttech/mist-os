@@ -236,7 +236,7 @@ impl TestServer {
 
                                     proxy
                                         .on_test_case_started(
-                                            test,
+                                            &test,
                                             ftest::StdHandles {
                                                 out: Some(stdout_end),
                                                 ..Default::default()
@@ -257,7 +257,7 @@ impl TestServer {
                                     };
 
                                     case_listener_proxy
-                                        .finished(result)
+                                        .finished(&result)
                                         .expect("on_test_case_finished failed");
                                 });
                             }

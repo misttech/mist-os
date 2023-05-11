@@ -957,7 +957,7 @@ mod tests {
         expect_item: bool,
     ) {
         let result = gatt
-            .write_value(WriteValueRequest {
+            .write_value(&WriteValueRequest {
                 peer_id: Some(PEER_ID.into()),
                 handle: Some(handle),
                 offset: Some(0),
@@ -1492,7 +1492,7 @@ mod tests {
         encrypted_buf: Vec<u8>,
     ) -> String {
         let () = gatt
-            .write_value(WriteValueRequest {
+            .write_value(&WriteValueRequest {
                 peer_id: Some(id.into()),
                 handle: Some(KEY_BASED_PAIRING_CHARACTERISTIC_HANDLE),
                 offset: Some(0),

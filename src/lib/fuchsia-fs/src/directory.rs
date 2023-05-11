@@ -669,7 +669,7 @@ pub async fn remove_dir_recursive(
     root_dir
         .unlink(
             name,
-            fio::UnlinkOptions {
+            &fio::UnlinkOptions {
                 flags: Some(fio::UnlinkFlags::MUST_BE_DIRECTORY),
                 ..Default::default()
             },
@@ -699,7 +699,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                 }
                 _ => {}
             }
-            dir.unlink(&dirent.name, fio::UnlinkOptions::default())
+            dir.unlink(&dirent.name, &fio::UnlinkOptions::default())
                 .await
                 .map_err(|e| EnumerateError::Fidl("unlink", e))?
                 .map_err(|s| EnumerateError::Unlink(zx_status::Status::from_raw(s)))?;

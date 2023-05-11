@@ -24,7 +24,7 @@ async fn command(proxy: KeyboardProxy, keyboard: Keyboard) -> WatchOrSetResult {
     if settings == KeyboardSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set Keyboard to {:?}", keyboard)
@@ -71,7 +71,7 @@ mod test {
                 let _ = responder.send(&mut Ok(()));
             }
             KeyboardRequest::Watch { responder } => {
-                let _ = responder.send(KeyboardSettings::from(expected_keyboard));
+                let _ = responder.send(&KeyboardSettings::from(expected_keyboard));
             }
         });
 
@@ -137,7 +137,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             KeyboardRequest::Watch { responder } => {
-                let _ = responder.send(KeyboardSettings::from(expected_keyboard));
+                let _ = responder.send(&KeyboardSettings::from(expected_keyboard));
             }
         });
 

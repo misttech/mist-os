@@ -39,7 +39,7 @@ async fn set_then_get() -> Result<(), Error> {
         };
 
         intl_settings_client
-            .set(new_settings)
+            .set(&new_settings)
             .await
             .context("modify settings (FIDL)")?
             .map_err(|e| format_err!("{:?}", e))
@@ -77,7 +77,7 @@ async fn set_then_get() -> Result<(), Error> {
 
     // Teardown
     intl_settings_client
-        .set(original_settings)
+        .set(&original_settings)
         .await
         .context("restore original settings (FIDL)")?
         .map_err(|e| format_err!("{:?}", e))

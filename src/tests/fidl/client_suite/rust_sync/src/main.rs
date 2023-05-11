@@ -123,7 +123,7 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                 }
                 RunnerRequest::CallTwoWayTableRequest { target, request, responder } => {
                     let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-                    match client.two_way_table_request(request, zx::Time::INFINITE) {
+                    match client.two_way_table_request(&request, zx::Time::INFINITE) {
                         Ok(()) => responder
                             .send(&mut EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),
@@ -167,7 +167,7 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                 }
                 RunnerRequest::CallOneWayTableRequest { target, request, responder } => {
                     let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-                    match client.one_way_table_request(request) {
+                    match client.one_way_table_request(&request) {
                         Ok(()) => responder
                             .send(&mut EmptyResultClassification::Success(Empty))
                             .context("sending response failed"),

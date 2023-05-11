@@ -156,7 +156,7 @@ impl KeyboardService {
             let dispatches = cancel_events.map(|event| {
                 // See the note below around "Send the SYNC events to the newly focused client".
                 validate_key_event(&event);
-                subscriber.listener.on_key_event(event)
+                subscriber.listener.on_key_event(&event)
             });
 
             if let Err(e) = future::try_join_all(dispatches).await {
@@ -194,7 +194,7 @@ impl KeyboardService {
             // Since ui_input3::KeyEvent is a FIDL type there is no way to guarantee
             // its well-formedness at compile time.  Let's check here.
             validate_key_event(&event);
-            subscriber.listener.on_key_event(event)
+            subscriber.listener.on_key_event(&event)
         });
 
         if let Err(e) = future::try_join_all(dispatches).await {
@@ -388,7 +388,7 @@ impl KeyListenerStore {
                     let forwarded_event = event.clone();
                     let handled = subscriber
                         .listener
-                        .on_key_event(forwarded_event)
+                        .on_key_event(&forwarded_event)
                         .on_timeout(fasync::Time::after(DEFAULT_LISTENER_TIMEOUT), || {
                             tracing::info!("Key listener timeout! {:?}", subscriber.view_ref);
                             Ok(ui_input3::KeyEventStatus::NotHandled)

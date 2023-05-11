@@ -25,7 +25,7 @@ async fn test_manual_brightness() {
 
     let mut display_settings = DisplaySettings::default();
     display_settings.brightness_value = Some(CHANGED_BRIGHTNESS);
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
 
@@ -44,7 +44,7 @@ async fn test_auto_brightness() {
     let mut display_settings = DisplaySettings::default();
     display_settings.auto_brightness = Some(true);
     display_settings.adjusted_auto_brightness = Some(AUTO_BRIGHTNESS_LEVEL);
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
 
@@ -64,7 +64,7 @@ async fn test_light_mode() {
     // Test that if display is enabled, it is reflected.
     let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::Enable);
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
 
@@ -73,7 +73,7 @@ async fn test_light_mode() {
     // Test that if display is disabled, it is reflected.
     let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::Disable);
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
 
@@ -82,7 +82,7 @@ async fn test_light_mode() {
     // Test that if display is disabled immediately, it is reflected.
     let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::DisableImmediately);
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
 
@@ -103,7 +103,7 @@ async fn test_theme_type_light() {
 
     let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.theme, expected_theme);
@@ -127,7 +127,7 @@ async fn test_theme_type_light_theme_mode_empty() {
 
     let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.theme, expected_theme);
@@ -165,7 +165,7 @@ async fn test_theme_mode_auto() {
 
     let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.theme, expected_theme);
@@ -187,7 +187,7 @@ async fn test_theme_mode_auto_and_type_light() {
 
     let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
-    proxy.set(display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.theme, expected_theme);
@@ -212,11 +212,11 @@ async fn test_theme_mode_auto_preserves_previous_type() {
 
     let mut first_display_settings = DisplaySettings::default();
     first_display_settings.theme = first_incoming_theme;
-    proxy.set(first_display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&first_display_settings).await.expect("set completed").expect("set successful");
 
     let mut second_display_settings = DisplaySettings::default();
     second_display_settings.theme = second_incoming_theme;
-    proxy.set(second_display_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&second_display_settings).await.expect("set completed").expect("set successful");
 
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.theme, expected_theme);
@@ -253,7 +253,7 @@ async fn test_set_multiple_fields_success() {
         }),
         ..Default::default()
     };
-    proxy.set(settings.clone()).await.expect("set completed").expect("set successful");
+    proxy.set(&settings).await.expect("set completed").expect("set successful");
 
     let settings_result = proxy.watch().await.expect("watch completed");
     assert_eq!(settings_result, settings);
@@ -287,7 +287,7 @@ async fn test_set_multiple_fields_brightness(
         adjusted_auto_brightness,
         ..Default::default()
     };
-    let result = proxy.set(settings).await.expect("set completed");
+    let result = proxy.set(&settings).await.expect("set completed");
     if expect_success {
         assert!(result.is_ok());
         let settings = proxy.watch().await.expect("watch completed");

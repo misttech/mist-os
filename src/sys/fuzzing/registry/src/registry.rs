@@ -296,7 +296,7 @@ mod tests {
             .try_for_each(|request| async {
                 match request {
                     fuzz::ControllerRequest::GetStatus { responder } => {
-                        responder.send(fuzz::Status::default())
+                        responder.send(&fuzz::Status::default())
                     }
                     _ => unreachable!("unsupported request"),
                 }

@@ -188,7 +188,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                     .create_interface(
                         &mut port_id,
                         server_end,
-                        fnet_interfaces_admin::Options::default(),
+                        &fnet_interfaces_admin::Options::default(),
                     )
                     .context("call create interface")
                     .map_err(errors::Error::NonFatal)?;

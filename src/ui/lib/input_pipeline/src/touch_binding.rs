@@ -368,7 +368,7 @@ impl TouchBinding {
                             false => Some(fidl_input_report::TouchConfigurationInputMode::MouseCollection),
                         };
                 report.touch = Some(touch);
-                match self.device_proxy.set_feature_report(report).await? {
+                match self.device_proxy.set_feature_report(&report).await? {
                     Ok(()) => {
                         // TODO(https://fxbug.dev/105092): Remove log message.
                         tracing::info!("touchpad: set touchpad_enabled to {}", enable);
@@ -940,7 +940,7 @@ mod tests {
             async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(get_touchpad_device_descriptor(
+                        let _ = responder.send(&get_touchpad_device_descriptor(
                             true, /* has_mouse_descriptor */
                         ));
                     }
@@ -1015,7 +1015,7 @@ mod tests {
         let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
             match input_device_request {
                 fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(get_touchpad_device_descriptor(has_mouse_descriptor));
+                    let _ = responder.send(&get_touchpad_device_descriptor(has_mouse_descriptor));
                 }
                 fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
                     let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {
@@ -1060,7 +1060,7 @@ mod tests {
             async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(get_touchpad_device_descriptor(true));
+                        let _ = responder.send(&get_touchpad_device_descriptor(true));
                     }
                     fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
                         let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {

@@ -40,7 +40,7 @@ pub async fn get_typeface_info_detailed(
     font_provider: &fonts::ProviderProxy,
     request: fonts::TypefaceRequest,
 ) -> Result<TypefaceInfo, Error> {
-    let typeface = font_provider.get_typeface(request.clone()).await?;
+    let typeface = font_provider.get_typeface(&request).await?;
 
     assert!(
         typeface != fonts::TypefaceResponse::default(),

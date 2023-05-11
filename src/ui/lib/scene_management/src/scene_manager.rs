@@ -260,7 +260,7 @@ pub fn create_viewport_hanging_get(
     initial_spec: InjectorViewportSpec,
 ) -> Arc<Mutex<InjectorViewportHangingGet>> {
     let notify_fn: InjectorViewportChangeFn = Box::new(|viewport_spec, responder| {
-        if let Err(fidl_error) = responder.send((*viewport_spec).into()) {
+        if let Err(fidl_error) = responder.send(&(*viewport_spec).into()) {
             info!("Viewport hanging get notification, FIDL error: {}", fidl_error);
         }
         // TODO(fxbug.dev/87670): the HangingGet docs don't explain what value to return.

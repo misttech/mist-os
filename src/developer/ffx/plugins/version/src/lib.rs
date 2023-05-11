@@ -146,7 +146,7 @@ mod test {
                 match req {
                     DaemonRequest::GetVersionInfo { responder } => {
                         if succeed {
-                            responder.send(info).unwrap();
+                            responder.send(&info).unwrap();
                         } else {
                             return;
                         }

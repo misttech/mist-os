@@ -166,7 +166,7 @@ impl InputDevice {
                 Some(reader_server_end)
             }
             Ok(InputDeviceRequest::GetDescriptor { responder }) => {
-                match responder.send(descriptor.clone()) {
+                match responder.send(&descriptor) {
                     Ok(()) => None,
                     Err(e) => panic!("failed to send GetDescriptor response: {e}"),
                 }

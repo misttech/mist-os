@@ -150,7 +150,7 @@ async fn configure_interface(
             device.get_port_watcher(server_end)?;
             HangingGetStream::new(proxy, fhardware_network::PortWatcherProxy::watch)
         };
-        let mut port_id = loop {
+        let port_id = loop {
             let port_event = port_events.next().await.context("get port event")??;
             match port_event {
                 fhardware_network::DevicePortEvent::Existing(port_id)
@@ -187,9 +187,9 @@ async fn configure_interface(
             proxy
         };
         device_control.create_interface(
-            &mut port_id,
+            &port_id,
             server_end,
-            fnet_interfaces_admin::Options {
+            &fnet_interfaces_admin::Options {
                 name: Some(name.clone()),
                 metric: Some(DEFAULT_METRIC),
                 ..Default::default()

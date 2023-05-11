@@ -121,7 +121,7 @@ impl StreamDiagnostics for DiagnosticsProxy {
         iterator: fidl::endpoints::ServerEnd<ArchiveIteratorMarker>,
     ) -> Result<fidl_fuchsia_developer_ffx::DiagnosticsStreamDiagnosticsResult, anyhow::Error> {
         return Ok((self as &DiagnosticsProxy)
-            .stream_diagnostics(target, parameters, iterator)
+            .stream_diagnostics(target, &parameters, iterator)
             .await?);
     }
 }
@@ -500,7 +500,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         state
             .target_collection_proxy
             .open_target(
-                TargetQuery { string_matcher: Some(self.node_name.clone()), ..Default::default() },
+                &TargetQuery { string_matcher: Some(self.node_name.clone()), ..Default::default() },
                 server,
             )
             .await??;
@@ -596,7 +596,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
             }
         }
         let _ = connection.stream_diagnostics(
-            StreamParameters {
+            &StreamParameters {
                 data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
                 stream_mode: parameters.stream_mode.as_ref().map(|mode| match mode {
                     StreamMode::SnapshotAll => fidl_fuchsia_diagnostics::StreamMode::Snapshot,

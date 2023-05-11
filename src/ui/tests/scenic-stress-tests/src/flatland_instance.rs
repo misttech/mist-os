@@ -76,7 +76,7 @@ fn create_viewport(
         .create_viewport(
             &mut viewport_id,
             token,
-            flatland::ViewportProperties {
+            &flatland::ViewportProperties {
                 logical_size: Some(fmath::SizeU {
                     width: DISPLAY_WIDTH as u32,
                     height: DISPLAY_HEIGHT as u32,

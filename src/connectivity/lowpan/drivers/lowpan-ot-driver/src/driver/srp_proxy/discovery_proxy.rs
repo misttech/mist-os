@@ -175,7 +175,7 @@ impl DiscoveryProxy {
         }
 
         if let Err(err) =
-            subscriber.subscribe_to_host_name(name, Self::host_name_subscription_options(), client)
+            subscriber.subscribe_to_host_name(name, &Self::host_name_subscription_options(), client)
         {
             bail!("Unable to subscribe to {:?}({:?}): {:?}", name, name_local_domain, err);
         }
@@ -232,7 +232,7 @@ impl DiscoveryProxy {
                     .resolve_host_name(
                         name,
                         DEFAULT_RESOLVE_DURATION_NS,
-                        Self::host_name_resolution_options(),
+                        &Self::host_name_resolution_options(),
                     )
                     .map_err(anyhow::Error::from)
                     .and_then(move |host_addresses| async move {
@@ -300,7 +300,7 @@ impl DiscoveryProxy {
 
         if let Err(err) = subscriber.subscribe_to_service(
             service_name,
-            Self::service_subscription_options(),
+            &Self::service_subscription_options(),
             client,
         ) {
             bail!("Unable to subscribe to {:?}({:?}): {:?}", service_name, name_local_domain, err);

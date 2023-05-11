@@ -83,7 +83,7 @@ impl ServiceMap {
         &self,
         service_name: &str,
         chan: Channel,
-        connection_info: ConnectionInfo,
+        connection_info: &ConnectionInfo,
     ) -> Result<(), Error> {
         self.inner
             .lock()

@@ -412,7 +412,7 @@ fn inject_key_and_receive_keyboard_protocol_message(
         let mut handles = TestHandles::new().await?;
 
         let (was_handled, received_event) = future::join(
-            handles.injector_service.inject(event),
+            handles.injector_service.inject(&event),
             expect_key_event(&mut handles.listener_stream),
         )
         .await;

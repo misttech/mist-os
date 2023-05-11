@@ -73,7 +73,7 @@ impl<O: OutputSink> Controller<O> {
     pub async fn configure(&self, options: fuzz::Options) -> Result<()> {
         self.set_timeout(&options, None);
         let result =
-            self.proxy.configure(options).await.context("fuchsia.fuzzer/Controller.Configure")?;
+            self.proxy.configure(&options).await.context("fuchsia.fuzzer/Controller.Configure")?;
         result.map_err(|status| {
             anyhow!("fuchsia.fuzzer/Controller.Configure returned: ZX_ERR_{}", status)
         })

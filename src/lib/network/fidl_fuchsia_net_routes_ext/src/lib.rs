@@ -586,16 +586,10 @@ pub fn get_watcher<I: FidlRouteIpExt>(
     let IpInvariant(result) = I::map_ip::<GetWatcherInputs<'_, I>, _>(
         GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy },
         |GetWatcherInputs { watcher_server_end, state_proxy }| {
-            IpInvariant(
-                state_proxy
-                    .get_watcher_v4(watcher_server_end, fnet_routes::WatcherOptionsV4::default()),
-            )
+            IpInvariant(state_proxy.get_watcher_v4(watcher_server_end, &Default::default()))
         },
         |GetWatcherInputs { watcher_server_end, state_proxy }| {
-            IpInvariant(
-                state_proxy
-                    .get_watcher_v6(watcher_server_end, fnet_routes::WatcherOptionsV6::default()),
-            )
+            IpInvariant(state_proxy.get_watcher_v6(watcher_server_end, &Default::default()))
         },
     );
 

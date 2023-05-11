@@ -64,7 +64,7 @@ async fn test_keyboard_storage() {
         autorepeat: Some(fidl_fuchsia_settings::Autorepeat { delay: 2, period: 1 }),
         ..Default::default()
     };
-    keyboard_service.set(keyboard_settings).await.expect("set completed").expect("set successful");
+    keyboard_service.set(&keyboard_settings).await.expect("set completed").expect("set successful");
 
     // Verify the value we set is persisted in DeviceStorage.
     let retrieved_struct = store.get().await;

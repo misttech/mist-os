@@ -136,11 +136,11 @@ impl WifiConnect for WifiConnectImpl {
     async fn connect(&self, network_config: NetworkConfig) -> Result<(), Error> {
         let (client_controller, client_state_updates_request) = (self.get_client_controller)()?;
 
-        let mut network_id = network_config.id.clone().unwrap();
+        let network_id = network_config.id.clone().unwrap();
 
-        match client_controller.save_network(network_config).await? {
+        match client_controller.save_network(&network_config).await? {
             Ok(()) => {
-                let result = client_controller.connect(&mut network_id).await?;
+                let result = client_controller.connect(&network_id).await?;
                 if result == wlan_common::RequestStatus::Acknowledged {
                     Ok(())
                 } else {
@@ -249,7 +249,7 @@ mod tests {
                         responder.send(wlan_common::RequestStatus::Acknowledged).unwrap();
 
                         proxy
-                            .on_client_state_update(wlan_policy::ClientStateSummary {
+                            .on_client_state_update(&wlan_policy::ClientStateSummary {
                                 state: Some(wlan_policy::WlanClientState::ConnectionsEnabled),
                                 networks: Some(vec![wlan_policy::NetworkState {
                                     id: Some(network_id()),
@@ -262,7 +262,7 @@ mod tests {
                             .await
                             .expect("sending client state update");
                         proxy
-                            .on_client_state_update(wlan_policy::ClientStateSummary {
+                            .on_client_state_update(&wlan_policy::ClientStateSummary {
                                 state: Some(wlan_policy::WlanClientState::ConnectionsEnabled),
                                 networks: Some(vec![wlan_policy::NetworkState {
                                     id: Some(network_id()),
@@ -318,7 +318,7 @@ mod tests {
                         responder.send(wlan_common::RequestStatus::Acknowledged).unwrap();
 
                         proxy
-                            .on_client_state_update(wlan_policy::ClientStateSummary {
+                            .on_client_state_update(&wlan_policy::ClientStateSummary {
                                 state: Some(wlan_policy::WlanClientState::ConnectionsEnabled),
                                 networks: Some(vec![wlan_policy::NetworkState {
                                     id: Some(network_id()),
@@ -331,7 +331,7 @@ mod tests {
                             .await
                             .expect("sending client state update");
                         proxy
-                            .on_client_state_update(wlan_policy::ClientStateSummary {
+                            .on_client_state_update(&wlan_policy::ClientStateSummary {
                                 state: Some(wlan_policy::WlanClientState::ConnectionsEnabled),
                                 networks: Some(vec![wlan_policy::NetworkState {
                                     id: Some(network_id()),

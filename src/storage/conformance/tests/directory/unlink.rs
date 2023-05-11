@@ -32,7 +32,7 @@ async fn unlink_file_with_sufficient_rights() {
         .await;
 
         src_dir
-            .unlink("file.txt", fio::UnlinkOptions::default())
+            .unlink("file.txt", &fio::UnlinkOptions::default())
             .await
             .expect("unlink fidl failed")
             .expect("unlink failed");
@@ -68,7 +68,7 @@ async fn unlink_file_with_insufficient_rights() {
 
         assert_eq!(
             src_dir
-                .unlink("file.txt", fio::UnlinkOptions::default())
+                .unlink("file.txt", &fio::UnlinkOptions::default())
                 .await
                 .expect("unlink fidl failed")
                 .expect_err("unlink succeeded"),
@@ -93,7 +93,7 @@ async fn unlink_directory_with_sufficient_rights() {
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
-        dir.unlink("src", fio::UnlinkOptions::default())
+        dir.unlink("src", &fio::UnlinkOptions::default())
             .await
             .expect("unlink fidl failed")
             .expect("unlink failed");
@@ -114,7 +114,7 @@ async fn unlink_directory_with_insufficient_rights() {
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
         assert_eq!(
-            dir.unlink("src", fio::UnlinkOptions::default())
+            dir.unlink("src", &fio::UnlinkOptions::default())
                 .await
                 .expect("unlink fidl failed")
                 .expect_err("unlink succeeded"),
@@ -139,13 +139,13 @@ async fn unlink_must_be_directory() {
         ..Default::default()
     };
     test_dir
-        .unlink("dir", must_be_directory.clone())
+        .unlink("dir", &must_be_directory)
         .await
         .expect("unlink fidl failed")
         .expect("unlink dir failed");
     assert_eq!(
         test_dir
-            .unlink("file", must_be_directory)
+            .unlink("file", &must_be_directory)
             .await
             .expect("unlink fidl failed")
             .expect_err("unlink file succeeded"),

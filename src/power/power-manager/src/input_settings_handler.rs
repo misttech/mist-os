@@ -282,7 +282,7 @@ mod tests {
             self.pending_request
                 .take()
                 .unwrap()
-                .send(Self::generate_device_settings(enabled))
+                .send(&Self::generate_device_settings(enabled))
                 .expect("Failed to send mic state update to client");
 
             // Wait for the next hanging-get request to arrive so we can be sure the node has

@@ -177,7 +177,7 @@ async fn refresh_host(host: HostDevice, server: Arc<RwLock<HostRequestStream>>, 
     let refresh = host.refresh_test_host_info();
     let expect_fidl = expect_call(server, |_, e| match e {
         HostRequest::WatchState { responder } => {
-            responder.send(FidlHostInfo::from(info))?;
+            responder.send(&FidlHostInfo::from(info))?;
             Ok(())
         }
         _ => Err(format_err!("Unexpected!")),

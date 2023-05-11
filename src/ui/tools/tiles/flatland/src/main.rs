@@ -229,8 +229,8 @@ impl Service {
             })
             .expect("fidl error");
 
-        let mut transform_id = flatland::TransformId { value: id.into() };
-        let mut link_id = flatland::ContentId { value: id.into() };
+        let transform_id = flatland::TransformId { value: id.into() };
+        let link_id = flatland::ContentId { value: id.into() };
 
         // Compute initial size of tile.
         let tile_count: u32 = self.tiles.len().try_into().unwrap();
@@ -245,20 +245,18 @@ impl Service {
             create_proxy::<flatland::ChildViewWatcherMarker>()
                 .expect("failed to create ChildViewWatcher endpoints");
 
-        self.session.create_transform(&mut transform_id).expect("fidl error");
+        self.session.create_transform(&transform_id).expect("fidl error");
         self.session
             .create_viewport(
-                &mut link_id,
+                &link_id,
                 view_creation_tokens.viewport_creation_token,
-                link_properties,
+                &link_properties,
                 child_view_watcher_request,
             )
             .expect("fidl error");
-        self.session.set_content(&mut transform_id, &mut link_id).expect("fidl error");
+        self.session.set_content(&transform_id, &link_id).expect("fidl error");
 
-        self.session
-            .add_child(&mut ROOT_TRANSFORM_ID.clone(), &mut transform_id)
-            .expect("fidl error");
+        self.session.add_child(&ROOT_TRANSFORM_ID, &transform_id).expect("fidl error");
 
         self.next_id = self.next_id + 1;
         self.tiles.insert(id, Tile { url: url, focusable: true });
@@ -286,16 +284,14 @@ impl Service {
 
     fn remove_tile(&mut self, key: u32) {
         if self.tiles.remove_entry(&key).is_some() {
-            let mut transform_id = flatland::TransformId { value: key.into() };
-            let mut link_id = flatland::ContentId { value: key.into() };
+            let transform_id = flatland::TransformId { value: key.into() };
+            let link_id = flatland::ContentId { value: key.into() };
 
-            self.session
-                .remove_child(&mut ROOT_TRANSFORM_ID.clone(), &mut transform_id)
-                .expect("fidl error");
-            self.session.release_transform(&mut transform_id).expect("fidl error");
+            self.session.remove_child(&ROOT_TRANSFORM_ID, &transform_id).expect("fidl error");
+            self.session.release_transform(&transform_id).expect("fidl error");
 
             // When removing a tile, we don't intend to reparent it, so we drop the returned future.
-            let _ = self.session.release_viewport(&mut link_id);
+            let _ = self.session.release_viewport(&link_id);
 
             self.relayout();
         } else {
@@ -336,25 +332,21 @@ impl Service {
         let margin_i = margin as i32;
 
         for (i, (id, _tile)) in self.tiles.iter().enumerate() {
-            let mut transform_id = flatland::TransformId { value: id.clone().into() };
+            let transform_id = flatland::TransformId { value: id.clone().into() };
             let i: u32 = i.try_into().unwrap();
             let col = (i / column_count) as i32;
             let row = (i % column_count) as i32;
 
             let y: i32 = col * (row_height_i + margin_i) + margin_i;
             let x: i32 = row * (column_width_i + margin_i) + margin_i;
-            self.session
-                .set_translation(&mut transform_id, &mut fmath::Vec_ { x, y })
-                .expect("fidl error");
+            self.session.set_translation(&transform_id, &fmath::Vec_ { x, y }).expect("fidl error");
 
-            let mut link_id = flatland::ContentId { value: id.clone().into() };
+            let link_id = flatland::ContentId { value: id.clone().into() };
             let link_properties = flatland::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width: column_width, height: row_height }),
                 ..Default::default()
             };
-            self.session
-                .set_viewport_properties(&mut link_id, link_properties)
-                .expect("fidl error");
+            self.session.set_viewport_properties(&link_id, &link_properties).expect("fidl error");
         }
 
         self.pending_present = true;

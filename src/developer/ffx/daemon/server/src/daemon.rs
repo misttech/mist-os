@@ -226,7 +226,7 @@ impl DaemonProtocolProvider for Daemon {
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .connect(protocol_selector, server)
+            .connect(&protocol_selector, server)
             .await
             .context("FIDL connection")?
             .map_err(|e| anyhow!("{:#?}", e))
@@ -697,7 +697,7 @@ impl Daemon {
                 responder.send(true).context("error sending response")?;
             }
             DaemonRequest::GetVersionInfo { responder } => {
-                return responder.send(info.clone()).context("sending GetVersionInfo response");
+                return responder.send(info).context("sending GetVersionInfo response");
             }
             DaemonRequest::ConnectToProtocol { name, server_end, responder } => {
                 let name_for_analytics = name.clone();

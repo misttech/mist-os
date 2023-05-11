@@ -163,7 +163,7 @@ pub fn add_le_peer(
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
         Ok((local, remote)) => {
-            let fut = proxy.add_low_energy_peer(parameters, remote);
+            let fut = proxy.add_low_energy_peer(&parameters, remote);
             Either::Right(async {
                 let _ = fut
                     .await?
@@ -181,7 +181,7 @@ pub fn add_bredr_peer(
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
         Ok((local, remote)) => {
-            let fut = proxy.add_bredr_peer(parameters, remote);
+            let fut = proxy.add_bredr_peer(&parameters, remote);
             Either::Right(async {
                 let _ = fut
                     .await?

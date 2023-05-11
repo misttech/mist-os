@@ -45,9 +45,9 @@ impl ActorInstance {
             startup: Some(StartupMode::Lazy),
             ..Default::default()
         };
-        let mut collection = CollectionRef { name: ACTOR_COLLECTION_NAME.to_string() };
+        let collection = CollectionRef { name: ACTOR_COLLECTION_NAME.to_string() };
         realm_proxy
-            .create_child(&mut collection, decl, CreateChildArgs::default())
+            .create_child(&collection, &decl, CreateChildArgs::default())
             .await
             .context("Could not send FIDL request to Realm.CreateChild")?
             .map_err(|e| {
@@ -56,10 +56,10 @@ impl ActorInstance {
 
         let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>()
             .context("Could not create endpoints for exposed dir")?;
-        let mut child_ref =
+        let child_ref =
             ChildRef { name: name.clone(), collection: Some(ACTOR_COLLECTION_NAME.to_string()) };
         realm_proxy
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .context("Could not send FIDL request to Realm.BindChild")?
             .map_err(|e| {

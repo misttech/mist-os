@@ -464,7 +464,7 @@ impl ProjectSampler {
             project_spec.customer_id = Some(customer_id);
             project_spec.project_id = Some(project_id);
             metric_logger_factory
-                .create_metric_event_logger(project_spec, metrics_server_end)
+                .create_metric_event_logger(&project_spec, metrics_server_end)
                 .await?
                 .map_err(|e| format_err!("error response for project {}: {:?}", project_id, e))?;
             metric_loggers.insert(project_id, metric_logger_proxy);
@@ -479,7 +479,7 @@ impl ProjectSampler {
                     project_spec.customer_id = Some(customer_id);
                     project_spec.project_id = Some(metric_project_id);
                     metric_logger_factory
-                        .create_metric_event_logger(project_spec, metrics_server_end)
+                        .create_metric_event_logger(&project_spec, metrics_server_end)
                         .await?
                         .map_err(|e| format_err!("error response for project {} while creating metric logger {}: {:?}", project_id, metric_project_id, e))?;
                     metric_loggers.insert(metric_project_id, metric_logger_proxy);

@@ -351,7 +351,7 @@ async fn list_targets(query: Option<&str>, tc: &TargetCollectionProxy) -> Result
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc.list_targets(
-        TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
+        &TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
         reader,
     )?;
     let mut res = Vec::new();
@@ -1133,7 +1133,7 @@ async fn doctor_summary<W: Write>(
         match timeout(
             retry_delay,
             tc_proxy.open_target(
-                TargetQuery { string_matcher: target.nodename.clone(), ..Default::default() },
+                &TargetQuery { string_matcher: target.nodename.clone(), ..Default::default() },
                 target_server,
             ),
         )
@@ -1690,7 +1690,7 @@ mod test {
         spawn_local_stream_handler(move |req| async move {
             match req {
                 DaemonRequest::GetVersionInfo { responder } => {
-                    responder.send(daemon_version_info()).unwrap();
+                    responder.send(&daemon_version_info()).unwrap();
                 }
                 DaemonRequest::ConnectToProtocol { responder, name: _, server_end } => {
                     spawn_target_collection(
@@ -1757,7 +1757,7 @@ mod test {
         spawn_local_stream_handler(move |req| async move {
             match req {
                 DaemonRequest::GetVersionInfo { responder } => {
-                    responder.send(daemon_version_info()).unwrap();
+                    responder.send(&daemon_version_info()).unwrap();
                 }
                 DaemonRequest::ConnectToProtocol { name: _, server_end, responder } => {
                     spawn_target_collection(
@@ -1806,7 +1806,7 @@ mod test {
                 let nodename = if has_nodename { Some(NODENAME.to_string()) } else { None };
                 match req {
                     DaemonRequest::GetVersionInfo { responder } => {
-                        responder.send(daemon_version_info()).unwrap();
+                        responder.send(&daemon_version_info()).unwrap();
                     }
                     DaemonRequest::ConnectToProtocol { name: _, server_end, responder } => {
                         let nodename = nodename.clone();
@@ -1912,7 +1912,7 @@ mod test {
         spawn_local_stream_handler(move |req| async move {
             match req {
                 DaemonRequest::GetVersionInfo { responder } => {
-                    responder.send(daemon_version_info()).unwrap();
+                    responder.send(&daemon_version_info()).unwrap();
                 }
                 DaemonRequest::ConnectToProtocol { name: _, server_end: _, responder } => {
                     // Do nothing with the server_end.

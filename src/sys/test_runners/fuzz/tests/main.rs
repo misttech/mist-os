@@ -26,7 +26,7 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<()>
     let (controller, log_task) = connect(&fuzz_manager).await;
     let options = fuzz::Options { seed: Some(1), ..Default::default() };
     let response = controller
-        .configure(options)
+        .configure(&options)
         .await
         .unwrap_or_else(|e| panic!("{}: {:?}", controller_name("Configure"), e));
     assert!(response.is_ok());
@@ -221,7 +221,7 @@ async fn test_reconnect() -> Result<()> {
     let test1 = || async move {
         let options = fuzz::Options { dictionary_level: Some(13), ..Default::default() };
         let response =
-            controller1.configure(options).await.context(controller_name("Configure"))?;
+            controller1.configure(&options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)
     };
     let test_result1 = test1().await;
@@ -263,7 +263,8 @@ async fn test_configure() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let options = fuzz::Options { max_input_size: Some(1024), ..Default::default() };
-        let response = controller.configure(options).await.context(controller_name("Configure"))?;
+        let response =
+            controller.configure(&options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)?;
 
         let options = controller.get_options().await.context(controller_name("GetOptions"))?;
@@ -295,7 +296,8 @@ async fn test_fuzz_until_runs() -> Result<()> {
             max_input_size: Some(4),
             ..Default::default()
         };
-        let response = controller.configure(options).await.context(controller_name("Configure"))?;
+        let response =
+            controller.configure(&options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)?;
         let (client_end, stream) = create_request_stream::<fuzz::MonitorMarker>()?;
         controller.add_monitor(client_end).await.context(controller_name("AddMonitor"))?;

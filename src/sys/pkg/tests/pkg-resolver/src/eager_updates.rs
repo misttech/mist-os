@@ -89,7 +89,7 @@ async fn test_empty_eager_config() {
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let (package, _resolved_context) = env
         .resolve_package(format!("fuchsia-pkg://test/{}", package_name).as_str())
@@ -226,7 +226,7 @@ async fn test_eager_resolve_package_while_updating() {
     let cup_proxy = env.proxies.cup.clone();
     let cup_write_task = fasync::Task::spawn(async move {
         cup_proxy
-            .write(&mut fpkg::PackageUrl { url: new_pkg_url.to_string() }, new_cup_data.into())
+            .write(&mut fpkg::PackageUrl { url: new_pkg_url.to_string() }, &new_cup_data.into())
             .await
             .unwrap()
             .unwrap()

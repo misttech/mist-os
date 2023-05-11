@@ -36,7 +36,7 @@ impl watch::Responder<KeyboardSettings, zx::Status> for KeyboardWatchResponder {
     fn respond(self, response: Result<KeyboardSettings, zx::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);
@@ -154,7 +154,7 @@ mod tests {
     async fn try_from_set_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
             .expect("should be able to create proxy");
-        let _fut = proxy.set(KeyboardSettings {
+        let _fut = proxy.set(&KeyboardSettings {
             keymap: Some(fidl_fuchsia_input::KeymapId::FrAzerty),
             ..Default::default()
         });

@@ -224,7 +224,7 @@ mod tests {
             ..Default::default()
         };
 
-        stream_config.create_ring_buffer(format, server).expect("ring buffer error");
+        stream_config.create_ring_buffer(&format, server).expect("ring buffer error");
         let props2 = match exec.run_until_stalled(&mut ring_buffer.get_properties()) {
             Poll::Ready(Ok(v)) => v,
             x => panic!("expected get_properties to be ready ok: {x:?}"),

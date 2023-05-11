@@ -2963,7 +2963,7 @@ mod tests {
                 .send_msg(
                     None,
                     &body,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
@@ -3175,7 +3175,7 @@ mod tests {
                 .send_msg(
                     Some(&mut A::create(A::REMOTE_ADDR, 200)),
                     &body,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
@@ -3221,7 +3221,7 @@ mod tests {
                 .send_msg(
                     Some(&mut A::create(A::LOCAL_ADDR, 200)),
                     &body,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
@@ -3471,7 +3471,7 @@ mod tests {
                 .send_msg(
                     None,
                     &body,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
@@ -3481,7 +3481,7 @@ mod tests {
         );
         let mut invalid_addr = A::create(A::REMOTE_ADDR, 0);
         assert_eq!(
-            socket.send_msg(Some(&mut invalid_addr), &body, fposix_socket::DatagramSocketSendControlData::default(), fposix_socket::SendMsgFlags::empty()).await.unwrap().expect_err(
+            socket.send_msg(Some(&mut invalid_addr), &body, &fposix_socket::DatagramSocketSendControlData::default(), fposix_socket::SendMsgFlags::empty()).await.unwrap().expect_err(
                 "writing to an invalid address (port 0) should fail with EINVAL instead of EPIPE"
             ),
             fposix::Errno::Einval,
@@ -3557,7 +3557,7 @@ mod tests {
                 .send_msg(
                     Some(&mut addr),
                     &buf,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty(),
                 )
                 .await
@@ -3644,7 +3644,7 @@ mod tests {
                 .send_msg(
                     None,
                     DATA,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
@@ -3734,7 +3734,7 @@ mod tests {
                 .send_msg(
                     Some(&mut A::create(mcast_addr, PORT)),
                     DATA,
-                    fposix_socket::DatagramSocketSendControlData::default(),
+                    &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await

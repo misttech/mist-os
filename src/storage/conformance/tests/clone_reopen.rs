@@ -170,7 +170,7 @@ async fn reopen_file_unsupported() {
 
     // fuchsia.io/Node.Reopen
     let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.reopen(fio::RightsRequest::default(), reopen_server).unwrap();
+    file_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
     assert_matches!(
         reopen_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -188,7 +188,7 @@ async fn reopen_file_node_reference_unsupported() {
 
     // fuchsia.io/Node.Reopen
     let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.reopen(fio::RightsRequest::default(), reopen_server).unwrap();
+    file_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
     assert_matches!(
         reopen_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -205,7 +205,7 @@ async fn reopen_directory_unsupported() {
 
     // fuchsia.io/Node.Reopen
     let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.reopen(fio::RightsRequest::default(), reopen_server).unwrap();
+    dir_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
     assert_matches!(
         reopen_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -222,7 +222,7 @@ async fn reopen_directory_node_reference_unsupported() {
 
     // fuchsia.io/Node.Reopen
     let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.reopen(fio::RightsRequest::default(), reopen_server).unwrap();
+    dir_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
     assert_matches!(
         reopen_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

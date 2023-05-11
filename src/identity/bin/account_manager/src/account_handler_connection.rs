@@ -102,7 +102,7 @@ impl AccountHandlerConnection for AccountHandlerConnectionImpl {
         };
 
         realm
-            .create_child(&collection_ref, child_decl, CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
             .await
             .map_err(|err| {
                 warn!("Failed to create account_handler component instance: {:?}", err);

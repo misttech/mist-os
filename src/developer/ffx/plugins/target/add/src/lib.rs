@@ -42,7 +42,7 @@ pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand
     let (client, server) = fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy.add_target(
         &mut addr,
-        ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
+        &ffx::AddTargetConfig { verify_connection: Some(!cmd.nowait), ..Default::default() },
         client,
     )?;
     let mut stream = server.into_stream()?;

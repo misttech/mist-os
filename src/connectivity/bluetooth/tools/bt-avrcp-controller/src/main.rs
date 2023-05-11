@@ -203,7 +203,7 @@ async fn set_player_application_settings<'a>(
     let mut settings = fidl_avrcp::PlayerApplicationSettings::default();
     settings.equalizer = Some(fidl_avrcp::Equalizer::Off);
 
-    match controller.set_player_application_settings(settings).await? {
+    match controller.set_player_application_settings(&settings).await? {
         Ok(set_settings) => Ok(format!("Set settings with: {:?}", set_settings)),
         Err(e) => Err(format_err!("Error in set settings {:?}", e)),
     }

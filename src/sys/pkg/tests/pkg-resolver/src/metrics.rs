@@ -69,7 +69,7 @@ async fn verify_resolve_emits_cobalt_events_with_metric_id(
     let served_repository = served_repository.start().unwrap();
     let repo_url = "fuchsia-pkg://example.com".parse().unwrap();
     let config = served_repository.make_repo_config(repo_url);
-    let () = env.proxies.repo_manager.add(config.clone().into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
 
     assert_eq!(
         env.resolve_package(&format!("fuchsia-pkg://example.com/{}", pkg.name())).await.map(|_| ()),
@@ -179,7 +179,7 @@ async fn resolve_success_regular() {
     let served_repository = served_repository.start().unwrap();
     let repo_url = "fuchsia-pkg://example.com".parse().unwrap();
     let config = served_repository.make_repo_config(repo_url);
-    let () = env.proxies.repo_manager.add(config.clone().into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
 
     assert_eq!(
         env.resolve_package(&format!("fuchsia-pkg://example.com/{}", pkg.name())).await.map(|_| ()),
@@ -226,7 +226,7 @@ async fn resolve_duration_success() {
     let served_repository = served_repository.start().unwrap();
     let repo_url = "fuchsia-pkg://example.com".parse().unwrap();
     let config = served_repository.make_repo_config(repo_url);
-    let () = env.proxies.repo_manager.add(config.clone().into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
 
     assert_eq!(
         env.resolve_package(&format!("fuchsia-pkg://example.com/{}", pkg.name())).await.map(|_| ()),

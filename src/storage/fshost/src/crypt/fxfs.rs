@@ -185,7 +185,7 @@ impl CryptService {
         let realm_proxy = connect_to_protocol::<RealmMarker>()?;
 
         realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await?
             .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
 

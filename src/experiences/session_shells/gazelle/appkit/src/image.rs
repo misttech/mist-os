@@ -28,13 +28,13 @@ impl Image {
     pub(crate) fn new(
         image_data: ImageData,
         flatland: ui_comp::FlatlandProxy,
-        mut content_id: ui_comp::ContentId,
+        content_id: ui_comp::ContentId,
     ) -> Result<Image, Error> {
         flatland.create_image(
-            &mut content_id,
+            &content_id,
             image_data.import_token,
             image_data.vmo_index,
-            ui_comp::ImageProperties {
+            &ui_comp::ImageProperties {
                 size: Some(fmath::SizeU { width: image_data.width, height: image_data.height }),
                 ..Default::default()
             },

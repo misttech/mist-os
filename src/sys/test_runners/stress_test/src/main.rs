@@ -95,7 +95,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                         err: Some(stderr_server),
                         ..Default::default()
                     };
-                    listener.on_test_case_started(invocation, std_handles, server_end)?;
+                    listener.on_test_case_started(&invocation, std_handles, server_end)?;
 
                     let result = if let Err(e) = test.clone().start().await {
                         if let Err(status) = stderr_client.write(e.to_string().as_bytes()) {
@@ -109,7 +109,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                         ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
                     };
 
-                    case_listener.finished(result)?;
+                    case_listener.finished(&result)?;
                 }
                 listener.on_finished()?;
             }

@@ -41,7 +41,7 @@ fn packet_forwarder<'a>(
 async fn initiate_connect(
     client_controller: &fidl_policy::ClientControllerProxy,
     mut update_stream: fidl_policy::ClientStateUpdatesRequestStream,
-    config: &mut fidl_policy::NetworkIdentifier,
+    config: &fidl_policy::NetworkIdentifier,
     sender: oneshot::Sender<()>,
 ) {
     // Issue the connect request.
@@ -73,16 +73,16 @@ async fn verify_client_connects_to_ap(
     .ssid(&AP_SSID);
 
     // The credentials need to be stored before attempting to connect.
+    let network_config = fidl_policy::NetworkConfig::from(network_config);
     client_controller
-        .save_network(fidl_policy::NetworkConfig::from(network_config.clone()))
+        .save_network(&network_config)
         .await
         .expect("sending save network request")
         .expect("saving network config.");
 
-    let network_config = fidl_policy::NetworkConfig::from(network_config);
-    let mut network_id = network_config.id.unwrap();
+    let network_id = network_config.id.unwrap();
 
-    let connect_fut = initiate_connect(&client_controller, update_stream, &mut network_id, sender);
+    let connect_fut = initiate_connect(&client_controller, update_stream, &network_id, sender);
     pin_mut!(connect_fut);
 
     let client_fut = client_helper.run_until_complete_or_timeout(

@@ -14,7 +14,7 @@ use {
 async fn main() {
     // Create the dynamic child
     let realm = connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
-    let mut collection_ref = fdecl::CollectionRef { name: String::from("coll") };
+    let collection_ref = fdecl::CollectionRef { name: String::from("coll") };
     let child_decl = fdecl::Child {
         name: Some(String::from("storage_user")),
         url: Some(String::from("#meta/storage_user.cm")),
@@ -24,17 +24,17 @@ async fn main() {
     };
 
     realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();
 
     // Start child
-    let mut child_ref =
+    let child_ref =
         fdecl::ChildRef { name: "storage_user".to_string(), collection: Some("coll".to_string()) };
     let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-    realm.open_exposed_dir(&mut child_ref, server_end).await.unwrap().unwrap();
+    realm.open_exposed_dir(&child_ref, server_end).await.unwrap().unwrap();
     let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(
         &exposed_dir,
     )
@@ -51,7 +51,7 @@ async fn main() {
         .unwrap();
 
     // Destroy the child
-    realm.destroy_child(&mut child_ref).await.unwrap().unwrap();
+    realm.destroy_child(&child_ref).await.unwrap().unwrap();
 
     // Expect the dynamic child to be destroyed
     EventMatcher::ok()

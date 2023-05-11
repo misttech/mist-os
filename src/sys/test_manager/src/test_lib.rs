@@ -115,7 +115,7 @@ impl TestBuilder {
 
     pub fn set_scheduling_options(&self, accumulate_debug_data: bool) -> Result<(), Error> {
         self.proxy
-            .with_scheduling_options(ftest_manager::SchedulingOptions {
+            .with_scheduling_options(&ftest_manager::SchedulingOptions {
                 accumulate_debug_data: Some(accumulate_debug_data),
                 ..Default::default()
             })
@@ -130,7 +130,7 @@ impl TestBuilder {
     ) -> Result<SuiteRunInstance, Error> {
         let (controller_proxy, controller) =
             fidl::endpoints::create_proxy().context("Cannot create proxy")?;
-        self.proxy.add_suite(test_url, run_options, controller)?;
+        self.proxy.add_suite(test_url, &run_options, controller)?;
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
     }
 
@@ -150,7 +150,7 @@ impl TestBuilder {
             offers,
             test_collection,
             test_url,
-            run_options,
+            &run_options,
             controller,
         )?;
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })

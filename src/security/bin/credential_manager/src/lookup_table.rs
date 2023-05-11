@@ -346,7 +346,7 @@ mod test {
         .await
         .unwrap();
         for entry in fuchsia_fs::directory::readdir(&child_dir).await.unwrap() {
-            child_dir.unlink(&entry.name, fio::UnlinkOptions::default()).await.unwrap().unwrap();
+            child_dir.unlink(&entry.name, &fio::UnlinkOptions::default()).await.unwrap().unwrap();
         }
 
         // Ensure that now we have an error since the label directory is empty.

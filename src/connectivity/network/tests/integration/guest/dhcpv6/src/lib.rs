@@ -67,7 +67,7 @@ async fn gets_dns_servers(name: &str) {
         .expect("create fuchsia.net.dhcpv6/Client client and server ends");
     let () = client_provider
         .new_client(
-            fnet_dhcpv6::NewClientParams {
+            &fnet_dhcpv6::NewClientParams {
                 interface_id: Some(iface.id()),
                 address: Some(fnet::Ipv6SocketAddress {
                     address: fnet::Ipv6Address { addr: addr.ipv6_bytes() },
@@ -251,7 +251,7 @@ fn start_dhcpv6_client(
         .expect("create fuchsia.net.dhcpv6/Client client and server ends");
     let () = client_provider
         .new_client(
-            fnet_dhcpv6::NewClientParams {
+            &fnet_dhcpv6::NewClientParams {
                 interface_id: Some(interface_id),
                 address: Some(fnet::Ipv6SocketAddress {
                     address: fnet::Ipv6Address { addr: addr.ipv6_bytes() },

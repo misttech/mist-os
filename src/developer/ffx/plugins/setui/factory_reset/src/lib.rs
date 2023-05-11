@@ -34,7 +34,7 @@ async fn command(
     if settings == FactoryResetSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set factory_reset to {:?}", settings)
@@ -122,7 +122,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             FactoryResetRequest::Watch { responder } => {
-                let _ = responder.send(FactoryResetSettings {
+                let _ = responder.send(&FactoryResetSettings {
                     is_local_reset_allowed: expected_is_local_reset_allowed,
                     ..Default::default()
                 });

@@ -149,13 +149,13 @@ impl Server {
                 debug!("Received profile get request");
                 match self.get_profile() {
                     Some(profile) => {
-                        responder.send(profile).context("Error sending response")?;
+                        responder.send(&profile).context("Error sending response")?;
                         debug!("Sent profile");
                     }
                     None => {
                         error!("Profile not initialized");
                         responder
-                            .send(Profile {
+                            .send(&Profile {
                                 locales: None,
                                 time_zones: None,
                                 calendars: None,

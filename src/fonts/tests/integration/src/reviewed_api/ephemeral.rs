@@ -42,7 +42,7 @@ async fn test_ephemeral_get_typeface(factory: &ProviderFactory) -> Result<(), Er
         ..Default::default()
     };
 
-    let response = font_provider.get_typeface(request).await?;
+    let response = font_provider.get_typeface(&request).await?;
 
     assert!(response.buffer.is_some(), "{:?}", response);
     assert_eq!(response.buffer_id.unwrap(), 0, "{:?}", response);

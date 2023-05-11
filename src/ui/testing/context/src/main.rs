@@ -88,7 +88,7 @@ async fn run_context_server(
                 let dimensions =
                     display_metrics.extent_in_px.expect("display metrics missing dimensions");
                 responder
-                    .send(ui_test_context::ContextGetDisplayDimensionsResponse {
+                    .send(&ui_test_context::ContextGetDisplayDimensionsResponse {
                         width_in_physical_px: Some(dimensions.width),
                         height_in_physical_px: Some(dimensions.height),
                         ..Default::default()

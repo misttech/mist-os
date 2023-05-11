@@ -133,7 +133,7 @@ impl HostArchiveReader {
 
         let (client, server) = fuchsia_async::emulated_handle::Socket::create_stream();
 
-        let _ = accessor.stream_diagnostics(params, server).await.map_err(|s| {
+        let _ = accessor.stream_diagnostics(&params, server).await.map_err(|s| {
             Error::IOError(
                 "call diagnostics_proxy".into(),
                 anyhow!("failure setting up diagnostics stream: {:?}", s),

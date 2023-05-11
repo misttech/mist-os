@@ -131,14 +131,14 @@ mod test {
         let deallocation_stack_trace =
             StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 
-        client.set_process_info(SamplerSetProcessInfoRequest {
+        client.set_process_info(&SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map),
             ..Default::default()
         })?;
-        client.record_allocation(0x100, allocation_stack_trace.clone(), 100)?;
-        client.record_allocation(0x200, allocation_stack_trace, 1000)?;
-        client.record_deallocation(0x100, deallocation_stack_trace)?;
+        client.record_allocation(0x100, &allocation_stack_trace, 100)?;
+        client.record_allocation(0x200, &allocation_stack_trace, 1000)?;
+        client.record_deallocation(0x100, &deallocation_stack_trace)?;
         drop(client);
 
         let (process_name, profile) = profile_future.await?;
@@ -187,7 +187,7 @@ mod test {
             },
         ];
 
-        client.set_process_info(SamplerSetProcessInfoRequest {
+        client.set_process_info(&SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map),
             ..Default::default()
@@ -238,12 +238,12 @@ mod test {
             },
         ];
 
-        client.set_process_info(SamplerSetProcessInfoRequest {
+        client.set_process_info(&SamplerSetProcessInfoRequest {
             process_name: Some("test process".to_string()),
             module_map: Some(module_map.clone()),
             ..Default::default()
         })?;
-        client.set_process_info(SamplerSetProcessInfoRequest {
+        client.set_process_info(&SamplerSetProcessInfoRequest {
             process_name: Some("other test process".to_string()),
             module_map: Some(module_map),
             ..Default::default()
@@ -266,7 +266,7 @@ mod test {
         let allocation_stack_trace =
             StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
 
-        client.record_allocation(0x100, allocation_stack_trace, 100)?;
+        client.record_allocation(0x100, &allocation_stack_trace, 100)?;
         drop(client);
 
         let (process_name, profile) = profile_future.await?;
@@ -284,7 +284,7 @@ mod test {
 
         let stack_trace = StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 
-        client.record_deallocation(0x100, stack_trace)?;
+        client.record_deallocation(0x100, &stack_trace)?;
         drop(client);
 
         let (process_name, profile) = profile_future.await?;

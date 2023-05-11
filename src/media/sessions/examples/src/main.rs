@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
         .context("Connecting to publisher.")?
         .publish(
             player_client_end,
-            PlayerRegistration {
+            &PlayerRegistration {
                 domain: Some("domain://example".to_string()),
                 ..Default::default()
             },
@@ -139,7 +139,7 @@ async fn main() -> Result<()> {
 
         if staged.is_some() && hanging_get.is_some() {
             println!("Sending the session service an update.");
-            hanging_get.take().unwrap().send(staged.take().unwrap())?;
+            hanging_get.take().unwrap().send(&staged.take().unwrap())?;
         }
     }
     println!("Channel to session service closed.");

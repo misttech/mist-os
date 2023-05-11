@@ -103,7 +103,7 @@ async fn set_dnd(
     let mut dnd_settings = DoNotDisturbSettings::default();
     dnd_settings.user_initiated_do_not_disturb = user_dnd;
     dnd_settings.night_mode_initiated_do_not_disturb = night_mode_dnd;
-    dnd_proxy.set(dnd_settings).await.expect("set completed").expect("set successful");
+    dnd_proxy.set(&dnd_settings).await.expect("set completed").expect("set successful");
 }
 
 async fn verify_dnd_watch(dnd_proxy: &DoNotDisturbProxy, expected_dnd: DoNotDisturbInfo) {

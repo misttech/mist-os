@@ -429,7 +429,7 @@ impl<T: Driver> ServeTo<DeviceRequestStream> for T {
                             None => Err(format_err!("watch_device_state stream ended early")),
                         })
                         .and_then(|response| {
-                            ready(responder.unwrap().send(response).map_err(Error::from))
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in watch_device_state request")?;
@@ -486,7 +486,7 @@ impl<T: Driver> ServeTo<DeviceExtraRequestStream> for T {
                             None => Err(format_err!("Device combined state stream ended early")),
                         })
                         .and_then(|response| {
-                            ready(responder.unwrap().send(response).map_err(Error::from))
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in watch_identity request")?;
@@ -739,7 +739,7 @@ impl<T: Driver> ServeTo<TelemetryProviderRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_telemetry()
                         .err_into::<Error>()
-                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_telemetry_info request")?;
                 }
@@ -961,7 +961,7 @@ impl<T: Driver> ServeTo<DeviceTestRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_mac_address_filter_settings()
                         .err_into::<Error>()
-                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_address_filter_settings request")?;
                 }
@@ -1144,7 +1144,7 @@ impl<T: Driver> ServeTo<CountersRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_counters()
                         .err_into::<Error>()
-                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in get_counters request")?;
                 }
@@ -1152,7 +1152,7 @@ impl<T: Driver> ServeTo<CountersRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.reset_counters()
                         .err_into::<Error>()
-                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in reset_counters request")?;
                 }
@@ -1193,7 +1193,7 @@ impl<T: Driver> ServeTo<FeatureRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_feature_config()
                         .err_into::<Error>()
-                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
                         .await
                         .context("error in GetFeatureConfig request")?;
                 }
@@ -1382,7 +1382,7 @@ mod tests {
             let (client_ep, server_ep) = create_endpoints::<EnergyScanResultStreamMarker>();
             let params = EnergyScanParameters::default();
 
-            assert_matches!(proxy.start_energy_scan(params, server_ep), Ok(()));
+            assert_matches!(proxy.start_energy_scan(&params, server_ep), Ok(()));
 
             let scanner = client_ep.into_proxy().unwrap();
             let mut results = vec![];
@@ -1420,7 +1420,7 @@ mod tests {
             let (client_ep, server_ep) = create_endpoints::<BeaconInfoStreamMarker>();
             let params = NetworkScanParameters::default();
 
-            assert_matches!(proxy.start_network_scan(params, server_ep), Ok(()));
+            assert_matches!(proxy.start_network_scan(&params, server_ep), Ok(()));
 
             let scanner = client_ep.into_proxy().unwrap();
             let mut results = vec![];

@@ -86,9 +86,11 @@ impl SuiteServer for TestServer {
         let num_parallel =
             Self::get_parallel_count(run_options.parallel.unwrap_or(PARALLEL_DEFAULT));
         let invocations = stream::iter(invocations);
+        let run_options = &run_options;
+        let test_component = &test_component;
         invocations
             .map(Ok)
-            .try_for_each_concurrent(num_parallel, |invocation| async {
+            .try_for_each_concurrent(num_parallel, |invocation| async move {
                 let test = invocation.name.as_ref().ok_or(RunTestError::TestCaseName)?.to_string();
                 debug!("Running test {}", test);
 
@@ -107,7 +109,7 @@ impl SuiteServer for TestServer {
 
                 run_listener
                     .on_test_case_started(
-                        invocation,
+                        &invocation,
                         ftest::StdHandles {
                             out: Some(stdout_client),
                             err: Some(stderr_client),
@@ -123,7 +125,7 @@ impl SuiteServer for TestServer {
                 match self
                     .run_test(
                         &test,
-                        &run_options,
+                        run_options,
                         test_component.clone(),
                         &mut test_stdout,
                         &mut test_stderr,
@@ -131,12 +133,12 @@ impl SuiteServer for TestServer {
                     .await
                 {
                     Ok(result) => {
-                        case_listener_proxy.finished(result).map_err(RunTestError::SendFinish)?;
+                        case_listener_proxy.finished(&result).map_err(RunTestError::SendFinish)?;
                     }
                     Err(error) => {
                         error!("failed to run test '{}'. {}", test, error);
                         case_listener_proxy
-                            .finished(ftest::Result_ {
+                            .finished(&ftest::Result_ {
                                 status: Some(ftest::Status::Failed),
                                 ..Default::default()
                             })
@@ -727,7 +729,7 @@ mod tests {
         .detach();
 
         suite_proxy
-            .run(&invocations, run_options, run_listener_client)
+            .run(&invocations, &run_options, run_listener_client)
             .context("cannot call run")?;
 
         collect_listener_event(run_listener).await.context("Failed to collect results")

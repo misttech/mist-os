@@ -83,7 +83,7 @@ mod tests {
                 let (_client_end, server_end) = create_endpoints::<ClientMarker>();
                 client_provider_proxy
                     .new_client(
-                        NewClientParams {
+                        &NewClientParams {
                             interface_id: Some(interface_id),
                             address: Some(fidl_socket_addr_v6!("[fe01::1:2]:546")),
                             config: Some(ClientConfig {

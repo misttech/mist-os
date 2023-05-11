@@ -21,7 +21,7 @@ pub async fn launch_impl<W: std::io::Write>(
 ) -> Result<()> {
     writeln!(writer, "Launching session: {}", cmd.url)?;
     let config = LaunchConfiguration { session_url: Some(cmd.url), ..Default::default() };
-    launcher_proxy.launch(config).await?.map_err(|err| format_err!("{:?}", err))
+    launcher_proxy.launch(&config).await?.map_err(|err| format_err!("{:?}", err))
 }
 
 #[cfg(test)]

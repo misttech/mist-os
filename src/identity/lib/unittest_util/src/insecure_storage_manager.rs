@@ -153,7 +153,7 @@ impl StorageManager for InsecureKeyDirectoryStorageManager {
 
                 let remove_result = self
                     .managed_dir
-                    .unlink(KEY_FILE_PATH, fio::UnlinkOptions::default())
+                    .unlink(KEY_FILE_PATH, &fio::UnlinkOptions::default())
                     .await
                     .map_err(|e| {
                         AccountManagerError::new(ApiError::Resource)

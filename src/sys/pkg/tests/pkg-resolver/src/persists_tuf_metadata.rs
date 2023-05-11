@@ -65,7 +65,7 @@ async fn test_resolve_persisted_package_succeeds() {
     let repo_config = served_repository
         .make_repo_config_with_persistent_storage("fuchsia-pkg://fuchsia.com".try_into().unwrap());
     // System cache fallback is only triggered for fuchsia.com repos.
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Try to resolve again, make sure we see the new version.
     let (package_dir, _resolved_context) = env.resolve_package(&pkg_url).await.unwrap();
@@ -129,7 +129,7 @@ async fn test_resolve_empty_config_fails() {
     let repo_config = served_repository
         .make_repo_config_with_persistent_storage("fuchsia-pkg://fuchsia.com".try_into().unwrap());
     // System cache fallback is only triggered for fuchsia.com repos.
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Try to resolve again. We expect to resolve the cached version because the pkg-resolver
     // configuration does not allow us to instantiate a persisted repository.
@@ -197,7 +197,7 @@ async fn test_resolve_dynamic_disabled_fails() {
     let _ = env
         .proxies
         .repo_manager
-        .add(repo_config.into())
+        .add(&repo_config.into())
         .await
         .unwrap()
         .expect_err("can't set repo config");
@@ -261,7 +261,7 @@ async fn test_resolve_no_config_fails() {
     let repo_config = served_repository
         .make_repo_config_with_persistent_storage("fuchsia-pkg://fuchsia.com".try_into().unwrap());
     // System cache fallback is only triggered for fuchsia.com repos.
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Try to resolve again. We expect to resolve the cached version because the pkg-resolver
     // configuration does not allow us to instantiate a persisted repository.

@@ -63,8 +63,8 @@ async fn dynamic_child() {
     lifecycle_controller
         .create_instance(
             ".",
-            &mut fdecl::CollectionRef { name: "servers".to_string() },
-            fdecl::Child {
+            &fdecl::CollectionRef { name: "servers".to_string() },
+            &fdecl::Child {
                 name: Some("dynamic_echo_server".to_string()),
                 url: Some("#meta/echo_server.cm".to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
@@ -122,7 +122,7 @@ async fn dynamic_child() {
     lifecycle_controller
         .destroy_instance(
             ".",
-            &mut fdecl::ChildRef {
+            &fdecl::ChildRef {
                 name: "dynamic_echo_server".to_string(),
                 collection: Some("servers".to_string()),
             },

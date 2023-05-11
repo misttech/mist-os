@@ -977,7 +977,7 @@ async fn test_cannot_call_set_options_after_watch<N: Netstack>(name: &str) {
         monitor.watch().await.expect("failed to fetch updated snapshot").internet_available,
         Some(_)
     );
-    assert_matches!(monitor.set_options(fnet_reachability::MonitorOptions::default()), Ok(()));
+    assert_matches!(monitor.set_options(&fnet_reachability::MonitorOptions::default()), Ok(()));
 
     // The request stream should be closed if the client calls SetOptions after calling Watch
     // previously.
@@ -1003,10 +1003,10 @@ async fn test_cannot_call_set_options_twice<N: Netstack>(name: &str) {
         .expect("failed to connect to fuchsia.net.reachability.Monitor");
 
     let () = monitor
-        .set_options(fnet_reachability::MonitorOptions::default())
+        .set_options(&fnet_reachability::MonitorOptions::default())
         .expect("failed to set reachability API options");
     let () = monitor
-        .set_options(fnet_reachability::MonitorOptions::default())
+        .set_options(&fnet_reachability::MonitorOptions::default())
         .expect("failed to set reachability API options");
 
     // The request stream should be closed if the client calls SetOptions after calling it once

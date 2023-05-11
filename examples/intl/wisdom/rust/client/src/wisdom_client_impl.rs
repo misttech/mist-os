@@ -36,7 +36,7 @@ impl Client {
     ) -> Result<String, Error> {
         let profile = make_intl_profile(timezone)?;
         print!("Asking for wisdom...\n");
-        let res = self.wisdom.ask_for_wisdom(profile, timestamp_ms as i64).await?.unwrap();
+        let res = self.wisdom.ask_for_wisdom(&profile, timestamp_ms as i64).await?.unwrap();
         Ok(res)
     }
 }

@@ -25,7 +25,7 @@ impl StreamProcessorFactory for EncoderFactory {
             let (encoder_client_end, encoder_request) = create_endpoints();
             let encoder = encoder_client_end.into_proxy()?;
             factory.create_encoder(
-                CreateEncoderParams {
+                &CreateEncoderParams {
                     input_details: Some(stream.format_details(format_details_version_ordinal)),
                     require_hw: Some(false),
                     ..Default::default()

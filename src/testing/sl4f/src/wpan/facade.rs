@@ -178,7 +178,7 @@ impl WpanFacade {
     ) -> Result<(), Error> {
         match self.device_test.read().as_ref() {
             Some(device_test) => {
-                device_test.replace_mac_address_filter_settings(settings.into()).await?
+                device_test.replace_mac_address_filter_settings(&settings.into()).await?
             }
             None => bail!("DeviceTest proxy is not set!"),
         }

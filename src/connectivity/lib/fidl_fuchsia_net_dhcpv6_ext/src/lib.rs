@@ -144,15 +144,10 @@ mod tests {
                             let (_, server_end) = fidl::endpoints::create_endpoints::<
                                 fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
                             >();
-                            let mut subnet = SUBNET;
                             address_responder
                                 .take()
                                 .expect("must have address responder")
-                                .send(
-                                    &mut subnet,
-                                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
-                                    server_end,
-                                )
+                                .send(&SUBNET, &Default::default(), server_end)
                                 .expect("FIDL error");
                         }
                         WatchType::DnsServers => {

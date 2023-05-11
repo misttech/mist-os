@@ -28,7 +28,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             AccessibilityRequest::Watch { responder } => {
-                let _ = responder.send(AccessibilitySettings::default());
+                let _ = responder.send(&AccessibilitySettings::default());
             }
         });
 

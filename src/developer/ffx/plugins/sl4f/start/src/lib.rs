@@ -40,7 +40,7 @@ async fn create_remote_component(
         .create_instance(
             PARENT_MONIKER,
             &mut collection,
-            decl.clone(),
+            &decl,
             fcomponent::CreateChildArgs::default(),
         )
         .await
@@ -70,7 +70,7 @@ async fn create_remote_component(
                 .create_instance(
                     PARENT_MONIKER,
                     &mut collection,
-                    decl.clone(),
+                    &decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await

@@ -254,7 +254,7 @@ async fn test_base_package_while_queue_full() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Add a base-pinned package to the end of the resolve list.
     pkg_urls.push(format!("fuchsia-pkg://fuchsia.com/{pkg_name}"));

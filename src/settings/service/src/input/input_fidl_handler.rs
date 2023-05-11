@@ -35,7 +35,7 @@ impl watch::Responder<InputSettings, fuchsia_zircon::Status> for InputWatchRespo
     fn respond(self, response: Result<InputSettings, fuchsia_zircon::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);

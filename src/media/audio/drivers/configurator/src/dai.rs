@@ -79,7 +79,7 @@ impl DaiInterface {
     ) -> Result<(), Error> {
         self.get_proxy()?
             .clone()
-            .create_ring_buffer(&mut dai_format, ring_buffer_format, ring_buffer)
+            .create_ring_buffer(&mut dai_format, &ring_buffer_format, ring_buffer)
             .map_err(|e| anyhow!("FIDL error creating ring buffer {:?}", e))
     }
 }

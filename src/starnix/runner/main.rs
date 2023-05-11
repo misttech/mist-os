@@ -102,8 +102,8 @@ async fn create_new_kernel(
         connect_to_protocol::<fcomponent::RealmMarker>().expect("Failed to connect to realm.");
     realm
         .create_child(
-            &mut fdecl::CollectionRef { name: KERNEL_COLLECTION.into() },
-            fdecl::Child {
+            &fdecl::CollectionRef { name: KERNEL_COLLECTION.into() },
+            &fdecl::Child {
                 name: Some(kernel_start_info.name.clone()),
                 url: Some(KERNEL_URL.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),

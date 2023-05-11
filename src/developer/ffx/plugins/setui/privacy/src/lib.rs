@@ -22,7 +22,7 @@ async fn command(proxy: PrivacyProxy, user_data_sharing_consent: Option<bool>) -
     if settings == PrivacySettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set user_data_sharing_consent to {:?}", user_data_sharing_consent)
@@ -105,7 +105,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             PrivacyRequest::Watch { responder } => {
-                let _ = responder.send(PrivacySettings {
+                let _ = responder.send(&PrivacySettings {
                     user_data_sharing_consent: expected_user_data_sharing_consent,
                     ..Default::default()
                 });

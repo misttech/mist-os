@@ -133,7 +133,7 @@ impl RunningSuite {
             ..Default::default()
         };
         test_realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
@@ -921,7 +921,7 @@ async fn run_invocations(
 ) -> Result<SuiteStatus, anyhow::Error> {
     let (run_listener_client, mut run_listener) =
         fidl::endpoints::create_request_stream().expect("cannot create request stream");
-    suite.run(&invocations, run_options, run_listener_client)?;
+    suite.run(&invocations, &run_options, run_listener_client)?;
 
     let tasks = Arc::new(lock::Mutex::new(vec![]));
     let running_test_cases = Arc::new(lock::Mutex::new(HashSet::new()));

@@ -37,7 +37,7 @@ pub async fn create_metrics_logger(
     };
 
     let status = factory_proxy
-        .create_metric_event_logger(project_spec, cobalt_server)
+        .create_metric_event_logger(&project_spec, cobalt_server)
         .await
         .context("create metrics event logger")?;
 

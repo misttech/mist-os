@@ -91,7 +91,7 @@ impl watch::Responder<SetupSettings, fuchsia_zircon::Status> for SetupWatchRespo
     fn respond(self, response: Result<SetupSettings, fuchsia_zircon::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);
@@ -176,7 +176,7 @@ mod tests {
         let (proxy, server) =
             fidl::endpoints::create_proxy::<SetupMarker>().expect("should be able to create proxy");
         let _fut = proxy.set(
-            SetupSettings {
+            &SetupSettings {
                 enabled_configuration_interfaces: CONFIGURATION_INTERFACES,
                 ..Default::default()
             },

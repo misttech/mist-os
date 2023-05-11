@@ -177,7 +177,7 @@ impl FidlProtocol for Diagnostics {
                     // a timeout in here.
                     match tc_proxy
                         .open_target(
-                            ffx::TargetQuery {
+                            &ffx::TargetQuery {
                                 string_matcher: target_str.clone(),
                                 ..Default::default()
                             },
@@ -198,7 +198,7 @@ impl FidlProtocol for Diagnostics {
                         Ok(()) => responder
                             .send(
                                 &mut target_handle
-                                    .stream_active_diagnostics(parameters, iterator)
+                                    .stream_active_diagnostics(&parameters, iterator)
                                     .await?,
                             )
                             .map_err(Into::into),
@@ -224,7 +224,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     Some("narbacular"),
-                    ffx::DaemonDiagnosticsStreamParameters::default(),
+                    &ffx::DaemonDiagnosticsStreamParameters::default(),
                     server
                 )
                 .await
@@ -242,7 +242,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     None,
-                    ffx::DaemonDiagnosticsStreamParameters {
+                    &ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::SnapshotAll),
                         ..Default::default()
                     },
@@ -263,7 +263,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     Some("flippity-flap"),
-                    ffx::DaemonDiagnosticsStreamParameters {
+                    &ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::SnapshotAll),
                         ..Default::default()
                     },
@@ -294,7 +294,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     Some("flippity-flap"),
-                    ffx::DaemonDiagnosticsStreamParameters {
+                    &ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::Subscribe),
                         ..Default::default()
                     },
@@ -340,7 +340,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     Some("flippity-flap"),
-                    ffx::DaemonDiagnosticsStreamParameters {
+                    &ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::Subscribe),
                         ..Default::default()
                     },

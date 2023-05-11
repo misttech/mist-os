@@ -367,11 +367,11 @@ fn parse_pair(args: &[&str], state: &Mutex<State>) -> Result<(FidlPeerId, Pairin
 }
 
 async fn handle_pair(
-    mut peer_id: FidlPeerId,
+    peer_id: FidlPeerId,
     pairing_opts: PairingOptions,
     access_svc: &AccessProxy,
 ) -> Result<String, Error> {
-    match access_svc.pair(&mut peer_id, pairing_opts).await? {
+    match access_svc.pair(&peer_id, &pairing_opts).await? {
         Ok(_) => Ok(String::new()),
         Err(err) => Ok(format!("Pair error: {:?}", err)),
     }

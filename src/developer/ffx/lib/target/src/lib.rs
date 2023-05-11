@@ -117,7 +117,7 @@ pub fn open_target_with_fut<'a>(
         timeout(
             target_timeout,
             tc_proxy.open_target(
-                TargetQuery { string_matcher: t_clone.clone(), ..Default::default() },
+                &TargetQuery { string_matcher: t_clone.clone(), ..Default::default() },
                 target_server_end,
             ),
         )

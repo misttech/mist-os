@@ -95,12 +95,12 @@ impl FidlServer {
             InstallerRequest::GetLastUpdateResult { responder } => {
                 let history = self.history.lock();
                 let last_result = into_update_result(history.last_update_attempt());
-                responder.send(last_result)?;
+                responder.send(&last_result)?;
             }
             InstallerRequest::GetUpdateResult { attempt_id, responder } => {
                 let history = self.history.lock();
                 let result = into_update_result(history.update_attempt(attempt_id));
-                responder.send(result)?;
+                responder.send(&result)?;
             }
             InstallerRequest::StartUpdate {
                 url,

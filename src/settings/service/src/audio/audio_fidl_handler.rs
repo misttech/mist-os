@@ -57,7 +57,7 @@ impl watch::Responder<AudioSettings, zx::Status> for AudioWatchResponder {
     fn respond(self, response: Result<AudioSettings, zx::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);

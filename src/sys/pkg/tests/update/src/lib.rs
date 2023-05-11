@@ -240,7 +240,7 @@ impl MockUpdateManagerService {
                             initiator: Some(fidl_update::Initiator::Service),
                             ..Default::default()
                         };
-                        proxy.on_start(options, server_end).await.unwrap();
+                        proxy.on_start(&options, server_end).await.unwrap();
                         Self::send_states(monitor, states).await;
                     }
                 }

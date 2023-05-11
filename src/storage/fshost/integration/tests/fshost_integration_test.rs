@@ -839,7 +839,7 @@ async fn verify_blobs() {
         .connect_to_protocol_at_exposed_dir::<BlobfsVerifierMarker>()
         .expect("connect_to_protcol_at_exposed_dir failed");
     blobfs_verifier
-        .verify(VerifyOptions::default())
+        .verify(&VerifyOptions::default())
         .await
         .expect("FIDL failure")
         .expect("verify failure");

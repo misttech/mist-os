@@ -338,10 +338,10 @@ pub async fn trace(
             let output = canonical_path(opts.output)?;
             let res = proxy
                 .start_recording(
-                    default,
+                    &default,
                     &output,
-                    ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() },
-                    trace_config,
+                    &ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() },
+                    &trace_config,
                 )
                 .await?;
             let target = handle_recording_result(res, &output).await?;

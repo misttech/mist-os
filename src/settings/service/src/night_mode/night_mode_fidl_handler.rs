@@ -35,7 +35,7 @@ impl watch::Responder<NightModeSettings, fuchsia_zircon::Status> for NightModeWa
     fn respond(self, response: Result<NightModeSettings, fuchsia_zircon::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);
@@ -125,7 +125,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>()
             .expect("should be able to create proxy");
         let _fut =
-            proxy.set(NightModeSettings { night_mode_enabled: Some(true), ..Default::default() });
+            proxy.set(&NightModeSettings { night_mode_enabled: Some(true), ..Default::default() });
         let mut request_stream: NightModeRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

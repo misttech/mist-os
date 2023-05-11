@@ -292,11 +292,10 @@ impl View {
         let view_bounds = properties.bounds.expect("missing embedded view bounds");
 
         // Create the viewport transform.
-        let mut transform_id =
-            Self::create_transform(self.flatland.clone(), &mut self.id_generator);
+        let transform_id = Self::create_transform(self.flatland.clone(), &mut self.id_generator);
 
         // Create the content id.
-        let mut content_id = self.id_generator.next_content_id();
+        let content_id = self.id_generator.next_content_id();
 
         // Create the view/viewport token pair.
         let token_pair = scenic::flatland::ViewCreationTokenPair::new()
@@ -307,9 +306,9 @@ impl View {
             .expect("failed to create child view watcher channel");
         self.flatland
             .create_viewport(
-                &mut content_id,
+                &content_id,
                 token_pair.viewport_creation_token,
-                ui_comp::ViewportProperties {
+                &ui_comp::ViewportProperties {
                     logical_size: view_bounds.size,
                     ..Default::default()
                 },
@@ -319,19 +318,19 @@ impl View {
 
         // Attach the embedding viewport to its transform.
         self.flatland
-            .set_content(&mut transform_id, &mut content_id)
+            .set_content(&transform_id, &content_id)
             .expect("failed to set viewport content");
 
         // Position the embedded view.
-        if let Some(mut origin) = view_bounds.origin {
+        if let Some(origin) = view_bounds.origin {
             self.flatland
-                .set_translation(&mut transform_id, &mut origin)
+                .set_translation(&transform_id, &origin)
                 .expect("failed to position embedded view");
         }
 
         // Attach the child view to the view's root transform.
         self.flatland
-            .add_child(&mut self.root_transform_id, &mut transform_id)
+            .add_child(&self.root_transform_id, &transform_id)
             .expect("failed to attach embedded view to root transform");
 
         // Present changes.
@@ -356,16 +355,16 @@ impl View {
         // Set viewport properties and translation.
         self.flatland
             .set_viewport_properties(
-                &mut embedded_view.content_id,
-                ui_comp::ViewportProperties {
+                &embedded_view.content_id,
+                &ui_comp::ViewportProperties {
                     logical_size: view_bounds.size,
                     ..Default::default()
                 },
             )
             .expect("failed to set viewport properties");
-        if let Some(mut origin) = view_bounds.origin {
+        if let Some(origin) = view_bounds.origin {
             self.flatland
-                .set_translation(&mut embedded_view.transform_id, &mut origin)
+                .set_translation(&embedded_view.transform_id, &origin)
                 .expect("failed to position embedded view");
         }
 
@@ -380,9 +379,7 @@ impl View {
     ) -> ui_comp::TransformId {
         let flatland_transform_id = id_generator.next_transform_id();
 
-        flatland
-            .create_transform(&mut flatland_transform_id.clone())
-            .expect("failed to create transform");
+        flatland.create_transform(&flatland_transform_id).expect("failed to create transform");
 
         flatland_transform_id
     }
@@ -504,7 +501,7 @@ impl View {
                                 // immediately sent to the listener
                                 let touch_report = self.get_touch_report(&e);
                                 listener
-                                    .report_touch_input(touch_report)
+                                    .report_touch_input(&touch_report)
                                     .expect("failed to send touch input report");
                             }
                             None => {
@@ -547,7 +544,7 @@ impl View {
                             match &self.touch_input_listener {
                                 Some(listener) => {
                                     listener
-                                        .report_touch_input(pending_event)
+                                        .report_touch_input(&pending_event)
                                         .expect("failed to send touch input report");
                                 }
                                 None => {
@@ -653,7 +650,7 @@ impl View {
             let event = self.get_mouse_report(&mouse_event);
             match &self.mouse_input_listener {
                 Some(listener) => {
-                    listener.report_mouse_input(event).expect("failed to send mouse input report");
+                    listener.report_mouse_input(&event).expect("failed to send mouse input report");
                 }
                 None => {
                     info!("no mouse event listener");
@@ -707,7 +704,7 @@ impl View {
             Some(listener) => match report {
                 Some(event) => {
                     listener
-                        .report_text_input(event)
+                        .report_text_input(&event)
                         .expect("failed to send keyboard input report");
                 }
                 None => {}

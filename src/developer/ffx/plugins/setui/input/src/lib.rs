@@ -173,7 +173,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             InputRequest::Watch { responder } => {
-                let _ = responder.send(InputSettings {
+                let _ = responder.send(&InputSettings {
                     devices: Some(create_input_devices(DeviceType::Camera, "camera", 1)),
                     ..Default::default()
                 });

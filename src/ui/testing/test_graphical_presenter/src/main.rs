@@ -321,14 +321,14 @@ impl TestGraphicalPresenter {
                 .context("error creating viewport watcher")?;
         self.flatland
             .create_viewport(
-                &mut VIEWPORT_CONTENT_ID.clone(),
+                &VIEWPORT_CONTENT_ID,
                 viewport_creation_token,
-                viewport_properties,
+                &viewport_properties,
                 child_view_watcher_request,
             )
             .context("Failed to create viewport")?;
         self.flatland
-            .set_content(&mut VIEWPORT_TRANSFORM_ID.clone(), &mut VIEWPORT_CONTENT_ID.clone())
+            .set_content(&VIEWPORT_TRANSFORM_ID, &VIEWPORT_CONTENT_ID)
             .context("Failed to set content viewport")?;
         self.try_present()?;
 

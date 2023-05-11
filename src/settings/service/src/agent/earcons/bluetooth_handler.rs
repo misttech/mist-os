@@ -94,7 +94,7 @@ impl BluetoothHandler {
             .map_err(|e| format_err!("Error creating watcher request stream: {:?}", e))?;
 
         call!(discovery_proxy =>
-            watch_sessions(WatchOptions::default(), watcher_client))
+            watch_sessions(&WatchOptions::default(), watcher_client))
         .map_err(|e| format_err!("Unable to start discovery of MediaSessions: {:?}", e))?;
 
         self.handle_bluetooth_connections(watcher_requests);

@@ -223,7 +223,7 @@ mod test {
                 panic!("Unexpected call to watch light groups");
             }
             LightRequest::WatchLightGroup { responder, .. } => {
-                let _ = responder.send(expected_light_settings.clone());
+                let _ = responder.send(&expected_light_settings);
             }
         });
 

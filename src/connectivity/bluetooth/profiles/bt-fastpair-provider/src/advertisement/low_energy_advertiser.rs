@@ -290,7 +290,7 @@ impl LowEnergyAdvertiser {
 
         let (connect_client, connect_server) =
             fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>()?;
-        let advertise_fut = self.peripheral.advertise(parameters, connect_client);
+        let advertise_fut = self.peripheral.advertise(&parameters, connect_client);
 
         let advertisement_stream = LowEnergyAdvertisement::new(advertise_fut, connect_server);
         self.advertisement.set(advertisement_stream);
@@ -485,7 +485,7 @@ mod tests {
         };
         let (connect_client1, connect_server1) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
-        let connected_fut1 = adv_peripheral_client.on_connected(example_peer1, connect_client1);
+        let connected_fut1 = adv_peripheral_client.on_connected(&example_peer1, connect_client1);
         pin_mut!(connected_fut1);
         let _ = exec
             .run_until_stalled(&mut connected_fut1)
@@ -498,7 +498,7 @@ mod tests {
         };
         let (connect_client2, connect_server2) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
-        let connected_fut2 = adv_peripheral_client.on_connected(example_peer2, connect_client2);
+        let connected_fut2 = adv_peripheral_client.on_connected(&example_peer2, connect_client2);
         pin_mut!(connected_fut2);
         let _ = exec
             .run_until_stalled(&mut connected_fut2)
@@ -537,7 +537,8 @@ mod tests {
         // Upstream server notifies with an invalidly formatted peer (missing all mandatory data).
         let (connect_client, _connect_server) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
-        let connected_fut = adv_peripheral_client.on_connected(le::Peer::default(), connect_client);
+        let connected_fut =
+            adv_peripheral_client.on_connected(&le::Peer::default(), connect_client);
         pin_mut!(connected_fut);
         let _ = exec
             .run_until_stalled(&mut connected_fut)

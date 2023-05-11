@@ -25,7 +25,7 @@ async fn command(
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         // Default to reboot the device in order for the change to take effect.
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone(), true).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings, true).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set configuration interfaces to {:?}", configuration_interfaces)
@@ -111,7 +111,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             SetupRequest::Watch { responder } => {
-                let _ = responder.send(SetupSettings {
+                let _ = responder.send(&SetupSettings {
                     enabled_configuration_interfaces: expected_interface,
                     ..Default::default()
                 });

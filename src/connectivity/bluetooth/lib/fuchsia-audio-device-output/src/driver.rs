@@ -304,7 +304,7 @@ impl SoftPcm {
     ) -> std::result::Result<(), anyhow::Error> {
         match request {
             StreamConfigRequest::GetHealthState { responder } => {
-                responder.send(HealthState::default())?;
+                responder.send(&HealthState::default())?;
             }
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
@@ -325,7 +325,7 @@ impl SoftPcm {
                     product:                  Some(self.product.to_string()),
                     ..Default::default()
                 };
-                responder.send(prop)?;
+                responder.send(&prop)?;
             }
             StreamConfigRequest::GetSupportedFormats { responder } => {
                 let pcm_formats = self.supported_formats.clone();
@@ -355,7 +355,7 @@ impl SoftPcm {
                     gain_db: Some(0.0f32),
                     ..Default::default()
                 };
-                responder.send(gain_state)?;
+                responder.send(&gain_state)?;
                 self.gain_state_replied = true
             }
             StreamConfigRequest::WatchPlugState { responder } => {
@@ -370,7 +370,7 @@ impl SoftPcm {
                     plug_state_time: Some(time.into_nanos() as i64),
                     ..Default::default()
                 };
-                responder.send(plug_state)?;
+                responder.send(&plug_state)?;
                 self.plug_state_replied = true;
             }
             StreamConfigRequest::SetGain { target_state, control_handle: _ } => {
@@ -403,7 +403,7 @@ impl SoftPcm {
                         .then_some((self.packet_frames * self.frame_bytes) as u32),
                     ..Default::default()
                 };
-                responder.send(prop)?;
+                responder.send(&prop)?;
             }
             RingBufferRequest::GetVmo {
                 min_frames,
@@ -486,7 +486,7 @@ impl SoftPcm {
                     internal_delay: Some(self.current_delay().into_nanos()),
                     ..Default::default()
                 };
-                responder.send(delay_info)?;
+                responder.send(&delay_info)?;
                 self.delay_info_replied = true;
             }
         }
@@ -621,7 +621,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
 
-        let result = stream_config.create_ring_buffer(format, server);
+        let result = stream_config.create_ring_buffer(&format, server);
         assert!(result.is_ok());
 
         let _ring_buffer_properties = exec.run_until_stalled(&mut ring_buffer.get_properties());
@@ -714,7 +714,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
 
-        let result = stream_config.create_ring_buffer(format, server);
+        let result = stream_config.create_ring_buffer(&format, server);
         assert!(result.is_ok());
 
         let result = exec.run_until_stalled(&mut ring_buffer.watch_delay_info());

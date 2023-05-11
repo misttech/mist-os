@@ -178,7 +178,7 @@ fn handle_remote_control_connect(
             responder,
         })) = diagnostics_stream.next().await
         {
-            accessor_proxy.stream_diagnostics(parameters, stream).await.unwrap();
+            accessor_proxy.stream_diagnostics(&parameters, stream).await.unwrap();
             responder.send().unwrap();
         }
     })

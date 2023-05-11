@@ -109,7 +109,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     info!(%id, "Trying to connect");
     // Try to connect and establish a GATT connection.
     let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>()?;
-    central.connect(&mut id.into(), ConnectionOptions::default(), le_server)?;
+    central.connect(&id.into(), &ConnectionOptions::default(), le_server)?;
     let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>()?;
     le_client.request_gatt_client(gatt_server)?;
 
@@ -217,7 +217,7 @@ async fn main() -> Result<(), Error> {
     };
     // The lifetime of the scan will be determined by `watch_scan_results` so this Future can be
     // ignored.
-    let _scan_fut = central.scan(options, scan_server).check()?;
+    let _scan_fut = central.scan(&options, scan_server).check()?;
     let scan_result = watch_scan_results(central, scan_client).await;
     info!("LE Battery Monitor finished: {scan_result:?}");
     Ok(())

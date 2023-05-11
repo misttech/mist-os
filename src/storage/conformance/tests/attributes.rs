@@ -152,7 +152,7 @@ async fn get_update_attributes_file_unsupported() {
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
-        file_proxy.update_attributes(fio::MutableNodeAttributes::default()).await.unwrap(),
+        file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }
@@ -174,7 +174,7 @@ async fn get_update_attributes_file_node_reference_unsupported() {
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
-        file_proxy.update_attributes(fio::MutableNodeAttributes::default()).await.unwrap(),
+        file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }
@@ -195,7 +195,7 @@ async fn get_update_attributes_directory_unsupported() {
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
-        dir_proxy.update_attributes(fio::MutableNodeAttributes::default()).await.unwrap(),
+        dir_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }
@@ -216,7 +216,7 @@ async fn get_update_attributes_directory_node_reference_unsupported() {
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
-        dir_proxy.update_attributes(fio::MutableNodeAttributes::default()).await.unwrap(),
+        dir_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }

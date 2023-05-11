@@ -44,14 +44,13 @@ impl From<ReachabilityState> for freachability::Snapshot {
 
 impl ReachabilityHandler {
     pub fn new() -> Self {
-        let notify_fn: NotifyFn =
-            Box::new(|state, responder| match responder.send(state.clone()) {
-                Ok(()) => true,
-                Err(e) => {
-                    error!("Failed to send reachability state to client: {}", e);
-                    false
-                }
-            });
+        let notify_fn: NotifyFn = Box::new(|state, responder| match responder.send(&state) {
+            Ok(()) => true,
+            Err(e) => {
+                error!("Failed to send reachability state to client: {}", e);
+                false
+            }
+        });
         let state = ReachabilityState {
             internet_available: false,
             gateway_reachable: false,
@@ -306,7 +305,7 @@ mod tests {
 
         assert_matches!(client.get_reachability_state(&mut executor), Ok(_));
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
+            client.watcher_proxy.set_options(&freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(executor.run_singlethreaded(client.watcher_proxy.on_closed()), Ok(_));
@@ -324,11 +323,11 @@ mod tests {
         let client = test_env.connect_client();
 
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
+            client.watcher_proxy.set_options(&freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(
-            client.watcher_proxy.set_options(freachability::MonitorOptions::default()),
+            client.watcher_proxy.set_options(&freachability::MonitorOptions::default()),
             Ok(())
         );
         assert_matches!(executor.run_singlethreaded(client.watcher_proxy.on_closed()), Ok(_));

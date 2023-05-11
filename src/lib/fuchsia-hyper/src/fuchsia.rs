@@ -197,7 +197,7 @@ async fn resolve_ip_addr(
     let LookupResult { addresses, .. } = proxy
         .lookup_ip(
             host,
-            LookupIpOptions {
+            &LookupIpOptions {
                 ipv4_lookup: Some(true),
                 ipv6_lookup: Some(true),
                 sort_addresses: Some(true),

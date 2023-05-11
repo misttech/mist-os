@@ -618,7 +618,7 @@ pub(crate) mod tests {
             _ => panic!("should be WatchStatus"),
         };
 
-        watch_status_responder.send(status).expect("watch status sent");
+        watch_status_responder.send(&status).expect("watch status sent");
     }
 
     /// Runs through the setup sequence of a AudioConsumer, returning the audio consumer,

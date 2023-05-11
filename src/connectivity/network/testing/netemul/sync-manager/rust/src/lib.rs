@@ -75,7 +75,7 @@ impl Bus {
 
     /// Publishes an event on the bus.
     pub fn publish(&self, event: Event) -> Result {
-        self.bus.publish(event.into())?;
+        self.bus.publish(&event.into())?;
         Ok(())
     }
 

@@ -534,7 +534,7 @@ mod tests {
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
-            controller.start_access_point(network_config, connectivity_mode, operating_band);
+            controller.start_access_point(&network_config, connectivity_mode, operating_band);
         pin_mut!(start_fut);
 
         // Process start request and verify start response.
@@ -585,7 +585,7 @@ mod tests {
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
-            controller.start_access_point(network_config, connectivity_mode, operating_band);
+            controller.start_access_point(&network_config, connectivity_mode, operating_band);
         pin_mut!(start_fut);
 
         // Verify the start response is successful despite the AP's failure to start.
@@ -630,7 +630,7 @@ mod tests {
         let network_config =
             fidl_policy::NetworkConfig { id: None, credential: None, ..Default::default() };
         let start_fut =
-            controller.start_access_point(network_config, connectivity_mode, operating_band);
+            controller.start_access_point(&network_config, connectivity_mode, operating_band);
         pin_mut!(start_fut);
 
         // Process start request and verify start response.
@@ -668,7 +668,7 @@ mod tests {
             credential: Some(credential),
             ..Default::default()
         };
-        let stop_fut = controller.stop_access_point(network_config);
+        let stop_fut = controller.stop_access_point(&network_config);
         pin_mut!(stop_fut);
 
         // Process stop request and verify stop response.
@@ -717,7 +717,7 @@ mod tests {
             credential: Some(credential),
             ..Default::default()
         };
-        let stop_fut = controller.stop_access_point(network_config);
+        let stop_fut = controller.stop_access_point(&network_config);
         pin_mut!(stop_fut);
 
         // Process stop request and verify stop response.
@@ -878,7 +878,7 @@ mod tests {
         let connectivity_mode = fidl_policy::ConnectivityMode::LocalOnly;
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
-            controller2.start_access_point(network_config, connectivity_mode, operating_band);
+            controller2.start_access_point(&network_config, connectivity_mode, operating_band);
         pin_mut!(start_fut);
 
         // Process start request and verify start response.

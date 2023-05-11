@@ -202,7 +202,7 @@ impl Directory {
     // the directory, it will be destroyed only if there are no other references to it.
     pub async fn remove(&self, filename: &str) -> Result<()> {
         let options = fio::UnlinkOptions::default();
-        match self.proxy.unlink(filename, options).await {
+        match self.proxy.unlink(filename, &options).await {
             Ok(r) => match r {
                 Ok(()) => Ok(()),
                 Err(e) => Err(format_err!(

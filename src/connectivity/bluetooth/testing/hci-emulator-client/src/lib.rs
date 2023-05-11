@@ -75,7 +75,7 @@ impl Emulator {
     /// handles the FIDL binding error.
     pub async fn publish(&self, settings: EmulatorSettings) -> Result<(), Error> {
         self.emulator()
-            .publish(settings)
+            .publish(&settings)
             .await
             .context("publish transport")?
             .map_err(|e: EmulatorError| format_err!("failed to publish bt-hci device: {:#?}", e))
@@ -347,7 +347,7 @@ mod tests {
             // HciEmulator channel is open.
             let result = fake_dev
                 .emulator()
-                .publish(default_settings())
+                .publish(&default_settings())
                 .await
                 .expect("Failed to send second Publish message to emulator device");
             assert_eq!(Err(EmulatorError::HciAlreadyPublished), result);

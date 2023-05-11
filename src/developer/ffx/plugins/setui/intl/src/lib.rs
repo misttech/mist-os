@@ -18,7 +18,7 @@ async fn command(proxy: IntlProxy, settings: IntlSettings) -> WatchOrSetResult {
     if settings == IntlSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set Intl to {:?}", Intl::from(settings))
@@ -119,7 +119,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             IntlRequest::Watch { responder } => {
-                let _ = responder.send(IntlSettings::from(expected_intl.clone()));
+                let _ = responder.send(&IntlSettings::from(expected_intl.clone()));
             }
         });
 

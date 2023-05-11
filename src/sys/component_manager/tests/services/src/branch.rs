@@ -39,8 +39,8 @@ async fn create_provider(
     info!("creating BankAccount provider \"{}\" with url={}", name, url);
     realm
         .create_child(
-            &mut fdecl::CollectionRef { name: ACCOUNT_PROVIDERS_COLLECTION.to_string() },
-            fdecl::Child {
+            &fdecl::CollectionRef { name: ACCOUNT_PROVIDERS_COLLECTION.to_string() },
+            &fdecl::Child {
                 name: Some(name.to_string()),
                 url: Some(url.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),

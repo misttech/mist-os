@@ -302,7 +302,7 @@ async fn execute_and_validate_preflights(
         .then(|preflight| {
             let UdpSendMsgPreflight { to_addr, expected_result } = preflight;
             let result =
-                proxy.send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest {
+                proxy.send_msg_preflight(&fposix_socket::DatagramSocketSendMsgPreflightRequest {
                     to: to_addr,
                     ..Default::default()
                 });
@@ -835,7 +835,7 @@ async fn connect_socket_and_validate_preflight(
     socket.connect(&mut addr).await.expect("call connect").expect("connect socket");
 
     let response = socket
-        .send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest::default())
+        .send_msg_preflight(&fposix_socket::DatagramSocketSendMsgPreflightRequest::default())
         .await
         .expect("call send_msg_preflight")
         .expect("preflight check should succeed");
@@ -988,7 +988,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     // Now that the address has been invalidated and removed, subsequent calls to
     // preflight using the connected address should fail.
     let result = socket
-        .send_msg_preflight(fposix_socket::DatagramSocketSendMsgPreflightRequest {
+        .send_msg_preflight(&fposix_socket::DatagramSocketSendMsgPreflightRequest {
             to: None,
             ..Default::default()
         })
@@ -1774,7 +1774,7 @@ async fn install_ip_device(
         let (control, server_end) =
             fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
         let () = device_control
-            .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::default())
+            .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
             .expect("create interface");
         control
     };
@@ -1869,11 +1869,11 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
     let (tun_pair, req) = fidl::endpoints::create_proxy::<fnet_tun::DevicePairMarker>()
         .expect("failed to create endpoints");
     let () = tun
-        .create_pair(fnet_tun::DevicePairConfig::default(), req)
+        .create_pair(&fnet_tun::DevicePairConfig::default(), req)
         .expect("failed to create tun pair");
 
     let () = tun_pair
-        .add_port(fnet_tun::DevicePairPortConfig {
+        .add_port(&fnet_tun::DevicePairPortConfig {
             base: Some(base_ip_device_port_config()),
             // No MAC, this is a pure IP device.
             mac_left: None,
@@ -1930,7 +1930,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .expect("failed to create endpoints");
     let () = tun
         .create_device(
-            fnet_tun::DeviceConfig { base: None, blocking: Some(true), ..Default::default() },
+            &fnet_tun::DeviceConfig { base: None, blocking: Some(true), ..Default::default() },
             req,
         )
         .expect("failed to create tun pair");
@@ -1940,7 +1940,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             .expect("failed to create endpoints");
         let () = tun_dev
             .add_port(
-                fnet_tun::DevicePortConfig {
+                &fnet_tun::DevicePortConfig {
                     base: Some(base_ip_device_port_config()),
                     online: Some(true),
                     // No MAC, this is a pure IP device.
@@ -2056,7 +2056,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         S: futures::stream::TryStream<Error = anyhow::Error> + std::marker::Unpin,
     {
         let () = tun_dev
-            .write_frame(frame)
+            .write_frame(&frame)
             .await
             .context("write_frame failed")?
             .map_err(zx::Status::from_raw)
@@ -2093,7 +2093,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
 
     // Send v4 ping request.
     let () = tun_dev
-        .write_frame(fnet_tun::Frame {
+        .write_frame(&fnet_tun::Frame {
             port: Some(TUN_DEFAULT_PORT_ID),
             frame_type: Some(fhardware_network::FrameType::Ipv4),
             data: Some(packet.clone()),
@@ -2165,7 +2165,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
 
     // Send v6 ping request.
     let () = tun_dev
-        .write_frame(fnet_tun::Frame {
+        .write_frame(&fnet_tun::Frame {
             port: Some(TUN_DEFAULT_PORT_ID),
             frame_type: Some(fhardware_network::FrameType::Ipv6),
             data: Some(packet.clone()),

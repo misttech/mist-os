@@ -136,7 +136,7 @@ async fn handle_run(
             fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>().expect("create proxy");
         listener
             .on_test_case_started(
-                test,
+                &test,
                 ftest::StdHandles {
                     out: Some(stdout_rx),
                     err: Some(stderr_rx),
@@ -154,7 +154,7 @@ async fn handle_run(
                 ftest::Status::Failed
             }
         };
-        case_proxy.finished(ftest::Result_ { status: Some(status), ..Default::default() }).ok();
+        case_proxy.finished(&ftest::Result_ { status: Some(status), ..Default::default() }).ok();
     }
 
     listener.on_finished().ok();
@@ -229,7 +229,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
         let time_start = Instant::now();
 
         proxy.stream_diagnostics(
-            StreamParameters {
+            &StreamParameters {
                 data_type: Some(DataType::Inspect),
                 stream_mode: Some(StreamMode::Snapshot),
                 format: Some(Format::Json),

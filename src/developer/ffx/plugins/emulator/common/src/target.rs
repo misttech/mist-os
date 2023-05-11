@@ -20,7 +20,7 @@ pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str
     let target = Some(name.to_string());
     let res = timeout(Duration::from_secs(1), async {
         let open_call_result = collection_proxy
-            .open_target(ffx::TargetQuery { string_matcher: target, ..Default::default() }, handle)
+            .open_target(&ffx::TargetQuery { string_matcher: target, ..Default::default() }, handle)
             .await;
         tracing::debug!("open_target result: {:?}", &open_call_result);
         if let Ok(open_result) = open_call_result {

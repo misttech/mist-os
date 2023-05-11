@@ -79,7 +79,7 @@ pub async fn profiler(
             });
 
             controller
-                .start(profiler::SessionStartRequest {
+                .start(&profiler::SessionStartRequest {
                     buffer_results: Some(true),
                     ..Default::default()
                 })

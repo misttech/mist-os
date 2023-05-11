@@ -651,7 +651,7 @@ fn save_and_connect(
     };
 
     // Save the network
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Begin processing the save request and the stash write from the save
@@ -948,7 +948,7 @@ fn test_save_and_fail_to_connect(
     };
 
     // Save the network
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Begin processing the save request and the stash write from the save
@@ -1060,7 +1060,7 @@ fn test_fail_to_save(
     };
 
     // Save the network
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Progress the WLAN policy side of the future
@@ -1102,7 +1102,7 @@ fn test_connect_to_new_network() {
     };
 
     // Save the second network.
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Process the stash write from the save.
@@ -1310,7 +1310,7 @@ fn test_autoconnect_to_saved_network() {
     };
 
     // Save the network.
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Process the stash write from the save.
@@ -1555,7 +1555,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     };
 
     // Save the network.
-    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     pin_mut!(save_fut);
 
     // Process the stash write from the save.

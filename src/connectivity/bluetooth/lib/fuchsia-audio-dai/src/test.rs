@@ -135,7 +135,7 @@ async fn test_handle_dai_requests(
         }
         match req.unwrap() {
             DaiRequest::GetProperties { responder } => {
-                log_error!(responder.send(properties.clone()), "properties response");
+                log_error!(responder.send(&properties), "properties response");
             }
             DaiRequest::GetDaiFormats { responder } => {
                 log_error!(responder.send(&mut Ok(vec![dai_formats.clone()])), "formats response");

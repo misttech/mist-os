@@ -310,7 +310,7 @@ impl DeviceOps for Device {
             minstrel.lock().add_peer(&assoc_cfg)?;
         }
         self.wlan_softmac_bridge_proxy
-            .notify_association_complete(assoc_cfg, zx::Time::INFINITE)
+            .notify_association_complete(&assoc_cfg, zx::Time::INFINITE)
             .map_err(|fidl_error| {
                 error!("FIDL error during ConfigureAssoc: {:?}", fidl_error);
                 zx::Status::INTERNAL

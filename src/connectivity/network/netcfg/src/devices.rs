@@ -261,7 +261,7 @@ impl NetworkDeviceInstance {
             .create_interface(
                 &mut port_id.clone(),
                 control_server_end,
-                fidl_fuchsia_net_interfaces_admin::Options {
+                &fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(name),
                     metric: Some(metric),
                     ..Default::default()

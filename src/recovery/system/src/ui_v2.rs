@@ -339,7 +339,7 @@ mod tests {
             .unwrap();
 
         progress_proxy
-            .render2(ProgressRendererRender2Request {
+            .render2(&ProgressRendererRender2Request {
                 status: Some(Status::Active),
                 percent_complete: Some(0.0),
                 ..Default::default()
@@ -347,7 +347,7 @@ mod tests {
             .await
             .unwrap();
         progress_proxy
-            .render2(ProgressRendererRender2Request {
+            .render2(&ProgressRendererRender2Request {
                 status: Some(Status::Complete),
                 percent_complete: Some(100.0),
                 ..Default::default()
@@ -391,7 +391,7 @@ mod tests {
             .unwrap();
 
         progress_proxy
-            .render2(ProgressRendererRender2Request {
+            .render2(&ProgressRendererRender2Request {
                 status: Some(Status::Active),
                 percent_complete: Some(0.0),
                 ..Default::default()
@@ -399,7 +399,7 @@ mod tests {
             .await
             .unwrap();
         progress_proxy
-            .render2(ProgressRendererRender2Request {
+            .render2(&ProgressRendererRender2Request {
                 status: Some(Status::Error),
                 ..Default::default()
             })

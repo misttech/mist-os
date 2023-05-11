@@ -511,7 +511,7 @@ impl FlatlandSceneManager {
             flatland.create_viewport(
                 &mut pointerinjector_viewport_content_id.clone(),
                 pointerinjector_view_creation_pair.viewport_creation_token,
-                link_properties,
+                &link_properties,
                 child_view_watcher_request,
             )?;
             flatland.set_content(
@@ -541,7 +541,7 @@ impl FlatlandSceneManager {
             flatland.create_viewport(
                 &mut a11y_viewport_content_id.clone(),
                 a11y_view_creation_pair.viewport_creation_token,
-                link_properties,
+                &link_properties,
                 a11y_view_watcher_request,
             )?;
             flatland.set_content(
@@ -671,7 +671,7 @@ impl FlatlandSceneManager {
             locked.create_viewport(
                 &mut ids.content_id.clone(),
                 viewport_creation_token,
-                viewport_properties,
+                &viewport_properties,
                 child_view_watcher_request,
             )?;
             locked

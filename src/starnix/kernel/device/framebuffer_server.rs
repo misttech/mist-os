@@ -158,7 +158,7 @@ fn init_scene(
         ..Default::default()
     };
     flatland
-        .create_image(&IMAGE_ID, buffer_tokens.import_token, 0, image_props)
+        .create_image(&IMAGE_ID, buffer_tokens.import_token, 0, &image_props)
         .map_err(|_| anyhow!("FIDL error creating image"))?;
     flatland.create_transform(&TRANSFORM_ID).map_err(|_| anyhow!("error creating transform"))?;
     flatland

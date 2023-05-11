@@ -45,7 +45,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             DisplayRequest::Watch { responder } => {
-                let _ = responder.send(DisplaySettings::from(expected_display.clone()));
+                let _ = responder.send(&DisplaySettings::from(expected_display.clone()));
             }
         });
 

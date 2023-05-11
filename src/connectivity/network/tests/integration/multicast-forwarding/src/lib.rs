@@ -707,7 +707,7 @@ macro_rules! routing_table_controller_impl {
             ) -> Result<(), AddRouteError> {
                 let mut fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
                 self.controller
-                    .add_route(&mut fidl_addresses, route)
+                    .add_route(&mut fidl_addresses, &route)
                     .await
                     .expect("add_route failed")
                     .map_err(Into::into)

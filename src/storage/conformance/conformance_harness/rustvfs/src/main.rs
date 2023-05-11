@@ -128,7 +128,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
 
                     ..Default::default()
                 };
-                responder.send(config)?;
+                responder.send(&config)?;
                 continue;
             }
             Io1HarnessRequest::GetDirectory {

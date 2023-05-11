@@ -162,8 +162,8 @@ impl HostDevice {
         id: PeerId,
         options: sys::PairingOptions,
     ) -> impl Future<Output = types::Result<()>> {
-        let mut id: fbt::PeerId = id.into();
-        self.0.proxy.pair(&mut id, options).map(from_fidl_result)
+        let id: fbt::PeerId = id.into();
+        self.0.proxy.pair(&id, &options).map(from_fidl_result)
     }
 
     pub fn forget(&self, id: PeerId) -> impl Future<Output = types::Result<()>> {
@@ -212,7 +212,7 @@ impl HostDevice {
     }
 
     pub fn set_local_data(&self, data: HostData) -> types::Result<()> {
-        self.0.proxy.set_local_data(data.into()).map_err(|e| e.into())
+        self.0.proxy.set_local_data(&data.into()).map_err(|e| e.into())
     }
 
     pub fn enable_privacy(&self, enable: bool) -> types::Result<()> {
@@ -431,7 +431,7 @@ pub(crate) mod test {
                     }
                     HostRequest::WatchState { responder } => {
                         assert_matches::assert_matches!(
-                            responder.send(FidlHostInfo::from(host_info.read().clone())),
+                            responder.send(&FidlHostInfo::from(host_info.read().clone())),
                             Ok(())
                         );
                     }

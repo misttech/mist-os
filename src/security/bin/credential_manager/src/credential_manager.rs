@@ -860,7 +860,7 @@ mod test {
         let (proxy, request_stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
         fasync::Task::spawn(async move {
             proxy
-                .add_credential(fcred::AddCredentialParams {
+                .add_credential(&fcred::AddCredentialParams {
                     le_secret: Some(vec![1; 32]),
                     he_secret: Some(vec![2; 32]),
                     reset_secret: Some(vec![3; 32]),

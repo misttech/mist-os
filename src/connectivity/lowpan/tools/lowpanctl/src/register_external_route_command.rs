@@ -31,7 +31,7 @@ impl RegisterExternalRouteCommand {
             ExternalRoute { subnet: Some(subnet), stable: Some(self.stable), ..Default::default() };
 
         device_route
-            .register_external_route(on_mesh_prefix)
+            .register_external_route(&on_mesh_prefix)
             .await
             .context("Unable to send register_external_route command")
     }

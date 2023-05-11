@@ -71,7 +71,7 @@ async fn create_dynamic_child() {
     let realm = client::connect_to_protocol::<RealmMarker>()
         .expect("failed to connect to fuchsia.component.Realm");
 
-    let mut collection_ref = CollectionRef { name: String::from("echo") };
+    let collection_ref = CollectionRef { name: String::from("echo") };
     let child_decl = Child {
         name: Some(String::from("lifecycle_dynamic")),
         url: Some(String::from("echo_server#meta/default.cm")),
@@ -80,7 +80,7 @@ async fn create_dynamic_child() {
     };
 
     realm
-        .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
         .await
         .expect("create_child failed")
         .expect("failed to create child");

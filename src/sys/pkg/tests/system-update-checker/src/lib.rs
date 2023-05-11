@@ -323,7 +323,7 @@ impl TestEnv {
             fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
         self.proxies
             .update_manager
-            .check_now(options, Some(client_end))
+            .check_now(&options, Some(client_end))
             .await
             .expect("make check_now call")
             .expect("check started");
@@ -385,7 +385,7 @@ async fn test_update_manager_check_now_error_checking_for_update() {
         .proxies
         .update_manager
         .check_now(
-            fidl_fuchsia_update::CheckOptions {
+            &fidl_fuchsia_update::CheckOptions {
                 initiator: Some(fidl_fuchsia_update::Initiator::User),
                 allow_attaching_to_existing_update_check: Some(true),
                 ..Default::default()

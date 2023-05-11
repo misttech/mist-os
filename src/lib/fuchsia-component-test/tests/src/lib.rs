@@ -601,7 +601,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
                     realm_proxy
                         .create_child(
                             &mut fcdecl::CollectionRef { name: collection_name_for_mock.clone() },
-                            fcdecl::Child {
+                            &fcdecl::Child {
                                 name: Some("echo-server".to_string()),
                                 url: Some(V2_ECHO_SERVER_FRAGMENT_URL.to_string()),
                                 startup: Some(fcdecl::StartupMode::Lazy),

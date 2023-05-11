@@ -515,7 +515,7 @@ impl ActionsTest {
             .realm_proxy
             .as_ref()
             .expect("realm service not started")
-            .create_child(&mut collection_ref, child_decl, args)
+            .create_child(&mut collection_ref, &child_decl, args)
             .await;
         res.expect("failed to create child")
     }

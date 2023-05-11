@@ -431,7 +431,7 @@ impl StreamProcessorInner {
         let buf_idx = packet.buffer_index;
         let vmo = self.output_buffers().get_mut(buf_idx).expect("output vmo should exist");
         vmo.read(&mut output, offset)?;
-        self.processor.recycle_output_packet(packet.header.into())?;
+        self.processor.recycle_output_packet(&packet.header.into())?;
         Ok(output)
     }
 }
@@ -503,7 +503,7 @@ impl StreamProcessor {
 
         let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy()?;
 
-        codec_svc.create_encoder(encoder_params, stream_processor_serverend)?;
+        codec_svc.create_encoder(&encoder_params, stream_processor_serverend)?;
 
         Ok(StreamProcessor::create(processor, sysmem_client))
     }
@@ -540,7 +540,7 @@ impl StreamProcessor {
 
         let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy()?;
 
-        codec_svc.create_decoder(decoder_params, stream_processor_serverend)?;
+        codec_svc.create_decoder(&decoder_params, stream_processor_serverend)?;
 
         Ok(StreamProcessor::create(processor, sysmem_client))
     }
@@ -626,7 +626,7 @@ impl StreamProcessor {
             known_end_access_unit: Some(true),
             ..Default::default()
         };
-        write.processor.queue_input_packet(packet).map_err(fidl_error_to_io_error)?;
+        write.processor.queue_input_packet(&packet).map_err(fidl_error_to_io_error)?;
         // pick another buffer for the input cursor
         write.setup_input_cursor();
         Ok(())

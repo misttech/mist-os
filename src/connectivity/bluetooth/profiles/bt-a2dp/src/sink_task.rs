@@ -111,7 +111,7 @@ impl ConfiguredSinkTask {
                     ..Default::default()
                 };
 
-                match builder.publisher.publish(player_client, registration).await {
+                match builder.publisher.publish(player_client, &registration).await {
                     Ok(session_id) => {
                         info!(%peer_id, %session_id, "Published session");
                         // If the receiver has hung up, this task will be dropped.

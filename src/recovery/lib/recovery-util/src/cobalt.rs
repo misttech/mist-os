@@ -66,7 +66,7 @@ fn get_logger_from_factory(
     fasync::Task::spawn(async move {
         if let Err(err) = factory_proxy
             .create_metric_event_logger(
-                ProjectSpec { project_id: Some(metrics::PROJECT_ID), ..Default::default() },
+                &ProjectSpec { project_id: Some(metrics::PROJECT_ID), ..Default::default() },
                 server_end,
             )
             .await

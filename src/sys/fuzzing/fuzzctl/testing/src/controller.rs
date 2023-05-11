@@ -234,7 +234,7 @@ pub async fn serve_controller(
             Some(Ok(fuzz::ControllerRequest::GetOptions { responder })) => {
                 test.record("fuchsia.fuzzer/Controller.GetOptions");
                 let options = fake.get_options();
-                responder.send(options)?;
+                responder.send(&options)?;
             }
             Some(Ok(fuzz::ControllerRequest::AddToCorpus { corpus, input, responder })) => {
                 test.record(format!("fuchsia.fuzzer/Controller.AddToCorpus({:?})", corpus));
@@ -260,7 +260,7 @@ pub async fn serve_controller(
             Some(Ok(fuzz::ControllerRequest::GetStatus { responder })) => {
                 test.record("fuchsia.fuzzer/Controller.GetStatus");
                 let status = fake.get_status();
-                responder.send(status)?;
+                responder.send(&status)?;
             }
             Some(Ok(fuzz::ControllerRequest::Fuzz { responder })) => {
                 test.record("fuchsia.fuzzer/Controller.Fuzz");

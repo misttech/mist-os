@@ -100,7 +100,7 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         let run_options =
             RunOptions { arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]), ..Default::default() };
         run_builder
-            .add_suite(url.as_str(), run_options, suite_controller)
+            .add_suite(url.as_str(), &run_options, suite_controller)
             .map_err(Error::msg)
             .context("fuchsia.test_manager.RunBuilder/AddSuite")?;
         run_builder

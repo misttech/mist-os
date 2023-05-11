@@ -1095,7 +1095,7 @@ async fn print_neigh_entries(
     let it = it_client.into_proxy().context("error creating proxy to entry iterator")?;
 
     let () = view
-        .open_entry_iterator(it_server, fneighbor::EntryIteratorOptions::default())
+        .open_entry_iterator(it_server, &fneighbor::EntryIteratorOptions::default())
         .context("error opening a connection to the entry iterator")?;
 
     let out_ref = &mut out;
@@ -1163,7 +1163,7 @@ async fn update_neigh_config(
     controller: fneighbor::ControllerProxy,
 ) -> Result<(), Error> {
     controller
-        .update_unreachability_config(interface, version, updates)
+        .update_unreachability_config(interface, version, &updates)
         .await
         .context("update_unreachability_config FIDL error")?
         .map_err(zx::Status::from_raw)
@@ -1349,7 +1349,7 @@ async fn do_dns<W: std::io::Write, C: NetCliDepsConnector>(
     let result = lookup
         .lookup_ip(
             &hostname,
-            fname::LookupIpOptions {
+            &fname::LookupIpOptions {
                 ipv4_lookup: Some(ipv4),
                 ipv6_lookup: Some(ipv6),
                 sort_addresses: Some(sort),

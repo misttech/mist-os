@@ -12,8 +12,7 @@ use {
     fidl_test_external::{
         LargeMessageTable, LargeMessageUnion, LargeMessageUnionUnknown, OverflowingProtocolEvent,
         OverflowingProtocolMarker, OverflowingProtocolProxy, OverflowingProtocolRequest,
-        OverflowingProtocolSynchronousProxy, OverflowingProtocolTwoWayRequestOnlyResponse,
-        OverflowingProtocolTwoWayResponseOnlyRequest,
+        OverflowingProtocolSynchronousProxy,
     },
     fuchsia_async as fasync,
     fuchsia_zircon::{Duration, Time},
@@ -65,16 +64,14 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                         LargeMessageUnion::Str(str) => {
                             assert_eq!(&str, &expected_str);
 
-                            responder
-                                .send(OverflowingProtocolTwoWayRequestOnlyResponse::default())
-                                .unwrap();
+                            responder.send(&Default::default()).unwrap();
                         }
                         LargeMessageUnionUnknown!() => panic!("unknown data"),
                     }
                 }
                 Ok(OverflowingProtocolRequest::TwoWayResponseOnly { responder, .. }) => {
                     responder
-                        .send(LargeMessageTable {
+                        .send(&LargeMessageTable {
                             str: Some(expected_str.to_string()),
                             ..Default::default()
                         })
@@ -176,12 +173,7 @@ async fn overflowing_two_way_request_only_small_async() {
 #[test]
 fn overflowing_two_way_response_only_large_sync() {
     run_client_sync(LARGE_STR, |client| {
-        let payload = client
-            .two_way_response_only(
-                OverflowingProtocolTwoWayResponseOnlyRequest::default(),
-                Time::INFINITE,
-            )
-            .unwrap();
+        let payload = client.two_way_response_only(&Default::default(), Time::INFINITE).unwrap();
 
         assert_eq!(&payload.str.unwrap(), LARGE_STR);
     })
@@ -190,12 +182,7 @@ fn overflowing_two_way_response_only_large_sync() {
 #[test]
 fn overflowing_two_way_response_only_small_sync() {
     run_client_sync(SMALL_STR, |client| {
-        let payload = client
-            .two_way_response_only(
-                OverflowingProtocolTwoWayResponseOnlyRequest::default(),
-                Time::INFINITE,
-            )
-            .unwrap();
+        let payload = client.two_way_response_only(&Default::default(), Time::INFINITE).unwrap();
 
         assert_eq!(&payload.str.unwrap(), SMALL_STR);
     })
@@ -204,10 +191,7 @@ fn overflowing_two_way_response_only_small_sync() {
 #[fasync::run_singlethreaded(test)]
 async fn overflowing_two_way_response_only_large_async() {
     run_client_async(LARGE_STR, |client| async move {
-        let payload = client
-            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::default())
-            .await
-            .unwrap();
+        let payload = client.two_way_response_only(&Default::default()).await.unwrap();
 
         assert_eq!(&payload.str.unwrap(), LARGE_STR);
     })
@@ -217,10 +201,7 @@ async fn overflowing_two_way_response_only_large_async() {
 #[fasync::run_singlethreaded(test)]
 async fn overflowing_two_way_response_only_small_async() {
     run_client_async(SMALL_STR, |client| async move {
-        let payload = client
-            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::default())
-            .await
-            .unwrap();
+        let payload = client.two_way_response_only(&Default::default()).await.unwrap();
 
         assert_eq!(&payload.str.unwrap(), SMALL_STR);
     })
@@ -269,7 +250,7 @@ async fn overflowing_two_way_both_request_and_response_small_async() {
 fn overflowing_one_way_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         client
-            .one_way_call(LargeMessageTable {
+            .one_way_call(&LargeMessageTable {
                 str: Some(LARGE_STR.to_string()),
                 ..Default::default()
             })
@@ -293,7 +274,7 @@ fn overflowing_one_way_large_sync() {
 fn overflowing_one_way_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         client
-            .one_way_call(LargeMessageTable {
+            .one_way_call(&LargeMessageTable {
                 str: Some(SMALL_STR.to_string()),
                 ..Default::default()
             })
@@ -317,7 +298,7 @@ fn overflowing_one_way_small_sync() {
 async fn overflowing_one_way_large_async() {
     run_client_async(LARGE_STR, |client| async move {
         client
-            .one_way_call(LargeMessageTable {
+            .one_way_call(&LargeMessageTable {
                 str: Some(LARGE_STR.to_string()),
                 ..Default::default()
             })
@@ -339,7 +320,7 @@ async fn overflowing_one_way_large_async() {
 async fn overflowing_one_way_small_async() {
     run_client_async(SMALL_STR, |client| async move {
         client
-            .one_way_call(LargeMessageTable {
+            .one_way_call(&LargeMessageTable {
                 str: Some(SMALL_STR.to_string()),
                 ..Default::default()
             })

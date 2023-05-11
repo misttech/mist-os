@@ -124,7 +124,7 @@ impl ActiveSetting {
                 )
             })?;
         device_proxy
-            .set_feature_report(FeatureReport {
+            .set_feature_report(&FeatureReport {
                 sensor: Some(SensorFeatureReport {
                     sensitivity: Some(vec![active_setting.gain as i64]),
                     // Feature report expects sampling rate in microseconds.
@@ -239,7 +239,7 @@ impl<T> LightSensorHandler<T> {
                 correlated_color_temperature: 0.0,
             },
             Box::new(|sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
-                if let Err(e) = responder.send(FidlLightSensorData::from(*sensor_data)) {
+                if let Err(e) = responder.send(&FidlLightSensorData::from(*sensor_data)) {
                     tracing::warn!("Failed to send updated data to client: {e:?}",);
                 }
                 true

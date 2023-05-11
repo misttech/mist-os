@@ -64,7 +64,7 @@ impl Device {
 
     pub fn set_gain(&self, gain_state: GainState) -> Result<(), Error> {
         self.stream_config_client
-            .set_gain(gain_state)
+            .set_gain(&gain_state)
             .map_err(|e| anyhow::anyhow!("Error setting device gain state: {e}"))
     }
 
@@ -84,7 +84,7 @@ impl Device {
                 .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {}", e))?;
 
         self.stream_config_client.create_ring_buffer(
-            fidl_fuchsia_hardware_audio::Format::from(&format),
+            &fidl_fuchsia_hardware_audio::Format::from(&format),
             ring_buffer_server,
         )?;
         let ring_buffer_wrapper = RingBuffer::new(&format, ring_buffer_client).await?;
@@ -255,7 +255,7 @@ impl Device {
                 .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {}", e))?;
 
         self.stream_config_client.create_ring_buffer(
-            fidl_fuchsia_hardware_audio::Format::from(&format),
+            &fidl_fuchsia_hardware_audio::Format::from(&format),
             ring_buffer_server,
         )?;
 

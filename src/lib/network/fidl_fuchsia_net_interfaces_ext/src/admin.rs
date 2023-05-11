@@ -154,7 +154,7 @@ impl Control {
     ) -> Result<(), TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>> {
         self.or_terminal_event_no_return(self.proxy.add_address(
             address,
-            parameters,
+            &parameters,
             address_state_provider,
         ))
     }
@@ -185,7 +185,7 @@ impl Control {
         fnet_interfaces_admin::ControlSetConfigurationResult,
         TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
     > {
-        self.or_terminal_event(self.proxy.set_configuration(config)).await
+        self.or_terminal_event(self.proxy.set_configuration(&config)).await
     }
 
     /// Calls GetConfiguration on the proxy.

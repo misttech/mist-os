@@ -208,7 +208,7 @@ impl BleAdvertiseFacade {
             };
 
         // advertise() only returns after advertising has been terminated, so we can't await here.
-        let advertise_fut = peripheral.advertise(parameters, client_end);
+        let advertise_fut = peripheral.advertise(&parameters, client_end);
 
         let server_fut = BleAdvertiseFacade::process_advertised_peripheral_stream(
             inner.clone(),

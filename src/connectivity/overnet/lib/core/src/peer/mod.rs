@@ -1304,7 +1304,10 @@ async fn server_conn_stream(
                             .connect(
                                 &service_name,
                                 app_channel,
-                                ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
+                                &ConnectionInfo {
+                                    peer: Some(node_id.into()),
+                                    ..Default::default()
+                                },
                             )
                             .map_err(RunnerError::ServiceError)
                             .await?;

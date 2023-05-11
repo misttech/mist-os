@@ -56,7 +56,7 @@ async fn package_resolution() {
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let (package, resolved_context) = env
         .resolve_package(format!("fuchsia-pkg://test/{}", s).as_str())
@@ -117,7 +117,7 @@ async fn separate_blobs_url() {
         .unwrap()
         .build();
     repo_config.insert_mirror(mirror).unwrap();
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Verify package installation from the split repo succeeds.
     let (package, _resolved_context) = env
@@ -155,7 +155,7 @@ async fn verify_resolve_with_altered_env(
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     alter_env(&env, &pkg);
 
@@ -867,7 +867,7 @@ async fn merkle_pinned_meta_far_size_different_than_tuf_metadata() {
 
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let pinned_url = format!(
         "fuchsia-pkg://test/merkle-pin-size?hash={}",
@@ -903,7 +903,7 @@ async fn resolve_local_mirror() {
         .await;
     let mut startup_blobs = env.blobfs.list_blobs().unwrap();
     let repo_config = repo.make_repo_config("fuchsia-pkg://test".parse().unwrap(), None, true);
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
     let (package_dir, _resolved_context) = env.resolve_package(&pkg_url).await.unwrap();
@@ -942,7 +942,7 @@ async fn superpackage() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let (package, _resolved_context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
@@ -973,7 +973,7 @@ async fn fetch_delivery_blob() {
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let (resolved_pkg, _resolved_context) =
         env.resolve_package("fuchsia-pkg://test/fetch_delivery_blob").await.unwrap();
@@ -1001,7 +1001,7 @@ async fn fetch_delivery_blob_fallback() {
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let (resolved_pkg, _resolved_context) =
         env.resolve_package("fuchsia-pkg://test/delivery_blob_fallback").await.unwrap();

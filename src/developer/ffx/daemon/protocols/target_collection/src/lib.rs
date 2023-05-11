@@ -349,7 +349,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                             }
                             Err(e) => {
                                 return add_target_responder
-                                    .error(ffx::AddTargetError {
+                                    .error(&ffx::AddTargetError {
                                         connection_error: Some(e),
                                         connection_error_logs: Some(
                                             target.host_pipe_log_buffer().lines(),
@@ -370,7 +370,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         .await;
                         let _ = drop_guard.0.take();
                         return add_target_responder
-                            .error(ffx::AddTargetError {
+                            .error(&ffx::AddTargetError {
                                 connection_error: Some(e),
                                 connection_error_logs: Some(logs),
                                 ..Default::default()
@@ -687,7 +687,7 @@ mod tests {
         let (reader, server) =
             fidl::endpoints::create_endpoints::<ffx::TargetCollectionReaderMarker>();
         tc.list_targets(
-            ffx::TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
+            &ffx::TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
             reader,
         )
         .unwrap();
@@ -919,7 +919,9 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::default(), client).unwrap();
+        proxy
+            .add_target(&mut target_addr.into(), &ffx::AddTargetConfig::default(), client)
+            .unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -963,7 +965,9 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::default(), client).unwrap();
+        proxy
+            .add_target(&mut target_addr.into(), &ffx::AddTargetConfig::default(), client)
+            .unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -1016,7 +1020,7 @@ mod tests {
                     port: 8022,
                     scope_id: 1,
                 }),
-                ffx::AddTargetConfig::default(),
+                &ffx::AddTargetConfig::default(),
                 client,
             )
             .unwrap();

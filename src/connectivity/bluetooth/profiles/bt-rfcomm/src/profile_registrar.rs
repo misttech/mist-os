@@ -253,7 +253,7 @@ impl ProfileRegistrar {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         profile_upstream
-            .advertise(&fidl_services, (&params.parameters).try_into().unwrap(), connect_client)
+            .advertise(&fidl_services, &(&params.parameters).try_into().unwrap(), connect_client)
             .map(|_| ())
     }
 
@@ -378,7 +378,7 @@ impl ProfileRegistrar {
         receiver: ClientEnd<bredr::ConnectionReceiverMarker>,
         responder: bredr::ProfileAdvertiseResponder,
     ) -> impl Future<Output = ()> {
-        let adv_fut = self.profile_upstream.advertise(&services, parameters, receiver);
+        let adv_fut = self.profile_upstream.advertise(&services, &parameters, receiver);
         async move {
             let _ = adv_fut
                 .await
@@ -611,7 +611,7 @@ mod tests {
     ) {
         let (connection, connection_stream) =
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let adv_fut = client.advertise(&services, bredr::ChannelParameters::default(), connection);
+        let adv_fut = client.advertise(&services, &bredr::ChannelParameters::default(), connection);
         (connection_stream, adv_fut)
     }
 

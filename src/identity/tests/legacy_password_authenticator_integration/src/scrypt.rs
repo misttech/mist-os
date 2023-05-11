@@ -35,7 +35,7 @@ async fn deprecated_provision_new_null_password_account_while_null_disallowed() 
     let error = account_manager
         .deprecated_provision_new_account(
             EMPTY_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -61,7 +61,7 @@ async fn deprecated_provision_new_real_password_account_on_unformatted_partition
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -89,7 +89,7 @@ async fn deprecated_provision_new_real_password_account_on_formatted_partition()
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -116,7 +116,7 @@ async fn deprecated_provision_new_account_over_existing_account_fails() {
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -134,7 +134,7 @@ async fn deprecated_provision_new_account_over_existing_account_fails() {
     let error = account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -159,7 +159,7 @@ async fn deprecated_provision_new_account_formats_directory() {
         account_manager
             .deprecated_provision_new_account(
                 REAL_PASSWORD,
-                AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+                &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
                 server_end,
             )
             .await
@@ -225,7 +225,7 @@ async fn locked_account_can_be_unlocked_again() {
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -315,7 +315,7 @@ async fn locking_account_terminates_all_clients() {
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -351,7 +351,7 @@ async fn remove_account_succeeds_and_terminates_clients() {
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await
@@ -378,7 +378,7 @@ async fn remove_account_succeeds_and_terminates_clients() {
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await

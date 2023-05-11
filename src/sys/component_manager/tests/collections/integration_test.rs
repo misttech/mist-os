@@ -22,7 +22,7 @@ async fn collections() {
 
     // Create a couple child components.
     for name in vec!["a", "b"] {
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let child_decl = fdecl::Child {
             name: Some(name.to_string()),
             url: Some(format!("#meta/trigger_{}.cm", name)),
@@ -31,7 +31,7 @@ async fn collections() {
             ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .unwrap_or_else(|e| panic!("create_child {} failed: {:?}", name, e))
             .unwrap_or_else(|e| panic!("failed to create child {}: {:?}", name, e));
@@ -42,10 +42,10 @@ async fn collections() {
 
     // Start the children.
     for name in vec!["a", "b"] {
-        let mut child_ref = new_child_ref(name, "coll");
+        let child_ref = new_child_ref(name, "coll");
         let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         realm
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .unwrap_or_else(|e| panic!("open_exposed_dir {} failed: {:?}", name, e))
             .unwrap_or_else(|e| panic!("failed to open exposed dir of child {}: {:?}", name, e));
@@ -59,9 +59,9 @@ async fn collections() {
 
     // Destroy one.
     {
-        let mut child_ref = new_child_ref("a", "coll");
+        let child_ref = new_child_ref("a", "coll");
         realm
-            .destroy_child(&mut child_ref)
+            .destroy_child(&child_ref)
             .await
             .expect("destroy_child a failed")
             .expect("failed to destroy child");
@@ -70,9 +70,9 @@ async fn collections() {
     // Binding to destroyed child should fail.
     {
         let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let mut child_ref = new_child_ref("a", "coll");
+        let child_ref = new_child_ref("a", "coll");
         let res = realm
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .expect("second open_exposed_dir a failed");
         let err = res.expect_err("expected open_exposed_dir a to fail");
@@ -84,7 +84,7 @@ async fn collections() {
 
     // Recreate child (with different URL), and start it. Should work.
     {
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let child_decl = fdecl::Child {
             name: Some("a".to_string()),
             url: Some("#meta/trigger_realm.cm".to_string()),
@@ -93,16 +93,16 @@ async fn collections() {
             ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .expect("second create_child a failed")
             .expect("failed to create second child a");
     }
     {
         let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let mut child_ref = new_child_ref("a", "coll");
+        let child_ref = new_child_ref("a", "coll");
         realm
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .expect("open_exposed_dir a failed")
             .expect("failed to open exposed dir of child a");
@@ -124,7 +124,7 @@ async fn child_args() {
     // Providing numbered handles to a component that is not in a single run collection should fail.
     {
         let name = "a";
-        let mut collection_ref = fdecl::CollectionRef { name: "not_single_run".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "not_single_run".to_string() };
         let child_decl = fdecl::Child {
             name: Some(name.to_string()),
             url: Some(format!("#meta/trigger_{}.cm", name)),
@@ -139,7 +139,7 @@ async fn child_args() {
             ..Default::default()
         };
         let res = realm
-            .create_child(&mut collection_ref, child_decl, child_args)
+            .create_child(&collection_ref, &child_decl, child_args)
             .await
             .unwrap_or_else(|e| panic!("create_child {} failed: {:?}", name, e));
         let err = res.expect_err("expected create_child a to fail");
@@ -147,7 +147,7 @@ async fn child_args() {
     }
     // Providing numbered handles to a component that is in a single run collection should succeed.
     {
-        let mut collection_ref = fdecl::CollectionRef { name: "single_run".to_owned() };
+        let collection_ref = fdecl::CollectionRef { name: "single_run".to_owned() };
         let child_decl = fdecl::Child {
             name: Some("write_startup_socket".to_owned()),
             url: Some("#meta/write_startup_socket.cm".to_owned()),
@@ -166,7 +166,7 @@ async fn child_args() {
             ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, child_args)
+            .create_child(&collection_ref, &child_decl, child_args)
             .await
             .expect("fidl error in create_child")
             .expect("failed to create_child");
@@ -191,7 +191,7 @@ async fn child_args() {
     }
     // Providing numbered handles with invalid id should fail.
     {
-        let mut collection_ref = fdecl::CollectionRef { name: "single_run".to_owned() };
+        let collection_ref = fdecl::CollectionRef { name: "single_run".to_owned() };
         let child_decl = fdecl::Child {
             name: Some("write_startup_socket_2".to_owned()),
             url: Some("#meta/write_startup_socket.cm".to_owned()),
@@ -220,7 +220,7 @@ async fn child_args() {
             ..Default::default()
         };
         let result = realm
-            .create_child(&mut collection_ref, child_decl, child_args)
+            .create_child(&collection_ref, &child_decl, child_args)
             .await
             .expect("fidl error in create_child");
 
@@ -241,9 +241,9 @@ fn new_child_ref(name: &str, collection: &str) -> fdecl::ChildRef {
 
 async fn list_children(realm: &fcomponent::RealmProxy) -> Result<String, Error> {
     let (iterator_proxy, server_end) = endpoints::create_proxy().unwrap();
-    let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+    let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
     realm
-        .list_children(&mut collection_ref, server_end)
+        .list_children(&collection_ref, server_end)
         .await
         .expect("list_children failed")
         .expect("failed to list children");

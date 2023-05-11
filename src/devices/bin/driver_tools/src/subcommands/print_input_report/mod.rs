@@ -461,7 +461,7 @@ mod tests {
                         ..Default::default()
                     };
                     responder
-                        .send(descriptor)
+                        .send(&descriptor)
                         .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                         .context("Failed to respond to GetDescriptor request")?;
                 }

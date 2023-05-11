@@ -129,7 +129,7 @@ impl ModularFacade {
             ..Default::default()
         };
         self.session_launcher
-            .launch(config)
+            .launch(&config)
             .await?
             .map_err(|err| format_err!("failed to launch session: {:?}", err))
     }

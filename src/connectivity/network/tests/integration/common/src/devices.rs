@@ -24,7 +24,7 @@ pub fn create_tun_device_with(
         .expect("connect to protocol");
     let (tun_dev, tun_dev_server_end) =
         fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>().expect("create proxy");
-    tun_ctl.create_device(device_config, tun_dev_server_end).expect("create tun device");
+    tun_ctl.create_device(&device_config, tun_dev_server_end).expect("create tun device");
     let (netdevice_client_end, netdevice_server_end) =
         fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
     tun_dev.get_device(netdevice_server_end).expect("get device");
@@ -72,7 +72,7 @@ pub async fn create_tun_port_with(
         .unzip();
     tun_device
         .add_port(
-            fnet_tun::DevicePortConfig {
+            &fnet_tun::DevicePortConfig {
                 base: Some(fnet_tun::BasePortConfig {
                     id: Some(id),
                     rx_types: Some(rx_types),

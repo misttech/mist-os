@@ -617,7 +617,7 @@ impl BluetoothSysFacade {
             ),
         };
         let fut = async move {
-            let result = proxy.pair(&mut PeerId { value: id }, pairing_options).await;
+            let result = proxy.pair(&mut PeerId { value: id }, &pairing_options).await;
             if let Err(err) = result {
                 error!(tag = &with_line!("BluetoothSysFacade::pair"), ?err, "Failed to pair with",);
             }
@@ -656,7 +656,7 @@ impl BluetoothSysFacade {
         let tag = "BluetoothSysFacade::update_settings";
         match &self.inner.read().config_proxy {
             Some(proxy) => {
-                let new_settings = proxy.update(settings).await?;
+                let new_settings = proxy.update(&settings).await?;
                 info!("new core stack settings: {:?}", new_settings);
                 Ok(())
             }

@@ -492,7 +492,7 @@ mod tests {
                 })];
                 let nodename = Some("fake_fuchsia_device".to_string());
                 responder
-                    .send(TargetInfo { nodename, addresses: Some(addrs), ..Default::default() })
+                    .send(&TargetInfo { nodename, addresses: Some(addrs), ..Default::default() })
                     .unwrap();
             }
             _ => assert!(false),
@@ -511,7 +511,7 @@ mod tests {
         setup_fake_build_info_proxy(move |req| match req {
             ProviderRequest::GetBuildInfo { responder } => {
                 responder
-                    .send(BuildInfo {
+                    .send(&BuildInfo {
                         version: Some("fake_version".to_string()),
                         product_config: Some("fake_product".to_string()),
                         board_config: Some("fake_board".to_string()),
@@ -527,7 +527,7 @@ mod tests {
         setup_fake_board_proxy(move |req| match req {
             BoardRequest::GetInfo { responder } => {
                 responder
-                    .send(BoardInfo {
+                    .send(&BoardInfo {
                         name: Some("fake_name".to_string()),
                         revision: Some("fake_revision".to_string()),
                         cpu_architecture: Some(Architecture::X64),
@@ -542,7 +542,7 @@ mod tests {
         setup_fake_last_reboot_info_proxy(move |req| match req {
             LastRebootInfoProviderRequest::Get { responder } => {
                 responder
-                    .send(LastReboot {
+                    .send(&LastReboot {
                         graceful: Some(true),
                         uptime: Some(65000),
                         reason: Some(RebootReason::ZbiSwap),
@@ -656,7 +656,7 @@ mod tests {
         setup_fake_device_proxy(move |req| match req {
             DeviceRequest::GetInfo { responder } => {
                 responder
-                    .send(DeviceInfo {
+                    .send(&DeviceInfo {
                         serial_number: Some("fake_serial".to_string()),
                         is_retail_demo: Some(false),
                         retail_sku: Some("fake_sku".to_string()),
@@ -684,7 +684,7 @@ mod tests {
         setup_fake_product_proxy(move |req| match req {
             ProductRequest::GetInfo { responder } => {
                 responder
-                    .send(ProductInfo {
+                    .send(&ProductInfo {
                         sku: Some("fake_sku".to_string()),
                         language: Some("fake_language".to_string()),
                         regulatory_domain: Some(RegulatoryDomain {

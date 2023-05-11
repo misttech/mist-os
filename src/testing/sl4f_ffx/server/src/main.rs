@@ -162,7 +162,7 @@ mod tests {
         let realm = builder.build().await.unwrap();
         let server = realm.root.connect_to_protocol_at_exposed_dir::<Sl4fBridgeMarker>().unwrap();
         assert_eq!(
-            server.execute(ffx::TargetQuery::default(), "foo").await.unwrap(),
+            server.execute(&ffx::TargetQuery::default(), "foo").await.unwrap(),
             "foo".to_string()
         );
     }

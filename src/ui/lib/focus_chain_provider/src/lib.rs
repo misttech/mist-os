@@ -44,7 +44,7 @@ type HangingGetPublisher = hanging_get::Publisher<
 pub fn make_publisher_and_stream_handler(
 ) -> (FocusChainProviderPublisher, FocusChainProviderRequestStreamHandler) {
     let notify_fn: HangingGetNotifyFn =
-        Box::new(|focus_koid_chain, responder| match responder.send(focus_koid_chain.clone()) {
+        Box::new(|focus_koid_chain, responder| match responder.send(&focus_koid_chain) {
             Ok(()) => true,
             Err(e) => {
                 error!("Failed to send focus chain to client: {e:?}");
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(stream_handler.subscriber_count(), 0);
 
         let received_focus_koid_chain = client
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+            .watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_koid_chain");
         assert!(received_focus_koid_chain.equivalent(&FocusKoidChain::default()).unwrap());
@@ -179,7 +179,7 @@ mod tests {
         let (served_focus_chain, _view_ref_controls) = make_focus_chain(2);
         publisher.set_state_and_notify_if_changed(&served_focus_chain).expect("set_state");
         let received_focus_koid_chain = client
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+            .watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_chain");
         assert!(received_focus_koid_chain.equivalent(&served_focus_chain).unwrap());
@@ -194,7 +194,7 @@ mod tests {
         stream_handler.handle_request_stream(stream).detach();
 
         let received_focus_koid_chain = client
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+            .watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_koid_chain");
         assert!(received_focus_koid_chain.equivalent(&FocusKoidChain::default()).unwrap());
@@ -206,7 +206,7 @@ mod tests {
         publisher.set_state_and_notify_if_changed(&served_focus_chain).expect("set_state");
 
         let received_focus_koid_chain = client
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+            .watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_chain");
         assert_eq!(received_focus_koid_chain.len(), 3);

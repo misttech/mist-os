@@ -55,7 +55,7 @@ struct BridgeProxy {
 #[async_trait]
 impl Bridge for BridgeProxy {
     async fn execute(&self, target_query: ffx::TargetQuery, req: &str) -> String {
-        self.proxy.execute(target_query, req).await.unwrap()
+        self.proxy.execute(&target_query, req).await.unwrap()
     }
     fn target(&self) -> Option<String> {
         self.target.clone()

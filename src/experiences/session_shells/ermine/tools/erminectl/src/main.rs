@@ -226,7 +226,7 @@ async fn main() -> Result<(), Error> {
             match command {
                 ShellSubCommand::Launch(ShellLaunchCommand { app_name }) => {
                     let result = shell_automator
-                        .launch(fermine::ShellAutomatorLaunchRequest {
+                        .launch(&fermine::ShellAutomatorLaunchRequest {
                             app_name: Some(app_name),
                             ..Default::default()
                         })

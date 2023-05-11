@@ -25,7 +25,7 @@ async fn test_privacymarker() {
         // Ensure setting interface propagates correctly
         let mut privacy_settings = fidl_fuchsia_settings::PrivacySettings::default();
         privacy_settings.user_data_sharing_consent = Some(true);
-        proxy.set(privacy_settings).await.expect("set completed").expect("set successful");
+        proxy.set(&privacy_settings).await.expect("set completed").expect("set successful");
     }
 
     {

@@ -167,7 +167,7 @@ mod tests {
         fn expect_get_pairing_state(self, result: PairingState) -> Self {
             self.push_pair(move |req| match req {
                 PairingStateWatcherRequest::WatchPairingState { responder } => {
-                    responder.send(fidl_fuchsia_weave::PairingState::from(result)).unwrap();
+                    responder.send(&fidl_fuchsia_weave::PairingState::from(result)).unwrap();
                 }
             })
         }

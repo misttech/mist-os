@@ -26,7 +26,7 @@ async fn command(proxy: DoNotDisturbProxy, do_not_disturb: DoNotDisturb) -> Watc
     if settings == DoNotDisturbSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set DoNotDisturb to {:?}", do_not_disturb)
@@ -124,7 +124,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             DoNotDisturbRequest::Watch { responder } => {
-                let _ = responder.send(DoNotDisturbSettings::from(expected_do_not_disturb));
+                let _ = responder.send(&DoNotDisturbSettings::from(expected_do_not_disturb));
             }
         });
 

@@ -39,7 +39,7 @@ async fn test_list_typefaces_empty_request_gets_all(
 
     let request = empty_list_typefaces_request();
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -57,7 +57,7 @@ async fn test_list_typefaces_no_results_after_last_page(
     let request = empty_list_typefaces_request();
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -77,7 +77,7 @@ async fn test_list_typefaces_paginates(factory: &ProviderFactory) -> Result<(), 
     let request = empty_list_typefaces_request();
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -112,7 +112,7 @@ async fn test_list_typefaces_no_results_found(factory: &ProviderFactory) -> Resu
     let request = name_query("404FontNotFound");
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -130,7 +130,7 @@ async fn test_list_typefaces_by_name(factory: &ProviderFactory) -> Result<(), Er
     let request = name_query("Roboto");
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -151,7 +151,7 @@ async fn test_list_typefaces_by_alias(factory: &ProviderFactory) -> Result<(), E
     let request = name_query("MaterialIcons");
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -170,7 +170,7 @@ async fn test_list_typefaces_by_name_ignores_case(factory: &ProviderFactory) -> 
     let request = name_query("roboto");
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -192,7 +192,7 @@ async fn test_list_typefaces_by_name_substring(factory: &ProviderFactory) -> Res
     request.flags = Some(fonts_exp::ListTypefacesFlags::MATCH_FAMILY_NAME_SUBSTRING);
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -212,7 +212,7 @@ async fn test_list_typefaces_by_slant_range(factory: &ProviderFactory) -> Result
 
     let request = slant_query(fonts::Slant::Upright, fonts::Slant::Italic);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -233,7 +233,7 @@ async fn test_list_typefaces_by_slant_range_is_inclusive(
 
     let request = slant_query(fonts::Slant::Italic, fonts::Slant::Italic);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -252,7 +252,7 @@ async fn test_list_typefaces_by_weight_range(factory: &ProviderFactory) -> Resul
 
     let request = weight_query(200, 300);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -273,7 +273,7 @@ async fn test_list_typefaces_by_weight_range_is_inclusive(
 
     let request = weight_query(300, 300);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -292,7 +292,7 @@ async fn test_list_typefaces_by_width_range(factory: &ProviderFactory) -> Result
 
     let request = width_query(fonts::Width::Condensed, fonts::Width::Expanded);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -313,7 +313,7 @@ async fn test_list_typefaces_by_width_range_is_inclusive(
 
     let request = width_query(fonts::Width::Normal, fonts::Width::Normal);
 
-    font_provider.list_typefaces(request, iterator).await?.expect("ListTypefaces request failed");
+    font_provider.list_typefaces(&request, iterator).await?.expect("ListTypefaces request failed");
 
     let response = client.get_next().await?;
     let results = response.results.unwrap();
@@ -333,7 +333,7 @@ async fn test_list_typefaces_by_language(factory: &ProviderFactory) -> Result<()
     let request = lang_query(vec![locale("ja")]);
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -354,7 +354,7 @@ async fn test_list_typefaces_by_code_point(factory: &ProviderFactory) -> Result<
     let request = code_point_query(vec!['な' as u32]);
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 
@@ -375,7 +375,7 @@ async fn test_list_typefaces_by_generic_family(factory: &ProviderFactory) -> Res
     let request = generic_family_query(fonts::GenericFontFamily::SansSerif);
 
     font_provider
-        .list_typefaces(request, iterator.into())
+        .list_typefaces(&request, iterator.into())
         .await?
         .expect("ListTypefaces request failed");
 

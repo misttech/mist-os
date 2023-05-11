@@ -32,7 +32,7 @@ async fn realm_api_without_override_returns_default() {
     };
 
     realm
-        .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
+        .create_child(&mut collection_ref, &child_decl, CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();

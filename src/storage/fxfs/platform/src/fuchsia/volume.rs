@@ -1595,7 +1595,7 @@ mod tests {
                 PROJECT_ID
             );
             root_proxy
-                .unlink(FILE_NAME, fio::UnlinkOptions::default())
+                .unlink(FILE_NAME, &fio::UnlinkOptions::default())
                 .await
                 .expect("FIDL call failed")
                 .expect("unlink failed");

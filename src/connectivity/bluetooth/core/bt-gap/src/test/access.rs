@@ -42,7 +42,7 @@ async fn test_pair() -> Result<(), Error> {
     let req_opts_ = req_opts.clone();
 
     let make_request = async move {
-        let response = client.pair(&mut req_id.into(), req_opts_.into()).await;
+        let response = client.pair(&req_id.into(), &req_opts_.into()).await;
         assert_matches!(response, Ok(Ok(())));
         // This terminating will drop the access client, which causest the access stream to
         // terminate. This will cause run_access to terminate which drops the host dispatcher, which

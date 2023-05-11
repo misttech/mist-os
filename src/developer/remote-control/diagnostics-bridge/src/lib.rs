@@ -528,7 +528,7 @@ mod test {
         let proxy = setup_diagnostics_bridge_proxy(|p| async { FakeArchiveReaderManager::new(p) });
         let (iterator, server) = create_proxy::<ArchiveIteratorMarker>().unwrap();
 
-        proxy.stream_diagnostics(default_log_parameters(), server).await.unwrap().unwrap();
+        proxy.stream_diagnostics(&default_log_parameters(), server).await.unwrap().unwrap();
 
         let entries = iterator.get_next().await.unwrap().expect("expected Ok response");
         assert!(entries.is_empty());
@@ -541,7 +541,7 @@ mod test {
 
         let err = proxy
             .stream_diagnostics(
-                BridgeStreamParameters {
+                &BridgeStreamParameters {
                     data_type: None,
                     stream_mode: Some(StreamMode::SnapshotThenSubscribe),
                     ..Default::default()
@@ -562,7 +562,7 @@ mod test {
 
         let err = proxy
             .stream_diagnostics(
-                BridgeStreamParameters {
+                &BridgeStreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: None,
                     ..Default::default()
@@ -583,7 +583,7 @@ mod test {
 
         let err = proxy
             .stream_diagnostics(
-                BridgeStreamParameters {
+                &BridgeStreamParameters {
                     data_type: Some(DataType::Inspect),
                     stream_mode: Some(StreamMode::SnapshotThenSubscribe),
                     ..Default::default()
@@ -604,7 +604,7 @@ mod test {
 
         let err = proxy
             .stream_diagnostics(
-                BridgeStreamParameters {
+                &BridgeStreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: Some(StreamMode::Subscribe),
                     ..Default::default()
@@ -631,7 +631,7 @@ mod test {
         let (iterator, server) = create_proxy::<ArchiveIteratorMarker>().unwrap();
 
         proxy
-            .stream_diagnostics(default_log_parameters(), server)
+            .stream_diagnostics(&default_log_parameters(), server)
             .await
             .unwrap()
             .expect("expect Ok response");
@@ -674,7 +674,7 @@ mod test {
         let (iterator, server) = create_proxy::<ArchiveIteratorMarker>().unwrap();
 
         proxy
-            .stream_diagnostics(default_log_parameters(), server)
+            .stream_diagnostics(&default_log_parameters(), server)
             .await
             .unwrap()
             .expect("expect Ok response");
@@ -710,7 +710,7 @@ mod test {
         let (_, server) = create_proxy::<ArchiveIteratorMarker>().unwrap();
 
         let result = proxy
-            .stream_diagnostics(default_log_parameters(), server)
+            .stream_diagnostics(&default_log_parameters(), server)
             .await
             .unwrap()
             .expect_err("connection should fail");
@@ -731,7 +731,7 @@ mod test {
         let (iterator, server) = create_proxy::<ArchiveIteratorMarker>().unwrap();
 
         proxy
-            .stream_diagnostics(default_log_parameters(), server)
+            .stream_diagnostics(&default_log_parameters(), server)
             .await
             .unwrap()
             .expect("expect Ok response");
@@ -763,7 +763,7 @@ mod test {
 
         proxy
             .stream_diagnostics(
-                BridgeStreamParameters {
+                &BridgeStreamParameters {
                     data_type: Some(DataType::Inspect),
                     stream_mode: Some(StreamMode::Snapshot),
                     ..Default::default()

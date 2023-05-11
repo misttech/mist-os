@@ -40,7 +40,7 @@ impl TestBatteryManager {
     /// Sends the provided `update` to the `watcher_client`. Returns a Future associated with the
     /// send request.
     pub fn send_update(&self, update: fpower::BatteryInfo) -> QueryResponseFut<()> {
-        let update_fut = self.watcher_client.on_change_battery_info(update);
+        let update_fut = self.watcher_client.on_change_battery_info(&update);
         update_fut
     }
 }

@@ -662,7 +662,7 @@ mod tests {
         // We need to select on both device.run and our proxy call because the device needs to be
         // polled to service the request.
         let result = select! {
-            result = keyboard_proxy.on_key_event(event.clone()).fuse() => result.unwrap(),
+            result = keyboard_proxy.on_key_event(&event).fuse() => result.unwrap(),
             _result = keyboard_device.run().fuse() => {
                 panic!("device.run() exited while processing key event");
             }
@@ -727,7 +727,7 @@ mod tests {
         // We need to select on both device.run and our proxy call because the device needs to be
         // polled to service the request.
         let result = select! {
-            result = keyboard_proxy.on_key_event(event).fuse() => result.unwrap(),
+            result = keyboard_proxy.on_key_event(&event).fuse() => result.unwrap(),
             _result = keyboard_device.run().fuse() => {
                 panic!("device.run() exited while processing key event");
             }
@@ -753,7 +753,7 @@ mod tests {
             ..Default::default()
         };
         let result = select! {
-            result = keyboard_proxy.on_key_event(event.clone()).fuse() => result.unwrap(),
+            result = keyboard_proxy.on_key_event(&event).fuse() => result.unwrap(),
             _result = keyboard_device.run().fuse() => {
                 panic!("device.run() exited while processing key event");
             }

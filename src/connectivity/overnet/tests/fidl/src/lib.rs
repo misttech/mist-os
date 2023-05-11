@@ -23,7 +23,7 @@ impl fidl_fuchsia_overnet::ServiceProviderProxyInterface for Service {
     fn connect_to_service(
         &self,
         chan: fidl::Channel,
-        _connection_info: fidl_fuchsia_overnet::ConnectionInfo,
+        _connection_info: &fidl_fuchsia_overnet::ConnectionInfo,
     ) -> std::result::Result<(), fidl::Error> {
         let test_name = self.1.clone();
         tracing::info!(%test_name, "got connection {:?}", chan);

@@ -75,7 +75,7 @@ impl GasProxy {
         let (service_client, service_request_stream) =
             create_request_stream::<gatt::LocalServiceMarker>()?;
         let service_info = build_generic_access_service_info();
-        gatt_server.publish_service(service_info, service_client).await?.map_err(|e| {
+        gatt_server.publish_service(&service_info, service_client).await?.map_err(|e| {
             format_err!("Failed to publish Generic Access Service to GATT server: {:?}", e)
         })?;
         info!("Published Generic Access Service to local device database.");
@@ -277,7 +277,7 @@ mod tests {
     async fn test_invalid_request() {
         let (service_client, _host_dispatcher) = setup_generic_access_service();
         let result = service_client
-            .write_value(gatt::LocalServiceWriteValueRequest {
+            .write_value(&gatt::LocalServiceWriteValueRequest {
                 peer_id: Some(PeerId { value: 1 }),
                 handle: Some(gatt::Handle { value: GENERIC_ACCESS_DEVICE_NAME_ID }),
                 offset: Some(0),

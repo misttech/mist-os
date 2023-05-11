@@ -23,7 +23,7 @@ async fn absolute_url_rejects_non_empty_context() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // Fails with non-empty context
     assert_matches!(
@@ -68,7 +68,7 @@ async fn relative_url_succeeds() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     let (_, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
@@ -112,7 +112,7 @@ async fn subpackage_of_a_subpackage() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     let (_, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
@@ -150,7 +150,7 @@ async fn relative_url_empty_context_fails() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     let (_, _) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
@@ -187,7 +187,7 @@ async fn bad_relative_url_fails() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     let (_, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
@@ -263,7 +263,7 @@ async fn non_base_superpackage_base_subpackage_succeeds() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     let (_, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await

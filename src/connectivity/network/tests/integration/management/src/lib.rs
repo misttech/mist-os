@@ -679,7 +679,7 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
         fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
             .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
     prefix_provider
-        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
+        .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
     assert_eq!(
         prefix_control
@@ -722,7 +722,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
             fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                 .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
         prefix_provider
-            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
+            .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
 
         // Calling acquire_prefix a second time results in ALREADY_ACQUIRING.
@@ -731,7 +731,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
                 fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                     .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
             prefix_provider
-                .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
+                .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
                 .expect("acquire prefix");
             let fnet_dhcpv6::PrefixControlEvent::OnExit { reason } = prefix_control
                 .take_event_stream()
@@ -752,7 +752,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
             fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                 .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
         prefix_provider
-            .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
+            .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
         match prefix_control
             .take_event_stream()
@@ -822,7 +822,7 @@ async fn test_prefix_provider_config_error<M: Manager, N: Netstack>(
     let (prefix_control, server_end) =
         fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
             .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
-    prefix_provider.acquire_prefix(config, server_end).expect("acquire prefix");
+    prefix_provider.acquire_prefix(&config, server_end).expect("acquire prefix");
     let fnet_dhcpv6::PrefixControlEvent::OnExit { reason } = prefix_control
         .take_event_stream()
         .try_next()
@@ -859,7 +859,7 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
         fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
             .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
     prefix_provider
-        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
+        .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
 
     let (res1, res2) =
@@ -1071,7 +1071,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                         .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
                 prefix_provider
                     .acquire_prefix(
-                        fnet_dhcpv6::AcquirePrefixConfig {
+                        &fnet_dhcpv6::AcquirePrefixConfig {
                             interface_id: Some(if_id),
                             ..Default::default()
                         },

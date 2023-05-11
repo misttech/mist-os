@@ -517,7 +517,7 @@ pub fn event_stream_from_state(
             // Register interest in all fields so that the strong validation
             // witness type can be used and the stream returned is compatible
             // with other methods in this crate.
-            fnet_interfaces::WatcherOptions {
+            &fnet_interfaces::WatcherOptions {
                 address_properties_interest: Some(
                     fnet_interfaces::AddressPropertiesInterest::VALID_UNTIL
                         | fnet_interfaces::AddressPropertiesInterest::PREFERRED_LIFETIME_INFO,

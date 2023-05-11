@@ -32,7 +32,7 @@ impl PlatformServices for HostPlatformServices {
             format!("{}:expose:{}", guest_type.moniker(), guest_type.guest_manager_interface());
         let selector = selectors::parse_selector::<selectors::VerboseError>(&selector)?;
         // This may fail, but we report the error when we later try to use the GuestManagerProxy.
-        let _ = self.remote_control.connect(selector, server_end.into_channel()).await?;
+        let _ = self.remote_control.connect(&selector, server_end.into_channel()).await?;
         Ok(guest_manager)
     }
 
@@ -42,7 +42,7 @@ impl PlatformServices for HostPlatformServices {
             format!("{}:expose:fuchsia.virtualization.LinuxManager", GuestType::Termina.moniker());
         let selector = selectors::parse_selector::<selectors::VerboseError>(&selector)?;
         // This may fail, but we report the error when we later try to use the LinuxManagerProxy.
-        let _ = self.remote_control.connect(selector, server_end.into_channel()).await?;
+        let _ = self.remote_control.connect(&selector, server_end.into_channel()).await?;
         Ok(linux_manager)
     }
 }

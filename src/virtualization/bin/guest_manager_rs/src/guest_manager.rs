@@ -302,7 +302,7 @@ impl GuestManager {
                                 });
 
 
-                            send_checked!(responder, self.guest_info(GuestManager::check_for_problems(network_state)));
+                            send_checked!(responder, &self.guest_info(GuestManager::check_for_problems(network_state)));
                         }
                     }
                 }
@@ -391,7 +391,7 @@ impl GuestManager {
         // Connect to interface watcher.
         let state_proxy = connect_to_protocol::<ninterfaces::StateMarker>()?;
         let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>()?;
-        state_proxy.get_watcher(ninterfaces::WatcherOptions::default(), watcher_server)?;
+        state_proxy.get_watcher(&ninterfaces::WatcherOptions::default(), watcher_server)?;
 
         // Collect interface state events until Idle is received, indicating the end of current
         // events at the time of the query.

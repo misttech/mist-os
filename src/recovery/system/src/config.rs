@@ -464,7 +464,7 @@ mod tests {
             match stream.next().await.unwrap() {
                 Ok(BuildInfoRequest::GetBuildInfo { responder }) => {
                     responder
-                        .send(BuildInfo {
+                        .send(&BuildInfo {
                             version: Some("proxy_version".to_string()),
                             ..Default::default()
                         })
@@ -513,7 +513,7 @@ mod tests {
         fasync::Task::local(async move {
             match stream.next().await.unwrap() {
                 Ok(BuildInfoRequest::GetBuildInfo { responder }) => {
-                    responder.send(BuildInfo::default()).unwrap();
+                    responder.send(&BuildInfo::default()).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }

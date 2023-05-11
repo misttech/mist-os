@@ -151,7 +151,7 @@ impl Config {
             create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
                 .expect("error connecting to WatcherMarker");
         state
-            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::default(), watcher_server)
+            .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), watcher_server)
             .expect("error getting interface watcher");
 
         let get_nicid_fut = async move {

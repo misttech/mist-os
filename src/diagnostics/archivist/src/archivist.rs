@@ -617,7 +617,7 @@ mod tests {
             let mut reader = fuchsia_async::Socket::from_socket(local).unwrap();
             accessor
                 .stream_diagnostics(
-                    StreamParameters {
+                    &StreamParameters {
                         data_type: Some(DataType::Logs),
                         stream_mode: Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot),
                         format: Some(Format::Json),

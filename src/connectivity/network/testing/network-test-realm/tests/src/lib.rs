@@ -2309,7 +2309,7 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
     .await;
 
     network_test_realm
-        .start_dhcpv6_client(fntr::ControllerStartDhcpv6ClientRequest {
+        .start_dhcpv6_client(&fntr::ControllerStartDhcpv6ClientRequest {
             interface_id: Some(interface.id()),
             address: Some(DEFAULT_IPV6_LINK_LOCAL_SOURCE_ADDR),
             stateful: Some(stateful),

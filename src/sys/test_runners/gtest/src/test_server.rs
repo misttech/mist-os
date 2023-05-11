@@ -290,7 +290,7 @@ impl TestServer {
 
         run_listener
             .on_test_case_started(
-                invocation,
+                &invocation,
                 ftest::StdHandles {
                     out: Some(stdout_client),
                     err: Some(stderr_client),
@@ -311,7 +311,7 @@ impl TestServer {
             if let Err(e) = TestServer::validate_args(user_args) {
                 test_stderr.write_str(&format!("{}", e)).await?;
                 case_listener_proxy
-                    .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
+                    .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
                     .map_err(RunTestError::SendFinish)?;
                 return Ok(());
             }
@@ -332,7 +332,10 @@ impl TestServer {
                         .write_str(&format!("failed to launch component process: {}", e))
                         .await?;
                     case_listener_proxy
-                        .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
+                        .finished(&TestResult {
+                            status: Some(Status::Failed),
+                            ..Default::default()
+                        })
                         .map_err(RunTestError::SendFinish)?;
                     return Ok(());
                 }
@@ -391,7 +394,7 @@ impl TestServer {
             test_stderr.write_str("Test exited abnormally\n").await?;
 
             case_listener_proxy
-                .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
+                .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
                 .map_err(RunTestError::SendFinish)?;
             return Ok(());
         }
@@ -407,7 +410,7 @@ impl TestServer {
                     .await?;
 
                 case_listener_proxy
-                    .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
+                    .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
                     .map_err(RunTestError::SendFinish)?;
                 return Ok(());
             }
@@ -426,7 +429,7 @@ impl TestServer {
                 .await?;
 
             case_listener_proxy
-                .finished(TestResult { status: Some(Status::Failed), ..Default::default() })
+                .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
                 .map_err(RunTestError::SendFinish)?;
             return Ok(());
         }
@@ -454,7 +457,7 @@ impl TestServer {
             }
         };
         case_listener_proxy
-            .finished(TestResult { status: Some(test_status), ..Default::default() })
+            .finished(&TestResult { status: Some(test_status), ..Default::default() })
             .map_err(RunTestError::SendFinish)?;
         debug!("test finish {}", test);
         Ok(())
@@ -853,7 +856,7 @@ mod tests {
         .detach();
 
         suite_proxy
-            .run(&invocations, run_options, run_listener_client)
+            .run(&invocations, &run_options, run_listener_client)
             .context("cannot call run")?;
 
         collect_listener_event(run_listener).await.context("Failed to collect results")

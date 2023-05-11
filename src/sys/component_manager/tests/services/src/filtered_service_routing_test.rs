@@ -926,7 +926,7 @@ async fn create_dynamic_service_client_from_offers(
 ) -> Result<(), fcomponent::Error> {
     let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("could not connect to Realm service");
-    let mut collection_ref = fdecl::CollectionRef { name: TEST_COLLECTION_NAME.to_string() };
+    let collection_ref = fdecl::CollectionRef { name: TEST_COLLECTION_NAME.to_string() };
     let child_decl = fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(CLIENT_COMPONENT_URL.to_string()),
@@ -936,8 +936,8 @@ async fn create_dynamic_service_client_from_offers(
     };
     realm
         .create_child(
-            &mut collection_ref,
-            child_decl,
+            &collection_ref,
+            &child_decl,
             fcomponent::CreateChildArgs {
                 numbered_handles: None,
                 dynamic_offers: Some(dynamic_offers),
@@ -972,7 +972,7 @@ async fn create_dynamic_service_client(
 async fn create_dynamic_service_provider(child_name: &str) {
     let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("could not connect to Realm service");
-    let mut collection_ref = fdecl::CollectionRef { name: TEST_COLLECTION_NAME.to_string() };
+    let collection_ref = fdecl::CollectionRef { name: TEST_COLLECTION_NAME.to_string() };
     let child_decl = fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(PROVIDER_COMPONENT_URL.to_string()),
@@ -980,7 +980,7 @@ async fn create_dynamic_service_provider(child_name: &str) {
         ..Default::default()
     };
     let _ = realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
         .await
         .expect("Failed to create dynamic child service client.");
 }

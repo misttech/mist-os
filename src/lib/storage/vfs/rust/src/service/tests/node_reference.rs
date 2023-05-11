@@ -206,7 +206,7 @@ fn attributes_not_supported() {
                 node_proxy.get_attributes(fio::NodeAttributesQuery::ABILITIES).await.unwrap();
             assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
             let response =
-                node_proxy.update_attributes(fio::MutableNodeAttributes::default()).await.unwrap();
+                node_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap();
             assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
         },
     );
@@ -220,7 +220,7 @@ fn reopen_not_supported() {
         |node_proxy| async move {
             let (client_end, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
 
-            node_proxy.reopen(fio::RightsRequest::default(), server_end).unwrap();
+            node_proxy.reopen(&fio::RightsRequest::default(), server_end).unwrap();
 
             let mut event_stream = client_end.take_event_stream();
             assert_matches!(

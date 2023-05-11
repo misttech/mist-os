@@ -896,7 +896,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url =
                 "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm"
@@ -922,7 +922,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url =
                 "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind2-component.cm"
@@ -947,7 +947,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
         .fuse();
@@ -1009,7 +1009,7 @@ mod tests {
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
@@ -1081,7 +1081,7 @@ mod tests {
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
@@ -1158,7 +1158,7 @@ mod tests {
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
-            let result = proxy.match_driver(args).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
 
             assert_eq!(result, Err(Status::NOT_SUPPORTED.into_raw()));
         }
@@ -1229,7 +1229,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
                 fdi::MatchedDriver::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
@@ -1245,7 +1245,7 @@ mod tests {
                 driver_url_suffix: Some("driver-2.cm".to_string()),
                 ..Default::default()
             };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
                 fdi::MatchedDriver::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-2.cm", d.url.unwrap());
@@ -1262,7 +1262,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let result = proxy.match_driver(args).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
         .fuse();
@@ -1336,7 +1336,7 @@ mod tests {
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
                 NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_owned(),
@@ -1440,7 +1440,7 @@ mod tests {
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
                 NON_FALLBACK_BASE_DRIVER_COMPONENT_URL.to_owned(),
@@ -1643,7 +1643,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
 
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         })
@@ -1678,7 +1678,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
                 FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_owned(),
@@ -1715,7 +1715,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind-component.cm".to_string();
             let expected_driver_url = "fuchsia-boot:///#driver/fake-driver.so".to_string();
@@ -1736,7 +1736,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind2-component.cm".to_string();
             let expected_driver_url = "fuchsia-boot:///#driver/fake-driver2.so".to_string();
@@ -1757,7 +1757,7 @@ mod tests {
             };
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
-            let result = proxy.match_driver(args).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
         .fuse();
@@ -1805,7 +1805,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
@@ -1832,7 +1832,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let result = proxy.match_driver(match_args).await.unwrap().unwrap();
+            let result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             assert_eq!(
                 fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                     specs: Some(vec![fdi::MatchedCompositeNodeSpecInfo {
@@ -1861,7 +1861,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let result = proxy.match_driver(mismatch_args).await.unwrap();
+            let result = proxy.match_driver(&mismatch_args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
         .fuse();
@@ -1983,7 +1983,7 @@ mod tests {
             ];
 
             let result = proxy
-                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(&fdf::CompositeNodeSpec {
                     name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
@@ -2010,7 +2010,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_1".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2036,7 +2036,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_2".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2184,7 +2184,7 @@ mod tests {
             ];
 
             let result = proxy
-                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(&fdf::CompositeNodeSpec {
                     name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
@@ -2211,7 +2211,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_1".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2237,7 +2237,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_2".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2396,7 +2396,7 @@ mod tests {
             ];
 
             let result = proxy
-                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(&fdf::CompositeNodeSpec {
                     name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
@@ -2531,7 +2531,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2565,7 +2565,7 @@ mod tests {
             };
 
             // We can see the spec comes back without a matched composite.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
@@ -2590,7 +2590,7 @@ mod tests {
             }
 
             // Now when we get it back, it has the matching composite driver on it.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
@@ -2729,7 +2729,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2763,7 +2763,7 @@ mod tests {
             };
 
             // We can see the spec comes back without a matched composite.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
@@ -2788,7 +2788,7 @@ mod tests {
             }
 
             // Now when we get it back, it has the matching composite driver on it.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
@@ -2938,7 +2938,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -2970,7 +2970,7 @@ mod tests {
             };
 
             // We can see the spec comes back without a matched composite.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
@@ -2995,7 +2995,7 @@ mod tests {
             }
 
             // Now when we get it back, it has the matching composite driver on it.
-            let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
+            let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
@@ -3073,7 +3073,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
@@ -3100,7 +3100,7 @@ mod tests {
             }];
 
             let result = proxy
-                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(&fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
                     parents: Some(vec![fdf::ParentSpec {
                         bind_rules: duplicate_bind_rules,
@@ -3177,7 +3177,7 @@ mod tests {
             }];
 
             let result = proxy
-                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(&fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
                     parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
@@ -3240,16 +3240,15 @@ mod tests {
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             // First attempt should fail since we haven't registered it.
-            let result = proxy.match_driver(args.clone()).await.unwrap();
+            let result = proxy.match_driver(&args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
 
             // Now register the ephemeral driver.
-            let mut pkg_url =
-                fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
-            registrar_proxy.register(&mut pkg_url).await.unwrap().unwrap();
+            let pkg_url = fidl_fuchsia_pkg::PackageUrl { url: component_manifest_url.to_string() };
+            registrar_proxy.register(&pkg_url).await.unwrap().unwrap();
 
             // Match succeeds now.
-            let result = proxy.match_driver(args.clone()).await.unwrap().unwrap();
+            let result = proxy.match_driver(&args).await.unwrap().unwrap();
             let expected_url = component_manifest_url.to_string();
             let expected_driver_url = driver_library_url.to_string();
             let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(

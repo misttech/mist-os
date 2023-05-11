@@ -54,7 +54,7 @@ impl MediaSessions {
         let watch_options = WatchOptions::default();
 
         if let Err(e) = discovery
-            .watch_sessions(watch_options, watcher_client)
+            .watch_sessions(&watch_options, watcher_client)
             .context("Should be able to watch media sessions")
         {
             warn!("FIDL error watching sessions: {:?}", e);

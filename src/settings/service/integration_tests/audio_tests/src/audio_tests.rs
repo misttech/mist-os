@@ -53,7 +53,7 @@ fn changed_media_stream_settings_2() -> AudioStreamSettings {
 async fn set_volume(proxy: &AudioProxy, streams: Vec<AudioStreamSettings>) {
     let mut audio_settings = AudioSettings::default();
     audio_settings.streams = Some(streams);
-    proxy.set(audio_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&audio_settings).await.expect("set completed").expect("set successful");
 }
 
 /// Verifies that a stream equal to |stream| is inside of |settings|.
@@ -297,7 +297,7 @@ async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
 
     let result = audio_test
         .proxy()
-        .set(AudioSettings { streams: Some(vec![setting]), ..Default::default() })
+        .set(&AudioSettings { streams: Some(vec![setting]), ..Default::default() })
         .await
         .expect("set completed");
     assert_eq!(result, Err(Error::Failed));
@@ -352,7 +352,7 @@ async fn valid_missing_input_tests(
 
     let result = audio_test
         .proxy()
-        .set(AudioSettings { streams: Some(vec![setting]), ..Default::default() })
+        .set(&AudioSettings { streams: Some(vec![setting]), ..Default::default() })
         .await
         .expect("set completed");
 

@@ -418,7 +418,7 @@ impl<'a> Logger<'a> {
         let (log_proxy, log_server_end) = create_proxy::<RemoteDiagnosticsBridgeMarker>()?;
         let selector = parse_selector::<VerboseError>(BRIDGE_SELECTOR).unwrap();
 
-        match remote_proxy.connect(selector, log_server_end.into_channel()).await? {
+        match remote_proxy.connect(&selector, log_server_end.into_channel()).await? {
             Ok(_) => {}
             Err(e) => {
                 tracing::info!("attempt to connect to logger for {} failed. {:?}", nodename, e);
@@ -458,7 +458,7 @@ impl<'a> Logger<'a> {
             ..Default::default()
         };
         let _ = log_proxy
-            .stream_diagnostics(params, listener_client)
+            .stream_diagnostics(&params, listener_client)
             .await?
             .map_err(|s| anyhow!("failure setting up diagnostics stream: {:?}", s))?;
         let _: () = listener_fut.await?;

@@ -134,7 +134,7 @@ async fn run_closed_target_server(
             }
             ClosedTargetRequest::TwoWayTablePayload { payload, responder } => {
                 responder
-                    .send(ClosedTargetTwoWayTablePayloadResponse {
+                    .send(&ClosedTargetTwoWayTablePayloadResponse {
                         v: payload.v,
                         ..Default::default()
                     })

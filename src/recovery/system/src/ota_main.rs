@@ -52,7 +52,7 @@ where
     fasync::Task::local(async move { scope.wait().await }).detach();
 
     ota_progress_proxy
-        .render2(ProgressRendererRender2Request {
+        .render2(&ProgressRendererRender2Request {
             status: Some(Status::Active),
             percent_complete: Some(0.0),
             ..Default::default()
@@ -76,7 +76,7 @@ where
                 return;
             }
             let _ = ota_progress_proxy
-                .render2(ProgressRendererRender2Request {
+                .render2(&ProgressRendererRender2Request {
                     status: Some(Status::Active),
                     percent_complete: Some(progress as f32),
                     ..Default::default()
@@ -96,7 +96,7 @@ where
         Ok(_) => {
             println!("OTA Success!");
             ota_progress_proxy
-                .render2(ProgressRendererRender2Request {
+                .render2(&ProgressRendererRender2Request {
                     status: Some(Status::Complete),
                     percent_complete: Some(100.0),
                     ..Default::default()
@@ -107,7 +107,7 @@ where
         Err(e) => {
             println!("OTA Error..... {:?}", e);
             ota_progress_proxy
-                .render2(ProgressRendererRender2Request {
+                .render2(&ProgressRendererRender2Request {
                     status: Some(Status::Error),
                     ..Default::default()
                 })

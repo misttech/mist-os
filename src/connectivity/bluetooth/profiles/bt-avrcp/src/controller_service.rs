@@ -219,7 +219,7 @@ impl ControllerService {
         let control_handle: ControllerControlHandle = self.fidl_stream.control_handle();
         let mut notification = Notification::default();
         Self::update_notification_from_controller_event(&mut notification, &event);
-        control_handle.send_on_notification(timestamp, notification).map_err(Error::from)
+        control_handle.send_on_notification(timestamp, &notification).map_err(Error::from)
     }
 
     fn cache_controller_notification_state(&mut self, event: &PeerControllerEvent) {
@@ -256,7 +256,7 @@ impl ControllerService {
 
             self.notification_window_counter += 1;
             return control_handle
-                .send_on_notification(self.notification_state_timestamp, notification)
+                .send_on_notification(self.notification_state_timestamp, &notification)
                 .map_err(Error::from);
         }
         Ok(())

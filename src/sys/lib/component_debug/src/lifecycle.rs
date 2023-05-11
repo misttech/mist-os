@@ -76,7 +76,7 @@ pub async fn create_instance_in_collection(
     url: &AbsoluteComponentUrl,
     child_args: Option<fcomponent::CreateChildArgs>,
 ) -> Result<(), CreateError> {
-    let mut collection_ref = fdecl::CollectionRef { name: collection.to_string() };
+    let collection_ref = fdecl::CollectionRef { name: collection.to_string() };
     let decl = fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(url.to_string()),
@@ -88,8 +88,8 @@ pub async fn create_instance_in_collection(
     lifecycle_controller
         .create_instance(
             &parent.to_string(),
-            &mut collection_ref,
-            decl,
+            &collection_ref,
+            &decl,
             child_args.unwrap_or(fcomponent::CreateChildArgs::default()),
         )
         .await

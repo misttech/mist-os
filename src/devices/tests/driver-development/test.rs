@@ -640,7 +640,7 @@ async fn test_add_test_node_dfv2() -> Result<()> {
     let (instance, driver_dev) = set_up_test_driver_realm(true).await?;
 
     driver_dev
-        .add_test_node(fdd::TestNodeAddArgs {
+        .add_test_node(&fdd::TestNodeAddArgs {
             name: Some("test_sample".to_string()),
             properties: Some(vec![fdf::NodeProperty {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),

@@ -154,22 +154,17 @@ impl Plumber {
                 size: Some(fidl_fuchsia_math::SizeU { width: size.width, height: size.height }),
                 ..Default::default()
             };
-            let mut flatland_image_id = flatland::ContentId { value: image_id as u64 };
+            let flatland_image_id = flatland::ContentId { value: image_id as u64 };
             let import_token = duplicate_import_token(&buffer_tokens.import_token)?;
-            flatland.create_image(
-                &mut flatland_image_id.clone(),
-                import_token,
-                uindex,
-                image_props,
-            )?;
+            flatland.create_image(&flatland_image_id, import_token, uindex, &image_props)?;
             flatland
                 .set_image_destination_size(
-                    &mut flatland_image_id,
-                    &mut fidl_fuchsia_math::SizeU { width: size.width, height: size.height },
+                    &flatland_image_id,
+                    &fidl_fuchsia_math::SizeU { width: size.width, height: size.height },
                 )
                 .expect("fidl error");
             flatland
-                .set_image_blending_function(&mut flatland_image_id, blend_mode)
+                .set_image_blending_function(&flatland_image_id, blend_mode)
                 .expect("fidl error");
             // Get all the images at this point, since if we wait until we need them for
             // rendering, Forma's private connection to sysmem has closed and it fails.

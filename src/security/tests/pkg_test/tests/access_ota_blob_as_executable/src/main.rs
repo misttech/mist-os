@@ -455,8 +455,8 @@ async fn perform_update(update_url: &str) {
         create_proxy::<RebootControllerMarker>().unwrap();
     installer_proxy
         .start_update(
-            &mut PackageUrl { url: update_url.to_string() },
-            Options {
+            &PackageUrl { url: update_url.to_string() },
+            &Options {
                 initiator: Some(Initiator::Service),
                 allow_attach_to_existing_attempt: Some(false),
                 should_write_recovery: Some(false),

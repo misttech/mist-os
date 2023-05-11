@@ -46,7 +46,7 @@ impl Stressor {
         child_name: String,
         url: String,
     ) -> Result<()> {
-        let mut collection_ref = fdecl::CollectionRef { name: collection.clone() };
+        let collection_ref = fdecl::CollectionRef { name: collection.clone() };
         let decl = fdecl::Child {
             name: Some(child_name.clone()),
             url: Some(url),
@@ -56,8 +56,8 @@ impl Stressor {
         self.lifecycle_controller
             .create_instance(
                 parent_moniker,
-                &mut collection_ref,
-                decl,
+                &collection_ref,
+                &decl,
                 fcomponent::CreateChildArgs::default(),
             )
             .await

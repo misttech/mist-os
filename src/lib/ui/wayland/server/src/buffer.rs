@@ -80,7 +80,7 @@ impl Image {
                 flatland
                     .borrow()
                     .proxy()
-                    .create_image(&mut content_id.clone(), import_token, 0, image_props)
+                    .create_image(&content_id, import_token, 0, &image_props)
                     .expect("fidl error");
                 let content = Content { id: content_id, flatland: flatland.clone() };
 

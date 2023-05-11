@@ -38,11 +38,7 @@ async fn test_intl_e2e() {
         assert_eq!(settings.temperature_unit, Some(fidl_fuchsia_intl::TemperatureUnit::Celsius));
         assert_eq!(settings.hour_cycle, Some(HourCycle::H12));
 
-        intl_service
-            .set(expected_settings.clone())
-            .await
-            .expect("set completed")
-            .expect("set successful");
+        intl_service.set(&expected_settings).await.expect("set completed").expect("set successful");
 
         // Verify the values we set are returned when watching.
         let settings = intl_service.watch().await.expect("watch completed");
@@ -85,14 +81,14 @@ async fn test_intl_e2e_set_twice() {
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_settings.hour_cycle = Some(HourCycle::H24);
-        intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
+        intl_service.set(&intl_settings).await.expect("set completed").expect("set successful");
 
         // Try to set to a new value: this second set should succeed too.
         let mut intl_settings = IntlSettings::default();
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_service
-            .set(intl_settings)
+            .set(&intl_settings)
             .await
             .expect("set completed")
             .expect("repeated set successful");
@@ -134,14 +130,14 @@ async fn test_intl_e2e_idempotent_set() {
         let updated_timezone = "GMT";
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
-        intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
+        intl_service.set(&intl_settings).await.expect("set completed").expect("set successful");
 
         // Try to set again to the same value: this second set should succeed.
         let mut intl_settings = IntlSettings::default();
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_service
-            .set(intl_settings)
+            .set(&intl_settings)
             .await
             .expect("set completed")
             .expect("repeated set successful");
@@ -168,14 +164,14 @@ async fn test_intl_invalid_timezone() {
     let mut intl_settings = IntlSettings::default();
     intl_settings.time_zone_id =
         Some(fidl_fuchsia_intl::TimeZoneId { id: INITIAL_TIME_ZONE.to_string() });
-    intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
+    intl_service.set(&intl_settings).await.expect("set completed").expect("set successful");
 
     // Set with an invalid timezone value.
     let mut intl_settings = IntlSettings::default();
     let updated_timezone = "not_a_real_time_zone";
     intl_settings.time_zone_id =
         Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
-    let _ = intl_service.set(intl_settings).await.expect("set completed").expect_err("invalid");
+    let _ = intl_service.set(&intl_settings).await.expect("set completed").expect_err("invalid");
 
     // Verify the returned when watching hasn't changed.
     let settings = intl_service.watch().await.expect("watch completed");
@@ -198,14 +194,14 @@ async fn test_intl_invalid_locale() {
     let mut intl_settings = IntlSettings::default();
     intl_settings.locales =
         Some(vec![fidl_fuchsia_intl::LocaleId { id: INITIAL_LOCALE.to_string() }]);
-    intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
+    intl_service.set(&intl_settings).await.expect("set completed").expect("set successful");
 
     // Set with an invalid locale.
     let mut intl_settings = IntlSettings::default();
     let updated_locale = "nope nope nope";
     intl_settings.locales =
         Some(vec![fidl_fuchsia_intl::LocaleId { id: updated_locale.to_string() }]);
-    let _ = intl_service.set(intl_settings).await.expect("set completed").expect_err("invalid");
+    let _ = intl_service.set(&intl_settings).await.expect("set completed").expect_err("invalid");
 
     // Verify the returned setting when watching hasn't changed.
     let settings = intl_service.watch().await.expect("watch completed");

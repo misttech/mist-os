@@ -34,7 +34,7 @@ async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, E
     let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = hci
         .emulator()
-        .add_low_energy_peer(peer_params, remote)
+        .add_low_energy_peer(&peer_params, remote)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
     Ok(peer)

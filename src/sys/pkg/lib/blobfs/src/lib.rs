@@ -171,7 +171,7 @@ impl Client {
     /// Delete the blob with the given merkle hash.
     pub async fn delete_blob(&self, blob: &Hash) -> Result<(), BlobfsError> {
         self.proxy
-            .unlink(&blob.to_string(), fio::UnlinkOptions::default())
+            .unlink(&blob.to_string(), &fio::UnlinkOptions::default())
             .await?
             .map_err(|s| BlobfsError::Unlink(Status::from_raw(s)))
     }

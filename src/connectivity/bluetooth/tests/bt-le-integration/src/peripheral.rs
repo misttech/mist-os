@@ -60,7 +60,7 @@ async fn start_advertising(
     let fut = harness
         .aux()
         .peripheral
-        .start_advertising(params, handle)
+        .start_advertising(&params, handle)
         .map_err(|e| e.into())
         .on_timeout(INTEGRATION_TIMEOUT.after_now(), move || Err(format_err!("timed out")));
     fut.await.map_err(|e| e.context("Could not start advertising").into())
@@ -432,7 +432,7 @@ async fn add_fake_peer(proxy: &HciEmulatorProxy, address: &Address) -> Result<Pe
         ..Default::default()
     };
     let _ = proxy
-        .add_low_energy_peer(params, remote)
+        .add_low_energy_peer(&params, remote)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:?}", e))?;
     Ok(local)

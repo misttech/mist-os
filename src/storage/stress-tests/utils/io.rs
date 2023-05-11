@@ -126,7 +126,7 @@ impl Directory {
 
     // Delete a file from the directory
     pub async fn remove(&self, filename: &str) -> Result<(), Status> {
-        match self.proxy.unlink(filename, fio::UnlinkOptions::default()).await {
+        match self.proxy.unlink(filename, &fio::UnlinkOptions::default()).await {
             Ok(result) => Status::ok(match result {
                 Ok(()) => 0,
                 Err(status) => status,

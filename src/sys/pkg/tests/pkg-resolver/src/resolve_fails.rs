@@ -31,7 +31,7 @@ async fn resolve_disallow_local_mirror_fails() {
         .build()
         .await;
     let repo_config = repo.make_repo_config("fuchsia-pkg://test".parse().unwrap(), None, true);
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
     let result = env.resolve_package(&pkg_url).await;
@@ -65,7 +65,7 @@ async fn resolve_local_and_remote_mirrors_fails() {
     let server = repo.server().start().expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let repo_config = RepositoryConfigBuilder::from(repo_config).use_local_mirror(true).build();
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
     let result = env.resolve_package(&pkg_url).await;
@@ -87,7 +87,7 @@ async fn create_tuf_client_timeout() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // The package does not need to exist in the repository, because the resolve will fail before
     // it obtains metadata.
@@ -125,7 +125,7 @@ async fn update_tuf_client_timeout() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     // The package does not need to exist in the repository, because the resolve will fail before
     // it obtains metadata.
@@ -164,7 +164,7 @@ async fn download_blob_header_timeout() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let result = env.resolve_package("fuchsia-pkg://test/test").await;
     assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableBlob);
@@ -202,7 +202,7 @@ async fn download_blob_body_timeout() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let result = env.resolve_package("fuchsia-pkg://test/test").await;
     assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableBlob);
@@ -302,7 +302,7 @@ async fn failed_resolve_stops_fetching_blobs() {
         .start()
         .expect("Starting server succeeds");
     let repo_config = server.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     let result = env.resolve_package("fuchsia-pkg://test/many-blobs").await;
     history.take();
@@ -340,7 +340,7 @@ async fn missing_subpackage_meta_far_does_not_hang() {
     );
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     assert_eq!(
         env.resolve_package("fuchsia-pkg://test/superpackage").await.unwrap_err(),
@@ -368,7 +368,7 @@ async fn delivery_blob_not_available_no_fallback() {
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
 
-    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
     assert_eq!(
         env.resolve_package("fuchsia-pkg://test/delivery_blob").await.unwrap_err(),

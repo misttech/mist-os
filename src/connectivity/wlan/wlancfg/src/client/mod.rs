@@ -1188,7 +1188,7 @@ mod tests {
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
             ..Default::default()
         };
-        let mut save_fut = controller.save_network(network_config);
+        let mut save_fut = controller.save_network(&network_config);
 
         // Run server_provider forward so that it will process the save network request
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
@@ -1256,7 +1256,7 @@ mod tests {
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
             ..Default::default()
         };
-        let mut save_fut = controller.save_network(network_config);
+        let mut save_fut = controller.save_network(&network_config);
 
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1315,7 +1315,7 @@ mod tests {
             credential: Some(fidl_policy::Credential::Password(b"other-password".to_vec())),
             ..Default::default()
         };
-        let mut save_fut = controller.save_network(network_config);
+        let mut save_fut = controller.save_network(&network_config);
 
         // Process the remove request on the server side and handle requests to stash on the way.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1373,7 +1373,7 @@ mod tests {
             ..Default::default()
         };
         // Attempt to save the config
-        let mut save_fut = controller.save_network(network_config);
+        let mut save_fut = controller.save_network(&network_config);
 
         // Run server_provider forward so that it will process the save network request
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1422,7 +1422,7 @@ mod tests {
             credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
             ..Default::default()
         };
-        let mut remove_fut = controller.remove_network(network_config.clone());
+        let mut remove_fut = controller.remove_network(&network_config);
 
         // Process the remove request on the server side and handle requests to stash on the way.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1444,7 +1444,7 @@ mod tests {
             .is_empty());
 
         // Removing a network that is not saved should not trigger a disconnect.
-        let mut remove_fut = controller.remove_network(network_config.clone());
+        let mut remove_fut = controller.remove_network(&network_config);
         // Process the remove request on the server side and handle requests to stash on the way.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(

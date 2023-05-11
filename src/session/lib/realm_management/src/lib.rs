@@ -23,7 +23,7 @@ pub async fn create_child_component(
     collection_name: &str,
     realm: &fcomponent::RealmProxy,
 ) -> Result<(), fcomponent::Error> {
-    let mut collection_ref = fdecl::CollectionRef { name: collection_name.to_string() };
+    let collection_ref = fdecl::CollectionRef { name: collection_name.to_string() };
     let child_decl = fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(child_url.to_string()),
@@ -33,7 +33,7 @@ pub async fn create_child_component(
     };
     let child_args = fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
     realm
-        .create_child(&mut collection_ref, child_decl, child_args)
+        .create_child(&collection_ref, &child_decl, child_args)
         .await
         .map_err(|_| fcomponent::Error::Internal)??;
 

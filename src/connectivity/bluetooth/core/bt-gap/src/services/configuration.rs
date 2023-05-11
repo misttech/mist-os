@@ -19,7 +19,7 @@ async fn handler(hd: HostDispatcher, event: ConfigurationRequest) -> fidl::Resul
     match event {
         ConfigurationRequest::Update { settings, responder } => {
             let new_config = hd.apply_sys_settings(settings).await;
-            responder.send(new_config.into())
+            responder.send(&new_config.into())
         }
     }
 }

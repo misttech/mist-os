@@ -243,7 +243,7 @@ impl NetstackFacade {
         let (watcher, server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()?;
         let () = interfaces_state
-            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)?;
+            .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)?;
 
         loop {
             match watcher.watch().await? {

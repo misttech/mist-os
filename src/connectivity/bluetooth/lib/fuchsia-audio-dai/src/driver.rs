@@ -92,13 +92,13 @@ impl DigitalAudioInterface {
 
     pub fn create_ring_buffer(
         &self,
-        mut dai_format: DaiFormat,
+        dai_format: DaiFormat,
         buffer_format: Format,
         ring_buffer_client: ServerEnd<RingBufferMarker>,
     ) -> Result<(), Error> {
         let proxy = self.get_proxy()?;
         proxy
-            .create_ring_buffer(&mut dai_format, buffer_format, ring_buffer_client)
+            .create_ring_buffer(&dai_format, &buffer_format, ring_buffer_client)
             .map_err(Into::into)
     }
 }
@@ -188,7 +188,7 @@ mod tests {
 
         match exec.run_until_stalled(&mut requests.next()) {
             Poll::Ready(Some(Ok(DaiRequest::GetProperties { responder }))) => responder
-                .send(DaiProperties {
+                .send(&DaiProperties {
                     is_input: Some(true),
                     manufacturer: Some(String::from("Fuchsia")),
                     product_name: Some(String::from("Spinny Audio")),

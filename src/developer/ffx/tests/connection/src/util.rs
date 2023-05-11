@@ -53,7 +53,7 @@ impl LaunchedComponentConnector {
         .expect("Selector is invalid");
         loop {
             let (proxy, server_end) = create_proxy::<StressorMarker>()?;
-            match rcs_proxy.connect(selector.clone(), server_end.into_channel()).await {
+            match rcs_proxy.connect(&selector, server_end.into_channel()).await {
                 Ok(_) => return Ok(proxy),
                 _ => continue,
             }

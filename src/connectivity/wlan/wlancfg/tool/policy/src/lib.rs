@@ -411,7 +411,7 @@ pub async fn handle_remove_network(
         }
     };
 
-    run_proxy_command(Box::pin(client_controller.remove_network(config)))
+    run_proxy_command(Box::pin(client_controller.remove_network(&config)))
         .await?
         .map_err(|e| format_err!("failed to remove network with {:?}", e))?;
 
@@ -495,7 +495,7 @@ async fn save_network(
     client_controller: wlan_policy::ClientControllerProxy,
     network_config: wlan_policy::NetworkConfig,
 ) -> Result<(), Error> {
-    run_proxy_command(Box::pin(client_controller.save_network(network_config.clone())))
+    run_proxy_command(Box::pin(client_controller.save_network(&network_config)))
         .await?
         .map_err(|e| format_err!("failed to save network with {:?}", e))?;
     println!(
@@ -555,7 +555,7 @@ pub async fn handle_start_ap(
     let connectivity_mode = wlan_policy::ConnectivityMode::Unrestricted;
     let operating_band = wlan_policy::OperatingBand::Any;
     let result = run_proxy_command(Box::pin(ap_controller.start_access_point(
-        config,
+        &config,
         connectivity_mode,
         operating_band,
     )))
@@ -595,7 +595,7 @@ pub async fn handle_stop_ap(
     ap_controller: wlan_policy::AccessPointControllerProxy,
     config: wlan_policy::NetworkConfig,
 ) -> Result<(), Error> {
-    let result = run_proxy_command(Box::pin(ap_controller.stop_access_point(config))).await?;
+    let result = run_proxy_command(Box::pin(ap_controller.stop_access_point(&config))).await?;
     handle_request_status(result)
 }
 
@@ -1453,14 +1453,14 @@ mod tests {
 
         // The client should now wait for events from the listener.  Send a Connecting update.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connecting,
         ));
 
         // The client should stall and then wait for a Connected message.  Send that over.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connected,
         ));
@@ -1504,14 +1504,14 @@ mod tests {
 
         // The client should now wait for events from the listener.  Send a Connecting update.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connecting,
         ));
 
         // The client should stall and then wait for a Connected message.  Send that over.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connected,
         ));
@@ -1611,7 +1611,7 @@ mod tests {
 
         // The client should now wait for events from the listener
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Failed,
         ));
@@ -1717,14 +1717,14 @@ mod tests {
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connecting,
         ));
 
         // Listen should process the message and stall again
         assert!(exec.run_until_stalled(&mut fut).is_pending());
-        let _ = test_values.update_proxy.on_client_state_update(create_client_state_summary(
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
             TEST_SSID,
             wlan_policy::ConnectionState::Connected,
         ));

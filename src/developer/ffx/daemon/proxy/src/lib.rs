@@ -449,7 +449,7 @@ mod test {
                 while let Some(request) = stream.try_next().await.unwrap_or(None) {
                     match request {
                         DaemonRequest::GetVersionInfo { responder, .. } => {
-                            responder.send(version_info.clone()).unwrap()
+                            responder.send(&version_info).unwrap()
                         }
                         DaemonRequest::Quit { responder, .. } => {
                             std::fs::remove_file(sockpath).unwrap();

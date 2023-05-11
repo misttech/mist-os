@@ -22,7 +22,7 @@ async fn test_pinweaver_provision_account(account_manager: &AccountManagerProxy)
     account_manager
         .deprecated_provision_new_account(
             REAL_PASSWORD,
-            AccountMetadata { name: Some("test".to_string()), ..Default::default() },
+            &AccountMetadata { name: Some("test".to_string()), ..Default::default() },
             server_end,
         )
         .await

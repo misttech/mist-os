@@ -145,7 +145,7 @@ impl Notify for RealAttemptNotifier {
                 .add_client(RealStateNotifier { proxy: monitor_proxy })
                 .await
                 .map_err(|_| ClosedClient)?;
-            proxy.on_start(options.into(), monitor_server_end).await.map_err(|_| ClosedClient)
+            proxy.on_start(&options.into(), monitor_server_end).await.map_err(|_| ClosedClient)
         }
         .boxed()
     }
@@ -249,7 +249,7 @@ mod tests {
         });
         let options = CheckOptions::builder().initiator(Initiator::User).build();
 
-        assert_matches!(proxy.check_now(options.into(), Some(client_end)).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&options.into(), Some(client_end)).await.unwrap(), Ok(()));
 
         assert_eq!(
             collect_all_on_state_events(request_stream).await,
@@ -302,10 +302,13 @@ mod tests {
         // both Monitor clients are enqueued. This prevents the second client from getting an
         // additional state event (since the event queue sends the last event when you add a client)
         assert_matches!(
-            proxy0.check_now(options.clone().into(), Some(client_end0)).await.unwrap(),
+            proxy0.check_now(&options.clone().into(), Some(client_end0)).await.unwrap(),
             Ok(())
         );
-        assert_matches!(proxy1.check_now(options.into(), Some(client_end1)).await.unwrap(), Ok(()));
+        assert_matches!(
+            proxy1.check_now(&options.into(), Some(client_end1)).await.unwrap(),
+            Ok(())
+        );
         assert_matches!(unblocker.send(()), Ok(()));
 
         let events = next_n_on_state_events(request_stream0, 3).await.1;
@@ -356,7 +359,7 @@ mod tests {
         let check_options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
-        assert_matches!(proxy.check_now(check_options.into(), None).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&check_options.into(), None).await.unwrap(), Ok(()));
 
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             request_stream.next().await.unwrap().unwrap();
@@ -408,7 +411,7 @@ mod tests {
         let options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
-        assert_matches!(proxy.check_now(options.into(), Some(client_end)).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&options.into(), Some(client_end)).await.unwrap(), Ok(()));
 
         let AttemptsMonitorRequest::OnStart { options: _, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
@@ -448,14 +451,14 @@ mod tests {
 
         //Start a hang on InstallingUpdate
         assert_matches!(
-            proxy.check_now(options.clone().into(), Some(client_end0)).await.unwrap(),
+            proxy.check_now(&options.clone().into(), Some(client_end0)).await.unwrap(),
             Ok(())
         );
 
         // When we do the next check, we should get an already in progress error since we're not
         // allowed to attach another client
         assert_eq!(
-            proxy.check_now(options.into(), Some(client_end1)).await.unwrap(),
+            proxy.check_now(&options.into(), Some(client_end1)).await.unwrap(),
             Err(CheckNotStartedReason::AlreadyInProgress)
         );
 
@@ -508,14 +511,14 @@ mod tests {
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
         //Start a hang on InstallingUpdate
         assert_matches!(
-            proxy.check_now(options.clone().into(), Some(client_end0)).await.unwrap(),
+            proxy.check_now(&options.clone().into(), Some(client_end0)).await.unwrap(),
             Ok(())
         );
 
         // When we do the next check, we should get an already in progress error since we're not
         // allowed to attach another client
         assert_eq!(
-            proxy.check_now(options.into(), Some(client_end1)).await.unwrap(),
+            proxy.check_now(&options.into(), Some(client_end1)).await.unwrap(),
             Err(CheckNotStartedReason::AlreadyInProgress)
         );
 
@@ -563,7 +566,7 @@ mod tests {
 
         assert_matches!(proxy0.monitor_all_update_checks(attempt_client_end), Ok(()));
         assert_matches!(
-            proxy0.check_now(options.clone().into(), Some(monitor_client)).await.unwrap(),
+            proxy0.check_now(&options.clone().into(), Some(monitor_client)).await.unwrap(),
             Ok(())
         );
 
@@ -579,7 +582,7 @@ mod tests {
         )
         .detach();
 
-        assert_matches!(proxy1.check_now(options.into(), None).await.unwrap(), Ok(()));
+        assert_matches!(proxy1.check_now(&options.into(), None).await.unwrap(), Ok(()));
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
 
@@ -631,7 +634,10 @@ mod tests {
             .build();
 
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
-        assert_matches!(proxy.check_now(check_options.clone().into(), None).await.unwrap(), Ok(()));
+        assert_matches!(
+            proxy.check_now(&check_options.clone().into(), None).await.unwrap(),
+            Ok(())
+        );
 
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
@@ -662,7 +668,7 @@ mod tests {
         );
 
         // Do another update check!
-        assert_matches!(proxy.check_now(check_options.into(), None).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&check_options.into(), None).await.unwrap(), Ok(()));
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
 
@@ -712,7 +718,7 @@ mod tests {
             ..Default::default()
         };
 
-        let res = proxy.check_now(invalid_options, Some(client_end)).await.unwrap();
+        let res = proxy.check_now(&invalid_options, Some(client_end)).await.unwrap();
 
         assert_eq!(res, Err(CheckNotStartedReason::InvalidOptions));
         assert_eq!(collect_all_on_state_events(request_stream).await, vec![]);
@@ -756,13 +762,13 @@ mod tests {
 
         // Start a hang on InstallingUpdate
         assert_matches!(
-            proxy.check_now(options.clone().into(), Some(client_end0)).await.unwrap(),
+            proxy.check_now(&options.clone().into(), Some(client_end0)).await.unwrap(),
             Ok(())
         );
 
         // When we do the next check, we should get an OK since we're allowed to attach to
         // an existing check
-        assert_matches!(proxy.check_now(options.into(), Some(client_end1)).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&options.into(), Some(client_end1)).await.unwrap(), Ok(()));
 
         // When we resume, both clients should see the on state events
         assert_matches!(unblocker.send(()), Ok(()));
@@ -796,7 +802,7 @@ mod tests {
             .build();
 
         assert_matches!(
-            proxy0.check_now(options.clone().into(), Some(client_end0)).await.unwrap(),
+            proxy0.check_now(&options.clone().into(), Some(client_end0)).await.unwrap(),
             Ok(())
         );
 
@@ -814,7 +820,10 @@ mod tests {
 
         // The first update check is still in progress and blocked, but we'll get an OK
         // since we allow_attaching_to_existing_update_check=true
-        assert_matches!(proxy1.check_now(options.into(), Some(client_end1)).await.unwrap(), Ok(()));
+        assert_matches!(
+            proxy1.check_now(&options.into(), Some(client_end1)).await.unwrap(),
+            Ok(())
+        );
 
         // Once we unblock, the update should resume
         assert_matches!(unblocker.send(()), Ok(()));

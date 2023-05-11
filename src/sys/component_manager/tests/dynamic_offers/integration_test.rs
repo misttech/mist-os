@@ -182,7 +182,7 @@ async fn realm_user(
     realm_proxy
         .create_child(
             &mut collection_ref,
-            fdecl::Child {
+            &fdecl::Child {
                 name: Some("child_realm".to_string()),
                 url: Some(child_realm_url),
                 startup: Some(fdecl::StartupMode::Lazy),

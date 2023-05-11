@@ -70,7 +70,7 @@ async fn knock_target(
     // by the FFX team directly.
     target_collection_proxy
         .open_target(
-            TargetQuery { string_matcher: default_target.clone(), ..Default::default() },
+            &TargetQuery { string_matcher: default_target.clone(), ..Default::default() },
             target_remote,
         )
         .await

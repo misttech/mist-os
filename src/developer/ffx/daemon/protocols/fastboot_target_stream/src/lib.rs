@@ -34,7 +34,8 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         match req {
             ffx::FastbootTargetStreamRequest::GetNext { responder } => responder
                 .send(
-                    self.inner
+                    &self
+                        .inner
                         .as_ref()
                         .expect("inner state should have been initialized")
                         .events_in

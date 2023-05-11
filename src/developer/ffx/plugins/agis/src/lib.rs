@@ -148,7 +148,7 @@ async fn listener_listen(
     let target_name = ffx_config::get(TARGET_DEFAULT_KEY).await?;
     let target_query = TargetQuery { string_matcher: target_name, ..Default::default() };
     listener
-        .listen(target_query, op.global_id)
+        .listen(&target_query, op.global_id)
         .await?
         .map_err(|e| anyhow!("The \"listen\" command failed with error: {:?}", e))?;
 

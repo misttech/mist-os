@@ -533,7 +533,7 @@ mod tests {
             test.realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl(name),
+                    &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -600,7 +600,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -621,7 +621,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -645,7 +645,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -668,7 +668,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -685,7 +685,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl("a"),
+                    &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await;
@@ -695,7 +695,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl("a"),
+                    &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -711,7 +711,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl("a"),
+                    &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -734,7 +734,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -767,7 +767,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Parent(
                             fdecl::ParentRef {},
@@ -795,7 +795,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -827,7 +827,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -858,7 +858,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![fdecl::Offer::Service(fdecl::OfferService {
                             source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
@@ -891,7 +891,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -922,7 +922,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs {
                         dynamic_offers: Some(vec![sample_offer_from(fdecl::Ref::Child(
                             fdecl::ChildRef {
@@ -954,7 +954,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl,
+                    &child_decl,
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -989,7 +989,7 @@ mod tests {
                 .realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl(name),
+                    &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await;
@@ -1060,7 +1060,7 @@ mod tests {
         };
         let res = test
             .realm_proxy
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&mut collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await;
         res.expect("fidl call failed").expect("failed to recreate child a");
 
@@ -1088,7 +1088,7 @@ mod tests {
             .realm_proxy
             .create_child(
                 &mut collection_ref,
-                child_decl("a"),
+                &child_decl("a"),
                 fcomponent::CreateChildArgs::default(),
             )
             .await;
@@ -1156,7 +1156,7 @@ mod tests {
         test.realm_proxy
             .create_child(
                 &mut collection_ref,
-                child_decl("a"),
+                &child_decl("a"),
                 fcomponent::CreateChildArgs::default(),
             )
             .await
@@ -1328,7 +1328,7 @@ mod tests {
             .realm_proxy
             .create_child(
                 &mut collection_ref,
-                child_decl("system"),
+                &child_decl("system"),
                 fcomponent::CreateChildArgs::default(),
             )
             .await;

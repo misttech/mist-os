@@ -128,7 +128,7 @@ async fn test_light_disabled_by_mic_mute_off() {
 
     // Send mic unmuted, which should disable the light.
     listener_proxy
-        .on_event(MediaButtonsEvent { mic_mute: Some(false), ..Default::default() })
+        .on_event(&MediaButtonsEvent { mic_mute: Some(false), ..Default::default() })
         .await
         .expect("on event called");
 

@@ -28,7 +28,7 @@ async fn test_multiple_watches() {
     let second_watch = proxy.watch();
 
     // Now we'll set a value which should cause the pending watch to complete.
-    proxy.set(updated_setting.clone()).await.expect("set completed").expect("set successful");
+    proxy.set(&updated_setting).await.expect("set completed").expect("set successful");
 
     assert_eq!(second_watch.await.expect("watch completed"), updated_setting);
 

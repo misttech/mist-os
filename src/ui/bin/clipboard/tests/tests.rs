@@ -46,7 +46,7 @@ struct TestHandles {
 }
 
 fn get_focus_koid_chain(proxy: &focus::FocusChainProviderProxy) -> FocusKoidChainFut {
-    proxy.watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+    proxy.watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
 }
 
 impl TestHandles {
@@ -306,8 +306,8 @@ async fn test_basic_copy_paste_across_different_view_refs() -> Result<(), Error>
 
         handles.set_focus_chain(vec![&view_ref_b]).await?;
 
-        let _ = reader_b.get_item(fclip::ReaderGetItemRequest::default()).await?;
-        let _ = reader_b.watch(fclip::ReaderWatchRequest::default()).await?;
+        let _ = reader_b.get_item(&fclip::ReaderGetItemRequest::default()).await?;
+        let _ = reader_b.watch(&fclip::ReaderWatchRequest::default()).await?;
 
         Ok(())
     }

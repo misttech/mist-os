@@ -249,7 +249,7 @@ mod tests {
             {
                 let settings =
                     fsettings::KeyboardSettings { keymap, autorepeat, ..Default::default() };
-                responder.send(settings).expect("response sent");
+                responder.send(&settings).expect("response sent");
             }
         })
         .detach();

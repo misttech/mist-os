@@ -911,7 +911,7 @@ impl<B: Blobfs> TestEnv<B> {
         R::Error: std::fmt::Debug,
     {
         let repo_config = repo.make_repo_config(url.try_into().unwrap());
-        let () = self.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+        let () = self.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
     }
 
     pub async fn restart_pkg_resolver(&mut self) {
@@ -1071,7 +1071,7 @@ impl<B: Blobfs> TestEnv<B> {
         url: impl Into<String>,
         cup: pkg::CupData,
     ) -> Result<(), WriteError> {
-        self.proxies.cup.write(&fpkg::PackageUrl { url: url.into() }, cup.into()).await.unwrap()
+        self.proxies.cup.write(&fpkg::PackageUrl { url: url.into() }, &cup.into()).await.unwrap()
     }
 
     pub async fn cup_get_info(

@@ -51,13 +51,13 @@ impl TunNetworkInterface {
         let (tun_dev, req) = create_proxy::<ftun::DeviceMarker>()?;
 
         tun_control
-            .create_device(ftun::DeviceConfig { blocking: Some(true), ..Default::default() }, req)
+            .create_device(&ftun::DeviceConfig { blocking: Some(true), ..Default::default() }, req)
             .context("failed to create tun pair")?;
 
         let (tun_port, port_req) = create_proxy::<ftun::PortMarker>()?;
         tun_dev
             .add_port(
-                ftun::DevicePortConfig {
+                &ftun::DevicePortConfig {
                     base: Some(ftun::BasePortConfig {
                         id: Some(TUN_PORT_ID),
                         mtu: Some(Ipv6::MINIMUM_LINK_MTU.get()),
@@ -115,7 +115,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &port_id,
                     control_sync_server.into(),
-                    fnetifadmin::Options { name: name.clone(), ..Default::default() },
+                    &fnetifadmin::Options { name: name.clone(), ..Default::default() },
                 )
                 .context("create_interface failed")?;
 
@@ -124,7 +124,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &port_id,
                     server_end,
-                    fnetifadmin::Options { name, ..Default::default() },
+                    &fnetifadmin::Options { name, ..Default::default() },
                 )
                 .context("create_interface failed")?;
 
@@ -185,7 +185,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         Ok(self
             .tun_dev
-            .write_frame(ftun::Frame {
+            .write_frame(&ftun::Frame {
                 port: Some(TUN_PORT_ID),
                 frame_type: Some(fhwnet::FrameType::Ipv6),
                 data: Some(packet.to_vec()),
@@ -248,7 +248,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         self.control_sync.lock().add_address(
             &device_addr,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+            &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             server_end,
         )?;
 
@@ -377,7 +377,7 @@ impl NetworkInterface for TunNetworkInterface {
                 if state.watcher.is_none() {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
                     let (watcher, req) = create_proxy::<WatcherMarker>()?;
-                    fnif_state.get_watcher(WatcherOptions::default(), req)?;
+                    fnif_state.get_watcher(&WatcherOptions::default(), req)?;
                     state.watcher = Some(watcher);
                 }
 
@@ -457,7 +457,7 @@ impl NetworkInterface for TunNetworkInterface {
             .control_sync
             .lock()
             .set_configuration(
-                fnetifadmin::Configuration {
+                &fnetifadmin::Configuration {
                     ipv6: Some(fnetifadmin::Ipv6Configuration {
                         forwarding: Some(enabled),
                         multicast_forwarding: Some(enabled),

@@ -47,7 +47,7 @@ async fn run_puppet(request_stream: PuppetRequestStream, puppet_view: Rc<RefCell
                         .await;
 
                     responder
-                        .send(PuppetSetEmbeddedViewPropertiesResponse {
+                        .send(&PuppetSetEmbeddedViewPropertiesResponse {
                             result: Some(Result_::Success),
                             ..Default::default()
                         })
@@ -105,7 +105,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                     .await;
 
                     responder
-                        .send(PuppetFactoryCreateResponse {
+                        .send(&PuppetFactoryCreateResponse {
                             result: Some(Result_::Success),
                             ..Default::default()
                         })

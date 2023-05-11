@@ -861,7 +861,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = name
 			t.Owned = name
 			t.Param = name
-		case fidlgen.StructDeclType:
+		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 			t.Fidl = name
 			t.Owned = name
 			if t.IsResourceType() {
@@ -870,28 +870,14 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 				t.Param = "&" + name
 			}
 			if val.Nullable {
-				t.Fidl = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.Fidl)
-				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
-				if declInfo.IsResourceType() {
-					t.Param = fmt.Sprintf("Option<%s>", name)
-				} else {
-					t.Param = fmt.Sprintf("Option<&%s>", name)
+				switch declInfo.Type {
+				case fidlgen.StructDeclType:
+					t.Fidl = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.Fidl)
+				case fidlgen.UnionDeclType:
+					t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
+				default:
+					panic(fmt.Sprintf("unexpected type: %s", declInfo.Type))
 				}
-			}
-		case fidlgen.TableDeclType:
-			t.Fidl = name
-			t.Owned = name
-			t.Param = name
-		case fidlgen.UnionDeclType:
-			t.Fidl = name
-			t.Owned = name
-			if declInfo.IsResourceType() {
-				t.Param = name
-			} else {
-				t.Param = "&" + name
-			}
-			if val.Nullable {
-				t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
 				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
 				if declInfo.IsResourceType() {
 					t.Param = fmt.Sprintf("Option<%s>", name)
@@ -952,7 +938,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
 			return v
-		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
+		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 			if t.IsResourceType() {
 				if t.Nullable {
 					return v + ".as_mut()"
@@ -960,17 +946,6 @@ func convertParamToEncodeExpr(v string, t Type) string {
 				return "&mut " + v
 			}
 			return v
-		case fidlgen.TableDeclType:
-			if t.IsResourceType() {
-				if t.Nullable {
-					return v + ".as_mut()"
-				}
-				return "&mut " + v
-			}
-			if t.Nullable {
-				return v + ".as_ref()"
-			}
-			return "&" + v
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
 		}

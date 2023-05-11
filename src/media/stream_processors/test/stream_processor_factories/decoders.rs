@@ -27,7 +27,7 @@ impl StreamProcessorFactory for DecoderFactory {
             // TODO(turnage): Account for all error reporting methods in the
             // runner options and output.
             factory.create_decoder(
-                CreateDecoderParams {
+                &CreateDecoderParams {
                     input_details: Some(stream.format_details(format_details_version_ordinal)),
                     promise_separate_access_units_on_input: Some(stream.is_access_units()),
                     permit_lack_of_split_header_handling: Some(true),

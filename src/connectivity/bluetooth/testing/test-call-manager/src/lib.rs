@@ -612,7 +612,7 @@ impl TestCallManager {
                 if Some(&current_network) == peer.reported_network.as_ref() {
                     peer.network_responder = Some(responder);
                 } else {
-                    responder.send(current_network.clone())?;
+                    responder.send(&current_network)?;
                     peer.reported_network = Some(current_network);
                 }
             }
@@ -944,7 +944,7 @@ impl TestCallManager {
             // Update the client if a responder is present
             if Some(&current_network) != peer.reported_network.as_ref() {
                 if let Some(responder) = peer.network_responder.take() {
-                    responder.send(current_network.clone())?;
+                    responder.send(&current_network)?;
                     peer.reported_network = Some(current_network.clone());
                 }
             }
@@ -1037,7 +1037,7 @@ impl TestCallManager {
         let proxy = inner.test_proxy.as_ref().ok_or_else(|| {
             format_err!("Cannot set slc connection behavior on command without HfpTest proxy")
         })?;
-        let () = proxy.set_connection_behavior(ConnectionBehavior {
+        let () = proxy.set_connection_behavior(&ConnectionBehavior {
             autoconnect: Some(autoconnect),
             ..Default::default()
         })?;

@@ -317,7 +317,11 @@ impl VolumeChangeEarconsTest {
     pub async fn set_volume(&self, streams: Vec<AudioStreamSettings>) {
         let mut audio_settings = AudioSettings::default();
         audio_settings.streams = Some(streams);
-        self.audio_proxy.set(audio_settings).await.expect("set completed").expect("set successful");
+        self.audio_proxy
+            .set(&audio_settings)
+            .await
+            .expect("set completed")
+            .expect("set successful");
     }
 
     // Verifies that the settings for the given target_usage matches the expected_settings when

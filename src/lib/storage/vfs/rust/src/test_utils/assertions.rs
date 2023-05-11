@@ -802,7 +802,7 @@ macro_rules! assert_get_buffer_err {
 macro_rules! assert_unlink {
     ($proxy:expr, $path:expr) => {{
         $proxy
-            .unlink($path, fio::UnlinkOptions::default())
+            .unlink($path, &fio::UnlinkOptions::default())
             .await
             .expect("fidl failed")
             .expect("unlink failed");
@@ -818,7 +818,7 @@ macro_rules! assert_unlink_err {
         assert_eq!(
             Status::from_raw(
                 $proxy
-                    .unlink($path, fio::UnlinkOptions::default())
+                    .unlink($path, &fio::UnlinkOptions::default())
                     .await
                     .expect("fidl failed")
                     .expect_err("unlink succeeded")

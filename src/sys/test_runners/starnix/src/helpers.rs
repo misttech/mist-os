@@ -35,7 +35,7 @@ pub async fn run_starnix_benchmark(
 
     debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(
-        test,
+        &test,
         ftest::StdHandles {
             out: Some(stdout_client),
             err: Some(stderr_client),
@@ -82,7 +82,7 @@ pub async fn run_starnix_benchmark(
     .await?;
     fuchsia_fs::file::write(&file_proxy, serde_json::to_string(&perfs)?).await?;
 
-    case_listener_proxy.finished(result)?;
+    case_listener_proxy.finished(&result)?;
 
     Ok(())
 }
@@ -159,8 +159,8 @@ impl TestKernel {
 
         realm
             .create_child(
-                &mut fdecl::CollectionRef { name: RUNNERS_COLLECTION.into() },
-                fdecl::Child {
+                &fdecl::CollectionRef { name: RUNNERS_COLLECTION.into() },
+                &fdecl::Child {
                     name: Some(kernel_start_info.name.clone()),
                     url: Some(runner_url.to_string()),
                     startup: Some(fdecl::StartupMode::Lazy),

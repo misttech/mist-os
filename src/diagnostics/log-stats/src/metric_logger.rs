@@ -74,7 +74,7 @@ async fn connect_to_cobalt(specs: &MetricSpecs) -> Result<MetricEventLoggerProxy
     let metric_logger_factory = connect_to_protocol::<MetricEventLoggerFactoryMarker>()?;
     let (proxy, request) = create_proxy().unwrap();
     metric_logger_factory
-        .create_metric_event_logger(project_spec, request)
+        .create_metric_event_logger(&project_spec, request)
         .await?
         .map_err(|e| format_err!("error response {:?}", e))?;
     Ok(proxy)

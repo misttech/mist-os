@@ -142,7 +142,7 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     let knock_client = fidl::client::Client::new(knock_client, "knock_client");
     rcs_proxy
         .connect(
-            selectors::parse_selector::<VerboseError>(
+            &selectors::parse_selector::<VerboseError>(
                 "core/remote-control:expose:fuchsia.developer.remotecontrol.RemoteControl",
             )
             .unwrap(),
@@ -164,7 +164,7 @@ pub async fn connect_with_timeout(
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    timeout::timeout(dur, rcs_proxy.connect(selectors::parse_selector::<VerboseError>(selector)?, server_end)
+    timeout::timeout(dur, rcs_proxy.connect(&selectors::parse_selector::<VerboseError>(selector)?, server_end)
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {
             fidl_result.map(|_| ()).map_err(|e| {
                     match e {

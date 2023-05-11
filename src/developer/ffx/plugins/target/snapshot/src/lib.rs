@@ -135,7 +135,7 @@ pub async fn dump_annotations<W: Write>(
 
     // Request annotations.
     let annotations = data_provider_proxy
-        .get_annotations(params)
+        .get_annotations(&params)
         .await
         .map_err(|e| anyhow!("Could not get the annotations from the target: {:?}", e))?
         .annotations
@@ -288,7 +288,7 @@ mod test {
             }
             DataProviderRequest::GetAnnotations { params, responder } => {
                 let _ignore = params;
-                responder.send(annotations.clone()).unwrap();
+                responder.send(&annotations).unwrap();
             }
             _ => assert!(false),
         })

@@ -165,7 +165,7 @@ mod tests {
         };
         let (dir, _) = fidl::endpoints::create_request_stream::<fio::DirectoryMarker>().unwrap();
         listener
-            .on_diagnostics_dir_ready(identity.clone().into(), dir)
+            .on_diagnostics_dir_ready(&identity.clone().into(), dir)
             .expect("failed to send event 2");
 
         let event = event_stream.next().await.unwrap();

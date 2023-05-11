@@ -51,7 +51,7 @@ impl Sink<(SessionId, PlayerProxyEvent)> for FlowControlledProxySink {
         (id, event): (SessionId, PlayerProxyEvent),
     ) -> Result<()> {
         let ack_fut = match event {
-            PlayerProxyEvent::Updated(delta) => self.proxy.session_updated(id, delta()),
+            PlayerProxyEvent::Updated(delta) => self.proxy.session_updated(id, &delta()),
             PlayerProxyEvent::Removed => self.proxy.session_removed(id),
         };
         self.acks.push(ack_fut);

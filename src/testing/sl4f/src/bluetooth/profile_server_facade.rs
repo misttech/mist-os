@@ -581,7 +581,7 @@ impl ProfileServerFacade {
         match &self.inner.read().profile_server_proxy {
             Some(server) => {
                 let _ =
-                    server.advertise(service_defs, ChannelParameters::default(), connect_client);
+                    server.advertise(service_defs, &ChannelParameters::default(), connect_client);
             }
             None => fx_err_and_bail!(&with_line!(tag), "No Server Proxy created."),
         };

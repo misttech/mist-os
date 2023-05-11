@@ -1332,7 +1332,7 @@ pub async fn create_metrics_logger(
 
     let status = factory_proxy
         .create_metric_event_logger_with_experiments(
-            project_spec,
+            &project_spec,
             &experiment_ids,
             cobalt_1dot1_server,
         )

@@ -77,7 +77,7 @@ impl RebootController {
         let selector = selectors::parse_selector::<VerboseError>(ADMIN_SELECTOR)?;
         self.get_remote_proxy()
             .await?
-            .connect(selector, server_end.into_channel())
+            .connect(&selector, server_end.into_channel())
             .await?
             .map(|_| proxy)
             .map_err(|_| anyhow!("could not get admin proxy"))

@@ -350,7 +350,7 @@ impl ArchiveReader {
         });
 
         archive
-            .stream_diagnostics(stream_parameters, server_end)
+            .stream_diagnostics(&stream_parameters, server_end)
             .map_err(Error::StreamDiagnostics)?;
         Ok(iterator)
     }

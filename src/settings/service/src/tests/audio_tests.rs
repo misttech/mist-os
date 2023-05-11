@@ -293,6 +293,9 @@ async fn test_invalid_stream_fails() {
         streams: Some(vec![changed_media_stream_settings()]),
         ..Default::default()
     };
-    let _ =
-        audio_proxy.set(audio_settings).await.expect("set completed").expect_err("set should fail");
+    let _ = audio_proxy
+        .set(&audio_settings)
+        .await
+        .expect("set completed")
+        .expect_err("set should fail");
 }

@@ -133,7 +133,7 @@ pub async fn start_ap_and_wait_for_confirmation(network_config: NetworkConfigBui
         // If the policy layer acknowledges the request to start the access point, then the
         // AP interface has been created.
         match controller
-            .start_access_point(config, connectivity_mode, operating_band)
+            .start_access_point(&config, connectivity_mode, operating_band)
             .await
             .expect("starting AP")
         {
@@ -241,7 +241,7 @@ pub async fn save_network(
     info!("Saving network. SSID: {:?}, Credential: {:?}", ssid, credential_to_string(&credential),);
     let network_config = create_network_config(ssid, security_type, credential);
     client_controller
-        .save_network(network_config)
+        .save_network(&network_config)
         .await
         .expect("save_network future failed")
         .expect("client controller failed to save network");
@@ -260,7 +260,7 @@ pub async fn remove_network(
     );
     let network_config = create_network_config(ssid, security_type, credential);
     client_controller
-        .remove_network(network_config)
+        .remove_network(&network_config)
         .await
         .expect("remove_network future failed")
         .expect("client controller failed to remove network");

@@ -170,7 +170,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             delay_schedule: Some(convert_delay_schedule(&params.delay_schedule)?),
             ..Default::default()
         };
-        let response = self.proxy.insert_leaf(insert_leaf_params).await?;
+        let response = self.proxy.insert_leaf(&insert_leaf_params).await?;
         self.diagnostics.pinweaver_outcome(
             PinweaverMethod::InsertLeaf,
             response.as_ref().map(|_| ()).map_err(|e| *e),
@@ -197,7 +197,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             h_aux: Some(h_aux),
             ..Default::default()
         };
-        let response = self.proxy.remove_leaf(remove_leaf_params).await?.map(|_| ());
+        let response = self.proxy.remove_leaf(&remove_leaf_params).await?.map(|_| ());
         self.diagnostics.pinweaver_outcome(PinweaverMethod::RemoveLeaf, response);
         Ok(response?)
     }
@@ -216,7 +216,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             cred_metadata: Some(cred_metadata),
             ..Default::default()
         };
-        let response = self.proxy.try_auth(try_auth_params).await?;
+        let response = self.proxy.try_auth(&try_auth_params).await?;
         self.diagnostics.pinweaver_outcome(
             PinweaverMethod::TryAuth,
             response.as_ref().map(|_| ()).map_err(|e| *e),
@@ -252,7 +252,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
             cred_metadata: Some(cred_metadata),
             ..Default::default()
         };
-        let response = self.proxy.log_replay(log_replay_params).await?;
+        let response = self.proxy.log_replay(&log_replay_params).await?;
         self.diagnostics.pinweaver_outcome(
             PinweaverMethod::LogReplay,
             response.as_ref().map(|_| ()).map_err(|e| *e),

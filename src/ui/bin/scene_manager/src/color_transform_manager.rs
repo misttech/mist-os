@@ -118,7 +118,7 @@ impl ColorTransformManager {
 
         let res = self
             .color_converter
-            .set_values(fidl_color::ConversionProperties {
+            .set_values(&fidl_color::ConversionProperties {
                 coefficients: Some(transform.matrix),
                 preoffsets: Some(transform.pre_offset),
                 postoffsets: Some(transform.post_offset),
@@ -450,7 +450,7 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
-            .set_color_transform_configuration(color_transform_configuration())
+            .set_color_transform_configuration(&color_transform_configuration())
             .await?;
         let properties = converter.expect_set_values().await;
         assert_eq!(properties.coefficients, Some([1.; 9]));
@@ -467,19 +467,19 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
-            .set_color_transform_configuration(color_transform_configuration())
+            .set_color_transform_configuration(&color_transform_configuration())
             .await?;
         converter.expect_set_values().await;
 
         // Setting the same value again is debounced.
         color_transform_proxy
-            .set_color_transform_configuration(color_transform_configuration())
+            .set_color_transform_configuration(&color_transform_configuration())
             .await?;
         converter.expect_no_requests().await;
 
         // Setting a different value isn't.
         color_transform_proxy
-            .set_color_transform_configuration(ColorTransformConfiguration {
+            .set_color_transform_configuration(&ColorTransformConfiguration {
                 color_adjustment_matrix: Some([0.; 9]),
                 ..color_transform_configuration()
             })
@@ -496,7 +496,7 @@ mod tests {
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
-            .set_color_transform_configuration(ColorTransformConfiguration {
+            .set_color_transform_configuration(&ColorTransformConfiguration {
                 color_adjustment_matrix: None,
                 ..color_transform_configuration()
             })
@@ -504,7 +504,7 @@ mod tests {
         converter.expect_no_requests().await;
 
         color_transform_proxy
-            .set_color_transform_configuration(ColorTransformConfiguration {
+            .set_color_transform_configuration(&ColorTransformConfiguration {
                 color_adjustment_pre_offset: None,
                 ..color_transform_configuration()
             })
@@ -512,7 +512,7 @@ mod tests {
         converter.expect_no_requests().await;
 
         color_transform_proxy
-            .set_color_transform_configuration(ColorTransformConfiguration {
+            .set_color_transform_configuration(&ColorTransformConfiguration {
                 color_adjustment_post_offset: None,
                 ..color_transform_configuration()
             })
@@ -528,7 +528,7 @@ mod tests {
         let (manager, mut converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
-        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
+        color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable {
             matrix: Some([1.; 9]),
             ..Default::default()
         })?;
@@ -548,7 +548,7 @@ mod tests {
         let (manager, converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
-        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable::default())?;
+        color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable::default())?;
 
         converter.expect_no_requests_sync(&mut exec);
         Ok(())
@@ -562,11 +562,11 @@ mod tests {
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
         let _ = color_transform_proxy
-            .set_color_transform_configuration(color_transform_configuration());
+            .set_color_transform_configuration(&color_transform_configuration());
         converter.expect_set_values_sync(&mut exec);
 
         // SetColorAdjustment is a no-op because a11y settings are active.
-        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
+        color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable {
             matrix: Some([4.; 9]),
             ..Default::default()
         })?;
@@ -574,7 +574,7 @@ mod tests {
 
         // Deactivate a11y settings.
         let _ =
-            color_transform_proxy.set_color_transform_configuration(ColorTransformConfiguration {
+            color_transform_proxy.set_color_transform_configuration(&ColorTransformConfiguration {
                 color_inversion_enabled: Some(false),
                 color_correction: Some(ColorCorrectionMode::Disabled),
                 color_adjustment_matrix: Some([0.; 9]),
@@ -585,7 +585,7 @@ mod tests {
         converter.expect_set_values_sync(&mut exec);
 
         // Now SetColorAdjustment has an effect.
-        color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
+        color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable {
             matrix: Some([5.; 9]),
             ..Default::default()
         })?;
@@ -610,7 +610,7 @@ mod tests {
         // Calling SetColorTransformConfiguration should also trigger a call to
         // scene_manager.present_root_view.
         color_transform_proxy
-            .set_color_transform_configuration(color_transform_configuration())
+            .set_color_transform_configuration(&color_transform_configuration())
             .await?;
         converter.expect_set_values().await;
 

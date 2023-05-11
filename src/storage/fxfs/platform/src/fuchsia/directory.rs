@@ -968,7 +968,7 @@ mod tests {
 
         close_file_checked(file).await;
 
-        root.unlink("foo", fio::UnlinkOptions::default())
+        root.unlink("foo", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
@@ -1016,7 +1016,7 @@ mod tests {
         .await;
         close_file_checked(file).await;
 
-        root.unlink("foo", fio::UnlinkOptions::default())
+        root.unlink("foo", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
@@ -1052,7 +1052,7 @@ mod tests {
         let buf = vec![0xaa as u8; 512];
         file::write(&file, buf.as_slice()).await.expect("write failed");
 
-        root.unlink("foo", fio::UnlinkOptions::default())
+        root.unlink("foo", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
@@ -1105,7 +1105,7 @@ mod tests {
 
         assert_eq!(
             zx::Status::from_raw(
-                root.unlink("foo", fio::UnlinkOptions::default())
+                root.unlink("foo", &fio::UnlinkOptions::default())
                     .await
                     .expect("FIDL call failed")
                     .expect_err("unlink succeeded")
@@ -1113,11 +1113,11 @@ mod tests {
             zx::Status::NOT_EMPTY
         );
 
-        dir.unlink("bar", fio::UnlinkOptions::default())
+        dir.unlink("bar", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
-        root.unlink("foo", fio::UnlinkOptions::default())
+        root.unlink("foo", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
@@ -1142,7 +1142,7 @@ mod tests {
         )
         .await;
 
-        root.unlink("foo", fio::UnlinkOptions::default())
+        root.unlink("foo", &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");
@@ -1220,7 +1220,7 @@ mod tests {
                 let wait_time = rand::thread_rng().gen_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 match parent
-                    .unlink(CHILD, fio::UnlinkOptions::default())
+                    .unlink(CHILD, &fio::UnlinkOptions::default())
                     .await
                     .expect("FIDL call failed")
                     .map_err(zx::Status::from_raw)
@@ -1268,7 +1268,7 @@ mod tests {
                         // We added the child before the directory was deleted; go ahead and
                         // clean up.
                         child
-                            .unlink(GRANDCHILD, fio::UnlinkOptions::default())
+                            .unlink(GRANDCHILD, &fio::UnlinkOptions::default())
                             .await
                             .expect("FIDL call failed")
                             .expect("unlink failed");
@@ -1357,7 +1357,7 @@ mod tests {
 
         // Remove an entry.
         parent
-            .unlink(&expected_entries.pop().unwrap().name, fio::UnlinkOptions::default())
+            .unlink(&expected_entries.pop().unwrap().name, &fio::UnlinkOptions::default())
             .await
             .expect("FIDL call failed")
             .expect("unlink failed");

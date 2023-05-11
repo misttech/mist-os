@@ -525,7 +525,7 @@ mod tests {
                 .create_instance(
                     "./",
                     &mut CollectionRef { name: "coll".to_string() },
-                    fdecl::Child {
+                    &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
@@ -597,7 +597,7 @@ mod tests {
                 .create_instance(
                     "&#^$%",
                     &mut CollectionRef { name: "coll".to_string() },
-                    fdecl::Child {
+                    &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
@@ -617,7 +617,7 @@ mod tests {
                 .create_instance(
                     "./does_not_exist",
                     &mut CollectionRef { name: "coll".to_string() },
-                    fdecl::Child {
+                    &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
@@ -637,7 +637,7 @@ mod tests {
                 .create_instance(
                     "./",
                     &mut CollectionRef { name: "not_coll".to_string() },
-                    fdecl::Child {
+                    &fdecl::Child {
                         name: Some("child".to_string()),
                         url: Some("test:///child".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
@@ -657,7 +657,7 @@ mod tests {
                 .create_instance(
                     "./",
                     &mut CollectionRef { name: "coll".to_string() },
-                    fdecl::Child {
+                    &fdecl::Child {
                         name: Some("&*^%&@#$".to_string()),
                         url: Some("test:///child".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),

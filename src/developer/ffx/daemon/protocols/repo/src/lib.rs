@@ -450,7 +450,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
             (config, aliases)
         };
 
-        match proxy.add(config.into()).await {
+        match proxy.add(&config.into()).await {
             Ok(Ok(())) => {}
             Ok(Err(err)) => {
                 tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
@@ -2337,7 +2337,7 @@ mod tests {
 
         proxy
             .register_target(
-                target,
+                &target,
                 fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
             )
             .await
@@ -3795,7 +3795,7 @@ mod tests {
             // Introducing conflicting alias...
             assert_eq!(
                 proxy
-                    .register_target(ffx::RepositoryTarget {
+                    .register_target(&ffx::RepositoryTarget {
                         repo_name: Some("other-repo".to_string()),
                         target_identifier: Some(TARGET_NODENAME.to_string()),
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
@@ -4587,7 +4587,7 @@ mod tests {
         assert_eq!(
             proxy
                 .register_target(
-                    ffx::RepositoryTarget {
+                    &ffx::RepositoryTarget {
                         repo_name: Some(REPO_NAME.to_string()),
                         target_identifier: Some(TARGET_NODENAME.to_string()),
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
@@ -4687,7 +4687,7 @@ mod tests {
         assert_eq!(
             proxy
                 .register_target(
-                    ffx::RepositoryTarget {
+                    &ffx::RepositoryTarget {
                         repo_name: Some(REPO_NAME.to_string()),
                         target_identifier: Some(TARGET_NODENAME.to_string()),
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),

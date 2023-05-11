@@ -467,7 +467,7 @@ async fn build_info_server_mock(
             {
                 let fbi::ProviderRequest::GetBuildInfo { responder } = request;
                 responder
-                    .send(fbi::BuildInfo {
+                    .send(&fbi::BuildInfo {
                         product_config: Some("test_recovery".to_string()),
                         board_config: Some(board.clone()),
 

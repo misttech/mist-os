@@ -873,7 +873,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
                 .expect("create watcher");
         let () = interface_state
-            .get_watcher(fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)
+            .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)
             .expect("initialize interface watcher");
 
         let ep = sandbox
@@ -1623,7 +1623,7 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
         ..Default::default()
     };
     address_state_provider
-        .update_address_properties(deprecated_properties)
+        .update_address_properties(&deprecated_properties)
         .await
         .expect("FIDL error deprecating address");
 

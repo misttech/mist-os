@@ -148,7 +148,7 @@ impl<'a> StagedFile<'a> {
             // For filenames that are known to be temporary, try to remove them.
             if name.starts_with(tempfile_prefix) {
                 warn!("Removing unexpected file '{}' from directory", &name);
-                let fidl_res = dir_proxy.unlink(name, fio::UnlinkOptions::default()).await;
+                let fidl_res = dir_proxy.unlink(name, &fio::UnlinkOptions::default()).await;
                 match fidl_res {
                     Err(x) => failures.push(StagedFileError::FidlError(x)),
                     Ok(unlink_res) => {

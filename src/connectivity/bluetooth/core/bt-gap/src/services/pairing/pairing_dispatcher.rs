@@ -219,7 +219,7 @@ impl PairingDispatcher {
                         let id = peer.id;
                         let response: BoxFuture<'static, _> = self
                             .upstream
-                            .on_pairing_request((&peer).into(), method, displayed_passkey)
+                            .on_pairing_request(&(&peer).into(), method, displayed_passkey)
                             .map(move |res| (res, responder))
                             .boxed();
                         info!(
@@ -348,7 +348,7 @@ mod test {
         let peer = simple_test_peer(PeerId(0));
 
         // Make the request
-        let result_fut = proxy.on_pairing_request((&peer).into(), sys::PairingMethod::Consent, 0);
+        let result_fut = proxy.on_pairing_request(&(&peer).into(), sys::PairingMethod::Consent, 0);
 
         // Create a dispatcher with a closed upstream
         let (upstream, upstream_server) =
@@ -394,7 +394,7 @@ mod test {
 
         let make_request = async move {
             let result =
-                proxy.on_pairing_request((&peer).into(), sys::PairingMethod::Consent, 0).await;
+                proxy.on_pairing_request(&(&peer).into(), sys::PairingMethod::Consent, 0).await;
             // Our channel should have been closed as the responder was dropped
             assert_matches!(result, Err(fidl::Error::ClientChannelClosed { .. }));
             // Now close the dispatcher so the test will finish
@@ -458,7 +458,7 @@ mod test {
 
         let make_request = async move {
             let result =
-                proxy.on_pairing_request((&peer).into(), sys::PairingMethod::Consent, 0).await;
+                proxy.on_pairing_request(&(&peer).into(), sys::PairingMethod::Consent, 0).await;
             // Our channel should have been closed as the responder was dropped
             let _passkey = passkey;
             assert_matches!(result, Ok((true, _passkey)));
@@ -510,7 +510,7 @@ mod test {
                 .expect("Host ClientEnd should become Proxy");
             let peer = simple_test_peer(PeerId(0));
             let result =
-                proxy.on_pairing_request((&peer).into(), sys::PairingMethod::Consent, 0).await;
+                proxy.on_pairing_request(&(&peer).into(), sys::PairingMethod::Consent, 0).await;
             // Our channel should have been closed as the responder was dropped
             assert_matches!(result, Ok((true, _passkey)));
             // Now close the dispatcher so the test will finish

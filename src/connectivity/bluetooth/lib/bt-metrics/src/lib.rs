@@ -27,7 +27,7 @@ pub fn create_metrics_logger() -> Result<metrics::MetricEventLoggerProxy, Error>
     };
 
     fasync::Task::spawn(async move {
-        match factory_proxy.create_metric_event_logger(project_spec, cobalt_server).await {
+        match factory_proxy.create_metric_event_logger(&project_spec, cobalt_server).await {
             Err(e) => warn!("FIDL failure setting up event logger: {e:?}"),
             Ok(Err(e)) => warn!("CreateMetricEventLogger failure: {e:?}"),
             Ok(Ok(())) => {}

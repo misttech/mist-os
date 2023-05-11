@@ -55,7 +55,7 @@ impl PointerInjectorMock {
                 SetupRequest::WatchViewport { responder, .. } => {
                     watch_state = match watch_state {
                         WatchState::WaitingFirstRequest(viewport) => {
-                            responder.send(viewport).expect("Failed to send viewport.");
+                            responder.send(&viewport).expect("Failed to send viewport.");
                             WatchState::WaitingSecondRequest
                         }
                         WatchState::WaitingSecondRequest => {

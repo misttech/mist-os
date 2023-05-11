@@ -768,7 +768,7 @@ mod tests {
             fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
         assert!(accessor
             .r#stream_diagnostics(
-                StreamParameters {
+                &StreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: Some(StreamMode::SnapshotThenSubscribe),
                     format: Some(Format::Json),
@@ -790,7 +790,7 @@ mod tests {
             fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
         assert!(accessor
             .r#stream_diagnostics(
-                StreamParameters {
+                &StreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: Some(StreamMode::Snapshot),
                     format: Some(Format::Json),
@@ -823,7 +823,7 @@ mod tests {
 
         assert!(accessor
             .r#stream_diagnostics(
-                StreamParameters {
+                &StreamParameters {
                     data_type: Some(DataType::Inspect),
                     stream_mode: Some(StreamMode::Snapshot),
                     format: Some(Format::Json),

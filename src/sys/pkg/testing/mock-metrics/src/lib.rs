@@ -120,7 +120,7 @@ mod tests {
         let (logger, server_end) = ::fidl::endpoints::create_proxy().unwrap();
         factory
             .create_metric_event_logger(
-                ProjectSpec {
+                &ProjectSpec {
                     project_id: Some(cobalt_sw_delivery_registry::PROJECT_ID),
                     ..Default::default()
                 },

@@ -136,7 +136,7 @@ async fn handle_check_now_cmd<W: std::io::Write>(
     } else {
         (None, None)
     };
-    if let Err(e) = update_manager.check_now(options, monitor_client).await? {
+    if let Err(e) = update_manager.check_now(&options, monitor_client).await? {
         anyhow::bail!("Update check failed to start: {:?}", e);
     }
     writeln!(writer, "Checking for an update.")?;

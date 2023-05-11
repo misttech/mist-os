@@ -211,11 +211,11 @@ impl DisplayTest {
         // Test that if screen is turned off, it is reflected.
         let mut display_settings = DisplaySettings::default();
         display_settings.auto_brightness = Some(false);
-        display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
+        display_proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
         let mut display_settings = DisplaySettings::default();
         display_settings.screen_enabled = Some(false);
-        display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
+        display_proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
         let settings = display_proxy.watch().await.expect("watch completed");
 
@@ -224,7 +224,7 @@ impl DisplayTest {
         // Test that if display is turned back on, the display and manual brightness are on.
         let mut display_settings = DisplaySettings::default();
         display_settings.screen_enabled = Some(true);
-        display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
+        display_proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
         let settings = display_proxy.watch().await.expect("watch completed");
 
@@ -234,7 +234,7 @@ impl DisplayTest {
         // Test that if auto brightness is turned on, the display and auto brightness are on.
         let mut display_settings = DisplaySettings::default();
         display_settings.auto_brightness = Some(true);
-        display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
+        display_proxy.set(&display_settings).await.expect("set completed").expect("set successful");
 
         let settings = display_proxy.watch().await.expect("watch completed");
 

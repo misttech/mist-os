@@ -23,7 +23,7 @@ async fn test_night_mode() {
     let mut night_mode_settings = fidl_fuchsia_settings::NightModeSettings::default();
     night_mode_settings.night_mode_enabled = Some(true);
     night_mode_service
-        .set(night_mode_settings)
+        .set(&night_mode_settings)
         .await
         .expect("set completed")
         .expect("set successful");

@@ -107,7 +107,7 @@ impl CryptKeeper {
         realm_proxy
             .create_child(
                 &fdecl::CollectionRef { name: args.crypt_collection_name.clone() },
-                fdecl::Child {
+                &fdecl::Child {
                     name: Some(args.crypt_component_name.clone()),
                     url: Some(CRYPT_CM_URL.to_string()),
                     startup: Some(fdecl::StartupMode::Lazy),

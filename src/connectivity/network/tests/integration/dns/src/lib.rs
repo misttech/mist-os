@@ -76,7 +76,7 @@ async fn no_ip_literal<N: Netstack>(name: &str) {
                 name_lookup
                     .lookup_ip(
                         "240.0.0.2",
-                        net_name::LookupIpOptions {
+                        &net_name::LookupIpOptions {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
                             ..Default::default()
@@ -94,7 +94,7 @@ async fn no_ip_literal<N: Netstack>(name: &str) {
                 name_lookup
                     .lookup_ip(
                         "abcd::2",
-                        net_name::LookupIpOptions {
+                        &net_name::LookupIpOptions {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
                             ..Default::default()
@@ -568,7 +568,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
         let ips = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions {
+                &net_name::LookupIpOptions {
                     ipv4_lookup: Some(true),
                     ipv6_lookup: Some(true),
                     sort_addresses: Some(true),
@@ -775,7 +775,7 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
                 let mut ips = name_lookup
                     .lookup_ip(
                         EXAMPLE_HOSTNAME,
-                        net_name::LookupIpOptions {
+                        &net_name::LookupIpOptions {
                             ipv4_lookup: Some(ipv4_lookup),
                             ipv6_lookup: Some(ipv6_lookup),
                             sort_addresses: Some(true),
@@ -920,7 +920,7 @@ async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
+                &net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");
@@ -978,7 +978,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
         let ips = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
+                &net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP")
@@ -1221,7 +1221,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
+                &net_name::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");
@@ -1239,7 +1239,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
-                net_name::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() },
+                &net_name::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() },
             )
             .await
             .expect("call lookup IP");

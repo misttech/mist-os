@@ -212,7 +212,7 @@ async fn test_basic_copy_paste_across_different_view_refs() -> Result<(), Error>
 
     handles.set_time_ns(40);
     let pasted_item =
-        reader_b.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+        reader_b.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
 
     let expected_item = make_clipboard_item("text/json".to_string(), "{}".to_string());
     assert_eq!(pasted_item, expected_item);
@@ -266,7 +266,8 @@ async fn test_basic_copy_paste_in_same_view_ref() -> Result<(), Error> {
     let item_to_copy = make_clipboard_item("text/json".to_string(), "{}".to_string());
     let _ = writer.set_item(item_to_copy).flatten_err().await?;
 
-    let pasted_item = reader.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+    let pasted_item =
+        reader.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
 
     let expected_item = make_clipboard_item("text/json".to_string(), "{}".to_string());
     assert_eq!(pasted_item, expected_item);
@@ -296,7 +297,7 @@ async fn test_paste_after_source_view_ref_is_closed() -> Result<(), Error> {
     drop(control_ref_a);
 
     let pasted_item =
-        reader_b.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+        reader_b.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
 
     let expected_item = make_clipboard_item("text/json".to_string(), "{}".to_string());
     assert_eq!(pasted_item, expected_item);
@@ -321,7 +322,8 @@ async fn test_copy_and_paste_empty_string() -> Result<(), Error> {
     let item_to_copy = make_clipboard_item("text/plain".to_string(), "".to_string());
     let _ = writer.set_item(item_to_copy).flatten_err().await?;
 
-    let pasted_item = reader.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+    let pasted_item =
+        reader.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
 
     let expected_item = make_clipboard_item("text/plain".to_string(), "".to_string());
     assert_eq!(pasted_item, expected_item);
@@ -348,15 +350,15 @@ async fn test_clear_clipboard() -> Result<(), Error> {
     let _ = writer_a.set_item(item_to_copy).flatten_err().await?;
 
     handles.set_focus_chain(vec![&view_ref_b]).await?;
-    let pasted = reader_b.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+    let pasted = reader_b.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
     let expected_item = make_clipboard_item("text/json".to_string(), "{}".to_string());
     assert_eq!(pasted, expected_item);
 
     handles.set_focus_chain(vec![&view_ref_a]).await?;
-    let _ = writer_a.clear(fclip::WriterClearRequest::default()).flatten_err().await?;
+    let _ = writer_a.clear(&fclip::WriterClearRequest::default()).flatten_err().await?;
 
     handles.set_focus_chain(vec![&view_ref_b]).await?;
-    let result = reader_b.get_item(fclip::ReaderGetItemRequest::default()).await?;
+    let result = reader_b.get_item(&fclip::ReaderGetItemRequest::default()).await?;
     assert_matches!(result, Err(fclip::ClipboardError::Empty));
 
     Ok(())
@@ -504,7 +506,8 @@ async fn test_copy_and_paste_default_mime_type() -> Result<(), Error> {
     let item_to_copy = make_clipboard_item(None, "abc".to_string());
     let _ = writer.set_item(item_to_copy).flatten_err().await?;
 
-    let pasted_item = reader.get_item(fclip::ReaderGetItemRequest::default()).flatten_err().await?;
+    let pasted_item =
+        reader.get_item(&fclip::ReaderGetItemRequest::default()).flatten_err().await?;
 
     let expected_item =
         make_clipboard_item("text/plain;charset=utf-8".to_string(), "abc".to_string());
@@ -536,7 +539,7 @@ fn test_writer_and_watcher() -> Result<(), Error> {
         .unwrap();
 
     {
-        let mut initial_watch_fut = reader_b.watch(fclip::ReaderWatchRequest::default());
+        let mut initial_watch_fut = reader_b.watch(&fclip::ReaderWatchRequest::default());
         assert_matches!(
             exec.run_until_stalled(&mut initial_watch_fut),
             Poll::Ready(Ok(Err(fclip::ClipboardError::Unauthorized)))
@@ -545,7 +548,7 @@ fn test_writer_and_watcher() -> Result<(), Error> {
 
     handles.set_time_ns(10);
 
-    let mut watch_fut = reader_b.watch(fclip::ReaderWatchRequest::default());
+    let mut watch_fut = reader_b.watch(&fclip::ReaderWatchRequest::default());
     assert_matches!(exec.run_until_stalled(&mut watch_fut), Poll::Pending);
 
     {
@@ -615,7 +618,7 @@ fn test_writer_and_watcher_hanging_get_stream() -> Result<(), Error> {
         .unwrap();
 
     let mut watch_stream = HangingGetStream::new(reader_b.clone(), |reader| {
-        reader.watch(fclip::ReaderWatchRequest::default())
+        reader.watch(&fclip::ReaderWatchRequest::default())
     });
 
     let mut stream_fut = watch_stream.next();

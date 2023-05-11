@@ -34,7 +34,7 @@ async fn request_scheduling_options(
         accumulate_debug_data: Some(run_params.accumulate_debug_data),
         ..Default::default()
     };
-    builder_proxy.with_scheduling_options(scheduling_options)?;
+    builder_proxy.with_scheduling_options(&scheduling_options)?;
     Ok(())
 }
 
@@ -158,11 +158,11 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
                 &realm.offers(),
                 realm.collection(),
                 &params.test_url,
-                run_options,
+                &run_options,
                 suite_server_end,
             )?;
         } else {
-            builder_proxy.add_suite(&params.test_url, run_options, suite_server_end)?;
+            builder_proxy.add_suite(&params.test_url, &run_options, suite_server_end)?;
         }
     }
 

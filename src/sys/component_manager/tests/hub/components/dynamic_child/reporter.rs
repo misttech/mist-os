@@ -10,7 +10,7 @@ use {
 #[fuchsia::main]
 async fn main() {
     // Create a dynamic child component
-    let mut collection_ref = fdecl::CollectionRef { name: String::from("coll") };
+    let collection_ref = fdecl::CollectionRef { name: String::from("coll") };
     let child_decl = fdecl::Child {
         name: Some("simple_instance".to_string()),
         url: Some(String::from("#meta/simple.cm")),
@@ -21,7 +21,7 @@ async fn main() {
     let realm = connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
 
     realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+        .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
         .await
         .unwrap()
         .unwrap();
@@ -47,12 +47,12 @@ async fn main() {
         .await;
 
     // Delete the dynamic child
-    let mut child_ref = fdecl::ChildRef {
+    let child_ref = fdecl::ChildRef {
         name: "simple_instance".to_string(),
         collection: Some("coll".to_string()),
     };
 
-    realm.destroy_child(&mut child_ref).await.unwrap().unwrap();
+    realm.destroy_child(&child_ref).await.unwrap().unwrap();
 
     expect_dir_listing("/hub/children", vec![]).await;
 }

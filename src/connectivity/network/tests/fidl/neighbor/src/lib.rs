@@ -134,7 +134,7 @@ fn get_entry_iterator(
     let (proxy, server_end) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
             .expect("failed to create EntryIterator proxy");
-    let () = view.open_entry_iterator(server_end, options).expect("failed to open EntryIterator");
+    let () = view.open_entry_iterator(server_end, &options).expect("failed to open EntryIterator");
     futures::stream::unfold(proxy, |proxy| {
         proxy.get_next().map(|r| {
             let it = r.expect("fuchsia.net.neighbor/EntryIterator.GetNext FIDL error");
@@ -935,7 +935,7 @@ async fn neigh_unreachability_config_errors(name: &str) {
             .update_unreachability_config(
                 alice.ep.id() + 100,
                 fidl_fuchsia_net::IpVersion::V4,
-                fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
+                &fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
             )
             .await
             .expect("update_unreachability_config FIDL error")
@@ -947,7 +947,7 @@ async fn neigh_unreachability_config_errors(name: &str) {
             .update_unreachability_config(
                 alice.loopback_id,
                 fidl_fuchsia_net::IpVersion::V4,
-                fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
+                &fidl_fuchsia_net_neighbor::UnreachabilityConfig::default(),
             )
             .await
             .expect("update_unreachability_config FIDL error")
@@ -961,7 +961,7 @@ async fn neigh_unreachability_config_errors(name: &str) {
             .update_unreachability_config(
                 alice.ep.id(),
                 fidl_fuchsia_net::IpVersion::V4,
-                invalid_config
+                &invalid_config
             )
             .await
             .expect("update_unreachability_config FIDL error")
@@ -1030,7 +1030,7 @@ async fn neigh_unreachability_config(name: &str) {
 
         // Verify that updating with the current config doesn't change anything
         let () = controller
-            .update_unreachability_config(alice.ep.id(), ip_version, original_config.clone())
+            .update_unreachability_config(alice.ep.id(), ip_version, &original_config)
             .await
             .expect("update_unreachability_config FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw)
@@ -1052,7 +1052,7 @@ async fn neigh_unreachability_config(name: &str) {
         updates.base_reachable_time = updated_base_reachable_time;
         updates.retransmit_timer = updated_retransmit_timer;
         let () = controller
-            .update_unreachability_config(alice.ep.id(), ip_version, updates)
+            .update_unreachability_config(alice.ep.id(), ip_version, &updates)
             .await
             .expect("update_unreachability_config FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw)
@@ -1151,7 +1151,10 @@ async fn cant_hang_twice(name: &str) {
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
             .expect("failed to create EntryIterator proxy");
     let () = view
-        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default())
+        .open_entry_iterator(
+            server_end,
+            &fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+        )
         .expect("failed to open EntryIterator");
 
     assert_eq!(
@@ -1192,7 +1195,10 @@ async fn channel_is_closed_if_not_polled(name: &str) {
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
             .expect("failed to create EntryIterator proxy");
     let () = view
-        .open_entry_iterator(server_end, fidl_fuchsia_net_neighbor::EntryIteratorOptions::default())
+        .open_entry_iterator(
+            server_end,
+            &fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
+        )
         .expect("failed to open EntryIterator");
 
     let controller = alice

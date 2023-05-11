@@ -163,10 +163,10 @@ impl TimeSourceLauncher {
             startup: Some(StartupMode::Lazy),
             ..Default::default()
         };
-        let mut collection_ref = CollectionRef { name: String::from(TIMESOURCE_COLLECTION_NAME) };
+        let collection_ref = CollectionRef { name: String::from(TIMESOURCE_COLLECTION_NAME) };
 
         realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
             .await
             .context("realm.create_child failed")?
             .map_err(|e| anyhow!("failed to create child: {:?}", e))?;
@@ -193,7 +193,7 @@ impl TimeSourceLauncher {
     ) -> Result<(), DestroyChildError> {
         debug!("Destroying TimeSource at {}", self.component_url);
         // Destroy the previously launched timesource.
-        let mut child_ref = ChildRef {
+        let child_ref = ChildRef {
             name: self.name.clone(),
             collection: Some(String::from(TIMESOURCE_COLLECTION_NAME)),
         };
@@ -205,7 +205,7 @@ impl TimeSourceLauncher {
         // check and the call, but that should be a rare event.
         if self.has_child(realm, &child_ref).await? {
             realm
-                .destroy_child(&mut child_ref)
+                .destroy_child(&child_ref)
                 .await
                 .map_err(|e| DestroyChildError::Internal(e.into()))?
                 .or_else(|err: fcomponent::Error| match err {
@@ -223,8 +223,8 @@ impl TimeSourceLauncher {
     // Returns true if the `realm` contains the child referenced by `child_ref`.
     async fn has_child(&self, realm: &RealmProxy, child_ref: &ChildRef) -> Result<bool> {
         let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>()?;
-        let mut collection = CollectionRef { name: TIMESOURCE_COLLECTION_NAME.into() };
-        let _response = realm.list_children(&mut collection, server_end).await?;
+        let collection = CollectionRef { name: TIMESOURCE_COLLECTION_NAME.into() };
+        let _response = realm.list_children(&collection, server_end).await?;
         loop {
             let children = iter_proxy.next().await?;
             if children.is_empty() {
@@ -587,7 +587,7 @@ mod test {
                             standard_deviation: Some(SAMPLE_1_STD_DEV_NANOS),
                             ..Default::default()
                         };
-                        responder.send(sample).unwrap();
+                        responder.send(&sample).unwrap();
                     }
                     _ => {}
                 };

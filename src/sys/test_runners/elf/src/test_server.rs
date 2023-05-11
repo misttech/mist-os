@@ -128,7 +128,7 @@ where
                 .unwrap();
         run_listener
             .on_test_case_started(
-                invocation,
+                &invocation,
                 ftest::StdHandles {
                     out: Some(stdout_client),
                     err: Some(stderr_client),
@@ -174,7 +174,7 @@ where
             _ => Status::Failed,
         };
         case_listener_proxy
-            .finished(TestResult { status: Some(status), ..Default::default() })
+            .finished(&TestResult { status: Some(status), ..Default::default() })
             .map_err(RunTestError::SendFinish)?;
         Ok(())
     }

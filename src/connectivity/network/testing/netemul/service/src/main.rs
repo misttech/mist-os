@@ -1371,12 +1371,12 @@ mod tests {
             let net_mgr2 = get_network_manager(&sandbox2);
 
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::default())
+                .create_network("network", &fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             let () = zx::Status::ok(status).expect("network creation");
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::default())
+                .create_network("network", &fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             assert_eq!(zx::Status::from_raw(status), zx::Status::ALREADY_EXISTS);
@@ -1385,13 +1385,13 @@ mod tests {
             // new one.
             let net_mgr1 = get_network_manager(&sandbox1);
             let (status, _network) = net_mgr1
-                .create_network("network", fnetemul_network::NetworkConfig::default())
+                .create_network("network", &fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             assert_eq!(zx::Status::from_raw(status), zx::Status::ALREADY_EXISTS);
 
             let (status, _network) = net_mgr2
-                .create_network("network", fnetemul_network::NetworkConfig::default())
+                .create_network("network", &fnetemul_network::NetworkConfig::default())
                 .await
                 .expect("calling create network");
             let () = zx::Status::ok(status).expect("network creation");

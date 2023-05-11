@@ -165,7 +165,7 @@ impl Notify for AttemptNotifier {
                 .add_client(StateNotifier { proxy: monitor_proxy })
                 .await
                 .map_err(|_| ClosedClient)?;
-            proxy.on_start(options.into(), monitor_server_end).await.map_err(|_| ClosedClient)
+            proxy.on_start(&options.into(), monitor_server_end).await.map_err(|_| ClosedClient)
         }
         .boxed()
     }
@@ -1034,7 +1034,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(false),
             ..Default::default()
         };
-        let result = proxy.check_now(options, None).await.unwrap();
+        let result = proxy.check_now(&options, None).await.unwrap();
         assert_matches!(result, Ok(()));
     }
 
@@ -1050,7 +1050,7 @@ mod tests {
         let (client_end, mut request_stream) =
             fidl::endpoints::create_request_stream().expect("create_request_stream");
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
-        assert_matches!(proxy.check_now(options, None).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&options, None).await.unwrap(), Ok(()));
 
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             request_stream.next().await.unwrap().unwrap();
@@ -1078,7 +1078,7 @@ mod tests {
             allow_attaching_to_existing_update_check: None,
             ..Default::default()
         };
-        let result = proxy.check_now(options, Some(client_end)).await.unwrap();
+        let result = proxy.check_now(&options, Some(client_end)).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::InvalidOptions));
         assert_matches!(stream.next().await, None);
     }
@@ -1097,7 +1097,7 @@ mod tests {
             allow_attaching_to_existing_update_check: None,
             ..Default::default()
         };
-        let result = proxy.check_now(options, None).await.unwrap();
+        let result = proxy.check_now(&options, None).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::AlreadyInProgress));
     }
 
@@ -1115,7 +1115,7 @@ mod tests {
             allow_attaching_to_existing_update_check: None,
             ..Default::default()
         };
-        let result = proxy.check_now(options, None).await.unwrap();
+        let result = proxy.check_now(&options, None).await.unwrap();
         assert_matches!(result, Err(CheckNotStartedReason::Throttled));
     }
 
@@ -1129,7 +1129,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(true),
             ..Default::default()
         };
-        let result = proxy.check_now(options, Some(client_end)).await.unwrap();
+        let result = proxy.check_now(&options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
         let expected_states = [
             update::State::CheckingForUpdates(CheckingForUpdatesData::default()),
@@ -1161,7 +1161,7 @@ mod tests {
         let (attempt_client_end, mut attempt_request_stream) =
             fidl::endpoints::create_request_stream().expect("create_request_stream");
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
-        assert_matches!(proxy.check_now(check_options_1, None).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&check_options_1, None).await.unwrap(), Ok(()));
 
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
@@ -1184,7 +1184,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(true),
             ..Default::default()
         };
-        assert_matches!(proxy.check_now(check_options_2, None).await.unwrap(), Ok(()));
+        assert_matches!(proxy.check_now(&check_options_2, None).await.unwrap(), Ok(()));
         let AttemptsMonitorRequest::OnStart { options, monitor, responder } =
             attempt_request_stream.next().await.unwrap().unwrap();
 
@@ -1212,7 +1212,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(true),
             ..Default::default()
         };
-        let result = proxy.check_now(options, Some(client_end)).await.unwrap();
+        let result = proxy.check_now(&options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
     }
 
@@ -1231,7 +1231,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(true),
             ..Default::default()
         };
-        let result = proxy.check_now(options, Some(client_end)).await.unwrap();
+        let result = proxy.check_now(&options, Some(client_end)).await.unwrap();
         assert_matches!(result, Ok(()));
         FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::InstallingUpdate).await;
         // Ignore the first InstallingUpdate state with no progress.

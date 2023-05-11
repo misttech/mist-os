@@ -118,7 +118,7 @@ impl watch::Responder<DisplaySettings, fuchsia_zircon::Status> for DisplayWatchR
     fn respond(self, response: Result<DisplaySettings, fuchsia_zircon::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);

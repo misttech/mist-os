@@ -45,7 +45,7 @@ impl watch::Responder<Vec<LightGroup>, fuchsia_zircon::Status> for IndividualLig
                     group.name.as_ref().map(|n| *n == light_group_name).unwrap_or(false)
                 }) {
                     Some(group) => {
-                        let _ = self.responder.send(group);
+                        let _ = self.responder.send(&group);
                     }
                     None => {
                         // Failed to find the given light group, close the connection.

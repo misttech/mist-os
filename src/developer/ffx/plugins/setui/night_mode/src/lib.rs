@@ -22,7 +22,7 @@ async fn command(proxy: NightModeProxy, night_mode_enabled: Option<bool>) -> Wat
     if settings == NightModeSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set night_mode_enabled to {:?}", night_mode_enabled)
@@ -105,7 +105,7 @@ mod test {
                 panic!("Unexpected call to set");
             }
             NightModeRequest::Watch { responder } => {
-                let _ = responder.send(NightModeSettings {
+                let _ = responder.send(&NightModeSettings {
                     night_mode_enabled: expected_night_mode_enabled,
                     ..Default::default()
                 });

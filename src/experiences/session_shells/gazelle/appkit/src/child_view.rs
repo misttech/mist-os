@@ -74,9 +74,9 @@ impl ChildView {
             create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
 
         flatland.create_viewport(
-            &mut viewport_content_id.clone(),
+            &viewport_content_id,
             viewport_creation_token,
-            ui_comp::ViewportProperties {
+            &ui_comp::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width, height }),
                 ..Default::default()
             },
@@ -143,8 +143,8 @@ impl ChildView {
 
     pub fn set_size(&mut self, width: u32, height: u32) -> Result<(), Error> {
         self.flatland.set_viewport_properties(
-            &mut self.viewport_content_id,
-            ui_comp::ViewportProperties {
+            &self.viewport_content_id,
+            &ui_comp::ViewportProperties {
                 logical_size: Some(fmath::SizeU { width, height }),
                 ..Default::default()
             },

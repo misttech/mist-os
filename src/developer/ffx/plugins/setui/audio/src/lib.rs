@@ -20,7 +20,7 @@ async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
     if settings == AudioSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set Audio to {:?}", audio)
@@ -116,7 +116,7 @@ mod test {
             }
             AudioRequest::Watch { responder } => {
                 let _ = responder.send(
-                    AudioSettings::try_from(expected_audio).expect("Invalid input arguments"),
+                    &AudioSettings::try_from(expected_audio).expect("Invalid input arguments"),
                 );
             }
         });

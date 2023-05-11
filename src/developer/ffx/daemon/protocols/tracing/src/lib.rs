@@ -125,14 +125,14 @@ enum TraceTaskStartError {
 
 async fn trace_shutdown(proxy: &trace::ControllerProxy) -> Result<(), ffx::RecordingError> {
     proxy
-        .stop_tracing(trace::StopOptions { write_results: Some(true), ..Default::default() })
+        .stop_tracing(&trace::StopOptions { write_results: Some(true), ..Default::default() })
         .await
         .map_err(|e| {
             tracing::warn!("stopping tracing: {:?}", e);
             ffx::RecordingError::RecordingStop
         })?;
     proxy
-        .terminate_tracing(trace::TerminateOptions {
+        .terminate_tracing(&trace::TerminateOptions {
             write_results: Some(true),
             ..Default::default()
         })
@@ -157,9 +157,9 @@ impl TraceTask {
         let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client).context("making async socket")?;
         let f = File::create(&output_file).await.context("opening file")?;
-        proxy.initialize_tracing(config.clone(), server)?;
+        proxy.initialize_tracing(&config, server)?;
         proxy
-            .start_tracing(trace::StartOptions::default())
+            .start_tracing(&trace::StartOptions::default())
             .await?
             .map_err(TraceTaskStartError::TracingStartError)?;
         let output_file_clone = output_file.clone();
@@ -539,7 +539,7 @@ mod tests {
                         FAKE_CONTROLLER_TRACE_OUTPUT.len(),
                         socket.write(FAKE_CONTROLLER_TRACE_OUTPUT.as_bytes()).unwrap()
                     );
-                    responder.send(trace::TerminateResult::default()).map_err(Into::into)
+                    responder.send(&trace::TerminateResult::default()).map_err(Into::into)
                 }
                 r => panic!("unexpected request: {:#?}", r),
             }
@@ -558,13 +558,13 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
         proxy
             .start_recording(
-                ffx::TargetQuery {
+                &ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
                     ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions::default(),
-                trace::TraceConfig::default(),
+                &ffx::TraceOptions::default(),
+                &trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -589,13 +589,13 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
         proxy
             .start_recording(
-                ffx::TargetQuery {
+                &ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
                     ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions::default(),
-                trace::TraceConfig::default(),
+                &ffx::TraceOptions::default(),
+                &trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -606,10 +606,10 @@ mod tests {
             Err(ffx::RecordingError::DuplicateTraceFile),
             proxy
                 .start_recording(
-                    ffx::TargetQuery::default(),
+                    &ffx::TargetQuery::default(),
                     &output,
-                    ffx::TraceOptions::default(),
-                    trace::TraceConfig::default()
+                    &ffx::TraceOptions::default(),
+                    &trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -636,13 +636,13 @@ mod tests {
             Err(ffx::RecordingError::RecordingAlreadyStarted),
             proxy
                 .start_recording(
-                    ffx::TargetQuery {
+                    &ffx::TargetQuery {
                         string_matcher: Some("foobar".to_owned()),
                         ..Default::default()
                     },
                     &output,
-                    ffx::TraceOptions::default(),
-                    trace::TraceConfig::default()
+                    &ffx::TraceOptions::default(),
+                    &trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -669,13 +669,13 @@ mod tests {
             Err(ffx::RecordingError::RecordingStart),
             proxy
                 .start_recording(
-                    ffx::TargetQuery {
+                    &ffx::TargetQuery {
                         string_matcher: Some("foobar".to_owned()),
                         ..Default::default()
                     },
                     &output,
-                    ffx::TraceOptions::default(),
-                    trace::TraceConfig::default()
+                    &ffx::TraceOptions::default(),
+                    &trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -706,13 +706,13 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
         proxy
             .start_recording(
-                ffx::TargetQuery {
+                &ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
                     ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
-                trace::TraceConfig::default(),
+                &ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                &trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -739,13 +739,13 @@ mod tests {
         let output = temp_dir.path().join("trace-test.fxt").into_os_string().into_string().unwrap();
         proxy
             .start_recording(
-                ffx::TargetQuery {
+                &ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
                     ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
-                trace::TraceConfig::default(),
+                &ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                &trace::TraceConfig::default(),
             )
             .await
             .unwrap()

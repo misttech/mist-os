@@ -139,7 +139,7 @@ impl MediaButtonsHandler {
                         if let Some(event) = &self.inner.borrow().last_event {
                             let event_to_send = event.clone();
                             let fut = async move {
-                                match proxy_clone.on_event(event_to_send).await {
+                                match proxy_clone.on_event(&event_to_send).await {
                                     Ok(_) => {}
                                     Err(e) => {
                                         tracing::info!(
@@ -215,7 +215,7 @@ impl MediaButtonsHandler {
             let handle_clone = handle.clone();
             let event_to_send = event.clone();
             let fut = async move {
-                match listener_clone.on_event(event_to_send).await {
+                match listener_clone.on_event(&event_to_send).await {
                     Ok(_) => {}
                     Err(e) => {
                         if let Some(handler) = weak_handler.upgrade() {

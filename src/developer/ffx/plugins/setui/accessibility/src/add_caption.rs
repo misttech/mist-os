@@ -42,7 +42,7 @@ async fn command(proxy: AccessibilityProxy, input: CaptionArgs) -> WatchOrSetRes
         return Err(format_err!("At least one option is required. Use --help to see options."));
     }
 
-    Ok(Either::Set(if let Err(err) = proxy.set(settings).await? {
+    Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
         format!("{:?}", err)
     } else {
         format!("Successfully set AccessibilitySettings")

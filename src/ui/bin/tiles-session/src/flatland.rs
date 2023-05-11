@@ -87,9 +87,9 @@ impl TilesSession for FlatlandTilesSession {
                 };
                 self.flatland
                     .create_viewport(
-                        &mut viewport_content_id.clone(),
+                        &viewport_content_id,
                         viewport_creation_token,
-                        viewport_properties,
+                        &viewport_properties,
                         tile_watcher_request,
                     )
                     .context("GraphicalPresenterPresentView create_viewport")?;
@@ -97,19 +97,13 @@ impl TilesSession for FlatlandTilesSession {
                 // Attach the Viewport to the scene graph.
                 let viewport_transform_id = self.id_generator.next_transform_id();
                 self.flatland
-                    .create_transform(&mut viewport_transform_id.clone())
+                    .create_transform(&viewport_transform_id)
                     .context("GraphicalPresenterPresentView create_transform")?;
                 self.flatland
-                    .set_content(
-                        &mut viewport_transform_id.clone(),
-                        &mut viewport_content_id.clone(),
-                    )
+                    .set_content(&viewport_transform_id, &viewport_content_id)
                     .context("GraphicalPresenterPresentView create_transform")?;
                 self.flatland
-                    .add_child(
-                        &mut self.root_transform_id.clone(),
-                        &mut viewport_transform_id.clone(),
-                    )
+                    .add_child(&self.root_transform_id, &viewport_transform_id)
                     .context("GraphicalPresenterPresentView add_child")?;
 
                 // Flush the changes.
@@ -237,8 +231,8 @@ impl FlatlandTilesSession {
 
         // Create the root transform for tiles.
         let root_transform_id = id_generator.next_transform_id();
-        flatland.create_transform(&mut root_transform_id.clone())?;
-        flatland.set_root_transform(&mut root_transform_id.clone())?;
+        flatland.create_transform(&root_transform_id)?;
+        flatland.set_root_transform(&root_transform_id)?;
 
         // Create the root view for tiles.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
@@ -286,8 +280,8 @@ impl FlatlandTilesSession {
         flatland: &ui_comp::FlatlandProxy,
         tile: &mut FlatlandChildView,
     ) -> Result<(), Error> {
-        let _ = flatland.release_viewport(&mut tile.viewport_content_id);
-        flatland.release_transform(&mut tile.viewport_transform_id)?;
+        let _ = flatland.release_viewport(&tile.viewport_content_id);
+        flatland.release_transform(&tile.viewport_transform_id)?;
         Ok(())
     }
 

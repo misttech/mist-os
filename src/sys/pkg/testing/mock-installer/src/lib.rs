@@ -224,7 +224,7 @@ mod tests {
         let (monitor_client_end, stream) =
             fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
         proxy
-            .start_update(&url, options, monitor_client_end, None)
+            .start_update(&url, &options, monitor_client_end, None)
             .await
             .expect("made start_update call")
             .expect("start_update call succeeded");

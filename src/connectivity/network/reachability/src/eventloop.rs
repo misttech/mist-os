@@ -127,7 +127,7 @@ async fn dns_lookup(
     name_lookup
         .lookup_ip(
             DNS_DOMAIN,
-            fnet_name::LookupIpOptions {
+            &fnet_name::LookupIpOptions {
                 ipv4_lookup: Some(true),
                 ipv6_lookup: Some(true),
                 ..Default::default()
@@ -245,7 +245,7 @@ impl EventLoop {
                 fidl::endpoints::create_proxy::<fnet_neighbor::EntryIteratorMarker>()
                     .context("failed to create EntryIterator proxy")?;
             let () = view
-                .open_entry_iterator(server_end, fnet_neighbor::EntryIteratorOptions::default())
+                .open_entry_iterator(server_end, &fnet_neighbor::EntryIteratorOptions::default())
                 .context("failed to open EntryIterator")?;
             futures::stream::try_unfold(proxy, |proxy| {
                 proxy.get_next().map_ok(|e| {

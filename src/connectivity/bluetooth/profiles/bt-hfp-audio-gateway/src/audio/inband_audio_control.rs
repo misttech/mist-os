@@ -461,7 +461,7 @@ mod tests {
         let (ring_buffer, server) =
             fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
         audio_input_stream_config
-            .create_ring_buffer(CodecId::MSBC.try_into().unwrap(), server)
+            .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .expect("create ring buffer");
 
         // We need to write to the stream at least once to start it up.
@@ -539,7 +539,7 @@ mod tests {
         let (ring_buffer, server) =
             fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
         audio_output_stream_config
-            .create_ring_buffer(CodecId::MSBC.try_into().unwrap(), server)
+            .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .unwrap();
 
         // Note: we don't need to read from the stream to start it, it gets polled automatically by
@@ -617,7 +617,7 @@ mod tests {
         let (ring_buffer, server) =
             fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
         audio_output_stream_config
-            .create_ring_buffer(CodecId::CVSD.try_into().unwrap(), server)
+            .create_ring_buffer(&CodecId::CVSD.try_into().unwrap(), server)
             .unwrap();
 
         // Note: we don't need to read from the stream to start it, it gets polled automatically by
@@ -685,7 +685,7 @@ mod tests {
         let (ring_buffer, server) =
             fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
         audio_output_stream_config
-            .create_ring_buffer(CodecId::MSBC.try_into().unwrap(), server)
+            .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .expect("create ring buffer");
 
         let notifications_per_ring = 20;

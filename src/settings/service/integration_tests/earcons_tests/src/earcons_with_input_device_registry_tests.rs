@@ -56,7 +56,7 @@ async fn test_max_volume_sound_on_press() {
     // to 1 (volume up).
     let buttons_event = MediaButtonsEventBuilder::new().set_volume(1).build();
     let listener_proxy = media_button_receiver.next().await.unwrap();
-    let _ = listener_proxy.on_event(buttons_event.clone()).await;
+    let _ = listener_proxy.on_event(&buttons_event).await;
 
     // Sets volume max again.
     test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;

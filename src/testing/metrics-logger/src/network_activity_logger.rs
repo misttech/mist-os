@@ -454,7 +454,7 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fhwnet::PortRequest::GetCounters { responder }) => {
-                        let _ = responder.send(get_counter());
+                        let _ = responder.send(&get_counter());
                     }
                     _ => assert!(false),
                 }

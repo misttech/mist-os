@@ -250,7 +250,7 @@ where
             signature: install_plan.ecdsa_signature.as_ref().cloned(),
             ..Default::default()
         };
-        proxy.write(&mut url, cup_data).await?.map_err(FuchsiaInstallError::CupWrite)
+        proxy.write(&mut url, &cup_data).await?.map_err(FuchsiaInstallError::CupWrite)
     }
 }
 

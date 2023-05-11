@@ -442,7 +442,7 @@ where
                                 results: Some(chunk),
                                 ..Default::default()
                             };
-                            responder.send(response)?;
+                            responder.send(&response)?;
                         }
                     }
                 }
@@ -482,7 +482,7 @@ where
             }
             GetFontFamilyInfo { family, responder } => {
                 let family_info = self.get_family_info(family);
-                Ok(responder.send(family_info)?)
+                Ok(responder.send(&family_info)?)
             }
             // TODO(fxbug.dev/34897): Implement font event dispatch
             RegisterFontSetEventListener { listener: _, responder: _ } => unimplemented!(),

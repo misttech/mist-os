@@ -78,7 +78,7 @@ impl ExpectationsComparer {
         let (case_listener_proxy, case_listener) =
             fidl::endpoints::create_proxy().context("error creating CaseListenerProxy")?;
         run_listener_proxy
-            .on_test_case_started(invocation.clone(), std_handles, case_listener)
+            .on_test_case_started(&invocation, std_handles, case_listener)
             .context("error calling run_listener_proxy.on_test_case_started(...)")?;
 
         let name = invocation.name.as_ref().expect("fuchsia.test/Invocation had no name");
@@ -136,7 +136,7 @@ impl ExpectationsComparer {
         }
 
         case_listener_proxy
-            .finished(fidl_fuchsia_test::Result_ { status: Some(status), ..Default::default() })
+            .finished(&fidl_fuchsia_test::Result_ { status: Some(status), ..Default::default() })
             .context("case listener proxy fidl error")?;
 
         Ok(expectation_error.map(|err| (invocation, err)))
@@ -165,13 +165,13 @@ impl ExpectationsComparer {
             tracing::info!("{name} skip is expected.");
             listener_proxy
                 .on_test_case_started(
-                    invocation,
+                    &invocation,
                     fidl_fuchsia_test::StdHandles::default(),
                     case_listener_server_end,
                 )
                 .context("error while telling run listener that a skipped test case had started")?;
             case_listener_proxy
-                .finished(fidl_fuchsia_test::Result_ {
+                .finished(&fidl_fuchsia_test::Result_ {
                     status: Some(fidl_fuchsia_test::Status::Skipped),
                     ..Default::default()
                 })
@@ -192,7 +192,7 @@ impl ExpectationsComparer {
                             .into_iter()
                             .map(|(invocation, _outcome)| invocation)
                             .collect::<Vec<_>>(),
-                        options,
+                        &options,
                         listener,
                     )
                     .context("error calling original test component's fuchsia.test/Suite#Run")?;

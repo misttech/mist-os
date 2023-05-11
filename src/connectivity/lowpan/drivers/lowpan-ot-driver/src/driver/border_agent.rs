@@ -122,7 +122,7 @@ fn publish_border_agent_service(
         .publish_service_instance(
             BORDER_AGENT_SERVICE_TYPE,
             service_instance.as_str(),
-            ServiceInstancePublicationOptions::default(),
+            &ServiceInstancePublicationOptions::default(),
             client,
         )
         .map(|x| -> Result<(), anyhow::Error> {

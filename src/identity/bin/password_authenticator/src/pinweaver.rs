@@ -182,7 +182,7 @@ impl CredManager for ManagerProxy {
             ..Default::default()
         };
 
-        self.add_credential(params)
+        self.add_credential(&params)
             .await
             .map_err(|err| {
                 error!("CredentialManager#AddCredential: couldn't send FIDL request: {:?}", err);
@@ -205,7 +205,7 @@ impl CredManager for ManagerProxy {
             ..Default::default()
         };
 
-        self.check_credential(params)
+        self.check_credential(&params)
             .await
             .map_err(|err| {
                 error!("CredentialManager#CheckCredential: couldn't send FIDL request: {:?}", err);

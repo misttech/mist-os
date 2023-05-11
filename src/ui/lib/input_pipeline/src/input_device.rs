@@ -524,7 +524,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -567,7 +567,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: Some(fidl_input_report::MouseDescriptor {
                                 input: Some(fidl_input_report::MouseInputDescriptor {
@@ -614,7 +614,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -649,7 +649,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -693,7 +693,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -728,7 +728,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -770,7 +770,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: None,
                             sensor: None,
@@ -804,7 +804,7 @@ mod tests {
             spawn_stream_handler(move |input_device_request| async move {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                        let _ = responder.send(&fidl_input_report::DeviceDescriptor {
                             device_info: None,
                             mouse: Some(fidl_input_report::MouseDescriptor {
                                 input: Some(fidl_input_report::MouseInputDescriptor {

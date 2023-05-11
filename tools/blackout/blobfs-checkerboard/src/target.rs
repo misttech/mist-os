@@ -217,7 +217,7 @@ impl Test for BlobfsCheckerboard {
                     } else {
                         blobfs
                             .root()
-                            .unlink(path, fio::UnlinkOptions::default())
+                            .unlink(path, &fio::UnlinkOptions::default())
                             .await?
                             .map_err(zx::Status::from_raw)?;
                         Some(Slot::Empty)

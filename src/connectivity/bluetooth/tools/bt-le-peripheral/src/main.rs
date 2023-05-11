@@ -180,7 +180,7 @@ fn advertise(
     eprintln!("Advertising with name \"{:?}\" and services: {}", name, service_names.join(", "),);
 
     // advertise() only resolves on advertisement termination, so don't await here.
-    let result_fut = peripheral.advertise(parameters, client_end);
+    let result_fut = peripheral.advertise(&parameters, client_end);
     Ok((server_stream, result_fut))
 }
 
@@ -443,7 +443,7 @@ mod tests {
                 };
 
                 let proxy = advertised_peripheral.into_proxy()?;
-                let _ = proxy.on_connected(peer, conn_client_end).await;
+                let _ = proxy.on_connected(&peer, conn_client_end).await;
 
                 responder.send(&mut Ok(()))?;
 

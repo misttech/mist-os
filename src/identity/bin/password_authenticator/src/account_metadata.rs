@@ -309,7 +309,7 @@ impl AccountMetadataStore for DataDirAccountMetadataStore {
     async fn remove(&mut self, account_id: &AccountId) -> Result<(), AccountMetadataStoreError> {
         let metadata_filename = format_account_id(account_id);
         let res =
-            self.accounts_dir.unlink(&metadata_filename, fio::UnlinkOptions::default()).await?;
+            self.accounts_dir.unlink(&metadata_filename, &fio::UnlinkOptions::default()).await?;
         match res {
             Ok(_) => Ok(()),
             Err(err) => Err(AccountMetadataStoreError::UnlinkError(zx::Status::from_raw(err))),

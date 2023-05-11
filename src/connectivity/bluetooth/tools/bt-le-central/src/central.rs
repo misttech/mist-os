@@ -116,7 +116,7 @@ pub async fn connect(
     state
         .read()
         .svc
-        .connect(&mut peer_id.into(), conn_opts, conn_server)
+        .connect(&peer_id.into(), &conn_opts, conn_server)
         .context("Failed to connect")?;
 
     let (gatt_proxy, gatt_server) = endpoints::create_proxy::<ClientMarker>()

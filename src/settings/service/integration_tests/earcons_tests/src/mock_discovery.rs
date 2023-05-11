@@ -66,7 +66,7 @@ pub(crate) async fn update_session(
 ) {
     for watcher in watchers.lock().await.iter() {
         watcher
-            .session_updated(id, create_delta_with_domain(domain))
+            .session_updated(id, &create_delta_with_domain(domain))
             .await
             .expect("Failed to send update request to handler");
     }

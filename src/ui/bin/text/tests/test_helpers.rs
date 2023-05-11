@@ -80,7 +80,7 @@ pub struct InputMethodEditorDispatcher<'a> {
 #[async_trait]
 impl<'a> KeyDispatcher for InputMethodEditorDispatcher<'a> {
     async fn dispatch(&self, event: ui_input3::KeyEvent) -> Result<bool> {
-        Ok(self.ime.dispatch_key3(event).await?)
+        Ok(self.ime.dispatch_key3(&event).await?)
     }
 }
 
@@ -92,7 +92,7 @@ pub struct KeyEventInjectorDispatcher<'a> {
 #[async_trait]
 impl<'a> KeyDispatcher for KeyEventInjectorDispatcher<'a> {
     async fn dispatch(&self, event: ui_input3::KeyEvent) -> Result<bool> {
-        Ok(self.key_event_injector.inject(event).await? == ui_input3::KeyEventStatus::Handled)
+        Ok(self.key_event_injector.inject(&event).await? == ui_input3::KeyEventStatus::Handled)
     }
 }
 

@@ -85,13 +85,13 @@ fn test_single_unfocused_client() -> Result<()> {
 
     let (reader_b, _koid_b) = handles.new_reader()?;
 
-    let mut initial_watch_fut = reader_b.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(
         exec.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Err(fclip::ClipboardError::Unauthorized)))
     );
 
-    let mut watch_fut = reader_b.watch(ReaderWatchRequest::default());
+    let mut watch_fut = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(exec.run_until_stalled(&mut watch_fut), Poll::Pending);
 
     assert!(handles
@@ -117,7 +117,7 @@ fn test_single_client_first_watches_while_focused() -> Result<()> {
 
     let reader_a = handles.new_reader_with_koid(koid_a)?;
 
-    let mut initial_watch_fut = reader_a.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(
         exec.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==
@@ -142,14 +142,14 @@ fn test_single_client_first_watches_then_gains_focus() -> Result<()> {
     let (reader_b, koid_b) = handles.new_reader()?;
 
     debug!("reader_b.watch");
-    let mut initial_watch_fut = reader_b.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(
         exec.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Err(fclip::ClipboardError::Unauthorized)))
     );
 
     debug!("reader_b.watch");
-    let mut watch_fut = reader_b.watch(ReaderWatchRequest::default());
+    let mut watch_fut = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(exec.run_until_stalled(&mut watch_fut), Poll::Pending);
 
     debug!("Updating focus to {:?} ", koid_b);
@@ -176,14 +176,14 @@ fn test_unchanged_metadata_updates_are_ignored() -> Result<()> {
 
     let reader_a = handles.new_reader_with_koid(koid_a)?;
 
-    let mut initial_watch_fut = reader_a.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(
         exec.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==
             ClipboardMetadata::with_last_modified_ns(1).into()
     );
 
-    let mut watch_fut = reader_a.watch(ReaderWatchRequest::default());
+    let mut watch_fut = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(exec.run_until_stalled(&mut watch_fut), Poll::Pending);
 
     handles.server.update_clipboard_metadata(ClipboardMetadata::with_last_modified_ns(1))?;
@@ -215,7 +215,7 @@ fn test_all_clients_are_marked_dirty_when_metadata_changes() -> Result<()> {
     for (reader, koid) in &readers_and_koids {
         handles.server.update_focus(*koid)?;
         handles.run_server_until_stalled(&mut exec);
-        let mut initial_watch_fut = reader.watch(ReaderWatchRequest::default());
+        let mut initial_watch_fut = reader.watch(&ReaderWatchRequest::default());
         assert_matches!(
             exec.run_until_stalled(&mut initial_watch_fut),
             Poll::Ready(Ok(Ok(metadata))) if metadata == expected_metadata
@@ -227,7 +227,7 @@ fn test_all_clients_are_marked_dirty_when_metadata_changes() -> Result<()> {
 
     let mut watch_futs = readers_and_koids
         .iter()
-        .map(|(reader, _)| reader.watch(ReaderWatchRequest::default()))
+        .map(|(reader, _)| reader.watch(&ReaderWatchRequest::default()))
         .collect::<Vec<_>>();
 
     // Verify that all the watchers are waiting for a change in the clipboard metadata.
@@ -285,14 +285,14 @@ fn test_last_clipboard_state_wins() -> Result<()> {
 
     let reader_a = handles.new_reader_with_koid(koid_a)?;
 
-    let mut initial_watch_fut = reader_a.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(
         executor.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==
             ClipboardMetadata::with_last_modified_ns(1).into()
     );
 
-    let mut watch_fut = reader_a.watch(ReaderWatchRequest::default());
+    let mut watch_fut = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(executor.run_until_stalled(&mut watch_fut), Poll::Pending);
 
     let koid_b = make_view_ref_koid()?;
@@ -327,20 +327,20 @@ fn test_last_focus_wins() -> Result<()> {
     handles.server.update_focus(koid_a)?;
     let _ = executor.run_until_stalled(&mut handles.server_task);
 
-    let mut initial_watch_fut_a = reader_a.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut_a = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(
         executor.run_until_stalled(&mut initial_watch_fut_a),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==
             ClipboardMetadata::with_last_modified_ns(1).into()
     );
 
-    let mut initial_watch_fut_b = reader_b.watch(ReaderWatchRequest::default());
+    let mut initial_watch_fut_b = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(
         executor.run_until_stalled(&mut initial_watch_fut_b),
         Poll::Ready(Ok(Err(fclip::ClipboardError::Unauthorized)))
     );
 
-    let mut watch_fut_a = reader_a.watch(ReaderWatchRequest::default());
+    let mut watch_fut_a = reader_a.watch(&ReaderWatchRequest::default());
     assert_matches!(executor.run_until_stalled(&mut watch_fut_a), Poll::Pending);
 
     handles.server.update_focus(koid_b)?;
@@ -355,7 +355,7 @@ fn test_last_focus_wins() -> Result<()> {
     // executed.
     assert_matches!(executor.run_until_stalled(&mut watch_fut_a), Poll::Pending);
 
-    let mut watch_fut_b = reader_b.watch(ReaderWatchRequest::default());
+    let mut watch_fut_b = reader_b.watch(&ReaderWatchRequest::default());
     assert_matches!(
         executor.run_until_stalled(&mut watch_fut_b),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==
@@ -379,7 +379,7 @@ fn test_new_watcher_is_notified_despite_flood_of_focus_changes() -> Result<()> {
     for (reader, koid) in &herd_readers_and_koids {
         handles.server.update_focus(*koid)?;
         handles.run_server_until_stalled(&mut exec);
-        let mut initial_watch_fut = reader.watch(ReaderWatchRequest::default());
+        let mut initial_watch_fut = reader.watch(&ReaderWatchRequest::default());
         assert_matches!(exec.run_until_stalled(&mut initial_watch_fut), Poll::Ready(Ok(Ok(_))));
     }
     handles.server.update_focus(None)?;
@@ -393,14 +393,14 @@ fn test_new_watcher_is_notified_despite_flood_of_focus_changes() -> Result<()> {
     for i in 0..(HERD_SIZE / 2) {
         let (reader, koid) = &herd_readers_and_koids[i];
         handles.server.update_focus(*koid)?;
-        herd_watch_futs.push(reader.watch(fclip::ReaderWatchRequest::default()));
+        herd_watch_futs.push(reader.watch(&fclip::ReaderWatchRequest::default()));
     }
     handles.server.update_focus(target_koid)?;
-    let mut target_initial_fut = target_reader.watch(fclip::ReaderWatchRequest::default());
+    let mut target_initial_fut = target_reader.watch(&fclip::ReaderWatchRequest::default());
     for i in (HERD_SIZE / 2 + 1)..HERD_SIZE {
         let (reader, koid) = &herd_readers_and_koids[i];
         handles.server.update_focus(*koid)?;
-        herd_watch_futs.push(reader.watch(fclip::ReaderWatchRequest::default()));
+        herd_watch_futs.push(reader.watch(&fclip::ReaderWatchRequest::default()));
     }
 
     // Now wait for the target future.
@@ -422,7 +422,7 @@ fn test_illegal_concurrent_watch() -> Result<()> {
     handles.server.update_focus(koid_a)?;
 
     {
-        let mut initial_watch_fut = reader_a.watch(fclip::ReaderWatchRequest::default());
+        let mut initial_watch_fut = reader_a.watch(&fclip::ReaderWatchRequest::default());
         assert_matches!(
             executor.run_until_stalled(&mut initial_watch_fut),
             Poll::Ready(Ok(Ok(metadata))) if metadata ==
@@ -431,10 +431,10 @@ fn test_illegal_concurrent_watch() -> Result<()> {
     }
 
     {
-        let mut watch_fut_1 = reader_a.watch(fclip::ReaderWatchRequest::default());
+        let mut watch_fut_1 = reader_a.watch(&fclip::ReaderWatchRequest::default());
         assert_matches!(executor.run_until_stalled(&mut watch_fut_1), Poll::Pending);
 
-        let mut watch_fut_2 = reader_a.watch(fclip::ReaderWatchRequest::default());
+        let mut watch_fut_2 = reader_a.watch(&fclip::ReaderWatchRequest::default());
         assert_matches!(
             executor.run_until_stalled(&mut watch_fut_2),
             Poll::Ready(Err(fidl::Error::ClientChannelClosed {
@@ -453,7 +453,7 @@ fn test_illegal_concurrent_watch() -> Result<()> {
 
     // A new reader, which has not committed the sin of multiple concurrent watch requests...
     let reader_a_prime = handles.new_reader_with_koid(koid_a)?;
-    let mut initial_watch_fut = reader_a_prime.watch(fclip::ReaderWatchRequest::default());
+    let mut initial_watch_fut = reader_a_prime.watch(&fclip::ReaderWatchRequest::default());
     assert_matches!(
         executor.run_until_stalled(&mut initial_watch_fut),
         Poll::Ready(Ok(Ok(metadata))) if metadata ==

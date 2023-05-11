@@ -139,7 +139,7 @@ impl MulticastRoutingManager {
                         ..Default::default()
                     };
 
-                    match multicast_routing_client_end.add_route(&addresses, route.clone()).await {
+                    match multicast_routing_client_end.add_route(&addresses, &route).await {
                         Err(err) => {
                             error!(
                                 tag="mcast_routing", "Got FIDL error {:?} when trying to add route {:?} for address {:?}",

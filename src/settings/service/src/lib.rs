@@ -763,7 +763,7 @@ async fn get_metric_event_logger_proxy(
 
     factory_proxy
         .create_metric_event_logger(
-            ProjectSpec {
+            &ProjectSpec {
                 customer_id: Some(CUSTOMER_ID),
                 project_id: Some(PROJECT_ID),
                 ..Default::default()

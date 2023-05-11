@@ -468,7 +468,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
                         }),
                         prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
                     },
-                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                    &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                     server,
                 )
                 .expect("Control.AddAddress FIDL error");

@@ -154,7 +154,7 @@ pub async fn run_gtest_cases(
     let (overall_test_listener_proxy, overall_test_listener) =
         create_proxy::<ftest::CaseListenerMarker>()?;
     run_listener_proxy.on_test_case_started(
-        ftest::Invocation {
+        &ftest::Invocation {
             name: Some(start_info.resolved_url.clone().unwrap_or_default()),
             tag: None,
             ..Default::default()
@@ -175,7 +175,7 @@ pub async fn run_gtest_cases(
 
         let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
         run_listener_proxy.on_test_case_started(
-            test,
+            &test,
             ftest::StdHandles::default(),
             case_listener,
         )?;
@@ -206,7 +206,7 @@ pub async fn run_gtest_cases(
     let component_controller = start_test_component(start_info, starnix_kernel)?;
     let _ = read_result(component_controller.take_event_stream()).await;
     overall_test_listener_proxy
-        .finished(TestResult { status: Some(Status::Passed), ..Default::default() })?;
+        .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
     // Parse test results.
     let mut read_content = read_file(&output_dir, &output_file_name)
@@ -234,7 +234,7 @@ pub async fn run_gtest_cases(
                 .remove(&name)
                 .unwrap_or_else(|| panic!("No case listener for test case {name}"));
             case_listener_proxy
-                .finished(TestResult { status: Some(status), ..Default::default() })?;
+                .finished(&TestResult { status: Some(status), ..Default::default() })?;
         }
     }
 
@@ -242,7 +242,7 @@ pub async fn run_gtest_cases(
     for (name, case_listener_proxy) in run_listener_proxies {
         tracing::warn!("Did not receive result for {name}. Marking as failed.");
         case_listener_proxy
-            .finished(TestResult { status: Some(Status::Failed), ..Default::default() })?;
+            .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })?;
     }
 
     Ok(())

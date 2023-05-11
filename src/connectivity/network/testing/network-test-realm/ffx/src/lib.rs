@@ -164,7 +164,7 @@ async fn handle_command(
                     request_dns_servers,
                 }) => (
                     controller
-                        .start_dhcpv6_client(fntr::ControllerStartDhcpv6ClientRequest {
+                        .start_dhcpv6_client(&fntr::ControllerStartDhcpv6ClientRequest {
                             interface_id: Some(interface_id),
                             address: Some(address.into()),
                             stateful: Some(stateful),

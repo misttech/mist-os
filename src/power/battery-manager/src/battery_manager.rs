@@ -134,7 +134,7 @@ impl BatteryManager {
             };
             debug!("::manager:: run watchers [{:?}]", &watchers.len());
             for w in &watchers {
-                if let Err(e) = w.on_change_battery_info(info.clone().into()).await {
+                if let Err(e) = w.on_change_battery_info(&info.clone().into()).await {
                     error!("failed to send battery info to watcher {:?}", e);
                 }
             }
@@ -297,7 +297,7 @@ impl BatteryManager {
                                 ?info,
                                 "::battery_manager_request:: handle GetBatteryInfo request"
                             );
-                            responder.send(info)?;
+                            responder.send(&info)?;
                         }
                         fpower::BatteryManagerRequest::Watch { watcher, .. } => {
                             let watcher = watcher.into_proxy()?;
@@ -308,7 +308,7 @@ impl BatteryManager {
                             let info = self.get_battery_info_copy();
 
                             debug!(?info, "::battery_manager_request:: callback on new watcher");
-                            watcher.on_change_battery_info(info).await?;
+                            watcher.on_change_battery_info(&info).await?;
                         }
                     }
                     Ok(())

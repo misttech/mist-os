@@ -83,7 +83,7 @@ impl WlanApPolicyFacade {
         match self
             .ap_controller
             .start_access_point(
-                NetworkConfig {
+                &NetworkConfig {
                     id: Some(network_id),
                     credential: Some(credential),
                     ..Default::default()
@@ -143,7 +143,7 @@ impl WlanApPolicyFacade {
         let network_id = NetworkIdentifier { ssid: target_ssid.clone(), type_: type_ };
         match self
             .ap_controller
-            .stop_access_point(NetworkConfig {
+            .stop_access_point(&NetworkConfig {
                 id: Some(network_id),
                 credential: Some(credential),
                 ..Default::default()

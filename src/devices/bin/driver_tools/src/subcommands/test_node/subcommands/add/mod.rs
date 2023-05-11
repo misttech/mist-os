@@ -26,7 +26,7 @@ pub async fn add_test_node(
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     driver_development_proxy
-        .add_test_node(fdd::TestNodeAddArgs {
+        .add_test_node(&fdd::TestNodeAddArgs {
             name: Some(cmd.name.clone()),
             properties: Some(vec![string_to_property(&cmd.property)?]),
             ..Default::default()

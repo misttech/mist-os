@@ -1490,7 +1490,7 @@ pub mod capability_util {
             connect_to_svc_in_namespace::<fcomponent::RealmMarker>(namespace, &path).await;
         let mut collection_ref = fdecl::CollectionRef { name: collection.to_string() };
         let child_decl = child_decl.native_into_fidl();
-        let res = realm_proxy.create_child(&mut collection_ref, child_decl, args).await;
+        let res = realm_proxy.create_child(&mut collection_ref, &child_decl, args).await;
         res.expect("failed to send fidl message").expect("failed to create child");
     }
 

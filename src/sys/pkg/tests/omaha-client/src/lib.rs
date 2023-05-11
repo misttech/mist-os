@@ -635,7 +635,7 @@ impl TestEnv {
             fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
         self.proxies
             .update_manager
-            .check_now(options, Some(client_end))
+            .check_now(&options, Some(client_end))
             .await
             .expect("make check_now call")
             .expect("check started");
@@ -1850,7 +1850,7 @@ async fn test_omaha_client_invalid_app_set() {
         ..Default::default()
     };
     assert_matches!(
-        env.proxies.update_manager.check_now(options, None).await.expect("check_now"),
+        env.proxies.update_manager.check_now(&options, None).await.expect("check_now"),
         Err(CheckNotStartedReason::Internal)
     );
 }

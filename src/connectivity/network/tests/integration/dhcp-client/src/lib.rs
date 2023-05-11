@@ -140,7 +140,7 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
     proxy
         .new_client(
             client_iface.id(),
-            NewClientParams {
+            &NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
                 ..Default::default()
@@ -152,7 +152,7 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
     proxy
         .new_client(
             client_iface.id(),
-            NewClientParams {
+            &NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
                 ..Default::default()
@@ -202,7 +202,7 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netsta
         proxy
             .new_client(
                 client_iface.id(),
-                NewClientParams {
+                &NewClientParams {
                     configuration_to_request: None,
                     request_ip_address: Some(true),
                     ..Default::default()
@@ -245,7 +245,7 @@ async fn client_provider_double_watch<N: Netstack>(name: &str) {
     proxy
         .new_client(
             client_iface.id(),
-            NewClientParams {
+            &NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
                 ..Default::default()
@@ -289,7 +289,7 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
     proxy
         .new_client(
             client_iface.id(),
-            NewClientParams {
+            &NewClientParams {
                 configuration_to_request: None,
                 request_ip_address: Some(true),
                 ..Default::default()

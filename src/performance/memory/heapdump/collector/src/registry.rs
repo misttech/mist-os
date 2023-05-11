@@ -425,7 +425,7 @@ mod tests {
             with_contents,
             ..Default::default()
         };
-        let result = proxy.take_live_snapshot(request).await.expect("FIDL channel error");
+        let result = proxy.take_live_snapshot(&request).await.expect("FIDL channel error");
 
         // Verify that the result matches our expectation (either success or a specific error).
         if let Some(expect_error) = expect_error {

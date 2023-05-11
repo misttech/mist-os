@@ -45,7 +45,7 @@ async fn publish_ids_to_feedback_impl(
         }
     };
 
-    match proxy.upsert(component_data).await {
+    match proxy.upsert(&component_data).await {
         Ok(()) => {}
         Err(e) => {
             error!("Could not set ids in snapshot metadata: {}", e);

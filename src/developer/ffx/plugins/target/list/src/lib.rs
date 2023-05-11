@@ -38,7 +38,7 @@ pub async fn list_targets(
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc_proxy.list_targets(
-        TargetQuery { string_matcher: cmd.nodename.clone(), ..Default::default() },
+        &TargetQuery { string_matcher: cmd.nodename.clone(), ..Default::default() },
         reader,
     )?;
     let mut res = Vec::new();

@@ -141,7 +141,7 @@ impl Filesystem {
                     COLLECTION_COUNTER.fetch_add(1, Ordering::Relaxed)
                 );
 
-                let mut collection_ref = fdecl::CollectionRef { name: collection_name };
+                let collection_ref = fdecl::CollectionRef { name: collection_name };
                 let child_decl = fdecl::Child {
                     name: Some(name.clone()),
                     url: Some(format!("#meta/{}.cm", component_name)),
@@ -151,8 +151,8 @@ impl Filesystem {
                 // Launch a new component in our collection.
                 realm_proxy
                     .create_child(
-                        &mut collection_ref,
-                        child_decl,
+                        &collection_ref,
+                        &child_decl,
                         fcomponent::CreateChildArgs::default(),
                     )
                     .await?

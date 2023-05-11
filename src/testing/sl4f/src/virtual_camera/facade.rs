@@ -72,7 +72,7 @@ impl VirtualCameraFacade {
 
         // Call the FIDL method.
         info!("Stream Config specifications {:?}", stream_config);
-        match camera_proxy.add_stream_config(config_index, stream_config) {
+        match camera_proxy.add_stream_config(config_index, &stream_config) {
             Ok(_) => Ok(to_value(true)?),
             Err(e) => Err(format_err!("AddStreamConfig failed with err {:?}", e)),
         }

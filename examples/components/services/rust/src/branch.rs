@@ -64,8 +64,8 @@ async fn start_provider(
     let child_args = fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
     realm
         .create_child(
-            &mut fdecl::CollectionRef { name: COLLECTION_NAME.to_string() },
-            fdecl::Child {
+            &fdecl::CollectionRef { name: COLLECTION_NAME.to_string() },
+            &fdecl::Child {
                 name: Some(name.to_string()),
                 url: Some(url.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),

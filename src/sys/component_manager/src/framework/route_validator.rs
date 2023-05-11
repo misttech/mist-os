@@ -1245,7 +1245,7 @@ mod tests {
             realm_proxy
                 .create_child(
                     &mut collection_ref,
-                    child_decl(name),
+                    &child_decl(name),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await

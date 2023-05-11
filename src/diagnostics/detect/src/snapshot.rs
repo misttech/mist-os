@@ -123,7 +123,7 @@ impl CrashReportHandlerBuilder {
                 name: Some(CRASH_PRODUCT_NAME.to_string()),
                 ..Default::default()
             };
-            config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), product_config).await?;
+            config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), &product_config).await?;
         }
         // Connect to the CrashReporter service if a proxy wasn't specified
         let proxy = self.proxy.unwrap_or(connect_proxy::<fidl_feedback::CrashReporterMarker>(

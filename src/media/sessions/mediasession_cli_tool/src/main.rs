@@ -82,7 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     match invocation.command {
         Command::Ls(_) => {
-            discovery.watch_sessions(WatchOptions::default(), watcher_client)?;
+            discovery.watch_sessions(&WatchOptions::default(), watcher_client)?;
             while let Some((id, delta, responder)) = watcher_requests
                 .try_next()
                 .await?
@@ -97,7 +97,7 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         Command::Info(info) => {
-            discovery.watch_sessions(WatchOptions::default(), watcher_client)?;
+            discovery.watch_sessions(&WatchOptions::default(), watcher_client)?;
             while let Some((id, delta, responder)) = watcher_requests
                 .try_next()
                 .await?

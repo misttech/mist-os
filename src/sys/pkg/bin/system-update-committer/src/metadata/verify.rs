@@ -31,7 +31,7 @@ pub trait VerifierProxy {
 
 impl VerifierProxy for fidl::BlobfsVerifierProxy {
     fn call_verify(&self, options: VerifyOptions) -> QueryResponseFut<VerifierVerifyResult> {
-        self.verify(options)
+        self.verify(&options)
     }
     fn source(&self) -> VerifySource {
         VerifySource::Blobfs
@@ -40,7 +40,7 @@ impl VerifierProxy for fidl::BlobfsVerifierProxy {
 
 impl VerifierProxy for fidl::NetstackVerifierProxy {
     fn call_verify(&self, options: VerifyOptions) -> QueryResponseFut<VerifierVerifyResult> {
-        self.verify(options)
+        self.verify(&options)
     }
     fn source(&self) -> VerifySource {
         VerifySource::Netstack

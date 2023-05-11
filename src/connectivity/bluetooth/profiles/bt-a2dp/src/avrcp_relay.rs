@@ -341,7 +341,7 @@ impl AvrcpRelay {
 
             if staged_info.is_some() && hanging_watcher.is_some() {
                 trace!("Sending watcher info: {:?}", staged_info.as_ref().unwrap());
-                hanging_watcher.take().unwrap().send(staged_info.take().unwrap())?;
+                hanging_watcher.take().unwrap().send(&staged_info.take().unwrap())?;
             }
         }
         Ok(())
@@ -781,7 +781,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 7000,
-                avrcp::Notification {
+                &avrcp::Notification {
                     status: Some(avrcp::PlaybackStatus::Paused),
                     ..Default::default()
                 },
@@ -863,7 +863,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 7000,
-                avrcp::Notification { addressed_player: Some(2), ..Default::default() },
+                &avrcp::Notification { addressed_player: Some(2), ..Default::default() },
             )
             .expect("should have sent");
 
@@ -922,7 +922,7 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 9000,
-                avrcp::Notification { pos: Some(3051), ..Default::default() },
+                &avrcp::Notification { pos: Some(3051), ..Default::default() },
             )
             .expect("should have sent");
 
@@ -1142,7 +1142,10 @@ mod tests {
             .control_handle()
             .send_on_notification(
                 7000,
-                avrcp::Notification { available_players_changed: Some(true), ..Default::default() },
+                &avrcp::Notification {
+                    available_players_changed: Some(true),
+                    ..Default::default()
+                },
             )
             .expect("should have sent");
 

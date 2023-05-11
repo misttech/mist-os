@@ -50,7 +50,7 @@ async fn test_accessibility_set_all() {
         assert_eq!(settings, initial_settings);
 
         // Ensure setting interface propagates correctly
-        proxy.set(expected_settings.clone()).await.expect("set completed").expect("set successful");
+        proxy.set(&expected_settings).await.expect("set completed").expect("set successful");
     }
 
     {
@@ -99,7 +99,7 @@ async fn test_accessibility_set_captions() {
             background_color: None,
             ..Default::default()
         });
-        proxy.set(first_set.clone()).await.expect("set completed").expect("set successful");
+        proxy.set(&first_set).await.expect("set completed").expect("set successful");
 
         // Set FontStyle and overwrite for_media.
         let mut second_set = AccessibilitySettings::default();
@@ -111,7 +111,7 @@ async fn test_accessibility_set_captions() {
             background_color: None,
             ..Default::default()
         });
-        proxy.set(second_set.clone()).await.expect("set completed").expect("set successful");
+        proxy.set(&second_set).await.expect("set completed").expect("set successful");
     }
 
     {

@@ -109,7 +109,7 @@ async fn do_scan(appname: &String, args: &[String], state: CentralStatePtr) -> R
     let scan_fut = state
         .write()
         .get_svc()
-        .scan(scan_options, result_watcher_server)
+        .scan(&scan_options, result_watcher_server)
         .map_err(|e| format_err!("scan error: {:?}", e));
 
     let watch_fut = central::watch_scan_results(state, result_watcher_client);

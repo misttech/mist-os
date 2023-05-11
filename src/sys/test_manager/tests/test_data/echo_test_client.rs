@@ -82,7 +82,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                         .expect("cannot create proxy");
                 proxy
                     .on_test_case_started(
-                        tests.pop().unwrap(),
+                        &tests.pop().unwrap(),
                         ftest::StdHandles::default(),
                         case_listener,
                     )
@@ -90,7 +90,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                 run_echo("test_string1", &mut result).await?;
                 run_echo("test_string2", &mut result).await?;
 
-                case_listener_proxy.finished(result).expect("on_test_case_finished failed");
+                case_listener_proxy.finished(&result).expect("on_test_case_finished failed");
 
                 proxy.on_finished().expect("on_finished failed");
             }

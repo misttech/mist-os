@@ -145,7 +145,7 @@ impl TestSandbox {
         let (status, network) = netm
             .create_network(
                 &name,
-                fnetemul_network::NetworkConfig {
+                &fnetemul_network::NetworkConfig {
                     latency: None,
                     packet_loss: None,
                     reorder: None,
@@ -694,7 +694,7 @@ impl<'a> TestNetwork<'a> {
 
     /// Sets the configuration for this network to `config`.
     pub async fn set_config(&self, config: fnetemul_network::NetworkConfig) -> Result<()> {
-        let status = self.network.set_config(config).await.context("call set_config")?;
+        let status = self.network.set_config(&config).await.context("call set_config")?;
         zx::Status::ok(status).context("set config")
     }
 
@@ -878,7 +878,7 @@ impl<'a> TestEndpoint<'a> {
             .create_interface(
                 &mut port_id,
                 server_end,
-                fnet_interfaces_admin::Options { name, metric, ..Default::default() },
+                &fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
             .context("create interface")?;
         let id = control.get_id().await.context("get id")?;

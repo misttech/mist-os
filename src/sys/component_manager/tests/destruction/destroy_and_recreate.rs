@@ -17,7 +17,7 @@ async fn main() {
     // Create a "trigger realm" child component.
     info!("Creating child");
     {
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let child_decl = fdecl::Child {
             name: Some("trigger".to_string()),
             url: Some("#meta/trigger_realm.cm".to_string()),
@@ -26,7 +26,7 @@ async fn main() {
             ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .unwrap_or_else(|e| panic!("create_child failed: {:?}", e))
             .unwrap_or_else(|e| panic!("failed to create child: {:?}", e));
@@ -35,11 +35,11 @@ async fn main() {
     // Bind to child, causing it to start (along with its eager children).
     info!("Binding to child");
     {
-        let mut child_ref =
+        let child_ref =
             fdecl::ChildRef { name: "trigger".to_string(), collection: Some("coll".to_string()) };
         let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         realm
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
             .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));
@@ -51,10 +51,10 @@ async fn main() {
     // Destroy the child.
     info!("Destroying and recreating child");
     {
-        let mut child_ref =
+        let child_ref =
             fdecl::ChildRef { name: "trigger".to_string(), collection: Some("coll".to_string()) };
         realm
-            .destroy_child(&mut child_ref)
+            .destroy_child(&child_ref)
             .await
             .expect("destroy_child failed")
             .expect("failed to destroy child");
@@ -62,7 +62,7 @@ async fn main() {
 
     // Recreate the child immediately.
     {
-        let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
+        let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         let child_decl = fdecl::Child {
             name: Some("trigger".to_string()),
             url: Some("#meta/trigger_realm.cm".to_string()),
@@ -71,7 +71,7 @@ async fn main() {
             ..Default::default()
         };
         realm
-            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
             .await
             .unwrap_or_else(|e| panic!("create_child failed: {:?}", e))
             .unwrap_or_else(|e| panic!("failed to create child: {:?}", e));
@@ -84,11 +84,11 @@ async fn main() {
     // Restart the child.
     info!("Restarting to child");
     {
-        let mut child_ref =
+        let child_ref =
             fdecl::ChildRef { name: "trigger".to_string(), collection: Some("coll".to_string()) };
         let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         realm
-            .open_exposed_dir(&mut child_ref, server_end)
+            .open_exposed_dir(&child_ref, server_end)
             .await
             .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
             .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));

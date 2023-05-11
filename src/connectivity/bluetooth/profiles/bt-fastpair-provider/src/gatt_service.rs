@@ -278,7 +278,7 @@ impl GattService {
         let (service_client, service_stream) = create_request_stream::<LocalServiceMarker>()
             .context("Can't create LocalService endpoints")?;
 
-        if let Err(e) = server_svc.publish_service(info, service_client).await? {
+        if let Err(e) = server_svc.publish_service(&info, service_client).await? {
             warn!("Couldn't set up Fast Pair GATT Service: {:?}", e);
             return Err(e.into());
         }
@@ -306,7 +306,7 @@ impl GattService {
             value: Some(value),
             ..Default::default()
         };
-        self.local_service_server.control_handle().send_on_notify_value(params).map_err(Into::into)
+        self.local_service_server.control_handle().send_on_notify_value(&params).map_err(Into::into)
     }
 
     /// Handle an incoming GATT read request for the local GATT characteristic at `handle`.
@@ -637,7 +637,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(params);
+        let write_request_fut = upstream_service_client.write_value(&params);
         pin_mut!(write_request_fut);
         // We expect an Error to be returned to the FIDL client. Additionally, no `GattService`
         // stream items should be produced. This is verified indirectly via `run_while` which will
@@ -654,7 +654,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(params);
+        let write_request_fut = upstream_service_client.write_value(&params);
         pin_mut!(write_request_fut);
         let (write_result, _gatt_service_fut) =
             run_while(&mut exec, gatt_service_fut, write_request_fut);
@@ -677,7 +677,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(params);
+        let write_request_fut = upstream_service_client.write_value(&params);
         pin_mut!(write_request_fut);
         let _ = exec
             .run_until_stalled(&mut write_request_fut)
@@ -746,7 +746,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(params);
+        let write_request_fut = upstream_service_client.write_value(&params);
         pin_mut!(write_request_fut);
         let _ = exec
             .run_until_stalled(&mut write_request_fut)

@@ -378,12 +378,12 @@ impl FlatlandScanout {
             .ok_or_else(|| anyhow!("No import_token available for resource VMO"))?;
 
         self.flatland
-            .create_image(&mut content_id.clone(), import_token, 0, image_props)
+            .create_image(&content_id, import_token, 0, &image_props)
             .context("Failed to create image")?;
-        let mut size = fmath::SizeU { width: resource.width(), height: resource.height() };
-        self.flatland.set_image_destination_size(&mut content_id.clone(), &mut size)?;
+        let size = fmath::SizeU { width: resource.width(), height: resource.height() };
+        self.flatland.set_image_destination_size(&content_id, &size)?;
         // Src blend mode will prevent any alpha blending with the background.
-        self.flatland.set_image_blending_function(&mut content_id.clone(), BlendMode::Src)?;
+        self.flatland.set_image_blending_function(&content_id, BlendMode::Src)?;
         Ok(content_id)
     }
 }

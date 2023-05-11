@@ -1163,7 +1163,7 @@ async fn assert_unsupported_directory_calls(
 
     // Verify unlink() is not supported.
     assert_eq!(
-        parent.unlink(child_base_path, fio::UnlinkOptions::default()).await.unwrap(),
+        parent.unlink(child_base_path, &fio::UnlinkOptions::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 

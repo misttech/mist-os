@@ -65,7 +65,7 @@ impl<'a: 'b, 'b> Stream<'a> {
             debug!("Sending input format details for follow-up stream.");
             self.stream_processor.queue_input_format_details(
                 self.stream_lifetime_ordinal,
-                self.stream.format_details(self.format_details_version_ordinal),
+                &self.stream.format_details(self.format_details_version_ordinal),
             )?;
         }
 
@@ -95,7 +95,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                 debug!("Sending input format details in response to input constraints.");
                 self.stream_processor.queue_input_format_details(
                     self.stream_lifetime_ordinal,
-                    self.stream.format_details(self.format_details_version_ordinal),
+                    &self.stream.format_details(self.format_details_version_ordinal),
                 )?;
 
                 let chunk_stream = self.stream.capped_chunks(buffer_set.buffer_size);
@@ -174,7 +174,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                     packet: output_packet,
                 }));
 
-                self.stream_processor.recycle_output_packet(PacketHeader {
+                self.stream_processor.recycle_output_packet(&PacketHeader {
                     buffer_lifetime_ordinal: Some(output_packet.header.buffer_lifetime_ordinal),
                     packet_index: Some(output_packet.header.packet_index),
                     ..Default::default()
@@ -227,7 +227,7 @@ impl<'a: 'b, 'b> Stream<'a> {
             match input_packet_stream.next_packet()? {
                 PacketPoll::Ready(input_packet) => {
                     debug!("Sending input packet. {:?}", input_packet.valid_length_bytes);
-                    self.stream_processor.queue_input_packet(input_packet)?;
+                    self.stream_processor.queue_input_packet(&input_packet)?;
                 }
                 PacketPoll::Eos => {
                     debug!("Sending end of stream.");

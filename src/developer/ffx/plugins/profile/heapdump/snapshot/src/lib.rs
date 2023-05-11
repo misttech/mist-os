@@ -31,7 +31,7 @@ pub async fn snapshot(
     };
 
     let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-    let result = collector.take_live_snapshot(request).await?;
+    let result = collector.take_live_snapshot(&request).await?;
     let receiver_stream = check_collector_error(result)?.into_stream()?;
 
     let snapshot = heapdump_snapshot::Snapshot::receive_from(receiver_stream).await?;

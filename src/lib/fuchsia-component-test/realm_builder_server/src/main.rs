@@ -2241,7 +2241,7 @@ mod tests {
         async fn add_child_or_panic(&self, name: &str, url: &str, options: ftest::ChildOptions) {
             let () = self
                 .realm_proxy
-                .add_child(name, url, options)
+                .add_child(name, url, &options)
                 .await
                 .expect("failed to make Realm.AddChild call")
                 .expect("failed to add child");
@@ -2662,13 +2662,13 @@ mod tests {
         // Add two local children
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_local_child returned an error");
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::default())
+            .add_local_child("b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -2745,7 +2745,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -2773,13 +2773,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2794,14 +2794,14 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2813,7 +2813,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -2822,7 +2822,7 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
@@ -2838,7 +2838,7 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
@@ -2848,7 +2848,7 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
@@ -2864,7 +2864,7 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
@@ -2901,7 +2901,7 @@ mod tests {
             .add_child(
                 "realm_with_child",
                 "#meta/realm_with_child.cm",
-                ftest::ChildOptions {
+                &ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
                     ..Default::default()
                 },
@@ -3005,8 +3005,8 @@ mod tests {
             .realm_proxy
             .add_child_from_decl(
                 "a",
-                a_decl.clone().native_into_fidl(),
-                ftest::ChildOptions::default(),
+                &a_decl.clone().native_into_fidl(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
@@ -3029,13 +3029,17 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", fcdecl::Component::default(), ftest::ChildOptions::default())
+            .add_child_from_decl(
+                "a",
+                &fcdecl::Component::default(),
+                &ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect_err("add_child_from_decl was supposed to error");
@@ -3050,14 +3054,18 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", fcdecl::Component::default(), ftest::ChildOptions::default())
+            .add_child_from_decl(
+                "a",
+                &fcdecl::Component::default(),
+                &ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect_err("add_child_from_decl was supposed to error");
@@ -3085,7 +3093,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", a_decl.clone(), ftest::ChildOptions::default())
+            .add_child_from_decl("a", &a_decl, &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child_from_decl returned an error");
@@ -3114,7 +3122,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -3160,13 +3168,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_local_child was supposed to error");
@@ -3181,14 +3189,14 @@ mod tests {
             .add_child(
                 "a",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::default(),
+                &ftest::ChildOptions::default(),
             )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_local_child was supposed to error");
@@ -3364,7 +3372,7 @@ mod tests {
             .await;
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::default())
+            .add_local_child("b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -3657,7 +3665,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -3685,7 +3693,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3827,7 +3835,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3843,7 +3851,7 @@ mod tests {
         assert_eq!(0, realm_and_builder_task.realm_contents.lock().await.local_component_ids.len());
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3864,7 +3872,7 @@ mod tests {
 
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3909,7 +3917,7 @@ mod tests {
 
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -4061,12 +4069,12 @@ mod tests {
             create_proxy::<ftest::RealmMarker>().unwrap();
         realm_and_builder_task
             .realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
+            .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_child("b", "test:///b", ftest::ChildOptions::default())
+            .add_child("b", "test:///b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4101,7 +4109,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4153,7 +4161,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4171,7 +4179,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4191,7 +4199,7 @@ mod tests {
         }));
         realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", a_decl.clone().native_into_fidl())
+            .replace_component_decl("a", &a_decl.clone().native_into_fidl())
             .await
             .expect("failed to call replace_component_decl")
             .expect("replace_component_decl returned an error");
@@ -4287,12 +4295,12 @@ mod tests {
             create_proxy::<ftest::RealmMarker>().unwrap();
         realm_and_builder_task
             .realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
+            .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_local_child("b", ftest::ChildOptions::default())
+            .add_local_child("b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4340,13 +4348,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::default())
+            .replace_component_decl("a", &fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4358,7 +4366,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::default())
+            .replace_component_decl("a", &fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4370,13 +4378,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::default())
+            .replace_component_decl("a", &fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4400,7 +4408,7 @@ mod tests {
         }]);
         realm_and_builder_task
             .realm_proxy
-            .replace_realm_decl(realm_decl.clone())
+            .replace_realm_decl(&realm_decl)
             .await
             .expect("failed to call replace_realm_decl")
             .expect("replace_realm_decl returned an error");
@@ -4430,7 +4438,7 @@ mod tests {
         };
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_realm_decl(realm_decl)
+            .replace_realm_decl(&realm_decl)
             .await
             .expect("failed to call replace_realm_decl")
             .expect_err("replace_realm_decl did not return an error");
@@ -4443,12 +4451,12 @@ mod tests {
         let (child_realm_proxy, child_realm_server_end) =
             create_proxy::<ftest::RealmMarker>().unwrap();
         rabt.realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
+            .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_local_child("b", ftest::ChildOptions::default())
+            .add_local_child("b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4465,35 +4473,27 @@ mod tests {
         let empty_opts = || ftest::ChildOptions::default();
         let empty_decl = || fcdecl::Component::default();
 
-        assert_err(rabt.realm_proxy.add_child("a", "test:///a", empty_opts())).await;
-        assert_err(rabt.realm_proxy.add_child_from_decl("a", empty_decl(), empty_opts())).await;
-        assert_err(rabt.realm_proxy.add_local_child("a", empty_opts())).await;
+        assert_err(rabt.realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
+        assert_err(rabt.realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
+        assert_err(rabt.realm_proxy.add_local_child("a", &empty_opts())).await;
         let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
-        assert_err(rabt.realm_proxy.add_child_realm("a", empty_opts(), server_end)).await;
+        assert_err(rabt.realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(rabt.realm_proxy.get_component_decl("b")).await;
-        assert_err(rabt.realm_proxy.replace_component_decl("b", empty_decl())).await;
-        assert_err(rabt.realm_proxy.replace_realm_decl(empty_decl())).await;
-        assert_err(rabt.realm_proxy.add_route(
-            &[],
-            &mut fcdecl::Ref::Self_(fcdecl::SelfRef {}),
-            &[],
-        ))
-        .await;
+        assert_err(rabt.realm_proxy.replace_component_decl("b", &empty_decl())).await;
+        assert_err(rabt.realm_proxy.replace_realm_decl(&empty_decl())).await;
+        assert_err(rabt.realm_proxy.add_route(&[], &fcdecl::Ref::Self_(fcdecl::SelfRef {}), &[]))
+            .await;
 
-        assert_err(child_realm_proxy.add_child("a", "test:///a", empty_opts())).await;
-        assert_err(child_realm_proxy.add_child_from_decl("a", empty_decl(), empty_opts())).await;
-        assert_err(child_realm_proxy.add_local_child("a", empty_opts())).await;
+        assert_err(child_realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
+        assert_err(child_realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
+        assert_err(child_realm_proxy.add_local_child("a", &empty_opts())).await;
         let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
-        assert_err(child_realm_proxy.add_child_realm("a", empty_opts(), server_end)).await;
+        assert_err(child_realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(child_realm_proxy.get_component_decl("b")).await;
-        assert_err(child_realm_proxy.replace_component_decl("b", empty_decl())).await;
-        assert_err(child_realm_proxy.replace_realm_decl(empty_decl())).await;
-        assert_err(child_realm_proxy.add_route(
-            &[],
-            &mut fcdecl::Ref::Self_(fcdecl::SelfRef {}),
-            &[],
-        ))
-        .await;
+        assert_err(child_realm_proxy.replace_component_decl("b", &empty_decl())).await;
+        assert_err(child_realm_proxy.replace_realm_decl(&empty_decl())).await;
+        assert_err(child_realm_proxy.add_route(&[], &fcdecl::Ref::Self_(fcdecl::SelfRef {}), &[]))
+            .await;
     }
 
     #[fuchsia::test]
@@ -4501,7 +4501,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test://a", ftest::ChildOptions::default())
+            .add_child("a", "test://a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4604,13 +4604,13 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::default())
+            .add_local_child("a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_child_local returned an error");
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::default())
+            .add_local_child("b", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");

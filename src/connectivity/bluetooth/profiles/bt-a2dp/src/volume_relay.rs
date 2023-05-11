@@ -145,7 +145,7 @@ impl VolumeRelay {
                         avrcp::AbsoluteVolumeHandlerRequest::SetVolume { requested_volume, responder } => {
                             let settings = AvrcpVolume(requested_volume).as_audio_settings(media::AudioRenderUsage::Media);
                             trace!("AVRCP Setting system volume to {} -> {:?}", requested_volume, settings);
-                            if let Err(e) = audio.set(settings).await {
+                            if let Err(e) = audio.set(&settings).await {
                                 warn!("Couldn't set media volume: {:?}", e);
                                 let _ = responder.send(current_volume);
                                 continue;
@@ -305,7 +305,7 @@ mod tests {
 
     fn respond_to_audio_watch(responder: settings::AudioWatchResponder, level: f32) {
         responder
-            .send(settings::AudioSettings {
+            .send(&settings::AudioSettings {
                 streams: Some(vec![settings::AudioStreamSettings {
                     stream: Some(media::AudioRenderUsage::Media),
                     user_volume: Some(settings::Volume {

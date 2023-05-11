@@ -280,7 +280,7 @@ impl AdvertisingProxyInner {
                     .publish_proxy_host(
                         local_name,
                         &addrs,
-                        ProxyHostPublicationOptions {
+                        &ProxyHostPublicationOptions {
                             perform_probe: Some(false),
                             ..Default::default()
                         },
@@ -448,7 +448,7 @@ impl AdvertisingProxyInner {
                 .publish_service_instance(
                     local_service_name,
                     local_instance_name,
-                    ServiceInstancePublicationOptions::default(),
+                    &ServiceInstancePublicationOptions::default(),
                     client,
                 )
                 .map(|x| match x {

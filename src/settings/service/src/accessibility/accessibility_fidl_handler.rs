@@ -36,7 +36,7 @@ impl watch::Responder<AccessibilitySettings, zx::Status> for AccessibilityWatchR
     fn respond(self, response: Result<AccessibilitySettings, zx::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);

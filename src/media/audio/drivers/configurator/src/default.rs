@@ -172,7 +172,7 @@ impl StreamConfig {
         match request {
             StreamConfigRequest::GetHealthState { responder } => {
                 tracing::trace!("StreamConfig get health state");
-                responder.send(HealthState::default())?;
+                responder.send(&HealthState::default())?;
             }
 
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
@@ -182,7 +182,7 @@ impl StreamConfig {
 
             StreamConfigRequest::GetProperties { responder } => {
                 tracing::trace!("StreamConfig properties: {:?}", self.properties);
-                responder.send(self.properties.clone())?;
+                responder.send(&self.properties)?;
             }
 
             StreamConfigRequest::GetSupportedFormats { responder } => {
@@ -233,7 +233,7 @@ impl StreamConfig {
                     ..Default::default()
                 };
                 state.gain_state_first_watch_replied = true;
-                responder.send(gain_state)?
+                responder.send(&gain_state)?
             }
 
             StreamConfigRequest::WatchPlugState { responder } => {
@@ -248,7 +248,7 @@ impl StreamConfig {
                 tracing::trace!("StreamConfig watch plug state: {:?}", plug_state.plugged);
                 if state.plug_state_updated {
                     state.plug_state_updated = false;
-                    responder.send(plug_state)?;
+                    responder.send(&plug_state)?;
                     return Ok(());
                 } else if state.plug_state_responder.is_none() {
                     state.plug_state_responder = Some(responder);
@@ -470,7 +470,7 @@ impl DefaultConfigurator {
                     plug_state_time: Some(stream_config_state.plugged_time),
                     ..Default::default()
                 };
-                match responder.send(plug_state) {
+                match responder.send(&plug_state) {
                     Ok(()) => continue,
                     Err(e) => {
                         tracing::warn!("Could not respond to plug state: {:?}", e);
@@ -1029,7 +1029,7 @@ mod tests {
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
-        proxy.create_ring_buffer(ring_buffer_format, server)?;
+        proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
         // To make sure we really complete running create ring buffer we call a 2-way method.
         let _props = proxy.get_properties().await?;
@@ -1087,7 +1087,7 @@ mod tests {
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
-        proxy.create_ring_buffer(ring_buffer_format, server)?;
+        proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
         // To make sure we really complete running create ring buffer we call a 2-way method.
         let _props = proxy.get_properties().await?;
@@ -1488,7 +1488,7 @@ mod tests {
                         plug_detect_capabilities: Some(PlugDetectCapabilities::Hardwired),
                         ..Default::default()
                     };
-                    responder.send(info)?;
+                    responder.send(&info)?;
                 }
                 CodecRequest::Stop { responder: _ } => {}
                 CodecRequest::Start { responder: _ } => {}
@@ -1509,7 +1509,7 @@ mod tests {
                 }
                 CodecRequest::SetDaiFormat { responder: _, format: _ } => {}
                 CodecRequest::WatchPlugState { responder } => {
-                    responder.send(PlugState {
+                    responder.send(&PlugState {
                         plugged: Some(TEST_CODEC_PLUGGED),
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
                         ..Default::default()
@@ -1580,7 +1580,7 @@ mod tests {
                             })),
                             ..Default::default()
                         };
-                        return Ok(responder.send(state)?);
+                        return Ok(responder.send(&state)?);
                     }
                     panic!("Not covered by test");
                 }
@@ -1890,7 +1890,7 @@ mod tests {
         ) -> std::result::Result<(), anyhow::Error> {
             match request {
                 CodecRequest::WatchPlugState { responder } => {
-                    responder.send(PlugState {
+                    responder.send(&PlugState {
                         // A plug state with missing plugged field is bad.
                         plug_state_time: Some(TEST_CODEC_PLUG_STATE_TIME),
                         ..Default::default()

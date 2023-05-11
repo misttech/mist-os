@@ -54,7 +54,7 @@ impl BuiltinCapability for KernelStats {
                         other_bytes: Some(mem_stats.other_bytes),
                         ..Default::default()
                     };
-                    responder.send(stats)?;
+                    responder.send(&stats)?;
                 }
                 fkernel::StatsRequest::GetMemoryStatsExtended { responder } => {
                     let mem_stats_extended = &self.resource.mem_stats_extended()?;
@@ -79,7 +79,7 @@ impl BuiltinCapability for KernelStats {
                         other_bytes: Some(mem_stats_extended.other_bytes),
                         ..Default::default()
                     };
-                    responder.send(stats)?;
+                    responder.send(&stats)?;
                 }
                 fkernel::StatsRequest::GetCpuStats { responder } => {
                     let cpu_stats = &self.resource.cpu_stats()?;

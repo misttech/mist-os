@@ -1269,7 +1269,7 @@ mod tests {
                 proxy
                     .lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions {
+                        &fname::LookupIpOptions {
                             ipv4_lookup: Some(true),
                             ipv6_lookup: Some(true),
                             ..Default::default()
@@ -1288,7 +1288,7 @@ mod tests {
                 proxy
                     .lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() }
+                        &fname::LookupIpOptions { ipv4_lookup: Some(true), ..Default::default() }
                     )
                     .await
                     .expect("lookup_ip"),
@@ -1303,7 +1303,7 @@ mod tests {
                 proxy
                     .lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() }
+                        &fname::LookupIpOptions { ipv6_lookup: Some(true), ..Default::default() }
                     )
                     .await
                     .expect("lookup_ip"),
@@ -1528,7 +1528,7 @@ mod tests {
                             proxy
                                 .lookup_ip(
                                     NO_RECORDS_AND_NO_ERROR_HOST,
-                                    fname::LookupIpOptions {
+                                    &fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
                                         ..Default::default()
@@ -1553,7 +1553,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV4_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ipv6_lookup: Some(true),
                                 ..Default::default()
@@ -1572,7 +1572,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV4_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1590,7 +1590,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV4_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1612,7 +1612,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV6_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ipv6_lookup: Some(true),
                                 ..Default::default()
@@ -1631,7 +1631,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV6_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1646,7 +1646,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV6_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1672,7 +1672,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             hostname,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 canonical_name_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1701,7 +1701,7 @@ mod tests {
                             proxy
                                 .lookup_ip(
                                     "240.0.0.2",
-                                    fname::LookupIpOptions {
+                                    &fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
                                         ..Default::default()
@@ -1719,7 +1719,7 @@ mod tests {
                             proxy
                                 .lookup_ip(
                                     "abcd::2",
-                                    fname::LookupIpOptions {
+                                    &fname::LookupIpOptions {
                                         ipv4_lookup: Some(ipv4_lookup),
                                         ipv6_lookup: Some(ipv6_lookup),
                                         ..Default::default()
@@ -1953,7 +1953,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV4_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv4_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -1974,7 +1974,7 @@ mod tests {
                     proxy
                         .lookup_ip(
                             REMOTE_IPV4_HOST,
-                            fname::LookupIpOptions {
+                            &fname::LookupIpOptions {
                                 ipv6_lookup: Some(true),
                                 ..Default::default()
                             }
@@ -2358,7 +2358,7 @@ mod tests {
                 let _: fidl::client::QueryResponseFut<fname::LookupLookupIpResult> =
                     name_lookup_proxy.lookup_ip(
                         LOCAL_HOST,
-                        fname::LookupIpOptions {
+                        &fname::LookupIpOptions {
                             ipv4_lookup: Some(true),
                             ipv6_lookup: Some(true),
                             ..Default::default()
@@ -2766,7 +2766,7 @@ mod tests {
                     // All arguments unset.
                     assert_eq!(
                         proxy
-                            .lookup_ip(REMOTE_IPV4_HOST, fname::LookupIpOptions::default())
+                            .lookup_ip(REMOTE_IPV4_HOST, &fname::LookupIpOptions::default())
                             .await
                             .expect("lookup_ip"),
                         Err(fname::LookupError::InvalidArgs)
@@ -2776,7 +2776,7 @@ mod tests {
                         proxy
                             .lookup_ip(
                                 REMOTE_IPV4_HOST,
-                                fname::LookupIpOptions {
+                                &fname::LookupIpOptions {
                                     ipv4_lookup: Some(false),
                                     ipv6_lookup: Some(false),
                                     ..Default::default()
@@ -2791,7 +2791,7 @@ mod tests {
                         proxy
                             .lookup_ip(
                                 REMOTE_IPV4_HOST,
-                                fname::LookupIpOptions {
+                                &fname::LookupIpOptions {
                                     ipv4_lookup: Some(false),
                                     ipv6_lookup: Some(true),
                                     ..Default::default()
@@ -2806,7 +2806,7 @@ mod tests {
                         proxy
                             .lookup_ip(
                                 REMOTE_IPV4_HOST,
-                                fname::LookupIpOptions {
+                                &fname::LookupIpOptions {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
                                     ..Default::default()
@@ -2824,7 +2824,7 @@ mod tests {
                         proxy
                             .lookup_ip(
                                 REMOTE_IPV4_IPV6_HOST,
-                                fname::LookupIpOptions {
+                                &fname::LookupIpOptions {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
                                     ..Default::default()
@@ -2842,7 +2842,7 @@ mod tests {
                         proxy
                             .lookup_ip(
                                 REMOTE_IPV4_IPV6_HOST,
-                                fname::LookupIpOptions {
+                                &fname::LookupIpOptions {
                                     ipv4_lookup: Some(true),
                                     ipv6_lookup: Some(true),
                                     sort_addresses: Some(true),

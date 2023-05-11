@@ -159,7 +159,7 @@ async fn write_characteristic(
 ) -> Result<(), Error> {
     let options =
         WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() };
-    svc.write_characteristic(&mut Handle { value: id }, &value, options)
+    svc.write_characteristic(&Handle { value: id }, &value, &options)
         .await
         .context("Failed to write characteristic")?
         .map_err(|e| format_err!("Failed to write characteristic: {:?}", e))?;
@@ -171,7 +171,7 @@ async fn write_characteristic(
 
 async fn read_descriptor(svc: &RemoteServiceProxy, id: u64) -> Result<(), Error> {
     let value: ReadValue = svc
-        .read_descriptor(&mut Handle { value: id }, &mut ReadOptions::ShortRead(ShortReadOptions))
+        .read_descriptor(&Handle { value: id }, &ReadOptions::ShortRead(ShortReadOptions))
         .await
         .context("Failed to read descriptor")?
         .map_err(|e| format_err!("Failed to read descriptor: {:?}", e))?;
@@ -219,7 +219,7 @@ async fn write_descriptor(
     svc.write_descriptor(
         &mut Handle { value: id },
         &value,
-        WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() },
+        &WriteOptions { write_mode: Some(mode), offset: Some(offset), ..Default::default() },
     )
     .await
     .context("Failed to write descriptor")?
@@ -857,6 +857,6 @@ mod tests {
         };
 
         // The notification should immediately receive a flow control response.
-        notifier.on_notification(notification_value).await.expect("on_notification");
+        notifier.on_notification(&notification_value).await.expect("on_notification");
     }
 }

@@ -234,7 +234,7 @@ impl WlanPolicyFacade {
             ..Default::default()
         };
         controller
-            .remove_network(config)
+            .remove_network(&config)
             .await
             .map_err(|err| format_err!("{:?}", err))? // FIDL error
             .map_err(|err| format_err!("{:?}", err)) // network config change error
@@ -252,7 +252,7 @@ impl WlanPolicyFacade {
         let saved_networks = self.get_saved_networks().await?;
         for network_config in saved_networks {
             controller
-                .remove_network(network_config)
+                .remove_network(&network_config)
                 .await
                 .map_err(|err| format_err!("{:?}", err))? // FIDL error
                 .map_err(|err| format_err!("{:?}", err))?; // network config change error
@@ -349,7 +349,7 @@ impl WlanPolicyFacade {
         let network_id = fidl_policy::NetworkIdentifier { ssid: target_ssid.clone(), type_: type_ };
 
         controller
-            .save_network(fidl_policy::NetworkConfig {
+            .save_network(&fidl_policy::NetworkConfig {
                 id: Some(network_id),
                 credential: Some(credential),
                 ..Default::default()

@@ -343,7 +343,7 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
     device_control
-        .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::default())
+        .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
 
     // Read the interface ID to make sure device install succeeded.
@@ -400,7 +400,7 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
     device_control
-        .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::default())
+        .create_interface(&mut port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
     assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
     tun_port.set_online(true).await.expect("can set online");

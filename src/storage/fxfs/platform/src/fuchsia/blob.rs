@@ -1353,7 +1353,7 @@ mod tests {
 
         fixture
             .root()
-            .unlink(&format!("{}", hash), fio::UnlinkOptions::default())
+            .unlink(&format!("{}", hash), &fio::UnlinkOptions::default())
             .await
             .expect("FIDL failed")
             .expect("unlink failed");
@@ -1613,7 +1613,7 @@ mod tests {
         for (hash, filename) in hashes.iter().zip(filenames) {
             fixture
                 .root()
-                .unlink(&format!("{}", hash), fio::UnlinkOptions::default())
+                .unlink(&format!("{}", hash), &fio::UnlinkOptions::default())
                 .await
                 .expect("FIDL call failed")
                 .expect("unlink failed");

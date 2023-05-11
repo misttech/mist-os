@@ -1325,7 +1325,7 @@ impl SubRealmBuilder {
         let name: String = name.into();
         let (child_realm_proxy, child_realm_server_end) =
             create_proxy::<ftest::RealmMarker>().expect("failed to create channel pair");
-        self.realm_proxy.add_child_realm(&name, options.into(), child_realm_server_end).await??;
+        self.realm_proxy.add_child_realm(&name, &options.into(), child_realm_server_end).await??;
 
         let mut child_path = self.realm_path.clone();
         child_path.push(name);
@@ -1350,7 +1350,7 @@ impl SubRealmBuilder {
             + 'static,
     {
         let name: String = name.into();
-        self.realm_proxy.add_local_child(&name, options.into()).await??;
+        self.realm_proxy.add_local_child(&name, &options.into()).await??;
 
         let mut child_path = self.realm_path.clone();
         child_path.push(name.clone());
@@ -1369,7 +1369,7 @@ impl SubRealmBuilder {
         options: ChildOptions,
     ) -> Result<ChildRef, Error> {
         let name: String = name.into();
-        self.realm_proxy.add_child(&name, &url.into(), options.into()).await??;
+        self.realm_proxy.add_child(&name, &url.into(), &options.into()).await??;
         Ok(ChildRef::new(name, self.realm_path.clone()))
     }
 
@@ -1382,7 +1382,7 @@ impl SubRealmBuilder {
     ) -> Result<ChildRef, Error> {
         let name: String = name.into();
         self.realm_proxy
-            .add_child_from_decl(&name, decl.native_into_fidl(), options.into())
+            .add_child_from_decl(&name, &decl.native_into_fidl(), &options.into())
             .await??;
         Ok(ChildRef::new(name, self.realm_path.clone()))
     }
@@ -1406,7 +1406,9 @@ impl SubRealmBuilder {
     ) -> Result<(), Error> {
         let child_ref: ChildRef = child_ref.into();
         child_ref.check_scope(&self.realm_path)?;
-        self.realm_proxy.replace_component_decl(&child_ref.name, decl.native_into_fidl()).await??;
+        self.realm_proxy
+            .replace_component_decl(&child_ref.name, &decl.native_into_fidl())
+            .await??;
         Ok(())
     }
 
@@ -1417,7 +1419,7 @@ impl SubRealmBuilder {
 
     /// Replaces the decl for this realm
     pub async fn replace_realm_decl(&self, decl: cm_rust::ComponentDecl) -> Result<(), Error> {
-        self.realm_proxy.replace_realm_decl(decl.native_into_fidl()).await?.map_err(Into::into)
+        self.realm_proxy.replace_realm_decl(&decl.native_into_fidl()).await?.map_err(Into::into)
     }
 
     /// Load the packaged structured config values for the component.
@@ -1456,7 +1458,7 @@ impl SubRealmBuilder {
             .set_config_value(
                 &child_ref.name,
                 key,
-                cm_rust::ConfigValueSpec::native_into_fidl_todo_fxb_126609(value),
+                &cm_rust::ConfigValueSpec::native_into_fidl_todo_fxb_126609(value),
             )
             .await?
             .map_err(Into::into)
@@ -1969,7 +1971,7 @@ impl ScopedInstanceFactory {
             fclient::realm().context("Failed to connect to Realm service")?
         };
         let child_name = child_name.into();
-        let mut collection_ref = fdecl::CollectionRef { name: self.collection_name.clone() };
+        let collection_ref = fdecl::CollectionRef { name: self.collection_name.clone() };
         let child_decl = fdecl::Child {
             name: Some(child_name.clone()),
             url: Some(url.into()),
@@ -1979,7 +1981,7 @@ impl ScopedInstanceFactory {
         let child_args =
             fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
         let () = realm
-            .create_child(&mut collection_ref, child_decl, child_args)
+            .create_child(&collection_ref, &child_decl, child_args)
             .await
             .context("CreateChild FIDL failed.")?
             .map_err(|e| format_err!("Failed to create child: {:?}", e))?;

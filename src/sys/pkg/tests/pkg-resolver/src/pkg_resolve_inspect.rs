@@ -71,7 +71,7 @@ async fn initial_inspect_state() {
 async fn adding_repo_updates_inspect_state() {
     let env = TestEnvBuilder::new().build().await;
     let config = RepositoryConfigBuilder::new("fuchsia-pkg://example.com".parse().unwrap()).build();
-    let () = env.proxies.repo_manager.add(config.clone().into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
 
     // Obtain inspect service and convert into a node hierarchy.
     let hierarchy = env.pkg_resolver_inspect_hierarchy().await;
@@ -107,7 +107,7 @@ async fn resolving_package_updates_inspect_state() {
     let served_repository = repo.server().start().unwrap();
     let repo_url = "fuchsia-pkg://example.com".parse().unwrap();
     let config = served_repository.make_repo_config(repo_url);
-    let () = env.proxies.repo_manager.add(config.clone().into()).await.unwrap().unwrap();
+    let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
 
     env.resolve_package("fuchsia-pkg://example.com/just_meta_far")
         .await
@@ -219,7 +219,7 @@ async fn package_and_blob_queues() {
         .proxies
         .repo_manager
         .add(
-            served_repository
+            &served_repository
                 .make_repo_config("fuchsia-pkg://rewritten.example.com".parse().unwrap())
                 .into(),
         )

@@ -76,7 +76,7 @@ impl ReplaceMacFilterSettingsCommand {
 
         if mode == MacAddressFilterMode::Disabled {
             device_test_proxy
-                .replace_mac_address_filter_settings(MacAddressFilterSettings {
+                .replace_mac_address_filter_settings(&MacAddressFilterSettings {
                     mode: Some(mode),
                     items: None,
                     ..Default::default()
@@ -85,7 +85,7 @@ impl ReplaceMacFilterSettingsCommand {
         } else {
             let mac_addr_filter_item_vec = self.get_mac_addr_filter_item_vec()?;
             device_test_proxy
-                .replace_mac_address_filter_settings(MacAddressFilterSettings {
+                .replace_mac_address_filter_settings(&MacAddressFilterSettings {
                     mode: Some(mode),
                     items: Some(mac_addr_filter_item_vec),
                     ..Default::default()

@@ -421,7 +421,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(Default::default())?;
+        info_change_responder.send(&Default::default())?;
 
         // Synchronize with the first watcher. After receiving this, we know that the service knows
         // about the player.

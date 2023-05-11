@@ -86,7 +86,7 @@ mod tests {
             {
                 match request {
                     hwinfo::ProductRequest::GetInfo { responder } => {
-                        responder.send(mock_info.clone()).ok();
+                        responder.send(&mock_info).ok();
                     }
                 }
             }

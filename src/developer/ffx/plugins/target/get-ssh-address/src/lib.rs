@@ -44,7 +44,7 @@ async fn get_ssh_address_impl<W: Write>(
     let t_clone_2 = target.clone();
     let res = timeout(timeout_dur, async {
         collection_proxy
-            .open_target(TargetQuery { string_matcher: target, ..Default::default() }, handle)
+            .open_target(&TargetQuery { string_matcher: target, ..Default::default() }, handle)
             .await?
             .map_err(|err| {
                 anyhow::Error::from(FfxError::OpenTargetError {

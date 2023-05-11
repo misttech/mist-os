@@ -20,7 +20,7 @@ async fn enumerate_directory_unsupported() {
     // fuchsia.io/Directory.Enumerate
     let (enumerate_proxy, enumerate_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryIteratorMarker>().unwrap();
-    dir_proxy.enumerate(fio::DirectoryEnumerateOptions::default(), enumerate_server).unwrap();
+    dir_proxy.enumerate(&fio::DirectoryEnumerateOptions::default(), enumerate_server).unwrap();
     assert_matches!(
         enumerate_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

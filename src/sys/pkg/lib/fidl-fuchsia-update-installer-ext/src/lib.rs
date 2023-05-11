@@ -107,7 +107,7 @@ pub async fn start_update(
         UpdateAttemptMonitor::new().map_err(UpdateAttemptError::FIDL)?;
 
     let attempt_id = installer_proxy
-        .start_update(&url, options.into(), monitor_client_end, reboot_controller_server_end)
+        .start_update(&url, &options.into(), monitor_client_end, reboot_controller_server_end)
         .await
         .map_err(UpdateAttemptError::FIDL)?
         .map_err(|reason| match reason {

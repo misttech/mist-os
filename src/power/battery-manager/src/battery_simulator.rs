@@ -129,7 +129,7 @@ impl SimulatedBatteryInfoSource {
             match request {
                 spower::BatterySimulatorRequest::GetBatteryInfo { responder, .. } => {
                     let info = self.get_battery_info_copy();
-                    responder.send(info.await).map_err(|e| format_err!("{}", e))?;
+                    responder.send(&info.await).map_err(|e| format_err!("{}", e))?;
                 }
                 spower::BatterySimulatorRequest::SetChargeStatus { charge_status, .. } => {
                     self.set_charge_status(charge_status).await?;

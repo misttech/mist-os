@@ -47,7 +47,7 @@ impl VmmLauncher {
     async fn spawn_vmm(&mut self, lifecycle: ServerEnd<GuestLifecycleMarker>) {
         let child_name = format!("vmm-{}", self.increment_instance_id());
         let collection_name = "virtual_machine_managers";
-        let mut collection_ref = cdecl::CollectionRef { name: collection_name.to_string() };
+        let collection_ref = cdecl::CollectionRef { name: collection_name.to_string() };
         let decl = cdecl::Child {
             name: Some(child_name.clone()),
             url: Some(self.vmm_component_url.clone()),
@@ -56,7 +56,7 @@ impl VmmLauncher {
             ..Default::default()
         };
         let args = CreateChildArgs::default();
-        let realm_result = self.realm.create_child(&mut collection_ref, decl, args).await;
+        let realm_result = self.realm.create_child(&collection_ref, &decl, args).await;
         match realm_result {
             Err(fidl_error) => {
                 tracing::error!("FIDL error creating vmm child: {}", fidl_error);
@@ -74,9 +74,9 @@ impl VmmLauncher {
         // Connect to exposed service directory for the vmm.
         let (svc_dir_proxy, svc_dir) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Failed to create directory proxy");
-        let mut child_ref =
+        let child_ref =
             cdecl::ChildRef { name: child_name, collection: Some(collection_name.to_string()) };
-        let realm_result = self.realm.open_exposed_dir(&mut child_ref, svc_dir).await;
+        let realm_result = self.realm.open_exposed_dir(&child_ref, svc_dir).await;
         match realm_result {
             Err(fidl_error) => {
                 tracing::error!("FIDL error opening vmm child exposed dir: {}", fidl_error);

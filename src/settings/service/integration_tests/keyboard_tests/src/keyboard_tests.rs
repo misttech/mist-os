@@ -30,7 +30,7 @@ async fn test_keyboard() {
     };
 
     // Ensure setting interface propagates correctly.
-    proxy.set(changed_value.clone()).await.expect("set completed").expect("set successful");
+    proxy.set(&changed_value).await.expect("set completed").expect("set successful");
 
     // Ensure retrieved value matches set value.
     let settings = proxy.watch().await.expect("watch completed");
@@ -52,7 +52,7 @@ async fn test_keyboard_clean_autorepeat_and_unset_keymap() {
     };
 
     // Setup initial values.
-    proxy.set(initial_value.clone()).await.expect("set completed").expect("set successful");
+    proxy.set(&initial_value).await.expect("set completed").expect("set successful");
 
     // Ensure retrieved value matches set value.
     let settings = proxy.watch().await.expect("watch completed");
@@ -63,7 +63,7 @@ async fn test_keyboard_clean_autorepeat_and_unset_keymap() {
     let mut keyboard_settings = fidl_fuchsia_settings::KeyboardSettings::default();
     keyboard_settings.keymap = None;
     keyboard_settings.autorepeat = Some(fidl_fuchsia_settings::Autorepeat { delay: 0, period: 0 });
-    proxy.set(keyboard_settings).await.expect("set completed").expect("set successful");
+    proxy.set(&keyboard_settings).await.expect("set completed").expect("set successful");
 
     let changed_value = KeyboardSettings {
         keymap: Some(KeymapId::UsQwerty),

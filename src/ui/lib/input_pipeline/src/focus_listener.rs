@@ -148,7 +148,7 @@ mod tests {
         focus_chain_provider_proxy: &focus::FocusChainProviderProxy,
     ) -> focus::FocusKoidChain {
         focus_chain_provider_proxy
-            .watch_focus_koid_chain(focus::FocusChainProviderWatchFocusKoidChainRequest::default())
+            .watch_focus_koid_chain(&focus::FocusChainProviderWatchFocusKoidChainRequest::default())
             .await
             .expect("watch_focus_koid_chain")
     }

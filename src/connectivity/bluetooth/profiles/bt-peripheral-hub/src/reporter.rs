@@ -99,7 +99,7 @@ mod tests {
             battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo::default()),
             ..Default::default()
         };
-        let report_request_fut = reporter_proxy.report(info);
+        let report_request_fut = reporter_proxy.report(&info);
         pin_mut!(server_task, report_request_fut);
 
         select! {
@@ -124,7 +124,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let report_request_fut = reporter_proxy.report(info);
+        let report_request_fut = reporter_proxy.report(&info);
         pin_mut!(server_task, report_request_fut);
 
         select! {

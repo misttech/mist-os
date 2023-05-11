@@ -782,7 +782,7 @@ mod tests {
                 Some(Ok(pointerinjector_config::SetupRequest::WatchViewport {
                     responder, ..
                 })) => {
-                    responder.send(create_viewport(0.0, 100.0)).expect("Failed to send viewport.");
+                    responder.send(&create_viewport(0.0, 100.0)).expect("Failed to send viewport.");
                 }
                 other => panic!("Received unexpected value: {:?}", other),
             };
@@ -813,7 +813,7 @@ mod tests {
                     responder, ..
                 })) => {
                     responder
-                        .send(create_viewport(100.0, 200.0))
+                        .send(&create_viewport(100.0, 200.0))
                         .expect("Failed to send viewport.");
                 }
                 other => panic!("Received unexpected value: {:?}", other),

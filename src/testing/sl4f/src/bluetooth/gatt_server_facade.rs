@@ -154,7 +154,7 @@ impl GattServerFacade {
             };
             // Ignore the confirmation.
             let (confirmation, _) = fidl::EventPair::create();
-            let _ = control_handle.send_on_indicate_value(value, confirmation);
+            let _ = control_handle.send_on_indicate_value(&value, confirmation);
         } else if notify {
             let value = ValueChangedParameters {
                 handle: Some(handle),
@@ -162,7 +162,7 @@ impl GattServerFacade {
                 peer_ids: Some(vec![peer_id.into()]),
                 ..Default::default()
             };
-            let _ = control_handle.send_on_notify_value(value);
+            let _ = control_handle.send_on_notify_value(&value);
         }
     }
 
@@ -630,7 +630,7 @@ impl GattServerFacade {
             .as_ref()
             .ok_or(format_err!("No Server Proxy created."))?
             .clone();
-        match server_proxy.publish_service(service_info, service_client).await? {
+        match server_proxy.publish_service(&service_info, service_client).await? {
             Ok(()) => info!(
                 tag = &[tag, &line!().to_string()].join("").as_str(),
                 uuid = ?service_uuid,

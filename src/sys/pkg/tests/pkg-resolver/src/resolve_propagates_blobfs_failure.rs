@@ -287,7 +287,7 @@ async fn assert_resolve_package_with_failing_blobfs_fails(
     let () = env
         .proxies
         .repo_manager
-        .add(repo_config.into())
+        .add(&repo_config.into())
         .await
         .unwrap()
         .map_err(Status::from_raw)

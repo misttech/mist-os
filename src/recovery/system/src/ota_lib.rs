@@ -72,7 +72,7 @@ impl OtaManager for OtaComponent {
         let (sender, receiver) = oneshot::channel::<OtaStatus>();
         self.completers.lock().await.push(sender);
 
-        let mut collection_ref = CollectionRef { name: String::from(COLLECTION_NAME) };
+        let collection_ref = CollectionRef { name: String::from(COLLECTION_NAME) };
         let child_decl = Child {
             name: Some(String::from(CHILD_NAME)),
             url: Some(String::from(OTA_COMPONENT_URL)),
@@ -81,7 +81,7 @@ impl OtaManager for OtaComponent {
         };
 
         self.realm
-            .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
+            .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
             .await
             .expect("create_child failed")
             .map_err(|e| format_err!("failed to start OTA child: {:?}", e))?;

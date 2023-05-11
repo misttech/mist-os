@@ -809,7 +809,7 @@ mod tests {
         settings.scan_mode = Some(fidl_fuchsia_bluetooth_avrcp::ScanMode::GroupScan);
         settings.shuffle_mode = Some(fidl_fuchsia_bluetooth_avrcp::ShuffleMode::Off);
         let set_player_application_settings_fut =
-            controller_proxy.set_player_application_settings(settings).fuse();
+            controller_proxy.set_player_application_settings(&settings).fuse();
         pin_mut!(set_player_application_settings_fut);
         expected_commands += 1;
 

@@ -128,7 +128,7 @@ impl GattClientFacade {
 
         // Scan doesn't return until scanning has stopped. We don't care when scanning stops, so we
         // can detach a task to run the scan future.
-        let scan_fut = central.scan(options, watcher_server);
+        let scan_fut = central.scan(&options, watcher_server);
         fasync::Task::spawn(async move {
             if let Err(e) = scan_fut.await {
                 warn!(tag = &with_line!(tag), "FIDL error during scan: {:?}", e);
@@ -266,7 +266,7 @@ impl GattClientFacade {
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("No active service"))?
-            .write_characteristic(&mut handle, &write_value, options);
+            .write_characteristic(&mut handle, &write_value, &options);
         write_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -414,7 +414,7 @@ impl GattClientFacade {
         let write_fut = self
             .get_remote_service_proxy()
             .ok_or(format_err!("RemoteService proxy not available"))?
-            .write_descriptor(&mut handle, &write_value, options);
+            .write_descriptor(&mut handle, &write_value, &options);
         write_fut
             .await
             .map_err(|_| format_err!("Failed to send message"))?
@@ -628,7 +628,7 @@ impl GattClientFacade {
             .as_ref()
             .unwrap()
             .proxy
-            .connect(&mut peer_id.clone().into(), options, conn_server_end)
+            .connect(&mut peer_id.clone().into(), &options, conn_server_end)
             .map_err(|_| format_err!("FIDL error when trying to connect()"))?;
 
         let (client_proxy, client_server_end) = fidl::endpoints::create_proxy()?;

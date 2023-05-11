@@ -103,7 +103,7 @@ impl IsolatedLogsProvider {
             batch_retrieval_timeout_seconds: batch_timeout,
             ..Default::default()
         };
-        self.accessor.stream_diagnostics(stream_parameters, iterator).map_err(|err| {
+        self.accessor.stream_diagnostics(&stream_parameters, iterator).map_err(|err| {
             warn!(%err, "Failed to subscribe to isolated logs");
             StreamError::SetupSubscriptionFailed
         })?;

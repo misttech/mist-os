@@ -34,7 +34,7 @@ impl watch::Responder<PrivacySettings, zx::Status> for PrivacyWatchResponder {
     fn respond(self, response: Result<PrivacySettings, zx::Status>) {
         match response {
             Ok(settings) => {
-                let _ = self.send(settings);
+                let _ = self.send(&settings);
             }
             Err(error) => {
                 self.control_handle().shutdown_with_epitaph(error);
@@ -112,7 +112,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>()
             .expect("should be able to create proxy");
         let _fut = proxy
-            .set(PrivacySettings { user_data_sharing_consent: Some(true), ..Default::default() });
+            .set(&PrivacySettings { user_data_sharing_consent: Some(true), ..Default::default() });
         let mut request_stream: PrivacyRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

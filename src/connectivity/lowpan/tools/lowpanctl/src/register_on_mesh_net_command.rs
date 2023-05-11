@@ -52,7 +52,7 @@ impl RegisterOnMeshNetCommand {
         };
 
         device_route
-            .register_on_mesh_prefix(on_mesh_prefix)
+            .register_on_mesh_prefix(&on_mesh_prefix)
             .await
             .context("Unable to send register_on_mesh_prefix command")
     }

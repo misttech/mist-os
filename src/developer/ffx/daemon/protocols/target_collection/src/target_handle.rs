@@ -129,7 +129,7 @@ impl TargetHandleInner {
             }
             ffx::TargetRequest::Identity { responder } => {
                 let target_info = ffx::TargetInfo::from(&*self.target);
-                responder.send(target_info).map_err(Into::into)
+                responder.send(&target_info).map_err(Into::into)
             }
             ffx::TargetRequest::StreamActiveDiagnostics { parameters, iterator, responder } => {
                 let target_identifier = self.target.nodename();

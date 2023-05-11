@@ -33,7 +33,7 @@ async fn notify_cobalt_current_software_distribution_impl(
 
         SoftwareDistributionInfo { current_channel: Some(channel.into()), ..Default::default() }
     };
-    match proxy.set_software_distribution_info(distribution_info).await {
+    match proxy.set_software_distribution_info(&distribution_info).await {
         Ok(fidl_fuchsia_cobalt::Status::Ok) => {}
         error => {
             error!("SystemDataUpdater.SetSoftwareDistributionInfo failed: {:?}", error);

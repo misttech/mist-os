@@ -183,7 +183,7 @@ impl AvrcpFacade {
     ) -> Result<CustomPlayerApplicationSettings, Error> {
         let tag = "AvrcpFacade::set_player_application_settings";
         match self.inner.read().controller_proxy.clone() {
-            Some(proxy) => match proxy.set_player_application_settings(settings.into()).await? {
+            Some(proxy) => match proxy.set_player_application_settings(&settings.into()).await? {
                 Ok(player_application_settings) => Ok(player_application_settings.into()),
                 Err(e) => fx_err_and_bail!(
                     &with_line!(tag),

@@ -60,7 +60,7 @@ impl SetUiFacade {
         }
         // Update network configuration without automatic device reboot.
         // For changes to take effect, either restart basemgr component or reboot device.
-        match setup_service_proxy.set(settings, false).await? {
+        match setup_service_proxy.set(&settings, false).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(err) => Err(format_err!("Update network settings failed with err {:?}", err)),
         }
@@ -100,7 +100,7 @@ impl SetUiFacade {
             Ok(proxy) => proxy,
             Err(e) => bail!("Failed to connect to Intl service {:?}.", e),
         };
-        match intl_service_proxy.set(intl_info.into()).await? {
+        match intl_service_proxy.set(&intl_info.into()).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(err) => Err(format_err!("Update intl settings failed with err {:?}", err)),
         }
@@ -175,7 +175,7 @@ impl SetUiFacade {
             brightness_value: Some(brightness),
             ..Default::default()
         };
-        match display_proxy.set(settings).await? {
+        match display_proxy.set(&settings).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(e) => Err(format_err!("SetBrightness failed with err {:?}", e)),
         }
@@ -212,7 +212,7 @@ impl SetUiFacade {
             fsettings::AudioSettings { streams: Some(vec![stream_settings]), ..Default::default() };
 
         info!("Setting audio settings {:?}", settings);
-        match audio_proxy.set(settings).await? {
+        match audio_proxy.set(&settings).await? {
             Ok(_) => Ok(to_value(SetUiResult::Success)?),
             Err(e) => Err(format_err!("SetVolume failed with err {:?}", e)),
         }
@@ -434,7 +434,7 @@ mod tests {
                         devices: Some(vec![device]),
                         ..Default::default()
                     };
-                    responder.send(settings).unwrap();
+                    responder.send(&settings).unwrap();
                 }
                 other => panic!("Unexpected Watch request: {:?}", other),
             }
@@ -496,7 +496,7 @@ mod tests {
                         devices: Some(vec![device]),
                         ..Default::default()
                     };
-                    responder.send(settings).unwrap();
+                    responder.send(&settings).unwrap();
                 }
                 other => panic!("Unexpected Watch request: {:?}", other),
             }
@@ -543,7 +543,7 @@ mod tests {
                         devices: Some(vec![device]),
                         ..Default::default()
                     };
-                    responder.send(settings).unwrap();
+                    responder.send(&settings).unwrap();
                 }
                 other => panic!("Unexpected Watch request: {:?}", other),
             }

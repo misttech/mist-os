@@ -112,12 +112,12 @@ async fn tap_like_over_network_tun() {
     let (tun_device, server_end) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>()
             .expect("failed to create device endpoints");
-    let () = tun.create_device(device_config, server_end).expect("failed to create device");
+    let () = tun.create_device(&device_config, server_end).expect("failed to create device");
     // Add a port.
     let (tun_port, server_end) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
             .expect("failed to create port endpoints");
-    let () = tun_device.add_port(port_config, server_end).expect("failed to add port");
+    let () = tun_device.add_port(&port_config, server_end).expect("failed to add port");
 
     // Install the interface in the stack.
     //
@@ -143,7 +143,7 @@ async fn tap_like_over_network_tun() {
     // Now we can send frames. In this example we'll send an ICMP echo request
     // and wait for the Netstack to respond.
     let () = tun_device
-        .write_frame(fidl_fuchsia_net_tun::Frame {
+        .write_frame(&fidl_fuchsia_net_tun::Frame {
             port: Some(PORT_ID),
             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ethernet),
             data: Some(helpers::bob_pings_alice_for_tap_like(&CONFIG_FOR_TAP_LIKE)),
@@ -188,7 +188,7 @@ async fn tap_like_over_network_tun() {
                     assert_eq!(sender_mac, CONFIG_FOR_TAP_LIKE.alice_mac);
                     assert_eq!(sender_ip, CONFIG_FOR_TAP_LIKE.ip_layer.alice_subnet.addr);
                     let () = tun_device
-                        .write_frame(fidl_fuchsia_net_tun::Frame {
+                        .write_frame(&fidl_fuchsia_net_tun::Frame {
                             port: Some(PORT_ID),
                             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ethernet),
                             data: Some(helpers::build_bob_arp_response(&CONFIG_FOR_TAP_LIKE)),
@@ -236,12 +236,12 @@ async fn tun_like_over_network_tun() {
     let (tun_device, server_end) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>()
             .expect("failed to create device endpoints");
-    let () = tun.create_device(device_config, server_end).expect("failed to create device");
+    let () = tun.create_device(&device_config, server_end).expect("failed to create device");
     // Add a port.
     let (tun_port, server_end) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
             .expect("failed to create port endpoints");
-    let () = tun_device.add_port(port_config, server_end).expect("failed to add port");
+    let () = tun_device.add_port(&port_config, server_end).expect("failed to add port");
 
     // Install the interface in the stack.
     //
@@ -267,7 +267,7 @@ async fn tun_like_over_network_tun() {
     // Now we can send frames. In this example we'll send an ICMP echo request
     // and wait for the Netstack to respond.
     let () = tun_device
-        .write_frame(fidl_fuchsia_net_tun::Frame {
+        .write_frame(&fidl_fuchsia_net_tun::Frame {
             port: Some(PORT_ID),
             frame_type: Some(fidl_fuchsia_hardware_network::FrameType::Ipv4),
             data: Some(helpers::bob_pings_alice_for_tun_like(&CONFIG_FOR_TUN_LIKE)),
@@ -549,7 +549,7 @@ mod helpers {
         u64,
     ) {
         // Get the information Installer needs to install the device.
-        let (network_device, mut port_id) = {
+        let (network_device, port_id) = {
             let (network_device, netdevice_server_end) =
                 fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()
                     .expect("failed to create netdevice proxy");
@@ -589,9 +589,9 @@ mod helpers {
                     .expect("create endpoints");
             let () = device_control
                 .create_interface(
-                    &mut port_id,
+                    &port_id,
                     server_end,
-                    fidl_fuchsia_net_interfaces_admin::Options::default(),
+                    &fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create_interface failed");
             control

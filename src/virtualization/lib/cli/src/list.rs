@@ -294,7 +294,7 @@ mod test {
                 .expect("unexpected call to mock manager");
 
             if let Some(guest_info) = response {
-                responder.send(guest_info).expect("failed to send mock response");
+                responder.send(&guest_info).expect("failed to send mock response");
             } else {
                 drop(responder);
             }

@@ -233,7 +233,7 @@ impl FactoryResetHandler {
             let countdown_state =
                 FactoryResetCountdownState { scheduled_reset_time: deadline, ..Default::default() };
 
-            if responder.send(countdown_state).is_err() {
+            if responder.send(&countdown_state).is_err() {
                 tracing::error!("Failed to send factory reset countdown state");
             }
 

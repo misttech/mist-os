@@ -115,7 +115,7 @@ impl ImeHandler {
             "dispatch_key: got a key_event without a timestamp: {:?}",
             &key_event
         );
-        match self.key_event_injector.inject(key_event).await {
+        match self.key_event_injector.inject(&key_event).await {
             Err(err) => tracing::error!("Failed to dispatch key to IME: {:?}", err),
             _ => {}
         };

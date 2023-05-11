@@ -65,7 +65,7 @@ impl<S: ServiceConnect> CurrentChannelNotifier<S> {
 
             info!("calling cobalt.SetSoftwareDistributionInfo(\"{:?}\")", distribution_info);
 
-            match cobalt.set_software_distribution_info(distribution_info).await {
+            match cobalt.set_software_distribution_info(&distribution_info).await {
                 Ok(CobaltStatus::Ok) => {
                     return;
                 }

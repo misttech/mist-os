@@ -46,7 +46,7 @@ impl SignalInterface {
     pub async fn set_element_state(&self, id: u64, state: ElementState) -> Result<(), Error> {
         self.get_proxy()?
             .clone()
-            .set_element_state(id, state)
+            .set_element_state(id, &state)
             .await?
             .map_err(|e| anyhow!("Set element error: {:?}", e))
     }

@@ -46,7 +46,7 @@ pub async fn generate_empty_watch_notification(
     let dummy_current = Notification::default();
     let interval: u32 = 0;
 
-    let result_fut = proxy.watch_notification(dummy_id, dummy_current, interval);
+    let result_fut = proxy.watch_notification(dummy_id, &dummy_current, interval);
     let (_, _, _, responder) = stream
         .next()
         .await
@@ -91,7 +91,7 @@ async fn send_set_player_application_settings(target_proxy: TargetHandlerProxy) 
         ..Default::default()
     };
     let res = target_proxy
-        .set_player_application_settings(requested_settings)
+        .set_player_application_settings(&requested_settings)
         .await
         .expect("FIDL call should work");
     assert_eq!(Err(TargetAvcError::RejectedInvalidParameter), res);
@@ -103,7 +103,7 @@ async fn send_set_player_application_settings(target_proxy: TargetHandlerProxy) 
         ..Default::default()
     };
     let res = target_proxy
-        .set_player_application_settings(requested_settings)
+        .set_player_application_settings(&requested_settings)
         .await
         .expect("FIDL call should work");
     let expected_response = PlayerApplicationSettings {
@@ -301,7 +301,7 @@ fn test_listen_to_media_sessions() -> Result<(), Error> {
         // Send a MediaSessionUpdate for session1 -> New active session because no
         // active sessions exist.
         let delta1 = SessionInfoDelta::default();
-        let _ = watcher_client.session_updated(session1_id.0, delta1).await;
+        let _ = watcher_client.session_updated(session1_id.0, &delta1).await;
         assert_eq!(Some(session1_id), media_sessions.get_active_session_id());
 
         // Send a play command to the active media session. It should be accepted since
@@ -334,7 +334,7 @@ fn test_listen_to_media_sessions() -> Result<(), Error> {
             player_status: Some(create_player_status()),
             ..Default::default()
         };
-        let _ = watcher_client.session_updated(session2_id.0, delta2).await;
+        let _ = watcher_client.session_updated(session2_id.0, &delta2).await;
         assert_eq!(Some(session1_id), media_sessions.get_active_session_id());
 
         // Send a pause command to the active media session. It should be accepted since
@@ -390,7 +390,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
         // Send a MediaSessionUpdate for session1 -> New active session because no
         // active sessions exist.
         let delta1 = SessionInfoDelta::default();
-        let _ = watcher_client.session_updated(session1_id.0, delta1).await;
+        let _ = watcher_client.session_updated(session1_id.0, &delta1).await;
         assert_eq!(Some(session1_id), media_sessions.get_active_session_id());
 
         // Get MediaSession supported player application setting attributes. This is
@@ -415,7 +415,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
             is_locally_active: Some(true),
             ..Default::default()
         };
-        let _ = watcher_client.session_updated(session2_id.0, delta2).await;
+        let _ = watcher_client.session_updated(session2_id.0, &delta2).await;
         assert_eq!(Some(session2_id), media_sessions.get_active_session_id());
 
         // Test getting the media info of the active session.
@@ -435,7 +435,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
             is_locally_active: Some(true),
             ..Default::default()
         };
-        let _ = watcher_client.session_updated(session1_id.0, delta1).await;
+        let _ = watcher_client.session_updated(session1_id.0, &delta1).await;
         assert_eq!(Some(session1_id), media_sessions.get_active_session_id());
 
         // Test getting player application settings.
@@ -455,7 +455,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
         let res = target_proxy
             .watch_notification(
                 NotificationEvent::PlaybackStatusChanged,
-                Notification::default(),
+                &Notification::default(),
                 /* interval= */ 0,
             )
             .await
@@ -470,7 +470,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
         // notification.
         let mut watch = target_proxy.watch_notification(
             NotificationEvent::TrackChanged,
-            Notification { track_id: Some(std::u64::MAX), ..Default::default() },
+            &Notification { track_id: Some(std::u64::MAX), ..Default::default() },
             0,
         );
         // This should not complete until we send the state update.
@@ -482,7 +482,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
             player_status: Some(create_player_status()),
             ..Default::default()
         };
-        let res = watcher_client.session_updated(session1_id.0, delta1).await;
+        let res = watcher_client.session_updated(session1_id.0, &delta1).await;
         assert_eq!(Ok(()), res.map_err(|e| format!("{}", e)));
 
         // We expect the `watch` future to have resolved now that an update has been received.
@@ -494,7 +494,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
 
         // Test the special case TrackPosChanged event.
         target_proxy
-            .watch_notification(NotificationEvent::TrackPosChanged, Notification::default(), 1)
+            .watch_notification(NotificationEvent::TrackPosChanged, &Notification::default(), 1)
             .await
     };
 

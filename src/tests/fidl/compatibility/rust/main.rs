@@ -342,15 +342,15 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
                             let resp = echo
-                                .echo_table_payload(payload)
+                                .echo_table_payload(&payload)
                                 .await
                                 .context("Error calling echo_table_payload on proxy")?;
-                            responder.send(resp).context("Error responding")?;
+                            responder.send(&resp).context("Error responding")?;
                         }
                         None => {
                             let mut resp = ResponseTable::default();
                             resp.value = payload.value;
-                            responder.send(resp).context("Error responding")?;
+                            responder.send(&resp).context("Error responding")?;
                         }
                     }
                 }
@@ -360,7 +360,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
                             let mut res = echo
-                                .echo_table_payload_with_error(payload)
+                                .echo_table_payload_with_error(&payload)
                                 .await
                                 .context("Error calling echo_table_payload_with_error on proxy")?;
                             responder.send(&mut res).context("Error responding")?;
@@ -386,7 +386,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     match forward_to_server {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
-                            echo.echo_table_payload_no_ret_val(payload)
+                            echo.echo_table_payload_no_ret_val(&payload)
                                 .context("Error sending echo_table_payload_no_ret_val to proxy")?;
                             let mut event_stream = echo.take_event_stream();
                             if let EchoEvent::OnEchoTablePayloadEvent { payload: response } =
@@ -406,7 +406,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                         }
                     }
                     control_handle
-                        .send_on_echo_table_payload_event(resp)
+                        .send_on_echo_table_payload_event(&resp)
                         .context("Error responding with event")?;
                 }
                 EchoRequest::EchoTableRequestComposed { mut payload, responder } => {
@@ -415,7 +415,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                         Some(_forward_to_server) => {
                             let echo = connect_to_echo().context("Error connecting to proxy")?;
                             let mut resp = echo
-                                .echo_table_request_composed(payload)
+                                .echo_table_request_composed(&payload)
                                 .await
                                 .context("Error calling echo_table_payload on proxy")?;
                             responder.send(&mut resp).context("Error responding")?;

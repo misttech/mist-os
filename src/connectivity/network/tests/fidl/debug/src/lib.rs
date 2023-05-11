@@ -154,7 +154,7 @@ async fn add_pure_ip_interface(
         .create_interface(
             &mut port_id,
             server_end,
-            fnet_interfaces_admin::Options {
+            &fnet_interfaces_admin::Options {
                 name: Some(interface_name.to_string()),
                 ..Default::default()
             },
