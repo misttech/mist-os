@@ -32,6 +32,7 @@ rustc_library("rust") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-core",
     "//third_party/rust_crates:tracing-log",
+    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   visibility = [

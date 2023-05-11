@@ -10,11 +10,18 @@ use fidl_fuchsia_diagnostics_stream as fstream;
 use fuchsia_zircon as zx;
 use std::{array::TryFromSliceError, borrow::Borrow, fmt::Debug, io::Cursor, ops::Deref};
 use thiserror::Error;
-use tracing::{Event, Metadata};
-use tracing_core::field::{Field, Visit};
+use tracing::{Event, Metadata, Subscriber};
+use tracing_core::{
+    field::{Field, Visit},
+    span,
+};
 use tracing_log::NormalizeEvent;
+use tracing_subscriber::{
+    layer::Context,
+    registry::{LookupSpan, Scope},
+};
 
-/// An `Encoder` wraps any value implementing `BufMutShared` and writes diagnostic stream records
+/// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records
 /// into it.
 pub struct Encoder<B> {
     pub(crate) buf: B,
@@ -39,7 +46,7 @@ pub struct WriteEventParams<'a, E, T, MS> {
 
 impl<B> Encoder<B>
 where
-    B: BufMutShared,
+    B: MutableBuffer,
 {
     /// Create a new `Encoder` from the provided buffer.
     pub fn new(buf: B) -> Self {
@@ -220,7 +227,12 @@ where
 
     /// Write a string padded to 8-byte alignment.
     fn write_string(&mut self, src: &str) -> Result<(), EncodingError> {
-        self.buf.put_slice(src.as_bytes()).map_err(|_| EncodingError::BufferTooSmall)?;
+        self.write_bytes(src.as_bytes())
+    }
+
+    /// Write bytes padded to 8-byte alignment.
+    fn write_bytes(&mut self, src: &[u8]) -> Result<(), EncodingError> {
+        self.buf.put_slice(src).map_err(|_| EncodingError::BufferTooSmall)?;
         unsafe {
             let align = std::mem::size_of::<u64>();
             let num_padding_bytes = (align - src.len() % align) % align;
@@ -231,7 +243,30 @@ where
     }
 }
 
-impl<B: BufMutShared> Visit for Encoder<B> {
+/// The attributes of a Span pre-encoded for usage in child events.
+pub struct EncodedSpanArguments {
+    encoder: Encoder<Cursor<ResizableBuffer>>,
+}
+
+impl EncodedSpanArguments {
+    /// Encodes the given span attributes.
+    pub fn new(attrs: &span::Attributes<'_>) -> Result<Self, EncodingError> {
+        let mut encoder = Encoder::new(Cursor::new(ResizableBuffer(Vec::new())));
+        attrs.record(&mut encoder);
+        if let Some(err) = encoder.found_error {
+            return Err(err);
+        }
+        Ok(Self { encoder })
+    }
+
+    fn copy_to<B: MutableBuffer>(&self, encoder: &mut Encoder<B>) -> Result<(), EncodingError> {
+        let buffer = self.encoder.inner();
+        let end = buffer.cursor().min(buffer.get_ref().0.len());
+        encoder.write_bytes(&buffer.get_ref().0[..end])
+    }
+}
+
+impl<B: MutableBuffer> Visit for Encoder<B> {
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
         if let Err(err) = self.maybe_write_argument(field, format!("{value:?}").as_str()) {
             self.found_error = Some(err);
@@ -340,8 +375,10 @@ pub trait RecordEvent {
     /// Returns the target of the record.
     fn target(&self) -> &str;
     /// Consumes this type and writes all the arguments.
-    fn write_arguments<B: BufMutShared>(self, writer: &mut Encoder<B>)
-        -> Result<(), EncodingError>;
+    fn write_arguments<B: MutableBuffer>(
+        self,
+        writer: &mut Encoder<B>,
+    ) -> Result<(), EncodingError>;
     /// Returns the timestamp associated to this record.
     fn timestamp(&self) -> zx::Time;
 }
@@ -355,15 +392,16 @@ pub trait RecordFields {
     fn timestamp(&self) -> zx::Time;
 
     /// Consumes this type and writes all the arguments.
-    fn write_arguments<B: BufMutShared>(
+    fn write_arguments<B: MutableBuffer>(
         &self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError>;
 }
 
 /// An event emitted by `tracing`.
-pub struct TracingEvent<'a> {
+pub struct TracingEvent<'a, S> {
     event: &'a Event<'a>,
+    context: Option<Context<'a, S>>,
     metadata: StoredMetadata<'a>,
     timestamp: zx::Time,
 }
@@ -384,18 +422,31 @@ impl<'a> Deref for StoredMetadata<'a> {
     }
 }
 
-impl<'a> From<&'a Event<'_>> for TracingEvent<'a> {
-    fn from(event: &'a Event<'_>) -> TracingEvent<'a> {
+impl<'a, S> TracingEvent<'a, S> {
+    /// Wraps a tracing event with its associated context.
+    pub fn new(event: &'a Event<'_>, context: Context<'a, S>) -> TracingEvent<'a, S> {
+        Self::inner(event, Some(context))
+    }
+
+    // Just for benchmark purposes since we can't construct a Context manually.
+    #[doc(hidden)]
+    pub fn from_event(event: &'a Event<'_>) -> TracingEvent<'a, S> {
+        Self::inner(event, None)
+    }
+
+    fn inner(event: &'a Event<'_>, context: Option<Context<'a, S>>) -> TracingEvent<'a, S> {
         // normalizing is needed to get log records to show up in trace metadata correctly
         if let Some(metadata) = event.normalized_metadata() {
             Self {
                 event,
+                context,
                 metadata: StoredMetadata::Owned(metadata),
                 timestamp: zx::Time::get_monotonic(),
             }
         } else {
             Self {
                 event,
+                context,
                 metadata: StoredMetadata::Borrowed(event.metadata()),
                 timestamp: zx::Time::get_monotonic(),
             }
@@ -403,7 +454,10 @@ impl<'a> From<&'a Event<'_>> for TracingEvent<'a> {
     }
 }
 
-impl RecordEvent for TracingEvent<'_> {
+impl<'a, S> RecordEvent for TracingEvent<'a, S>
+where
+    for<'lookup> S: Subscriber + LookupSpan<'lookup>,
+{
     fn severity(&self) -> Severity {
         self.metadata.severity()
     }
@@ -424,11 +478,21 @@ impl RecordEvent for TracingEvent<'_> {
         self.timestamp
     }
 
-    fn write_arguments<B: BufMutShared>(
+    fn write_arguments<B: MutableBuffer>(
         self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
         writer.found_error = None;
+        if let Some(context) = self.context {
+            let span_iter =
+                context.event_scope(self.event).map(Scope::from_root).into_iter().flatten();
+            for span in span_iter {
+                let extensions = span.extensions();
+                if let Some(encoded) = extensions.get::<EncodedSpanArguments>() {
+                    encoded.copy_to(writer)?;
+                }
+            }
+        }
         self.event.record(writer);
         if let Some(err) = writer.found_error.take() {
             return Err(err);
@@ -485,7 +549,7 @@ impl RecordEvent for TestRecord<'_> {
         self.timestamp
     }
 
-    fn write_arguments<B: BufMutShared>(
+    fn write_arguments<B: MutableBuffer>(
         self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
@@ -501,7 +565,7 @@ impl RecordFields for fstream::Record {
         self.severity
     }
 
-    fn write_arguments<B: BufMutShared>(
+    fn write_arguments<B: MutableBuffer>(
         &self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
@@ -537,8 +601,8 @@ impl<'a> From<&'a fstream::Argument> for Argument<'a> {
     }
 }
 
-/// Analogous to `bytes::BufMut`, but immutably-sized and appropriate for use in shared memory.
-pub trait BufMutShared {
+/// Analogous to `bytes::BufMut` with some additions to be able to write at specific offsets.
+pub trait MutableBuffer {
     /// Returns the number of total bytes this container can store. Shared memory buffers are not
     /// expected to resize and this should return the same value during the entire lifetime of the
     /// buffer.
@@ -564,9 +628,7 @@ pub trait BufMutShared {
     unsafe fn put_slice_at(&mut self, src: &[u8], offset: usize);
 
     /// Returns whether the buffer has sufficient remaining capacity to write an incoming value.
-    fn has_remaining(&self, num_bytes: usize) -> bool {
-        (self.cursor() + num_bytes) <= self.capacity()
-    }
+    fn has_remaining(&self, num_bytes: usize) -> bool;
 
     /// Advances the write cursor without immediately writing any bytes to the buffer. The returned
     /// struct offers the ability to later write to the provided portion of the buffer.
@@ -682,7 +744,53 @@ pub struct WriteSlot {
     range: std::ops::Range<usize>,
 }
 
-impl<'a, T: BufMutShared + ?Sized> BufMutShared for &'a mut T {
+#[derive(Debug)]
+struct ResizableBuffer(Vec<u8>);
+
+impl MutableBuffer for Cursor<ResizableBuffer> {
+    fn capacity(&self) -> usize {
+        self.get_ref().0.len()
+    }
+
+    fn cursor(&self) -> usize {
+        self.position() as usize
+    }
+
+    fn has_remaining(&self, _num_bytes: usize) -> bool {
+        true
+    }
+
+    unsafe fn advance_cursor(&mut self, n: usize) {
+        self.set_position(self.position() + n as u64);
+    }
+
+    unsafe fn put_slice_at(&mut self, to_put: &[u8], offset: usize) {
+        let this = &mut self.get_mut().0;
+        if offset < this.len() {
+            let available = this.len() - offset;
+
+            // Copy the elements that fit into the buffer.
+            let min = available.min(to_put.len());
+            let dest = &mut this[offset..(offset + min)];
+            dest.copy_from_slice(&to_put[..min]);
+
+            // If we couldn't fit all elements, then extend the buffer with the remaining elements.
+            if available < to_put.len() {
+                this.extend_from_slice(&to_put[available..]);
+            }
+        } else {
+            // If the offset is bigger than the length, fill with zeros up to the offset and then
+            // write the slice.
+            this.resize(offset, 0);
+            this.extend_from_slice(to_put);
+        }
+    }
+}
+
+impl<'a, T: MutableBuffer + ?Sized> MutableBuffer for &'a mut T {
+    fn has_remaining(&self, num_bytes: usize) -> bool {
+        (**self).has_remaining(num_bytes)
+    }
     fn capacity(&self) -> usize {
         (**self).capacity()
     }
@@ -700,7 +808,10 @@ impl<'a, T: BufMutShared + ?Sized> BufMutShared for &'a mut T {
     }
 }
 
-impl<T: BufMutShared + ?Sized> BufMutShared for Box<T> {
+impl<T: MutableBuffer + ?Sized> MutableBuffer for Box<T> {
+    fn has_remaining(&self, num_bytes: usize) -> bool {
+        (**self).has_remaining(num_bytes)
+    }
     fn capacity(&self) -> usize {
         (**self).capacity()
     }
@@ -718,7 +829,11 @@ impl<T: BufMutShared + ?Sized> BufMutShared for Box<T> {
     }
 }
 
-impl BufMutShared for Cursor<Vec<u8>> {
+impl MutableBuffer for Cursor<Vec<u8>> {
+    fn has_remaining(&self, num_bytes: usize) -> bool {
+        (self.cursor() + num_bytes) <= self.capacity()
+    }
+
     fn capacity(&self) -> usize {
         self.get_ref().len()
     }
@@ -737,7 +852,11 @@ impl BufMutShared for Cursor<Vec<u8>> {
     }
 }
 
-impl BufMutShared for Cursor<&mut [u8]> {
+impl MutableBuffer for Cursor<&mut [u8]> {
+    fn has_remaining(&self, num_bytes: usize) -> bool {
+        (self.cursor() + num_bytes) <= self.capacity()
+    }
+
     fn capacity(&self) -> usize {
         self.get_ref().len()
     }
@@ -756,7 +875,10 @@ impl BufMutShared for Cursor<&mut [u8]> {
     }
 }
 
-impl<const N: usize> BufMutShared for Cursor<[u8; N]> {
+impl<const N: usize> MutableBuffer for Cursor<[u8; N]> {
+    fn has_remaining(&self, num_bytes: usize) -> bool {
+        (self.cursor() + num_bytes) <= self.capacity()
+    }
     fn capacity(&self) -> usize {
         self.get_ref().len()
     }
@@ -804,7 +926,7 @@ mod tests {
     use crate::parse::parse_record;
     use once_cell::sync::Lazy;
     use std::sync::Mutex;
-    use tracing::Subscriber;
+    use tracing::{info_span, Subscriber};
     use tracing_subscriber::{
         layer::{Context, Layer, SubscriberExt},
         Registry,
@@ -939,33 +1061,45 @@ mod tests {
         );
     }
 
-    #[test]
-    fn build_record_from_tracing_event() {
-        #[derive(Debug)]
-        struct PrintMe(u32);
+    #[derive(Debug)]
+    struct PrintMe(u32);
 
-        #[allow(clippy::type_complexity)]
-        static LAST_RECORD: Lazy<Mutex<Option<Encoder<Cursor<[u8; 1024]>>>>> =
-            Lazy::new(|| Mutex::new(None));
+    #[allow(clippy::type_complexity)]
+    static LAST_RECORD: Lazy<Mutex<Option<Encoder<Cursor<[u8; 1024]>>>>> =
+        Lazy::new(|| Mutex::new(None));
 
-        struct EncoderLayer;
-        impl<S: Subscriber> Layer<S> for EncoderLayer {
-            fn on_event(&self, event: &Event<'_>, _cx: Context<'_, S>) {
-                let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
-                encoder
-                    .write_event(WriteEventParams {
-                        event: TracingEvent::from(event),
-                        tags: &["a-tag"],
-                        metatags: [Metatag::Target].iter(),
-                        pid: zx::Koid::from_raw(0),
-                        tid: zx::Koid::from_raw(0),
-                        dropped: 0,
-                    })
-                    .expect("wrote event");
-                *LAST_RECORD.lock().unwrap() = Some(encoder);
-            }
+    struct EncoderLayer;
+    impl<S> Layer<S> for EncoderLayer
+    where
+        for<'lookup> S: Subscriber + LookupSpan<'lookup>,
+    {
+        fn on_event(&self, event: &Event<'_>, cx: Context<'_, S>) {
+            let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
+            encoder
+                .write_event(WriteEventParams {
+                    event: TracingEvent::new(event, cx),
+                    tags: &["a-tag"],
+                    metatags: [Metatag::Target].iter(),
+                    pid: zx::Koid::from_raw(0),
+                    tid: zx::Koid::from_raw(0),
+                    dropped: 0,
+                })
+                .expect("wrote event");
+            *LAST_RECORD.lock().unwrap() = Some(encoder);
         }
 
+        fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+            let span = ctx.span(id).expect("Span not found, this is a bug");
+            let mut extensions = span.extensions_mut();
+            if extensions.get_mut::<EncodedSpanArguments>().is_none() {
+                let encoded = EncodedSpanArguments::new(attrs).expect("encoded");
+                extensions.insert(encoded);
+            }
+        }
+    }
+
+    #[test]
+    fn build_record_from_tracing_event() {
         let before_timestamp = zx::Time::get_monotonic().into_nanos();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         tracing::info!(
@@ -1032,5 +1166,107 @@ mod tests {
                 ]
             }
         );
+    }
+
+    #[test]
+    fn spans_are_supported() {
+        let before_timestamp = zx::Time::get_monotonic().into_nanos();
+        let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
+        let span = info_span!("my span", tag = "span_tag", span_field = 42);
+        span.in_scope(|| {
+            let nested_span =
+                info_span!("my other span", tag = "nested_span_tag", nested_span_field = "hello");
+            nested_span.in_scope(|| {
+                tracing::info!(is_bool = true, "a log in spans");
+            });
+        });
+
+        let guard = LAST_RECORD.lock().unwrap();
+        let encoder = guard.as_ref().unwrap();
+        let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
+        assert!(record.timestamp > before_timestamp);
+        assert_eq!(
+            record,
+            fstream::Record {
+                timestamp: record.timestamp,
+                severity: Severity::Info,
+                arguments: vec![
+                    fstream::Argument {
+                        name: "pid".to_string(),
+                        value: fstream::Value::UnsignedInt(0)
+                    },
+                    fstream::Argument {
+                        name: "tid".to_string(),
+                        value: fstream::Value::UnsignedInt(0)
+                    },
+                    fstream::Argument {
+                        name: "tag".to_string(),
+                        value: fstream::Value::Text(
+                            "diagnostics_log_encoding_lib_test::encode::tests".into()
+                        ),
+                    },
+                    fstream::Argument {
+                        name: "tag".to_string(),
+                        value: fstream::Value::Text("span_tag".into(),),
+                    },
+                    fstream::Argument {
+                        name: "span_field".to_string(),
+                        value: fstream::Value::SignedInt(42),
+                    },
+                    fstream::Argument {
+                        name: "tag".to_string(),
+                        value: fstream::Value::Text("nested_span_tag".into(),),
+                    },
+                    fstream::Argument {
+                        name: "nested_span_field".to_string(),
+                        value: fstream::Value::Text("hello".into()),
+                    },
+                    fstream::Argument {
+                        name: "message".to_string(),
+                        value: fstream::Value::Text("a log in spans".into())
+                    },
+                    fstream::Argument {
+                        name: "is_bool".to_string(),
+                        value: fstream::Value::Boolean(true)
+                    },
+                    fstream::Argument {
+                        name: "tag".to_string(),
+                        value: fstream::Value::Text("a-tag".into(),)
+                    },
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn resizable_vec_mutable_buffer() {
+        // Putting a slice at offset=len is equivalent to concatenating.
+        let mut vec = Cursor::new(ResizableBuffer(vec![1u8, 2, 3]));
+        unsafe {
+            vec.put_slice_at(&[4, 5, 6], 3);
+        }
+        assert_eq!(vec.get_ref().0, vec![1, 2, 3, 4, 5, 6]);
+
+        // Putting a slice at an offset inside the buffer, is equivalent to replacing the items
+        // there.
+        let mut vec = Cursor::new(ResizableBuffer(vec![1, 3, 7, 9, 11, 13, 15]));
+        unsafe {
+            vec.put_slice_at(&[2, 4, 6], 2);
+        }
+        assert_eq!(vec.get_ref().0, vec![1, 3, 2, 4, 6, 13, 15]);
+
+        // Putting a slice at an index in range replaces all the items and extends if needed.
+        let mut vec = Cursor::new(ResizableBuffer(vec![1, 2, 3]));
+        unsafe {
+            vec.put_slice_at(&[4, 5, 6, 7], 0);
+        }
+        assert_eq!(vec.get_ref().0, vec![4, 5, 6, 7]);
+
+        // Putting a slice at an offset beyond the buffer, fills with zeros the items in between.
+        let mut vec = Cursor::new(ResizableBuffer(vec![1, 2, 3]));
+        unsafe {
+            vec.put_slice_at(&[4, 5, 6], 5);
+        }
+        assert_eq!(vec.get_ref().0, vec![1, 2, 3, 0, 0, 4, 5, 6]);
     }
 }

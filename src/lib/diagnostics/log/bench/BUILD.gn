@@ -22,6 +22,7 @@ rustc_binary("encoding-bin") {
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-core",
+    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   sources = [ "src/encoding.rs" ]

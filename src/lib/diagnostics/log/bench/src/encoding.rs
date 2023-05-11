@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use std::{io::Cursor, mem::MaybeUninit, time::Duration};
 use tracing::{Callsite, Event, Level, Metadata};
 use tracing_core::{field, identify_callsite, subscriber::Interest, Kind};
+use tracing_subscriber::Registry;
 
 static PLACEHOLDER_TEXT: Lazy<String> = Lazy::new(|| "x".repeat(32000));
 static PROCESS_ID: Lazy<zx::Koid> =
@@ -118,7 +119,7 @@ macro_rules! impl_bench_write_event {
                         || encoder(),
                         |encoder| encoder.write_event(
                             WriteEventParams {
-                            event: TracingEvent::from(&event),
+                            event: TracingEvent::<Registry>::from_event(&event),
                             tags: &["some-tag"],
                             metatags: std::iter::empty(),
                             pid: *PROCESS_ID,

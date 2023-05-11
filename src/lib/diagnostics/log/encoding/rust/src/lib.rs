@@ -168,7 +168,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            encode::{BufMutShared, Encoder, EncodingError},
+            encode::{Encoder, EncodingError, MutableBuffer},
             parse::{parse_argument, try_parse_record, ParseResult},
         },
         fidl_fuchsia_diagnostics::Severity,

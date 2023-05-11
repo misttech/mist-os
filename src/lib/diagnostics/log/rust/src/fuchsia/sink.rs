@@ -3,7 +3,10 @@
 
 use crate::PublishError;
 use diagnostics_log_encoding::{
-    encode::{BufMutShared, Encoder, EncodingError, TestRecord, TracingEvent, WriteEventParams},
+    encode::{
+        EncodedSpanArguments, Encoder, EncodingError, MutableBuffer, TestRecord, TracingEvent,
+        WriteEventParams,
+    },
     Metatag,
 };
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
@@ -14,8 +17,11 @@ use std::{
     io::Cursor,
     sync::atomic::{AtomicU32, Ordering},
 };
-use tracing::{subscriber::Subscriber, Event};
-use tracing_subscriber::layer::{Context, Layer};
+use tracing::{span, subscriber::Subscriber, Event};
+use tracing_subscriber::{
+    layer::{Context, Layer},
+    registry::LookupSpan,
+};
 
 thread_local! {
     static PROCESS_ID: zx::Koid =
@@ -93,11 +99,14 @@ impl Sink {
     }
 }
 
-impl<S: Subscriber> Layer<S> for Sink {
-    fn on_event(&self, event: &Event<'_>, _cx: Context<'_, S>) {
+impl<S> Layer<S> for Sink
+where
+    for<'lookup> S: Subscriber + LookupSpan<'lookup>,
+{
+    fn on_event(&self, event: &Event<'_>, cx: Context<'_, S>) {
         self.encode_and_send(|encoder, previously_dropped| {
             encoder.write_event(WriteEventParams {
-                event: TracingEvent::from(event),
+                event: TracingEvent::new(event, cx),
                 tags: &self.tags,
                 metatags: self.metatags.iter(),
                 pid: PROCESS_ID.with(|p| *p),
@@ -105,6 +114,16 @@ impl<S: Subscriber> Layer<S> for Sink {
                 dropped: previously_dropped,
             })
         });
+    }
+
+    fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+        let span = ctx.span(id).expect("span exists. Internal tracing bug if it doesn't");
+        let mut extensions = span.extensions_mut();
+        if extensions.get_mut::<EncodedSpanArguments>().is_none() {
+            if let Ok(encoded) = EncodedSpanArguments::new(attrs) {
+                extensions.insert(encoded);
+            }
+        }
     }
 }
 
@@ -116,7 +135,7 @@ mod tests {
     use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
-    use tracing::{debug, error, info, trace, warn};
+    use tracing::{debug, error, info, info_span, trace, warn};
     use tracing_subscriber::{layer::SubscriberExt, Registry};
 
     const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";
@@ -294,6 +313,38 @@ mod tests {
         expected
             .arguments
             .push(Argument { name: "tag".into(), value: Value::Text("tags_are_sent".into()) });
+        assert_eq!(observed, expected);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn spans_are_supported() {
+        let socket = init_sink(&[], &[]).await;
+        let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
+        let mut next_message = || {
+            let len = socket.read(&mut buf).unwrap();
+            let (record, _) = parse_record(&buf[..len]).unwrap();
+            assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
+            record
+        };
+
+        let span = info_span!("span 1", tag = "foo");
+        let _s1 = span.enter();
+        let span2 = info_span!("span 2", key = 2);
+        let _s2 = span2.enter();
+        info!("this should have span fields");
+        let observed = next_message();
+
+        let mut expected = Record {
+            timestamp: observed.timestamp,
+            severity: Severity::Info,
+            arguments: arg_prefix(),
+        };
+        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
+        expected.arguments.push(Argument { name: "key".into(), value: Value::SignedInt(2) });
+        expected.arguments.push(Argument {
+            name: "message".into(),
+            value: Value::Text("this should have span fields".into()),
+        });
         assert_eq!(observed, expected);
     }
 
