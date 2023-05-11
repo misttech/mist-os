@@ -119,10 +119,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   system_image_deps (optional)
 #     [list of labels] The objects installed in the system image.
 #
-#   devmgr_config (default: [])
-#     [list of strings] List of arguments to add to /boot/config/additional_boot_args.
-#     DEPRECATED: Use additional_boot_args instead.
-#
 #   additional_boot_args (default: [])
 #     [list of strings] List of arguments to add to /boot/config/additional_boot_args.
 #     These arguments come after synthesized arguments to configure blobfs.
@@ -543,11 +539,6 @@ template("assembled_system") {
   additional_boot_args = []
   if (defined(invoker.additional_boot_args)) {
     additional_boot_args = invoker.additional_boot_args
-  }
-
-  # TODO(http://fxbug.dev/91451): Remove after migration.
-  if (defined(invoker.devmgr_config)) {
-    additional_boot_args += invoker.devmgr_config
   }
 
   use_assembly_fshost =
