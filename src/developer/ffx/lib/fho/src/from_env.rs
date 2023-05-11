@@ -164,14 +164,14 @@ where
 }
 
 /// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
-/// specify the selector string for the proxy you're loading.
+/// specify the moniker for the component exposing the proxy you're loading.
 ///
 /// Example:
 ///
 /// ```rust
 /// #[derive(FfxTool)]
 /// struct Tool {
-///     #[with(fho::deferred(fho::selector("core/selector/thing")))]
+///     #[with(fho::deferred(fho::moniker("/core/foo/thing")))]
 ///     foo_proxy: fho::Deferred<FooProxy>,
 /// }
 /// ```
@@ -244,7 +244,42 @@ impl<P: Proxy + 'static> TryFromEnvWith for WithSelector<P> {
     }
 }
 
-/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
+/// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
+pub struct WithMoniker<P> {
+    moniker: String,
+    timeout: Duration,
+    _p: PhantomData<fn() -> P>,
+}
+
+#[async_trait(?Send)]
+impl<P: Proxy + 'static> TryFromEnvWith for WithMoniker<P> {
+    type Output = P;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
+            .with_user_message(|| format!("Failed creating proxy for moniker {}", self.moniker))?;
+        let retry_count = 1;
+        let mut tries = 0;
+        // TODO(fxbug.dev/113143): Remove explicit retries/timeouts here so they can be
+        // configurable instead.
+        let rcs_instance = loop {
+            tries += 1;
+            let res = env.injector.remote_factory().await;
+            if res.is_ok() || tries > retry_count {
+                break res;
+            }
+        }?;
+        rcs::connect_with_timeout::<P::Protocol>(
+            self.timeout,
+            &self.moniker,
+            &rcs_instance,
+            server_end.into_channel(),
+        )
+        .await?;
+        Ok(proxy)
+    }
+}
+
+/// A decorator for proxy types in [`crate::ffxtool`] implementations so you can
 /// specify the selector string for the proxy you're loading.
 ///
 /// Example:
@@ -265,6 +300,32 @@ pub fn selector<P: Proxy>(selector: impl AsRef<str>) -> WithSelector<P> {
 pub fn selector_timeout<P: Proxy>(selector: impl AsRef<str>, timeout_secs: u64) -> WithSelector<P> {
     WithSelector {
         selector: selector.as_ref().to_owned(),
+        timeout: Duration::from_secs(timeout_secs),
+        _p: Default::default(),
+    }
+}
+
+/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
+/// specify the moniker for the component exposing the proxy you're loading.
+///
+/// Example:
+///
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     #[with(fho::moniker("core/foo/thing"))]
+///     foo_proxy: FooProxy,
+/// }
+/// ```
+pub fn moniker<P: Proxy>(moniker: impl AsRef<str>) -> WithMoniker<P> {
+    moniker_timeout(moniker, 15)
+}
+
+/// Like [`moniker`], but lets you also specify an override for the default
+/// timeout.
+pub fn moniker_timeout<P: Proxy>(moniker: impl AsRef<str>, timeout_secs: u64) -> WithMoniker<P> {
+    WithMoniker {
+        moniker: moniker.as_ref().to_owned(),
         timeout: Duration::from_secs(timeout_secs),
         _p: Default::default(),
     }
