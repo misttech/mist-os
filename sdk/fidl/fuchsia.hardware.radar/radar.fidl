@@ -53,6 +53,10 @@ type StatusCode = strict enum {
 
     /// An unspecified driver or sensor error was encountered.
     SENSOR_ERROR = 12;
+
+    /// The radar driver or proxy was not in the correct state for this call.
+    @available(added=HEAD)
+    BAD_STATE = 13;
 };
 
 type Burst = struct {
@@ -190,4 +194,107 @@ protocol RadarBurstReaderProvider {
     Connect(resource struct {
         server server_end:RadarBurstReader;
     }) -> () error StatusCode;
+};
+
+@available(added=12)
+protocol RadarSensorInfo {
+    /// Returns the size and period of bursts reported by the sensor.
+    ///
+    /// - response `size` the size of each radar burst in bytes.
+    /// - response `period` the time between bursts in nanoseconds.
+    GetBurstProperties() -> (struct {
+        size uint32;
+        period zx.Duration;
+    });
+};
+
+@available(added=12)
+type BurstData = resource struct {
+    /// A VMO holding zero or more radar bursts of the size reported by
+    /// `GetBurstProperties()`. Bursts are stored contiguously with no padding
+    /// between them.
+    vmo zx.Handle:<VMO, zx.Rights.READ | zx.Rights.MAP>;
+    /// The number of bursts stored in `vmo`.
+    burst_count uint32;
+};
+
+/// Test clients may use this protocol to inject burst data to radar clients
+/// through a virtual radar driver. Only one client of this protocol can be
+/// connected at a time. radar-proxy will send epitaph status code
+/// `ZX_ERR_ALREADY_BOUND` to and close channels from any additional clients
+/// that attempt to connect.
+@available(added=12)
+@discoverable
+protocol RadarBurstInjector {
+    compose RadarSensorInfo;
+
+    /// Enqueues the given VMO with burst data to be injected. After all bursts
+    /// from this VMO have been injected, radar-proxy will move on to the next
+    /// VMO in the queue. The caller must not write to the VMO until it has been
+    /// returned by `OnBurstsDelivered()`. The VMO will be closed and unmapped
+    /// if the injector client unexpectedly disconnects.
+    ///
+    /// Bursts are injected by radar-proxy at the rate reported by the
+    /// underlying driver's `GetBurstProperties()` method. If no VMOs are in the
+    /// queue at the time that a burst is to be delivered, radar-proxy will stop
+    /// sending bursts until either `EnqueueBursts()` or `StopBurstInjection()`
+    /// is called.
+    ///
+    /// + request `bursts` the `BurstData` struct containing bursts to inject.
+    /// - response `bursts_id` the ID to be passed back through
+    ///     `OnBurstsDelivered()` after the final burst from this buffer has
+    ///     been injected.
+    /// * error one of the following `StatusCode` values:
+    /// *   `VMO_BAD_HANDLE`: The VMO handle was invalid.
+    /// *   `VMO_ACCESS_DENIED`: The VMO had insufficient rights.
+    /// *   `VMO_TOO_SMALL`: The VMO was too small to hold the indicated number
+    /// *     of bursts.
+    /// *   `INVALID_ARGS`: The number of bursts was zero.
+    /// *   `BAD_STATE`: A previous call to `StopBurstInjection()` is still
+    /// *     pending.
+    EnqueueBursts(resource struct {
+        bursts BurstData;
+    }) -> (struct {
+        bursts_id uint32;
+    }) error StatusCode;
+
+    /// Returns an ID corresponding to a `BurstData` struct previously passed to
+    /// `EnqueueBursts()`. Upon receiving this event the client is free to write
+    /// to the VMO, and if desired, pass it back to radar-proxy for injection.
+    ///
+    /// + request `bursts_id` the ID returned by a previous call to
+    ///     `EnqueueBursts()`.
+    -> OnBurstsDelivered(struct {
+        bursts_id uint32;
+    });
+
+    /// Tells radar-proxy to read future bursts from enqueued VMOs rather than
+    /// from the real radar driver. radar-proxy will attempt to deliver the
+    /// first injected burst at the time that the radar driver would have done
+    /// so. If the queue is or becomes empty then sending of bursts will stop
+    /// until more bursts are available in the queue. See `EnqueueBursts()`
+    /// above.
+    ///
+    /// radar-proxy will call `StopBursts()` on the real radar driver before
+    /// it starts to deliver the enqueued bursts.
+    ///
+    /// * error one of the following `StatusCode` values:
+    /// *   `BAD_STATE`: Injection has already been started, or a previous call
+    /// *     to `StopBurstInjection()` is still pending.
+    StartBurstInjection() -> () error StatusCode;
+
+    /// Tells radar-proxy to finish injecting bursts from VMOs currently on the
+    /// queue then switch back to delivering bursts from the real radar driver.
+    /// The reply to this call will not be sent until `OnBurstsDelivered()` has
+    /// been called for the final VMO to be injected, and any other calls made
+    /// in that time will return errors.
+    ///
+    /// radar-proxy will call `StartBursts()` on the real radar driver as part
+    /// of this call. There may be a delay before RadarBurstReader clients start
+    /// to receive bursts from the driver again.
+    ///
+    /// * error one of the following `StatusCode` values:
+    /// *   `BAD_STATE`: Injection has already been stopped, or a call to this
+    /// *     method is still pending.
+    StopBurstInjection() -> () error StatusCode;
 };

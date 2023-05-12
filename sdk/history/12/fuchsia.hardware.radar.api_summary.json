@@ -16,6 +16,126 @@
         "name": "fuchsia.hardware.radar/Burst"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.radar/BurstData.burst_count",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.radar/BurstData.vmo",
+        "ordinal": "1",
+        "type": "zx/Handle:<VMO,zx.READ,zx.MAP>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.radar/BurstData",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector.EnqueueBursts",
+        "ordinal": "8149459733802198512",
+        "type": "(fuchsia.hardware.radar/BurstData bursts) -> (fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector.GetBurstProperties",
+        "ordinal": "6474947458047311842",
+        "type": "() -> (uint32 size,int64 period)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector.OnBurstsDelivered",
+        "ordinal": "7119376798607851374",
+        "type": " -> (uint32 bursts_id)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector.StartBurstInjection",
+        "ordinal": "83540994064589690",
+        "type": "() -> (fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector.StopBurstInjection",
+        "ordinal": "5992983899524372872",
+        "type": "() -> (fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Response.bursts_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.radar/StatusCode"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_EnqueueBursts_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.radar/StatusCode"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StartBurstInjection_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.radar/StatusCode"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.radar/RadarBurstInjector_StopBurstInjection_Result",
+        "strictness": "strict"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader.GetBurstProperties",
         "ordinal": "3836925016865417559",
@@ -197,6 +317,16 @@
         "name": "fuchsia.hardware.radar/RadarBurstReader_UnregisterVmos_Result",
         "resourceness": "resource",
         "strictness": "strict"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarSensorInfo.GetBurstProperties",
+        "ordinal": "6474947458047311842",
+        "type": "() -> (uint32 size,int64 period)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.radar/RadarSensorInfo"
     },
     {
         "kind": "enum/member",
