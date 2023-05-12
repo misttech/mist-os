@@ -527,8 +527,8 @@ impl DynamicFileSource for ProcMountsFileSource {
             let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
             let origin =
                 NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
-            let fs_spec = String::from_utf8_lossy(&origin.path_escaping_chroot()).into_owned();
-            let fs_file = String::from_utf8_lossy(&mountpoint.path_escaping_chroot()).into_owned();
+            let fs_spec = String::from_utf8_lossy(&origin.path(&task)).into_owned();
+            let fs_file = String::from_utf8_lossy(&mountpoint.path(&task)).into_owned();
             let fs_vfstype = "TODO";
             let fs_mntopts = "TODO";
             writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
@@ -610,8 +610,8 @@ impl DynamicFileSource for ProcMountinfoFile {
                 mount.id,
                 parent.id,
                 mount.root.node.fs().dev_id,
-                String::from_utf8_lossy(&origin.path_escaping_chroot()),
-                String::from_utf8_lossy(&mountpoint.path_escaping_chroot())
+                String::from_utf8_lossy(&origin.path(&task)),
+                String::from_utf8_lossy(&mountpoint.path(&task))
             )?;
             if let Some(peer_group) = mount.read().peer_group() {
                 write!(sink, " shared:{}", peer_group.id)?;

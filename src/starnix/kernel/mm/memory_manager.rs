@@ -1660,6 +1660,7 @@ impl DesiredAddress {
 }
 
 fn write_map(
+    task: &Task,
     sink: &mut DynamicFileBuf,
     range: &Range<UserAddress>,
     map: &Mapping,
@@ -1684,7 +1685,7 @@ fn write_map(
         // File names can have newlines that need to be escaped before printing.
         // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
         // escaping applied to paths is replacing newlines with an octal sequence.
-        let path = filename.path_escaping_chroot();
+        let path = filename.path(task);
         sink.write_iter(
             path.iter()
                 .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
@@ -1720,10 +1721,11 @@ impl SequenceFileSource for ProcMapsFile {
         cursor: UserAddress,
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
-        let state = self.0.mm.state.read();
+        let task = &self.0;
+        let state = task.mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            write_map(sink, range, map)?;
+            write_map(task, sink, range, map)?;
             return Ok(Some(range.end));
         }
         Ok(None)
@@ -1747,10 +1749,11 @@ impl SequenceFileSource for ProcSmapsFile {
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
-        let state = self.0.mm.state.read();
+        let task = &self.0;
+        let state = task.mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            write_map(sink, range, map)?;
+            write_map(task, sink, range, map)?;
 
             let vmo_info = map.vmo.info().map_err(MemoryManager::get_errno_for_map_err)?;
             let size_kb = vmo_info.size_bytes / 1024;
