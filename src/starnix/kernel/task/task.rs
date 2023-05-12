@@ -19,7 +19,7 @@ use crate::execution::*;
 use crate::fs::*;
 use crate::loader::*;
 use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::*;
+use crate::logging::{self, *};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
 use crate::signals::{send_signal, types::*, SignalInfo};
 use crate::syscalls::{decls::Syscall, SyscallResult};
@@ -338,6 +338,9 @@ pub struct Task {
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
     pub has_seccomp_filters: AtomicU8,
+
+    /// Used to ensure that all logs related to this task carry the same metadata about the task.
+    logging_span: logging::Span,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -384,6 +387,7 @@ impl Task {
             }
             result
         };
+        let logging_span = logging::Span::new(thread_group.leader, id, &command);
         let task = Task {
             id,
             thread_group,
@@ -413,6 +417,7 @@ impl Task {
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
             has_seccomp_filters,
+            logging_span,
         };
         #[cfg(any(test, debug_assertions))]
         {
@@ -890,12 +895,14 @@ impl Task {
     pub fn set_command_name(&self, name: CString) {
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
-        *self.command.write() = if bytes.len() > 15 {
+        let name = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
             name
         };
+        self.logging_span.update(self.thread_group.leader, self.id, &name);
+        *self.command.write() = name;
     }
 
     /// Processes a Zircon exception associated with this task.
@@ -974,6 +981,10 @@ impl Task {
                 return Ok(());
             }
         }
+    }
+
+    pub fn logging_span(&self) -> logging::Span {
+        self.logging_span.clone()
     }
 }
 
@@ -1394,8 +1405,6 @@ impl CurrentTask {
         set_zx_name(&fuchsia_runtime::thread_self(), basename.as_bytes());
         set_zx_name(&self.thread_group.process, basename.as_bytes());
         self.set_command_name(basename);
-        crate::logging::set_current_task_info(self);
-
         Ok(())
     }
 

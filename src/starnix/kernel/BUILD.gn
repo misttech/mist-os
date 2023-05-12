@@ -334,7 +334,7 @@ rustc_binary("starnix_kernel_bin") {
     features += [ "restricted_mode" ]
   }
   if (starnix_disable_logging) {
-    features = [ "disable_logging" ]
+    features += [ "disable_logging" ]
   }
   if (starnix_disable_tracing) {
     features += [ "disable_tracing" ]

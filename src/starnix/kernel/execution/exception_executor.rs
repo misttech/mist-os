@@ -15,7 +15,7 @@ use std::mem;
 use std::sync::Arc;
 
 use super::shared::*;
-use crate::logging::{log_trace, log_warn, set_current_task_info, set_zx_name};
+use crate::logging::{log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::*;
 use crate::syscalls::decls::SyscallDecl;
@@ -50,7 +50,8 @@ where
             // This sets the logging debug info for the current thread, but does not do so for
             // the thread started immediately below. That thread will never execute Starnix kernel
             // code, so we don't need to worry about providing it with the right thread-local.
-            set_current_task_info(&current_task);
+            let span = current_task.logging_span();
+            let _span_guard = span.enter();
             let exceptions = start_task_thread(&current_task)?;
             // Unwrap the error because if we don't, we'll panic anyway from destroying the task
             // without having previous called sys_exit(), and that will swallow the actual error.

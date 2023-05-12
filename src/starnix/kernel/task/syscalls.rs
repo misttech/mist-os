@@ -650,7 +650,6 @@ pub fn sys_prctl(
                 thread.set_name(&name_str).map_err(|_| errno!(EINVAL))?;
             }
             current_task.set_command_name(name_str);
-            crate::logging::set_current_task_info(current_task);
             Ok(0.into())
         }
         PR_GET_NAME => {

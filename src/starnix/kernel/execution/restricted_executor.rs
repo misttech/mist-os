@@ -17,7 +17,7 @@ use crate::arch::{
     execution::{generate_cfi_directives, restore_cfi_directives},
     registers::RegisterState,
 };
-use crate::logging::{log_error, log_trace, log_warn, set_current_task_info, set_zx_name};
+use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::syscalls::decls::SyscallDecl;
@@ -79,7 +79,8 @@ extern "C" {
 /// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
 fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
-    set_current_task_info(current_task);
+    let span = current_task.logging_span();
+    let _span_guard = span.enter();
 
     // The task does not yet have a thread associated with it, so associate it with this thread.
     let mut thread = current_task.thread.write();
