@@ -65,8 +65,3 @@ fuchsia_package("process_explorer_package") {
 core_shard("process_explorer_core_shard") {
   shard_file = "meta/process_explorer.core_shard.cml"
 }
-
-group("tests") {
-  testonly = true
-  deps = [ "//src/developer/process_explorer/tests:tests" ]
-}
