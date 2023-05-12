@@ -39,9 +39,12 @@ impl DomainConfigPackage {
         for (directory, directory_config) in self.config.directories {
             let subdir = cml::RelativePath::new(&directory)
                 .with_context(|| format!("Calculating relative path for {directory}"))?;
+            let name = cml::Name::try_new(&directory)
+                .with_context(|| format!("Calculating name for {directory}"))?;
             exposes.push(cml::Expose {
                 // unwrap is safe, because try_new cannot fail with "pkg".
                 directory: Some(cml::OneOrMany::One(cml::Name::try_new("pkg").unwrap())),
+                r#as: Some(name),
                 subdir: Some(subdir),
                 ..cml::Expose::new_from(cml::OneOrMany::One(cml::ExposeFromRef::Framework))
             });
@@ -169,7 +172,7 @@ mod tests {
             availability: _,
         }) => {
             assert_eq!(source_name, &CapabilityName::from("pkg"));
-            assert_eq!(target_name, &CapabilityName::from("pkg"));
+            assert_eq!(target_name, &CapabilityName::from("config-dir"));
             assert_eq!(subdir, &PathBuf::from("config-dir"));
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
@@ -266,7 +269,7 @@ mod tests {
             availability: _,
         }) => {
             assert_eq!(source_name, &CapabilityName::from("pkg"));
-            assert_eq!(target_name, &CapabilityName::from("pkg"));
+            assert_eq!(target_name, &CapabilityName::from("config-dir"));
             assert_eq!(subdir, &PathBuf::from("config-dir"));
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
