@@ -50,7 +50,12 @@ use futures::{
     SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr};
-use netstack3_core::device::DeviceId;
+use netstack3_core::{
+    device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
+    ip::device::{
+        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    },
+};
 
 use crate::bindings::{
     devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
@@ -891,38 +896,46 @@ fn set_configuration(
     Ok(fnet_interfaces_admin::Configuration {
         ipv4: ipv4.map(|fnet_interfaces_admin::Ipv4Configuration { forwarding, .. }| {
             fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: forwarding.map(|enable| {
-                    netstack3_core::device::update_ipv4_configuration(
+                forwarding: forwarding.and_then(|enable| {
+                    update_ipv4_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &core_id,
-                        |config| {
-                            let forwarding_enabled = &mut config.ip_config.forwarding_enabled;
-                            let prev = *forwarding_enabled;
-                            *forwarding_enabled = enable;
-                            prev
+                        Ipv4DeviceConfigurationUpdate {
+                            ip_config: Some(IpDeviceConfigurationUpdate {
+                                forwarding_enabled: Some(enable),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
                         },
                     )
                     .expect("checked supported configuration before calling")
+                    .ip_config
+                    .expect("IP configuration was updated")
+                    .forwarding_enabled
                 }),
                 ..Default::default()
             }
         }),
         ipv6: ipv6.map(|fnet_interfaces_admin::Ipv6Configuration { forwarding, .. }| {
             fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: forwarding.map(|enable| {
-                    netstack3_core::device::update_ipv6_configuration(
+                forwarding: forwarding.and_then(|enable| {
+                    update_ipv6_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &core_id,
-                        |config| {
-                            let forwarding_enabled = &mut config.ip_config.forwarding_enabled;
-                            let prev = *forwarding_enabled;
-                            *forwarding_enabled = enable;
-                            prev
+                        Ipv6DeviceConfigurationUpdate {
+                            ip_config: Some(IpDeviceConfigurationUpdate {
+                                forwarding_enabled: Some(enable),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
                         },
                     )
                     .expect("checked supported configuration before calling")
+                    .ip_config
+                    .expect("IP configuration was updated")
+                    .forwarding_enabled
                 }),
                 ..Default::default()
             }

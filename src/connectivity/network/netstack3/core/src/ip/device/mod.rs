@@ -43,7 +43,7 @@ use crate::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
             },
             router_solicitation::{RsHandler, RsTimerId},
-            slaac::{SlaacHandler, SlaacTimerId},
+            slaac::{SlaacConfiguration, SlaacHandler, SlaacTimerId},
             state::{
                 AddrConfig, DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration,
                 IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration, Ipv4DeviceState,
@@ -1560,10 +1560,150 @@ pub(crate) fn get_ipv6_configuration<
     sync_ctx.with_ip_device_configuration(device_id, |config, _ctx| config.clone())
 }
 
+/// An update to IP device configuration.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct IpDeviceConfigurationUpdate {
+    /// A change in IP enabled.
+    pub ip_enabled: Option<bool>,
+    /// A change in forwarding enabled.
+    pub forwarding_enabled: Option<bool>,
+    /// A change in Group Messaging Protocol (GMP) enabled.
+    pub gmp_enabled: Option<bool>,
+}
+
+/// An update to IPv4 device configuration.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Ipv4DeviceConfigurationUpdate {
+    /// A change in the IP device configuration.
+    pub ip_config: Option<IpDeviceConfigurationUpdate>,
+}
+
+fn get_prev_and_update<T>(field: &mut T, new: Option<T>) -> Option<T> {
+    new.map(|v| core::mem::replace(field, v))
+}
+
+/// Updates the IPv4 configuration for the device.
+///
+/// Each field in [`Ipv4DeviceConfigurationUpdate`] represents an optionally
+/// updateable configuration. If the field has a `Some(_)` value, then an
+/// attempt will be made to update that configuration on the device. A `None`
+/// value indicates that an update for the configuration is not requested.
+///
+/// Note that some fields have the type `Option<Option<T>>`. In this case,
+/// as long as the outer `Option` is `Some`, then an attempt will be made to
+/// update the configuration.
+///
+/// The IP device configuration is left unchanged if an `Err` is returned.
+/// Otherwise, the previous values are returned for configurations that were
+/// requested to be updated.
+pub(crate) fn update_ipv4_configuration<
+    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    Ipv4DeviceConfigurationUpdate { ip_config }: Ipv4DeviceConfigurationUpdate,
+) -> Result<Ipv4DeviceConfigurationUpdate, NotSupportedError> {
+    update_ipv4_configuration_inner(sync_ctx, ctx, device_id, |config| {
+        Ipv4DeviceConfigurationUpdate {
+            ip_config: ip_config.map(
+                |IpDeviceConfigurationUpdate { ip_enabled, forwarding_enabled, gmp_enabled }| {
+                    IpDeviceConfigurationUpdate {
+                        ip_enabled: get_prev_and_update(
+                            &mut config.ip_config.ip_enabled,
+                            ip_enabled,
+                        ),
+                        gmp_enabled: get_prev_and_update(
+                            &mut config.ip_config.gmp_enabled,
+                            gmp_enabled,
+                        ),
+                        forwarding_enabled: get_prev_and_update(
+                            &mut config.ip_config.forwarding_enabled,
+                            forwarding_enabled,
+                        ),
+                    }
+                },
+            ),
+        }
+    })
+}
+
+/// An update to IPv6 device configuration.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Ipv6DeviceConfigurationUpdate {
+    /// A change in DAD transmits.
+    pub dad_transmits: Option<Option<NonZeroU8>>,
+    /// A change in maximum router solicitations.
+    pub max_router_solicitations: Option<Option<NonZeroU8>>,
+    /// A change in SLAAC configuration.
+    pub slaac_config: Option<SlaacConfiguration>,
+    /// A change in the IP device configuration.
+    pub ip_config: Option<IpDeviceConfigurationUpdate>,
+}
+
+/// Updates the IPv6 configuration for a device.
+///
+/// Each field in [`Ipv6DeviceConfigurationUpdate`] represents an optionally
+/// updateable configuration. If the field has a `Some(_)` value, then an
+/// attempt will be made to update that configuration on the device. A `None`
+/// value indicates that an update for the configuration is not requested.
+///
+/// Note that some fields have the type `Option<Option<T>>`. In this case,
+/// as long as the outer `Option` is `Some`, then an attempt will be made to
+/// update the configuration.
+///
+/// The IP device configuration is left unchanged if an `Err` is returned.
+/// Otherwise, the previous values are returned for configurations that were
+/// requested to be updated.
+pub(crate) fn update_ipv6_configuration<
+    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
+    SC: Ipv6DeviceConfigurationContext<C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    Ipv6DeviceConfigurationUpdate {
+        dad_transmits,
+        max_router_solicitations,
+        slaac_config,
+        ip_config,
+    }: Ipv6DeviceConfigurationUpdate,
+) -> Result<Ipv6DeviceConfigurationUpdate, NotSupportedError> {
+    update_ipv6_configuration_inner(sync_ctx, ctx, device_id, |config| {
+        Ipv6DeviceConfigurationUpdate {
+            dad_transmits: get_prev_and_update(&mut config.dad_transmits, dad_transmits),
+            max_router_solicitations: get_prev_and_update(
+                &mut config.max_router_solicitations,
+                max_router_solicitations,
+            ),
+            slaac_config: get_prev_and_update(&mut config.slaac_config, slaac_config),
+            ip_config: ip_config.map(
+                |IpDeviceConfigurationUpdate { ip_enabled, forwarding_enabled, gmp_enabled }| {
+                    IpDeviceConfigurationUpdate {
+                        ip_enabled: get_prev_and_update(
+                            &mut config.ip_config.ip_enabled,
+                            ip_enabled,
+                        ),
+                        gmp_enabled: get_prev_and_update(
+                            &mut config.ip_config.gmp_enabled,
+                            gmp_enabled,
+                        ),
+                        forwarding_enabled: get_prev_and_update(
+                            &mut config.ip_config.forwarding_enabled,
+                            forwarding_enabled,
+                        ),
+                    }
+                },
+            ),
+        }
+    })
+}
+
 /// Updates the IPv4 Configuration for the device.
 ///
 /// The device's configuration will be left unchanged when `Err(_)` is returned.
-pub(crate) fn update_ipv4_configuration<
+fn update_ipv4_configuration_inner<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceConfigurationContext<Ipv4, C>,
     O,
@@ -1656,7 +1796,7 @@ pub(super) fn is_ip_device_enabled<
 /// Updates the IPv6 Configuration for the device.
 ///
 /// The device's configuration will be left unchanged when `Err(_)` is returned.
-pub(crate) fn update_ipv6_configuration<
+fn update_ipv6_configuration_inner<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceConfigurationContext<C>,
     O,
@@ -1821,10 +1961,15 @@ pub(crate) fn clear_ipv6_device_state<
 pub(crate) mod testutil {
     use super::*;
 
+    use core::fmt::Debug;
     use lock_order::Locked;
     use net_types::{ip::Ipv6Scope, ScopeableAddress as _};
 
-    use crate::{device::DeviceId, NonSyncContext, SyncCtx};
+    use crate::{
+        device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
+        testutil::{FakeNonSyncCtx, FakeSyncCtx},
+        NonSyncContext, SyncCtx,
+    };
 
     pub(crate) fn get_global_ipv6_addrs<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -1875,6 +2020,102 @@ pub(crate) mod testutil {
     ) -> O {
         with_assigned_addr_subnets::<Ipv6, _, _, _, _>(sync_ctx, device_id, cb)
     }
+
+    pub(crate) trait UpdateIpDeviceConfigurationTestIpExt: Ip {
+        type IpDeviceConfiguration: AsRef<IpDeviceConfiguration>
+            + AsMut<IpDeviceConfiguration>
+            + PartialEq
+            + Debug;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration;
+
+        fn update_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            config: IpDeviceConfigurationUpdate,
+        ) -> Result<IpDeviceConfigurationUpdate, NotSupportedError>;
+
+        fn set_ip_device_enabled(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            enabled: bool,
+            prev_enabled: bool,
+        ) {
+            let make_update = |enabled| IpDeviceConfigurationUpdate {
+                ip_enabled: Some(enabled),
+                ..Default::default()
+            };
+
+            assert_eq!(
+                Self::update_ip_configuration(sync_ctx, ctx, device, make_update(enabled)),
+                Ok(make_update(prev_enabled)),
+            );
+        }
+    }
+
+    impl UpdateIpDeviceConfigurationTestIpExt for Ipv4 {
+        type IpDeviceConfiguration = Ipv4DeviceConfiguration;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration {
+            crate::device::get_ipv4_configuration(sync_ctx, device)
+        }
+
+        fn update_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            config: IpDeviceConfigurationUpdate,
+        ) -> Result<IpDeviceConfigurationUpdate, NotSupportedError> {
+            update_ipv4_configuration(
+                sync_ctx,
+                ctx,
+                device,
+                Ipv4DeviceConfigurationUpdate { ip_config: Some(config), ..Default::default() },
+            )
+            .map(|Ipv4DeviceConfigurationUpdate { ip_config }| ip_config.unwrap())
+        }
+    }
+
+    impl UpdateIpDeviceConfigurationTestIpExt for Ipv6 {
+        type IpDeviceConfiguration = Ipv6DeviceConfiguration;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration {
+            crate::device::get_ipv6_configuration(sync_ctx, device)
+        }
+
+        fn update_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            config: IpDeviceConfigurationUpdate,
+        ) -> Result<IpDeviceConfigurationUpdate, NotSupportedError> {
+            update_ipv6_configuration(
+                sync_ctx,
+                ctx,
+                device,
+                Ipv6DeviceConfigurationUpdate { ip_config: Some(config), ..Default::default() },
+            )
+            .map(
+                |Ipv6DeviceConfigurationUpdate {
+                     dad_transmits: _,
+                     max_router_solicitations: _,
+                     slaac_config: _,
+                     ip_config,
+                 }| ip_config.unwrap(),
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1882,7 +2123,6 @@ mod tests {
     use super::*;
 
     use alloc::vec;
-    use core::fmt::Debug;
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
 
@@ -1892,7 +2132,9 @@ mod tests {
 
     use crate::{
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
-        ip::gmp::GmpDelayedReportTimerId,
+        ip::{
+            device::testutil::UpdateIpDeviceConfigurationTestIpExt, gmp::GmpDelayedReportTimerId,
+        },
         testutil::{
             assert_empty, Ctx, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
             TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
@@ -1917,10 +2159,13 @@ mod tests {
 
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true
-        })
-        .unwrap();
+        let set_ipv4_enabled =
+            |ctx: &mut crate::testutil::FakeNonSyncCtx, enabled, expected_prev| {
+                Ipv4::set_ip_device_enabled(sync_ctx, ctx, &device_id, enabled, expected_prev)
+            };
+
+        set_ipv4_enabled(&mut non_sync_ctx, true, false);
+
         let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -1930,10 +2175,7 @@ mod tests {
             })]
         );
 
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = false
-        })
-        .unwrap();
+        set_ipv4_enabled(&mut non_sync_ctx, false, true);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
@@ -1959,10 +2201,7 @@ mod tests {
             })]
         );
 
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true
-        })
-        .unwrap();
+        set_ipv4_enabled(&mut non_sync_ctx, true, false);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -1978,16 +2217,10 @@ mod tests {
             ]
         );
         // Verify that a redundant "enable" does not generate any events.
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true
-        })
-        .unwrap();
+        set_ipv4_enabled(&mut non_sync_ctx, true, true);
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = false
-        })
-        .unwrap();
+        set_ipv4_enabled(&mut non_sync_ctx, false, true);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -2003,10 +2236,7 @@ mod tests {
             ]
         );
         // Verify that a redundant "disable" does not generate any events.
-        update_ipv4_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = false
-        })
-        .unwrap();
+        set_ipv4_enabled(&mut non_sync_ctx, false, false);
         assert_eq!(non_sync_ctx.take_events()[..], []);
     }
 
@@ -2015,11 +2245,10 @@ mod tests {
         non_sync_ctx: &mut FakeNonSyncCtx,
         device_id: &DeviceId<FakeNonSyncCtx>,
         ll_addr: AddrSubnet<Ipv6Addr, LinkLocalAddr<UnicastAddr<Ipv6Addr>>>,
+        expected_prev: bool,
     ) {
-        update_ipv6_configuration(sync_ctx, non_sync_ctx, device_id, |config| {
-            config.ip_config.ip_enabled = true;
-        })
-        .unwrap();
+        Ipv6::set_ip_device_enabled(sync_ctx, non_sync_ctx, device_id, true, expected_prev);
+
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                 &mut Locked::new(*sync_ctx),
@@ -2053,63 +2282,73 @@ mod tests {
         )
         .into();
         let ll_addr = local_mac.to_ipv6_link_local();
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.gmp_enabled = true;
-
-            // Doesn't matter as long as we perform DAD and router
-            // solicitation.
-            config.dad_transmits = NonZeroU8::new(1);
-            config.max_router_solicitations = NonZeroU8::new(1);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                // Doesn't matter as long as we perform DAD and router
+                // solicitation.
+                dad_transmits: Some(NonZeroU8::new(1)),
+                max_router_solicitations: Some(NonZeroU8::new(1)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    gmp_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         // Enable the device and observe an auto-generated link-local address,
         // router solicitation and DAD for the auto-generated address.
-        let test_enable_device =
-            |sync_ctx: &mut &FakeSyncCtx, non_sync_ctx: &mut FakeNonSyncCtx, extra_group| {
-                enable_ipv6_device(sync_ctx, non_sync_ctx, &device_id, ll_addr);
-                let mut timers = vec![
-                    (
-                        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(RsTimerId {
-                            device_id: device_id.clone(),
-                        }))),
-                        ..,
-                    ),
-                    (
-                        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(DadTimerId {
-                            device_id: device_id.clone(),
-                            addr: ll_addr.ipv6_unicast_addr(),
-                        }))),
-                        ..,
-                    ),
-                    (
-                        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
-                            MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                                device: device_id.clone(),
-                                group_addr: ll_addr.addr().to_solicited_node_address(),
-                            })
-                            .into(),
-                        ))),
-                        ..,
-                    ),
-                ];
-                if let Some(group_addr) = extra_group {
-                    timers.push((
-                        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
-                            MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                                device: device_id.clone(),
-                                group_addr,
-                            })
-                            .into(),
-                        ))),
-                        ..,
-                    ))
-                }
-                non_sync_ctx.timer_ctx().assert_timers_installed(timers);
-            };
-        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None);
+        let test_enable_device = |sync_ctx: &mut &FakeSyncCtx,
+                                  non_sync_ctx: &mut FakeNonSyncCtx,
+                                  extra_group,
+                                  expected_prev| {
+            enable_ipv6_device(sync_ctx, non_sync_ctx, &device_id, ll_addr, expected_prev);
+            let mut timers = vec![
+                (
+                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(RsTimerId {
+                        device_id: device_id.clone(),
+                    }))),
+                    ..,
+                ),
+                (
+                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(DadTimerId {
+                        device_id: device_id.clone(),
+                        addr: ll_addr.ipv6_unicast_addr(),
+                    }))),
+                    ..,
+                ),
+                (
+                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
+                        MldDelayedReportTimerId(GmpDelayedReportTimerId {
+                            device: device_id.clone(),
+                            group_addr: ll_addr.addr().to_solicited_node_address(),
+                        })
+                        .into(),
+                    ))),
+                    ..,
+                ),
+            ];
+            if let Some(group_addr) = extra_group {
+                timers.push((
+                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
+                        MldDelayedReportTimerId(GmpDelayedReportTimerId {
+                            device: device_id.clone(),
+                            group_addr,
+                        })
+                        .into(),
+                    ))),
+                    ..,
+                ))
+            }
+            non_sync_ctx.timer_ctx().assert_timers_installed(timers);
+        };
+        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None, false);
         let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -2126,15 +2365,13 @@ mod tests {
             ]
         );
 
-        let test_disable_device =
-            |sync_ctx: &mut &FakeSyncCtx, non_sync_ctx: &mut FakeNonSyncCtx| {
-                update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
-                    config.ip_config.ip_enabled = false;
-                })
-                .unwrap();
-                non_sync_ctx.timer_ctx().assert_no_timers_installed();
-            };
-        test_disable_device(&mut sync_ctx, &mut non_sync_ctx);
+        let test_disable_device = |sync_ctx: &mut &FakeSyncCtx,
+                                   non_sync_ctx: &mut FakeNonSyncCtx,
+                                   expected_prev| {
+            Ipv6::set_ip_device_enabled(sync_ctx, non_sync_ctx, &device_id, false, expected_prev);
+            non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        };
+        test_disable_device(&mut sync_ctx, &mut non_sync_ctx, true);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -2197,7 +2434,7 @@ mod tests {
             })]
         );
 
-        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, Some(multicast_addr));
+        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, Some(multicast_addr), false);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -2212,7 +2449,7 @@ mod tests {
                 })
             ]
         );
-        test_disable_device(&mut sync_ctx, &mut non_sync_ctx);
+        test_disable_device(&mut sync_ctx, &mut non_sync_ctx, true);
         // The address was manually added, don't expect it to be removed.
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -2230,7 +2467,7 @@ mod tests {
         );
 
         // Verify that a redundant "disable" does not generate any events.
-        test_disable_device(&mut sync_ctx, &mut non_sync_ctx);
+        test_disable_device(&mut sync_ctx, &mut non_sync_ctx, false);
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         assert_eq!(
@@ -2256,7 +2493,7 @@ mod tests {
             &device_id,
             multicast_addr,
         );
-        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None);
+        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None, false);
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -2273,7 +2510,7 @@ mod tests {
         );
 
         // Verify that a redundant "enable" does not generate any events.
-        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None);
+        test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None, true);
         assert_eq!(non_sync_ctx.take_events()[..], []);
     }
 
@@ -2291,17 +2528,25 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.dad_transmits = NonZeroU8::new(1);
-
-            config.ip_config.gmp_enabled = true;
-            config.max_router_solicitations = NonZeroU8::new(1);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(1)),
+                max_router_solicitations: Some(NonZeroU8::new(1)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    gmp_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let ll_addr = local_mac.to_ipv6_link_local();
 
-        enable_ipv6_device(&mut sync_ctx, &mut non_sync_ctx, &device_id, ll_addr);
+        enable_ipv6_device(&mut sync_ctx, &mut non_sync_ctx, &device_id, ll_addr, false);
         let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -2376,62 +2621,6 @@ mod tests {
         );
     }
 
-    trait UpdateIpDeviceConfigurationTestIpExt: Ip {
-        type IpDeviceConfiguration: AsMut<IpDeviceConfiguration> + PartialEq + Debug;
-
-        fn get_ip_configuration(
-            sync_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration;
-
-        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
-            sync_ctx: &FakeSyncCtx,
-            ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-            cb: F,
-        ) -> Result<(), NotSupportedError>;
-    }
-
-    impl UpdateIpDeviceConfigurationTestIpExt for Ipv4 {
-        type IpDeviceConfiguration = Ipv4DeviceConfiguration;
-
-        fn get_ip_configuration(
-            sync_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration {
-            crate::device::get_ipv4_configuration(sync_ctx, device)
-        }
-
-        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
-            sync_ctx: &FakeSyncCtx,
-            ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-            cb: F,
-        ) -> Result<(), NotSupportedError> {
-            crate::device::update_ipv4_configuration(sync_ctx, ctx, device, cb)
-        }
-    }
-
-    impl UpdateIpDeviceConfigurationTestIpExt for Ipv6 {
-        type IpDeviceConfiguration = Ipv6DeviceConfiguration;
-
-        fn get_ip_configuration(
-            sync_ctx: &FakeSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-        ) -> Self::IpDeviceConfiguration {
-            crate::device::get_ipv6_configuration(sync_ctx, device)
-        }
-
-        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
-            sync_ctx: &FakeSyncCtx,
-            ctx: &mut FakeNonSyncCtx,
-            device: &DeviceId<FakeNonSyncCtx>,
-            cb: F,
-        ) -> Result<(), NotSupportedError> {
-            crate::device::update_ipv6_configuration(sync_ctx, ctx, device, cb)
-        }
-    }
-
     #[ip_test]
     fn update_ip_device_configuration_err<I: Ip + UpdateIpDeviceConfigurationTestIpExt>() {
         let FakeCtx { sync_ctx, mut non_sync_ctx } = FakeCtx::default();
@@ -2451,15 +2640,282 @@ mod tests {
                 sync_ctx,
                 &mut non_sync_ctx,
                 &loopback_device_id,
-                |config| {
-                    let config = config.as_mut();
-                    config.ip_enabled = !config.ip_enabled;
-                    config.gmp_enabled = !config.gmp_enabled;
-                    config.forwarding_enabled = true;
-                }
+                IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(!original_state.as_ref().ip_enabled),
+                    gmp_enabled: Some(!original_state.as_ref().gmp_enabled),
+                    forwarding_enabled: Some(true),
+                },
             ),
             Err(NotSupportedError),
         );
         assert_eq!(original_state, I::get_ip_configuration(sync_ctx, &loopback_device_id));
+    }
+
+    #[test]
+    fn update_ipv4_configuration_return() {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let local_mac = Ipv4::FAKE_CONFIG.local_mac;
+        let device_id = crate::device::add_ethernet_device(
+            &sync_ctx,
+            local_mac,
+            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+        // Perform no update.
+        assert_eq!(
+            update_ipv4_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv4DeviceConfigurationUpdate::default()
+            ),
+            Ok(Ipv4DeviceConfigurationUpdate::default()),
+        );
+
+        // Enable all but forwarding. All features are initially disabled.
+        assert_eq!(
+            update_ipv4_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv4DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        forwarding_enabled: Some(false),
+                        gmp_enabled: Some(true),
+                    }),
+                },
+            ),
+            Ok(Ipv4DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(false),
+                    forwarding_enabled: Some(false),
+                    gmp_enabled: Some(false),
+                }),
+            }),
+        );
+
+        // Change forwarding config.
+        assert_eq!(
+            update_ipv4_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv4DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        forwarding_enabled: Some(true),
+                        gmp_enabled: None,
+                    }),
+                },
+            ),
+            Ok(Ipv4DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    forwarding_enabled: Some(false),
+                    gmp_enabled: None,
+                }),
+            }),
+        );
+
+        // No update to anything (GMP enabled set to already set
+        // value).
+        assert_eq!(
+            update_ipv4_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv4DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: None,
+                        forwarding_enabled: None,
+                        gmp_enabled: Some(true),
+                    }),
+                },
+            ),
+            Ok(Ipv4DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: None,
+                    forwarding_enabled: None,
+                    gmp_enabled: Some(true),
+                }),
+            }),
+        );
+
+        // Disable/change everything.
+        assert_eq!(
+            update_ipv4_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv4DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(false),
+                        forwarding_enabled: Some(false),
+                        gmp_enabled: Some(false),
+                    }),
+                },
+            ),
+            Ok(Ipv4DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    forwarding_enabled: Some(true),
+                    gmp_enabled: Some(true),
+                }),
+            }),
+        );
+    }
+
+    #[test]
+    fn update_ipv6_configuration_return() {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let device_id = crate::device::add_ethernet_device(
+            &sync_ctx,
+            local_mac,
+            ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+        // Perform no update.
+        assert_eq!(
+            update_ipv6_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate::default()
+            ),
+            Ok(Ipv6DeviceConfigurationUpdate::default()),
+        );
+
+        // Enable all but forwarding. All features are initially disabled.
+        assert_eq!(
+            update_ipv6_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    max_router_solicitations: Some(NonZeroU8::new(2)),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: None
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        forwarding_enabled: Some(false),
+                        gmp_enabled: Some(true),
+                    }),
+                },
+            ),
+            Ok(Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(None),
+                max_router_solicitations: Some(None),
+                slaac_config: Some(SlaacConfiguration::default()),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(false),
+                    forwarding_enabled: Some(false),
+                    gmp_enabled: Some(false),
+                }),
+            }),
+        );
+
+        // Change forwarding config.
+        assert_eq!(
+            update_ipv6_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: None,
+                    max_router_solicitations: None,
+                    slaac_config: None,
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        forwarding_enabled: Some(true),
+                        gmp_enabled: None,
+                    }),
+                },
+            ),
+            Ok(Ipv6DeviceConfigurationUpdate {
+                dad_transmits: None,
+                max_router_solicitations: None,
+                slaac_config: None,
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    forwarding_enabled: Some(false),
+                    gmp_enabled: None,
+                }),
+            }),
+        );
+
+        // No update to anything (GMP enabled set to already set
+        // value).
+        assert_eq!(
+            update_ipv6_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: None,
+                    max_router_solicitations: None,
+                    slaac_config: None,
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: None,
+                        forwarding_enabled: None,
+                        gmp_enabled: Some(true),
+                    }),
+                },
+            ),
+            Ok(Ipv6DeviceConfigurationUpdate {
+                dad_transmits: None,
+                max_router_solicitations: None,
+                slaac_config: None,
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: None,
+                    forwarding_enabled: None,
+                    gmp_enabled: Some(true),
+                }),
+            }),
+        );
+
+        // Disable/change everything.
+        assert_eq!(
+            update_ipv6_configuration(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(None),
+                    max_router_solicitations: Some(None),
+                    slaac_config: Some(SlaacConfiguration::default()),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(false),
+                        forwarding_enabled: Some(false),
+                        gmp_enabled: Some(false),
+                    }),
+                },
+            ),
+            Ok(Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(1)),
+                max_router_solicitations: Some(NonZeroU8::new(2)),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    temporary_address_configuration: None
+                }),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    forwarding_enabled: Some(true),
+                    gmp_enabled: Some(true),
+                }),
+            }),
+        );
     }
 }

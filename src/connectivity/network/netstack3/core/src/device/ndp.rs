@@ -72,7 +72,8 @@ mod tests {
             add_ip_addr_subnet, del_ip_addr, ethernet,
             link::LinkAddress,
             testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
-            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, Mtu,
+            update_ipv6_configuration, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
+            FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -80,11 +81,12 @@ mod tests {
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
                 slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
                 state::{
-                    AddrConfig, Ipv6AddressEntry, Ipv6DadState, Ipv6DeviceConfiguration, Lifetime,
-                    SlaacConfig, TemporarySlaacConfig,
+                    AddrConfig, Ipv6AddressEntry, Ipv6DadState, Lifetime, SlaacConfig,
+                    TemporarySlaacConfig,
                 },
                 testutil::{get_global_ipv6_addrs, with_assigned_ipv6_addr_subnets},
-                Ipv6DeviceHandler, Ipv6DeviceTimerId,
+                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+                Ipv6DeviceTimerId,
             },
             receive_ip_packet,
             testutil::is_in_ip_multicast,
@@ -327,30 +329,25 @@ mod tests {
         let remote_device_id = remote_device_id.into();
 
         // Create the devices (will start DAD at the same time).
-        let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
-            ipv6_config.ip_config.ip_enabled = true;
-
+        let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
-            ipv6_config.dad_transmits = NonZeroU8::new(1);
+            dad_transmits: Some(NonZeroU8::new(1)),
+            ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_enabled: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
         net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &local_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &local_device_id, update)
+                    .unwrap();
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &remote_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &remote_device_id, update)
+                    .unwrap();
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
 
@@ -407,32 +404,27 @@ mod tests {
         let local_device_id = local_eth_device_id.clone().into();
 
         // Enable DAD.
-        let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
-            ipv6_config.ip_config.ip_enabled = true;
-
+        let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
-            ipv6_config.dad_transmits = NonZeroU8::new(1);
+            dad_transmits: Some(NonZeroU8::new(1)),
+            ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_enabled: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
         let addr = AddrSubnet::new(local_ip().get(), 128).unwrap();
         let multicast_addr = local_ip().to_solicited_node_address();
         net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &local_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &local_device_id, update)
+                    .unwrap();
             add_ip_addr_subnet(sync_ctx, non_sync_ctx, &local_device_id, addr).unwrap();
         });
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &remote_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &remote_device_id, update)
+                    .unwrap();
         });
 
         // Only local should be in the solicited node multicast group.
@@ -494,10 +486,19 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &dev_id, |config| {
-            config.ip_config.ip_enabled = true;
-            config.dad_transmits = NonZeroU8::new(1);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &dev_id,
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(1)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
         let addr = local_ip();
         add_ip_addr_subnet(
@@ -541,10 +542,19 @@ mod tests {
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &dev_id);
 
         // Enable DAD.
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &dev_id, |config| {
-            config.ip_config.ip_enabled = true;
-            config.dad_transmits = NonZeroU8::new(3);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &dev_id,
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(3)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
         add_ip_addr_subnet(
             &sync_ctx,
@@ -573,18 +583,18 @@ mod tests {
         let (mut net, local_eth_device_id, remote_device_id) = setup_net();
         let local_device_id = local_eth_device_id.clone().into();
 
-        let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
-            ipv6_config.ip_config.ip_enabled = true;
-            ipv6_config.dad_transmits = NonZeroU8::new(3);
+        let update = Ipv6DeviceConfigurationUpdate {
+            dad_transmits: Some(NonZeroU8::new(3)),
+            ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_enabled: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
         net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &local_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &local_device_id, update)
+                    .unwrap();
 
             add_ip_addr_subnet(
                 sync_ctx,
@@ -595,13 +605,9 @@ mod tests {
             .unwrap();
         });
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
-            crate::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &remote_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate =
+                update_ipv6_configuration(sync_ctx, non_sync_ctx, &remote_device_id, update)
+                    .unwrap();
         });
 
         let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
@@ -687,14 +693,18 @@ mod tests {
 
         assert_empty(non_sync_ctx.frames_sent());
 
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &dev_id,
-            |ipv6_config| {
-                ipv6_config.ip_config.ip_enabled = true;
-                ipv6_config.dad_transmits = NonZeroU8::new(3);
-                ipv6_config.max_router_solicitations = None;
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(3)),
+                max_router_solicitations: Some(None),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -796,14 +806,18 @@ mod tests {
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &dev_id);
 
         // Enable DAD.
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &dev_id,
-            |ipv6_config| {
-                ipv6_config.ip_config.ip_enabled = true;
-                ipv6_config.dad_transmits = NonZeroU8::new(3);
-                ipv6_config.max_router_solicitations = None;
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(3)),
+                max_router_solicitations: Some(None),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -1235,15 +1249,18 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
-        crate::device::update_ipv6_configuration(
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             &sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            |config| {
-                config.ip_config.ip_enabled = true;
-
+            Ipv6DeviceConfigurationUpdate {
                 // Test expects to send 3 RSs.
-                config.max_router_solicitations = NonZeroU8::new(3);
+                max_router_solicitations: Some(NonZeroU8::new(3)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -1332,13 +1349,17 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            |config| {
-                config.ip_config.ip_enabled = true;
-                config.max_router_solicitations = NonZeroU8::new(2);
+            Ipv6DeviceConfigurationUpdate {
+                max_router_solicitations: Some(NonZeroU8::new(2)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -1405,13 +1426,21 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.ip_config.ip_enabled = true;
-
-            // Doesn't matter as long as we are configured to send at least 2
-            // solicitations.
-            config.max_router_solicitations = NonZeroU8::new(2);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                // Doesn't matter as long as we are configured to send at least 2
+                // solicitations.
+                max_router_solicitations: Some(NonZeroU8::new(2)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
         let timer_id: TimerId<_> =
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID")).into();
@@ -1513,13 +1542,17 @@ mod tests {
 
         // Enable DAD for the device.
         const DUP_ADDR_DETECT_TRANSMITS: u8 = 3;
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.ip_config.ip_enabled = true;
-                ipv6_config.dad_transmits = NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS);
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -1546,13 +1579,11 @@ mod tests {
         assert_eq!(non_sync_ctx.timer_ctx().timers().len(), 1);
 
         // Disable DAD during DAD.
-        crate::device::update_ipv6_configuration(
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             &sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.dad_transmits = None;
-            },
+            Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
         )
         .unwrap();
         let expected_timer_id = dad_timer_id(device_id, fake_config.remote_ip.try_into().unwrap());
@@ -1809,9 +1840,15 @@ mod tests {
             idgen_retries,
         );
 
-        crate::device::update_ipv6_configuration(&sync_ctx, non_sync_ctx, &device, |ipv6_config| {
-            ipv6_config.slaac_config = slaac_config;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(slaac_config),
+                ..Default::default()
+            },
+        )
         .unwrap();
         (ctx, device, slaac_config)
     }
@@ -1821,9 +1858,19 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device, _): (_, _, SlaacConfiguration) =
             initialize_with_temporary_addresses_enabled();
         let mut sync_ctx = &sync_ctx;
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.slaac_config.enable_stable_addresses = true;
-        })
+        let config = crate::device::get_ipv6_configuration(&sync_ctx, &device);
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..config.slaac_config
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         let prefix1 = TestSlaacPrefix {
@@ -2165,13 +2212,24 @@ mod tests {
         // Have no addresses yet.
         assert_empty(get_global_ipv6_addrs(&sync_ctx, &device));
 
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.ip_config.ip_enabled = true;
-            config.slaac_config.enable_stable_addresses = true;
-
-            // Doesn't matter as long as we perform DAD.
-            config.dad_transmits = NonZeroU8::new(1);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                // Doesn't matter as long as we perform DAD.
+                dad_transmits: Some(NonZeroU8::new(1)),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         // Set the retransmit timer between neighbor solicitations to be greater
@@ -2380,10 +2438,22 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.ip_config.ip_enabled = true;
-            config.slaac_config.enable_stable_addresses = true;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         let src_mac = config.remote_mac;
@@ -2616,16 +2686,19 @@ mod tests {
             idgen_retries,
         );
 
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.slaac_config = slaac_config;
-                ipv6_config.ip_config.ip_enabled = true;
-
+            Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
-                ipv6_config.dad_transmits = NonZeroU8::new(1);
+                dad_transmits: Some(NonZeroU8::new(1)),
+                slaac_config: Some(slaac_config),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -2771,16 +2844,19 @@ mod tests {
             idgen_retries,
         );
 
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.slaac_config = slaac_config;
-                ipv6_config.ip_config.ip_enabled = true;
-
+            Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
-                ipv6_config.dad_transmits = NonZeroU8::new(1);
+                dad_transmits: Some(NonZeroU8::new(1)),
+                slaac_config: Some(slaac_config),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -2905,13 +2981,17 @@ mod tests {
             0,
         );
 
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.slaac_config = slaac_config;
-                ipv6_config.ip_config.ip_enabled = true;
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(slaac_config),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3073,13 +3153,17 @@ mod tests {
         );
         let device = device_id.clone().into();
         // No DAD for the auto-generated link-local address.
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.dad_transmits = None;
-                ipv6_config.ip_config.ip_enabled = true;
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(None),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3101,14 +3185,15 @@ mod tests {
             1,
         );
 
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
+            Ipv6DeviceConfigurationUpdate {
                 // Perform DAD for later addresses.
-                ipv6_config.dad_transmits = NonZeroU8::new(1);
-                ipv6_config.slaac_config = slaac_config;
+                dad_transmits: Some(NonZeroU8::new(1)),
+                slaac_config: Some(slaac_config),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3179,12 +3264,13 @@ mod tests {
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
         );
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device,
-            |ipv6_config| {
-                ipv6_config.slaac_config = slaac_config;
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(slaac_config),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3376,9 +3462,15 @@ mod tests {
             idgen_retries,
         );
 
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.slaac_config = slaac_config;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(slaac_config),
+                ..Default::default()
+            },
+        )
         .unwrap();
         // The new valid time is measured from the time at which the address was created (`start`),
         // not the current time (`now`). That means the max valid lifetime takes precedence over
@@ -3426,10 +3518,22 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.ip_config.ip_enabled = true;
-            config.slaac_config.enable_stable_addresses = true;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         let src_mac = config.remote_mac;

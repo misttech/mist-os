@@ -561,6 +561,7 @@ mod tests {
         },
         device::{ethernet, testutil::FakeDeviceId, DeviceId},
         ip::{
+            device::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
@@ -1337,13 +1338,17 @@ mod tests {
         let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                           non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            crate::device::update_ipv4_configuration(
+            let _: Ipv4DeviceConfigurationUpdate = crate::device::update_ipv4_configuration(
                 sync_ctx,
                 non_sync_ctx,
                 &device_id,
-                |config| {
-                    config.ip_config.ip_enabled = ip_enabled;
-                    config.ip_config.gmp_enabled = gmp_enabled;
+                Ipv4DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(ip_enabled),
+                        gmp_enabled: Some(gmp_enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 },
             )
             .unwrap();

@@ -3088,8 +3088,12 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
-        device::{self, testutil::set_forwarding_enabled, FrameDestination, WeakDeviceId},
+        device::{
+            self, testutil::set_forwarding_enabled, update_ipv6_configuration, FrameDestination,
+            WeakDeviceId,
+        },
         ip::{
+            device::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
             testutil::is_in_ip_multicast,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
         },
@@ -4404,12 +4408,20 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |config| {
-            config.ip_config.ip_enabled = true;
-
-            // Doesn't matter as long as DAD is enabled.
-            config.dad_transmits = NonZeroU8::new(1);
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                // Doesn't matter as long as DAD is enabled.
+                dad_transmits: Some(NonZeroU8::new(1)),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         let frame_dst = FrameDestination::Individual { local: true };
@@ -4646,15 +4658,18 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-            crate::device::update_ipv6_configuration(
-                &sync_ctx,
+            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                sync_ctx,
                 &mut non_sync_ctx,
                 &device,
-                |config| {
-                    config.ip_config.ip_enabled = true;
-
+                Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as DAD is enabled.
-                    config.dad_transmits = NonZeroU8::new(1);
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 },
             )
             .unwrap();

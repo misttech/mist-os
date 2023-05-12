@@ -67,8 +67,8 @@ use crate::{
                 Ipv6DeviceConfiguration,
             },
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
-            IpDeviceConfigurationContext, IpDeviceStateContext, Ipv6DeviceConfigurationContext,
-            Ipv6DeviceContext,
+            IpDeviceConfigurationContext, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceContext,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -1984,36 +1984,50 @@ pub fn get_ipv6_configuration<NonSyncCtx: NonSyncContext>(
     crate::ip::device::get_ipv6_configuration(&mut Locked::new(sync_ctx), device)
 }
 
-/// Updates the IPv4 Configuration for a `device`.
+/// Updates the IPv4 configuration for a device.
 ///
-/// The device's configuration will be left unchanged when `Err(_)` is returned.
-pub fn update_ipv4_configuration<
-    NonSyncCtx: NonSyncContext,
-    O,
-    F: FnOnce(&mut Ipv4DeviceConfiguration) -> O,
->(
+/// Each field in [`Ipv4DeviceConfigurationUpdate`] represents an optionally
+/// updateable configuration. If the field has a `Some(_)` value, then an
+/// attempt will be made to update that configuration on the device. A `None`
+/// value indicates that an update for the configuration is not requested.
+///
+/// Note that some fields have the type `Option<Option<T>>`. In this case,
+/// as long as the outer `Option` is `Some`, then an attempt will be made to
+/// update the configuration.
+///
+/// The IP device configuration is left unchanged if an `Err` is returned.
+/// Otherwise, the previous values are returned for configurations that were
+/// requested to be updated.
+pub fn update_ipv4_configuration<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    update_cb: F,
-) -> Result<O, NotSupportedError> {
-    crate::ip::device::update_ipv4_configuration(&mut Locked::new(sync_ctx), ctx, device, update_cb)
+    config: Ipv4DeviceConfigurationUpdate,
+) -> Result<Ipv4DeviceConfigurationUpdate, NotSupportedError> {
+    crate::ip::device::update_ipv4_configuration(&mut Locked::new(sync_ctx), ctx, device, config)
 }
 
-/// Updates the IPv6 Configuration for a `device`.
+/// Updates the IPv6 configuration for a device.
 ///
-/// The device's configuration will be left unchanged when `Err(_)` is returned.
-pub fn update_ipv6_configuration<
-    NonSyncCtx: NonSyncContext,
-    O,
-    F: FnOnce(&mut Ipv6DeviceConfiguration) -> O,
->(
+/// Each field in [`Ipv6DeviceConfigurationUpdate`] represents an optionally
+/// updateable configuration. If the field has a `Some(_)` value, then an
+/// attempt will be made to update that configuration on the device. A `None`
+/// value indicates that an update for the configuration is not requested.
+///
+/// Note that some fields have the type `Option<Option<T>>`. In this case,
+/// as long as the outer `Option` is `Some`, then an attempt will be made to
+/// update the configuration.
+///
+/// The IP device configuration is left unchanged if an `Err` is returned.
+/// Otherwise, the previous values are returned for configurations that were
+/// requested to be updated.
+pub fn update_ipv6_configuration<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    update_cb: F,
-) -> Result<O, NotSupportedError> {
-    crate::ip::device::update_ipv6_configuration(&mut Locked::new(sync_ctx), ctx, device, update_cb)
+    config: Ipv6DeviceConfigurationUpdate,
+) -> Result<Ipv6DeviceConfigurationUpdate, NotSupportedError> {
+    crate::ip::device::update_ipv6_configuration(&mut Locked::new(sync_ctx), ctx, device, config)
 }
 
 #[cfg(test)]
@@ -2022,7 +2036,7 @@ pub(crate) mod testutil {
 
     use net_types::ip::IpVersion;
 
-    use crate::testutil::Ctx;
+    use crate::{ip::device::IpDeviceConfigurationUpdate, testutil::Ctx};
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
@@ -2089,13 +2103,21 @@ pub(crate) mod testutil {
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
     ) {
-        update_ipv4_configuration(sync_ctx, ctx, device, |config| {
-            config.ip_config.ip_enabled = true;
-        })
+        let ip_config =
+            Some(IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() });
+        let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
+            sync_ctx,
+            ctx,
+            device,
+            Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+        )
         .unwrap();
-        update_ipv6_configuration(sync_ctx, ctx, device, |config| {
-            config.ip_config.ip_enabled = true;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            ctx,
+            device,
+            Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+        )
         .unwrap();
     }
 
@@ -2106,15 +2128,29 @@ pub(crate) mod testutil {
         device: &DeviceId<NonSyncCtx>,
         enabled: bool,
     ) -> Result<(), NotSupportedError> {
+        let ip_config = Some(IpDeviceConfigurationUpdate {
+            forwarding_enabled: Some(enabled),
+            ..Default::default()
+        });
         match I::VERSION {
-            IpVersion::V4 => update_ipv4_configuration(sync_ctx, ctx, device, |config| {
-                config.ip_config.forwarding_enabled = enabled;
-            })
-            .unwrap(),
-            IpVersion::V6 => update_ipv6_configuration(sync_ctx, ctx, device, |config| {
-                config.ip_config.forwarding_enabled = enabled;
-            })
-            .unwrap(),
+            IpVersion::V4 => {
+                let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
+                    sync_ctx,
+                    ctx,
+                    device,
+                    Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+                )
+                .unwrap();
+            }
+            IpVersion::V6 => {
+                let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                    sync_ctx,
+                    ctx,
+                    device,
+                    Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+                )
+                .unwrap();
+            }
         }
 
         Ok(())
@@ -2177,8 +2213,11 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::testutil::{
-        Ctx, TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+    use crate::{
+        ip::device::{slaac::SlaacConfiguration, IpDeviceConfigurationUpdate},
+        testutil::{
+            Ctx, TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
     };
 
     #[test]
@@ -2253,25 +2292,30 @@ mod tests {
             let device = ethernet_device.clone().into();
             // Enable the device, turning on a bunch of features that install
             // timers.
-            crate::device::update_ipv4_configuration(
+            let ip_config = Some(IpDeviceConfigurationUpdate {
+                ip_enabled: Some(true),
+                gmp_enabled: Some(true),
+                ..Default::default()
+            });
+            let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
-                |state| {
-                    state.ip_config.ip_enabled = true;
-                    state.ip_config.gmp_enabled = true;
-                },
+                Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
             )
             .unwrap();
-            crate::device::update_ipv6_configuration(
+            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 &device,
-                |state| {
-                    state.ip_config.ip_enabled = true;
-                    state.ip_config.gmp_enabled = true;
-                    state.max_router_solicitations = Some(nonzero!(2u8));
-                    state.slaac_config.enable_stable_addresses = true;
+                Ipv6DeviceConfigurationUpdate {
+                    max_router_solicitations: Some(Some(nonzero!(2u8))),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config,
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -2371,12 +2415,21 @@ mod tests {
             );
         }
 
-        crate::device::update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device, |state| {
-            state.ip_config.ip_enabled = true;
-            // Enable DAD so that the auto-generated address triggers a DAD
-            // message immediately on interface enable.
-            state.dad_transmits = Some(nonzero!(1u8));
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            &sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                // Enable DAD so that the auto-generated address triggers a DAD
+                // message immediately on interface enable.
+                dad_transmits: Some(Some(nonzero!(1u8))),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         if with_tx_queue {

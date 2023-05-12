@@ -294,10 +294,12 @@ mod tests {
         },
         device::{
             testutil::{FakeDeviceId, FakeWeakDeviceId},
-            FrameDestination,
+            update_ipv6_configuration, FrameDestination,
         },
         ip::{
-            device::Ipv6DeviceTimerId,
+            device::{
+                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId,
+            },
             receive_ip_packet,
             testutil::FakeIpDeviceIdCtx,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric},
@@ -759,9 +761,18 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(&&*sync_ctx, non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
@@ -1155,12 +1166,16 @@ mod tests {
         );
 
         // Disable the interface.
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            |config| {
-                config.ip_config.ip_enabled = false;
+            Ipv6DeviceConfigurationUpdate {
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(false),
+                    ..Default::default()
+                }),
+                ..Default::default()
             },
         )
         .unwrap();

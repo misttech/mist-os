@@ -23,7 +23,7 @@ use netstack3_core::{
     add_ip_addr_subnet,
     device::update_ipv6_configuration,
     ip::{
-        device::slaac::STABLE_IID_SECRET_KEY_BYTES,
+        device::{slaac::STABLE_IID_SECRET_KEY_BYTES, Ipv6DeviceConfigurationUpdate},
         types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
     },
 };
@@ -447,10 +447,16 @@ impl TestSetupBuilder {
                 stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
                     let devices: &Devices<_> = non_sync_ctx.as_ref();
                     let device = devices.get_core_id(if_id).unwrap();
-                    update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
-                        config.dad_transmits = None
-                    })
-                    .unwrap()
+                    let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &device,
+                        Ipv6DeviceConfigurationUpdate {
+                            dad_transmits: Some(None),
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
                 });
                 if let Some(addr) = addr {
                     stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
@@ -831,15 +837,10 @@ fn get_slaac_secret<'s>(
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
         let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
-        netstack3_core::device::update_ipv6_configuration(
-            sync_ctx,
-            non_sync_ctx,
-            &device,
-            |config| {
-                config.slaac_config.temporary_address_configuration.map(|t| t.secret_key.clone())
-            },
-        )
-        .unwrap()
+        netstack3_core::device::get_ipv6_configuration(sync_ctx, &device)
+            .slaac_config
+            .temporary_address_configuration
+            .map(|t| t.secret_key)
     })
 }
 

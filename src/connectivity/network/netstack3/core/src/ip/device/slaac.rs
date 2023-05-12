@@ -1579,10 +1579,15 @@ mod tests {
             FakeCtx, FakeInstant, FakeInstantRange as _, FakeNonSyncCtx, FakeSyncCtx,
             FakeTimerCtxExt as _,
         },
-        device::{testutil::FakeDeviceId, FrameDestination},
+        device::{testutil::FakeDeviceId, update_ipv6_configuration, FrameDestination},
         ip::{
-            device::testutil::with_assigned_ipv6_addr_subnets,
-            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ip_packet, testutil::FakeIpDeviceIdCtx,
+            device::{
+                testutil::with_assigned_ipv6_addr_subnets, IpDeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate,
+            },
+            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+            receive_ip_packet,
+            testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
             assert_empty, Ctx, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
@@ -2670,12 +2675,12 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::device::update_ipv6_configuration(
-            &sync_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            |config| {
-                config.slaac_config = SlaacConfiguration {
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
                     enable_stable_addresses: true,
                     temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
                         temp_valid_lifetime: ONE_HOUR,
@@ -2683,7 +2688,8 @@ mod tests {
                         temp_idgen_retries: 0,
                         secret_key: SECRET_KEY,
                     }),
-                };
+                }),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -2691,10 +2697,19 @@ mod tests {
         let set_ip_enabled = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                               non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                               enabled| {
-            crate::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
-                config.ip_config.ip_enabled = enabled;
-            })
-            .unwrap()
+            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                sync_ctx,
+                non_sync_ctx,
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         };
         set_ip_enabled(&mut sync_ctx, &mut non_sync_ctx, true /* enabled */);
         non_sync_ctx.timer_ctx().assert_no_timers_installed();

@@ -646,7 +646,13 @@ mod tests {
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             update_ipv6_configuration, EthernetDeviceId,
         },
-        ip::{icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ip_packet, FrameDestination},
+        ip::{
+            device::{
+                testutil::UpdateIpDeviceConfigurationTestIpExt as _, Ipv6DeviceConfigurationUpdate,
+            },
+            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+            receive_ip_packet, FrameDestination,
+        },
         testutil::{
             FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
@@ -1274,10 +1280,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true;
-        })
-        .unwrap();
+        Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, true, false);
 
         let remote_mac_bytes = remote_mac.bytes();
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])];
@@ -1366,15 +1369,19 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = link_device_id.clone().into();
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true;
-        })
-        .unwrap();
+        Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, true, false);
+
         // Set DAD config after enabling the device so that the default address
         // does not perform DAD.
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.dad_transmits = dad_transmits;
-        })
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(dad_transmits),
+                ..Default::default()
+            },
+        )
         .unwrap();
         crate::device::add_ip_addr_subnet(
             &sync_ctx,
@@ -1505,10 +1512,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = true;
-        })
-        .unwrap();
+        Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, true, false);
 
         let remote_mac_bytes = remote_mac.bytes();
 
@@ -1641,10 +1645,7 @@ mod tests {
         assert_eq!(payload, body);
 
         // Disabling the device should clear the neighbor table.
-        update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, |config| {
-            config.ip_config.ip_enabled = false;
-        })
-        .unwrap();
+        Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, false, true);
         assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, HashMap::new());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }

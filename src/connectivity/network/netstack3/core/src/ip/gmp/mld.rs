@@ -473,7 +473,9 @@ mod tests {
         },
         device::{testutil::FakeDeviceId, DeviceId},
         ip::{
-            device::Ipv6DeviceTimerId,
+            device::{
+                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId,
+            },
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, QueryReceivedGenericAction,
@@ -1268,18 +1270,22 @@ mod tests {
         let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                           non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            crate::device::update_ipv6_configuration(
+            let _: Ipv6DeviceConfigurationUpdate = crate::device::update_ipv6_configuration(
                 sync_ctx,
                 non_sync_ctx,
                 &device_id,
-                |config| {
+                Ipv6DeviceConfigurationUpdate {
                     // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
                     // for a link-local address results in reports sent with a
                     // specified source address.
-                    config.dad_transmits = None;
-                    config.max_router_solicitations = None;
-                    config.ip_config.ip_enabled = ip_enabled;
-                    config.ip_config.gmp_enabled = gmp_enabled;
+                    dad_transmits: Some(None),
+                    max_router_solicitations: Some(None),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(ip_enabled),
+                        gmp_enabled: Some(gmp_enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 },
             )
             .unwrap();

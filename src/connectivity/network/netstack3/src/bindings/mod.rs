@@ -67,16 +67,16 @@ use netstack3_core::{
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
     device::{
-        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
-        DeviceSendFrameError, EthernetDeviceId,
+        loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
+        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
     },
     error::NetstackError,
     handle_timer,
     ip::{
         device::{
-            slaac::SlaacConfiguration,
-            state::{IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6DeviceConfiguration},
-            IpDeviceEvent, RemovedReason,
+            slaac::SlaacConfiguration, state::Ipv6DeviceConfiguration, IpDeviceConfigurationUpdate,
+            IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+            RemovedReason,
         },
         icmp,
         types::RawMetric,
@@ -612,13 +612,22 @@ fn set_interface_enabled(
         assert!(!dev_enabled, "caller attemped to disable an interface that is considered enabled");
     }
 
-    netstack3_core::device::update_ipv4_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
-        config.ip_config.ip_enabled = should_enable;
-    })
+    let ip_config =
+        Some(IpDeviceConfigurationUpdate { ip_enabled: Some(should_enable), ..Default::default() });
+
+    let _: Ipv4DeviceConfigurationUpdate = netstack3_core::device::update_ipv4_configuration(
+        sync_ctx,
+        non_sync_ctx,
+        &core_id,
+        Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+    )
     .expect("changing ip_enabled should never fail");
-    netstack3_core::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
-        config.ip_config.ip_enabled = should_enable;
-    })
+    let _: Ipv6DeviceConfigurationUpdate = netstack3_core::device::update_ipv6_configuration(
+        sync_ctx,
+        non_sync_ctx,
+        &core_id,
+        Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+    )
     .expect("changing ip_enabled should never fail");
 
     Ok(())
@@ -816,39 +825,30 @@ impl Netstack {
         devices.add_device(binding_id, loopback.clone());
 
         // Don't need DAD and IGMP/MLD on loopback.
-        netstack3_core::device::update_ipv4_configuration(
+        let ip_config = Some(IpDeviceConfigurationUpdate {
+            ip_enabled: Some(true),
+            forwarding_enabled: Some(false),
+            gmp_enabled: Some(false),
+        });
+        let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
             sync_ctx,
             non_sync_ctx,
             &loopback,
-            |config| {
-                *config = Ipv4DeviceConfiguration {
-                    ip_config: IpDeviceConfiguration {
-                        ip_enabled: true,
-                        gmp_enabled: false,
-                        forwarding_enabled: false,
-                    },
-                };
-            },
+            Ipv4DeviceConfigurationUpdate { ip_config },
         )
         .unwrap();
-        netstack3_core::device::update_ipv6_configuration(
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             sync_ctx,
             non_sync_ctx,
             &loopback,
-            |config| {
-                *config = Ipv6DeviceConfiguration {
-                    dad_transmits: None,
-                    max_router_solicitations: None,
-                    slaac_config: SlaacConfiguration {
-                        enable_stable_addresses: true,
-                        temporary_address_configuration: None,
-                    },
-                    ip_config: IpDeviceConfiguration {
-                        ip_enabled: true,
-                        gmp_enabled: false,
-                        forwarding_enabled: false,
-                    },
-                };
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(None),
+                max_router_solicitations: Some(None),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    temporary_address_configuration: None,
+                }),
+                ip_config,
             },
         )
         .unwrap();

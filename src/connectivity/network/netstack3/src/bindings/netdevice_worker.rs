@@ -17,10 +17,16 @@ use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
-    device::{ethernet, EthernetWeakDeviceId},
+    device::{
+        ethernet, update_ipv4_configuration, update_ipv6_configuration, EthernetWeakDeviceId,
+    },
     ip::{
-        device::slaac::{
-            SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
+        device::{
+            slaac::{
+                SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
+            },
+            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate,
         },
         types::RawMetric,
     },
@@ -29,8 +35,7 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
-    IpDeviceConfiguration, Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx,
-    DEFAULT_INTERFACE_METRIC,
+    Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -332,40 +337,39 @@ impl DeviceHandler {
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
         non_sync_ctx.rng().fill(&mut secret_key);
-        netstack3_core::device::update_ipv6_configuration(
+
+        let ip_config = Some(IpDeviceConfigurationUpdate {
+            ip_enabled: Some(false),
+            forwarding_enabled: Some(false),
+            gmp_enabled: Some(true),
+        });
+
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             sync_ctx,
             non_sync_ctx,
             &core_id,
-            |config| {
-                *config = Ipv6DeviceConfiguration {
-                    dad_transmits: Some(
-                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
+            Ipv6DeviceConfigurationUpdate {
+                dad_transmits: Some(Some(
+                    Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
+                )),
+                max_router_solicitations: Some(Some(
+                    Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
+                )),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    temporary_address_configuration: Some(
+                        TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
                     ),
-                    max_router_solicitations: Some(
-                        Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
-                    ),
-                    slaac_config: SlaacConfiguration {
-                        enable_stable_addresses: true,
-                        temporary_address_configuration: Some(
-                            TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
-                        ),
-                    },
-                    ip_config: IpDeviceConfiguration {
-                        ip_enabled: false,
-                        gmp_enabled: true,
-                        forwarding_enabled: false,
-                    },
-                };
+                }),
+                ip_config,
             },
         )
         .unwrap();
-        netstack3_core::device::update_ipv4_configuration(
+        let _: Ipv4DeviceConfigurationUpdate = update_ipv4_configuration(
             sync_ctx,
             non_sync_ctx,
             &core_id,
-            |config| {
-                config.ip_config.gmp_enabled = true;
-            },
+            Ipv4DeviceConfigurationUpdate { ip_config },
         )
         .unwrap();
 
