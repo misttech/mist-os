@@ -1017,24 +1017,27 @@ pub fn sys_seccomp(
             current_task.set_seccomp_state(SeccompFilterState::Strict)?;
             Ok(().into())
         }
-        SECCOMP_SET_MODE_FILTER => match flags {
-            0
-            | SECCOMP_FILTER_FLAG_LOG
-            | SECCOMP_FILTER_FLAG_NEW_LISTENER
-            | SECCOMP_FILTER_FLAG_SPEC_ALLOW
-            | SECCOMP_FILTER_FLAG_TSYNC => {
-                if !current_task.read().no_new_privs()
-                    && !current_task.creds().has_capability(CAP_SYS_ADMIN)
-                {
-                    return error!(EACCES);
-                }
-                if args.is_null() {
-                    return error!(EFAULT);
-                }
-                current_task.add_seccomp_filter(args, flags)
+        SECCOMP_SET_MODE_FILTER => {
+            if flags
+                & (SECCOMP_FILTER_FLAG_LOG
+                    | SECCOMP_FILTER_FLAG_NEW_LISTENER
+                    | SECCOMP_FILTER_FLAG_SPEC_ALLOW
+                    | SECCOMP_FILTER_FLAG_TSYNC
+                    | SECCOMP_FILTER_FLAG_TSYNC_ESRCH)
+                != flags
+            {
+                return error!(EINVAL);
             }
-            _ => error!(EINVAL),
-        },
+            if !current_task.read().no_new_privs()
+                && !current_task.creds().has_capability(CAP_SYS_ADMIN)
+            {
+                return error!(EACCES);
+            }
+            if args.is_null() {
+                return error!(EFAULT);
+            }
+            current_task.add_seccomp_filter(args, flags)
+        }
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 {
                 return error!(EINVAL);

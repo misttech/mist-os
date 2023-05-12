@@ -1408,6 +1408,19 @@ impl CurrentTask {
         Ok(())
     }
 
+    fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
+        // By default, TSYNC indicates failure state by returning the first thread
+        // id not to be able to sync, rather than by returning -1 and setting
+        // errno.  However, if TSYNC_ESRCH is set, it returns ESRCH.  This
+        // prevents conflicts with fact that SECCOMP_FILTER_FLAG_NEW_LISTENER
+        // makes seccomp return an fd.
+        if flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH != 0 {
+            Err(errno!(ESRCH))
+        } else {
+            Ok(id.into())
+        }
+    }
+
     pub fn add_seccomp_filter(
         &mut self,
         bpf_filter: UserAddress,
@@ -1445,24 +1458,20 @@ impl CurrentTask {
                     let mut filters: Vec<SeccompFilter> = self.read().seccomp_filters.clone();
 
                     // For TSYNC to work, all of the other thread filters in this process have to
-                    // be a subsequence of this thread's filters, and none of them can be in
+                    // be a prefix of this thread's filters, and none of them can be in
                     // strict mode.
                     let tasks = state.tasks().collect::<Vec<_>>();
                     for task in &tasks {
-                        // nb: TSYNC indicates failure state by returning the first thread
-                        // id not to be able to sync, rather than by returning -1 and setting
-                        // errno.
-
                         let other_task_state = task.mutable_state.read();
                         let maybe_new_length =
                             other_task_state.seccomp_provided_instructions + fprog.len + 4;
 
                         if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
-                            return Ok(task.id.into());
+                            return Self::seccomp_tsync_error(task.id, flags);
                         }
 
                         // All threads need to do the length check, but only other threads need
-                        // the subsequence check.
+                        // the prefix check.
                         if task.id == self.id {
                             continue;
                         }
@@ -1472,19 +1481,19 @@ impl CurrentTask {
                             & SeccompFilterState::Strict as u8
                             != 0
                         {
-                            return Ok(task.id.into());
+                            return Self::seccomp_tsync_error(task.id, flags);
                         }
 
-                        // Check that target thread's filters are a subsequence of this thread's
+                        // Check that target thread's filters are a prefix of this thread's
                         // filters.
                         if other_task_state.seccomp_filters.len() > filters.len() {
-                            return Ok(task.id.into());
+                            return Self::seccomp_tsync_error(task.id, flags);
                         }
                         for (filter, other_filter) in
                             filters.iter().zip(other_task_state.seccomp_filters.iter())
                         {
                             if other_filter.unique_id != filter.unique_id {
-                                return Ok(task.id.into());
+                                return Self::seccomp_tsync_error(task.id, flags);
                             }
                         }
                     }
@@ -1695,9 +1704,9 @@ pub struct SeccompFilter {
     program: EbpfProgram,
 
     /// The unique-to-this-process id of this filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
-    /// threads in this process have filters that are a subsequence of the thread attempting to do
-    /// the TSYNC. Identical filters attached in separate seccomp calls are treated as different
-    /// from each other for this purpose, so we need a way of distinguishing them.
+    /// threads in this process have filters that are a prefix of the filters of the thread
+    /// attempting to do the TSYNC. Identical filters attached in separate seccomp calls are treated
+    /// as different from each other for this purpose, so we need a way of distinguishing them.
     unique_id: u64,
 }
 
