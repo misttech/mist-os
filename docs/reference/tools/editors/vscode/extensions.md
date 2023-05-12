@@ -191,7 +191,7 @@ from [Configuring workflow](#rust-configure-workflow):
     // use fuchsia toolchain and fuchsia's rules for rustfmt:
     "rust-analyzer.rustfmt.extraArgs": [
         "+fuchsia",
-        "--config-path= {{ '<var>' }}FUCHSIA_DIR{{ '</var>' }}/rustfmt.toml"
+        "--config-path={{ '<var>' }}FUCHSIA_DIR{{ '</var>' }}/rustfmt.toml"
     ],
 
 ```
