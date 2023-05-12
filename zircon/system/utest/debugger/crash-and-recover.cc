@@ -80,9 +80,9 @@ bool test_prep_and_segv() {
       :
       : [zero] "g"(0), [test_data] "g"(test_data), [pc] "g"(segv_pc)
       : "rax", "r8", "r9", "r10");
-#endif
 
-#ifdef __aarch64__
+#elif defined(__aarch64__)
+
   void* segv_pc;
   // Note: Fuchsia is always PIC.
   __asm__(
@@ -105,6 +105,31 @@ bool test_prep_and_segv() {
       :
       : [test_data] "r"(test_data), [pc] "r"(segv_pc)
       : "x0", "x8", "x9", "x10");
+
+#elif defined(__riscv)
+
+  void* segv_pc;
+  __asm__("lla %0, .Lsegv_here" : "=r"(segv_pc));
+  printf("About to segv, pc %p\n", segv_pc);
+
+  // Set s1 to point to test_data so we can easily access it
+  // from the parent process.  Likewise set s2 to segv_pc
+  // so the parent process can verify it matches the fault PC.
+  void* scratch;
+  __asm__ volatile(
+      R"""(
+        mv s1, zero
+        mv s2, %[test_data]
+        mv s3, %[pc]
+      .Lsegv_here:
+        ld %[scratch], (s1)
+      )"""
+      : [scratch] "=r"(scratch)
+      : [test_data] "r"(test_data), [pc] "r"(segv_pc)
+      : "s1", "s2", "s3");
+
+#else
+#error "what machine?"
 #endif
 
   // On resumption test_data should have had kTestDataAdjust added to each element.
@@ -129,6 +154,10 @@ void test_segv_pc(zx_handle_t thread) {
   ASSERT_EQ(regs.rip, regs.r10, "fault PC does not match r10");
 #elif defined(__aarch64__)
   ASSERT_EQ(regs.pc, regs.r[10], "fault PC does not match x10");
+#elif defined(__riscv)
+  ASSERT_EQ(regs.pc, regs.s3, "fault PC does not match s3");
+#else
+#error "what machine?"
 #endif
 }
 
@@ -149,6 +178,10 @@ void test_memory_ops(zx_handle_t inferior, zx_handle_t thread) {
   // than the untagged address.
   constexpr uintptr_t kAddrMask = ~(UINT64_C(0xFF) << 56);
   test_data_addr &= kAddrMask;
+#elif defined(__riscv)
+  test_data_addr = regs.s2;
+#else
+#error "what machine?"
 #endif
 
   size_t size = read_inferior_memory(inferior, test_data_addr, test_data, sizeof(test_data));
@@ -168,8 +201,8 @@ void test_memory_ops(zx_handle_t inferior, zx_handle_t thread) {
   // Note: Verification of the write is done in the inferior.
 }
 
-void fix_inferior_segv(zx_handle_t thread) {
-  printf("Fixing inferior segv\n");
+void fix_inferior_segv(zx_handle_t thread, const char* what) {
+  printf("Fixing inferior segv for %s\n", what);
 
   // The segv was because r8 == 0, change it to a usable value. See TestPrepAndSegv.
   zx_thread_state_general_regs_t regs;
@@ -178,6 +211,10 @@ void fix_inferior_segv(zx_handle_t thread) {
   regs.r8 = regs.rsp;
 #elif defined(__aarch64__)
   regs.r[8] = regs.sp;
+#elif defined(__riscv)
+  regs.s1 = regs.sp;
+#else
+#error "what machine?"
 #endif
   write_inferior_gregs(thread, &regs);
 }

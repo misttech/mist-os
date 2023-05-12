@@ -30,7 +30,7 @@
 #include "utils.h"
 
 void dump_gregs(zx_handle_t thread_handle, const zx_thread_state_general_regs_t* regs) {
-  printf("Registers for thread %d\n", thread_handle);
+  printf("Registers for thread %#x:\n", thread_handle);
 
 #define DUMP_NAMED_REG(name) \
   printf("  %8s      %24ld  0x%lx\n", #name, (long)regs->name, (long)regs->name)
@@ -66,6 +66,43 @@ void dump_gregs(zx_handle_t thread_handle, const zx_thread_state_general_regs_t*
   DUMP_NAMED_REG(pc);
   DUMP_NAMED_REG(cpsr);
 
+#elif defined(__riscv)
+
+  DUMP_NAMED_REG(pc);
+  DUMP_NAMED_REG(ra);
+  DUMP_NAMED_REG(sp);
+  DUMP_NAMED_REG(gp);
+  DUMP_NAMED_REG(tp);
+  DUMP_NAMED_REG(t0);
+  DUMP_NAMED_REG(t1);
+  DUMP_NAMED_REG(t2);
+  DUMP_NAMED_REG(s0);
+  DUMP_NAMED_REG(s1);
+  DUMP_NAMED_REG(a0);
+  DUMP_NAMED_REG(a1);
+  DUMP_NAMED_REG(a2);
+  DUMP_NAMED_REG(a3);
+  DUMP_NAMED_REG(a4);
+  DUMP_NAMED_REG(a5);
+  DUMP_NAMED_REG(a6);
+  DUMP_NAMED_REG(a7);
+  DUMP_NAMED_REG(s2);
+  DUMP_NAMED_REG(s3);
+  DUMP_NAMED_REG(s4);
+  DUMP_NAMED_REG(s5);
+  DUMP_NAMED_REG(s6);
+  DUMP_NAMED_REG(s7);
+  DUMP_NAMED_REG(s8);
+  DUMP_NAMED_REG(s9);
+  DUMP_NAMED_REG(s10);
+  DUMP_NAMED_REG(s11);
+  DUMP_NAMED_REG(t3);
+  DUMP_NAMED_REG(t4);
+  DUMP_NAMED_REG(t5);
+  DUMP_NAMED_REG(t6);
+
+#else
+#error "what machine?"
 #endif
 
 #undef DUMP_NAMED_REG
@@ -97,8 +134,11 @@ void write_inferior_gregs(zx_handle_t thread, const zx_thread_state_general_regs
 
 size_t read_inferior_memory(zx_handle_t proc, uintptr_t vaddr, void* buf, size_t len) {
   zx_status_t status = zx_process_read_memory(proc, vaddr, buf, len, &len);
-  if (status < 0)
+  if (status != ZX_OK) {
+    ZX_ASSERT(vaddr != 0);
+    printf("zx_process_read_memory failed at %#" PRIxPTR "\n", vaddr);
     tu_fatal("read_inferior_memory", status);
+}
   return len;
 }
 

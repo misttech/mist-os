@@ -131,6 +131,11 @@ void test_watchpoint_impl(zx_handle_t excp_channel) {
   printf("Watchpoint: Writing debug registers.\n");
 
   status = set_watchpoint(thread_handle);
+#ifdef __riscv
+  EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED);
+  printf("Watchpoint: Not supported on RISC-V\n");
+  return;
+#endif
   ASSERT_EQ(status, ZX_OK);
 
   printf("Watchpoint: Resuming thread.\n");

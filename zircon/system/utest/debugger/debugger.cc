@@ -50,9 +50,9 @@ void handle_expected_page_fault(zx_handle_t inferior, const zx_exception_info_t*
   // Do some tests that require a suspended inferior.
   test_memory_ops(inferior, thread.get());
 
-  fix_inferior_segv(thread.get());
+  fix_inferior_segv(thread.get(), "handle_expected_page_fault");
   // Useful for debugging, otherwise a bit too verbose.
-  // dump_inferior_regs(thread);
+  //dump_inferior_regs(thread.get());
 
   // Increment this before resuming the inferior in case the inferior
   // sends RESP_RECOVERED_FROM_CRASH and the testcase processes the message

@@ -23,7 +23,7 @@ zx_status_t cleanup_breakpoint(zx_handle_t thread) {
   // On x86, the pc is left at one past the s/w break insn,
   // so there's nothing more we need to do.
   return ZX_OK;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
   // Skip past the brk instruction.
   zx_thread_state_general_regs_t regs = {};
   zx_status_t status =
@@ -97,7 +97,7 @@ void dyn_break_on_load_test_handler(inferior_data_t* data, const zx_port_packet_
 #if defined(__x86_64__)
       // x64 will report the exception address after execution the software breakpoint instruction.
       rip = regs.rip - 1;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
       rip = regs.pc;
 #endif
 

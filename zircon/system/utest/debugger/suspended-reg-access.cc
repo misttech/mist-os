@@ -93,9 +93,9 @@ int reg_access_thread_func(void* arg_) {
       : [result] "=r"(result), [pc] "=&r"(pc), [sp] "=&r"(sp)
       : [initial_value] "r"(initial_value)
       : REG_ACCESS_TEST_REG_NAME);
-#endif
 
-#ifdef __aarch64__
+#elif defined(__aarch64__)
+
   __asm__(
       "\
         adr %[pc], .\n\
@@ -111,9 +111,9 @@ int reg_access_thread_func(void* arg_) {
       : [result] "=r"(result), [pc] "=&r"(pc), [sp] "=&r"(sp)
       : [initial_value] "r"(initial_value)
       : REG_ACCESS_TEST_REG_NAME);
-#endif
 
-#ifdef __riscv
+#elif defined(__riscv)
+
   __asm__(
       "\
         lla %[pc], .\n\
@@ -128,6 +128,9 @@ int reg_access_thread_func(void* arg_) {
       : [result] "=r"(result), [pc] "=&r"(pc), [sp] "=&r"(sp)
       : [initial_value] "r"(initial_value)
       : REG_ACCESS_TEST_REG_NAME);
+
+#else
+#error "what machine?"
 #endif
 
   arg->result = result;
@@ -257,19 +260,13 @@ void* suspended_in_syscall_reg_access_thread_func(void* arg_) {
 
   uint64_t sp;
 #ifdef __x86_64__
-  __asm__(
-      "\
-        mov %%rsp, %[sp]"
-      : [sp] "=r"(sp));
-#endif
-#ifdef __aarch64__
-  __asm__(
-      "\
-        mov %[sp], sp"
-      : [sp] "=r"(sp));
-#endif
-#ifdef __riscv
+  __asm__("mov %%rsp, %[sp]" : [sp] "=r"(sp));
+#elif defined(__aarch64__)
+  __asm__("mov %[sp], sp" : [sp] "=r"(sp));
+#elif defined(__riscv)
   __asm__("mv %[sp], sp" : [sp] "=r"(sp));
+#else
+#error "what machine?"
 #endif
   arg->sp.store(sp);
 
@@ -514,7 +511,7 @@ void suspended_in_exception_handler(inferior_data_t* data, const zx_port_packet_
         test_memory_ops(data->inferior, suspend_data->thread_handle);
 
         // Now correct the issue and resume the inferior.
-        fix_inferior_segv(suspend_data->thread_handle);
+        fix_inferior_segv(suspend_data->thread_handle, "suspended_in_exception_handler");
 
         atomic_fetch_add(&suspend_data->segv_count, 1);
 

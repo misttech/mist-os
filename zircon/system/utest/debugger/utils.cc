@@ -42,6 +42,8 @@ uint64_t extract_sp_reg(const zx_thread_state_general_regs_t* regs) {
   return regs->rsp;
 #elif defined(__aarch64__) || defined(__riscv)
   return regs->sp;
+#else
+#error "what machine?"
 #endif
 }
 

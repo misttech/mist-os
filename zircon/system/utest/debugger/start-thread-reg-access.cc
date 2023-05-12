@@ -77,10 +77,10 @@ __asm__(
     "  jmp *%rdx\n"
     "0:ud2\n"
 #elif defined(__riscv)
-    "  li a0, " MAGIC_REGISTER_VALUE_ASM
+    "  li t0, " MAGIC_REGISTER_VALUE_ASM
     "\n"
-    "  bne a0, a1, 0f\n"
-    "  jr a2\n"
+    "  bne t0, t1, 0f\n"
+    "  jr t2\n"
     "0:unimp\n"
 #else
 #error "what machine?"
@@ -143,6 +143,8 @@ void test_thread_start_register_access(reg_access_test_state_t* test_state, zx_h
   expected_regs.sp = regs.sp;
   expected_regs.a0 = regs.a0;
   expected_regs.a1 = regs.a1;
+#else
+#error "what machine?"
 #endif
 
   // These values we know with certainty.
@@ -169,7 +171,7 @@ void test_thread_start_register_access(reg_access_test_state_t* test_state, zx_h
   if (num_threads > 1) {
     EXPECT_NE(test_state->inferior_exec_load_addr, 0);
     zx_vaddr_t our_exec_load_addr = get_exec_load_addr();
-    zx_vaddr_t raw_thread_func_addr = reinterpret_cast<zx_vaddr_t>(&raw_capture_regs_thread_func);
+    zx_vaddr_t raw_thread_func_addr = reinterpret_cast<uintptr_t>(&raw_capture_regs_thread_func);
     raw_thread_func_addr -= our_exec_load_addr;
     raw_thread_func_addr += test_state->inferior_exec_load_addr;
 #if defined(__x86_64__)
@@ -181,9 +183,11 @@ void test_thread_start_register_access(reg_access_test_state_t* test_state, zx_h
     regs.pc = raw_thread_func_addr;
     regs.r[3] = kMagicRegisterValue;
 #elif defined(__riscv)
-    regs.a2 = regs.pc;
+    regs.t2 = regs.pc;
     regs.pc = raw_thread_func_addr;
-    regs.a1 = kMagicRegisterValue;
+    regs.t1 = kMagicRegisterValue;
+#else
+#error "what machine?"
 #endif
   }
 
@@ -231,6 +235,10 @@ void thread_start_test_exception_handler_worker(inferior_data_t* data,
         break;
 
       default: {
+        zx::thread thread;
+        ASSERT_OK(exception.get_thread(&thread));
+        printf("Unexpected exception type %#x on thread %ld\n", info.type, info.tid);
+        dump_inferior_regs(thread.get());
         ASSERT_TRUE(false, "unexpected exception type: 0x%x", info.type);
         __UNREACHABLE;
       }

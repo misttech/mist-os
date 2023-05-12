@@ -12,4 +12,4 @@ void test_segv_pc(zx_handle_t thread);
 
 void test_memory_ops(zx_handle_t inferior, zx_handle_t thread);
 
-void fix_inferior_segv(zx_handle_t thread);
+void fix_inferior_segv(zx_handle_t thread, const char* what);
