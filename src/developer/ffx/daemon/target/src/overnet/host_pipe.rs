@@ -130,31 +130,6 @@ pub(crate) struct HostPipeChild {
     task: Option<Task<()>>,
 }
 
-fn setup_watchdogs() {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    tracing::debug!("Setting up executor watchdog");
-    let flag = Arc::new(AtomicBool::new(false));
-
-    fuchsia_async::Task::spawn({
-        let flag = Arc::clone(&flag);
-        async move {
-            fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
-            flag.store(true, Ordering::Relaxed);
-            tracing::debug!("Executor watchdog fired");
-        }
-    })
-    .detach();
-
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        if !flag.load(Ordering::Relaxed) {
-            tracing::error!("Aborting due to watchdog timeout!");
-            std::process::abort();
-        }
-    });
-}
-
 impl HostPipeChild {
     async fn new_inner(
         addr: SocketAddr,
@@ -182,8 +157,6 @@ impl HostPipeChild {
         let mut ssh = build_ssh_command(addr, args).await?;
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
-
-        setup_watchdogs();
 
         let mut ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
 
