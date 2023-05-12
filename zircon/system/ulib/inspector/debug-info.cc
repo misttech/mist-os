@@ -224,33 +224,18 @@ void print_exception_report(FILE* out, const zx_exception_report_t& report,
 
     fault_addr = excp_data->far;
 #elif defined(__riscv)
-    static constexpr uint32_t RISCV64_EXCEPTION_IACCESS_FAULT = 1;
-    static constexpr uint32_t RISCV64_EXCEPTION_LOAD_ACCESS_FAULT = 5;
-    static constexpr uint32_t RISCV64_EXCEPTION_STORE_ACCESS_FAULT = 7;
     static constexpr uint32_t RISCV64_EXCEPTION_INS_PAGE_FAULT = 12;
     static constexpr uint32_t RISCV64_EXCEPTION_LOAD_PAGE_FAULT = 13;
     static constexpr uint32_t RISCV64_EXCEPTION_STORE_PAGE_FAULT = 15;
 
     switch (report.context.arch.u.riscv_64.cause) {
-      case RISCV64_EXCEPTION_IACCESS_FAULT:
-        access_type = "execute";
-        violation = "protection";
-        break;
       case RISCV64_EXCEPTION_INS_PAGE_FAULT:
         access_type = "execute";
         violation = "not-present";
         break;
-      case RISCV64_EXCEPTION_LOAD_ACCESS_FAULT:
-        access_type = "read";
-        violation = "protection";
-        break;
       case RISCV64_EXCEPTION_LOAD_PAGE_FAULT:
         access_type = "read";
         violation = "not-present";
-        break;
-      case RISCV64_EXCEPTION_STORE_ACCESS_FAULT:
-        access_type = "write";
-        violation = "protection";
         break;
       case RISCV64_EXCEPTION_STORE_PAGE_FAULT:
         access_type = "write";
@@ -258,6 +243,15 @@ void print_exception_report(FILE* out, const zx_exception_report_t& report,
         break;
       default:
         access_type = "unknown";
+    }
+    switch (static_cast<zx_status_t>(report.context.synth_code)) {
+      case ZX_ERR_NOT_FOUND:
+        violation = "not-present";
+        break;
+      case ZX_ERR_ACCESS_DENIED:
+        violation = "protection";
+        break;
+      default:
         violation = "unknown";
     }
     fault_addr = report.context.arch.u.riscv_64.tval;
