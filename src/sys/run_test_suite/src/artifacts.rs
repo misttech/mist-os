@@ -46,11 +46,11 @@ where
     match artifact {
         ftest_manager::Artifact::Stdout(socket) => {
             let stdout = reporter.new_artifact(&ArtifactType::Stdout)?;
-            Ok(copy_socket_artifact(socket, stdout).map_ok(|()| None).named("stdout").boxed())
+            Ok(copy_socket_artifact(socket, stdout).map_ok(|_| None).named("stdout").boxed())
         }
         ftest_manager::Artifact::Stderr(socket) => {
             let stderr = reporter.new_artifact(&ArtifactType::Stderr)?;
-            Ok(copy_socket_artifact(socket, stderr).map_ok(|()| None).named("stderr").boxed())
+            Ok(copy_socket_artifact(socket, stderr).map_ok(|_| None).named("stderr").boxed())
         }
         ftest_manager::Artifact::Log(syslog) => {
             let syslog_artifact = reporter.new_artifact(&ArtifactType::Syslog)?;
@@ -108,12 +108,14 @@ where
 async fn copy_socket_artifact<W: Write>(
     socket: fidl::Socket,
     mut artifact: W,
-) -> Result<(), anyhow::Error> {
+) -> Result<usize, anyhow::Error> {
     let mut async_socket = fidl::AsyncSocket::from_socket(socket)?;
+    let mut len = 0;
     loop {
         let done =
             test_diagnostics::SocketReadFut::new(&mut async_socket, |maybe_buf| match maybe_buf {
                 Some(buf) => {
+                    len += buf.len();
                     artifact.write_all(buf)?;
                     Ok(false)
                 }
@@ -122,7 +124,7 @@ async fn copy_socket_artifact<W: Write>(
             .await?;
         if done {
             artifact.flush()?;
-            return Ok(());
+            return Ok(len);
         }
     }
 }
@@ -161,12 +163,13 @@ async fn copy_debug_data(
             fasync::Task::spawn(async move {
                 let _ = &debug_data;
                 let mut output = output?;
-                let file = debug_data
-                    .file
-                    .ok_or_else(|| anyhow!("Missing profile file handle"))?
-                    .into_proxy()?;
+                let socket =
+                    debug_data.socket.ok_or_else(|| anyhow!("Missing profile socket handle"))?;
                 debug!("Reading run profile \"{:?}\"", debug_data.name);
-                copy_file_to_writer(&file, &mut output).await
+                let start = std::time::Instant::now();
+                let len = copy_socket_artifact(socket, &mut output).await?;
+                debug!("Copied file {:?}: {} bytes in {:?}", debug_data.name, len, start.elapsed());
+                Ok::<(), anyhow::Error>(())
             })
         })
         .collect::<Vec<_>>()
@@ -199,7 +202,8 @@ async fn copy_custom_artifact_directory(
         futs.push(async move {
             let file = file.with_context(|| format!("with path {:?}", path))?;
             let mut output_file = output_file?;
-            copy_file_to_writer(&file, &mut output_file).await
+
+            copy_file_to_writer(&file, &mut output_file).await.map(|_| ())
         });
     });
 
@@ -217,7 +221,7 @@ async fn copy_custom_artifact_directory(
 async fn copy_file_to_writer<T: Write>(
     file: &fio::FileProxy,
     output: &mut T,
-) -> Result<(), anyhow::Error> {
+) -> Result<usize, anyhow::Error> {
     const READ_SIZE: u64 = fio::MAX_BUF;
 
     let mut vector = VecDeque::new();
@@ -226,16 +230,18 @@ async fn copy_file_to_writer<T: Write>(
     for _n in 0..PIPELINED_READ_COUNT {
         vector.push_back(file.read(READ_SIZE));
     }
+    let mut len = 0;
     loop {
         let buf =
             vector.pop_front().unwrap().await?.map_err(fuchsia_zircon_status::Status::from_raw)?;
         if buf.is_empty() {
             break;
         }
+        len += buf.len();
         output.write_all(&buf)?;
         vector.push_back(file.read(READ_SIZE));
     }
-    Ok(())
+    Ok(len)
 }
 
 #[cfg(test)]
@@ -271,8 +277,9 @@ mod file_tests {
     use {
         super::*,
         crate::output::InMemoryDirectoryWriter,
-        fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
-        fidl_fuchsia_io as fio,
+        fidl::endpoints::ServerEnd,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        futures::prelude::*,
         maplit::hashmap,
         std::{collections::HashMap, sync::Arc},
         vfs::{
@@ -283,39 +290,22 @@ mod file_tests {
         },
     };
 
+    async fn serve_content_over_socket(content: Vec<u8>, socket: fuchsia_zircon::Socket) {
+        let mut socket = fidl::AsyncSocket::from_socket(socket).unwrap();
+        socket.write_all(content.as_slice()).await.expect("Cannot serve content over socket");
+    }
+
     async fn serve_and_copy_debug_data(
-        fake_dir: Arc<Simple>,
+        expected_files: &HashMap<PathBuf, Vec<u8>>,
         directory_writer: InMemoryDirectoryWriter,
     ) {
-        let (directory_client, directory_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        fake_dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(directory_service.into_channel()),
-        );
-        let mut paths = vec![];
-        let mut enumerate = fuchsia_fs::directory::readdir_recursive(&directory_client, None);
-        while let Ok(Some(file)) = enumerate.try_next().await {
-            if file.kind == fuchsia_fs::directory::DirentKind::File {
-                paths.push(file.name);
-            }
-        }
         let mut served_files = vec![];
-        paths.iter().for_each(|path| {
-            let file = fuchsia_fs::directory::open_file_no_describe(
-                &directory_client,
-                path,
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            )
-            .expect("open file");
+        expected_files.iter().for_each(|(path, content)| {
+            let (client, server) = fuchsia_zircon::Socket::create_stream();
+            fasync::Task::spawn(serve_content_over_socket(content.clone(), server)).detach();
             served_files.push(ftest_manager::DebugData {
-                name: Some(path.to_string()),
-                file: Some(ClientEnd::new(file.into_channel().unwrap().into_zx_channel())),
+                name: Some(path.display().to_string()),
+                socket: Some(client.into()),
                 ..Default::default()
             });
         });
@@ -441,9 +431,9 @@ mod file_tests {
 
     #[fuchsia::test]
     async fn test_copy_debug_data() {
-        for (name, fake_dir, expected_files) in test_cases() {
+        for (name, _fake_dir, expected_files) in test_cases() {
             let artifact = InMemoryDirectoryWriter::default();
-            serve_and_copy_debug_data(fake_dir, artifact.clone()).await;
+            serve_and_copy_debug_data(&expected_files, artifact.clone()).await;
             let actual_files: HashMap<_, _> = artifact
                 .files
                 .lock()

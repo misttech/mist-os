@@ -11,6 +11,7 @@ use {
     fuchsia_component::client,
     futures::{channel::mpsc, prelude::*, stream},
     pretty_assertions::assert_eq,
+    test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{
         collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
         TestRunEventPayload,
@@ -644,9 +645,9 @@ async fn debug_data_test() {
 
     let num_debug_data_events = stream::iter(run_events_result.unwrap())
         .then(|run_event| async move {
-            let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-            let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
-            contents == b"Debug data from test\n"
+            let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
+            let content = collect_string_from_socket(socket).await.unwrap();
+            content == "Debug data from test\n"
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
         .count()
@@ -670,9 +671,9 @@ async fn debug_data_accumulate_test() {
 
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
-                let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-                let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
-                contents == b"Debug data from test\n"
+                let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
+                let content = collect_string_from_socket(socket).await.unwrap();
+                content == "Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
             .count()
@@ -698,9 +699,9 @@ async fn debug_data_isolated_test() {
 
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
-                let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-                let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
-                contents == b"Debug data from test\n"
+                let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
+                let content = collect_string_from_socket(socket).await.unwrap();
+                content == "Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
             .count()

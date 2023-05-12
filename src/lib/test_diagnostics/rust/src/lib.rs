@@ -5,6 +5,7 @@
 //! This crate provides helper functions to collect test diagnostics.
 
 use {
+    fuchsia_async as fasync,
     futures::{
         channel::mpsc,
         io::AsyncRead,
@@ -21,7 +22,7 @@ pub use crate::diagnostics::LogStream;
 mod diagnostics;
 
 thread_local! {
-    static BUFFER: RefCell<[u8; 2048]> = RefCell::new([0; 2048]);
+    static BUFFER: RefCell<[u8; 1024*48]> = RefCell::new([0; 1024*48]);
 }
 
 /// Future that executes a function when bytes are available on a socket.
@@ -58,6 +59,17 @@ where
             }
         })
     }
+}
+
+pub async fn collect_string_from_socket(socket: fidl::Socket) -> Result<String, anyhow::Error> {
+    let (s, mut r) = mpsc::channel(1024);
+    let task = fasync::Task::spawn(collect_and_send_string_output(socket, s));
+    let mut ret = String::new();
+    while let Some(content) = r.next().await {
+        ret.push_str(&content);
+    }
+    task.await?;
+    Ok(ret)
 }
 
 pub async fn collect_and_send_string_output(

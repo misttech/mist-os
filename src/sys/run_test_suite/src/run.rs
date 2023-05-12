@@ -819,26 +819,15 @@ mod test {
             run_reporter,
         });
 
-        let dir = pseudo_directory! {
-            "test_file.profraw" => read_only("Not a real profile"),
-        };
-
-        let (file_client, file_service) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-            vfs::path::Path::validate_and_split("test_file.profraw").unwrap(),
-            ServerEnd::new(file_service.into_channel()),
-        );
-
         let (debug_client, debug_service) =
             fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>();
         let debug_data_fut = async move {
+            let (client, server) = fuchsia_zircon::Socket::create_stream();
+            let _ = server.write(b"Not a real profile").unwrap();
             let mut service = debug_service.into_stream().unwrap();
             let mut data = vec![ftest_manager::DebugData {
                 name: Some("test_file.profraw".to_string()),
-                file: Some(file_client),
+                socket: Some(client.into()),
                 ..Default::default()
             }];
             while let Ok(Some(request)) = service.try_next().await {

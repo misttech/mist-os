@@ -6,7 +6,7 @@ use {
     crate::constants,
     crate::run_events::RunEvent,
     anyhow::{anyhow, Context, Error},
-    fidl::endpoints::{create_endpoints, create_request_stream, ClientEnd},
+    fidl::endpoints::{create_proxy, create_request_stream, Proxy},
     fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
     futures::{channel::mpsc, pin_mut, prelude::*, stream::FusedStream, StreamExt, TryStreamExt},
     std::path::{Path, PathBuf},
@@ -183,6 +183,35 @@ async fn filter_map_filename(
     }
 }
 
+async fn serve_file_over_socket(file: fio::FileProxy, socket: fuchsia_zircon::Socket) {
+    let mut socket = fasync::Socket::from_socket(socket).unwrap();
+
+    // We keep a buffer of 4.8 MB while reading the file
+    let num_bytes: u64 = 1024 * 48;
+    let (mut sender, mut recv) = mpsc::channel(100);
+    let _file_read_task = fasync::Task::spawn(async move {
+        loop {
+            let bytes = fuchsia_fs::file::read_num_bytes(&file, num_bytes).await.unwrap();
+            let len = bytes.len();
+            if let Err(_) = sender.send(bytes).await {
+                // no recv, don't read rest of the file.
+                break;
+            }
+            if len != usize::try_from(num_bytes).unwrap() {
+                // done reading file
+                break;
+            }
+        }
+    });
+
+    while let Some(bytes) = recv.next().await {
+        if let Err(e) = socket.write_all(bytes.as_slice()).await {
+            warn!("cannot serve file: {:?}", e);
+            return;
+        }
+    }
+}
+
 /// Serves the |DebugDataIterator| protocol by serving all the files contained under
 /// |dir_path|.
 ///
@@ -221,16 +250,20 @@ pub(crate) async fn serve_iterator(
         let debug_data = next_files
             .into_iter()
             .map(|file_name| {
-                let (file, server) = create_endpoints::<fio::NodeMarker>();
+                let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+                let file = fio::FileProxy::new(file.into_channel().unwrap());
                 directory.open(
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,
                     fio::ModeType::empty(),
                     &file_name,
                     server,
                 )?;
+
                 tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
+                let (client, server) = fuchsia_zircon::Socket::create_stream();
+                fasync::Task::spawn(serve_file_over_socket(file, server)).detach();
                 Ok(ftest_manager::DebugData {
-                    file: Some(ClientEnd::new(file.into_channel())),
+                    socket: Some(client.into()),
                     name: file_name.into(),
                     ..Default::default()
                 })
@@ -245,7 +278,7 @@ pub(crate) async fn serve_iterator(
 mod test {
     use {
         super::*, crate::run_events::RunEventPayload, fuchsia_async as fasync,
-        std::collections::HashSet, tempfile::tempdir,
+        std::collections::HashSet, tempfile::tempdir, test_diagnostics::collect_string_from_socket,
     };
 
     #[fuchsia::test]
@@ -324,12 +357,10 @@ mod test {
 
         let mut values = proxy.get_next().await.expect("get next");
         assert_eq!(1usize, values.len());
-        let ftest_manager::DebugData { name, file, .. } = values.pop().unwrap();
+        let ftest_manager::DebugData { name, socket, .. } = values.pop().unwrap();
         assert_eq!(Some("file".to_string()), name);
-        let contents = fuchsia_fs::file::read(&file.expect("has file").into_proxy().unwrap())
-            .await
-            .expect("read file");
-        assert_eq!(b"test".to_vec(), contents);
+        let contents = collect_string_from_socket(socket.unwrap()).await.expect("read socket");
+        assert_eq!("test", contents);
 
         let values = proxy.get_next().await.expect("get next");
         assert_eq!(values, vec![]);
@@ -370,12 +401,9 @@ mod test {
         }
 
         let file_contents: HashSet<_> = futures::stream::iter(all_files)
-            .then(|ftest_manager::DebugData { name, file, .. }| async move {
-                let contents = fuchsia_fs::file::read_to_string(
-                    &file.expect("has file").into_proxy().unwrap(),
-                )
-                .await
-                .expect("read file");
+            .then(|ftest_manager::DebugData { name, socket, .. }| async move {
+                let contents =
+                    collect_string_from_socket(socket.unwrap()).await.expect("read socket");
                 (name.unwrap(), contents)
             })
             .collect()

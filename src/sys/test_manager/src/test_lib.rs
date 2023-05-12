@@ -181,14 +181,11 @@ impl TestBuilder {
                                     break;
                                 }
                                 for data_file in data {
-                                    let file_proxy = data_file
-                                        .file
-                                        .expect("File cannot be empty")
-                                        .into_proxy()?;
+                                    let socket = data_file.socket.expect("File cannot be empty");
                                     events.push(TestRunEvent::debug_data(
                                         fidl_event.timestamp,
                                         data_file.name.expect("Name cannot be empty"),
-                                        file_proxy,
+                                        socket,
                                     ));
                                 }
                             }
@@ -212,18 +209,18 @@ impl TestRunEvent {
     pub fn debug_data<S: Into<String>>(
         timestamp: Option<i64>,
         filename: S,
-        proxy: fio::FileProxy,
+        socket: fidl::Socket,
     ) -> Self {
         Self {
             timestamp,
-            payload: TestRunEventPayload::DebugData { filename: filename.into(), proxy },
+            payload: TestRunEventPayload::DebugData { filename: filename.into(), socket },
         }
     }
 }
 
 #[derive(Debug)]
 pub enum TestRunEventPayload {
-    DebugData { filename: String, proxy: fio::FileProxy },
+    DebugData { filename: String, socket: fidl::Socket },
 }
 
 /// Events produced by test suite.

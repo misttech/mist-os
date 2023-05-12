@@ -451,6 +451,6 @@ protocol DebugDataIterator {
 type DebugData = resource table {
     /// Name of the file. Must be unique per DebugDataIterator.
     1: name string:512;
-    /// Read-only channel over which the file may be accessed.
-    2: file client_end:fuchsia.io.File;
+    /// Socket over which the file may be accessed.
+    2: socket zx.Handle:SOCKET;
 };

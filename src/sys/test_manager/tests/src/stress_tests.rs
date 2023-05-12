@@ -8,6 +8,7 @@ use {
     fuchsia_component::client,
     futures::{prelude::*, stream},
     pretty_assertions::assert_eq,
+    test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{
         collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
         TestRunEventPayload,
@@ -47,9 +48,9 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     let test_run_events = stream::iter(run_events_result.unwrap());
     let num_vmos = test_run_events
         .then(|run_event| async move {
-            let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-            let contents = fuchsia_fs::file::read(&proxy).await.expect("read file");
-            contents.len() == vmo_size && contents.iter().all(|byte| *byte == b'a')
+            let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
+            let content = collect_string_from_socket(socket).await.expect("cannot read socket");
+            content.len() == vmo_size && content.chars().all(|c| c == 'a')
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
         .count()

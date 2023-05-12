@@ -83,7 +83,7 @@ impl DebugDataProcessor {
                 proxy_init_fn: Box::new(move || Ok(maybe_proxy.lock().unwrap().take().unwrap())),
             },
             sender: DebugDataSender { sender },
-            stream,
+            stream: stream,
         }
     }
 
@@ -251,6 +251,7 @@ mod test {
         futures::{FutureExt, TryFutureExt},
         maplit::hashset,
         std::{collections::HashSet, task::Poll},
+        test_diagnostics::collect_string_from_socket,
     };
 
     const VMO_SIZE: u64 = 4096;
@@ -409,11 +410,9 @@ mod test {
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        fuchsia_fs::file::read_to_string(
-                            &debug_data.file.unwrap().into_proxy().unwrap(),
-                        )
-                        .await
-                        .expect("read file"),
+                        collect_string_from_socket(debug_data.socket.unwrap())
+                            .await
+                            .expect("Cannot read socket"),
                     ))
                 })
                 .try_collect()
@@ -480,11 +479,9 @@ mod test {
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        fuchsia_fs::file::read_to_string(
-                            &debug_data.file.unwrap().into_proxy().unwrap(),
-                        )
-                        .await
-                        .expect("read file"),
+                        collect_string_from_socket(debug_data.socket.unwrap())
+                            .await
+                            .expect("read socket"),
                     ))
                 })
                 .try_collect()
