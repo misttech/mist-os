@@ -9,25 +9,38 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
 # TODO(fxb/117740): We only need to cover bazel inputs that end up in the product,
 # e.g. not tests or build tools. This can be achieved by adding metadata to
-# the bazel inputs list by splitting the lists.
+# the bazel inputs list (i.e. converting it into some dictionary) or by
+# splitting into more granular lists.
 
 group("all_bazel_inputs") {
-  # Some of the inputs are testonly
-  testonly = true
-
   deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
 
   # Remove a potential circular dependency on the spdx bazel_input_resource itself.
   deps -= [ "//build/bazel/licenses:all_bazel_inputs_licenses_spdx" ]
+
+  # Remove eng-only AIBs which are testonly.
+  deps -= eng_platform_aib_labels
+
+  # See fxb/126949#c15. Zedboot is only used in eng builds and is testonly, so can't
+  # be used in license calculations.
+  deps -= [ "//build/images/zedboot:zedboot.bazel_legacy_aib" ]
+
+  if (fuchsia_zbi_testonly) {
+    # Remove fuchsia_zbi_testonly=true targets. See fxb/126949#c18 for why that is ok.
+    deps -= [
+      "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
+      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    ]
+  }
 }
 
 # Collects the license data for all GN inputs and makes it available for Bazel
 license_data("licenses_data") {
-  testonly = true
   target = "//build/bazel/licenses:all_bazel_inputs"
   out_dir = "$target_out_dir/licenses_data"
   produce_spdx = true
@@ -58,7 +71,6 @@ license_data("licenses_data") {
 #     * fxbug.dev/117694 workaround: Manually delete cached depenedncy calculation:
 #       `rm out/default/project.json`
 bazel_input_resource("all_bazel_inputs_licenses_spdx") {
-  testonly = true
   deps = [ ":licenses_data" ]
   sources = get_target_outputs(":licenses_data_spdx_copy")
   outputs = [ "licenses_data/results.spdx.json" ]
