@@ -20,13 +20,14 @@ async fn get_connection_info_file() {
         // TODO(http://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
         let mut expected_operations = fio::Operations::GET_ATTRIBUTES;
         if file_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-            expected_operations |= fio::R_STAR_DIR;
+            expected_operations |= fio::Operations::READ_BYTES;
         }
         if file_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-            expected_operations |= fio::W_STAR_DIR;
+            expected_operations |=
+                fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES;
         }
         if file_flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-            expected_operations |= fio::X_STAR_DIR;
+            expected_operations |= fio::Operations::EXECUTE;
         }
 
         assert_eq!(

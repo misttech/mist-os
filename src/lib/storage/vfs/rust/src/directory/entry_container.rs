@@ -80,6 +80,14 @@ pub trait Directory: DirectoryEntry {
     /// The "mode" field will be filled in by the connection.
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
 
+    /// Returns node attributes (io2).
+    async fn get_attributes(
+        &self,
+        _requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     /// Called when the directory is closed.
     fn close(&self) -> Result<(), Status>;
 

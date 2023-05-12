@@ -12,8 +12,6 @@ mod watchers_task;
 use crate::{
     common::{rights_to_posix_mode_bits, send_on_open_with_error},
     directory::{
-        common::with_directory_options,
-        connection::io1::DerivedConnection,
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo},
         entry_container::{Directory, DirectoryWatcher},
@@ -22,6 +20,7 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
+    ProtocolsExt, ToObjectRequest,
 };
 
 use {
@@ -188,16 +187,16 @@ impl<T: LazyDirectory> DirectoryEntry for Lazy<T> {
         let name = match path.next() {
             Some(name) => name.to_string(),
             None => {
-                return with_directory_options(
-                    flags,
-                    server_end,
-                    |describe, options, server_end| {
-                        ImmutableConnection::create_connection(
-                            scope, self, describe, options, server_end,
-                        )
-                    },
-                )
-                .unwrap_or(());
+                flags.to_object_request(server_end).handle(|object_request| {
+                    ImmutableConnection::create_connection(
+                        scope,
+                        self,
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    );
+                    Ok(())
+                });
+                return;
             }
         };
 

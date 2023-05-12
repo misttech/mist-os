@@ -9,7 +9,6 @@
 use crate::{
     common::{rights_to_posix_mode_bits, send_on_open_with_error},
     directory::{
-        common::with_directory_options,
         connection::io1::DerivedConnection,
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo},
@@ -25,6 +24,7 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
+    ProtocolsExt, ToObjectRequest,
 };
 
 use {
@@ -187,22 +187,26 @@ where
         let (name, path_ref) = match path.next_with_ref() {
             (path_ref, Some(name)) => (name, path_ref),
             (_, None) => {
-                return with_directory_options(
-                    flags,
-                    server_end,
-                    |describe, options, server_end| {
-                        if Connection::MUTABLE {
-                            MutableConnection::create_connection(
-                                scope, self, describe, options, server_end,
-                            )
-                        } else {
-                            ImmutableConnection::create_connection(
-                                scope, self, describe, options, server_end,
-                            )
-                        }
-                    },
-                )
-                .unwrap_or(());
+                flags.to_object_request(server_end).handle(|object_request| {
+                    let options = flags.to_directory_options()?;
+                    if Connection::MUTABLE {
+                        MutableConnection::create_connection(
+                            scope,
+                            self,
+                            options,
+                            object_request.take(),
+                        );
+                    } else {
+                        ImmutableConnection::create_connection(
+                            scope,
+                            self,
+                            options,
+                            object_request.take(),
+                        );
+                    }
+                    Ok(())
+                });
+                return;
             }
         };
 

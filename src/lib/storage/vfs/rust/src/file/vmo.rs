@@ -9,11 +9,14 @@
 mod tests;
 
 use crate::{
-    common::{rights_to_posix_mode_bits, send_on_open_with_error},
+    common::rights_to_posix_mode_bits,
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
-    file::{common::vmo_flags_to_rights, connection::io1::create_connection, File, FileIo},
+    file::{
+        common::vmo_flags_to_rights, connection::io1::create_connection, File, FileIo, FileOptions,
+    },
     path::Path,
+    ProtocolsExt, ToObjectRequest,
 };
 
 use {
@@ -231,26 +234,26 @@ impl DirectoryEntry for VmoFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        if !path.is_empty() {
-            send_on_open_with_error(describe, server_end, Status::NOT_DIR);
-            return;
-        }
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(Status::NOT_DIR);
+            }
 
-        if flags.intersects(fio::OpenFlags::APPEND) {
-            send_on_open_with_error(describe, server_end, Status::NOT_SUPPORTED);
-            return;
-        }
+            if flags.intersects(fio::OpenFlags::APPEND) {
+                return Err(Status::NOT_SUPPORTED);
+            }
 
-        create_connection(
-            scope.clone(),
-            self.clone(),
-            flags,
-            server_end,
-            self.readable,
-            self.writable,
-            self.executable,
-        );
+            create_connection(
+                scope.clone(),
+                self.clone(),
+                flags.to_file_options()?,
+                object_request.take(),
+                self.readable,
+                self.writable,
+                self.executable,
+            );
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -300,7 +303,7 @@ impl FileIo for VmoFile {
 
 #[async_trait]
 impl File for VmoFile {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         let mut vmo_state = self.vmo.lock().await;
         if vmo_state.is_some() {
             return Ok(());

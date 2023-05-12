@@ -11,11 +11,12 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
-            immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
+            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -41,27 +42,32 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
         let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
         if path.is_empty() {
-            if flags.intersects(
-                fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::TRUNCATE
-                    | fio::OpenFlags::APPEND,
-            ) {
-                let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-                return;
-            }
+            flags.to_object_request(server_end).handle(|object_request| {
+                if flags.intersects(
+                    fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::RIGHT_EXECUTABLE
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::CREATE_IF_ABSENT
+                        | fio::OpenFlags::TRUNCATE
+                        | fio::OpenFlags::APPEND,
+                ) {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
 
-            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
-            // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
-            // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
-            // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
-            // that combination of arguments would normally result in MetaAsFile being used.
-            return with_directory_options(flags, server_end, |describe, options, server_end| {
-                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
-            })
-            .unwrap_or(());
+                // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
+                // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
+                // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
+                // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
+                // that combination of arguments would normally result in MetaAsFile being used.
+                ImmutableConnection::create_connection(
+                    scope,
+                    self,
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                Ok(())
+            });
+            return;
         }
 
         // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except

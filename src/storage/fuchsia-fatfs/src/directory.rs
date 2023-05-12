@@ -27,10 +27,7 @@ use {
         sync::{Arc, RwLock},
     },
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options,
-            connection::io1::DerivedConnection,
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher, MutableDirectory},
@@ -43,6 +40,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -757,29 +755,31 @@ impl DirectoryEntry for FatDirectory {
     ) {
         let mut closer = Closer::new(&self.filesystem);
 
-        match self.lookup(flags, path, &mut closer) {
-            Err(e) => {
-                send_on_open_with_error(flags.contains(fio::OpenFlags::DESCRIBE), server_end, e)
-            }
-            Ok(FatNode::Dir(entry)) => {
-                with_directory_options(flags, server_end, |describe, options, server_end| {
+        flags.to_object_request(server_end).handle(|object_request| {
+            match self.lookup(flags, path, &mut closer)? {
+                FatNode::Dir(entry) => {
+                    let options = flags.to_directory_options()?;
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
                     MutableConnection::create_connection(
                         scope,
                         entry.clone(),
-                        describe,
                         options,
-                        server_end,
-                    )
-                })
-                .unwrap_or(())
+                        object_request.take(),
+                    );
+                    Ok(())
+                }
+                FatNode::File(entry) => {
+                    let options = flags.to_file_options()?;
+                    let () = entry
+                        .open_ref(&self.filesystem.lock().unwrap())
+                        .expect("entry should already be open");
+                    entry.clone().create_connection(scope, options, object_request.take());
+                    Ok(())
+                }
             }
-            Ok(FatNode::File(entry)) => {
-                entry.clone().open(scope, flags, Path::dot(), server_end);
-            }
-        };
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

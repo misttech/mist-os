@@ -11,6 +11,7 @@
 
 pub mod test_utils;
 
+#[macro_use]
 pub mod common;
 
 pub mod execution_scope;
@@ -18,6 +19,8 @@ pub mod path;
 
 pub mod directory;
 pub mod file;
+pub mod object_request;
+pub mod protocols;
 pub mod remote;
 pub mod service;
 pub mod symlink;
@@ -107,6 +110,9 @@ pub use vfs_macros::pseudo_directory;
 /// modify this directory.  Clients operations are still checked against specific connection
 /// permissions as specified in the `fuchsia.io` interface.
 pub use vfs_macros::mut_pseudo_directory;
+
+pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
+pub use protocols::ProtocolsExt;
 
 // This allows the pseudo_directory! macro to use absolute paths within this crate to refer to the
 // helper functions. External crates that use pseudo_directory! will rely on the pseudo_directory

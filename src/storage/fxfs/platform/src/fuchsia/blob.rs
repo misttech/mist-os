@@ -24,7 +24,7 @@ use {
     fuchsia_merkle::{hash_block, MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{channel::oneshot, join},
+    futures::{channel::oneshot, future::BoxFuture, join, FutureExt},
     fxfs::{
         async_enter,
         errors::FxfsError,
@@ -55,9 +55,8 @@ use {
     },
     storage_device::buffer,
     vfs::{
-        common::{rights_to_posix_mode_bits, send_on_open_with_error},
+        common::rights_to_posix_mode_bits,
         directory::{
-            common::with_directory_options,
             dirents_sink::{self, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{DirectoryWatcher, MutableDirectory},
@@ -68,11 +67,12 @@ use {
         file::{
             connection::io1::{
                 create_connection_async, create_node_reference_connection_async,
-                create_stream_connection_async, create_stream_options_from_open_flags,
+                create_stream_connection_async,
             },
-            File, FileIo,
+            File, FileIo, FileOptions,
         },
         path::Path,
+        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -306,58 +306,52 @@ impl DirectoryEntry for BlobDirectory {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        scope.clone().spawn_with_shutdown(move |shutdown| async move {
-            match self.lookup(flags, path).await {
-                Err(e) => {
-                    debug!(?e, "lookup failed");
-                    send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        map_to_status(e),
-                    );
-                }
-                Ok(node) => {
+        flags.to_object_request(server_end).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                async move {
+                    let node = self.lookup(flags, path).await.map_err(|e| {
+                        debug!(?e, "lookup failed");
+                        map_to_status(e)
+                    })?;
                     if node.is::<BlobDirectory>() {
-                        let () = match with_directory_options(
-                            flags,
-                            server_end,
-                            |describe, options, server_end| {
-                                MutableConnection::create_connection_async(
-                                    scope,
-                                    node.downcast::<BlobDirectory>()
-                                        .unwrap_or_else(|_| unreachable!())
-                                        .take(),
-                                    describe,
-                                    options,
-                                    server_end,
-                                    shutdown,
-                                )
-                            },
-                        ) {
-                            None => {}
-                            Some(fut) => fut.await,
-                        };
+                        Ok(MutableConnection::create_connection_async(
+                            scope,
+                            node.downcast::<BlobDirectory>()
+                                .unwrap_or_else(|_| unreachable!())
+                                .take(),
+                            flags.to_directory_options()?,
+                            object_request.take(),
+                            shutdown,
+                        )
+                        .boxed())
                     } else if node.is::<FxBlob>() {
                         let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
-                        FxBlob::create_connection(node, scope.clone(), flags, server_end, shutdown)
-                            .await;
+                        FxBlob::create_connection_async(
+                            node,
+                            scope,
+                            flags.to_file_options()?,
+                            object_request,
+                            shutdown,
+                        )
                     } else if node.is::<FxUnsealedBlob>() {
                         let node =
                             node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
-                        FxUnsealedBlob::create_connection(
+                        Ok(FxUnsealedBlob::create_connection(
                             node,
-                            scope.clone(),
-                            flags,
-                            server_end,
+                            scope,
+                            flags.to_file_options()?,
+                            object_request.take(),
                             shutdown,
                         )
-                        .await;
+                        .boxed())
                     } else {
                         unreachable!();
                     }
                 }
-            };
-        });
+                .boxed()
+            },
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -446,43 +440,40 @@ impl FxBlob {
         file
     }
 
-    async fn create_connection(
+    fn create_connection_async(
         this: OpenedNode<Self>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        server_end: ServerEnd<fio::NodeMarker>,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
         shutdown: oneshot::Receiver<()>,
-    ) {
-        if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            create_node_reference_connection_async(scope, this.take(), flags, server_end, shutdown)
-                .await;
+    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+        Ok(if options.is_node {
+            create_node_reference_connection_async(
+                scope,
+                this.take(),
+                options,
+                object_request.take(),
+                shutdown,
+            )
+            .boxed()
         } else {
-            let options = create_stream_options_from_open_flags(flags)
-                .unwrap_or_else(|| panic!("Invalid flags for stream connection: {:?}", flags));
-            let stream = match zx::Stream::create(options, this.buffer.vmo(), 0) {
-                Ok(stream) => stream,
-                Err(status) => {
-                    send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        status,
-                    );
-                    return;
-                }
-            };
+            let stream_options = options
+                .to_stream_options()
+                .unwrap_or_else(|| panic!("Invalid options for stream connection: {options:?}"));
+            let stream = zx::Stream::create(stream_options, this.buffer.vmo(), 0)?;
             create_stream_connection_async(
                 scope,
                 this.take(),
-                flags,
-                server_end,
+                options,
+                object_request.take(),
                 /*readable=*/ true,
                 /*writable=*/ false,
                 /*executable=*/ true,
                 stream,
                 shutdown,
             )
-            .await;
-        }
+            .boxed()
+        })
     }
 }
 
@@ -495,17 +486,23 @@ impl DirectoryEntry for FxBlob {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        if !path.is_empty() {
-            send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
-                server_end,
-                Status::NOT_FILE,
-            );
-            return;
-        }
-        scope.clone().spawn_with_shutdown(move |shutdown| {
-            Self::create_connection(OpenedNode::new(self), scope, flags, server_end, shutdown)
-        });
+        flags.to_object_request(server_end).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                Box::pin(async move {
+                    if !path.is_empty() {
+                        return Err(Status::NOT_FILE);
+                    }
+                    Self::create_connection_async(
+                        OpenedNode::new(self),
+                        scope,
+                        flags.to_file_options()?,
+                        object_request,
+                        shutdown,
+                    )
+                })
+            },
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -649,7 +646,7 @@ pub async fn init_vmex_resource() -> Result<(), Error> {
 /// Implement VFS trait so blobs can be accessed as files.
 #[async_trait]
 impl File for FxBlob {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -966,21 +963,21 @@ impl FxUnsealedBlob {
     async fn create_connection(
         this: OpenedNode<Self>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        server_end: ServerEnd<fio::NodeMarker>,
+        options: FileOptions,
+        object_request: ObjectRequest,
         shutdown: oneshot::Receiver<()>,
     ) {
         create_connection_async(
             scope,
             this.take(),
-            flags,
-            server_end,
+            options,
+            object_request,
             /*readable=*/ true,
             /*writable=*/ true,
             /*executable=*/ false,
             shutdown,
         )
-        .await;
+        .await
     }
 }
 
@@ -992,17 +989,23 @@ impl DirectoryEntry for FxUnsealedBlob {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        if !path.is_empty() {
-            send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
-                server_end,
-                Status::NOT_FILE,
-            );
-            return;
-        }
-        scope.clone().spawn_with_shutdown(move |shutdown| {
-            Self::create_connection(OpenedNode::new(self), scope, flags, server_end, shutdown)
-        });
+        flags.to_object_request(server_end).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                Box::pin(async move {
+                    if !path.is_empty() {
+                        return Err(Status::NOT_FILE);
+                    }
+                    Ok(Self::create_connection(
+                        OpenedNode::new(self),
+                        scope,
+                        flags.to_file_options()?,
+                        object_request.take(),
+                        shutdown,
+                    ))
+                })
+            },
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -1048,7 +1051,7 @@ impl FxNode for FxUnsealedBlob {
 
 #[async_trait]
 impl File for FxUnsealedBlob {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+    async fn open(&self, _optionss: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 

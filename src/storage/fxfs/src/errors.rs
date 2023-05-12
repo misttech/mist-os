@@ -44,6 +44,8 @@ pub enum FxfsError {
     AlreadyBound,
     #[error("Bad path")]
     BadPath,
+    #[error("Wrong type")]
+    WrongType,
 }
 
 impl FxfsError {
@@ -93,6 +95,7 @@ mod fuchsia {
                 FxfsError::OutOfRange => Status::OUT_OF_RANGE,
                 FxfsError::AlreadyBound => Status::ALREADY_BOUND,
                 FxfsError::BadPath => Status::BAD_PATH,
+                FxfsError::WrongType => Status::WRONG_TYPE,
             }
         }
     }

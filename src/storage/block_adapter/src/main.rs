@@ -19,12 +19,12 @@ use {
     remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient},
     std::sync::Arc,
     vfs::{
-        common::{rights_to_posix_mode_bits, send_on_open_with_error},
+        common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{connection::io1::create_connection, File, FileIo},
+        file::{connection::io1::create_connection, File, FileIo, FileOptions},
         path::Path,
-        pseudo_directory,
+        pseudo_directory, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -50,15 +50,21 @@ impl DirectoryEntry for BlockFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        if !path.is_empty() {
-            send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
-                server_end,
-                zx::Status::NOT_FILE,
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(zx::Status::NOT_FILE);
+            }
+            create_connection(
+                scope,
+                self,
+                flags.to_file_options()?,
+                object_request.take(),
+                true,
+                true,
+                false,
             );
-            return;
-        }
-        create_connection(scope, self, flags, server_end, true, true, false);
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -68,7 +74,7 @@ impl DirectoryEntry for BlockFile {
 
 #[async_trait]
 impl File for BlockFile {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), zx::Status> {
+    async fn open(&self, _options: &FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
 

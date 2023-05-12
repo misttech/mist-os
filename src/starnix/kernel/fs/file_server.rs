@@ -18,7 +18,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::ffi::CString;
 use std::sync::{Arc, Weak};
-use vfs::{directory, execution_scope, file, path};
+use vfs::{directory, execution_scope, file, path, ProtocolsExt, ToObjectRequest};
 
 /// FIDL io server to expose starnix file descriptors to external fuchsia component.
 pub struct FileServer {
@@ -198,17 +198,20 @@ impl StarnixNodeConnection {
     ) -> Result<(), Errno> {
         if self.is_dir() {
             if path.is_dot() {
-                let server_end = std::mem::replace(server_end, zx::Handle::invalid().into());
-                return directory::common::with_directory_options(flags, server_end, |describe, options, server_end| {
-                    // Reopen the current directory.
-                    let file = self.reopen(flags)?;
-                    scope.clone().spawn_with_shutdown(move |shutdown| {
-                        directory::mutable::connection::io1::MutableConnection::create_connection_async(
-                            scope, file, describe, options, server_end, shutdown,
-                        )
+                // Reopen the current directory.
+                let dir = self.reopen(flags)?;
+                flags
+                    .to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into()))
+                    .handle(|object_request| {
+                        directory::mutable::connection::io1::MutableConnection::create_connection(
+                            scope,
+                            dir,
+                            flags.to_directory_options()?,
+                            object_request.take(),
+                        );
+                        Ok(())
                     });
-                    Ok(())
-                }).unwrap_or(Ok(()));
+                return Ok(());
             }
 
             // Open a path under the current directory.
@@ -249,12 +252,23 @@ impl StarnixNodeConnection {
             return error!(EINVAL);
         }
         let file = self.reopen(flags)?;
-        let server_end = std::mem::replace(server_end, zx::Handle::invalid().into());
-        scope.clone().spawn_with_shutdown(move |shutdown| {
-            file::connection::io1::create_raw_connection_async(
-                scope, file, flags, server_end, true, true, false, shutdown,
-            )
-        });
+        flags.to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into())).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                Box::pin(async move {
+                    Ok(file::connection::io1::create_raw_connection_async(
+                        scope,
+                        file,
+                        flags.to_file_options()?,
+                        object_request.take(),
+                        true,
+                        true,
+                        false,
+                        shutdown,
+                    ))
+                })
+            },
+        );
         Ok(())
     }
 
@@ -377,7 +391,7 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
 
 #[async_trait]
 impl file::File for StarnixNodeConnection {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), zx::Status> {
+    async fn open(&self, _optionss: &file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
     async fn truncate(&self, length: u64) -> Result<(), zx::Status> {

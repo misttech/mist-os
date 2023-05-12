@@ -4,80 +4,33 @@
 
 //! Common utilities for implementing file nodes and connections.
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {crate::file::FileOptions, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Validate that the requested flags for a new connection are valid. This includes permission
-/// handling, only allowing certain operations, and disallowing invalid flag combinations.
+/// handling, only allowing certain operations.
 ///
-/// On success, returns the validated flags, with some ambiguities cleaned up. On failure, it
-/// returns a [`Status`] indicating the problem.
-///
-/// [`fio::OpenFlags::OPEN_FLAG_NODE_REFERENCE`] is preserved and prohibits read and write access.
-///
-/// Changing this function can be dangerous! Flags operations may have security implications.
-pub fn new_connection_validate_flags(
-    mut flags: fio::OpenFlags,
+/// Changing this function can be dangerous! There are security implications.
+pub fn new_connection_validate_options(
+    options: &FileOptions,
     readable: bool,
     writable: bool,
     executable: bool,
-) -> Result<fio::OpenFlags, zx::Status> {
+) -> Result<(), zx::Status> {
     // Nodes supporting both W+X rights are not supported.
     debug_assert!(!(writable && executable));
 
-    // Check target type.
-    if flags.intersects(fio::OpenFlags::DIRECTORY) {
-        return Err(zx::Status::NOT_DIR);
-    }
-    if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-        flags &= !fio::OpenFlags::NOT_DIRECTORY;
-    }
-
-    // For files, the OPEN_FLAG_POSIX_* flags are ignored as they have meaning only for directories.
-    flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
-
     // Validate permissions.
-    if !readable && flags.intersects(fio::OpenFlags::RIGHT_READABLE) {
+    if !readable && options.rights.contains(fio::Operations::READ_BYTES) {
         return Err(zx::Status::ACCESS_DENIED);
     }
-    if !writable && flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+    if !writable && options.rights.contains(fio::Operations::WRITE_BYTES) {
         return Err(zx::Status::ACCESS_DENIED);
     }
-    if !executable && flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
+    if !executable && options.rights.contains(fio::Operations::EXECUTE) {
         return Err(zx::Status::ACCESS_DENIED);
     }
 
-    // Verify allowed operations/flags this node supports.
-    let flags_without_rights = flags.difference(
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-    );
-    let allowed_flags = fio::OpenFlags::NODE_REFERENCE
-        | fio::OpenFlags::DESCRIBE
-        | fio::OpenFlags::CREATE
-        | fio::OpenFlags::CREATE_IF_ABSENT
-        | if writable {
-            fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE
-        } else {
-            fio::OpenFlags::empty()
-        };
-    if flags_without_rights.intersects(!allowed_flags) {
-        return Err(zx::Status::NOT_SUPPORTED);
-    }
-
-    // Disallow invalid flag combinations.
-    let mut prohibited_flags = fio::OpenFlags::empty();
-    if !(flags.intersects(fio::OpenFlags::RIGHT_WRITABLE)) {
-        prohibited_flags |= fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE
-    }
-    if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        prohibited_flags |= !fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
-    }
-    if flags.intersects(prohibited_flags) {
-        return Err(zx::Status::INVALID_ARGS);
-    }
-
-    Ok(flags)
+    Ok(())
 }
 
 /// Converts the set of validated VMO flags to their respective zx::Rights.
@@ -143,11 +96,11 @@ pub fn get_backing_memory_validate_flags(
 #[cfg(test)]
 mod tests {
     use super::{
-        get_backing_memory_validate_flags, new_connection_validate_flags, vmo_flags_to_rights,
+        get_backing_memory_validate_flags, new_connection_validate_options, vmo_flags_to_rights,
     };
-    use crate::test_utils::build_flag_combinations;
+    use crate::{file::FileOptions, test_utils::build_flag_combinations, ProtocolsExt};
 
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {assert_matches::assert_matches, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     fn io_flags_to_rights(flags: fio::OpenFlags) -> (bool, bool, bool) {
         return (
@@ -163,63 +116,27 @@ mod tests {
             | if executable { fio::VmoFlags::EXECUTE } else { fio::VmoFlags::empty() };
     }
 
-    #[track_caller]
-    fn ncvf_ok(
+    fn ncvf(
         flags: fio::OpenFlags,
         readable: bool,
         writable: bool,
         executable: bool,
-        expected_new_flags: fio::OpenFlags,
-    ) {
-        assert!(!(writable && executable), "Cannot specify both writable and executable!");
-        let res = new_connection_validate_flags(flags, readable, writable, executable);
-        match res {
-            Ok(new_flags) => assert_eq!(
-                expected_new_flags, new_flags,
-                "new_connection_validate_flags returned unexpected set of flags.\n\
-                    Expected: {:?}\n\
-                    Actual: {:?}",
-                expected_new_flags, new_flags
-            ),
-            Err(status) => panic!("new_connection_validate_flags failed.  Status: {}", status),
-        }
-    }
-
-    #[track_caller]
-    fn ncvf_err(
-        flags: fio::OpenFlags,
-        readable: bool,
-        writable: bool,
-        executable: bool,
-        expected_status: zx::Status,
-    ) {
-        let res = new_connection_validate_flags(flags, readable, writable, executable);
-        match res {
-            Ok(new_flags) => panic!(
-                "new_connection_validate_flags should have failed.  \
-                    Got new flags: {:X}",
-                new_flags
-            ),
-            Err(status) => assert_eq!(expected_status, status),
-        }
+    ) -> Result<FileOptions, zx::Status> {
+        let options = flags.to_file_options()?;
+        new_connection_validate_options(&options, readable, writable, executable)?;
+        Ok(options)
     }
 
     #[test]
     fn new_connection_validate_flags_node_reference() {
-        ncvf_err(
-            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY,
-            true,
-            true,
-            false,
-            zx::Status::NOT_DIR,
+        assert_matches!(
+            ncvf(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY, true, true, false),
+            Err(zx::Status::NOT_DIR)
         );
 
-        ncvf_ok(
-            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
-            true,
-            true,
-            false,
-            fio::OpenFlags::NODE_REFERENCE,
+        assert_matches!(
+            ncvf(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY, true, true, false),
+            Ok(FileOptions { is_node: true, .. })
         );
     }
 
@@ -243,7 +160,7 @@ mod tests {
             if (writable && executable) || !open_flags.intersects(ALL_POSIX_FLAGS) {
                 continue;
             }
-            ncvf_ok(open_flags, readable, writable, executable, open_flags & !ALL_POSIX_FLAGS);
+            assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
         }
     }
 
@@ -258,57 +175,39 @@ mod tests {
         ) {
             let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
             let (readable, writable, executable) = io_flags_to_rights(open_flags);
-            ncvf_ok(open_flags, readable, writable, executable, open_flags);
+            assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
         }
     }
 
     #[test]
     fn new_connection_validate_flags_truncate() {
-        ncvf_err(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE,
-            true,
-            true,
-            false,
-            zx::Status::INVALID_ARGS,
+        assert_matches!(
+            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE, true, true, false,),
+            Err(zx::Status::INVALID_ARGS)
         );
-        ncvf_ok(
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
-            true,
-            true,
-            false,
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
+        assert_matches!(
+            ncvf(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE, true, true, false),
+            Ok(_)
         );
-        ncvf_err(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE,
-            true,
-            false,
-            false,
-            zx::Status::NOT_SUPPORTED,
+        assert_matches!(
+            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE, true, false, false),
+            Err(zx::Status::INVALID_ARGS)
         );
     }
 
     #[test]
     fn new_connection_validate_flags_append() {
-        ncvf_err(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND,
-            true,
-            false,
-            false,
-            zx::Status::NOT_SUPPORTED,
+        assert_eq!(
+            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, false, false),
+            Err(zx::Status::INVALID_ARGS),
         );
-        ncvf_err(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND,
-            true,
-            true,
-            false,
-            zx::Status::INVALID_ARGS,
+        assert_eq!(
+            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, true, false),
+            Err(zx::Status::INVALID_ARGS),
         );
-        ncvf_ok(
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
-            true,
-            true,
-            false,
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
+        assert_matches!(
+            ncvf(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND, true, true, false),
+            Ok(_)
         );
     }
 
@@ -327,18 +226,27 @@ mod tests {
             // Ensure all combinations are valid except when both writable and executable are set,
             // as this combination is disallowed.
             if !(writable && executable) {
-                ncvf_ok(open_flags, readable, writable, executable, open_flags);
+                assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
             }
 
             // Ensure we report ACCESS_DENIED if open_flags exceeds the supported connection rights.
             if readable && !(writable && executable) {
-                ncvf_err(open_flags, false, writable, executable, zx::Status::ACCESS_DENIED);
+                assert_eq!(
+                    ncvf(open_flags, false, writable, executable),
+                    Err(zx::Status::ACCESS_DENIED)
+                );
             }
             if writable {
-                ncvf_err(open_flags, readable, false, executable, zx::Status::ACCESS_DENIED);
+                assert_eq!(
+                    ncvf(open_flags, readable, false, executable),
+                    Err(zx::Status::ACCESS_DENIED)
+                );
             }
             if executable {
-                ncvf_err(open_flags, readable, writable, false, zx::Status::ACCESS_DENIED);
+                assert_eq!(
+                    ncvf(open_flags, readable, writable, false),
+                    Err(zx::Status::ACCESS_DENIED)
+                );
             }
         }
     }

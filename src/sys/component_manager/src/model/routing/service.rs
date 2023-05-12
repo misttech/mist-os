@@ -37,10 +37,7 @@ use {
     },
     tracing::{error, warn},
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options,
-            connection::io1::DerivedConnection,
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher},
@@ -50,6 +47,7 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -124,17 +122,23 @@ impl DirectoryEntry for FilteredServiceDirectory {
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        if path.is_empty() {
-            // If path is empty just connect to itself as a directory.
-            return with_directory_options(flags, server_end, |describe, options, server_end| {
-                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
-            })
-            .unwrap_or(());
-        }
-        let input_path_string = path.clone().into_string();
-        let service_instance_name =
-            path.peek().map(ToString::to_string).expect("path should not be empty");
-        if self.path_matches_allowed_instance(&service_instance_name) {
+        flags.to_object_request(server_end).handle(|object_request| {
+            if path.is_empty() {
+                // If path is empty just connect to itself as a directory.
+                ImmutableConnection::create_connection(
+                    scope,
+                    self,
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                return Ok(());
+            }
+            let input_path_string = path.clone().into_string();
+            let service_instance_name =
+                path.peek().map(ToString::to_string).expect("path should not be empty");
+            if !self.path_matches_allowed_instance(&service_instance_name) {
+                return Err(zx::Status::NOT_FOUND);
+            }
             let source_path = self
                 .instance_name_target_to_source
                 .get(&service_instance_name)
@@ -152,23 +156,20 @@ impl DirectoryEntry for FilteredServiceDirectory {
                     format!("{}/{}", source, protocol_name).to_string()
                 });
 
-            if let Err(e) =
-                self.source_dir_proxy.open(flags, fio::ModeType::empty(), &source_path, server_end)
-            {
+            if let Err(e) = self.source_dir_proxy.open(
+                flags,
+                fio::ModeType::empty(),
+                &source_path,
+                object_request.take().into_server_end(),
+            ) {
                 error!(
                     error = %e,
                     path = source_path.as_str(),
                     "Error opening instance in FilteredServiceDirectory"
                 );
             }
-            return;
-        } else {
-            send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
-                server_end,
-                zx::Status::NOT_FOUND,
-            );
-        }
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

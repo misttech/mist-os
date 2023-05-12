@@ -23,12 +23,12 @@ use {
         pin::Pin,
         sync::{Arc, RwLock},
     },
-    tracing::error,
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{connection, File as VfsFile, FileIo as VfsFileIo},
+        file::{connection, File as VfsFile, FileIo as VfsFileIo, FileOptions},
         path::Path,
+        ObjectRequest, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -148,6 +148,25 @@ impl FatFile {
         self.filesystem.mark_dirty();
         Ok((total_written as u64, file_offset))
     }
+
+    pub(crate) fn create_connection(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequest,
+    ) {
+        connection::io1::create_connection(
+            // Note readable/writable do not override what's set in flags, they merely tell the
+            // FileConnection that it's valid to open the file readable/writable.
+            scope,
+            self,
+            options,
+            object_request,
+            /*readable=*/ true,
+            /*writable=*/ true,
+            /*executable=*/ false,
+        );
+    }
 }
 
 impl Node for FatFile {
@@ -213,7 +232,7 @@ impl Debug for FatFile {
 
 #[async_trait]
 impl VfsFile for FatFile {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -348,31 +367,15 @@ impl DirectoryEntry for FatFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let status = if !path.is_empty() {
-            Err(Status::NOT_DIR)
-        } else {
-            self.open_ref(&self.filesystem.lock().unwrap())
-        };
-        match status {
-            Ok(_) => {}
-            Err(e) => {
-                server_end
-                    .close_with_epitaph(e)
-                    .unwrap_or_else(|e| error!("Failing failed: {:?}", e));
-                return;
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(Status::NOT_DIR);
             }
-        }
-        connection::io1::create_connection(
-            // Note readable/writable do not override what's set in flags, they merely tell the
-            // FileConnection that it's valid to open the file readable/writable.
-            scope.clone(),
-            self,
-            flags,
-            server_end,
-            /*readable=*/ true,
-            /*writable=*/ true,
-            /*executable=*/ false,
-        );
+            let options = flags.to_file_options()?;
+            self.open_ref(&self.filesystem.lock().unwrap())?;
+            self.create_connection(scope, options, object_request.take());
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

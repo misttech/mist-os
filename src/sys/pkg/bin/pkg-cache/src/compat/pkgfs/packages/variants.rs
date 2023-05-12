@@ -16,10 +16,7 @@ use {
     },
     tracing::error,
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options,
-            connection::io1::DerivedConnection,
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher},
@@ -28,6 +25,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -60,42 +58,48 @@ impl DirectoryEntry for PkgfsPackagesVariants {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+        flags.to_object_request(server_end).handle(|object_request| {
+            // This directory and all child nodes are read-only
+            if flags.intersects(
+                fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::CREATE
+                    | fio::OpenFlags::CREATE_IF_ABSENT
+                    | fio::OpenFlags::TRUNCATE
+                    | fio::OpenFlags::APPEND,
+            ) {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
 
-        // This directory and all child nodes are read-only
-        if flags.intersects(
-            fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::TRUNCATE
-                | fio::OpenFlags::APPEND,
-        ) {
-            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-        }
-
-        match path.next().map(|variant| self.variant(variant)) {
-            None => {
-                let () =
-                    with_directory_options(flags, server_end, |describe, options, server_end| {
-                        ImmutableConnection::create_connection(
-                            scope, self, describe, options, server_end,
+            match path.next().map(|variant| self.variant(variant)) {
+                None => {
+                    ImmutableConnection::create_connection(
+                        scope,
+                        self,
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    );
+                }
+                Some(Some(hash)) => {
+                    let blobfs = self.blobfs.clone();
+                    let server_end = object_request.take().into_server_end();
+                    scope.clone().spawn(async move {
+                        if let Err(e) = package_directory::serve_path(
+                            scope, blobfs, hash, flags, path, server_end,
                         )
+                        .await
+                        {
+                            error!(
+                                "Failed to open package directory for {}: {:#}",
+                                hash,
+                                anyhow!(e)
+                            );
+                        }
                     })
-                    .unwrap_or(());
+                }
+                Some(None) => return Err(zx::Status::NOT_FOUND),
             }
-            Some(Some(hash)) => {
-                let blobfs = self.blobfs.clone();
-                scope.clone().spawn(async move {
-                    if let Err(e) =
-                        package_directory::serve_path(scope, blobfs, hash, flags, path, server_end)
-                            .await
-                    {
-                        error!("Failed to open package directory for {}: {:#}", hash, anyhow!(e));
-                    }
-                })
-            }
-            Some(None) => send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND),
-        }
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

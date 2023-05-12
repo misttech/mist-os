@@ -10,17 +10,18 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_hash::Hash,
     fuchsia_zircon as zx,
+    futures::FutureExt,
     std::{collections::BTreeMap, str::FromStr, sync::Arc},
     system_image::{ExecutabilityRestrictions, NonStaticAllowList},
     tracing::error,
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
-            immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
+            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -115,86 +116,93 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
-        // This directory and all child nodes are read-only
-        if flags.intersects(
-            fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::TRUNCATE
-                | fio::OpenFlags::APPEND,
-        ) {
-            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-        }
+        flags.to_object_request(server_end).handle(|object_request| {
+            // This directory and all child nodes are read-only
+            if flags.intersects(
+                fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::CREATE
+                    | fio::OpenFlags::CREATE_IF_ABSENT
+                    | fio::OpenFlags::TRUNCATE
+                    | fio::OpenFlags::APPEND,
+            ) {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
 
-        scope.clone().spawn(async move {
             // The `path.next()` above pops of the next path element, but `path`
             // still holds any remaining path elements.
             match path.next().map(Hash::from_str) {
                 None => {
-                    let () = with_directory_options(
-                        flags,
-                        server_end,
-                        |describe, options, server_end| {
-                            ImmutableConnection::create_connection(
-                                scope, self, describe, options, server_end,
-                            )
-                        },
-                    )
-                    .unwrap_or(());
+                    ImmutableConnection::create_connection(
+                        scope,
+                        self,
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    );
+                    Ok(())
                 }
                 Some(Ok(package_hash)) => {
-                    let package_status = crate::cache_service::get_package_status(
-                        self.base_packages.as_ref(),
-                        self.non_base_packages.as_ref(),
-                        &package_hash,
-                    )
-                    .await;
-                    if let crate::cache_service::PackageStatus::Other = package_status {
-                        let () =
-                            send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
-                        return;
-                    }
+                    let cloned_scope = scope.clone();
+                    object_request.take().spawn(&scope, move |object_request, _| {
+                        async move {
+                            let package_status = crate::cache_service::get_package_status(
+                                self.base_packages.as_ref(),
+                                self.non_base_packages.as_ref(),
+                                &package_hash,
+                            )
+                            .await;
+                            if let crate::cache_service::PackageStatus::Other = package_status {
+                                return Err(zx::Status::NOT_FOUND);
+                            }
 
-                    let executability_status = crate::cache_service::executability_status(
-                        self.executability_restrictions,
-                        &package_status,
-                        self.non_static_allow_list.as_ref(),
-                    );
-                    let executablity_requested = flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE);
-                    use crate::cache_service::ExecutabilityStatus::*;
-                    let flags = match (executability_status, executablity_requested) {
-                        (Forbidden, true) => {
-                            let () = send_on_open_with_error(
-                                describe,
-                                server_end,
-                                zx::Status::ACCESS_DENIED,
+                            let executability_status = crate::cache_service::executability_status(
+                                self.executability_restrictions,
+                                &package_status,
+                                self.non_static_allow_list.as_ref(),
                             );
-                            return;
+                            let executablity_requested =
+                                flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE);
+                            use crate::cache_service::ExecutabilityStatus::*;
+                            let flags = match (executability_status, executablity_requested) {
+                                (Forbidden, true) => {
+                                    return Err(zx::Status::ACCESS_DENIED);
+                                }
+                                (Forbidden, false) => {
+                                    flags.difference(fio::OpenFlags::POSIX_EXECUTABLE)
+                                }
+                                (Allowed, _) => flags,
+                            };
+
+                            let server_end = object_request.take().into_server_end();
+                            Ok(async move {
+                                if let Err(e) = package_directory::serve_path(
+                                    cloned_scope,
+                                    self.blobfs.clone(),
+                                    package_hash,
+                                    flags,
+                                    path,
+                                    server_end,
+                                )
+                                .await
+                                {
+                                    error!(
+                                        "Unable to serve package for {}: {:#}",
+                                        package_hash,
+                                        anyhow!(e)
+                                    );
+                                }
+                            })
                         }
-                        (Forbidden, false) => flags.difference(fio::OpenFlags::POSIX_EXECUTABLE),
-                        (Allowed, _) => flags,
-                    };
-                    if let Err(e) = package_directory::serve_path(
-                        scope,
-                        self.blobfs.clone(),
-                        package_hash,
-                        flags,
-                        path,
-                        server_end,
-                    )
-                    .await
-                    {
-                        error!("Unable to serve package for {}: {:#}", package_hash, anyhow!(e));
-                    }
+                        .boxed()
+                    });
+                    Ok(())
                 }
                 Some(Err(_)) => {
                     // Names that are not valid hashes can't exist in this directory.
-                    send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND)
+                    Err(zx::Status::NOT_FOUND)
                 }
             }
-        })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

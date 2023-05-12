@@ -16,10 +16,7 @@ use {
         sync::Arc,
     },
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options,
-            connection::io1::DerivedConnection,
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher},
@@ -28,6 +25,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -79,46 +77,47 @@ impl DirectoryEntry for PkgfsPackages {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+        flags.to_object_request(server_end).handle(|object_request| {
+            // This directory and all child nodes are read-only
+            if flags.intersects(
+                fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::CREATE
+                    | fio::OpenFlags::CREATE_IF_ABSENT
+                    | fio::OpenFlags::TRUNCATE
+                    | fio::OpenFlags::APPEND,
+            ) {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
 
-        // This directory and all child nodes are read-only
-        if flags.intersects(
-            fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::TRUNCATE
-                | fio::OpenFlags::APPEND,
-        ) {
-            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-        }
-
-        scope.clone().spawn(async move {
             match path.next().map(PackageName::from_str) {
                 None => {
-                    let () = with_directory_options(
-                        flags,
-                        server_end,
-                        |describe, options, server_end| {
-                            ImmutableConnection::create_connection(
-                                scope, self, describe, options, server_end,
-                            )
-                        },
-                    )
-                    .unwrap_or(());
+                    ImmutableConnection::create_connection(
+                        scope.clone(),
+                        self,
+                        flags.to_directory_options()?,
+                        object_request.take(),
+                    );
+                    Ok(())
                 }
-                Some(Ok(package_name)) => match self.package_variants(&package_name).await {
-                    Some(variants) => {
-                        Arc::new(PkgfsPackagesVariants::new(variants, self.blobfs.clone()))
-                            .open(scope, flags, path, server_end)
-                    }
-                    None => send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND),
-                },
+                Some(Ok(package_name)) => {
+                    let object_request = object_request.take();
+                    scope.clone().spawn(async move {
+                        match self.package_variants(&package_name).await {
+                            Some(variants) => {
+                                Arc::new(PkgfsPackagesVariants::new(variants, self.blobfs.clone()))
+                                    .open(scope, flags, path, object_request.into_server_end());
+                            }
+                            None => object_request.shutdown(zx::Status::NOT_FOUND),
+                        }
+                    });
+                    Ok(())
+                }
                 Some(Err(_)) => {
                     // Names that are not valid package names can't exist in this directory.
-                    send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND)
+                    Err(zx::Status::NOT_FOUND)
                 }
             }
-        })
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {

@@ -18,6 +18,57 @@ mod common;
 
 pub mod connection;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct FileOptions {
+    pub rights: fio::Operations,
+    pub is_node: bool,
+    pub is_append: bool,
+}
+
+impl FileOptions {
+    /// Converts to `StreamOptions`. Returns `None` if a stream should not be used for a connection
+    /// with these options.
+    pub fn to_stream_options(&self) -> Option<zx::StreamOptions> {
+        if self.is_node {
+            // Don't use streams when opening a connection as a node reference. Reading, writing, or
+            // seeking on a node reference should return ZX_ERR_BAD_HANDLE. Giving a node reference
+            // a stream with no rights will fail those requests with ZX_ERR_ACCESS_DENIED.
+            return None;
+        }
+        let mut options = zx::StreamOptions::empty();
+        if self.rights.contains(fio::Operations::READ_BYTES) {
+            options |= zx::StreamOptions::MODE_READ;
+        }
+        if self.rights.contains(fio::Operations::WRITE_BYTES) {
+            options |= zx::StreamOptions::MODE_WRITE;
+        }
+        if self.is_append {
+            options |= zx::StreamOptions::MODE_APPEND;
+        }
+        Some(options)
+    }
+
+    pub(crate) fn to_io1(&self) -> fio::OpenFlags {
+        let mut flags = fio::OpenFlags::empty();
+        if self.rights.contains(fio::Operations::READ_BYTES) {
+            flags |= fio::OpenFlags::RIGHT_READABLE;
+        }
+        if self.rights.contains(fio::Operations::WRITE_BYTES) {
+            flags |= fio::OpenFlags::RIGHT_WRITABLE;
+        }
+        if self.rights.contains(fio::Operations::EXECUTE) {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        }
+        if self.is_node {
+            flags |= fio::OpenFlags::NODE_REFERENCE;
+        }
+        if self.is_append {
+            flags |= fio::OpenFlags::APPEND;
+        }
+        flags
+    }
+}
+
 /// Trait used for all files.
 #[async_trait]
 pub trait File: Send + Sync {
@@ -28,7 +79,7 @@ pub trait File: Send + Sync {
     /// * OPEN_FLAG_TRUNCATE - A call to truncate() will be made immediately after open().
     /// * OPEN_FLAG_DESCRIBE - The OnOpen event is sent before any other requests are received from
     /// the file's client.
-    async fn open(&self, flags: fio::OpenFlags) -> Result<(), Status>;
+    async fn open(&self, options: &FileOptions) -> Result<(), Status>;
 
     /// Truncate the file to |length|.
     /// If there are pending attributes to update (see set_attrs), they should also be flushed at
@@ -45,6 +96,14 @@ pub trait File: Send + Sync {
 
     /// Get this file's attributes.
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
+
+    /// Returns node attributes (io2).
+    async fn get_attributes(
+        &self,
+        _requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
 
     /// Set the attributes of this file based on the values in `attrs`.
     async fn set_attrs(

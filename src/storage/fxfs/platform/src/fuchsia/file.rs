@@ -16,7 +16,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::{channel::oneshot, join},
+    futures::{channel::oneshot, future::BoxFuture, join, FutureExt},
     fxfs::{
         async_enter,
         filesystem::SyncOptions,
@@ -34,17 +34,17 @@ use {
         },
     },
     vfs::{
-        common::{rights_to_posix_mode_bits, send_on_open_with_error},
+        common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{
             connection::io1::{
                 create_node_reference_connection_async, create_stream_connection_async,
-                create_stream_options_from_open_flags,
             },
-            File,
+            File, FileOptions,
         },
         path::Path,
+        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -76,44 +76,41 @@ impl FxFile {
         self.open_count.load(Ordering::Relaxed)
     }
 
-    pub async fn create_connection(
+    pub fn create_connection_async(
         this: OpenedNode<FxFile>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        server_end: ServerEnd<fio::NodeMarker>,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
         shutdown: oneshot::Receiver<()>,
-    ) {
-        if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            create_node_reference_connection_async(scope, this.take(), flags, server_end, shutdown)
-                .await;
+    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+        if options.is_node {
+            Ok(create_node_reference_connection_async(
+                scope,
+                this.take(),
+                options,
+                object_request.take(),
+                shutdown,
+            )
+            .boxed())
         } else {
-            let options = create_stream_options_from_open_flags(flags)
-                .unwrap_or_else(|| panic!("Invalid flags for stream connection: {:?}", flags));
-            let stream = match zx::Stream::create(options, this.vmo(), 0) {
-                Ok(stream) => stream,
-                Err(status) => {
-                    send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        status,
-                    );
-                    return;
-                }
-            };
-            create_stream_connection_async(
+            let stream_options = options
+                .to_stream_options()
+                .unwrap_or_else(|| panic!("Invalid options for stream connection: {:?}", options));
+            let stream = zx::Stream::create(stream_options, this.vmo(), 0)?;
+            Ok(create_stream_connection_async(
                 // Note readable/writable/executable do not override what's set in flags, they
                 // merely tell the FileConnection which set of rights the file can be opened as.
                 scope.clone(),
                 this.take(),
-                flags,
-                server_end,
+                options,
+                object_request.take(),
                 /*readable=*/ true,
                 /*writable=*/ true,
                 /*executable=*/ false,
                 stream,
                 shutdown,
             )
-            .await;
+            .boxed())
         }
     }
 
@@ -233,17 +230,23 @@ impl DirectoryEntry for FxFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        if !path.is_empty() {
-            send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
-                server_end,
-                Status::NOT_FILE,
-            );
-            return;
-        }
-        scope.clone().spawn_with_shutdown(move |shutdown| {
-            Self::create_connection(OpenedNode::new(self), scope, flags, server_end, shutdown)
-        });
+        flags.to_object_request(server_end).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                Box::pin(async move {
+                    if !path.is_empty() {
+                        return Err(Status::NOT_FILE);
+                    }
+                    Self::create_connection_async(
+                        OpenedNode::new(self),
+                        scope,
+                        flags.to_file_options()?,
+                        object_request,
+                        shutdown,
+                    )
+                })
+            },
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -253,7 +256,7 @@ impl DirectoryEntry for FxFile {
 
 #[async_trait]
 impl File for FxFile {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 

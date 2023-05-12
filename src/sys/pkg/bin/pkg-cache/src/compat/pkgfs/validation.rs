@@ -12,13 +12,13 @@ use {
     },
     tracing::{error, info},
     vfs::{
-        common::send_on_open_with_error,
         directory::{
-            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
-            immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
+            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -67,25 +67,31 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
     ) {
         let flags =
             flags.difference(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+
+        let object_request = flags.to_object_request(server_end);
 
         if path.is_empty() {
-            if flags.intersects(
-                fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::TRUNCATE
-                    | fio::OpenFlags::APPEND,
-            ) {
-                let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-                return;
-            }
+            object_request.handle(|object_request| {
+                if flags.intersects(
+                    fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::RIGHT_EXECUTABLE
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::CREATE_IF_ABSENT
+                        | fio::OpenFlags::TRUNCATE
+                        | fio::OpenFlags::APPEND,
+                ) {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
 
-            return with_directory_options(flags, server_end, |describe, options, server_end| {
-                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
-            })
-            .unwrap_or(());
+                ImmutableConnection::create_connection(
+                    scope,
+                    self,
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                Ok(())
+            });
+            return;
         }
 
         if path.as_ref() == "missing" {
@@ -95,13 +101,13 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
                     scope,
                     flags,
                     VfsPath::dot(),
-                    server_end,
+                    object_request.into_server_end(),
                 );
             });
             return;
         }
 
-        let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
+        object_request.shutdown(zx::Status::NOT_FOUND);
     }
 
     fn entry_info(&self) -> EntryInfo {

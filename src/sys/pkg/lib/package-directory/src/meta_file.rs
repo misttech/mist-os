@@ -12,8 +12,8 @@ use {
     std::sync::Arc,
     tracing::error,
     vfs::{
-        common::send_on_open_with_error, directory::entry::EntryInfo,
-        execution_scope::ExecutionScope, path::Path as VfsPath,
+        directory::entry::EntryInfo, execution_scope::ExecutionScope, path::Path as VfsPath,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -68,32 +68,35 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
-        if !path.is_empty() {
-            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_DIR);
-            return;
-        }
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(zx::Status::NOT_DIR);
+            }
 
-        if flags.intersects(
-            fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::TRUNCATE
-                | fio::OpenFlags::APPEND,
-        ) {
-            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-            return;
-        }
+            if flags.intersects(
+                fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::RIGHT_EXECUTABLE
+                    | fio::OpenFlags::CREATE
+                    | fio::OpenFlags::CREATE_IF_ABSENT
+                    | fio::OpenFlags::TRUNCATE
+                    | fio::OpenFlags::APPEND,
+            ) {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
 
-        let () = vfs::file::connection::io1::create_connection(
-            scope, self, flags, server_end,
-            // readable/writable do not override what's set in flags, they merely tell the
-            // FileConnection that it's valid to open the file readable/writable.
-            true,  /*=readable*/
-            false, /*=writable*/
-            false, /*=executable*/
-        );
+            let () = vfs::file::connection::io1::create_connection(
+                scope,
+                self,
+                flags.to_file_options()?,
+                object_request.take(),
+                // readable/writable do not override what's set in flags, they merely tell the
+                // FileConnection that it's valid to open the file readable/writable.
+                true,  /*=readable*/
+                false, /*=writable*/
+                false, /*=executable*/
+            );
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
@@ -103,7 +106,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
 
 #[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
-    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), zx::Status> {
+    async fn open(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
 
@@ -238,6 +241,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             file::{File, FileIo},
+            ProtocolsExt,
         },
     };
 
@@ -383,7 +387,10 @@ mod tests {
     async fn file_open() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        assert_eq!(File::open(&meta_file, fio::OpenFlags::empty()).await, Ok(()));
+        assert_eq!(
+            File::open(&meta_file, &fio::OpenFlags::empty().to_file_options().unwrap()).await,
+            Ok(())
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

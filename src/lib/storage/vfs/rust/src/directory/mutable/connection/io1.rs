@@ -10,7 +10,6 @@ use crate::{
         extended_attributes_sender,
     },
     directory::{
-        common::DirectoryOptions,
         connection::{
             io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
@@ -18,10 +17,12 @@ use crate::{
         entry::DirectoryEntry,
         entry_container::MutableDirectory,
         mutable::entry_constructor::NewEntryType,
+        DirectoryOptions,
     },
     execution_scope::ExecutionScope,
     path::{validate_name, Path},
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
+    ObjectRequest,
 };
 
 use {
@@ -50,26 +51,6 @@ impl DerivedConnection for MutableConnection {
         MutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
     }
 
-    fn create_connection(
-        scope: ExecutionScope,
-        directory: Arc<Self::Directory>,
-        describe: bool,
-        options: DirectoryOptions,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        if let Ok((connection, requests)) =
-            Self::prepare_connection(scope.clone(), directory, describe, options, server_end)
-        {
-            // If we fail to send the task to the executor, it is probably shut down or is in the
-            // process of shutting down (this is the only error state currently).  So there is
-            // nothing for us to do - the connection will be closed automatically when the
-            // connection object is dropped.
-            let _ = scope.spawn_with_shutdown(move |shutdown| {
-                Self::handle_requests(connection, requests, shutdown)
-            });
-        }
-    }
-
     fn entry_not_found(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
@@ -90,19 +71,43 @@ impl DerivedConnection for MutableConnection {
 }
 
 impl MutableConnection {
+    pub fn create_connection(
+        scope: ExecutionScope,
+        directory: Arc<dyn MutableDirectory>,
+        options: DirectoryOptions,
+        object_request: ObjectRequest,
+    ) {
+        // Ensure we close the directory if we fail to prepare the connection.
+        let directory = OpenDirectory::new(directory);
+
+        let connection = Self::new(scope.clone(), directory, options);
+
+        // If we fail to send the task to the executor, it is probably shut down or is in the
+        // process of shutting down (this is the only error state currently).  So there is
+        // nothing for us to do - the connection will be closed automatically when the
+        // connection object is dropped.
+        let _ = scope.spawn_with_shutdown(move |shutdown| async {
+            if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
+                Self::handle_requests(connection, requests, shutdown).await;
+            }
+        });
+    }
+
     /// Very similar to create_connection, but creates a connection without spawning a new task.
     pub async fn create_connection_async(
         scope: ExecutionScope,
         directory: Arc<dyn MutableDirectory>,
-        describe: bool,
         options: DirectoryOptions,
-        server_end: ServerEnd<fio::NodeMarker>,
+        object_request: ObjectRequest,
         shutdown: oneshot::Receiver<()>,
     ) {
-        if let Ok((connection, requests)) =
-            Self::prepare_connection(scope, directory, describe, options, server_end)
-        {
-            Self::handle_requests(connection, requests, shutdown).await;
+        // Ensure we close the directory if we fail to prepare the connection.
+        let directory = OpenDirectory::new(directory);
+
+        let connection = Self::new(scope, directory, options);
+
+        if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
+            Self::handle_requests(connection, requests, shutdown).await
         }
     }
 
@@ -338,30 +343,6 @@ impl MutableConnection {
         self.base.directory.remove_extended_attribute(name).await
     }
 
-    fn prepare_connection(
-        scope: ExecutionScope,
-        directory: Arc<dyn MutableDirectory>,
-        describe: bool,
-        options: DirectoryOptions,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) -> Result<(Self, fio::DirectoryRequestStream), Error> {
-        // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenDirectory::new(directory);
-
-        let (requests, control_handle) =
-            ServerEnd::<fio::DirectoryMarker>::new(server_end.into_channel())
-                .into_stream_and_control_handle()?;
-
-        let connection = Self::new(scope, directory, options);
-
-        if describe {
-            control_handle
-                .send_on_open_(zx::Status::OK.into_raw(), Some(connection.base.node_info()))?;
-        }
-
-        Ok((connection, requests))
-    }
-
     async fn handle_requests(
         self,
         requests: fio::DirectoryRequestStream,
@@ -383,7 +364,7 @@ impl MutableConnection {
 
 impl TokenInterface for MutableConnection {
     fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-        (self.base.directory.clone(), self.base.options.into_io1())
+        (self.base.directory.clone(), self.base.options.to_io1())
     }
 
     fn token_registry(&self) -> &TokenRegistry {
@@ -397,15 +378,16 @@ mod tests {
         super::*,
         crate::{
             directory::{
-                common::with_directory_options,
                 dirents_sink,
                 entry::{DirectoryEntry, EntryInfo},
                 entry_container::{Directory, DirectoryWatcher},
                 traversal_position::TraversalPosition,
             },
             path::Path,
+            ProtocolsExt, ToObjectRequest,
         },
         async_trait::async_trait,
+        fidl::endpoints::ServerEnd,
         std::{
             any::Any,
             sync::{Arc, Mutex, Weak},
@@ -572,17 +554,15 @@ mod tests {
             *cur_id += 1;
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            let server_end = server_end.into_channel().into();
-            let () = with_directory_options(flags, server_end, |describe, options, server_end| {
+            flags.to_object_request(server_end).handle(|object_request| {
                 MutableConnection::create_connection(
                     self.scope.clone(),
                     dir.clone(),
-                    describe,
-                    options,
-                    server_end,
-                )
-            })
-            .unwrap_or(());
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                Ok(())
+            });
             (dir, proxy)
         }
     }

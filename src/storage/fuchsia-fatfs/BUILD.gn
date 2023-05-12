@@ -23,7 +23,6 @@ fatfs_deps = [
   "//third_party/rust_crates:fatfs",
   "//third_party/rust_crates:libc",
   "//third_party/rust_crates:scopeguard",
-  "//third_party/rust_crates:tracing",
 ]
 
 fatfs_sources = [

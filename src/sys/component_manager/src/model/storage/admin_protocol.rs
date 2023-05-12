@@ -864,8 +864,6 @@ mod tests {
         test_case::test_case,
         vfs::{
             directory::{
-                common::with_directory_options,
-                connection::io1::DerivedConnection,
                 dirents_sink,
                 entry::{DirectoryEntry, EntryInfo},
                 entry_container::{Directory, DirectoryWatcher},
@@ -879,6 +877,7 @@ mod tests {
             file::vmo::read_only,
             mut_pseudo_directory,
             path::Path,
+            ProtocolsExt, ToObjectRequest,
         },
     };
 
@@ -1389,16 +1388,15 @@ mod tests {
             _path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            with_directory_options(flags, server_end, |describe, options, server_end| {
+            flags.to_object_request(server_end).handle(|object_request| {
                 ImmutableConnection::create_connection(
                     self.scope.clone(),
-                    self.clone(),
-                    describe,
-                    options,
-                    server_end,
-                )
-            })
-            .unwrap_or(())
+                    self,
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                Ok(())
+            });
         }
 
         fn entry_info(&self) -> EntryInfo {

@@ -84,9 +84,11 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   fio::Operations rights = fio::Operations::kGetAttributes;
   if (!options().flags.node_reference) {
-    rights |= options().rights.read ? fio::wire::kRStarDir : fio::Operations();
-    rights |= options().rights.write ? fio::wire::kWStarDir : fio::Operations();
-    rights |= options().rights.execute ? fio::wire::kXStarDir : fio::Operations();
+    rights |= options().rights.read ? fio::Operations::kReadBytes : fio::Operations();
+    rights |= options().rights.write
+                  ? fio::Operations::kWriteBytes | fio::Operations::kUpdateAttributes
+                  : fio::Operations();
+    rights |= options().rights.execute ? fio::Operations::kExecute : fio::Operations();
   }
   fidl::Arena arena;
   completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights).Build());

@@ -16,6 +16,7 @@ use {
     either::{Left, Right},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    futures::FutureExt,
     fxfs::{
         errors::FxfsError,
         filesystem::SyncOptions,
@@ -33,9 +34,8 @@ use {
         sync::{Arc, Mutex},
     },
     vfs::{
-        common::{rights_to_posix_mode_bits, send_on_open_with_error},
+        common::rights_to_posix_mode_bits,
         directory::{
-            common::with_directory_options,
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{DirectoryWatcher, MutableDirectory},
@@ -45,7 +45,8 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        symlink,
+        symlink::{self, SymlinkOptions},
+        ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -92,7 +93,7 @@ impl FxDirectory {
 
     async fn lookup(
         self: &Arc<Self>,
-        flags: fio::OpenFlags,
+        protocols: &dyn ProtocolsExt,
         mut path: Path,
         posix_attributes: Option<PosixAttributes>,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
@@ -112,32 +113,46 @@ impl FxDirectory {
             // lock in place.
             let keys =
                 [LockKey::object(store.store_object_id(), current_dir.directory.object_id())];
-            let transaction_or_guard = if last_segment && flags.intersects(fio::OpenFlags::CREATE) {
-                Left(fs.clone().new_transaction(&keys, Options::default()).await?)
-            } else {
-                // When child objects are created, the object is created along with the directory
-                // entry in the same transaction, and so we need to hold a read lock over the lookup
-                // and open calls.
-                Right(fs.read_lock(&keys).await)
-            };
+            let transaction_or_guard =
+                if last_segment && protocols.open_mode() != fio::OpenMode::OpenExisting {
+                    Left(fs.clone().new_transaction(&keys, Options::default()).await?)
+                } else {
+                    // When child objects are created, the object is created along with the
+                    // directory entry in the same transaction, and so we need to hold a read lock
+                    // over the lookup and open calls.
+                    Right(fs.read_lock(&keys).await)
+                };
 
             match current_dir.directory.lookup(name).await? {
                 Some((object_id, object_descriptor)) => {
                     if transaction_or_guard.is_left()
-                        && flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT)
+                        && protocols.open_mode() == fio::OpenMode::AlwaysCreate
                     {
                         bail!(FxfsError::AlreadyExists);
                     }
                     if last_segment {
                         match object_descriptor {
-                            ObjectDescriptor::File | ObjectDescriptor::Symlink => {
-                                if flags.intersects(fio::OpenFlags::DIRECTORY) {
-                                    bail!(FxfsError::NotDir)
+                            ObjectDescriptor::Directory => {
+                                if !protocols.is_dir_allowed() {
+                                    if protocols.is_file_allowed() {
+                                        bail!(FxfsError::NotFile)
+                                    } else {
+                                        bail!(FxfsError::WrongType)
+                                    }
                                 }
                             }
-                            ObjectDescriptor::Directory => {
-                                if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-                                    bail!(FxfsError::NotFile)
+                            ObjectDescriptor::File => {
+                                if !protocols.is_file_allowed() {
+                                    if protocols.is_dir_allowed() {
+                                        bail!(FxfsError::NotDir)
+                                    } else {
+                                        bail!(FxfsError::WrongType)
+                                    }
+                                }
+                            }
+                            ObjectDescriptor::Symlink => {
+                                if !protocols.is_symlink_allowed() {
+                                    bail!(FxfsError::WrongType)
                                 }
                             }
                             ObjectDescriptor::Volume => bail!(FxfsError::Inconsistent),
@@ -157,7 +172,12 @@ impl FxDirectory {
                     if let Left(mut transaction) = transaction_or_guard {
                         let node = OpenedNode::new(
                             current_dir
-                                .create_child(&mut transaction, name, flags, posix_attributes)
+                                .create_child(
+                                    &mut transaction,
+                                    name,
+                                    protocols.create_directory(),
+                                    posix_attributes,
+                                )
                                 .await?,
                         );
                         if let GetResult::Placeholder(p) =
@@ -188,10 +208,10 @@ impl FxDirectory {
         self: &Arc<Self>,
         transaction: &mut Transaction<'_>,
         name: &str,
-        flags: fio::OpenFlags,
+        create_dir: bool, // If false, creates a file.
         posix_attributes: Option<PosixAttributes>,
     ) -> Result<Arc<dyn FxNode>, Error> {
-        if flags.contains(fio::OpenFlags::DIRECTORY) {
+        if create_dir {
             Ok(Arc::new(FxDirectory::new(
                 Some(self.clone()),
                 self.directory.create_child_dir(transaction, name, posix_attributes).await?,
@@ -520,7 +540,7 @@ impl MutableDirectory for FxDirectory {
         }
         let object_id =
             dir.create_symlink(&mut transaction, &target, &name).await.map_err(map_to_status)?;
-        if connection.is_some() {
+        if let Some(connection) = connection {
             if let GetResult::Placeholder(p) = self.volume().cache().get_or_reserve(object_id).await
             {
                 transaction
@@ -530,8 +550,8 @@ impl MutableDirectory for FxDirectory {
                         symlink::Connection::spawn(
                             self.volume().scope().clone(),
                             node,
-                            fio::OpenFlags::RIGHT_READABLE,
-                            ServerEnd::new(connection.unwrap().into_channel()),
+                            SymlinkOptions,
+                            fio::OpenFlags::RIGHT_READABLE.to_object_request(connection),
                         );
                     })
                     .await
@@ -558,54 +578,56 @@ impl DirectoryEntry for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        scope.clone().spawn_with_shutdown(move |shutdown| async move {
-            match self.lookup(flags, path, None).await {
-                Err(e) => send_on_open_with_error(
-                    flags.contains(fio::OpenFlags::DESCRIBE),
-                    server_end,
-                    map_to_status(e),
-                ),
-                Ok(node) => {
+        flags.to_object_request(server_end).spawn(
+            &scope.clone(),
+            move |object_request, shutdown| {
+                Box::pin(async move {
+                    let node = self.lookup(&flags, path, None).await.map_err(map_to_status)?;
                     if node.is::<FxDirectory>() {
-                        let () = match with_directory_options(
-                            flags,
-                            server_end,
-                            |describe, options, server_end| {
-                                MutableConnection::create_connection_async(
-                                    scope,
-                                    node.downcast::<FxDirectory>()
-                                        .unwrap_or_else(|_| unreachable!())
-                                        .take(),
-                                    describe,
-                                    options,
-                                    server_end,
-                                    shutdown,
-                                )
-                            },
-                        ) {
-                            None => {}
-                            Some(fut) => fut.await,
-                        };
+                        Ok(MutableConnection::create_connection_async(
+                            scope,
+                            node.downcast::<FxDirectory>()
+                                .unwrap_or_else(|_| unreachable!())
+                                .take(),
+                            flags.to_directory_options()?,
+                            object_request.take(),
+                            shutdown,
+                        )
+                        .boxed())
                     } else if node.is::<FxFile>() {
                         let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                         if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                             let mut server =
-                                BlockServer::new(node, scope, server_end.into_channel());
-                            let _ = server.run().await;
+                                BlockServer::new(node, scope, object_request.take().into_channel());
+                            Ok(async move {
+                                let _ = server.run().await;
+                            }
+                            .boxed())
                         } else {
-                            FxFile::create_connection(node, scope, flags, server_end, shutdown)
-                                .await;
+                            FxFile::create_connection_async(
+                                node,
+                                scope,
+                                flags.to_file_options()?,
+                                object_request,
+                                shutdown,
+                            )
                         }
                     } else if node.is::<FxSymlink>() {
                         let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                        symlink::Connection::run(scope, node.take(), flags, server_end, shutdown)
-                            .await;
+                        Ok(symlink::Connection::run(
+                            scope,
+                            node.take(),
+                            flags.to_symlink_options()?,
+                            object_request.take(),
+                            shutdown,
+                        )
+                        .boxed())
                     } else {
                         unreachable!();
                     }
-                }
-            };
-        });
+                })
+            },
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -1552,17 +1574,14 @@ mod tests {
 
             let flags = fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE;
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::CREATE;
 
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
 
             let dir = root_dir
-                .lookup(
-                    fio::OpenFlags::CREATE | flags,
-                    path,
-                    Some(PosixAttributes { mode, ..Default::default() }),
-                )
+                .lookup(&flags, path, Some(PosixAttributes { mode, ..Default::default() }))
                 .await
                 .expect("lookup failed");
 
@@ -1593,14 +1612,12 @@ mod tests {
 
             let flags = fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE;
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::CREATE;
 
             // We should still be able to create the directory even if we don't
             // pass it any mode bits
-            let dir = root_dir
-                .lookup(fio::OpenFlags::CREATE | flags, path, None)
-                .await
-                .expect("lookup failed");
+            let dir = root_dir.lookup(&flags, path, None).await.expect("lookup failed");
             let properties = dir.get_properties().await.expect("get_properties failed");
             assert!(properties.posix_attributes.is_none());
 

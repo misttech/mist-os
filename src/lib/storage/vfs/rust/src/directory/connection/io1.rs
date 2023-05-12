@@ -5,21 +5,24 @@
 use crate::{
     common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny as _},
     directory::{
-        common::{check_child_connection_flags, DirectoryOptions},
+        common::check_child_connection_flags,
         connection::util::OpenDirectory,
         entry::DirectoryEntry,
         entry_container::{Directory, DirectoryWatcher},
         mutable::entry_constructor::NewEntryType,
         read_dirents,
         traversal_position::TraversalPosition,
+        DirectoryOptions,
     },
     execution_scope::ExecutionScope,
+    object_request::Representation,
     path::Path,
 };
 
 use {
     anyhow::Error,
-    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt as _},
+    async_trait::async_trait,
+    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::channel::oneshot,
     pin_project::pin_project,
@@ -54,19 +57,6 @@ pub trait DerivedConnection: Send + Sync {
         directory: OpenDirectory<Self::Directory>,
         options: DirectoryOptions,
     ) -> Self;
-
-    /// Initializes a directory connection, and sending `OnOpen` event if `describe` is true.
-    /// Then either runs this connection inside of the specified `scope` or, in case of
-    /// an error, sends an appropriate `OnOpen` event (if requested) over the `server_end`
-    /// connection.
-    /// If an error occurs, create_connection() must call close() on the directory.
-    fn create_connection(
-        scope: ExecutionScope,
-        directory: Arc<Self::Directory>,
-        describe: bool,
-        options: DirectoryOptions,
-        server_end: ServerEnd<fio::NodeMarker>,
-    );
 
     fn entry_not_found(
         scope: ExecutionScope,
@@ -155,14 +145,6 @@ where
         BaseConnection { scope, directory, options, seek: Default::default() }
     }
 
-    pub(in crate::directory) fn node_info(&self) -> fio::NodeInfoDeprecated {
-        if self.options.node {
-            fio::NodeInfoDeprecated::Service(fio::Service)
-        } else {
-            fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
-        }
-    }
-
     /// Handle a [`DirectoryRequest`].  This function is responsible for handing all the basic
     /// directory operations.
     pub(in crate::directory) async fn handle_request(
@@ -247,7 +229,7 @@ where
             }
             fio::DirectoryRequest::GetFlags { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetFlags");
-                responder.send(zx::Status::OK.into_raw(), self.options.into_io1())?;
+                responder.send(zx::Status::OK.into_raw(), self.options.to_io1())?;
             }
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::SetFlags");
@@ -368,7 +350,7 @@ where
 
     fn handle_clone(&self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
         let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        let flags = match inherit_rights_for_clone(self.options.into_io1(), flags) {
+        let flags = match inherit_rights_for_clone(self.options.to_io1(), flags) {
             Ok(updated) => updated,
             Err(status) => {
                 send_on_open_with_error(describe, server_end, status);
@@ -403,7 +385,7 @@ where
             flags |= fio::OpenFlags::DIRECTORY;
         }
 
-        let flags = match check_child_connection_flags(self.options.into_io1(), flags) {
+        let flags = match check_child_connection_flags(self.options.to_io1(), flags) {
             Ok(updated) => updated,
             Err(status) => {
                 send_on_open_with_error(describe, server_end, status);
@@ -489,6 +471,29 @@ where
     ) -> Result<(), zx::Status> {
         let directory = self.directory.clone();
         directory.register_watcher(self.scope.clone(), mask, watcher)
+    }
+}
+
+#[async_trait]
+impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
+    type Protocol = fio::DirectoryMarker;
+
+    async fn get_representation(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::Representation, zx::Status> {
+        Ok(fio::Representation::Directory(fio::DirectoryInfo {
+            attributes: Some(self.directory.get_attributes(requested_attributes).await?),
+            ..Default::default()
+        }))
+    }
+
+    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status> {
+        Ok(if self.options.node {
+            fio::NodeInfoDeprecated::Service(fio::Service)
+        } else {
+            fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
+        })
     }
 }
 

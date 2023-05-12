@@ -13,11 +13,12 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
-            immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
+            entry::EntryInfo, immutable::connection::io1::ImmutableConnection,
+            traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
+        ProtocolsExt, ToObjectRequest,
     },
 };
 pub(crate) struct NonMetaSubdir<S: crate::NonMetaStorage> {
@@ -45,21 +46,26 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
         let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
         if path.is_empty() {
-            if flags.intersects(
-                fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::TRUNCATE
-                    | fio::OpenFlags::APPEND,
-            ) {
-                let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
-                return;
-            }
+            flags.to_object_request(server_end).handle(|object_request| {
+                if flags.intersects(
+                    fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::CREATE_IF_ABSENT
+                        | fio::OpenFlags::TRUNCATE
+                        | fio::OpenFlags::APPEND,
+                ) {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
 
-            return with_directory_options(flags, server_end, |describe, options, server_end| {
-                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
-            })
-            .unwrap_or(());
+                ImmutableConnection::create_connection(
+                    scope,
+                    self,
+                    flags.to_directory_options()?,
+                    object_request.take(),
+                );
+                Ok(())
+            });
+            return;
         }
 
         // vfs::path::Path::as_str() is an object relative path expression [1], except that it may:

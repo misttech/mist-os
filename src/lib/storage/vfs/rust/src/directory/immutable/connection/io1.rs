@@ -7,7 +7,6 @@
 
 use crate::{
     directory::{
-        common::DirectoryOptions,
         connection::{
             io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
@@ -15,13 +14,14 @@ use crate::{
         entry::DirectoryEntry,
         entry_container,
         mutable::entry_constructor::NewEntryType,
+        DirectoryOptions,
     },
     execution_scope::ExecutionScope,
     path::Path,
+    ObjectRequest,
 };
 
 use {
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::Status,
     futures::{channel::oneshot, TryStreamExt as _},
@@ -45,6 +45,28 @@ impl ImmutableConnection {
             }
         }
     }
+
+    pub fn create_connection(
+        scope: ExecutionScope,
+        directory: Arc<dyn entry_container::Directory>,
+        options: DirectoryOptions,
+        object_request: ObjectRequest,
+    ) {
+        // Ensure we close the directory if we fail to create the connection.
+        let directory = OpenDirectory::new(directory);
+
+        let connection = Self::new(scope.clone(), directory, options);
+
+        // If we fail to send the task to the executor, it is probably shut down or is in the
+        // process of shutting down (this is the only error state currently).  So there is nothing
+        // for us to do - the connection will be closed automatically when the connection object is
+        // dropped.
+        let _ = scope.spawn_with_shutdown(move |shutdown| async {
+            if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
+                connection.handle_requests(requests, shutdown).await;
+            }
+        });
+    }
 }
 
 impl DerivedConnection for ImmutableConnection {
@@ -57,47 +79,6 @@ impl DerivedConnection for ImmutableConnection {
         options: DirectoryOptions,
     ) -> Self {
         ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
-    }
-
-    fn create_connection(
-        scope: ExecutionScope,
-        directory: Arc<Self::Directory>,
-        describe: bool,
-        options: DirectoryOptions,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        // Ensure we close the directory if we fail to create the connection.
-        let directory = OpenDirectory::new(directory);
-
-        let (requests, control_handle) =
-            match ServerEnd::<fio::DirectoryMarker>::new(server_end.into_channel())
-                .into_stream_and_control_handle()
-            {
-                Ok((requests, control_handle)) => (requests, control_handle),
-                Err(_) => {
-                    // As we report all errors on `server_end`, if we failed to send an error over
-                    // this connection, there is nowhere to send the error to.
-                    return;
-                }
-            };
-
-        let connection = Self::new(scope.clone(), directory, options);
-
-        if describe {
-            match control_handle
-                .send_on_open_(Status::OK.into_raw(), Some(connection.base.node_info()))
-            {
-                Ok(()) => (),
-                Err(_) => return,
-            }
-        }
-
-        // If we fail to send the task to the executor, it is probably shut down or is in the
-        // process of shutting down (this is the only error state currently).  So there is nothing
-        // for us to do - the connection will be closed automatically when the connection object is
-        // dropped.
-        let _ =
-            scope.spawn_with_shutdown(|shutdown| connection.handle_requests(requests, shutdown));
     }
 
     fn entry_not_found(
