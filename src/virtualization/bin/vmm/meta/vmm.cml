@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "syslog/client.shard.cml",
+        "trace/client.shard.cml",
+    ],
     program: {
         runner: "elf",
         binary: "bin/vmm",
@@ -74,7 +77,6 @@
                 "fuchsia.net.virtualization.Control",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
             ],
         },
         {
@@ -92,10 +94,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
                 "#virtio_balloon_devices",

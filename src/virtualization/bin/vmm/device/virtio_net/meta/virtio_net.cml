@@ -5,6 +5,7 @@
     include: [
         "//src/connectivity/network/lib/net_interfaces/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/use.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -17,10 +18,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.net.virtualization.Control",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.net.virtualization.Control" ],
         },
     ],
     expose: [

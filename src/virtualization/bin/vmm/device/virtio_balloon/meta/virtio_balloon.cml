@@ -5,6 +5,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/use.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -13,11 +14,6 @@
     capabilities: [
         {
             protocol: [ "fuchsia.virtualization.hardware.VirtioBalloon" ],
-        },
-    ],
-    use: [
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
         },
     ],
     expose: [

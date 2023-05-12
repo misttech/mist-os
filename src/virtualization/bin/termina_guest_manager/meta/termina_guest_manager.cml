@@ -5,6 +5,7 @@
     include: [
         "//src/virtualization/bin/guest_manager/meta/guest_manager.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -30,10 +31,7 @@
             path: "/dev",
         },
         {
-            protocol: [
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.scenic.Scenic",
-            ],
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
             from: "parent",
             availability: "optional",
         },

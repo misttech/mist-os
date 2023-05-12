@@ -6,6 +6,7 @@
         "//src/connectivity/network/lib/net_interfaces/client.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     children: [
         {
@@ -53,7 +54,6 @@
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
