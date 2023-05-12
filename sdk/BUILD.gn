@@ -7,6 +7,7 @@
 import("//build/config/build_api_module.gni")
 import("//build/dart/toolchain.gni")
 import("//build/fidl/toolchain.gni")
+import("//build/sdk/generate_final_idk.gni")
 import("//build/sdk/merged_sdk.gni")
 import("//build/sdk/sdk.gni")
 import("//build/sdk/sdk_documentation.gni")
@@ -84,14 +85,46 @@ group("archives") {
   ]
 }
 
+# Dependencies used to generate the official
+# Fuchsia Core IDK.
+_fuchsia_idk_deps = [
+  ":core",
+  ":core_testing",
+  ":e2e_testing",
+  ":fuchsia_dart",
+]
+
+# A target used to generate an IDK archive
+# that only contains prebuilt binaries for
+# a single target_cpu architecture.
+#
+# This will be replaced by "final_fuchsia_idk"
+# defined below once we update our infra
+# recipes and builder configurations.
+# See https://fxbug.dev/126262
 merged_sdk("merged") {
   testonly = true
-  deps = [
-    ":core",
-    ":core_testing",
-    ":e2e_testing",
-    ":fuchsia_dart",
+  deps = _fuchsia_idk_deps
+}
+
+# This targets generates a "final" IDK archive
+# that contains prebuilt binaries for several
+# target_cpu architecture. This is done by
+# performing several sub-builds and merging
+# the results explicitly.
+#
+# This will deprecate the :merged target
+# above once infra recipes and builder
+# configuration have been updated.
+# See https://fxbug.dev/126262
+generate_final_idk("final_fuchsia_idk") {
+  output_name = "fuchsia_idk"
+  target_cpus = [
+    "x64",
+    "arm64",
   ]
+  sdk_target_labels = _fuchsia_idk_deps
+  testonly = true
 }
 
 group("tests_no_e2e") {

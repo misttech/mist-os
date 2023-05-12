@@ -62,6 +62,9 @@ group("non_hermetic_deps") {
   # See: fxbug.dev/69444
   visibility += [ "//sdk:cts_generate" ]
 
+  # See: fxbug.dev/44889
+  visibility += [ "//sdk:final_fuchsia_idk" ]
+
   # TODO(http://fxbug.dev/92612): Remove entries when
   # assembly input bundle creation no longer triggers false-positives in the
   # action_tracer.py due to how it cleans it's dynamic outputs.

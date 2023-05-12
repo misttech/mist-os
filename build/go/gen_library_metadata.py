@@ -87,7 +87,15 @@ def main():
             name = name_file.read()
 
     build_dir = os.path.abspath(args.root_build_dir)
-    source_root = os.path.dirname(os.path.dirname(build_dir))
+
+    # Find source_root from library source_dir, i.e. do not assume
+    # that the build directory is two levels down the source root
+    source_root = build_dir
+    while not os.path.exists(os.path.join(source_root, '.jiri_manifest')):
+        source_root = os.path.dirname(source_root)
+        if source_root in ('', '/'):
+            parser.error('Cannot find Fuchsia source directory!')
+
     third_party_dir = os.path.join(source_root, 'third_party')
 
     # For Fuchsia sources, the declared package name must correspond to the
@@ -143,10 +151,14 @@ def main():
         current_sources.append(Source(name, args.source_dir, args.output))
     result = get_sources(args.deps, extra_sources=current_sources)
     with open(args.output, 'w') as output_file:
-        json.dump({
-            'package': name,
-            'sources': result,
-        }, output_file, indent=2, sort_keys=True)
+        json.dump(
+            {
+                'package': name,
+                'sources': result,
+            },
+            output_file,
+            indent=2,
+            sort_keys=True)
 
 
 if __name__ == '__main__':
