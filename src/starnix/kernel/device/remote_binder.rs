@@ -17,6 +17,7 @@ use crate::types::{
     UserAddress, UserCString, UserRef, PATH_MAX,
 };
 use anyhow::Error;
+use derivative::Derivative;
 use fidl::{
     endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd},
     AsHandleRef,
@@ -185,7 +186,8 @@ impl FileOps for RemoteBinderFileOps {
 
 /// Request sent from the FIDL server thread to the running tasks. The requests that require a
 /// response send a `Sender` to let the task return the response.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 enum TaskRequest {
     /// Set the associated vmo for the binder connection. See the SetVmo method in the Binder FIDL
     /// protocol.
@@ -196,8 +198,9 @@ enum TaskRequest {
         fidl::Vmo,
         // mapped_address
         u64,
-        // responder
-        oneshot::Sender<Result<(), Errno>>,
+        // responder.
+        // a synchronous function avoids thread hops.
+        #[derivative(Debug = "ignore")] Box<dyn FnOnce(Result<(), Errno>) + Send>,
     ),
     /// Execute the given ioctl. See the Ioctl method in the Binder FIDL
     /// protocol.
@@ -210,10 +213,13 @@ enum TaskRequest {
         u64,
         // KOID,
         u64,
-        // responder
-        oneshot::Sender<Result<(), Errno>>,
+        // responder.
+        // a synchronous function avoids thread hops.
+        #[derivative(Debug = "ignore")]
+        #[allow(clippy::type_complexity)]
+        Box<dyn FnOnce(Result<(), Errno>) -> Result<(), fidl::Error> + Send>,
     ),
-    /// Open the binder device driver situated at `path` in the Task filesysten namespace.
+    /// Open the binder device driver situated at `path` in the Task filesystem namespace.
     Open(
         // path
         Vec<u8>,
@@ -235,22 +241,6 @@ enum TaskRequest {
 struct BoundTaskRequest {
     koid: u64,
     request: TaskRequest,
-}
-
-/// Turns a closure into a Sender which clients can use to call the closure.
-///
-/// The function is executed asynchronously, on a local task.
-fn into_sender<F>(f: F) -> oneshot::Sender<Result<(), Errno>>
-where
-    F: FnOnce(Result<(), Errno>) + Send + 'static,
-{
-    let (sender, receiver) = oneshot::channel::<Result<(), Errno>>();
-    fasync::Task::local(async move {
-        let result = receiver.await.unwrap_or_else(|_| error!(EINVAL));
-        f(result)
-    })
-    .detach();
-    sender
 }
 
 /// Returns the Errno in result if it is either EINTR or EAGAIN, None therwise.
@@ -444,7 +434,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         remote_binder_connection.clone(),
                         vmo,
                         mapped_address,
-                        into_sender(move |e| {
+                        Box::new(move |e| {
                             if e.is_err() {
                                 control_handle.shutdown()
                             }
@@ -462,7 +452,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                             request,
                             parameter,
                             tid,
-                            into_sender(move |e| {
+                            Box::new(move |e| {
                                 trace_duration!(
                                     trace_category_starnix!(),
                                     trace_name_remote_binder_ioctl_fidl_reply!()
@@ -477,7 +467,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                                     fposix::Errno::from_primitive(e.code.error_code() as i32)
                                         .unwrap_or(fposix::Errno::Einval)
                                 });
-                                let _ = responder.send(&mut e);
+                                responder.send(&mut e)
                             }),
                         ),
                     });
@@ -732,7 +722,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 TaskRequest::SetVmo(remote_binder_connection, vmo, mapped_address, responder) => {
                     let result = remote_binder_connection.map_external_vmo(vmo, mapped_address);
                     let interruption = must_interrupt(&result);
-                    responder.send(result).map_err(|_| errno!(EINVAL))?;
+                    responder(result);
                     interruption
                 }
                 TaskRequest::Ioctl(
@@ -754,7 +744,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     let result =
                         remote_binder_connection.ioctl(current_task, request, parameter.into());
                     let interruption = must_interrupt(&result);
-                    responder.send(result).map_err(|_| errno!(EINVAL))?;
+                    responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
                 TaskRequest::Return(spawn_thread) => {
