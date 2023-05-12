@@ -13,12 +13,12 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use log::trace;
 use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
+use tracing::trace;
 
 use crate::{
     context::SendFrameContext,
@@ -580,7 +580,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
             Ok(()) => {}
             Err(ReceiveQueueFullError(((), _frame))) => {
                 // RX queue is full - there is nothing further we can do here.
-                log::error!("dropped RX frame on loopback device due to full RX queue")
+                tracing::error!("dropped RX frame on loopback device due to full RX queue")
             }
         }
 

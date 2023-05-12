@@ -18,7 +18,6 @@ use lock_order::Locked;
 
 use derivative::Derivative;
 use either::Either;
-use log::trace;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness, ZonedAddr,
@@ -30,6 +29,7 @@ use packet_formats::{
     ip::IpProto,
     udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
 };
+use tracing::trace;
 
 use thiserror::Error;
 

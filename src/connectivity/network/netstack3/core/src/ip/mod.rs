@@ -35,7 +35,6 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use log::{debug, trace};
 #[cfg(test)]
 use net_types::ip::IpVersion;
 use net_types::{
@@ -54,6 +53,7 @@ use packet_formats::{
     ipv6::{Ipv6Packet, Ipv6PacketBuilder},
 };
 use thiserror::Error;
+use tracing::{debug, trace};
 
 use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},

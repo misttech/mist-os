@@ -50,12 +50,12 @@ use core::{fmt::Debug, marker::PhantomData, time};
 
 use derivative::Derivative;
 use lock_order::Locked;
-use log::trace;
 use net_types::{
     ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6, SubnetEither},
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, EmptyBuf};
+use tracing::trace;
 
 use crate::{
     context::{CounterContext, EventContext, RngContext, TimerContext},

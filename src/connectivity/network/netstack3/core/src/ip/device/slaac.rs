@@ -18,13 +18,13 @@ use core::{
 use nonzero_ext::nonzero;
 
 use assert_matches::assert_matches;
-use log::{debug, error, trace};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     UnicastAddr, Witness as _,
 };
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng as _, RngCore};
+use tracing::{debug, error, trace};
 
 pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{

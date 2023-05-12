@@ -9,8 +9,8 @@ use alloc::collections::HashMap;
 use core::time::Duration;
 
 use derivative::Derivative;
-use log::trace;
 use net_types::ip::{Ip, IpAddress, IpVersionMarker, Mtu};
+use tracing::trace;
 
 use crate::context::{TimerContext, TimerHandler};
 

@@ -158,7 +158,7 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryCo
                                     // newly discovered routes are usually not in the
                                     // routing table.
                                     assert!(routes.remove(&route), "just added the route");
-                                    log::warn!(
+                                    tracing::warn!(
                                 "error adding discovered IPv6 route={:?} on device_id={}: {}",
                                  route, device_id, e,
                             );
@@ -241,7 +241,7 @@ fn del_discovered_ipv6_route<
 ) {
     match sync_ctx.del_discovered_ipv6_route(ctx, device_id, route) {
         Ok(()) => {}
-        Err(e @ NotFoundError) => log::info!(
+        Err(e @ NotFoundError) => tracing::info!(
             "error deleting discovered IPv6 route={:?} on device_id={}: {}",
             route,
             device_id,

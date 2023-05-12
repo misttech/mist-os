@@ -10,7 +10,6 @@
 
 use core::{convert::Infallible as Never, time::Duration};
 
-use log::{debug, error};
 use net_types::{
     ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr},
     LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness,
@@ -32,6 +31,7 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 use thiserror::Error;
+use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{

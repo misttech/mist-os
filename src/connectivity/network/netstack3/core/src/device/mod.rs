@@ -27,7 +27,6 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use log::{debug, trace};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -37,6 +36,7 @@ use net_types::{
 };
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
+use tracing::{debug, trace};
 
 use crate::{
     context::{InstantContext, RecvFrameContext, SendFrameContext},

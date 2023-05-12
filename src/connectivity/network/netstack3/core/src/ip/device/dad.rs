@@ -6,9 +6,9 @@
 
 use core::num::NonZeroU8;
 
-use log::debug;
 use net_types::{ip::Ipv6Addr, MulticastAddr, UnicastAddr, Witness as _};
 use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
+use tracing::debug;
 
 use crate::{
     context::{EventContext, TimerContext, TimerHandler},

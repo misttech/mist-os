@@ -33,7 +33,6 @@ use lock_order::Locked;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use log::warn;
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
@@ -47,6 +46,7 @@ use packet_formats::ip::IpProto;
 use rand::RngCore;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
+use tracing::warn;
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
@@ -1538,7 +1538,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         ip_transport_ctx
                             .send_ip_packet(ctx, &conn.ip_sock, ser, None)
                             .unwrap_or_else(|(body, err)| {
-                                log::debug!(
+                                tracing::debug!(
                                     "failed to reset connection to {:?}, body: {:?}, err: {:?}",
                                     ip,
                                     body,
@@ -2035,7 +2035,7 @@ fn do_send_inner<I, SC, C>(
                 // not return the error to caller but just log it instead. If
                 // we find a case where the caller is interested in the error,
                 // then we can always come back and change this.
-                log::debug!(
+                tracing::debug!(
                     "failed to send an ip packet on {:?}, body: {:?}, err: {:?}",
                     conn_id,
                     body,

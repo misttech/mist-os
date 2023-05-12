@@ -8,7 +8,7 @@
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
 use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16};
-use log::trace;
+use tracing::trace;
 
 use net_types::{
     ip::{IpAddress, IpVersionMarker},
@@ -508,7 +508,7 @@ where
             // If we cannot find a device or the device's MTU is too small,
             // there isn't much we can do here since sending a RST back is
             // impossible, we just need to silent drop the segment.
-            log::error!("Cannot find a device with large enough MTU for the connection");
+            tracing::error!("Cannot find a device with large enough MTU for the connection");
             match err {
                 MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
                     return HandleIncomingSegmentDisposition::FoundSocket

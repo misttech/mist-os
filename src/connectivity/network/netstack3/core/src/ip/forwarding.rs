@@ -7,12 +7,12 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, slice::Iter};
 
-use log::debug;
 use net_types::{
     ip::{Ip, Subnet},
     SpecifiedAddr,
 };
 use thiserror::Error;
+use tracing::debug;
 
 use crate::{
     error::NotFoundError,
@@ -381,12 +381,12 @@ mod tests {
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
     use itertools::Itertools;
-    use log::trace;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         SpecifiedAddr,
     };
+    use tracing::trace;
 
     use super::*;
     use crate::{

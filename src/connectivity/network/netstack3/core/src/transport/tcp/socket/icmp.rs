@@ -41,7 +41,7 @@ where
         let mut buffer = &mut original_body;
         let Some(flow_and_seqnum) = buffer
             .take_obj_front::<TcpFlowAndSeqNum>() else {
-            log::error!("received an ICMP error but its body is less than 8 bytes");
+            tracing::error!("received an ICMP error but its body is less than 8 bytes");
             return;
         };
 

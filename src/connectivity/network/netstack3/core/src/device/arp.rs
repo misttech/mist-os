@@ -6,7 +6,6 @@
 
 use core::time::Duration;
 
-use log::{debug, trace, warn};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
@@ -16,6 +15,7 @@ use packet_formats::{
     arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
     utils::NonZeroDuration,
 };
+use tracing::{debug, trace, warn};
 
 use crate::{
     context::{CounterContext, SendFrameContext, TimerContext},

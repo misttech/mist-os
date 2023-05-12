@@ -284,7 +284,11 @@ fn deliver_to_device_sockets<
             BufferSocketHandler::handle_frame(sync_ctx, ctx, device_id, sent_frame.into(), bytes)
         }
         Err(ParseSentFrameError) => {
-            log::trace!("failed to parse outgoing frame on {:?} ({} bytes)", device_id, bytes.len())
+            tracing::trace!(
+                "failed to parse outgoing frame on {:?} ({} bytes)",
+                device_id,
+                bytes.len()
+            )
         }
     }
 }

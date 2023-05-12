@@ -8,7 +8,6 @@ use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
 
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
-use log::{debug, error, trace};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
@@ -38,6 +37,7 @@ use packet_formats::{
     ipv6::{ExtHdrParseError, Ipv6Header},
 };
 use thiserror::Error;
+use tracing::{debug, error, trace};
 use zerocopy::ByteSlice;
 
 use crate::{

@@ -95,18 +95,17 @@ lib_deps = [
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:either",
-  "//third_party/rust_crates:log",
   "//third_party/rust_crates:nonzero_ext",
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:siphasher",
   "//third_party/rust_crates:smallvec",
   "//third_party/rust_crates:thiserror",
+  "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:zerocopy",
 ]
 
 lib_test_deps = [
   "proptest-support",
-  "teststd",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
   "//third_party/rust_crates:assert_matches",
@@ -114,6 +113,7 @@ lib_test_deps = [
   "//third_party/rust_crates:proptest",
   "//third_party/rust_crates:rand_xorshift",
   "//third_party/rust_crates:test-case",
+  "//third_party/rust_crates:tracing-subscriber",
 ]
 
 lib_not_fuzz_deps = [

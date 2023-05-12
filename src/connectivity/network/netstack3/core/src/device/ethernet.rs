@@ -12,7 +12,6 @@ use lock_order::{
     Locked,
 };
 
-use log::trace;
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -31,6 +30,7 @@ use packet_formats::{
     },
     utils::NonZeroDuration,
 };
+use tracing::trace;
 
 use crate::{
     context::{
@@ -313,7 +313,7 @@ fn send_ethernet_frame<
     ) {
         Ok(()) => Ok(()),
         Err(TransmitQueueFrameError::NoQueue(e)) => {
-            log::error!("device {} not ready to send frame: {:?}", device_id, e);
+            tracing::error!("device {} not ready to send frame: {:?}", device_id, e);
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {

@@ -30,7 +30,6 @@ mod tests {
 
     use assert_matches::assert_matches;
     use lock_order::Locked;
-    use log::trace;
     use net_declare::net::{mac, subnet_v6};
     use net_types::{
         ethernet::Mac,
@@ -55,6 +54,7 @@ mod tests {
         utils::NonZeroDuration,
     };
     use rand::RngCore;
+    use tracing::trace;
     use zerocopy::ByteSlice;
 
     use crate::{

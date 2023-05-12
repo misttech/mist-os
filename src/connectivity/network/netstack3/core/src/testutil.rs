@@ -21,6 +21,14 @@ use packet::{Buf, BufferMut};
 use packet_formats::ip::IpProto;
 use rand::{self, CryptoRng, Rng as _, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
+use tracing::Subscriber;
+use tracing_subscriber::{
+    fmt::{
+        format::{self, FormatEvent, FormatFields},
+        FmtContext,
+    },
+    registry::LookupSpan,
+};
 
 use crate::{
     context::{
@@ -368,24 +376,23 @@ pub(crate) fn run_with_many_seeds<F: FnMut(u128)>(mut f: F) {
     }
 }
 
-/// log::Log implementation that uses stdout.
-///
-/// Useful when debugging tests.
-struct Logger;
+struct SimpleFormatter;
 
-impl log::Log for Logger {
-    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
-        true
+impl<S, N> FormatEvent<S, N> for SimpleFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: format::Writer<'_>,
+        event: &tracing::Event<'_>,
+    ) -> std::fmt::Result {
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
     }
-
-    fn log(&self, record: &log::Record<'_>) {
-        teststd::println!("{}", record.args())
-    }
-
-    fn flush(&self) {}
 }
-
-static LOGGER: Logger = Logger;
 
 static LOGGER_ONCE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(true);
 
@@ -395,10 +402,12 @@ static LOGGER_ONCE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicB
 /// This function sets global program state, so all tests that run after this
 /// function is called will use the logger.
 pub(crate) fn set_logger_for_test() {
-    // log::set_logger will panic if called multiple times.
+    // `init` will panic if called multiple times.
     if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
-        log::set_logger(&LOGGER).unwrap();
-        log::set_max_level(log::LevelFilter::Trace);
+        tracing_subscriber::fmt()
+            .event_format(SimpleFormatter)
+            .with_max_level(tracing::Level::TRACE)
+            .init();
     }
 }
 
