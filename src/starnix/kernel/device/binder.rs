@@ -7,7 +7,7 @@
 use crate::device::mem::new_null_file;
 use crate::device::remote_binder::RemoteBinderDevice;
 use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
@@ -48,8 +48,7 @@ fuchsia_trace::string_name_macro!(trace_name_binder_ioctl, "binder_ioctl");
 
 /// Allows for sequential reading of a task's userspace memory.
 pub struct UserMemoryCursor {
-    buffer: Vec<u8>,
-    consumed: usize,
+    buffer: VecInputBuffer,
 }
 
 impl UserMemoryCursor {
@@ -58,21 +57,17 @@ impl UserMemoryCursor {
     /// Any reads past `addr + len` will fail with `EINVAL`.
     pub fn new(ma: &dyn MemoryAccessor, addr: UserAddress, len: u64) -> Result<Self, Errno> {
         let buffer = ma.read_buffer(&UserBuffer { address: addr, length: len as usize })?;
-        Ok(Self { buffer, consumed: 0 })
+        Ok(Self { buffer: buffer.into() })
     }
 
     /// Read an object from userspace memory and increment the read position.
     pub fn read_object<T: FromBytes>(&mut self) -> Result<T, Errno> {
-        let prev_consumed = self.consumed;
-        self.consumed += std::mem::size_of::<T>();
-        let obj = T::read_from(&self.buffer[prev_consumed..self.consumed])
-            .ok_or_else(|| errno!(EINVAL))?;
-        Ok(obj)
+        self.buffer.read_object::<T>()
     }
 
     /// The total number of bytes read.
     pub fn bytes_read(&self) -> usize {
-        self.consumed
+        self.buffer.bytes_read()
     }
 }
 

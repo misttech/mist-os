@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::mm::{MemoryAccessor, MemoryManager};
-use crate::types::{error, Errno, UserAddress, UserBuffer};
+use crate::types::{errno, error, Errno, UserAddress, UserBuffer};
+use zerocopy::FromBytes;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
 /// order, and must return for each, how many bytes has been written.
@@ -371,6 +372,8 @@ impl OutputBuffer for VecOutputBuffer {
 #[derive(Debug)]
 pub struct VecInputBuffer {
     buffer: Vec<u8>,
+
+    // Invariant: `bytes_read <= buffer.len()` at all times.
     bytes_read: usize,
 }
 
@@ -392,6 +395,7 @@ impl InputBuffer for VecInputBuffer {
         if self.bytes_read + read > self.buffer.len() {
             return error!(EINVAL);
         }
+        debug_assert!(self.bytes_read <= self.buffer.len());
         Ok(read)
     }
     fn advance(&mut self, length: usize) -> Result<(), Errno> {
@@ -399,6 +403,7 @@ impl InputBuffer for VecInputBuffer {
             return error!(EINVAL);
         }
         self.bytes_read += length;
+        debug_assert!(self.bytes_read <= self.buffer.len());
         Ok(())
     }
     fn available(&self) -> usize {
@@ -411,6 +416,23 @@ impl InputBuffer for VecInputBuffer {
         let result = self.available();
         self.bytes_read += result;
         result
+    }
+}
+
+impl VecInputBuffer {
+    /// Read an object from userspace memory and increment the read position.
+    ///
+    /// Returns an error if there is not enough available bytes compared to the size of `T`.
+    pub fn read_object<T: FromBytes>(&mut self) -> Result<T, Errno> {
+        let size = std::mem::size_of::<T>();
+        let end = self.bytes_read + size;
+        if end > self.buffer.len() {
+            return error!(EINVAL);
+        }
+        let obj = T::read_from(&self.buffer[self.bytes_read..end]).ok_or_else(|| errno!(EINVAL))?;
+        self.bytes_read = end;
+        debug_assert!(self.bytes_read <= self.buffer.len());
+        Ok(obj)
     }
 }
 
@@ -560,6 +582,23 @@ mod tests {
         assert_eq!(input_buffer.available(), 0);
         assert_eq!(&buffer, b"world");
         assert!(matches!(input_buffer.read_exact(&mut buffer), Err(_)));
+
+        // Test read_object
+        let mut input_buffer = VecInputBuffer::new(b"hello");
+        assert_eq!(input_buffer.bytes_read(), 0);
+        let buffer: [u8; 3] = input_buffer.read_object().expect("read_object");
+        assert_eq!(&buffer, b"hel");
+        assert_eq!(input_buffer.bytes_read(), 3);
+        let buffer: [u8; 2] = input_buffer.read_object().expect("read_object");
+        assert_eq!(&buffer, b"lo");
+        assert_eq!(input_buffer.bytes_read(), 5);
+        assert!(matches!(input_buffer.read_object::<[u8; 1]>(), Err(_)));
+        assert_eq!(input_buffer.bytes_read(), 5);
+
+        let mut input_buffer = VecInputBuffer::new(b"hello");
+        assert_eq!(input_buffer.bytes_read(), 0);
+        assert!(matches!(input_buffer.read_object::<[u8; 100]>(), Err(_)));
+        assert_eq!(input_buffer.bytes_read(), 0);
     }
 
     #[::fuchsia::test]
