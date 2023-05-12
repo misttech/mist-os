@@ -189,9 +189,14 @@ void AmlG12TdmDai::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notificat
 
 void AmlG12TdmDai::Start(StartCallback callback) {
   uint64_t start_time = 0;
-  if (rb_started_ || !rb_fetched_) {
-    zxlogf(ERROR, "Could not start");
-    callback(start_time);
+  if (rb_started_) {
+    zxlogf(ERROR, "Could not start: already started");
+    ringbuffer_binding_->Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+  if (!rb_fetched_) {
+    zxlogf(ERROR, "Could not start: first, GetVmo must successfully complete");
+    ringbuffer_binding_->Close(ZX_ERR_BAD_STATE);
     return;
   }
 
@@ -212,10 +217,13 @@ void AmlG12TdmDai::Start(StartCallback callback) {
 }
 
 void AmlG12TdmDai::Stop(StopCallback callback) {
-  if (!rb_started_) {
-    zxlogf(ERROR, "Could not stop");
-    callback();
+  if (!rb_fetched_) {
+    zxlogf(ERROR, "GetVmo must successfully complete before calling Start or Stop");
+    ringbuffer_binding_->Close(ZX_ERR_BAD_STATE);
     return;
+  }
+  if (!rb_started_) {
+    zxlogf(INFO, "Stop called while stopped; this is allowed");
   }
   notify_timer_.Cancel();
   us_per_notification_ = 0;
@@ -356,13 +364,22 @@ void AmlG12TdmDai::CreateRingBuffer(
   delay_info_sent_ = false;
   ringbuffer_binding_->set_error_handler([this](zx_status_t status) -> void {
     zxlogf(INFO, "RingBuffer protocol %s", zx_status_get_string(status));
-    Stop([]() {});
+    ResetRingBuffer();
   });
   dai_format_ = std::move(dai_format);
 
   internal_delay_nsec_ = 0;  // No internal delay known, so we report 0.
 
   Reset([]() {});
+}
+
+void AmlG12TdmDai::ResetRingBuffer() {
+  rb_fetched_ = false;
+  rb_started_ = false;
+  expected_notifications_per_ring_ = 0;
+  position_callback_.reset();
+  dai_format_ = {};
+  Stop([]() {});
 }
 
 void AmlG12TdmDai::GetProperties(

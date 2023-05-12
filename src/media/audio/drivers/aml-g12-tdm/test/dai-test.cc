@@ -576,6 +576,42 @@ TEST_F(AmlG12TdmDaiRingBufferTest, RingBufferGetVmoMultipleTimes) {
   ASSERT_TRUE(out_result.response().ring_buffer.is_valid());
 }
 
+TEST_F(AmlG12TdmDaiRingBufferTest, StartStartedRingBuffer) {
+  ::fuchsia::hardware::audio::RingBuffer_GetVmo_Result out_result = {};
+  constexpr uint32_t kMinFrames = 8192;
+  ASSERT_OK(ring_buffer_->GetVmo(kMinFrames, 0, &out_result));
+  ZX_ASSERT(out_result.response().ring_buffer.is_valid());
+
+  int64_t out_start_time = 0;
+  EXPECT_OK(ring_buffer_->Start(&out_start_time));
+  EXPECT_EQ(ring_buffer_->Start(&out_start_time),
+            ZX_ERR_PEER_CLOSED);  // Not ok to start a started ring buffer.
+}
+
+TEST_F(AmlG12TdmDaiRingBufferTest, StopStoppedRingBuffer) {
+  ::fuchsia::hardware::audio::RingBuffer_GetVmo_Result out_result = {};
+  constexpr uint32_t kMinFrames = 8192;
+  ASSERT_OK(ring_buffer_->GetVmo(kMinFrames, 0, &out_result));
+  ZX_ASSERT(out_result.response().ring_buffer.is_valid());
+
+  EXPECT_OK(ring_buffer_->Stop());  // Ok to stop a stopped ring buffer.
+  int64_t out_start_time = 0;
+  EXPECT_OK(ring_buffer_->Start(&out_start_time));
+  EXPECT_OK(ring_buffer_->Stop());
+  EXPECT_OK(ring_buffer_->Stop());                  // Ok to stop a stopped ring buffer.
+  EXPECT_OK(ring_buffer_->Start(&out_start_time));  // Ok to start again.
+}
+
+TEST_F(AmlG12TdmDaiRingBufferTest, StartRingBufferNoVmo) {
+  int64_t out_start_time = 0;
+  EXPECT_EQ(ring_buffer_->Start(&out_start_time),
+            ZX_ERR_PEER_CLOSED);  // Not ok to start a ring buffer with no VMO.
+}
+
+TEST_F(AmlG12TdmDaiRingBufferTest, StopRingBufferNoVmo) {
+  EXPECT_EQ(ring_buffer_->Stop(), ZX_ERR_PEER_CLOSED);  // Not ok to stop a ring buffer with no VMO.
+}
+
 TEST_F(AmlG12TdmDaiTest, ClientCloseDaiChannel) {
   auto fake_parent = MockDevice::FakeRootParent();
   metadata::AmlConfig metadata = GetDefaultMetadata();
