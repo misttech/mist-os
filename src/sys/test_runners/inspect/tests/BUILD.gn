@@ -31,7 +31,6 @@ rustc_test("tests_bin") {
 }
 
 fuchsia_component("inspect_runner_integration_test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/inspect_runner_integration_test.cml"
   deps = [ ":tests_bin" ]

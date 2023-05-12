@@ -29,7 +29,6 @@ rustc_test("tests_bin") {
 }
 
 fuchsia_component("gtest_runner_integration_test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/gtest_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
@@ -55,7 +54,6 @@ rustc_test("stress_tests_bin") {
 }
 
 fuchsia_component("gtest_runner_stress_test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/gtest_runner_stress_test.cml"
   deps = [ ":stress_tests_bin" ]

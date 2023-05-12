@@ -34,12 +34,4 @@
             rights: [ "r*" ],
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "inspect-test-runner",
-                "test_manager",
-            ],
-        },
-    },
 }

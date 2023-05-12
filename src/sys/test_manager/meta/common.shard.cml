@@ -64,7 +64,7 @@
         },
         {
             name: "legacy_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/legacy-test-runner#meta/legacy-test-runner.cm",
+            url: "legacy-test-runner#meta/legacy-test-runner.cm",
         },
         {
             name: "lib_loader_cache",

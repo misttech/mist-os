@@ -48,6 +48,7 @@ fuchsia_package("legacy-test-runner") {
     ":*",
     "//bundles/assembly/*",
     "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
   ]
   deps = [ ":legacy_test_runner_cmp" ]
 }

@@ -31,7 +31,6 @@ rustc_test("bin") {
 }
 
 fuchsia_test_component("integration-test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/fuzz_test_runner_integration_test.cml"
   deps = [ ":bin" ]
 }
