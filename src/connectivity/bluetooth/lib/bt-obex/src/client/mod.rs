@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 
 use fuchsia_bluetooth::types::Channel;
-use futures::stream::TryStreamExt;
-use packet_encoding::Encodable;
-use tracing::{info, trace};
+use tracing::trace;
 
-use crate::error::{Error, PacketError};
+use crate::error::Error;
 use crate::header::HeaderSet;
 use crate::operation::{
-    OpCode, RequestPacket, ResponseCode, ResponsePacket, MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE,
+    GetOperation, OpCode, RequestPacket, ResponseCode, ResponsePacket, MAX_PACKET_SIZE,
+    MIN_MAX_PACKET_SIZE,
 };
+use crate::transport::ObexTransportManager;
 
 /// Returns the maximum packet size that will be used for the OBEX session.
 /// `transport_max` is the maximum size that the underlying transport (e.g. L2CAP, RFCOMM) supports.
@@ -29,13 +29,15 @@ pub struct ObexClient {
     connected: bool,
     /// The maximum OBEX packet length for this OBEX session.
     max_packet_size: u16,
-    /// The L2CAP or RFCOMM transport.
-    transport: Channel,
+    /// Manages the RFCOMM or L2CAP transport and provides a reservation system for starting
+    /// new operations.
+    transport: ObexTransportManager,
 }
 
 impl ObexClient {
-    pub fn new(transport: Channel) -> Self {
-        let max_packet_size = max_packet_size_from_transport(transport.max_tx_size());
+    pub fn new(channel: Channel) -> Self {
+        let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
+        let transport = ObexTransportManager::new(channel);
         Self { connected: false, max_packet_size, transport }
     }
 
@@ -49,38 +51,9 @@ impl ObexClient {
         trace!("Max packet size set to {peer_max_packet_size}");
     }
 
-    /// Sends the encoded OBEX packet over the `transport` to the remote peer.
-    /// Returns Error if the send could not be completed.
-    fn send_data(&self, data: impl Encodable<Error = PacketError>) -> Result<(), Error> {
-        let mut buf = vec![0; data.encoded_len()];
-        data.encode(&mut buf[..])?;
-        let _ = self.transport.as_ref().write(&buf)?;
-        Ok(())
-    }
-
-    /// Attempts to receive and parse an OBEX response packet from the `transport`.
-    /// Returns the parsed packet on success, Error otherwise.
-    async fn receive_data(&mut self, code: OpCode) -> Result<ResponsePacket, Error> {
-        match self.transport.try_next().await? {
-            Some(raw_data) => {
-                let decoded = ResponsePacket::decode(&raw_data[..], code)?;
-                trace!("Received response: {decoded:?}");
-                Ok(decoded)
-            }
-            None => {
-                info!("OBEX transport closed");
-                // TODO(fxbug.dev/125306): Maybe do more here to "close" the `transport` and
-                // terminate the ObexClient.
-                Err(fuchsia_zircon::Status::PEER_CLOSED.into())
-            }
-        }
-    }
-
     fn handle_connect_response(&mut self, response: ResponsePacket) -> Result<HeaderSet, Error> {
         let request = OpCode::Connect;
-        if !matches!(response.code(), ResponseCode::Ok) {
-            return Err(Error::peer_rejected(request, *response.code()));
-        }
+        let response = response.expect_code(request, ResponseCode::Ok)?;
 
         // Expect the 4 bytes of additional data. We negotiate the max packet length based on what
         // the peer requests. See OBEX 1.5 Section 3.4.1.
@@ -101,13 +74,30 @@ impl ObexClient {
             return Err(Error::operation(OpCode::Connect, "already connected"));
         }
 
-        let request = RequestPacket::new_connect(self.max_packet_size, headers);
-        trace!("Making outgoing CONNECT request: {request:?}");
-        self.send_data(request)?;
-        trace!("Successfully made CONNECT request");
-        let response = self.receive_data(OpCode::Connect).await?;
+        let response = {
+            let request = RequestPacket::new_connect(self.max_packet_size, headers);
+            let mut transport = self.transport.try_new_operation()?;
+            trace!("Making outgoing CONNECT request: {request:?}");
+            transport.send(request)?;
+            trace!("Successfully made CONNECT request");
+            transport.receive_response(OpCode::Connect).await?
+        };
+
         let response_headers = self.handle_connect_response(response)?;
         Ok(response_headers)
+    }
+
+    /// Initializes a GET Operation to retrieve data from the remote OBEX Server.
+    /// Returns a `GetOperation` on success, Error if the new operation couldn't be started.
+    pub fn get(&mut self, headers: HeaderSet) -> Result<GetOperation<'_>, Error> {
+        // A GET can only be initiated after the OBEX session is connected.
+        if !self.connected {
+            return Err(Error::operation(OpCode::Get, "session not connected"));
+        }
+
+        // Only one operation can be active at a time.
+        let transport = self.transport.try_new_operation()?;
+        Ok(GetOperation::new(headers, transport))
     }
 }
 
@@ -115,14 +105,13 @@ impl ObexClient {
 mod tests {
     use super::*;
 
-    use crate::header::Header;
-
     use assert_matches::assert_matches;
-    use async_test_helpers::expect_stream_item;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
     use futures::pin_mut;
-    use packet_encoding::Decodable;
+
+    use crate::header::Header;
+    use crate::transport::test_utils::expect_request_and_reply;
 
     #[fuchsia::test]
     fn max_packet_size_calculation() {
@@ -137,22 +126,6 @@ mod tests {
         // Upper bound should be enforced.
         let transport_max_large = 700000;
         assert_eq!(max_packet_size_from_transport(transport_max_large), std::u16::MAX);
-    }
-
-    #[track_caller]
-    fn expect_request_and_reply(
-        exec: &mut fasync::TestExecutor,
-        channel: &mut Channel,
-        expected_request: OpCode,
-        response: ResponsePacket,
-    ) {
-        let request_raw = expect_stream_item(exec, channel).expect("request");
-        let request = RequestPacket::decode(&request_raw[..]).expect("can decode request");
-        assert_eq!(*request.code(), expected_request);
-
-        let mut response_buf = vec![0; response.encoded_len()];
-        response.encode(&mut response_buf[..]).expect("can encode response");
-        let _ = channel.as_ref().write(&response_buf[..]).expect("write to channel success");
     }
 
     /// Returns a new ObexClient and the remote end of the transport.
@@ -207,5 +180,29 @@ mod tests {
         // Trying to connect again is an Error since it can only be done once.
         let result = client.connect(HeaderSet::new()).await;
         assert_matches!(result, Err(Error::OperationError { .. }));
+    }
+
+    #[fuchsia::test]
+    fn get_before_connect_is_error() {
+        let _exec = fasync::TestExecutor::new();
+        let (mut client, _remote) = new_obex_client(false);
+
+        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let get_result = client.get(headers);
+        assert_matches!(get_result, Err(Error::OperationError { .. }));
+    }
+
+    #[fuchsia::test]
+    fn sequential_get_operations_is_ok() {
+        let _exec = fasync::TestExecutor::new();
+        let (mut client, _remote) = new_obex_client(true);
+
+        // Creating the first GET operation should succeed.
+        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let _get_operation1 = client.get(headers.clone()).expect("can initialize first get");
+
+        // After the first one "completes" (e.g. no longer held), it's okay to initiate a GET.
+        drop(_get_operation1);
+        let _get_operation2 = client.get(headers).expect("can initialize second get");
     }
 }

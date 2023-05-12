@@ -15,3 +15,6 @@ pub mod header;
 
 /// Types and interfaces associated with the supported OBEX operations.
 mod operation;
+
+/// Defines the `ObexTransport` which is a wrapper around the underlying L2CAP or RFCOMM channel.
+mod transport;

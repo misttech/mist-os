@@ -30,6 +30,15 @@ impl HeaderSet {
         Ok(set)
     }
 
+    #[cfg(test)]
+    pub fn from_header(header: Header) -> Result<Self, Error> {
+        Self::from_headers(vec![header])
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.headers.is_empty()
+    }
+
     pub fn contains_header(&self, id: &HeaderIdentifier) -> bool {
         self.headers.iter().find(|(header_id, _)| header_id == id).is_some()
     }
@@ -44,6 +53,32 @@ impl HeaderSet {
         // in the order it is added.
         self.headers.push((id, header));
         Ok(())
+    }
+
+    /// Removes and returns the payload for the Body Header from the set.
+    /// If `final_` is set, then the EndOfBody header payload is returned.
+    /// Returns Error if the expected Header is not present in the collection.
+    pub fn get_body(&mut self, final_: bool) -> Result<Vec<u8>, Error> {
+        if final_ {
+            let Some(Header::EndOfBody(end_of_body)) = self.remove(&HeaderIdentifier::EndOfBody) else {
+                return Err(PacketError::data("missing end of body header").into());
+            };
+            Ok(end_of_body)
+        } else {
+            let Some(Header::Body(body)) = self.remove(&HeaderIdentifier::Body) else {
+                return Err(PacketError::data("missing body header").into());
+            };
+            Ok(body)
+        }
+    }
+
+    /// Removes and returns the specified Header from the collection. Returns None if the Header is
+    /// not present.
+    pub fn remove(&mut self, id: &HeaderIdentifier) -> Option<Header> {
+        let Some(index) = self.headers.iter().position(|(idx, _)| id == idx) else {
+            return None;
+        };
+        Some(self.headers.remove(index).1)
     }
 }
 
@@ -95,6 +130,46 @@ mod tests {
         headers.add(Header::Count(123)).expect("can add header");
         assert!(headers.contains_header(&HeaderIdentifier::Count));
         assert_matches!(headers.add(Header::Count(100)), Err(Error::Duplicate(_)));
+    }
+
+    #[fuchsia::test]
+    fn remove_headers() {
+        let mut headers =
+            HeaderSet::from_headers(vec![Header::Count(123), Header::Name("123".into())]).unwrap();
+        assert!(headers.contains_header(&HeaderIdentifier::Count));
+        assert!(headers.contains_header(&HeaderIdentifier::Name));
+        assert!(headers.remove(&HeaderIdentifier::Count).is_some());
+        assert!(!headers.contains_header(&HeaderIdentifier::Count));
+        assert!(headers.remove(&HeaderIdentifier::Count).is_none());
+        assert!(headers.remove(&HeaderIdentifier::Name).is_some());
+        assert!(!headers.contains_header(&HeaderIdentifier::Name));
+    }
+
+    #[fuchsia::test]
+    fn get_body_headers() {
+        let mut headers =
+            HeaderSet::from_headers(vec![Header::Body(vec![1]), Header::EndOfBody(vec![1, 2])])
+                .unwrap();
+        assert!(headers.contains_header(&HeaderIdentifier::Body));
+        assert!(headers.contains_header(&HeaderIdentifier::EndOfBody));
+
+        let eob = headers.get_body(true).expect("end of body exists");
+        assert_eq!(eob, vec![1, 2]);
+        // Trying to get it again is an Error since it no longer exists in the collection.
+        assert_matches!(headers.get_body(true), Err(Error::Packet(PacketError::Data(_))));
+
+        let b = headers.get_body(false).expect("end of body exists");
+        assert_eq!(b, vec![1]);
+        // Trying to get it again is an Error since it no longer exists in the collection.
+        assert_matches!(headers.get_body(false), Err(Error::Packet(PacketError::Data(_))));
+
+        // Body exists, but user wants EOB.
+        let mut headers = HeaderSet::from_headers(vec![Header::Body(vec![1])]).unwrap();
+        assert_matches!(headers.get_body(true), Err(Error::Packet(PacketError::Data(_))));
+
+        // EOB exists, but user wants Body.
+        let mut headers = HeaderSet::from_headers(vec![Header::EndOfBody(vec![1])]).unwrap();
+        assert_matches!(headers.get_body(false), Err(Error::Packet(PacketError::Data(_))));
     }
 
     #[fuchsia::test]

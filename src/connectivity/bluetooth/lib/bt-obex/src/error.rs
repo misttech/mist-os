@@ -17,8 +17,12 @@ pub enum Error {
     Duplicate(HeaderIdentifier),
     #[error("Encountered an IO Error: {}", .0)]
     IOError(#[from] zx::Status),
+    #[error("Operation is already in progress")]
+    OperationInProgress,
     #[error("Internal error during {:?}: {:?}", .operation, .msg)]
     OperationError { operation: OpCode, msg: String },
+    #[error("Peer disconnected")]
+    PeerDisconnected,
     #[error("Peer rejected {:?} request with Error: {:?}", .operation, .response)]
     PeerRejected { operation: OpCode, response: ResponseCode },
     #[error("Invalid {:?} response from peer: {:?}", .operation, .msg)]
