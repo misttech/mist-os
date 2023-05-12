@@ -30,6 +30,7 @@ if (is_host) {
       "src/system.rs",
       "src/todo.rs",
       "src/update_package.rs",
+      "src/zbi.rs",
     ]
 
     deps = [

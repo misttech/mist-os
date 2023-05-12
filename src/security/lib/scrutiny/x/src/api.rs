@@ -151,9 +151,18 @@ pub trait Zbi {
     /// Concrete type used for accessing blobs stored in blootfs.
     type Blob: Blob;
 
+    /// Concrete error that may be returned by `Zbi` operations.
+    type Error: Error;
+
     /// Iterate over (path, contents) pairs of files in this ZBI's bootfs. See
     /// https://fuchsia.dev/fuchsia-src/concepts/process/userboot#bootfs for details.
-    fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>>;
+    ///
+    /// # Panics
+    ///
+    /// Some reader strategies may not support concurrent invocations of `Zbi::bootfs`.
+    fn bootfs(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>>, Self::Error>;
 }
 
 /// Kernel command-line flags. See https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline
@@ -364,8 +373,8 @@ pub enum DataSourceKind {
     /// A Fuchsia Volume Manager (FVM) filesystem volume file. See
     /// https://fuchsia.dev/fuchsia-src/concepts/filesystems/filesystems#fvm for details.
     FvmVolume,
-    /// A Zircon Boot Image (ZBI) file.
-    Zbi,
+    /// The bootfs filesystem inside a Zircon Boot Image (ZBI) file.
+    ZbiBootfs,
 
     /// Multiple kinds are associated with underlying data source(s).
     Multiple(Vec<DataSourceKind>),

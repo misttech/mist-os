@@ -19,6 +19,7 @@ use crate::api;
 use crate::product_bundle::ProductBundleRepositoryBlob;
 
 // External dependencies.
+use std::convert::Infallible;
 use std::path::PathBuf;
 
 pub struct ComponentInstanceCapability;
@@ -136,8 +137,11 @@ pub struct Zbi;
 impl api::Zbi for Zbi {
     type BootfsPath = PathBuf;
     type Blob = Blob<ProductBundleRepositoryBlob>;
+    type Error = Infallible;
 
-    fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>> {
+    fn bootfs(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>>, Self::Error> {
         todo!("TODO(fxbug.dev/111251): Integrate with production system API");
     }
 }

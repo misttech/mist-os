@@ -67,6 +67,7 @@ pub mod fake {
     use crate::blob::fake::Blob as FakeBlob;
     use crate::hash::fake::Hash;
     use crate::package::fake::Package as FakePackage;
+    use std::convert;
     use std::iter;
     use std::marker::PhantomData;
 
@@ -122,9 +123,12 @@ pub mod fake {
     impl api::Zbi for Zbi {
         type BootfsPath = &'static str;
         type Blob = FakeBlob<Hash>;
+        type Error = convert::Infallible;
 
-        fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>> {
-            Box::new(iter::empty())
+        fn bootfs(
+            &self,
+        ) -> Result<Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>>, Self::Error> {
+            Ok(Box::new(iter::empty()))
         }
     }
 
