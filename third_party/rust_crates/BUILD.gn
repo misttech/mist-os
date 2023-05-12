@@ -102,6 +102,10 @@ group("bincode") {
   public_deps = [ ":bincode-v1_3_3" ]
 }
 
+group("bit-set") {
+  public_deps = [ ":bit-set-v0_5_0" ]
+}
+
 group("bit-vec") {
   public_deps = [ ":bit-vec-v0_5_0" ]
 }
