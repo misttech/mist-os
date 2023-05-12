@@ -146,9 +146,10 @@ async fn exec_server() -> Result<(), Error> {
     let weak_router = Arc::downgrade(&router);
     std::mem::drop(router);
     let usb_fut = async move {
-        while let Err(e) = usb::run_usb_links(weak_router.clone()).await {
-            error!("USB scanner failed with error {e:?}, retrying ...");
-            fasync::Timer::new(std::time::Duration::from_secs(5)).await;
+        // TODO: Change this info! to error! Once we can return normally if USB support is disabled
+        // (fxbug.dev/95554)
+        if let Err(e) = usb::run_usb_links(weak_router.clone()).await {
+            info!("USB scanner failed with error {e:?}");
         }
     };
 
