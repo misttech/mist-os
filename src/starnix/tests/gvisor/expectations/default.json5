@@ -519,7 +519,6 @@
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
-                "ProcSelfAuxv.EntryPresence",
                 "ProcPidMem.Read",
                 "ProcPidMem.Unmapped",
                 "ProcPidMem.RepeatedRead",

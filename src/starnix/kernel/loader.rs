@@ -438,6 +438,7 @@ pub fn load_executable(
             (AT_BASE, interp_elf.map_or(0, |interp| interp.file_base as u64)),
             (AT_PAGESZ, *PAGE_SIZE),
             (AT_PHDR, main_elf.file_base.wrapping_add(main_elf.headers.file_header().phoff) as u64),
+            (AT_PHENT, main_elf.headers.file_header().phentsize as u64),
             (AT_PHNUM, main_elf.headers.file_header().phnum as u64),
             (
                 AT_ENTRY,
