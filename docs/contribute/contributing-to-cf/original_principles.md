@@ -510,8 +510,7 @@ subtree it behaves a lot like a full topology:
     doesn't have a way to distinguish whether it's running in a test or
     production environment (unless it somehow deduces this fact through its
     interactions with the capabilities offered to it).
--   All capabilities with a `framework` source are scoped. For example, if you
-    request the `hub from framework`, you'll get a hub rooted at that component.
+-   All capabilities with a `framework` source are scoped.
 -   Component framework offers a number of [built-in capabilities][src-builtin],
     but these capabilities can be shimmed simply by replacing them with a
     capability from another source. This includes runners and resolvers.
@@ -724,9 +723,6 @@ specifically granted by the parent, for example:
 -   Component-scoped event streams, which allow components to receive lifecycle
     events about children. - Access to its own package through `/pkg`, which
     every component gets even without having to request it
--   [`hub`][docs-hub], which allows its client to traverse part of component
-    topology rooted at a particular realm, meaning that it can observe and
-    access the services of all components within that realm.
 
 Nevertheless, thanks to the invariant that framework capabilities never provide
 access to capabilities from the containing environment, these capabilities do
@@ -736,7 +732,7 @@ not violate [least privilege](#least-privilege),
 
 ### APIs that expose peer info {#peer-exception}
 
-There are some privileged APIs (hub, realm-scoped event streams) that expose
+There are some privileged APIs (e.g. realm-scoped event streams) that expose
 internal information about a component, such as its relative moniker, URL, or
 outgoing directory. However, these APIs are locked down and only usable by
 non-production or specially privileged components like `archivist` or
@@ -754,7 +750,6 @@ contents of a collection are runtime determined.
 [docs-environments]: /docs/concepts/components/v2/environments.md
 [docs-eventpair]: /docs/reference/kernel_objects/eventpair.md
 [docs-get-started]: /docs/get-started/learn/components
-[docs-hub]: /docs/concepts/components/v2/hub.md
 [docs-intro-components]: /docs/concepts/components/v2/introduction.md#components
 [docs-manifests]: /docs/concepts/components/v2/component_manifests.md
 [docs-monikers]: /docs/concepts/components/v2/identifiers.md#monikers

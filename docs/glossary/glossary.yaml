@@ -1083,15 +1083,6 @@
   related_guides: [""]
   area: ["General", "System"]
 
-- term: "Hub"
-  short_description: "A portal for tools to access detailed structural information about
-  component instances at runtime, such as their names, job and process ids, and
-  exposed capabilities."
-  full_description: ""
-  see_also: ["<a href=\"/docs/concepts/components/v2/hub.md\">Hub</a>"]
-  related_guides: [""]
-  area: ["Component Framework"]
-
 - term: "Image"
   short_description: "A bitmap containing pixels that can be attached to a
   <a href=\"/docs/glossary#transform\">Transform</a> in <a href=\"/docs/glossary#flatland\">Flatland</a>."

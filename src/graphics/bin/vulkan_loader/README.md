@@ -103,8 +103,14 @@ metadata.json is a single JSON file that describes the ICD to the loader. Exampl
 
 The loader service exposes inspect data (under `core/vulkan_loader`) about its
 current state and what components it has loaded. `manifest-fs` and `device-fs`
-are also exposed through the [hub][hub] at
-`/hub-v2/children/core/children/vulkan_loader/out/debug/`. The loader
+are also exposed in the loader component's `out/debug` directory.
+
+```posix-terminal
+ffx component explore /core/vulkan_loader -c "cat out/debug/manifest-fs"
+ffx component explore /core/vulkan_loader -c "cat out/debug/device-fs"
+```
+
+The loader
 service must be launched first; one way to do that is using [ffx component
 start][ffx-start].
 
@@ -117,5 +123,4 @@ start][ffx-start].
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [loaderinterface]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md
 [meta-far]: /docs/concepts/packages/package.md#meta-far
-[hub]: /docs/concepts/components/v2/hub.md
 [ffx-start]: /docs/development/sdk/ffx/start-a-component-during-development.md#start-a-component

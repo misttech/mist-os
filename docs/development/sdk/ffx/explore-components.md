@@ -204,8 +204,8 @@ Moniker: /bootstrap/archivist
 
 Fuchsia does not allow accessing child components directly from the parent.
 Previously, using knowledge of the component topology to access a child component's
-capabilities made tools brittle in `fx shell`, and in other tools that used to keep
-hard-coded paths to `/hub-v2` which encoded knowledge about the system topology.
+capabilities made tools brittle and dependent on hard-coded paths that encoded
+knowledge about the system topology.
 
 Instead, the following alternatives are recommended:
 

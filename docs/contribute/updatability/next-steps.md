@@ -79,9 +79,6 @@ allowed access to certain global namespaces and would expose components to
 platform implementation details that had no affordances for updatability such
 as versioning or transition support. The new Component Framework either enforces
 [isolation][principles-secure] or forbids access to these namespaces entirely.
-For instance the [hub] becomes hierarchically contained, only offering
-information about the component’s realm and its children but never of its parent,
-since a global hub is a form of [ambient authority][principles-secure].
 
 The [components v2 migration][cfv2-migration] is an ongoing multi-year effort.
 Currently the team is focused on
@@ -229,7 +226,6 @@ even if CTS coverage never reaches 100% of the platform surface.
 [fxb-82514]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=82514
 [fxb-82740]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=82740
 [fxb-84117]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=84117
-[hub]: /docs/concepts/components/v2/hub.md
 [inspect]: /docs/development/diagnostics/inspect/README.md
 [logs]: /docs/reference/diagnostics/logs/README.md
 [monikers]: /docs/concepts/components/v2/identifiers.md#monikers

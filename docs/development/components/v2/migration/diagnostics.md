@@ -251,10 +251,7 @@ direct log messages back to the `debuglog` buffer.
 The hub provides access to detailed structural information about component
 instances at runtime. In Components v1, `appmgr` provides the v1 Hub
 through a specific directory structure populated in your component's namespace
-under `/hub`. In Components v2, many v1 Hub use cases have preferred alternative
-approaches.
-
-When migrating to Components v2, consider the following alternatives:
+under `/hub`. In Components v2, consider the following alternatives:
 
 -   [Observing lifecycle events][migrate-features-events]: Clients watching the
     filesystem to observe component instance changes should use
@@ -266,53 +263,6 @@ When migrating to Components v2, consider the following alternatives:
     services exposed through a component's `out/svc` directory should route
     these services and capability providers into their tests instead, similar to
     `injected-services`.
-
-For other use cases, follow the instructions in this section to migrate to the
-[v2 Hub][hub-v2] provided by Component Manager.
-
-Note: Features of the Hub are designed to support test components only. If you
-need to access the Hub outside of the test realm, reach out to
-[component-framework-dev][cf-dev-list] for assistance.
-
-### Route the hub directory
-
-When [migrating tests][migrate-tests], you'll need to route the `hub`
-[directory capability][directory-capabilities] to your test component if any
-components in the test realm need to read data from the v2 Hub.
-
-Following the example in [Test uses injected services][migrate-tests-inject],
-add the `hub` directory capability to your CML file:
-
-```json5
-//my_component_test.cml
-{
-    use: [
-        {
-            directory: "hub",
-            from: "framework",
-            rights: [ "r*" ],
-            path: "/hub",
-        },
-    ]
-}
-```
-
-### Update hub reference paths
-
-Update your code to reference the content path from the v2 Hub directory
-structure. Here are some examples of path differences between the Hub
-implementations:
-
-| v1 Hub Path | [v2 Hub][hub-v2] Path |
-| --------------------- | --------------------- |
-| `/hub/c/{{ '<var>' }}component-name{{ '</var>' }}/{{ '<var>' }}instance-id{{ '</var>' }}/url` | `/hub/url` |
-| `/hub/c/{{ '<var>' }}component-name{{ '</var>' }}/{{ '<var>' }}instance-id{{ '</var>' }}/in/{{ '<var>' }}svc-path{{ '</var>' }}` | `/hub/exec/in/{{ '<var>' }}svc-path{{ '</var>' }}` |
-| `/hub/c/{{ '<var>' }}component-name{{ '</var>' }}/{{ '<var>' }}instance-id{{ '</var>' }}/process-id` | `/hub/exec/runtime/elf/process-id` |
-| `/hub/c/{{ '<var>' }}child-component{{ '</var>' }}` | `/hub/children/{{ '<var>' }}child-component{{ '</var>' }}` |
-
-Note: The `hub` directory routed to your component is scoped to the current
-realm. To access hub contents from the parent realm, route the hub from `parent`
-instead of `framework`. This feature is not available with the v1 Hub.
 
 ## What's next {#next}
 
@@ -332,11 +282,9 @@ specific features your components may support:
 [debug-log-rust]: /src/sys/lib/stdout-to-debuglog/rust
 [debug-log]: /docs/development/diagnostics/logs/recording.md#debuglog_handles
 [directory-capabilities]: /docs/concepts/components/v2/capabilities/directory.md
-[cf-dev-list]: https://groups.google.com/a/fuchsia.dev/g/component-framework-dev
 [emulatortest]: /tools/emulator/emulatortest
 [event-capabilities]: /docs/concepts/components/v2/capabilities/event.md
 [ffx-inspect]: https://fuchsia.dev/reference/tools/sdk/ffx.md#inspect
-[hub-v2]: /docs/concepts/components/v2/hub.md
 [inspect]: /docs/development/diagnostics/inspect/README.md
 [integration-test-monikers]: /docs/development/testing/components/integration_testing.md#test-component-moniker
 [logs]: /docs/development/diagnostics/logs/README.md

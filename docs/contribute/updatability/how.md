@@ -224,7 +224,6 @@ platform interfaces are observed and respected.
 [fxb-84117]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=84117
 [glossary.product]: /docs/glossary/README.md#product
 [glossary.product-owner]: /docs/glossary/README.md#product-owner
-[hub]: /docs/concepts/components/v2/hub.md
 [idk]: /docs/development/idk/README.md
 [inspect]: /docs/development/diagnostics/inspect/README.md
 [kernel-objects]: /docs/reference/kernel_objects/objects.md

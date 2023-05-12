@@ -41,9 +41,6 @@ toc:
   path: /docs/concepts/components/configuration.md
 - title: "Diagnostics"
   section:
-  - title: "Hub"
-    path: /docs/concepts/components/v2/hub.md
-    status: deprecated
   - title: "Lifecycle events"
     section:
     - title: "Overview"

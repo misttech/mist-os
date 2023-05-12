@@ -229,7 +229,6 @@ There are some typical objects that a component namespace might contain:
   - `vendor.topic.Interface`: service defined by a _vendor_
 - `dev/`: device tree (relevant portions visible to privileged components as needed)
   - `class/`, ...
-- `hub/`: introspect the system, see [Hub][hub] (privileged components only)
 - `config/`: configuration data for the component
 
 ## Namespace Participants
@@ -306,6 +305,5 @@ defined by the feature set of the component.
 
 [glossary.protocol]: /docs/glossary/README.md#protocol
 [glossary.service]: /docs/glossary/README.md#service
-[hub]: /docs/concepts/components/v2/hub.md
 [protocol-capabilities]: /docs/concepts/components/v2/capabilities/protocol.md
 [service-capabilities]: /docs/concepts/components/v2/capabilities/service.md

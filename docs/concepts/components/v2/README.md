@@ -30,10 +30,6 @@ Components are the basic unit of executable software on Fuchsia.
 -   [Resolvers](capabilities/resolvers.md): Find components from URLs; add
     support for methods of software packaging and distribution.
 
-## Diagnostics
-
--   [Hub](hub.md): A live view of the component topology at runtime.
-
 ## Internals
 
 -   [Component manifest design principles][rfc0093]
