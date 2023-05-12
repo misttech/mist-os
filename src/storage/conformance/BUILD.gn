@@ -13,6 +13,7 @@ group("tests") {
   deps = [
     ":io_conformance_util_tests",
     "//src/storage/conformance/conformance_harness/cppvfs:cppvfs-io1-conformance-test",
+    "//src/storage/conformance/conformance_harness/fxfs:fxfs-conformance-test",
     "//src/storage/conformance/conformance_harness/minfs:minfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/rustvfs:rustvfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/sdkcpp:sdkcpp-io1-conformance-test",
@@ -57,6 +58,7 @@ rustc_test("io1_conformance_test") {
     "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
