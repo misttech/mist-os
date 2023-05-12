@@ -1130,4 +1130,11 @@ mod tests {
             .await
             .expect("match_device failed"));
     }
+
+    #[fuchsia::test]
+    fn test_device_fvm_path() {
+        let device =
+            MockDevice::new().set_topological_path("/some/fvm/path/with/another/fvm/inside");
+        assert_eq!(device.fvm_path(), Some("/some/fvm/path/with/another/fvm".to_string()));
+    }
 }
