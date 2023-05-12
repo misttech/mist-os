@@ -45,6 +45,7 @@
 
                 // chroot_test
                 "ChrootTest.ProcFdLinkResolutionInChroot",
+                "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
                 "ChrootTest.DotDotFromOpenFD",
                 "ChrootTest.CreatesNewRoot",
                 "ChrootTest.WithoutCapability",

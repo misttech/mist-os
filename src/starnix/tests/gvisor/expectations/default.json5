@@ -35,7 +35,6 @@
                 "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
                 // chroot_test
-                "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
                 "ChrootTest.ProcMountsMountinfoNoEscape",
 
                 // chown_test

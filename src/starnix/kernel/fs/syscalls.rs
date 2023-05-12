@@ -637,7 +637,7 @@ pub fn sys_readlinkat(
 
     let target = match name.readlink(current_task)? {
         SymlinkTarget::Path(path) => path,
-        SymlinkTarget::Node(node) => node.path(),
+        SymlinkTarget::Node(node) => node.path(current_task),
     };
 
     // Cap the returned length at buffer_size.
@@ -1101,10 +1101,17 @@ pub fn sys_getcwd(
     buf: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let cwd = current_task.fs().cwd();
     let root = current_task.fs().root();
-
-    let mut user_cwd = cwd.path_from_root(Some(&root));
+    let cwd = current_task.fs().cwd();
+    let mut user_cwd = match cwd.path_from_root(Some(&root)) {
+        PathWithReachability::Reachable(path) => path,
+        PathWithReachability::Unreachable(mut path) => {
+            let mut combined = vec![];
+            combined.extend_from_slice(b"(unreachable)");
+            combined.append(&mut path);
+            combined
+        }
+    };
     user_cwd.push(b'\0');
     if user_cwd.len() > size {
         return error!(ERANGE);
@@ -1275,7 +1282,7 @@ pub fn sys_mount(
     if flags.contains(MountFlags::BIND) {
         do_mount_bind(current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
-        do_mount_change_propagation_type(target, flags)
+        do_mount_change_propagation_type(current_task, target, flags)
     } else {
         do_mount_create(current_task, source_addr, target, filesystemtype_addr, data_addr, flags)
     }
@@ -1290,15 +1297,23 @@ fn do_mount_bind(
     let source = lookup_at(current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
     log_trace!(
         "mount(source={:?}, target={:?}, flags={:?})",
-        String::from_utf8_lossy(&source.path()),
-        String::from_utf8_lossy(&target.path()),
+        String::from_utf8_lossy(&source.path(current_task)),
+        String::from_utf8_lossy(&target.path(current_task)),
         flags
     );
     target.mount(WhatToMount::Bind(source), flags)
 }
 
-fn do_mount_change_propagation_type(target: NamespaceNode, flags: MountFlags) -> Result<(), Errno> {
-    log_trace!("mount(target={:?}, flags={:?})", String::from_utf8_lossy(&target.path()), flags);
+fn do_mount_change_propagation_type(
+    current_task: &CurrentTask,
+    target: NamespaceNode,
+    flags: MountFlags,
+) -> Result<(), Errno> {
+    log_trace!(
+        "mount(target={:?}, flags={:?})",
+        String::from_utf8_lossy(&target.path(current_task)),
+        flags
+    );
 
     // Flag validation. Of the three propagation type flags, exactly one must be passed. The only
     // valid flags other than propagation type are MS_SILENT and MS_REC.
@@ -1348,7 +1363,7 @@ fn do_mount_create(
     log_trace!(
         "mount(source={:?}, target={:?}, type={:?}, data={:?})",
         String::from_utf8_lossy(source),
-        String::from_utf8_lossy(&target.path()),
+        String::from_utf8_lossy(&target.path(current_task)),
         String::from_utf8_lossy(fs_type),
         String::from_utf8_lossy(data)
     );

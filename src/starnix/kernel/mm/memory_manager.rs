@@ -1684,7 +1684,7 @@ fn write_map(
         // File names can have newlines that need to be escaped before printing.
         // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
         // escaping applied to paths is replacing newlines with an octal sequence.
-        let path = filename.path();
+        let path = filename.path_escaping_chroot();
         sink.write_iter(
             path.iter()
                 .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })

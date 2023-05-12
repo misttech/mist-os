@@ -153,11 +153,11 @@ mod test {
     fn test_chdir() {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
 
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path());
+        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
 
         let bin = current_task.open_file(b"bin", OpenFlags::RDONLY).expect("missing bin directory");
         current_task.fs().chdir(&current_task, bin.name.clone()).expect("Failed to chdir");
-        assert_eq!(b"/bin".to_vec(), current_task.fs().cwd().path());
+        assert_eq!(b"/bin".to_vec(), current_task.fs().cwd().path_escaping_chroot());
 
         // Now that we have changed directories to bin, we're opening a file
         // relative to that directory, which doesn't exist.
@@ -177,7 +177,7 @@ mod test {
                     .clone(),
             )
             .expect("Failed to chdir");
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path());
+        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
 
         // Now bin exists again because we've gone back to the root.
         assert!(current_task.open_file(b"bin", OpenFlags::RDONLY).is_ok());
@@ -194,7 +194,7 @@ mod test {
                     .clone(),
             )
             .expect("Failed to chdir");
-        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path());
+        assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
         assert!(current_task.open_file(b"bin", OpenFlags::RDONLY).is_ok());
     }
 }

@@ -521,13 +521,14 @@ impl DynamicFileSource for ProcMountsFileSource {
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let ns = self.0.fs().namespace();
+        let task = self.0.clone();
+        let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
             let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
             let origin =
                 NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
-            let fs_spec = String::from_utf8_lossy(&origin.path()).into_owned();
-            let fs_file = String::from_utf8_lossy(&mountpoint.path()).into_owned();
+            let fs_spec = String::from_utf8_lossy(&origin.path_escaping_chroot()).into_owned();
+            let fs_file = String::from_utf8_lossy(&mountpoint.path_escaping_chroot()).into_owned();
             let fs_vfstype = "TODO";
             let fs_mntopts = "TODO";
             writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
@@ -595,7 +596,8 @@ impl DynamicFileSource for ProcMountinfoFile {
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
-        let ns = self.0.fs().namespace();
+        let task = self.0.clone();
+        let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
             let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
             // Can't fail, mountpoint() and root() can't return a NamespaceNode with no mount
@@ -608,8 +610,8 @@ impl DynamicFileSource for ProcMountinfoFile {
                 mount.id,
                 parent.id,
                 mount.root.node.fs().dev_id,
-                String::from_utf8_lossy(&origin.path()),
-                String::from_utf8_lossy(&mountpoint.path())
+                String::from_utf8_lossy(&origin.path_escaping_chroot()),
+                String::from_utf8_lossy(&mountpoint.path_escaping_chroot())
             )?;
             if let Some(peer_group) = mount.read().peer_group() {
                 write!(sink, " shared:{}", peer_group.id)?;
@@ -702,6 +704,24 @@ impl LookupContext {
 impl Default for LookupContext {
     fn default() -> Self {
         LookupContext::new(SymlinkMode::Follow)
+    }
+}
+
+/// Whether the path is reachable from the given root.
+pub enum PathWithReachability {
+    /// The path is reachable from the given root.
+    Reachable(FsString),
+
+    /// The path is not reachable from the given root.
+    Unreachable(FsString),
+}
+
+impl PathWithReachability {
+    fn into_path(self) -> FsString {
+        match self {
+            PathWithReachability::Reachable(path) => path,
+            PathWithReachability::Unreachable(path) => path,
+        }
     }
 }
 
@@ -935,20 +955,34 @@ impl NamespaceNode {
         self.mount_if_root().ok()?.mountpoint()
     }
 
+    /// The path from the task's root to this node.
+    pub fn path(&self, task: &Task) -> FsString {
+        self.path_from_root(Some(&task.fs().root())).into_path()
+    }
+
     /// The path from the root of the namespace to this node.
-    pub fn path(&self) -> FsString {
-        self.path_from_root(None)
+    pub fn path_escaping_chroot(&self) -> FsString {
+        self.path_from_root(None).into_path()
     }
 
     /// Returns the path to this node, accounting for a custom root.
     /// A task may have a custom root set by `chroot`.
-    pub fn path_from_root(&self, root: Option<&NamespaceNode>) -> FsString {
+    pub fn path_from_root(&self, root: Option<&NamespaceNode>) -> PathWithReachability {
         if self.mount.is_none() {
-            return self.entry.local_name().to_vec();
+            return PathWithReachability::Reachable(self.entry.local_name().to_vec());
         }
+
+        fn build_path(mut components: Vec<FsString>) -> FsString {
+            if components.is_empty() {
+                return b"/".to_vec();
+            }
+            components.push(vec![]);
+            components.reverse();
+            components.join(&b'/')
+        }
+
         let mut components = vec![];
         let mut current = self.escape_mount();
-
         if let Some(root) = root {
             // The current node is expected to intersect with the custom root as we travel up the tree.
             while &current != root {
@@ -957,10 +991,7 @@ impl NamespaceNode {
                     current = parent.escape_mount();
                 } else {
                     // This node hasn't intersected with the custom root and has reached the namespace root.
-                    // Append (unreachable) and return.
-                    components.push(b"(unreachable)".to_vec());
-                    components.reverse();
-                    return components.join(&b'/');
+                    return PathWithReachability::Unreachable(build_path(components));
                 }
             }
         } else {
@@ -971,12 +1002,7 @@ impl NamespaceNode {
             }
         }
 
-        if components.is_empty() {
-            return b"/".to_vec();
-        }
-        components.push(vec![]);
-        components.reverse();
-        components.join(&b'/')
+        PathWithReachability::Reachable(build_path(components))
     }
 
     pub fn mount(&self, what: WhatToMount, flags: MountFlags) -> Result<(), Errno> {
@@ -1030,7 +1056,7 @@ impl NamespaceNode {
 impl fmt::Debug for NamespaceNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("NamespaceNode")
-            .field("path", &String::from_utf8_lossy(&self.path()))
+            .field("path", &String::from_utf8_lossy(&self.path_escaping_chroot()))
             .field("mount", &self.mount)
             .field("entry", &self.entry)
             .finish()
@@ -1162,9 +1188,9 @@ mod test {
         let pts =
             dev.lookup_child(&current_task, &mut context, b"pts").expect("failed to lookup pts");
 
-        assert_eq!(b"/".to_vec(), ns.root().path());
-        assert_eq!(b"/dev".to_vec(), dev.path());
-        assert_eq!(b"/dev/pts".to_vec(), pts.path());
+        assert_eq!(b"/".to_vec(), ns.root().path_escaping_chroot());
+        assert_eq!(b"/dev".to_vec(), dev.path_escaping_chroot());
+        assert_eq!(b"/dev/pts".to_vec(), pts.path_escaping_chroot());
         Ok(())
     }
 
