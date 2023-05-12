@@ -51,7 +51,7 @@ pub struct FsNode {
     /// FileObjects writing with O_APPEND should grab a write() lock on this
     /// field to ensure they operate sequentially. FileObjects writing without
     /// O_APPEND should grab read() lock so that they can operate in parallel.
-    pub append_lock: RwLock<()>,
+    pub append_lock: InterruptibleRwLock<()>,
 
     /// Mutable information about this node.
     ///
@@ -589,7 +589,7 @@ impl FsNode {
             };
             #[cfg(any(test, debug_assertions))]
             {
-                let _l1 = result.append_lock.read();
+                let _l1 = result.append_lock.raw_read();
                 let _l2 = result.info.read();
                 let _l3 = result.flock_info.lock();
             }

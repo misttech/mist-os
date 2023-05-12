@@ -792,10 +792,10 @@ impl FileObject {
         }
         self.node().clear_suid_and_sgid_bits(current_task);
         let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
-            let _guard = self.node().append_lock.write();
+            let _guard = self.node().append_lock.write(current_task)?;
             self.ops().write(self, current_task, data)?
         } else {
-            let _guard = self.node().append_lock.read();
+            let _guard = self.node().append_lock.read(current_task)?;
             self.ops().write(self, current_task, data)?
         };
         self.node().update_ctime_mtime();
@@ -813,7 +813,7 @@ impl FileObject {
         }
         self.node().clear_suid_and_sgid_bits(current_task);
         let bytes_written = {
-            let _guard = self.node().append_lock.read();
+            let _guard = self.node().append_lock.read(current_task)?;
             self.ops().write_at(self, current_task, offset, data)?
         };
         self.node().update_ctime_mtime();
