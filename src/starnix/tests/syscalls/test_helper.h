@@ -49,6 +49,13 @@ class ForkHelper {
   // then exit with a status equals to the number of failed expectation and
   // assertion. Return immediately with the pid of the child.
   pid_t RunInForkedProcess(std::function<void()> action);
+
+  // Checks for process termination by the given signal, instead of expecting
+  // the forked process to terminate normally.
+  void ExpectSignal(int signum);
+
+ private:
+  int death_signum_;
 };
 
 // Helper class to handle tests that needs to clone processes.

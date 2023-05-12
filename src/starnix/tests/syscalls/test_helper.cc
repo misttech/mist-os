@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 
 namespace {
-::testing::AssertionResult WaitForChildrenInternal() {
+::testing::AssertionResult WaitForChildrenInternal(int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
   for (;;) {
     int wstatus;
@@ -32,18 +32,27 @@ namespace {
       result = ::testing::AssertionFailure()
                << "wait error: " << strerror(errno) << "(" << errno << ")";
     }
-    if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
-      result = ::testing::AssertionFailure()
-               << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
-               << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
-               << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+    if (death_signum == 0) {
+      if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+        result = ::testing::AssertionFailure()
+                 << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
+                 << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
+                 << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+      }
+    } else {
+      if (!WIFSIGNALED(wstatus) || WTERMSIG(wstatus) != death_signum) {
+        result = ::testing::AssertionFailure()
+                 << "wait_status: WIFSIGNALED(wstatus) = " << WIFSIGNALED(wstatus)
+                 << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
+                 << ", WTERMSIG(wstatus) = " << WTERMSIG(wstatus);
+      }
     }
   }
 }
 
 }  // namespace
 
-ForkHelper::ForkHelper() {
+ForkHelper::ForkHelper() : death_signum_(0) {
   // Ensure that all children will ends up being parented to the process that
   // created the helper.
   prctl(PR_SET_CHILD_SUBREAPER, 1);
@@ -51,10 +60,12 @@ ForkHelper::ForkHelper() {
 
 ForkHelper::~ForkHelper() {
   // Wait for all remaining children, and ensure non failed.
-  EXPECT_TRUE(WaitForChildrenInternal()) << ": at least a child had a failure";
+  EXPECT_TRUE(WaitForChildrenInternal(death_signum_)) << ": at least a child had a failure";
 }
 
-bool ForkHelper::WaitForChildren() { return WaitForChildrenInternal(); }
+void ForkHelper::ExpectSignal(int signum) { death_signum_ = signum; }
+
+bool ForkHelper::WaitForChildren() { return WaitForChildrenInternal(death_signum_); }
 
 pid_t ForkHelper::RunInForkedProcess(std::function<void()> action) {
   pid_t pid = SAFE_SYSCALL(fork());

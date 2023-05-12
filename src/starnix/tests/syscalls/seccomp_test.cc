@@ -16,6 +16,8 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 
+#include "src/starnix/tests/syscalls/test_helper.h"
+
 namespace {
 
 // A syscall not implemented by Linux that we don't expect to be called.
@@ -64,8 +66,9 @@ void install_filter_block(uint32_t syscall_nr, uint32_t action) {
 }
 
 TEST(SeccompTest, RetTrapBypassesIgn) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGSYS);
+  helper.RunInForkedProcess([] {
     std::thread t([]() {
       install_filter_block(kFilteredSyscall, SECCOMP_RET_TRAP);
 
@@ -76,31 +79,24 @@ TEST(SeccompTest, RetTrapBypassesIgn) {
     });
     // Should never join - process should be killed.
     t.join();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+  });
 }
 
 // Test to ensure strict mode works.
 TEST(SeccompTest, Strict) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGKILL);
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     EXPECT_EQ(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
     syscall(kFilteredSyscall);
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) << "status " << status;
+  });
 }
 
 // Cannot change from Filtered to Strict
 TEST(SeccompTest, FilterToStrictErrors) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     ASSERT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
     sock_filter filter[] = {
@@ -114,17 +110,13 @@ TEST(SeccompTest, FilterToStrictErrors) {
 
     EXPECT_EQ(EINVAL, errno);
     exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 // Checks for attempt to install null filter with FILTER, or non-null filter with STRICT
 TEST(SeccompTest, BadArgs) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL, NULL, NULL));
     EXPECT_EQ(EFAULT, errno);
@@ -140,13 +132,7 @@ TEST(SeccompTest, BadArgs) {
 
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, &prog, NULL, NULL));
     EXPECT_EQ(EINVAL, errno);
-
-    exit_with_failure_code();
-  }
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 // Test to attempt to install filter without the right caps.
@@ -155,22 +141,18 @@ TEST(SeccompTest, BadNoNewPrivs) {
   if (HasSysAdmin()) {
     GTEST_SKIP() << "Skipped perms test because running as root";
   }
-  pid_t const pid = fork();
-  if (pid == 0) {
+
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     // Neither CAP_SYS_ADMIN nor NO_NEW_PRIVS == 1
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
     EXPECT_EQ(EACCES, errno);
-    exit_with_failure_code();
-  }
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 TEST(SeccompTest, SeccompMax4KMinOne) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     constexpr uint64_t too_big = BPF_MAXINSNS + 1;
     auto filter = std::make_unique<sock_filter[]>(too_big);
@@ -191,13 +173,7 @@ TEST(SeccompTest, SeccompMax4KMinOne) {
     };
     EXPECT_NE(0, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &zero_prog, 0, 0))
         << "Zero size filter was allowed";
-
-    exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 #define MAX_INSNS_PER_PATH 32768
@@ -205,8 +181,8 @@ TEST(SeccompTest, SeccompMax4KMinOne) {
 // Ensure that the total number of instructions in filters does not exceed the
 // maximum.  Note that each filter has a fixed overhead of 4 instructions.
 TEST(SeccompTest, SeccompMaxTotalInsns) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
     auto filter = std::make_unique<sock_filter[]>(BPF_MAXINSNS);
     sock_filter val = BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
@@ -222,20 +198,14 @@ TEST(SeccompTest, SeccompMaxTotalInsns) {
 
     EXPECT_EQ(-1, prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &fprog, 0, 0));
     EXPECT_EQ(errno, ENOMEM);
-
-    exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 // If a BPF operation contains BPF_ABS, then the specified offset has to be
 // aligned to a 32-bit boundary and not exceed sizeof(seccomp_data)
 TEST(SeccompTest, FilterAccessInBounds) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
     sock_filter filter[] = {
@@ -250,17 +220,13 @@ TEST(SeccompTest, FilterAccessInBounds) {
         << "unaligned abs was allowed in filter";
 
     EXPECT_EQ(EINVAL, errno) << "unaligned abs did not set set errno correctly";
-    exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 TEST(SeccompTest, RetKillProcess) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGSYS);
+  helper.RunInForkedProcess([] {
     std::thread t([]() {
       install_filter_block(kFilteredSyscall, SECCOMP_RET_KILL_PROCESS);
       syscall(kFilteredSyscall);
@@ -268,16 +234,13 @@ TEST(SeccompTest, RetKillProcess) {
     });
     // Should never join - process should be killed.
     t.join();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+  });
 }
 
 TEST(SeccompTest, KillProcessOnBadRetAction) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGSYS);
+  helper.RunInForkedProcess([] {
     std::thread t([]() {
       install_filter_block(kFilteredSyscall, 0x00020000U);
       syscall(kFilteredSyscall);
@@ -285,16 +248,13 @@ TEST(SeccompTest, KillProcessOnBadRetAction) {
     });
     // Should never join - process should be killed.
     t.join();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+  });
 }
 
 TEST(SeccompTest, PrctlGetSeccomp) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.ExpectSignal(SIGSYS);
+  helper.RunInForkedProcess([] {
     std::thread t([]() {
       EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
@@ -320,16 +280,12 @@ TEST(SeccompTest, PrctlGetSeccomp) {
     });
     // Should never join - process should be killed.
     t.join();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGSYS) << "status " << status;
+  });
 }
 
 TEST(SeccompTest, ErrnoIsMaxFFF) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     EXPECT_GE(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 
     install_filter_block(kFilteredSyscall, SECCOMP_RET_ERRNO | 0x1000);
@@ -337,18 +293,14 @@ TEST(SeccompTest, ErrnoIsMaxFFF) {
     EXPECT_EQ(0xfff, errno);
 
     exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 // Test that TSYNC from thread A won't work if you add a filter in thread B,
 // spawned from thread A.
 TEST(SeccompTest, TsyncEsrch) {
-  pid_t const pid = fork();
-  if (pid == 0) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
     std::mutex m;
     std::condition_variable cv;
     int ready = 0;
@@ -391,12 +343,7 @@ TEST(SeccompTest, TsyncEsrch) {
     ready++;
     cv.notify_all();
     t.join();
-    exit_with_failure_code();
-  };
-  ASSERT_NE(pid, -1) << "Fork failed";
-  int status;
-  ASSERT_NE(waitpid(pid, &status, 0), -1);
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << "status " << status;
+  });
 }
 
 }  // anonymous namespace
