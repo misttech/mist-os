@@ -30,6 +30,7 @@ group("tests") {
     "hw_info:tests",
     "lib:tests",
     "memory:tests",
+    "process_explorer:tests",
     "remote-control:tests",
     "shell:tests",
     "ssh-key-manager:tests",
