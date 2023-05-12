@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod error;
+pub mod error;
 
 use anyhow::{anyhow, Context, Error, Result};
 use async_trait::async_trait;
