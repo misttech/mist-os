@@ -35,9 +35,9 @@ enum Command {
 async fn main() -> Result<(), anyhow::Error> {
     let Config { block_size, pci_bus, pci_device, cmd } = Config::from_args();
 
-    // The filename is in the format pci-<bus>:<device>.<function>. The function is always zero for
-    // virtio block devices.
-    let topological_path_suffix = format!("/{:02}:{:02}.0/virtio-block/block", pci_bus, pci_device);
+    // The filename is will contain the BDF in the form <bus>:<device>.<function>. The function is
+    // always zero for virtio block devices.
+    let bdf = format!("{:02}:{:02}.0", pci_bus, pci_device);
 
     // This tool has access to block nodes in the /dev/class/block path, but we need to match
     // against composite PCI devices which sit in the /dev/ root we cannot get blanket access to. To
@@ -51,7 +51,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let block_proxy = device_watcher::wait_for_device_with(
         &block_dir,
         |device_watcher::DeviceInfo { filename, topological_path }| {
-            topological_path.ends_with(&topological_path_suffix).then(|| {
+            topological_path.contains(&bdf).then(|| {
                 client::connect_to_named_protocol_at_dir_root::<BlockMarker>(&block_dir, filename)
             })
         },
