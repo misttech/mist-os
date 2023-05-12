@@ -11,9 +11,6 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"
 
-// TODO(fxbug.dev/126333): Implement.
-extern "C" zx_handle_t get_root_resource() { return 0; }
-
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,
     fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev,

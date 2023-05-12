@@ -45,7 +45,6 @@ source_set("bus_mapper") {
     "$magma_build_root/src/magma_util/platform:trace",
     "..:logger",
     "..:object",
-    "//src/lib/ddk",
   ]
 }
 
@@ -87,6 +86,7 @@ source_set("dependency_injection_device") {
 }
 
 entry_deps = [
+  ":bus_mapper",
   ":status",
   ":thread_profile",
   "$magma_build_root/src/magma_util:short_macros",

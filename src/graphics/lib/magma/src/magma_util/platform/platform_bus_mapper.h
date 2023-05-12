@@ -36,6 +36,10 @@ class PlatformBusMapper {
   virtual std::unique_ptr<PlatformBuffer> CreateContiguousBuffer(size_t size,
                                                                  uint32_t alignment_log2,
                                                                  const char* name) = 0;
+#if defined(__Fuchsia__)
+  static void SetInfoResource(zx::resource info_resource);
+  static void SetInfoResource(zx::unowned_resource info_resource);
+#endif
 
   static std::unique_ptr<PlatformBusMapper> Create(
       std::shared_ptr<PlatformHandle> bus_transaction_initiator);

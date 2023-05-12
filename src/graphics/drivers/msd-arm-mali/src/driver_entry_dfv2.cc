@@ -13,6 +13,7 @@
 
 #include "magma_util/short_macros.h"
 #include "parent_device_dfv2.h"
+#include "platform_bus_mapper.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_driver_base.h"
@@ -30,6 +31,12 @@ class MaliDriver : public MagmaDriverBaseType {
       : MagmaDriverBaseType("mali", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override {
+    zx::result info_resource = GetInfoResource();
+    if (!info_resource.is_ok()) {
+      return info_resource.take_error();
+    }
+    magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
+
     parent_device_ = ParentDeviceDFv2::Create(context().incoming());
     if (!parent_device_) {
       MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv2");
@@ -51,6 +58,11 @@ class MaliDriver : public MagmaDriverBaseType {
       return zx::error(ZX_ERR_INTERNAL);
     }
     return zx::ok();
+  }
+
+  void Stop() override {
+    MagmaDriverBaseType::Stop();
+    magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 
  private:

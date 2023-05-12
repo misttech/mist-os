@@ -25,6 +25,7 @@
 #include "magma_util/platform/zircon/zircon_platform_status.h"
 #include "magma_util/short_macros.h"
 #include "parent_device_dfv1.h"
+#include "platform_bus_mapper.h"
 #include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
@@ -109,6 +110,7 @@ zx_status_t GpuDevice::Init() {
 
 static zx_status_t driver_bind(void* context, zx_device_t* parent) {
   MAGMA_LOG(INFO, "driver_bind: binding\n");
+  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource()));
   auto gpu = std::make_unique<GpuDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;

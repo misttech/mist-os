@@ -4,13 +4,17 @@
 
 #include "zircon_platform_bus_mapper.h"
 
-#include <lib/ddk/driver.h>
 #include <lib/zx/process.h>
+#include <zircon/status.h>
 
 #include "platform_logger.h"
 #include "platform_trace.h"
 
 namespace magma {
+
+namespace {
+zx::resource info_resource_s;
+}
 
 ZirconPlatformBusMapper::BusMapping::~BusMapping() {
   for (auto& pmt : pmt_) {
@@ -57,9 +61,11 @@ std::unique_ptr<PlatformBusMapper::BusMapping> ZirconPlatformBusMapper::MapPageR
                           pmt[i].reset_and_get_address());
     }
     if (status != ZX_OK) {
-      zx_info_kmem_stats_t kmem_stats;
-      zx_object_get_info(get_root_resource(), ZX_INFO_KMEM_STATS, &kmem_stats, sizeof(kmem_stats),
-                         nullptr, nullptr);
+      zx_info_kmem_stats_t kmem_stats{};
+      if (info_resource_s) {
+        info_resource_s.get_info(ZX_INFO_KMEM_STATS, &kmem_stats, sizeof(kmem_stats), nullptr,
+                                 nullptr);
+      }
       zx_info_task_stats_t task_stats = {};
       zx::process::self()->get_info(ZX_INFO_TASK_STATS, &task_stats, sizeof(task_stats), nullptr,
                                     nullptr);
@@ -91,6 +97,21 @@ std::unique_ptr<PlatformBuffer> ZirconPlatformBusMapper::CreateContiguousBuffer(
     DRETP(nullptr, "Failed to create contiguous vmo: %d", status);
   vmo.set_property(ZX_PROP_NAME, name, strlen(name));
   return PlatformBuffer::Import(vmo.release());
+}
+
+// static
+void PlatformBusMapper::SetInfoResource(zx::resource info_resource) {
+  info_resource_s = std::move(info_resource);
+}
+
+// static
+void PlatformBusMapper::SetInfoResource(zx::unowned_resource info_resource) {
+  zx::resource resource_dup;
+  zx_status_t status = info_resource->duplicate(ZX_RIGHT_SAME_RIGHTS, &resource_dup);
+  if (status != ZX_OK) {
+    DMESSAGE("Failed to duplicate info resource: %s", zx_status_get_string(status));
+  }
+  info_resource_s = std::move(resource_dup);
 }
 
 std::unique_ptr<PlatformBusMapper> PlatformBusMapper::Create(

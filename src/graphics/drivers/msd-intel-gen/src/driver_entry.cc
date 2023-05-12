@@ -8,6 +8,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/resource.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,6 +118,8 @@ zx_status_t IntelDevice::Init() {
 
 static zx_status_t sysdrv_bind(void* ctx, zx_device_t* parent) {
   DLOG("sysdrv_bind start zx_device %p", parent);
+  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource()));
+
   auto gpu = std::make_unique<IntelDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;

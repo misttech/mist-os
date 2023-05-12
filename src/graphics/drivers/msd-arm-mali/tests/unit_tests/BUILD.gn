@@ -53,11 +53,13 @@ executable("msd_arm_mali_dfv2_tests") {
   testonly = true
   sources = [ "dfv2_tests.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/driver-runtime-main:gtest",
+    "//src/devices/testing/fake-resource",
     "//src/graphics/drivers/msd-arm-mali:msd_arm_entry_dfv2",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/lib/magma/src/magma_util:registers",

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
@@ -88,6 +89,22 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   // Initialize MagmaDriver and MagmaSystemDevice.
   virtual zx::result<> MagmaStart() = 0;
+
+  zx::result<zx::resource> GetInfoResource() {
+    auto info_resource = context().incoming()->template Connect<fuchsia_kernel::InfoResource>();
+
+    if (info_resource.is_error()) {
+      MAGMA_DMESSAGE("Error requesting info resource: %s", info_resource.status_string());
+      return info_resource.take_error();
+    }
+    auto info_resource_client = fidl::WireSyncClient(std::move(*info_resource));
+    auto result = info_resource_client->Get();
+    if (!result.ok()) {
+      MAGMA_DMESSAGE("Protocol error calling InfoResource.Get(): %s", result.status_string());
+      return zx::error(result.error().status());
+    }
+    return zx::ok(std::move(result->resource));
+  }
 
   std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
 

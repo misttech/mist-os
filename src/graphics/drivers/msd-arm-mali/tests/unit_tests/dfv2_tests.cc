@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/fake-resource/resource.h>
 #include <lib/zx/result.h>
 
 #include <gtest/gtest.h>
@@ -30,6 +32,22 @@ void InstallMaliRegisterIoHook(magma::RegisterIo* register_io) {
 }
 
 namespace {
+
+class FakeInfoResource : public fidl::testing::WireTestBase<fuchsia_kernel::InfoResource> {
+ public:
+  FakeInfoResource() {}
+
+  void Get(GetCompleter::Sync& completer) override {
+    zx::resource resource;
+    fake_root_resource_create(resource.reset_and_get_address());
+    completer.Reply(std::move(resource));
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+};
+
 TEST(MsdArmDFv2, LoadDriver) {
   // This dispatcher is used by the driver itself.
   fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherNoDefaultAllowSync};
@@ -87,6 +105,12 @@ TEST(MsdArmDFv2, LoadDriver) {
                       .AddService<fuchsia_hardware_platform_device::Service>(
                           pdev->GetInstanceHandler(test_env_dispatcher.dispatcher()), "pdev");
               EXPECT_EQ(ZX_OK, result.status_value());
+
+              EXPECT_EQ(ZX_OK, test_environment->incoming_directory()
+                                   .component()
+                                   .AddProtocol<fuchsia_kernel::InfoResource>(
+                                       std::make_unique<FakeInfoResource>())
+                                   .status_value());
             }).status_value());
 
   class MaliHook : public magma::RegisterIo::Hook {

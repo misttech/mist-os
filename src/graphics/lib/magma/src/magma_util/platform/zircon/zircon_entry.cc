@@ -21,6 +21,7 @@
 #include <ddktl/protocol/empty-protocol.h>
 
 #include "magma_util/short_macros.h"
+#include "platform_bus_mapper.h"
 #include "platform_handle.h"
 #include "platform_logger.h"
 #include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
@@ -99,6 +100,7 @@ zx_status_t GpuDevice::Init() {
 
 static zx_status_t driver_bind(void* context, zx_device_t* parent) {
   MAGMA_LOG(INFO, "driver_bind: binding\n");
+  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource()));
   auto gpu = std::make_unique<GpuDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;
