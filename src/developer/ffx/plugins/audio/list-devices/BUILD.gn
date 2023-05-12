@@ -22,6 +22,11 @@ ffx_plugin("ffx_audio_listdevices") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:serde",
   ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_rust",
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/fuchsia-async",
+  ]
 
   sources = [ "src/lib.rs" ]
 }
