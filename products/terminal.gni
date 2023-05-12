@@ -44,7 +44,6 @@ legacy_base_package_labels += [
 # Add UI packages on terminal.
 legacy_cache_package_labels += [
   "//src/fonts/collections:small-open-fonts-collection",
-  "//src/ui/bin/sensor-config:empty-sensor-config-pkg",
   "//src/ui/bin/terminal",
 
   # Used to mock out display hardware in UI integration tests.

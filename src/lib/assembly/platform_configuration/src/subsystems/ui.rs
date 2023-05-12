@@ -45,11 +45,8 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             "UI is only supported in the default feature set level"
         );
 
+        let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
-            // TODO(fxbug.dev/126530): Make an default empty sensor config once all clients are
-            // specifying the config in the product assembly config.
-            let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
-
             // If the config is empty, do not write it to the directory.
             // TODO(fxbug.dev/126530): Remove this check once products stop supplying an empty
             // config.
