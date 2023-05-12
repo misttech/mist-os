@@ -100,7 +100,7 @@ def main():
 
     input_paths = map(os.path.abspath, args.input)
     input_paths = list(filter(os.path.exists, input_paths)) # conventionally ignore empty inputs
-    input_dirs = list(map(os.path.isdir, input_paths))
+    input_dirs = list(filter(os.path.isdir, input_paths))
     if len(input_dirs) > 0:
         assert len(input_dirs) == len(input_paths), "input formats cannot be mixed"
         in_fmt = build_id_fmt
