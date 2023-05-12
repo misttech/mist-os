@@ -209,7 +209,7 @@ bit_ceil(T value) {
 
 template <typename T>
 constexpr std::enable_if_t<is_bit_type<T>::value, T> bit_floor(T value) {
-  return static_cast<T>(T(1) << (bit_width(value) - T(1)));
+  return value == 0 ? 0 : static_cast<T>(T(1) << (static_cast<T>(bit_width(value)) - T(1)));
 }
 
 template <unsigned little, unsigned big>

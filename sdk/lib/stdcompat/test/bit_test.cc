@@ -601,10 +601,8 @@ TEST(IntPow2Test, BitCeiIsCorrect) {
 
 template <typename T>
 constexpr bool CheckBitFloor() {
-  static_assert(cpp20::bit_floor<T>(static_cast<T>(0)) == 0,
-                "bit_ceil must be 1 for zero and one.");
-  static_assert(cpp20::bit_floor<T>(static_cast<T>(1)) == 1,
-                "bit_ceil must be 1 for zero and one.");
+  static_assert(cpp20::bit_floor<T>(static_cast<T>(0)) == 0, "bit_floor must be 0 for zero.");
+  static_assert(cpp20::bit_floor<T>(static_cast<T>(1)) == 1, "bit_floor must be 1 for one.");
 
   for (int i = 0; i < std::numeric_limits<T>::digits; ++i) {
     T t = static_cast<T>(T(1) << i);
@@ -622,26 +620,26 @@ constexpr bool CheckBitFloor() {
 }
 
 TEST(IntPow2Test, BitFloorIsCorrect) {
-  static_assert(CheckBitFloor<unsigned>(), "bit_ceil failed for unsigned.");
-  static_assert(CheckBitFloor<unsigned char>(), "bit_ceil failed for unsigned.");
-  static_assert(CheckBitFloor<unsigned long>(), "bit_ceil failed for unsigned long.");
-  static_assert(CheckBitFloor<unsigned long long>(), "bit_ceil failed for unsigned long long.");
+  static_assert(CheckBitFloor<unsigned>(), "bit_floor failed for unsigned.");
+  static_assert(CheckBitFloor<unsigned char>(), "bit_floor failed for unsigned.");
+  static_assert(CheckBitFloor<unsigned long>(), "bit_floor failed for unsigned long.");
+  static_assert(CheckBitFloor<unsigned long long>(), "bit_floor failed for unsigned long long.");
 
-  static_assert(CheckBitFloor<uint8_t>(), "bit_ceil failed for uint8_t.");
-  static_assert(CheckBitFloor<uint16_t>(), "bit_ceil failed for uint16_t.");
-  static_assert(CheckBitFloor<uint32_t>(), "bit_ceil failed for uint32_t.");
-  static_assert(CheckBitFloor<uint64_t>(), "bit_ceil failed for uint64_t.");
-  static_assert(CheckBitFloor<uint128_t>(), "bit_ceil failed for uint128_t.");
+  static_assert(CheckBitFloor<uint8_t>(), "bit_floor failed for uint8_t.");
+  static_assert(CheckBitFloor<uint16_t>(), "bit_floor failed for uint16_t.");
+  static_assert(CheckBitFloor<uint32_t>(), "bit_floor failed for uint32_t.");
+  static_assert(CheckBitFloor<uint64_t>(), "bit_floor failed for uint64_t.");
+  static_assert(CheckBitFloor<uint128_t>(), "bit_floor failed for uint128_t.");
 
-  static_assert(CheckBitFloor<uint_least8_t>(), "bit_ceil failed for uint_least8_t.");
-  static_assert(CheckBitFloor<uint_least16_t>(), "bit_ceil failed for uint_least16_t.");
-  static_assert(CheckBitFloor<uint_least32_t>(), "bit_ceil failed for uint_least32_t.");
-  static_assert(CheckBitFloor<uint_least64_t>(), "bit_ceil failed for uint_least64_t.");
+  static_assert(CheckBitFloor<uint_least8_t>(), "bit_floor failed for uint_least8_t.");
+  static_assert(CheckBitFloor<uint_least16_t>(), "bit_floor failed for uint_least16_t.");
+  static_assert(CheckBitFloor<uint_least32_t>(), "bit_floor failed for uint_least32_t.");
+  static_assert(CheckBitFloor<uint_least64_t>(), "bit_floor failed for uint_least64_t.");
 
-  static_assert(CheckBitFloor<uint_fast8_t>(), "bit_ceil failed for uint_least8_t.");
-  static_assert(CheckBitFloor<uint_fast16_t>(), "bit_ceil failed for uint_least16_t.");
-  static_assert(CheckBitFloor<uint_fast32_t>(), "bit_ceil failed for uint_least32_t.");
-  static_assert(CheckBitFloor<uint_fast64_t>(), "bit_ceil failed for uint_least64_t.");
+  static_assert(CheckBitFloor<uint_fast8_t>(), "bit_floor failed for uint_least8_t.");
+  static_assert(CheckBitFloor<uint_fast16_t>(), "bit_floor failed for uint_least16_t.");
+  static_assert(CheckBitFloor<uint_fast32_t>(), "bit_floor failed for uint_least32_t.");
+  static_assert(CheckBitFloor<uint_fast64_t>(), "bit_floor failed for uint_least64_t.");
 }
 
 #if defined(__cpp_lib_int_pow2) && __cpp_lib_int_pow2 >= 202002L && \
