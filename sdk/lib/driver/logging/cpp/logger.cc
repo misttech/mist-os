@@ -202,6 +202,10 @@ void Logger::logvf(FuchsiaLogSeverity severity, cpp20::span<std::string> tags, c
     buffer.WriteKeyValue("tag", tag);
   }
   FlushRecord(buffer, dropped);
+
+  if (severity == FUCHSIA_LOG_FATAL) {
+    abort();
+  }
 }
 
 }  // namespace fdf
