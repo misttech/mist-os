@@ -111,6 +111,19 @@ pub struct WarningResult {
     pub using_node: NodePath,
     pub capability: CapabilityName,
     pub warning: ErrorWithMessage<CapabilityRouteError>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub route: Vec<RouteSegment>,
+}
+
+impl PartialEq for WarningResult {
+    fn eq(&self, other: &Self) -> bool {
+        // The route is not serialized to the Scrutiny allowlist file.
+        // It is only used to produce a human-readable error message.
+        // When filtering error results, ignore the route.
+        self.using_node == other.using_node
+            && self.capability == other.capability
+            && self.warning == other.warning
+    }
 }
 
 /// Ok-severity results from `CapabilityRouteController`.
@@ -515,6 +528,28 @@ mod tests {
         return Zbi { sections: Vec::default(), bootfs, cmdline: "".to_string() };
     }
 
+    fn json_pretty(data: &serde_json::Value) -> String {
+        let mut buffer = Vec::new();
+        let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+        let mut serializer = serde_json::Serializer::with_formatter(&mut buffer, formatter);
+        data.serialize(&mut serializer).unwrap();
+        String::from_utf8(buffer).unwrap()
+    }
+
+    fn assert_json_eq(actual: serde_json::Value, expected: serde_json::Value) {
+        if actual != expected {
+            println!("JSON MISMATCH");
+            println!(">>>>>>>> ACTUAL");
+            println!("{}", json_pretty(&actual));
+            println!("<<<<<<<< ACTUAL");
+            println!(">>>>>>>> EXPECTED");
+            println!("{}", json_pretty(&expected));
+            println!("<<<<<<<< EXPECTED");
+        }
+
+        assert_eq!(actual, expected);
+    }
+
     // Prepares a ZBI with a nonempty component ID index, collects a `V2ComponentModel` with one
     // component instance, and checks that the component ID index provided by that component instance
     // contains the expected entry.
@@ -567,7 +602,7 @@ mod tests {
                             "protocol": [
                                 "protocol",
                             ],
-                            "from" : "#self",
+                            "from": "#self",
                             "to": "#my-resolver"
                         },
                     ],
@@ -575,21 +610,21 @@ mod tests {
                         {
                             "name": "logger",
                             "url": "fuchsia-pkg://fuchsia.com/logger#meta/logger.cm",
-                            "environment" : "#myenv",
+                            "environment": "#myenv",
                         },
                         {
-                            "name" : "my-resolver",
-                            "url" : "fuchsia-pkg://fuchsia.com/resolver#meta/resolver.cm",
+                            "name": "my-resolver",
+                            "url": "fuchsia-pkg://fuchsia.com/resolver#meta/resolver.cm",
 
                         },
                     ],
-                    "environments" : [
+                    "environments": [
                         {
                             "name": "myenv",
                             "extends": "realm",
-                            "resolvers" : [ {
-                                "resolver" : "my-resolver",
-                                "from" : "#my-resolver",
+                            "resolvers": [ {
+                                "resolver": "my-resolver",
+                                "from": "#my-resolver",
                                 "scheme": "fuchsia-pkg",
                             },
                             ],
@@ -600,9 +635,9 @@ mod tests {
             (
                 "fuchsia-pkg://fuchsia.com/logger#meta/logger.cm",
                 json!({
-                    "program" : {
-                        "runner" : "elf",
-                        "binary" : "bin/logger",
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/logger",
                     },
                 }),
             ),
@@ -647,7 +682,7 @@ mod tests {
             model.clone(),
             json!({ "scheme": "fuchsia-pkg", "moniker": "/my-resolver", "protocol": "protocol"}),
         )?;
-        assert_eq!(
+        assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
@@ -687,13 +722,13 @@ mod tests {
                             "environment": "#myenv"
                         },
                     ],
-                    "environments" : [
+                    "environments": [
                         {
                             "name": "myenv",
                             "extends": "realm",
-                            "resolvers" : [
+                            "resolvers": [
                                 {
-                                    "resolver" : "my-resolver",
+                                    "resolver": "my-resolver",
                                     "scheme": "fuchsia-pkg",
                                     "from": "self",
                                 }
@@ -706,9 +741,9 @@ mod tests {
             (
                 "fuchsia-pkg://fuchsia.com/logger#meta/logger.cm",
                 json!({
-                    "program" : {
-                        "runner" : "elf",
-                        "binary" : "bin/logger",
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/logger",
                     },
                 }),
             ),
@@ -719,7 +754,7 @@ mod tests {
             model.clone(),
             json!({ "scheme": "fuchsia-pkg", "moniker": "/", "protocol": "protocol"}),
         )?;
-        assert_eq!(
+        assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
@@ -748,7 +783,7 @@ mod tests {
                     "offer": [
                         {
                             "resolver": "my-resolver",
-                            "from" : "self",
+                            "from": "self",
                             "to": "#logger"
                         },
                     ],
@@ -771,20 +806,20 @@ mod tests {
             (
                 "fuchsia-pkg://fuchsia.com/logger#meta/logger.cm",
                 json!({
-                    "children" : [
+                    "children": [
                         {
                             "name": "log-child",
                             "url": "fuchsia-pkg://fuchsia.com/log-child#meta/log-child.cm",
-                            "environment" : "#env",
+                            "environment": "#env",
                         },
                     ],
-                    "environments" : [
+                    "environments": [
                         {
                             "name": "env",
                             "extends": "none",
-                            "resolvers" : [ {
-                                "resolver" : "my-resolver",
-                                "from" : "parent",
+                            "resolvers": [ {
+                                "resolver": "my-resolver",
+                                "from": "parent",
                                 "scheme": "fuchsia-pkg",
                             },
                             ],
@@ -795,9 +830,9 @@ mod tests {
             (
                 "fuchsia-pkg://fuchsia.com/log-child#meta/log-child.cm",
                 json!({
-                    "program" : {
-                        "runner" : "elf",
-                        "binary" : "bin/logger",
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/logger",
                     },
                 }),
             ),
@@ -809,7 +844,7 @@ mod tests {
             model.clone(),
             json!({ "scheme": "fuchsia-pkg", "moniker": "/", "protocol": "protocol"}),
         )?;
-        assert_eq!(
+        assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
@@ -842,17 +877,17 @@ mod tests {
                             "protocol": [
                                 "fuchsia.component.resolution.Resolver",
                             ],
-                            "from" : "#bootstrap",
+                            "from": "#bootstrap",
                             "to": "#core"
                         },
                     ],
-                    "environments" : [
+                    "environments": [
                         {
                             "name": "core-env",
                             "extends": "realm",
-                            "resolvers" : [ {
-                                "resolver" : "base_resolver",
-                                "from" : "#bootstrap",
+                            "resolvers": [ {
+                                "resolver": "base_resolver",
+                                "from": "#bootstrap",
                                 "scheme": "fuchsia-pkg",
                             },
                             ],
@@ -923,17 +958,17 @@ mod tests {
                             "protocol": [
                                 "fuchsia.test.SpecialProtocol",
                             ],
-                            "from" : "#self",
+                            "from": "#self",
                             "to": "#custom-resolver"
                         },
                     ],
-                    "environments" : [
+                    "environments": [
                         {
                             "name": "custom-resolver-env",
                             "extends": "realm",
-                            "resolvers" : [ {
-                                "resolver" : "custom-resolver",
-                                "from" : "#custom-resolver",
+                            "resolvers": [ {
+                                "resolver": "custom-resolver",
+                                "from": "#custom-resolver",
                                 "scheme": "fuchsia-pkg",
                             },
                             ],
@@ -947,9 +982,9 @@ mod tests {
             (
                 "fuchsia-boot:///#meta/base-resolver.cm",
                 json!({
-                    "program" : {
-                        "runner" : "elf",
-                        "binary" : "bin/foo",
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/foo",
                     },
                 }),
             ),
@@ -957,9 +992,9 @@ mod tests {
             (
                 "fuchsia-pkg://fuchsia.com/resolve-me#meta/resolve-me.cm",
                 json!({
-                    "program" : {
-                        "runner" : "elf",
-                        "binary" : "bin/app",
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/app",
                     },
                 }),
             ),
@@ -1006,7 +1041,7 @@ mod tests {
             model.clone(),
             json!({ "scheme": "fuchsia-pkg", "moniker": "/core/custom-resolver", "protocol": "fuchsia.test.SpecialProtocol"}),
         )?;
-        assert_eq!(
+        assert_json_eq(
             response,
             json!({
               "deps": ["core_dep"],
@@ -1023,7 +1058,7 @@ mod tests {
 
         let controller = V2ComponentModelMappingController::default();
         let response = controller.query(model.clone(), json!("{}"))?;
-        assert_eq!(
+        assert_json_eq(
             response,
             json!({"instances":  [{ "instance": "/", "url": DEFAULT_ROOT_URL.to_string() }]})
         );
@@ -1042,7 +1077,7 @@ mod tests {
 
         let controller = V2ComponentModelMappingController::default();
         let response = controller.query(model.clone(), json!("{}"))?;
-        assert_eq!(response, json!({"instances": [ {"instance": "/", "url": root_url }]}));
+        assert_json_eq(response, json!({"instances": [ {"instance": "/", "url": root_url }]}));
 
         Ok(())
     }
@@ -1151,6 +1186,43 @@ mod tests {
                                     "message": "`/` does not have child `#missing_child`.",
                                 },
                                 "using_node": "/child",
+                                "route": [
+                                    {
+                                        "action": "use_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "source": "parent",
+                                            "source_name": "protocol",
+                                            "target_path": "/dir/svc",
+                                            "type": "protocol",
+                                        },
+                                        "moniker": "/child",
+                                    },
+                                    {
+                                        "action": "offer_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "source": {
+                                                "child": {
+                                                    "collection": null,
+                                                    "name": "missing_child",
+                                                },
+                                            },
+                                            "source_name": "protocol",
+                                            "target": {
+                                                "child": {
+                                                    "collection": null,
+                                                    "name": "child",
+                                                },
+                                            },
+                                            "target_name": "protocol",
+                                            "type": "protocol",
+                                        },
+                                        "moniker": "/",
+                                    },
+                                ],
                             },
                         ],
                     }
@@ -1158,7 +1230,7 @@ mod tests {
             ]
         });
 
-        assert_eq!(response, expected);
+        assert_json_eq(response, expected);
 
         Ok(())
     }
@@ -1290,6 +1362,43 @@ mod tests {
                             "message": "`/` does not have child `#missing_child`.",
                         },
                         "using_node": "/child",
+                        "route": [
+                            {
+                                "action": "use_by",
+                                "capability": {
+                                    "availability": "required",
+                                    "dependency_type": "strong",
+                                    "source": "parent",
+                                    "source_name": "protocol",
+                                    "target_path": "/dir/svc",
+                                    "type": "protocol",
+                                },
+                                "moniker": "/child",
+                            },
+                            {
+                                "action": "offer_by",
+                                "capability": {
+                                    "availability": "required",
+                                    "dependency_type": "strong",
+                                    "source": {
+                                        "child": {
+                                            "collection": null,
+                                            "name": "missing_child",
+                                        },
+                                    },
+                                    "source_name": "protocol",
+                                    "target": {
+                                        "child": {
+                                            "collection": null,
+                                            "name": "child",
+                                        },
+                                    },
+                                    "target_name": "protocol",
+                                    "type": "protocol",
+                                },
+                                "moniker": "/",
+                            },
+                        ],
                     },
                 ]
               }
@@ -1297,7 +1406,7 @@ mod tests {
           ]
         });
 
-        assert_eq!(response, expected);
+        assert_json_eq(response, expected);
 
         Ok(())
     }
@@ -1314,77 +1423,116 @@ mod tests {
         )?;
 
         let expected = json!({
-          "deps": ["v2_component_tree_dep"],
-          "results": [
-            {
-              "capability_type": "directory",
-              "results": {
-                  "errors": [
-                      {
-                          "capability": "bad_dir",
-                          "error": {
-                              "error": {
-                                  "analyzer_model_error": {
-                                      "routing_error": {
-                                          "use_from_parent_not_found": {
-                                              "capability_id": "bad_dir",
-                                              "moniker": "/child",
-                                          }
-                                      }
-                                  }
-                              },
-                              "message": "`bad_dir` was not offered to `/child` by parent.",
-                          },
-                          "using_node": "/child",
-                          "route": [
-                              {
-                                  "action": "use_by",
-                                  "capability": {
-                                      "availability": "required",
-                                      "dependency_type": "strong",
-                                      "rights": 1,
-                                      "source": "parent",
-                                      "source_name": "bad_dir",
-                                      "subdir": null,
-                                      "target_path": "/",
-                                      "type": "directory",
-                                  },
-                                  "moniker": "/child",
-                              },
-                          ],
-                      },
-                  ]
-              }
-            },
-              {
-                  "capability_type": "protocol",
-                  "results": {
-                      "warnings": [
-                          {
-                              "capability": "protocol",
-                              "using_node": "/child",
-                              "warning": {
-                                  "error": {
-                                      "analyzer_model_error": {
-                                          "routing_error": {
-                                              "offer_from_child_instance_not_found": {
-                                                  "capability_id": "protocol",
-                                                  "child_moniker": "missing_child",
-                                                  "moniker": "/",
-                                              }
-                                          }
-                                      }
-                                  },
-                                  "message": "`/` does not have child `#missing_child`.",
-                              }
-                          }
-                      ]
-                  }
-              }
-          ]
+            "deps": [
+                "v2_component_tree_dep",
+            ],
+            "results": [
+                {
+                    "capability_type": "directory",
+                    "results": {
+                        "errors": [
+                            {
+                                "capability": "bad_dir",
+                                "error": {
+                                    "error": {
+                                        "analyzer_model_error": {
+                                            "routing_error": {
+                                                "use_from_parent_not_found": {
+                                                    "capability_id": "bad_dir",
+                                                    "moniker": "/child",
+                                                },
+                                            },
+                                        },
+                                    },
+                                    "message": "`bad_dir` was not offered to `/child` by parent.",
+                                },
+                                "using_node": "/child",
+                                "route": [
+                                    {
+                                        "action": "use_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "rights": 1,
+                                            "source": "parent",
+                                            "source_name": "bad_dir",
+                                            "subdir": null,
+                                            "target_path": "/",
+                                            "type": "directory",
+                                        },
+                                        "moniker": "/child",
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+                {
+                    "capability_type": "protocol",
+                    "results": {
+                        "warnings": [
+                            {
+                                "capability": "protocol",
+                                "using_node": "/child",
+                                "warning": {
+                                    "error": {
+                                        "analyzer_model_error": {
+                                            "routing_error": {
+                                                "offer_from_child_instance_not_found": {
+                                                    "capability_id": "protocol",
+                                                    "child_moniker": "missing_child",
+                                                    "moniker": "/",
+                                                },
+                                            },
+                                        },
+                                    },
+                                    "message": "`/` does not have child `#missing_child`.",
+                                },
+                                "route": [
+                                    {
+                                        "action": "use_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "source": "parent",
+                                            "source_name": "protocol",
+                                            "target_path": "/dir/svc",
+                                            "type": "protocol",
+                                        },
+                                        "moniker": "/child",
+                                    },
+                                    {
+                                        "action": "offer_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "source": {
+                                                "child": {
+                                                    "collection": null,
+                                                    "name": "missing_child",
+                                                },
+                                            },
+                                            "source_name": "protocol",
+                                            "target": {
+                                                "child": {
+                                                    "collection": null,
+                                                    "name": "child",
+                                                },
+                                            },
+                                            "target_name": "protocol",
+                                            "type": "protocol",
+                                        },
+                                        "moniker": "/",
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            ],
         });
 
-        assert_eq!(response, expected);
+        assert_json_eq(response, expected);
 
         Ok(())
     }
@@ -1450,7 +1598,7 @@ mod tests {
           ]
         });
 
-        assert_eq!(response, expected);
+        assert_json_eq(response, expected);
 
         Ok(())
     }

@@ -10,7 +10,7 @@ use errors::ffx_bail;
 use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
-use scrutiny_plugins::verify::CapabilityRouteResults;
+use scrutiny_plugins::verify::{CapabilityRouteResults, ResultsForCapabilityType};
 use serde_json;
 use std::{collections::HashSet, fs, io::Read, path::PathBuf};
 
@@ -87,7 +87,7 @@ pub async fn verify(
     }?;
     let command = CommandBuilder::new("verify.capability_routes")
         .param("capability_types", query.capability_types.join(" "))
-        .param("response_level", query.response_level)
+        .param("response_level", &query.response_level)
         .build();
     let plugins =
         vec!["AdditionalBootConfigPlugin", "StaticPkgsPlugin", "CorePlugin", "VerifyPlugin"];
@@ -103,9 +103,18 @@ pub async fn verify(
     let allowlist_filter = load_allowlist(&query.allowlist_paths)
         .context("Failed to parse all allowlist fragments from supported format")?;
 
+    // Capability type-bucketed errors, warnings, and/or info.
     let mut filtered_analysis = allowlist_filter.filter_analysis(route_analysis.results);
+
+    // Human-readable messages associated with errors and warnings drawn from `filtered_analysis`.
     let mut human_readable_errors = vec![];
 
+    // Human-readable messages associated with info drawn from `filtered_analysis`.
+    let mut human_readable_messages = vec![];
+
+    // Clean `filtered_analysis.results` to contain only error and warning data relevant to
+    // allowlist entries, and populate human-readable collections.
+    let mut ok_analysis = vec![];
     for entry in filtered_analysis.iter_mut() {
         // If there are any errors, produce the human-readable version of each.
         for error in entry.results.errors.iter_mut() {
@@ -120,19 +129,102 @@ pub async fn verify(
                 })
                 .collect();
 
-            // Add the failure to the route segments
-            let error = format!("❌ ERROR: {}", error.error.message);
+            // Add the failure to the route segments.
+            let error = format!(
+                "❌ ERROR: {}\n    Moniker: {}\n    Capability: {}",
+                error.error.message, error.using_node, error.capability
+            );
             context.push(error);
 
-            // The context must begin from the point of failure
+            // The context must begin from the point of failure.
             context.reverse();
 
-            // Chain the error context into a single string
+            // Chain the error context into a single string.
             let error_with_context = context.join("\n");
             human_readable_errors.push(error_with_context);
         }
+
+        for warning in entry.results.warnings.iter_mut() {
+            // Remove all route segments so they don't show up in allowlist JSON snippet.
+            let mut context: Vec<String> = warning
+                .route
+                .drain(..)
+                .enumerate()
+                .map(|(i, s)| {
+                    let step = format!("step {}", i + 1);
+                    format!("{:>8}: {}", step, s)
+                })
+                .collect();
+
+            // Add the warning to the route segments.
+            let warning = format!(
+                "⚠️ WARNING: {}\n    Moniker: {}\n    Capability: {}",
+                warning.warning.message, warning.using_node, warning.capability
+            );
+            context.push(warning);
+
+            // The context must begin from the warning message.
+            context.reverse();
+
+            // Chain the warning context into a single string.
+            let warning_with_context = context.join("\n");
+            human_readable_errors.push(warning_with_context);
+        }
+
+        let mut ok_item = ResultsForCapabilityType {
+            capability_type: entry.capability_type.clone(),
+            results: Default::default(),
+        };
+        for ok in entry.results.ok.iter_mut() {
+            let mut context: Vec<String> = if &query.response_level != "verbose" {
+                // Remove all route segments so they don't show up in JSON snippet.
+                ok.route
+                    .drain(..)
+                    .enumerate()
+                    .map(|(i, s)| {
+                        let step = format!("step {}", i + 1);
+                        format!("{:>8}: {}", step, s)
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+            context.push(format!("ℹ️ INFO: {}: {}", ok.using_node, ok.capability));
+
+            // The context must begin from the capability description.
+            context.reverse();
+
+            // Chain the report context into a single string.
+            let message_with_context = context.join("\n");
+            human_readable_messages.push(message_with_context);
+
+            // Accumulate ok data outside the collection reported on error/warning.
+            ok_item.results.ok.push(ok.clone());
+        }
+        // Remove ok data from collection reported on error/warning, and store extracted `ok_item`.
+        entry.results.ok = vec![];
+        ok_analysis.push(ok_item);
     }
 
+    // Report human-readable info without bailing.
+    if !human_readable_messages.is_empty() {
+        println!(
+            "
+Static Capability Flow Analysis Info:
+The route verifier is reporting all capability routes in this build.
+
+>>>>>> START OF JSON SNIPPET
+{}
+<<<<<< END OF JSON SNIPPET
+
+Route messages:
+{}",
+            serde_json::to_string_pretty(&ok_analysis).unwrap(),
+            human_readable_messages.join("\n\n")
+        );
+    }
+
+    // Bail after reporting human-readable error/warning messages.
     if !human_readable_errors.is_empty() {
         ffx_bail!(
             "

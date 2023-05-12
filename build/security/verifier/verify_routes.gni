@@ -79,6 +79,12 @@ template("verify_routes") {
       "routes",
       "--product-bundle",
       rebase_path(invoker.product_bundle_path, root_build_dir),
+
+      ## Uncomment the lines below to fail on route verification warnings. Other valid option values
+      ## include "all" and "verbose", but non-warning/error messages do not cause a non-zero status
+      ## code.
+      # "--response-level",
+      # "warn",
     ]
 
     if (defined(invoker.component_tree_config)) {

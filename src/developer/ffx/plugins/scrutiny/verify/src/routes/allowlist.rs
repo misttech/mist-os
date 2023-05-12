@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Result};
-use scrutiny_plugins::verify::{ResultsBySeverity, ResultsForCapabilityType};
+use scrutiny_plugins::verify::{ErrorResult, ResultsBySeverity, ResultsForCapabilityType};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json5::from_reader;
 use std::io::Read;
@@ -274,46 +274,59 @@ impl AllowlistFilter for VersionedAllowlist<V0ExtendableFormat> {
                 // Entry for every `capability_type` in `route_analysis`.
                 ResultsForCapabilityType {
                     capability_type: analysis_item.capability_type.clone(),
-                    // Retain error when:
-                    // 1. `allowlist` does not have results for
-                    //    `capability_type` (i.e., nothing allowed for
-                    //    `capability_type`), OR
-                    // 2. `allowlist` does not have an identical `allow_error`
-                    //    in its `capability_type` results.
                     results: ResultsBySeverity {
-                        errors: analysis_item
-                            .results
-                            .errors
-                            .iter()
-                            .filter_map(|analysis_error| {
-                                match allowlist.iter().find(|&allow_item| {
-                                    allow_item.capability_type == analysis_item.capability_type
-                                }) {
-                                    Some(allow_item) => {
-                                        match allow_item
-                                            .results
-                                            .errors
-                                            .iter()
-                                            .find(|&allow_error| analysis_error == allow_error)
-                                        {
-                                            Some(_matching_allowlist_error) => None,
-                                            // No allowlist error match; report
-                                            // error from within `filter_map`.
-                                            None => Some(analysis_error.clone()),
-                                        }
-                                    }
-                                    // No allowlist defined for capability type;
-                                    // report error from within `filter_map`.
-                                    None => Some(analysis_error.clone()),
-                                }
-                            })
-                            .collect(),
-                        ..Default::default()
+                        errors: filter_v0_errors(analysis_item, allowlist),
+                        // Retain all `warnings` results. This collection will be empty when
+                        // response level is set to "error".
+                        warnings: analysis_item.results.warnings.clone(),
+                        // Retain all `ok` results. This collection will be empty when response
+                        // level is set to "error" or "warn".
+                        ok: analysis_item.results.ok.clone(),
                     },
                 }
             })
             .collect()
     }
+}
+
+/// Filters out allowlist format v0 errors that should be permitted.
+///
+/// Retain errors when:
+/// 1. `allowlist` does not have results for
+///    `capability_type` (i.e., nothing allowed for `capability_type`), OR
+/// 2. `allowlist` does not have an identical `allow_error` in its `capability_type` results.
+fn filter_v0_errors(
+    analysis_item: &ResultsForCapabilityType,
+    allowlist: &Vec<ResultsForCapabilityType>,
+) -> Vec<ErrorResult> {
+    analysis_item
+        .results
+        .errors
+        .iter()
+        .filter_map(|analysis_error| {
+            match allowlist
+                .into_iter()
+                .find(|&allow_item| allow_item.capability_type == analysis_item.capability_type)
+            {
+                Some(allow_item) => {
+                    match allow_item
+                        .results
+                        .errors
+                        .iter()
+                        .find(|&allow_error| analysis_error == allow_error)
+                    {
+                        Some(_matching_allowlist_error) => None,
+                        // No allowlist error match; report
+                        // error from within `filter_map`.
+                        None => Some(analysis_error.clone()),
+                    }
+                }
+                // No allowlist defined for capability type;
+                // report error from within `filter_map`.
+                None => Some(analysis_error.clone()),
+            }
+        })
+        .collect()
 }
 
 //
