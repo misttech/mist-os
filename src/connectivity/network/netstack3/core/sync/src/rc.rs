@@ -75,11 +75,15 @@ impl<T> Drop for Primary<T> {
         //
         // TODO(https://fxbug.dev/122388): Require explicit marking for
         // destruction of the reference and support blocking.
-        assert_eq!(
-            false,
-            marked_for_destruction.swap(true, Ordering::Release),
-            "Must not be marked for destruction yet"
-        );
+        let was_marked = marked_for_destruction.swap(true, Ordering::Release);
+
+        // Make debugging easier: don't panic if a panic is already happening
+        // since double-panics are annoying to debug.
+        if std::thread::panicking() {
+            return;
+        }
+
+        assert_eq!(was_marked, false, "Must not be marked for destruction yet");
 
         // Make sure that this `Killable` is the last thing to hold a strong
         // reference to the underlying data when it is being dropped.

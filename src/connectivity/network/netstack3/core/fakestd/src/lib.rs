@@ -6,3 +6,6 @@
 
 pub use ::core::{convert, fmt, option};
 pub use ::std::error;
+pub mod thread {
+    pub use ::std::thread::panicking;
+}

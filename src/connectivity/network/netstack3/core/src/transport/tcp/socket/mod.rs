@@ -3264,7 +3264,9 @@ mod tests {
     impl Drop for NonSyncState {
         fn drop(&mut self) {
             let Self(events) = self;
-            assert_eq!(events, &[], "some events were not consumed");
+            if !std::thread::panicking() {
+                assert_eq!(events, &[], "some events were not consumed");
+            }
         }
     }
 
