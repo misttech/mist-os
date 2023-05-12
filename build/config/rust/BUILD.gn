@@ -181,10 +181,12 @@ config("output_dir_sensitive") {
   }
 }
 
-# On remote-cache miss, execute locally, but still allow remote execution
-# to occur and populate the cache.  This may be an attractive option for
-# targets that are large, frequently miss the cache, frequently on the
-# critical path and prefer local build speeds.
+# On remote-cache miss, execute locally.
+# This mode will not attempt any remote execution, and thus,
+# not warm the remote cache.
+# This may be an attractive option for targets that are large,
+# frequently miss the cache, frequently on the critical path and
+# thus, benefit from local build speeds.
 config("rbe_strategy_local") {
   if (rust_rbe_enable) {
     # --remote-flag=* is a pseudo flag that is intercepted by
@@ -193,8 +195,10 @@ config("rbe_strategy_local") {
   }
 }
 
-# Use whichever succeeds first between local and remote.
-# This has the advantage of also populating the remote cache.
+# On cache-miss, use whichever succeeds first between local and remote.
+# There is a limited number of local execution slots.
+# The remote cache is warmed by this mode, so the next time the same
+# action is encountered, it will cache hit.
 config("rbe_strategy_racing") {
   if (rust_rbe_enable) {
     # --remote-flag=* is a pseudo flag that is intercepted by
