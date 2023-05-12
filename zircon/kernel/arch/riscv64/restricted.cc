@@ -7,10 +7,11 @@
 #include <inttypes.h>
 #include <trace.h>
 
+#include <arch/debugger.h>
 #include <arch/interrupt.h>
 #include <arch/vm.h>
 #include <kernel/restricted_state.h>
-#include <ktl/iterator.h>
+#include <kernel/thread.h>
 
 #define LOCAL_TRACE 0
 
@@ -117,9 +118,21 @@ void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state
 
 void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
     const ArchSavedNormalState& arch_state, uintptr_t vector_table, uintptr_t context) {
-  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on risc-v.
+  zx_thread_state_general_regs_t regs = {};
+  regs.pc = vector_table;
+  regs.a0 = context;
+  regs.a1 = ZX_RESTRICTED_REASON_EXCEPTION;
+  [[maybe_unused]] zx_status_t status = arch_set_general_regs(Thread::Current().Get(), &regs);
+  // This will only fail if register state has not been saved, but this will always
+  // have happened by this stage of exception handling.
+  DEBUG_ASSERT(status == ZX_OK);
 }
 
 void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& state) {
-  // TODO(https://fxbug.dev/121512): Implement in-thread exceptions on risc-v.
+  zx_thread_state_general_regs_t regs = {};
+  [[maybe_unused]] zx_status_t status = arch_get_general_regs(Thread::Current().Get(), &regs);
+  // This will only fail if register state has not been saved, but this will always
+  // have happened by this stage of exception handling.
+  DEBUG_ASSERT(status == ZX_OK);
+  state = regs;
 }

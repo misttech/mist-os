@@ -20,15 +20,6 @@
 #include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
-#if defined(__x86_64__) || defined(__aarch64__)
-#define ARCH_HAS_IN_THREAD_EXCEPTIONS 1
-#else
-#define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
-#endif
-
-constexpr uint32_t kRestrictedEnterOptions =
-    ARCH_HAS_IN_THREAD_EXCEPTIONS ? 0 : ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL;
-
 extern "C" void vectab();
 extern "C" void syscall_bounce();
 extern "C" void syscall_bounce_post_syscall();
@@ -362,16 +353,9 @@ TEST(RestrictedMode, EnterInvalidArgs) {
   // Invalid options.
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0xffffffff, 0, 0));
 
-  if constexpr (!ARCH_HAS_IN_THREAD_EXCEPTIONS) {
-    // In-thread exceptions are not yet implemented (no ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL).
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
-              zx_restricted_enter(kRestrictedEnterOptions & (~ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL),
-                                  0, 0));
-  }
-
   // Enter restricted mode with invalid args.
   // Vector table must be valid user pointer.
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(kRestrictedEnterOptions, -1, 0));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0, -1, 0));
 }
 
 TEST(RestrictedMode, BindState) {
@@ -454,7 +438,7 @@ TEST(RestrictedMode, Basic) {
 
   // Enter restricted mode with reasonable args, expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(kRestrictedEnterOptions, (uintptr_t)vectab, &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
@@ -523,8 +507,7 @@ TEST(RestrictedMode, Bench) {
       auto deadline = t + zx::ticks::per_second();
       int iter = 0;
       while (zx::ticks::now() <= deadline) {
-        ASSERT_OK(
-            restricted_enter_wrapper(kRestrictedEnterOptions, (uintptr_t)vectab, &reason_code));
+        ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
         iter++;
       }
       t = zx::ticks::now() - t;
@@ -582,22 +565,20 @@ TEST(RestrictedMode, Bench) {
     }
 
     // In-thread exception handling
-    if constexpr (ARCH_HAS_IN_THREAD_EXCEPTIONS) {
-      auto t = zx::ticks::now();
-      auto deadline = t + zx::ticks::per_second();
-      int iter = 0;
-      zx_restricted_reason_t reason_code;
-      state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
-      ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-      while (zx::ticks::now() <= deadline) {
-        ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
-        iter++;
-      }
-      t = zx::ticks::now() - t;
-
-      printf("in-thread exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
+    auto t = zx::ticks::now();
+    auto deadline = t + zx::ticks::per_second();
+    int iter = 0;
+    zx_restricted_reason_t reason_code;
+    state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
+    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+    while (zx::ticks::now() <= deadline) {
+      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+      iter++;
     }
+    t = zx::ticks::now() - t;
+
+    printf("in-thread exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
+           t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
   }
 }
 
@@ -639,7 +620,6 @@ TEST(RestrictedMode, ExceptionChannel) {
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 }
 
-#if ARCH_HAS_IN_THREAD_EXCEPTIONS
 // Verify we can receive restricted exceptions using in-thread exception handlers.
 TEST(RestrictedMode, InThreadException) {
   zx::vmo vmo;
@@ -674,9 +654,11 @@ TEST(RestrictedMode, InThreadException) {
   constexpr uint32_t kEsrIlBit = 1ull << 25;
   EXPECT_EQ(kEsrIlBit, exception_state.exception.context.arch.u.arm_64.esr);
   EXPECT_EQ(0u, exception_state.exception.context.arch.u.arm_64.far);
+#elif defined(__riscv)
+  EXPECT_EQ(0x2, exception_state.exception.context.arch.u.riscv_64.cause);
+  EXPECT_EQ(0u, exception_state.exception.context.arch.u.riscv_64.tval);
 #endif
 }
-#endif  // ARCH_HAS_IN_THREAD_EXCEPTIONS
 
 // Verify that restricted_enter fails on invalid zx_restricted_state_t values.
 TEST(RestrictedMode, EnterBadStateStruct) {
@@ -692,8 +674,7 @@ TEST(RestrictedMode, EnterBadStateStruct) {
     ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
     // This should fail with bad state.
-    ASSERT_EQ(ZX_ERR_BAD_STATE,
-              zx_restricted_enter(kRestrictedEnterOptions, (uintptr_t)&vectab, 0));
+    ASSERT_EQ(ZX_ERR_BAD_STATE, zx_restricted_enter(0, (uintptr_t)&vectab, 0));
   };
 
   state.set_pc(-1);  // pc is outside of user space
