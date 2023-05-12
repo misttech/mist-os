@@ -758,7 +758,7 @@ impl Environment {
 
 /// polyfill for File::create_new, which is currently nightly-only.
 fn create_new_file(path: &Path) -> std::io::Result<File> {
-    OpenOptions::new().read(true).write(true).create(true).open(path)
+    OpenOptions::new().read(true).write(true).create_new(true).open(path)
 }
 
 impl fmt::Display for Environment {
