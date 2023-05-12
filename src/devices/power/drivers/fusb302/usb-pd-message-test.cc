@@ -204,6 +204,17 @@ TEST(HeaderConcreteParsingTest, SoftResetFromSource) {
   EXPECT_EQ(0, header.data_object_count());
 }
 
+TEST(HeaderConcreteParsingTest, GetSourceCapabilitiesFromSink) {
+  Header header = Header::CreateFromBytes(0x47, 0x00);
+
+  EXPECT_EQ(PowerRole::kSink, header.power_role());
+  EXPECT_EQ(SpecRevision::kRev2, header.spec_revision());
+  EXPECT_EQ(DataRole::kUpstreamFacingPort, header.data_role());
+  EXPECT_EQ(MessageType::kGetSourceCapabilities, header.message_type());
+  EXPECT_EQ(usb_pd::MessageId(0), header.message_id());
+  EXPECT_EQ(0, header.data_object_count());
+}
+
 TEST(MessageTest, SourceCapabilitiesOneObject) {
   // From the USB Type C ports of the Framework Gen 12 laptop.
   Header header = Header::CreateFromBytes(0xa1, 0x11);
@@ -214,6 +225,13 @@ TEST(MessageTest, SourceCapabilitiesOneObject) {
 
   ASSERT_EQ(1, message.data_objects().size());
   EXPECT_EQ(0x2701912c, message.data_objects()[0]);
+}
+
+TEST(MessageTest, GetSourceCapabilities) {
+  Message message(MessageType::kGetSourceCapabilities, MessageId(0), PowerRole::kSink,
+                  SpecRevision::kRev2, DataRole::kUpstreamFacingPort, {});
+  static constexpr std::pair<uint8_t, uint8_t> expected_bytes = {0x47, 0x00};
+  EXPECT_EQ(expected_bytes, message.header().bytes());
 }
 
 }  // namespace
