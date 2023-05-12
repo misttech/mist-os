@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp};
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use fho::{daemon_protocol, selector, FfxMain, FfxTool, SimpleWriter};
+use fho::{daemon_protocol, moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
 use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
 use serde::Serialize;
@@ -58,9 +58,11 @@ impl Vtc {
 
 #[derive(FfxTool)]
 pub struct AgisTool {
-    #[with(selector("core/agis:expose:fuchsia.gpu.agis.ComponentRegistry"))]
+    #[with(moniker("/core/agis"))]
+    // fuchsia.gpu.agis.ComponentRegistry
     component_registry: ComponentRegistryProxy,
-    #[with(selector("core/agis:expose:fuchsia.gpu.agis.Observer"))]
+    // fuchsia.gpu.agis.Observer
+    #[with(moniker("/core/agis"))]
     observer: ObserverProxy,
     #[with(daemon_protocol())]
     listener: ListenerProxy,
