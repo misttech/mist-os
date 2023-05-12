@@ -5981,9 +5981,9 @@ From //third_party/pigweed/src/pw_arduino_build/arduino.gni:33
 
 ### pw_arduino_build_PACKAGE_NAME
 
-TODO(tonymd): "teensy/avr" here should match the folders in this dir:
+TODO(tonymd): "avr/1.58.1" here should match the folders in this dir:
 "../third_party/arduino/cores/$pw_arduino_build_CORE_NAME/hardware/*")
-For teensy: "teensy/avr", for adafruit-samd: "samd/1.6.2"
+For teensy: "avr/1.58.1", for adafruit-samd: "samd/1.6.2"
 
 **Current value (from the default):** `""`
 
@@ -6805,9 +6805,14 @@ From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:30
 
 ### pw_toolchain_CLANG_PREFIX
 
-**Current value (from the default):** `"../../prebuilt/third_party/bin/"`
+This flag allows you to specify the root directory of the clang, clang++,
+and llvm-ar binaries to use when compiling with a clang-based toolchain.
+This is useful for debugging toolchain-related issues by building with an
+externally-provided toolchain.
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:26
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:23
 
 ### pw_toolchain_COVERAGE_ENABLED
 
@@ -6858,9 +6863,11 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:26
 
 ### pw_toolchain_RUST_PREFIX
 
-**Current value (from the default):** `"../../prebuilt/third_party/rust/bin/"`
+This flag allows you to specify the root directory of the rustc binary.
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:33
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:26
 
 ### pw_toolchain_SANITIZERS
 
