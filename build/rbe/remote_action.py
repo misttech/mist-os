@@ -848,7 +848,7 @@ def make_download_stubs(
       working_dir_abs: absolute path to current working dir, relative to which
           files are created.
       rrpl: single-action reproxy log (reproxy.LogRecord), which contains
-          file digests.
+          file digests.  The non-reduced .rpl format is also acceptable.
       build_id: any string that corresponds to a unique build.
 
     Returns:
@@ -1067,6 +1067,7 @@ class RemoteAction(object):
         # of remote actions in the reproxy_*.rrpl file.
         # The information contained in this log is the same,
         # but is much easier to find than in the cumulative log.
+        # The non-reduced .rpl format is also acceptable.
         return Path(self._default_auxiliary_file_basename + '.rrpl')
 
     @property
