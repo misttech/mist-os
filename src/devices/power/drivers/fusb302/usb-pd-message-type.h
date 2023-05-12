@@ -55,9 +55,11 @@ enum class ControlMessageType : uint8_t {
 //
 // usbpd3.1 6.4 "Data Message", Table 6-6 "Data Message Types"
 enum class DataMessageType : uint8_t {
-  kSourceCapabilities = 0b0'0001,         // Source_Capabilities, Section 6.4.1.2
-  kRequestPower = 0b0'0010,               // Request, Section 6.4.2
-  kBuiltInSelfTest = 0b0'0011,            // BIST, Section 6.4.3
+  kSourceCapabilities = 0b0'0001,  // Source_Capabilities, Section 6.4.1.2
+  kRequestPower = 0b0'0010,        // Request, Section 6.4.2
+  kBuiltInSelfTest = 0b0'0011,     // BIST, Section 6.4.3
+
+  // Introduced in PD Revision 3.0
   kSinkCapabilities = 0b0'0100,           // Sink_Capabilities, Section 6.4.1.3
   kBatteryStatus = 0b0'0101,              // Battery_Status, Section 6.4.5
   kAlert = 0b0'0110,                      // Alert, Section 6.4.6
@@ -67,7 +69,8 @@ enum class DataMessageType : uint8_t {
   kExtendedPowerRangeMode = 0b0'1010,     // EPR_Mode, Section 6.4.10
   kSourceInfo = 0b0'1011,                 // Source_Info, Section 6.4.11
   kMaximumPdSpecRevision = 0b0'1100,      // Revision, Section 6.4.12
-  kVendorDefined = 0b0'1111,              // Vendor_Defined, Section 6.4.4
+
+  kVendorDefined = 0b0'1111,  // Vendor_Defined, Section 6.4.4
 };
 
 // Set on `MessageType` values that represent data message types.
