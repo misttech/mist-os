@@ -8,8 +8,8 @@ use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_unknown::CloseableCloseResult;
 use futures::StreamExt as _;
-use log::error;
 use netstack3_core::SyncCtx;
+use tracing::error;
 
 use crate::bindings::{socket::SocketWorkerProperties, util, BindingsNonSyncCtxImpl, Ctx};
 
@@ -128,7 +128,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                     continue;
                 }
                 Some(Err(e)) => {
-                    log::log!(
+                    log_error!(
                         util::fidl_err_log_level(&e),
                         "got error while polling for requests: {}",
                         e

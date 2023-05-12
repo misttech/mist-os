@@ -116,14 +116,14 @@ impl NetdeviceWorker {
             let id = if let Some(id) = state.lock().await.get(&port) {
                 id.clone()
             } else {
-                log::debug!("dropping frame for port {:?}, no device mapping available", port);
+                tracing::debug!("dropping frame for port {:?}, no device mapping available", port);
                 continue;
             };
 
             // TODO(https://fxbug.dev/100873): pass strongly owned buffers down
             // to the stack instead of copying it out.
             rx.read_at(0, &mut buff[..rx.len()]).map_err(|e| {
-                log::error!("failed to read from buffer {:?}", e);
+                tracing::error!("failed to read from buffer {:?}", e);
                 Error::Client(e)
             })?;
 
@@ -135,7 +135,7 @@ impl NetdeviceWorker {
                 // be removed under us. Note that when the device removal has
                 // completed, the interface's `PortHandler` will be uninstalled
                 // from the port slab (table of ports for this network device).
-                log::debug!("received frame for device after it has been removed; device_id={:?}", id);
+                tracing::debug!("received frame for device after it has been removed; device_id={:?}", id);
                 // We continue because even though we got frames for a removed
                 // device, this network device may have other ports that will
                 // receive and handle frames.
@@ -219,12 +219,12 @@ impl DeviceHandler {
                 mac_proxy.get_unicast_address().await.map_err(|e| {
                     // TODO(https://fxbug.dev/100871): support non-ethernet
                     // devices.
-                    log::warn!("failed to get unicast address, sending not supported: {:?}", e);
+                    tracing::warn!("failed to get unicast address, sending not supported: {:?}", e);
                     Error::ConfigurationNotSupported
                 })?;
             let mac = net_types::ethernet::Mac::new(octets);
             net_types::UnicastAddr::new(mac).ok_or_else(|| {
-                log::warn!("{} is not a valid unicast address", mac);
+                tracing::warn!("{} is not a valid unicast address", mac);
                 Error::MacNotUnicast { mac, port }
             })?
         };
@@ -240,13 +240,13 @@ impl DeviceHandler {
                 .map_err(Error::CantConnectToPort)?,
         )
         .unwrap_or_else(|e| {
-            log::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
+            tracing::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
         });
 
         let mut state = state.lock().await;
         let state_entry = match state.entry(port) {
             netdevice_client::port_slab::Entry::Occupied(occupied) => {
-                log::warn!(
+                tracing::warn!(
                     "attempted to install port {:?} which is already installed for {:?}",
                     port,
                     occupied.get()
@@ -254,7 +254,7 @@ impl DeviceHandler {
                 return Err(Error::AlreadyInstalled(port));
             }
             netdevice_client::port_slab::Entry::SaltMismatch(stale) => {
-                log::warn!(
+                tracing::warn!(
                     "attempted to install port {:?} which is already has a stale entry: {:?}",
                     port,
                     stale

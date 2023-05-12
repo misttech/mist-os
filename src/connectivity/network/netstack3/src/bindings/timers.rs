@@ -20,7 +20,7 @@ use futures::{
     future::{Fuse, FutureExt as _},
     stream::StreamExt as _,
 };
-use log::{trace, warn};
+use tracing::{trace, warn};
 
 use netstack3_core::sync::RwLock as CoreRwLock;
 

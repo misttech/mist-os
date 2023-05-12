@@ -12,7 +12,6 @@ use fidl::{endpoints::RequestStream as _, Peered as _};
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::TryStreamExt as _;
-use log::error;
 use net_types::ethernet::Mac;
 use netstack3_core::{
     device::{
@@ -27,6 +26,7 @@ use netstack3_core::{
     SyncCtx,
 };
 use packet::Buf;
+use tracing::error;
 
 use crate::bindings::{
     devices::BindingId,

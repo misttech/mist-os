@@ -10,8 +10,8 @@ use fidl_fuchsia_posix_socket as psocket;
 
 use const_unwrap::const_unwrap_option;
 use fuchsia_zircon::{self as zx, Peered as _};
-use log::{error, trace};
 use thiserror::Error;
+use tracing::{error, trace};
 
 // These values were picked to match Linux behavior.
 

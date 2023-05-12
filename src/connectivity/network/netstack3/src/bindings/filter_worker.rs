@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_net_filter as fnet_filter;
 use futures::TryStreamExt;
-use log::error;
+use tracing::error;
 
 pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<(), fidl::Error> {
     use fnet_filter::FilterRequest;
@@ -34,7 +34,7 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                            (https://fxbug.dev/106604); ignoring GetRules"
                     );
                     responder.send(&[], 0).unwrap_or_else(|e| {
-                        log::log!(
+                        log_error!(
                             crate::bindings::util::fidl_err_log_level(&e),
                             "Responder send error: {:?}",
                             e

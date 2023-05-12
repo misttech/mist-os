@@ -24,7 +24,6 @@ use fidl::endpoints::RequestStream as _;
 use fidl_fuchsia_unknown::CloseableCloseResult;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
-use log::{error, trace, warn};
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
@@ -51,6 +50,7 @@ use packet_formats::{
     },
 };
 use thiserror::Error;
+use tracing::{error, trace, warn};
 
 use crate::bindings::{
     socket::{

@@ -27,6 +27,14 @@ use netstack3_core::{
         types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
     },
 };
+use tracing::Subscriber;
+use tracing_subscriber::{
+    fmt::{
+        format::{self, FormatEvent, FormatFields},
+        FmtContext,
+    },
+    registry::LookupSpan,
+};
 
 use crate::bindings::{
     devices::{BindingId, Devices},
@@ -60,34 +68,41 @@ mod util {
     }
 }
 
-/// log::Log implementation that uses stdout.
-///
-/// Useful when debugging tests.
-struct Logger;
+struct LogFormatter;
 
-impl log::Log for Logger {
-    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
-        true
+impl<S, N> FormatEvent<S, N> for LogFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: format::Writer<'_>,
+        event: &tracing::Event<'_>,
+    ) -> std::fmt::Result {
+        write!(
+            writer,
+            "[{}] ({}) ",
+            event.metadata().level(),
+            event.metadata().module_path().unwrap_or("")
+        )?;
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
     }
-
-    fn log(&self, record: &log::Record<'_>) {
-        println!("[{}] ({}) {}", record.level(), record.module_path().unwrap_or(""), record.args())
-    }
-
-    fn flush(&self) {}
 }
-
-static LOGGER: Logger = Logger;
 
 static LOGGER_ONCE: Once = Once::new();
 
 /// Install a logger for tests.
 pub(crate) fn set_logger_for_test() {
-    // log::set_logger will panic if called multiple times; using a Once makes
+    // `init` will panic if called multiple times; using a Once makes
     // set_logger_for_test idempotent
     LOGGER_ONCE.call_once(|| {
-        log::set_logger(&LOGGER).unwrap();
-        log::set_max_level(log::LevelFilter::Trace);
+        tracing_subscriber::fmt()
+            .event_format(LogFormatter)
+            .with_max_level(tracing::Level::TRACE)
+            .init();
     })
 }
 

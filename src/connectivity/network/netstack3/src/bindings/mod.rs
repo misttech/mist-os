@@ -44,10 +44,10 @@ use futures::{
     channel::mpsc, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _, StreamExt as _,
     TryStreamExt as _,
 };
-use log::{debug, error};
 use packet::{Buf, BufferMut};
 use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
+use tracing::{debug, error};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
@@ -359,7 +359,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 
         if enabled {
             state.handler.send(frame.as_ref()).unwrap_or_else(|e| {
-                log::warn!("failed to send frame to {:?}: {:?}", state.handler, e)
+                tracing::warn!("failed to send frame to {:?}: {:?}", state.handler, e)
             })
         }
 
@@ -1007,7 +1007,7 @@ impl NetstackSeed {
                                 .await
                         }
                         WorkItem::Incoming(Service::InterfacesAdmin(installer)) => {
-                            log::debug!(
+                            tracing::debug!(
                                 "serving {}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
                             );
@@ -1016,7 +1016,7 @@ impl NetstackSeed {
                                 .forward(task_sink.clone().sink_map_err(anyhow::Error::from))
                                 .await
                                 .unwrap_or_else(|e| {
-                                    log::warn!(
+                                    tracing::warn!(
                                 "error serving {}: {:?}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                                 e

@@ -18,7 +18,6 @@ use futures::{
     TryStreamExt as _,
 };
 use itertools::Itertools as _;
-use log::{info, warn};
 use net_types::{
     ethernet::Mac,
     ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6},
@@ -32,6 +31,7 @@ use netstack3_core::{
     },
 };
 use thiserror::Error;
+use tracing::{info, warn};
 
 use crate::bindings::{
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},

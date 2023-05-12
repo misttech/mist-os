@@ -43,7 +43,6 @@ common_deps = [
   "//third_party/rust_crates:either",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:itertools",
-  "//third_party/rust_crates:log",
   "//third_party/rust_crates:nonzero_ext",
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:rand",
@@ -64,6 +63,8 @@ common_test_deps = [
   "//third_party/rust_crates:futures-lite",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:test-case",
+  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:tracing-subscriber",
 ]
 
 common_sources = [

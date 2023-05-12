@@ -169,14 +169,14 @@ impl Watcher {
             match responder.send(&event) {
                 Ok(()) => (),
                 Err(e) if e.is_closed() => (),
-                Err(e) => log::error!("error sending event {:?} to watcher: {:?}", event, e),
+                Err(e) => tracing::error!("error sending event {:?} to watcher: {:?}", event, e),
             }
             return;
         }
         match events.push(event) {
             Ok(()) => (),
             Err(event) => {
-                log::warn!("failed to enqueue event {:?} on watcher, closing channel", event);
+                tracing::warn!("failed to enqueue event {:?} on watcher, closing channel", event);
                 stream.control_handle().shutdown();
             }
         }
@@ -369,7 +369,7 @@ impl Worker {
                     Some(Ok(())) => {}
                     Some(Err(e)) => {
                         if !e.is_closed() {
-                            log::error!("error operating interface watcher {:?}", e);
+                            tracing::error!("error operating interface watcher {:?}", e);
                         }
                     }
                     // This should not be observable since we check if our
@@ -383,13 +383,13 @@ impl Worker {
                             current_watchers.push(Watcher { stream, events, responder: None })
                         }
                         Err(status) => {
-                            log::warn!("failed to construct events for watcher: {}", status);
+                            tracing::warn!("failed to construct events for watcher: {}", status);
                             stream.control_handle().shutdown_with_epitaph(status);
                         }
                     }
                 }
                 Action::Sink(Some(SinkAction::Event(e))) => {
-                    log::debug!("consuming event {:?}", e);
+                    tracing::debug!("consuming event {:?}", e);
                     if let Some(event) = Self::consume_event(&mut interface_state, e)? {
                         current_watchers.iter_mut().for_each(|watcher| watcher.push(event.clone()));
                     }

@@ -1063,11 +1063,11 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
 ///
 /// A closed [`fidl::Error`] indicates that the client closed the channel, and
 /// the Netstack should not generate errors based on client behavior.
-pub(crate) fn fidl_err_log_level(e: &fidl::Error) -> log::Level {
+pub(crate) fn fidl_err_log_level(e: &fidl::Error) -> tracing::Level {
     if e.is_closed() {
-        log::Level::Warn
+        tracing::Level::WARN
     } else {
-        log::Level::Error
+        tracing::Level::ERROR
     }
 }
 
@@ -1422,8 +1422,8 @@ mod tests {
                 status: zx_status::Status::PEER_CLOSED,
                 protocol_name: "PLACEHOLDER_PROTOCOL"
             }),
-            log::Level::Warn
+            tracing::Level::WARN
         );
-        assert_eq!(fidl_err_log_level(&fidl::Error::UnexpectedSyncResponse), log::Level::Error);
+        assert_eq!(fidl_err_log_level(&fidl::Error::UnexpectedSyncResponse), tracing::Level::ERROR);
     }
 }
