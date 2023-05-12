@@ -185,6 +185,9 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
 			return cleanup, err
 		}
+		if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
+			return cleanup, err
+		}
 		if r.ffxExperimentLevel >= 1 {
 			if err := ffx.Run(ctx, "config", "set", "overnet.cso", "only", "-l", "global"); err != nil {
 				return cleanup, err
