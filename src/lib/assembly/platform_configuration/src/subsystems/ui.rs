@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{ensure, Context};
+use anyhow::ensure;
 use assembly_config_schema::{platform_config::ui_config::PlatformUiConfig, FileEntry};
 
 pub(crate) struct UiSubsystem;
@@ -47,17 +47,10 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
 
         let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
-            // If the config is empty, do not write it to the directory.
-            // TODO(fxbug.dev/126530): Remove this check once products stop supplying an empty
-            // config.
-            let contents = std::fs::read_to_string(sensor_config_path)
-                .with_context(|| format!("reading sensor config {sensor_config_path}"))?;
-            if !contents.trim_end().is_empty() {
-                config_dir.entry(FileEntry {
-                    source: sensor_config_path.clone(),
-                    destination: "config.json".into(),
-                })?;
-            }
+            config_dir.entry(FileEntry {
+                source: sensor_config_path.clone(),
+                destination: "config.json".into(),
+            })?;
         }
         Ok(())
     }
