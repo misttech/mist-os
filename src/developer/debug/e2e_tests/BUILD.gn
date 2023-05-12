@@ -56,9 +56,11 @@ if (is_host) {
     _ffx_test_data_path = rebase_path(ffx_test_host_tools_out_dir, root_out_dir)
 
     _is_lto = select_variant + [ "lto" ] - [ "lto" ] != select_variant
+    _is_thinlto =
+        select_variant + [ "thinlto" ] - [ "thinlto" ] != select_variant
 
     defines = [
-      "ZXDB_E2E_TESTS_BUILD_TYPE=\"optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto\"",
+      "ZXDB_E2E_TESTS_BUILD_TYPE=\"optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto:is_thinlto=$_is_thinlto\"",
       "ZXDB_E2E_TESTS_SYMBOL_DIR=\"${symbol_dir}\"",
       "ZXDB_E2E_TESTS_SCRIPTS_DIR=\"" + rebase_path("scripts", root_out_dir) +
           "\"",

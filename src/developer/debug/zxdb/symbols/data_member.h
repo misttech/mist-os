@@ -19,19 +19,20 @@ class DataMember final : public Value {
   // Construct with fxl::MakeRefCounted().
 
   // The byte offset from the containing class or struct of this data member. This is only valid
-  // if !is_external() -- see the base class' Value::is_external().
+  // if !is_external() and data_bit_offset is not set -- see the base class' Value::is_external().
   uint32_t member_location() const { return member_location_; }
   void set_member_location(uint32_t m) { member_location_ = m; }
 
   bool is_bitfield() const { return bit_size_ != 0; }
 
   // The DW_AT_data_bit_offset is used in DWARF 4 to indicate the bit position of a member bitfield.
-  // Unlike bit_offset, this will measure from the beginning of the containing structure. Currently
-  // all of our toolchains emit bit_offset (DWARF 2 style) and don't use this.
+  // Unlike bit_offset, this will measure from the beginning of the containing structure.
+  //
+  // If data_bit_offset is set, then member_location, byte_size, and bit_offset will not be set.
   uint32_t data_bit_offset() const { return data_bit_offset_; }
   void set_data_bit_offset(uint32_t dbo) { data_bit_offset_ = dbo; }
 
-  // The DW_AT_byte_size attribute on the data member.
+  // The DW_AT_byte_size attribute on the data member. It won't be set if data_bit_offset is set.
   //
   // Normally the byte size will be 0 which means to take the size from the type. For bitfields
   // this will indicate the size of the larger field containing the bitfield, and the bit_offset
@@ -61,6 +62,7 @@ class DataMember final : public Value {
   //   - byte_size = 4
   //   - bit_offset = 29
   //   - bit_size = 3
+  //   - data_bit_offset = 0
   //
   // Bit layout (stored in the low 3 bits of a 32-bit integer):
   //
@@ -76,12 +78,14 @@ class DataMember final : public Value {
   //     // byte_size = 1
   //     // bit_size = 6
   //     // bit_offset = 2
+  //     // data_bit_offset = 0
   //     bool a : 6;
   //
   //     // member_location = 0
   //     // byte_size = 1
   //     // bit_size = 7
-  //     // bit_offset =-5
+  //     // bit_offset = -5
+  //     // data_bit_offset = 6
   //     bool b : 7;
   //   };
   //
@@ -114,6 +118,7 @@ class DataMember final : public Value {
   DataMember(const std::string& assigned_name, LazySymbol type, uint32_t member_loc);
   ~DataMember();
 
+  // TODO: use std::optional to distinguish unset values and 0.
   uint32_t member_location_ = 0;
   uint32_t data_bit_offset_ = 0;
   uint32_t byte_size_ = 0;
