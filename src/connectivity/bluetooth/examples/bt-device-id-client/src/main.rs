@@ -31,7 +31,7 @@ fn set_device_identification(
     let records = vec![example_di_record()];
     let (client, server) = fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()?;
 
-    let request_fut = di_svc.set_device_identification(&mut records.into_iter(), server);
+    let request_fut = di_svc.set_device_identification(&records, server);
 
     let fut = async move {
         let result = request_fut.await;
