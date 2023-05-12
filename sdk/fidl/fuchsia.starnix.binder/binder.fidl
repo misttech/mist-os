@@ -95,9 +95,15 @@ protocol DevBinder {
         /// The service giving the binder driver access to the resources of the client process.
         2: process_accessor client_end:ProcessAccessor;
 
+        /// The handle to the process that will use the binder driver. It is
+        /// used by the driver to read the data sent to the driver. If not
+        /// present, the driver will use `process_accessor` for reading data.
+        /// Optional
+        3: process zx.Handle:PROCESS;
+
         /// The request to the Binder protocol implementation.
         /// Mandatory
-        3: binder server_end:Binder;
+        4: binder server_end:Binder;
     });
 
     /// Close the binder device node, previously opened with `Open`. The handle

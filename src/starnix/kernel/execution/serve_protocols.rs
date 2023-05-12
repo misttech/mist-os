@@ -136,6 +136,7 @@ pub async fn serve_dev_binder(
                     let path = payload.path.ok_or_else(|| errno!(EINVAL))?;
                     let process_accessor =
                         payload.process_accessor.ok_or_else(|| errno!(EINVAL))?;
+                    let process = payload.process;
                     let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
                     let node = container.system_task.lookup_path_from_root(&path)?;
                     let device_type = node.entry.node.info().rdev;
@@ -147,7 +148,7 @@ pub async fn serve_dev_binder(
                         .ok_or_else(|| errno!(ENOTSUP))?
                         .clone();
                     binder_driver
-                        .open_external(&container.kernel, process_accessor, binder)
+                        .open_external(&container.kernel, process_accessor, process, binder)
                         .detach();
                     Ok(())
                 })();
