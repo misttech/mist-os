@@ -119,6 +119,11 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
   // kernel panicked or the higher layer forgot to restore.
   riscv64_thread_fpu_restore(newthread, current_fpu_status);
 
+  // Set the percpu in_restricted_mode field.
+  const bool in_restricted =
+      newthread->restricted_state() != nullptr && newthread->restricted_state()->in_restricted();
+  arch_set_restricted_flag(in_restricted);
+
   // Regular integer context switch.
   riscv64_context_switch(&oldthread->arch().sp, newthread->arch().sp);
 }

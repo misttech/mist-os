@@ -26,11 +26,6 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
   LTRACEF("options %#x vector %#" PRIx64 " context %#" PRIx64 "\n", options, vector_table_ptr,
           context);
 
-  // Only x86 and arm64 are supported.
-#if !defined(__x86_64__) && !defined(__aarch64__)
-  return ZX_ERR_NOT_SUPPORTED;
-#endif
-
   // Reject invalid option bits.
   if (options & (~ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL)) {
     return ZX_ERR_INVALID_ARGS;
@@ -48,11 +43,6 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
 
 zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
   LTRACEF("options 0x%x\n", options);
-
-  // Only x86 and arm64 are supported.
-#if !defined(__x86_64__) && !defined(__aarch64__)
-  return ZX_ERR_NOT_SUPPORTED;
-#endif
 
   // No options allowed.
   if (options != 0) {
@@ -107,11 +97,6 @@ zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
 zx_status_t sys_restricted_unbind_state(uint32_t options) {
   LTRACEF("options 0x%x\n", options);
 
-  // Only x86 and arm64 are supported.
-#if !defined(__x86_64__) && !defined(__aarch64__)
-  return ZX_ERR_NOT_SUPPORTED;
-#endif
-
   // No options allowed.
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
@@ -125,11 +110,6 @@ zx_status_t sys_restricted_unbind_state(uint32_t options) {
 // zx_restricted_kick
 zx_status_t sys_restricted_kick(zx_handle_t handle, uint32_t options) {
   LTRACEF("options 0x%x\n", options);
-
-  // Only x86 and arm64 are supported.
-#if !defined(__x86_64__) && !defined(__aarch64__)
-  return ZX_ERR_NOT_SUPPORTED;
-#endif
 
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;

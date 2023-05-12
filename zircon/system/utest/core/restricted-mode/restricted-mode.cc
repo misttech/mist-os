@@ -21,14 +21,10 @@
 #include <zxtest/zxtest.h>
 
 #if defined(__x86_64__) || defined(__aarch64__)
-#define ARCH_HAS_RESTRICTED_MODE 1
 #define ARCH_HAS_IN_THREAD_EXCEPTIONS 1
 #else
-#define ARCH_HAS_RESTRICTED_MODE 0
 #define ARCH_HAS_IN_THREAD_EXCEPTIONS 0
 #endif
-
-#if ARCH_HAS_RESTRICTED_MODE
 
 constexpr uint32_t kRestrictedEnterOptions =
     ARCH_HAS_IN_THREAD_EXCEPTIONS ? 0 : ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL;
@@ -259,6 +255,106 @@ class ArchRegisterState {
   zx_restricted_state_t state_{};
 };
 
+#elif defined(__riscv)
+
+class ArchRegisterState {
+ public:
+  static void WritePcToGeneralRegs(zx_thread_state_general_regs_t& regs, uint64_t pc) {
+    regs.pc = pc;
+  }
+
+  void InitializeRegisters() {
+    // Initialize all standard registers to arbitrary values.
+    state_.ra = 0x0101010101010101;
+    state_.sp = 0x0202020202020202;
+    state_.gp = 0x0303030303030303;
+    state_.tp = reinterpret_cast<uintptr_t>(&tls_val_);
+    state_.t0 = 0x0505050505050505;
+    state_.t1 = 0x0606060606060606;
+    state_.t2 = 0x0707070707070707;
+    state_.s0 = 0x0808080808080808;
+    state_.s1 = 0x0909090909090909;
+    state_.a0 = 0x0a0a0a0a0a0a0a0a;
+    state_.a1 = 0x0b0b0b0b0b0b0b0b;
+    state_.a2 = 0x0c0c0c0c0c0c0c0c;
+    state_.a3 = 0x0d0d0d0d0d0d0d0d;
+    state_.a4 = 0x0e0e0e0e0e0e0e0e;
+    state_.a5 = 0x0f0f0f0f0f0f0f0f;
+    state_.a6 = 0x0101010101010101;
+    state_.a7 = 0x0202020202020202;
+    state_.s2 = 0x0303030303030303;
+    state_.s3 = 0x0404040404040404;
+    state_.s4 = 0x0505050505050505;
+    state_.s5 = 0x0606060606060606;
+    state_.s6 = 0x0707070707070707;
+    state_.s7 = 0x0808080808080808;
+    state_.s8 = 0x0909090909090909;
+    state_.s9 = 0x0a0a0a0a0a0a0a0a;
+    state_.s10 = 0x0b0b0b0b0b0b0b0b;
+    state_.s11 = 0x0c0c0c0c0c0c0c0c;
+    state_.t3 = 0x0d0d0d0d0d0d0d0d;
+    state_.t4 = 0x0e0e0e0e0e0e0e0e;
+    state_.t5 = 0x0f0f0f0f0f0f0f0f;
+    state_.t6 = 0x0101010101010101;
+  }
+
+  void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) {
+    static_assert(sizeof(regs) <= sizeof(state_));
+    memcpy(&state_, &regs, sizeof(regs));
+  }
+
+  void VerifyTwiddledRestrictedState(RegisterMutation mutation) const {
+    // Validate the state of the registers is what was written inside restricted mode.
+    //
+    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
+    EXPECT_EQ(0x0101010101010102, state_.ra);
+    EXPECT_EQ(0x0202020202020203, state_.sp);
+    EXPECT_EQ(0x0303030303030304, state_.gp);
+    EXPECT_EQ(reinterpret_cast<uintptr_t>(&tls_val_), state_.tp);
+    if (mutation == RegisterMutation::kFromSyscall) {
+      EXPECT_EQ(0x40, state_.t0);
+    } else {
+      EXPECT_EQ(0x0505050505050506, state_.t0);
+    }
+    EXPECT_EQ(0x0606060606060607, state_.t1);
+    EXPECT_EQ(0x0707070707070708, state_.t2);
+    EXPECT_EQ(0x0808080808080809, state_.s0);
+    EXPECT_EQ(0x090909090909090a, state_.s1);
+    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.a0);
+    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.a1);
+    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.a2);
+    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.a3);
+    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.a4);
+    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.a5);
+    EXPECT_EQ(0x0101010101010102, state_.a6);
+    EXPECT_EQ(0x0202020202020203, state_.a7);
+    EXPECT_EQ(0x0303030303030304, state_.s2);
+    EXPECT_EQ(0x0404040404040405, state_.s3);
+    EXPECT_EQ(0x0505050505050506, state_.s4);
+    EXPECT_EQ(0x0606060606060607, state_.s5);
+    EXPECT_EQ(0x0707070707070708, state_.s6);
+    EXPECT_EQ(0x0808080808080809, state_.s7);
+    EXPECT_EQ(0x090909090909090a, state_.s8);
+    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.s9);
+    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.s10);
+    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.s11);
+    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.t3);
+    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.t4);
+    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.t5);
+    EXPECT_EQ(0x0101010101010102, state_.t6);
+
+    // Check that thread local storage was updated correctly in restricted mode.
+    EXPECT_EQ(0x0505050505050506, tls_val_);
+  }
+  uintptr_t pc() { return state_.pc; }
+  void set_pc(uintptr_t pc) { state_.pc = pc; }
+  zx_restricted_state_t& restricted_state() { return state_; }
+
+ private:
+  uint64_t tls_val_ = 0;
+  zx_restricted_state_t state_{};
+};
+
 #endif
 
 // Verify that restricted_enter handles invalid args.
@@ -306,7 +402,7 @@ TEST(RestrictedMode, BindState) {
   zx_vaddr_t ptr = 0;
   ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
                                        zx_system_get_page_size(), &ptr));
-  zx_restricted_state_t* state2 = reinterpret_cast<zx_restricted_state*>(ptr);
+  zx_restricted_state_t* state2 = reinterpret_cast<zx_restricted_state_t*>(ptr);
 
   // Read the state out of the vmo and compare with memory map.
   zx_restricted_state_t state = {};
@@ -668,7 +764,9 @@ TEST(RestrictedMode, KickBeforeEnter) {
   EXPECT_EQ(0x0101010101010101, state.restricted_state().rax);
 #elif defined(__aarch64__)  // defined(__x86_64__)
   EXPECT_EQ(0x0202020202020202, state.restricted_state().x[1]);
-#endif                      // defined(__aarch64__)
+#elif defined(__riscv)      // defined(__aarch64__)
+  EXPECT_EQ(0x0b0b0b0b0b0b0b0b, state.restricted_state().a1);
+#endif                      // defined(__riscv)
 
   // Check that the kicked state is cleared
   ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
@@ -782,7 +880,10 @@ TEST(RestrictedMode, KickWhileRunning) {
 #elif defined(__aarch64__)  // defined(__x86_64__)
   state.restricted_state().x[0] = reinterpret_cast<uint64_t>(&flag);
   state.restricted_state().x[1] = 42;
-#endif                      // defined(__aarch64__)
+#elif defined(__riscv)      // defined(__aarch64__)
+  state.restricted_state().a0 = reinterpret_cast<uint64_t>(&flag);
+  state.restricted_state().a1 = 42;
+#endif                      // defined(__riscv)
 
   // Write the state to the state VMO.
   ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
@@ -817,7 +918,9 @@ TEST(RestrictedMode, KickWhileRunning) {
   EXPECT_EQ(state.restricted_state().rbx, 43);
 #elif defined(__aarch64__)  // defined(__x86_64__)
   EXPECT_EQ(state.restricted_state().x[1], 43);
-#endif                      // defined(__aarch64__)
+#elif defined(__riscv)      // defined(__aarch64__)
+  EXPECT_EQ(state.restricted_state().a1, 43);
+#endif                      // defined(__riscv)
 }
 
 TEST(RestrictedMode, KickJustBeforeSyscall) {
@@ -842,7 +945,10 @@ TEST(RestrictedMode, KickJustBeforeSyscall) {
 #elif defined(__aarch64__)  // defined(__x86_64__)
   state.restricted_state().x[0] = reinterpret_cast<uint64_t>(&wait_on);
   state.restricted_state().x[1] = reinterpret_cast<uint64_t>(&signal);
-#endif                      // defined(__aarch64__)
+#elif defined(__riscv)      // defined(__aarch64__)
+  state.restricted_state().a0 = reinterpret_cast<uint64_t>(&wait_on);
+  state.restricted_state().a1 = reinterpret_cast<uint64_t>(&signal);
+#endif                      // defined(__riscv)
 
   // Write the state to the state VMO.
   ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
@@ -874,18 +980,3 @@ TEST(RestrictedMode, KickJustBeforeSyscall) {
   EXPECT_EQ(ZX_RESTRICTED_REASON_KICK, reason_code);
   kicker.join();
 }
-
-#else  // !ARCH_HAS_RESTRICTED_MODE
-
-// Restricted mode is not implemented so the syscalls should fail appropriately.
-TEST(RestrictedMode, NotSupported) {
-  zx::vmo vmo;
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_unbind_state(0));
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(0, 0, 0));
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, 0, 0));
-  zx_handle_t current_thread_handle = thrd_get_zx_handle(thrd_current());
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_kick(current_thread_handle, 0));
-}
-
-#endif  // ARCH_HAS_RESTRICTED_MODE

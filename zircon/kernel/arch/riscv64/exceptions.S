@@ -7,6 +7,7 @@
 #include <asm.h>
 #include <arch/regs.h>
 #include <arch/riscv64.h>
+#include <arch/riscv64/mp.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
 #include <zircon/errors.h>
 
@@ -384,6 +385,11 @@ FUNCTION(riscv64_syscall_dispatcher)
     // table use below.
     sd     ra, 8(sp)
 
+    // Check if we're issuing a syscall from restricted mode.
+    // We do this after storing RA to make sure we don't lose the call chain.
+    lw t3, PERCPU_IN_RESTRICTED_MODE(s11)
+    bnez t3, .Lrestricted_syscall
+
     ld     t1, RISCV64_IFRAME_OFFSET_PC(a0)
     ld     t0, RISCV64_IFRAME_OFFSET_T0(a0)
     // Load a0 last since it points to the iframe.
@@ -419,6 +425,10 @@ FUNCTION(riscv64_syscall_dispatcher)
     mv     a1, t1 // pc into arg 1
     call   unknown_syscall
     j      .Lpost_syscall
+
+.Lrestricted_syscall:
+    call syscall_from_restricted // This does not return.
+    unimp
 
 // Adds the label for the jump table.
 .balign 8

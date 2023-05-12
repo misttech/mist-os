@@ -33,6 +33,7 @@ __END_CDECLS
 
 #include <stdint.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 
 // ====== Pager writeback support ====== //
@@ -102,8 +103,8 @@ typedef uint64_t zx_restricted_reason_t;
 // When exiting restricted mode for certain reasons, additional information
 // may be provided by zircon. However, regardless of the reason code this
 // will always be the first structure inside the restricted mode state VMO.
-typedef struct zx_restricted_state {
 #if __aarch64__
+typedef struct zx_restricted_state {
   uint64_t x[31];
   uint64_t sp;
   uint64_t pc;
@@ -111,19 +112,21 @@ typedef struct zx_restricted_state {
   // Contains only the user-controllable upper 4-bits (NZCV).
   uint32_t cpsr;
   uint8_t padding1[4];
+} zx_restricted_state_t;
 #elif __x86_64__
+typedef struct zx_restricted_state {
   // User space active registers
   uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax, rsp;
   uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
   uint64_t ip, flags;
 
   uint64_t fs_base, gs_base;
-#else
-  // Avoids sizing differences for empty structs between C and C++.
-  uint64_t reserved;
-#endif
-
 } zx_restricted_state_t;
+#elif __riscv
+typedef zx_riscv64_thread_state_general_regs_t zx_restricted_state_t;
+#else
+#error what architecture?
+#endif
 
 // Structure populated by zircon when exiting restricted mode with the
 // reason code `ZX_RESTRICTED_REASON_SYSCALL`.

@@ -7,6 +7,10 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_
 
+#define PERCPU_IN_RESTRICTED_MODE 24
+
+#ifndef __ASSEMBLER__
+
 #include <zircon/compiler.h>
 
 #include <arch/defines.h>
@@ -35,7 +39,12 @@ struct alignas(MAX_CACHE_LINE) riscv64_percpu {
   // A pointer providing fast access to the high-level arch-agnostic per-CPU
   // struct.
   percpu* high_level_percpu;
+
+  // Flag to track that we're in restricted mode.
+  uint32_t in_restricted_mode;
 };
+static_assert(offsetof(struct riscv64_percpu, in_restricted_mode) == PERCPU_IN_RESTRICTED_MODE,
+              "in_restricted mode is at the wrong offset");
 
 // The compiler doesn't reliably generate the right code for setting the
 // register via this variable, so it's only used for reading.  (Unfortunately
@@ -108,8 +117,11 @@ void riscv64_mp_early_init_percpu(uint32_t hart_id, uint cpu_num);
 inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
 inline cpu_num_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
 
-// TODO(travisg): implement
-inline void arch_set_restricted_flag(bool restricted) {}
-inline bool arch_get_restricted_flag() { return false; }
+inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
+inline void arch_set_restricted_flag(bool restricted) {
+  WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
+}
+
+#endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_

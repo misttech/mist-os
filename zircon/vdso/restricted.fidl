@@ -45,6 +45,9 @@ protocol Restricted {
     /// On arm64, *context* is placed in *x0* and a reason code is placed in *x1*.
     /// All other registers are currently undefined, including the stack pointer.
     ///
+    /// On riscv64, *context* is placed in *a0* and a reason code is placed in *a1*.
+    /// All other registers are currently undefined, including the stack pointer.
+    ///
     /// The *reason code* specifies the reason that normal mode execution has resumed.
     /// This *reason code* may be one of `ZX_RESTRICTED_REASON_SYSCALL`,
     /// `ZX_RESTRICTED_REASON_EXCEPTION`.

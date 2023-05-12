@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RESTRICTED_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RESTRICTED_H_
 
-// Restricted mode is currently unimplemented for RISC-V.
 struct ArchSavedNormalState {};
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RESTRICTED_H_

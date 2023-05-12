@@ -8,6 +8,8 @@ source_set("restricted-mode") {
     sources += [ "x64.S" ]
   } else if (current_cpu == "arm64") {
     sources += [ "arm64.S" ]
+  } else if (current_cpu == "riscv64") {
+    sources += [ "riscv64.S" ]
   }
   deps = [
     "//zircon/system/ulib/pretty",
