@@ -522,9 +522,13 @@ impl DynamicFileSource for ProcMountsFileSource {
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
         let task = self.0.clone();
+        let root = task.fs().root();
         let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
             let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
+            if !mountpoint.is_descendant_of(&root) {
+                return Ok(());
+            }
             let origin =
                 NamespaceNode { mount: mount.origin_mount.clone(), entry: Arc::clone(&mount.root) };
             let fs_spec = String::from_utf8_lossy(&origin.path(&task)).into_owned();
@@ -597,9 +601,13 @@ impl DynamicFileSource for ProcMountinfoFile {
         // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
         // extra work to maintain it.
         let task = self.0.clone();
+        let root = task.fs().root();
         let ns = task.fs().namespace();
         for_each_mount(&ns.root_mount, &mut |mount| {
             let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
+            if !mountpoint.is_descendant_of(&root) {
+                return Ok(());
+            }
             // Can't fail, mountpoint() and root() can't return a NamespaceNode with no mount
             let parent = mountpoint.mount.as_ref().unwrap();
             let origin =
@@ -627,7 +635,7 @@ impl DynamicFileSource for ProcMountinfoFile {
 }
 
 fn for_each_mount<E>(
-    mount: &Arc<Mount>,
+    mount: &MountHandle,
     callback: &mut impl FnMut(&MountHandle) -> Result<(), E>,
 ) -> Result<(), E> {
     callback(mount)?;
@@ -906,6 +914,23 @@ impl NamespaceNode {
         Some(mountpoint_or_self.with_new_entry(mountpoint_or_self.entry.parent()?))
     }
 
+    /// Whether this namespace node is a descendant of the given node.
+    ///
+    /// Walks up the namespace node tree looking for ancestor. If ancestor is
+    /// found, returns true. Otherwise, returns false.
+    pub fn is_descendant_of(&self, ancestor: &NamespaceNode) -> bool {
+        let ancestor = ancestor.escape_mount();
+        let mut current = self.escape_mount();
+        while current != ancestor {
+            if let Some(parent) = current.parent() {
+                current = parent.escape_mount();
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
     /// If this is a mount point, return the root of the mount. Otherwise return self.
     fn enter_mount(&self) -> NamespaceNode {
         // While the child is a mountpoint, replace child with the mount's root.
@@ -985,7 +1010,8 @@ impl NamespaceNode {
         let mut current = self.escape_mount();
         if let Some(root) = root {
             // The current node is expected to intersect with the custom root as we travel up the tree.
-            while &current != root {
+            let root = root.escape_mount();
+            while current != root {
                 if let Some(parent) = current.parent() {
                     components.push(current.entry.local_name().to_vec());
                     current = parent.escape_mount();

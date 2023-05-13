@@ -34,9 +34,6 @@
                 "BadOffset/AIOReadWriteParamTest.BadOffset/0",
                 "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
-                // chroot_test
-                "ChrootTest.ProcMountsMountinfoNoEscape",
-
                 // chown_test
                 "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
 
