@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use component_debug::cli::run_cmd;
 use ffx_component::rcs::connect_to_lifecycle_controller;
 use ffx_component_run_args::RunComponentCommand;
-use ffx_core::ffx_plugin;
+use ffx_core::{ffx_plugin, macro_deps::errors::FfxError};
 use ffx_log::{error::LogError, log_impl, LogOpts};
 use ffx_log_args::LogCommand;
 use ffx_log_frontend::RemoteDiagnosticsBridgeProxyWrapper;
@@ -18,9 +18,12 @@ async fn cmd_impl(
     target_collection_proxy: TargetCollectionProxy,
     rcs_proxy: rc::RemoteControlProxy,
     args: RunComponentCommand,
-) -> Result<(), LogError> {
+) -> Result<(), anyhow::Error> {
     let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
-    let host = rcs_proxy.identify_host().await??;
+    let host = rcs_proxy
+        .identify_host()
+        .await?
+        .map_err(|err| anyhow!("Error identifying host: {:?}", err))?;
 
     // All errors from component_debug library are user-visible.
     run_cmd(
@@ -31,7 +34,8 @@ async fn cmd_impl(
         lifecycle_controller,
         std::io::stdout(),
     )
-    .await?;
+    .await
+    .map_err(|e| FfxError::Error(e, 1))?;
 
     if args.follow_logs {
         let log_filter = args.moniker.to_string().strip_prefix("/").unwrap().to_string();
