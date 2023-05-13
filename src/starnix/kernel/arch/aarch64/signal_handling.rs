@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::arch::registers::RegisterState;
 use crate::mm::vmo::round_up_to_increment;
-use crate::mm::{DesiredAddress, MappingName, MappingOptions, PAGE_SIZE};
+use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags, PAGE_SIZE};
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;
@@ -87,6 +87,7 @@ impl SignalStackFrame {
                         .expect("Failed to create signal trampoline vmo."),
                 );
                 vmo.write(&instructions, 0).expect("Failed to write signal trampoline vmo.");
+                let prot_flags = ProtectionFlags::EXEC | ProtectionFlags::READ;
                 *trampoline = task
                     .mm
                     .map(
@@ -94,7 +95,8 @@ impl SignalStackFrame {
                         vmo,
                         0,
                         instructions.len(),
-                        zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ,
+                        prot_flags,
+                        prot_flags.to_vmar_flags(),
                         MappingOptions::empty(),
                         MappingName::None,
                     )

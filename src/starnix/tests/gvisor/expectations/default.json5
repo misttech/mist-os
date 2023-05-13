@@ -527,8 +527,6 @@
                 "ProcPidMem.AfterExit",
                 "ProcPidMem.SameUser",
                 "ProcSelfMaps.Basic",
-                "ProcSelfMaps.Map2",
-                "ProcSelfMaps.MapUnmap",
                 "ProcSelfMaps.SharedAnon",
                 "ProcSelfFdInfo.Flags",
                 "ProcSelfCwd.Absolute",

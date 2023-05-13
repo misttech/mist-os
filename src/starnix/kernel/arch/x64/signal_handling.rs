@@ -174,7 +174,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::mm::{DesiredAddress, MappingName, MappingOptions};
+    use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
     use crate::testing::*;
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::from(100);
@@ -434,6 +434,7 @@ mod tests {
         const STACK_SIZE: usize = 0x1000;
 
         // Give the task a stack.
+        let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let stack_base = current_task
             .mm
             .map(
@@ -441,7 +442,8 @@ mod tests {
                 Arc::new(zx::Vmo::create(STACK_SIZE as u64).expect("failed to create stack VMO")),
                 0,
                 STACK_SIZE,
-                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+                prot_flags,
+                prot_flags.to_vmar_flags(),
                 MappingOptions::empty(),
                 MappingName::None,
             )

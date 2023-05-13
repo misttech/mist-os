@@ -33,6 +33,44 @@ bitflags! {
 }
 
 bitflags! {
+    pub struct ProtectionFlags: u32 {
+      const READ = PROT_READ;
+      const WRITE = PROT_WRITE;
+      const EXEC = PROT_EXEC;
+    }
+}
+
+impl ProtectionFlags {
+    pub fn to_vmar_flags(self) -> zx::VmarFlags {
+        let mut vmar_flags = zx::VmarFlags::empty();
+        if self.contains(ProtectionFlags::READ) {
+            vmar_flags |= zx::VmarFlags::PERM_READ;
+        }
+        if self.contains(ProtectionFlags::WRITE) {
+            vmar_flags |= zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
+        }
+        if self.contains(ProtectionFlags::EXEC) {
+            vmar_flags |= zx::VmarFlags::PERM_EXECUTE;
+        }
+        vmar_flags
+    }
+
+    pub fn from_vmar_flags(vmar_flags: zx::VmarFlags) -> ProtectionFlags {
+        let mut prot_flags = ProtectionFlags::empty();
+        if vmar_flags.contains(zx::VmarFlags::PERM_READ) {
+            prot_flags |= ProtectionFlags::READ;
+        }
+        if vmar_flags.contains(zx::VmarFlags::PERM_WRITE) {
+            prot_flags |= ProtectionFlags::WRITE;
+        }
+        if vmar_flags.contains(zx::VmarFlags::PERM_EXECUTE) {
+            prot_flags |= ProtectionFlags::EXEC;
+        }
+        prot_flags
+    }
+}
+
+bitflags! {
     pub struct MremapFlags: u32 {
         const MAYMOVE = MREMAP_MAYMOVE;
         const FIXED = MREMAP_FIXED;
@@ -70,8 +108,8 @@ struct Mapping {
     /// The offset in the VMO that corresponds to the base address.
     vmo_offset: u64,
 
-    /// The rights used by the mapping.
-    permissions: zx::VmarFlags,
+    /// The protection flags used by the mapping.
+    prot_flags: ProtectionFlags,
 
     /// The flags for this mapping.
     options: MappingOptions,
@@ -92,20 +130,10 @@ impl Mapping {
         base: UserAddress,
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
         options: MappingOptions,
     ) -> Mapping {
-        Mapping {
-            base,
-            vmo,
-            vmo_offset,
-            permissions: flags
-                & (zx::VmarFlags::PERM_READ
-                    | zx::VmarFlags::PERM_WRITE
-                    | zx::VmarFlags::PERM_EXECUTE),
-            options,
-            name: MappingName::None,
-        }
+        Mapping { base, vmo, vmo_offset, prot_flags, options, name: MappingName::None }
     }
 
     /// Converts a `UserAddress` to an offset in this mapping's VMO.
@@ -119,7 +147,7 @@ impl Mapping {
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        if !self.permissions.contains(zx::VmarFlags::PERM_READ) {
+        if !self.prot_flags.contains(ProtectionFlags::READ) {
             return error!(EFAULT);
         }
         self.vmo.read(bytes, self.address_to_offset(addr)).map_err(|e| {
@@ -134,7 +162,7 @@ impl Mapping {
     /// - `addr`: The address to write to.
     /// - `bytes`: The bytes to write to the VMO.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<(), Errno> {
-        if !self.permissions.contains(zx::VmarFlags::PERM_WRITE) {
+        if !self.prot_flags.contains(ProtectionFlags::WRITE) {
             return error!(EFAULT);
         }
         self.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
@@ -208,13 +236,14 @@ impl MemoryManagerState {
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         name: MappingName,
     ) -> Result<UserAddress, Errno> {
         let addr = UserAddress::from_ptr(
             self.user_vmar
-                .map(vmar_offset, &vmo, vmo_offset, length, flags)
+                .map(vmar_offset, &vmo, vmo_offset, length, vmar_flags)
                 .map_err(MemoryManager::get_errno_for_map_err)?,
         );
 
@@ -227,7 +256,7 @@ impl MemoryManagerState {
             }
         }
 
-        let mut mapping = Mapping::new(addr, vmo, vmo_offset, flags, options);
+        let mut mapping = Mapping::new(addr, vmo, vmo_offset, prot_flags, options);
         mapping.name = name;
         let end = (addr + length).round_up(*PAGE_SIZE)?;
         self.mappings.insert(addr..end, mapping);
@@ -362,8 +391,10 @@ impl MemoryManagerState {
             );
         }
 
+        let prot_flags = original_mapping.prot_flags;
+
         // Since the mapping is growing in-place, it must be mapped at the original address.
-        let vmar_flags = original_mapping.permissions
+        let vmar_flags = prot_flags.to_vmar_flags()
             | unsafe {
                 zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
             };
@@ -377,6 +408,7 @@ impl MemoryManagerState {
             original_mapping.vmo,
             original_mapping.vmo_offset,
             final_length,
+            prot_flags,
             vmar_flags,
             original_mapping.options,
             original_mapping.name,
@@ -437,10 +469,10 @@ impl MemoryManagerState {
         let (vmar_offset, vmar_flags) = if let Some(dst_addr) = &dst_addr {
             (
                 self.user_address_to_vmar_offset(*dst_addr).map_err(|_| errno!(EINVAL))?,
-                src_mapping.permissions | zx::VmarFlags::SPECIFIC,
+                src_mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
             )
         } else {
-            (0, src_mapping.permissions)
+            (0, src_mapping.prot_flags.to_vmar_flags())
         };
 
         let new_address = if src_mapping.options.contains(MappingOptions::ANONYMOUS)
@@ -474,6 +506,7 @@ impl MemoryManagerState {
                 Arc::new(child_vmo),
                 0,
                 dst_length,
+                src_mapping.prot_flags,
                 vmar_flags,
                 src_mapping.options,
                 src_mapping.name,
@@ -486,6 +519,7 @@ impl MemoryManagerState {
                 src_mapping.vmo,
                 dst_vmo_offset,
                 dst_length,
+                src_mapping.prot_flags,
                 vmar_flags,
                 src_mapping.options,
                 src_mapping.name,
@@ -591,7 +625,8 @@ impl MemoryManagerState {
                 Arc::new(child_vmo),
                 0,
                 child_length,
-                mapping.permissions | zx::VmarFlags::SPECIFIC,
+                mapping.prot_flags,
+                mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
                 mapping.options,
                 mapping.name,
             )?;
@@ -611,15 +646,16 @@ impl MemoryManagerState {
         &mut self,
         addr: UserAddress,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
         // TODO(https://fxbug.dev/97514): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
         // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
         // compute the potentially extended range before modifying the Zircon protections or metadata.
+        let vmar_flags = prot_flags.to_vmar_flags();
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
-        unsafe { self.user_vmar.protect(addr.ptr(), length, flags) }.map_err(|s| match s {
+        unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
             zx::Status::INVALID_ARGS => errno!(EINVAL),
             // TODO: This should still succeed and change protection on whatever is mapped.
             zx::Status::NOT_FOUND => errno!(EINVAL),
@@ -634,10 +670,7 @@ impl MemoryManagerState {
         for (range, mapping) in self.mappings.intersection(addr..end) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
-            mapping.permissions = flags
-                & (zx::VmarFlags::PERM_READ
-                    | zx::VmarFlags::PERM_WRITE
-                    | zx::VmarFlags::PERM_EXECUTE);
+            mapping.prot_flags = prot_flags;
             updates.push((range, mapping));
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
@@ -793,7 +826,7 @@ impl MemoryManagerState {
             }
             None => return Ok(false),
         };
-        if is_write && !mapping_to_grow.permissions.contains(zx::VmarFlags::PERM_WRITE) {
+        if is_write && !mapping_to_grow.prot_flags.contains(ProtectionFlags::WRITE) {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
@@ -813,14 +846,20 @@ impl MemoryManagerState {
             }
             _ => anyhow!("Unexpected error creating VMO: {s}"),
         })?);
-        let flags = mapping_to_grow.permissions | zx::VmarFlags::SPECIFIC;
-        let mapping = Mapping::new(low_addr, vmo.clone(), 0, flags, mapping_to_grow.options);
+        let vmar_flags = mapping_to_grow.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC;
+        let mapping = Mapping::new(
+            low_addr,
+            vmo.clone(),
+            0,
+            mapping_to_grow.prot_flags,
+            mapping_to_grow.options,
+        );
         let vmar_offset = self
             .user_address_to_vmar_offset(low_addr)
             .map_err(|_| anyhow!("Address outside of user range"))?;
         let mapped_address = self
             .user_vmar
-            .map(vmar_offset, &vmo, 0, length, flags)
+            .map(vmar_offset, &vmo, 0, length, vmar_flags)
             .map_err(MemoryManager::get_errno_for_map_err)?;
         if mapped_address != low_addr.ptr() {
             return Err(anyhow!("Could not map extension of mapping to desired location."));
@@ -1134,12 +1173,14 @@ impl MemoryManager {
                 let vmo = zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?;
                 set_zx_name(&vmo, b"starnix-brk");
                 let length = *PAGE_SIZE as usize;
+                let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
                 let addr = state.map(
                     0,
                     Arc::new(vmo),
                     0,
                     length,
-                    zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+                    prot_flags,
+                    prot_flags.to_vmar_flags(),
                     MappingOptions::empty(),
                     MappingName::None,
                 )?;
@@ -1278,7 +1319,8 @@ impl MemoryManager {
                 target_vmo.clone(),
                 vmo_offset,
                 length,
-                mapping.permissions | zx::VmarFlags::SPECIFIC,
+                mapping.prot_flags,
+                mapping.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC,
                 mapping.options,
                 mapping.name.clone(),
             )?;
@@ -1332,7 +1374,8 @@ impl MemoryManager {
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
         length: usize,
-        mut flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        mut vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         name: MappingName,
     ) -> Result<UserAddress, Errno> {
@@ -1341,7 +1384,7 @@ impl MemoryManager {
                 // MAP_32BIT specifies that the memory allocated will
                 // be within the first 2 GB of the process address space.
                 if options.contains(MappingOptions::LOWER_32BIT) {
-                    flags |= zx::VmarFlags::OFFSET_IS_UPPER_LIMIT;
+                    vmar_flags |= zx::VmarFlags::OFFSET_IS_UPPER_LIMIT;
                     0x80000000 - self.base_addr.ptr()
                 } else {
                     0
@@ -1351,21 +1394,22 @@ impl MemoryManager {
         };
 
         let mut state = self.state.write();
-        let mut try_map = |vmar_offset, flags| {
+        let mut try_map = |vmar_offset, vmar_flags| {
             state.map(
                 vmar_offset,
                 Arc::clone(&vmo),
                 vmo_offset,
                 length,
-                flags,
+                prot_flags,
+                vmar_flags,
                 options,
                 name.clone(),
             )
         };
-        let addr = match try_map(vmar_offset, flags) {
-            Err(errno) if flags.contains(zx::VmarFlags::SPECIFIC) => match addr {
+        let addr = match try_map(vmar_offset, vmar_flags) {
+            Err(errno) if vmar_flags.contains(zx::VmarFlags::SPECIFIC) => match addr {
                 DesiredAddress::Fixed(_) => return Err(errno),
-                DesiredAddress::Hint(_) => try_map(0, flags - zx::VmarFlags::SPECIFIC),
+                DesiredAddress::Hint(_) => try_map(0, vmar_flags - zx::VmarFlags::SPECIFIC),
             },
             result => result,
         }?;
@@ -1401,10 +1445,10 @@ impl MemoryManager {
         &self,
         addr: UserAddress,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
         let mut state = self.state.write();
-        state.protect(addr, length, flags)
+        state.protect(addr, length, prot_flags)
     }
 
     pub fn madvise(
@@ -1463,7 +1507,7 @@ impl MemoryManager {
                     range.start,
                     mapping.vmo.clone(),
                     mapping.vmo_offset,
-                    mapping.permissions,
+                    mapping.prot_flags,
                     mapping.options,
                 );
                 state.mappings.insert(start_split_range, start_split_mapping);
@@ -1496,7 +1540,7 @@ impl MemoryManager {
                     end,
                     mapping.vmo.clone(),
                     mapping.vmo_offset + tail_offset as u64,
-                    mapping.permissions,
+                    mapping.prot_flags,
                     mapping.options,
                 );
                 state.mappings.insert(tail_range, tail_mapping);
@@ -1559,7 +1603,7 @@ impl MemoryManager {
     ) -> Result<(Arc<zx::Vmo>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        if !mapping.permissions.contains(perms) {
+        if !mapping.prot_flags.to_vmar_flags().contains(perms) {
             return error!(EACCES);
         }
         Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
@@ -1670,9 +1714,9 @@ fn write_map(
         "{:08x}-{:08x} {}{}{}{} {:08x} 00:00 {} ",
         range.start.ptr(),
         range.end.ptr(),
-        if map.permissions.contains(zx::VmarFlags::PERM_READ) { 'r' } else { '-' },
-        if map.permissions.contains(zx::VmarFlags::PERM_WRITE) { 'w' } else { '-' },
-        if map.permissions.contains(zx::VmarFlags::PERM_EXECUTE) { 'x' } else { '-' },
+        if map.prot_flags.contains(ProtectionFlags::READ) { 'r' } else { '-' },
+        if map.prot_flags.contains(ProtectionFlags::WRITE) { 'w' } else { '-' },
+        if map.prot_flags.contains(ProtectionFlags::EXEC) { 'x' } else { '-' },
         if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
         map.vmo_offset,
         if let MappingName::File(filename) = &map.name { filename.entry.node.inode_num } else { 0 }
@@ -2390,7 +2434,10 @@ mod tests {
 
         let mut bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
         assert!(mm.write_memory(addr, &bytes).is_ok());
-        mm.state.write().protect(second_map, *PAGE_SIZE as usize, zx::VmarFlags::empty()).unwrap();
+        mm.state
+            .write()
+            .protect(second_map, *PAGE_SIZE as usize, ProtectionFlags::empty())
+            .unwrap();
         assert_eq!(mm.state.read().read_memory_partial(addr, &mut bytes), Ok(*PAGE_SIZE as usize));
     }
 
@@ -2493,7 +2540,7 @@ mod tests {
 
         let mapped_addr = map_memory_growsdown(&current_task, *PAGE_SIZE);
 
-        mm.protect(mapped_addr, *PAGE_SIZE as usize, zx::VmarFlags::PERM_READ).unwrap();
+        mm.protect(mapped_addr, *PAGE_SIZE as usize, ProtectionFlags::READ).unwrap();
 
         assert_matches!(
             mm.extend_growsdown_mapping_to_address(mapped_addr - *PAGE_SIZE, true),
@@ -2546,13 +2593,15 @@ mod tests {
             vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, VMO_SIZE).unwrap(),
         );
 
-        let vmar_flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
+        let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
+        let vmar_flags = prot_flags.to_vmar_flags();
         let addr = mm
             .map(
                 DesiredAddress::Hint(UserAddress::default()),
                 child_vmo,
                 0,
                 VMO_SIZE as usize,
+                prot_flags,
                 vmar_flags,
                 MappingOptions::empty(),
                 MappingName::None,

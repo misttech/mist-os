@@ -10,7 +10,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::lock::Mutex;
 use crate::logging::impossible_error;
 use crate::mm::vmo::round_up_to_system_page_size;
-use crate::mm::PAGE_SIZE;
+use crate::mm::{ProtectionFlags, PAGE_SIZE};
 use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -267,10 +267,10 @@ impl VmoFileObject {
         vmo: &Arc<zx::Vmo>,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         let mut vmo = Arc::clone(vmo);
-        if prot.contains(zx::VmarFlags::PERM_EXECUTE) {
+        if prot.contains(ProtectionFlags::EXEC) {
             vmo = Arc::new(
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .map_err(impossible_error)?
@@ -310,7 +310,7 @@ impl FileOps for VmoFileObject {
         file: &FileObject,
         current_task: &CurrentTask,
         _length: Option<usize>,
-        prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
     }

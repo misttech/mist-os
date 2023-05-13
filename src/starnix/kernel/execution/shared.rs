@@ -19,7 +19,7 @@ use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, Syslog
 use crate::fs::*;
 use crate::logging::log_trace;
 use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
-use crate::mm::{MappingName, MemoryAccessorExt, MemoryManager};
+use crate::mm::{MappingName, MemoryAccessorExt, MemoryManager, ProtectionFlags};
 use crate::signals::dequeue_signal;
 use crate::syscalls::{
     decls::{Syscall, SyscallDecl},
@@ -203,12 +203,14 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     );
     vmo.write(&instructions, 0).map_err(|e| from_status_like_fdio!(e))?;
 
+    let prot_flags = ProtectionFlags::EXEC | ProtectionFlags::READ;
     let instruction_pointer = current_task.mm.map(
         DesiredAddress::Hint(UserAddress::default()),
         vmo,
         0,
         instructions.len(),
-        zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ,
+        prot_flags,
+        prot_flags.to_vmar_flags(),
         MappingOptions::empty(),
         MappingName::None,
     )?;

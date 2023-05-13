@@ -8,6 +8,7 @@ use crate::fs::{
     DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
     SeekOrigin, UnlinkKind,
 };
+use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::types::{errno, error, ino_t, off_t, DeviceType, Errno, FileMode, OpenFlags};
 use async_trait::async_trait;
@@ -399,17 +400,17 @@ impl file::File for StarnixNodeConnection {
         Ok(())
     }
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
-        let mut vmar_flags = zx::VmarFlags::empty();
+        let mut prot_flags = ProtectionFlags::empty();
         if flags.contains(fio::VmoFlags::READ) {
-            vmar_flags |= zx::VmarFlags::PERM_READ;
+            prot_flags |= ProtectionFlags::READ;
         }
         if flags.contains(fio::VmoFlags::WRITE) {
-            vmar_flags |= zx::VmarFlags::PERM_WRITE;
+            prot_flags |= ProtectionFlags::WRITE;
         }
         if flags.contains(fio::VmoFlags::EXECUTE) {
-            vmar_flags |= zx::VmarFlags::PERM_EXECUTE;
+            prot_flags |= ProtectionFlags::EXEC;
         }
-        let vmo = self.file.get_vmo(&self.task, None, vmar_flags)?;
+        let vmo = self.file.get_vmo(&self.task, None, prot_flags)?;
         if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
             let size = vmo.get_size()?;
             vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, size)

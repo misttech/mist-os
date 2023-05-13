@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
+use crate::mm::ProtectionFlags;
 use crate::task::CurrentTask;
 use crate::types::*;
 
@@ -83,7 +84,7 @@ impl FileOps for ImageFile {
         file: &FileObject,
         current_task: &CurrentTask,
         _length: Option<usize>,
-        prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
     }

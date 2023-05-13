@@ -20,6 +20,7 @@ use crate::logging::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{
     DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
+    ProtectionFlags,
 };
 use crate::mutable_state::Guard;
 use crate::syscalls::{SyscallResult, SUCCESS};
@@ -198,7 +199,7 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
-        _prot: zx::VmarFlags,
+        _prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         panic!("get_vmo should never be called directly.");
     }
@@ -210,7 +211,8 @@ impl FileOps for BinderConnection {
         addr: DesiredAddress,
         _vmo_offset: u64,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        vmar_flags: zx::VmarFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -219,7 +221,8 @@ impl FileOps for BinderConnection {
             &self.proc(current_task)?,
             addr,
             length,
-            flags,
+            prot_flags,
+            vmar_flags,
             mapping_options,
             filename,
         )
@@ -3530,7 +3533,8 @@ impl BinderDriver {
         binder_proc: &Arc<BinderProcess>,
         addr: DesiredAddress,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        vmar_flags: zx::VmarFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
@@ -3549,7 +3553,8 @@ impl BinderDriver {
             vmo.clone(),
             0,
             length,
-            flags,
+            prot_flags,
+            vmar_flags,
             mapping_options,
             MappingName::File(filename),
         )?;
@@ -3990,13 +3995,15 @@ pub mod tests {
     /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
     /// `proc`.
     fn mmap_shared_memory(driver: &BinderDriver, task: &CurrentTask, proc: &Arc<BinderProcess>) {
+        let prot_flags = ProtectionFlags::READ;
         driver
             .mmap(
                 task,
                 proc,
                 DesiredAddress::Hint(UserAddress::default()),
                 VMO_LENGTH,
-                zx::VmarFlags::PERM_READ,
+                prot_flags,
+                prot_flags.to_vmar_flags(),
                 MappingOptions::empty(),
                 NamespaceNode::new_anonymous(DirEntry::new_unrooted(Arc::new(FsNode::new_root(
                     PanickingFsNode,

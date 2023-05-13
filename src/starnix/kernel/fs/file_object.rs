@@ -11,7 +11,9 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
-use crate::mm::{DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessorExt};
+use crate::mm::{
+    DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
+};
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::as_any::*;
@@ -135,7 +137,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
-        _prot: zx::VmarFlags,
+        _prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         error!(ENODEV)
     }
@@ -151,26 +153,23 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         addr: DesiredAddress,
         vmo_offset: u64,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
-        // Sanitize the protection flags to only include PERM_READ, PERM_WRITE, and PERM_EXECUTE.
-        let zx_prot_flags = flags
-            & (zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE | zx::VmarFlags::PERM_EXECUTE);
-
         let vmo = if options.contains(MappingOptions::SHARED) {
-            self.get_vmo(file, current_task, Some(length), zx_prot_flags)?
+            self.get_vmo(file, current_task, Some(length), prot_flags)?
         } else {
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let vmo = self.get_vmo(
                 file,
                 current_task,
                 Some(length),
-                zx_prot_flags - zx::VmarFlags::PERM_WRITE,
+                prot_flags - ProtectionFlags::WRITE,
             )?;
             let mut clone_flags = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
-            if !zx_prot_flags.contains(zx::VmarFlags::PERM_WRITE) {
+            if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
             }
             Arc::new(
@@ -183,7 +182,8 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             vmo.clone(),
             vmo_offset,
             length,
-            flags,
+            prot_flags,
+            vmar_flags,
             options,
             MappingName::File(filename),
         )?;
@@ -579,7 +579,7 @@ impl FileOps for OPathOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
-        _prot: zx::VmarFlags,
+        _prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         error!(EBADF)
     }
@@ -833,12 +833,12 @@ impl FileObject {
         &self,
         current_task: &CurrentTask,
         length: Option<usize>,
-        prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        if prot.contains(zx::VmarFlags::PERM_READ) && !self.can_read() {
+        if prot.contains(ProtectionFlags::READ) && !self.can_read() {
             return error!(EACCES);
         }
-        if prot.contains(zx::VmarFlags::PERM_WRITE) && !self.can_write() {
+        if prot.contains(ProtectionFlags::WRITE) && !self.can_write() {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
@@ -851,21 +851,32 @@ impl FileObject {
         addr: DesiredAddress,
         vmo_offset: u64,
         length: usize,
-        flags: zx::VmarFlags,
+        prot_flags: ProtectionFlags,
+        vmar_flags: zx::VmarFlags,
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
-        if flags.contains(zx::VmarFlags::PERM_READ) && !self.can_read() {
+        if vmar_flags.contains(zx::VmarFlags::PERM_READ) && !self.can_read() {
             return error!(EACCES);
         }
-        if flags.contains(zx::VmarFlags::PERM_WRITE)
+        if vmar_flags.contains(zx::VmarFlags::PERM_WRITE)
             && !self.can_write()
             && options.contains(MappingOptions::SHARED)
         {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().mmap(self, current_task, addr, vmo_offset, length, flags, options, filename)
+        self.ops().mmap(
+            self,
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            vmar_flags,
+            options,
+            filename,
+        )
     }
 
     pub fn readdir(

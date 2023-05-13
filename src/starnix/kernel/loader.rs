@@ -150,7 +150,7 @@ impl elf_load::Mapper for Mapper<'_> {
         vmo: &zx::Vmo,
         vmo_offset: u64,
         length: usize,
-        flags: zx::VmarFlags,
+        vmar_flags: zx::VmarFlags,
     ) -> Result<usize, zx::Status> {
         let vmo = Arc::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
         self.mm
@@ -159,7 +159,8 @@ impl elf_load::Mapper for Mapper<'_> {
                 vmo,
                 vmo_offset,
                 length,
-                flags,
+                ProtectionFlags::from_vmar_flags(vmar_flags),
+                vmar_flags,
                 MappingOptions::empty(),
                 MappingName::File(self.file.name.clone()),
             )
@@ -252,8 +253,7 @@ fn resolve_executable_impl(
     if recursion_depth >= MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
-    let vmo =
-        file.get_vmo(current_task, None, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_EXECUTE)?;
+    let vmo = file.get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
     let mut header = [0u8; 2];
     match vmo.read(&mut header, 0) {
         Ok(()) => {}
@@ -363,7 +363,7 @@ fn resolve_elf(
         let interp_vmo = interp_file.get_vmo(
             current_task,
             None,
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_EXECUTE,
+            ProtectionFlags::READ | ProtectionFlags::EXEC,
         )?;
         Some(ResolvedInterpElf { file: interp_file, vmo: interp_vmo })
     } else {
@@ -400,12 +400,14 @@ pub fn load_executable(
         .as_ref()
         .set_name(CStr::from_bytes_with_nul(b"[stack]\0").unwrap())
         .map_err(impossible_error)?;
+    let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
     let stack_base = current_task.mm.map(
         DesiredAddress::Hint(UserAddress::default()),
         Arc::clone(&stack_vmo),
         0,
         stack_size,
-        zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+        prot_flags,
+        prot_flags.to_vmar_flags(),
         MappingOptions::empty(),
         MappingName::None,
     )?;
@@ -413,12 +415,14 @@ pub fn load_executable(
 
     let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso {
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+        let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
         let map_result = current_task.mm.map(
             DesiredAddress::Hint(UserAddress::default()),
             Arc::clone(vdso_vmo),
             0,
             vmo_size as usize,
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_EXECUTE,
+            prot_flags,
+            prot_flags.to_vmar_flags(),
             MappingOptions::empty(),
             MappingName::None,
         )?;

@@ -12,20 +12,6 @@ use crate::logging::*;
 use crate::mm::*;
 use crate::syscalls::*;
 
-fn mmap_prot_to_vm_opt(prot: u32) -> zx::VmarFlags {
-    let mut flags = zx::VmarFlags::empty();
-    if prot & PROT_READ != 0 {
-        flags |= zx::VmarFlags::PERM_READ;
-    }
-    if prot & PROT_WRITE != 0 {
-        flags |= zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
-    }
-    if prot & PROT_EXEC != 0 {
-        flags |= zx::VmarFlags::PERM_EXECUTE;
-    }
-    flags
-}
-
 // Returns any platform-specific mmap flags. This is a separate function because as of this writing
 // "attributes on expressions are experimental."
 #[cfg(target_arch = "x86_64")]
@@ -46,11 +32,10 @@ pub fn sys_mmap(
     fd: FdNumber,
     offset: u64,
 ) -> Result<UserAddress, Errno> {
-    // These are the flags that are currently supported.
-    if prot & !(PROT_READ | PROT_WRITE | PROT_EXEC) != 0 {
+    let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
         not_implemented!("mmap: prot: 0x{:x}", prot);
-        return error!(EINVAL);
-    }
+        errno!(EINVAL)
+    })?;
 
     let valid_flags: u32 = get_valid_platform_mmap_flags()
         | MAP_PRIVATE
@@ -82,13 +67,13 @@ pub fn sys_mmap(
 
     // TODO(tbodt): should we consider MAP_NORESERVE?
 
-    let mut zx_flags = mmap_prot_to_vm_opt(prot) | zx::VmarFlags::ALLOW_FAULTS;
+    let mut vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS;
     if addr.ptr() != 0 {
-        zx_flags |= zx::VmarFlags::SPECIFIC;
+        vmar_flags |= zx::VmarFlags::SPECIFIC;
     }
     if flags & MAP_FIXED != 0 && flags & MAP_FIXED_NOREPLACE == 0 {
         // SAFETY: We are operating on another process, so it's safe to use SPECIFIC_OVERWRITE
-        zx_flags |= unsafe {
+        vmar_flags |= unsafe {
             zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
         };
     }
@@ -122,7 +107,8 @@ pub fn sys_mmap(
             vmo.clone(),
             vmo_offset,
             length,
-            zx_flags,
+            prot_flags,
+            vmar_flags,
             options,
             MappingName::None,
         )?;
@@ -130,7 +116,16 @@ pub fn sys_mmap(
     } else {
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = current_task.files.get(fd)?;
-        file.mmap(current_task, addr, vmo_offset, length, zx_flags, options, file.name.clone())?
+        file.mmap(
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            vmar_flags,
+            options,
+            file.name.clone(),
+        )?
     };
 
     if flags & MAP_POPULATE != 0 {
@@ -146,12 +141,11 @@ pub fn sys_mprotect(
     length: usize,
     prot: u32,
 ) -> Result<(), Errno> {
-    // These are the flags that are currently supported.
-    if prot & !(PROT_READ | PROT_WRITE | PROT_EXEC) != 0 {
+    let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
         not_implemented!("mmap: prot: 0x{:x}", prot);
-        return error!(EINVAL);
-    }
-    current_task.mm.protect(addr, length, mmap_prot_to_vm_opt(prot))?;
+        errno!(EINVAL)
+    })?;
+    current_task.mm.protect(addr, length, prot_flags)?;
     Ok(())
 }
 

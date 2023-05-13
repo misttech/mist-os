@@ -10,7 +10,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::RwLock;
 use crate::logging::*;
-use crate::mm::MemoryAccessorExt;
+use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -170,7 +170,7 @@ impl FileOps for Arc<Framebuffer> {
         file: &FileObject,
         current_task: &CurrentTask,
         _length: Option<usize>,
-        prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
     }

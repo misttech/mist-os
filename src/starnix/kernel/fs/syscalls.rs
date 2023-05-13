@@ -16,7 +16,7 @@ use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::*;
 use crate::mm::PAGE_SIZE;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::*;
@@ -360,9 +360,8 @@ pub fn sys_sendfile(
     let mut in_offset = in_file.offset.lock();
     let info = in_file.node().info();
 
-    let vmo = in_file
-        .get_vmo(current_task, None, zx::VmarFlags::PERM_READ)
-        .map_err(|_| errno!(EINVAL))?;
+    let vmo =
+        in_file.get_vmo(current_task, None, ProtectionFlags::READ).map_err(|_| errno!(EINVAL))?;
 
     assert!(*in_offset >= 0);
     let start_pos = *in_offset as usize;

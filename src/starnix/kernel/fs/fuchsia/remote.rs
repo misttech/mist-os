@@ -17,6 +17,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::{Mutex, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::*;
+use crate::mm::ProtectionFlags;
 use crate::task::*;
 use crate::types::*;
 use crate::vmex_resource::VMEX_RESOURCE;
@@ -578,12 +579,13 @@ impl FileOps for RemoteFileObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
-        mut prot: zx::VmarFlags,
+        prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        let has_execute = prot.contains(zx::VmarFlags::PERM_EXECUTE);
-        prot -= zx::VmarFlags::PERM_EXECUTE;
+        let has_execute = prot.contains(ProtectionFlags::EXEC);
+        let vmar_flags = prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE;
         // TODO(tbodt): Consider caching the VMO handle instead of getting a new one on each call.
-        let mut vmo = self.zxio.vmo_get(prot).map_err(|status| from_status_like_fdio!(status))?;
+        let mut vmo =
+            self.zxio.vmo_get(vmar_flags).map_err(|status| from_status_like_fdio!(status))?;
         if has_execute {
             vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
         }

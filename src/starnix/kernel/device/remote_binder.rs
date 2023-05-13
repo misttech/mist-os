@@ -7,7 +7,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::{FdEvents, FileObject, FileOps, FsNode, NamespaceNode, SeekOrigin};
 use crate::lock::Mutex;
 use crate::logging::{log_error, log_warn};
-use crate::mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt};
+use crate::mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::{CurrentTask, ThreadGroup, WaitQueue, Waiter};
 use crate::types::{
@@ -116,7 +116,7 @@ impl FileOps for RemoteBinderFileOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
-        _prot: zx::VmarFlags,
+        _prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         error!(EOPNOTSUPP)
     }
@@ -128,7 +128,8 @@ impl FileOps for RemoteBinderFileOps {
         _addr: DesiredAddress,
         _vmo_offset: u64,
         _length: usize,
-        _flags: zx::VmarFlags,
+        _prot_flags: ProtectionFlags,
+        _vmar_flags: zx::VmarFlags,
         _mapping_options: MappingOptions,
         _filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
