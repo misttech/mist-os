@@ -9,6 +9,9 @@
 
 import("//boards/common/arm64-common.gni")
 
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/vim3/board_information.json5"
+
 board_name = "vim3"
 board_description = "A generic vim3 device"
 

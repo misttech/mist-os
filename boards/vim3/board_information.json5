@@ -4,9 +4,8 @@
 
 // BoardInformation for ProductAssembly
 {
-    name: "vim3-dfv2",
+    name: "vim3",
     provided_features: [
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::usb_peripheral_support",
     ],
 }
