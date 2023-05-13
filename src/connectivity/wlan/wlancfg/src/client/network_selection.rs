@@ -141,13 +141,16 @@ impl NetworkSelector {
                     Ok(scan_results) => scan_results,
                     Err(e) => return Err(e),
                 };
-
+                let passive_scan_ssids: HashSet<types::Ssid> = HashSet::from_iter(
+                    passive_scan_results.iter().map(|result| result.ssid.clone()),
+                );
                 let requested_active_scan_ssids: Vec<types::Ssid> =
                     select_subset_potentially_hidden_networks(
                         self.saved_network_manager.get_networks().await,
                     )
                     .drain(..)
                     .map(|id| id.ssid)
+                    .filter(|ssid| !passive_scan_ssids.contains(ssid))
                     .collect();
 
                 self.telemetry_sender.send(TelemetryEvent::ActiveScanRequested {
