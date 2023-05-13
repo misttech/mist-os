@@ -1568,14 +1568,6 @@ migrated in-place to the specified format when fshost mounts it.
 
 From //src/storage/fshost/generated_fshost_config.gni:32
 
-### data_sharing_oobe_enabled
-
-Whether or not to provide the data sharing consent step in OOBE.
-
-**Current value (from the default):** `false`
-
-From //src/experiences/session_shells/ermine/login/BUILD.gn:13
-
 ### debian_guest_earlycon
 
 **Current value (from the default):** `false`
@@ -3002,41 +2994,6 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 From //zircon/kernel/params.gni:102
 
-### ermine_app_entries
-
-Build arg that allows overriding the default set of application entries
-using '--args=ermine_app_entries="config/app_launch_entries.json"'
-
-**Current value (from the default):** `"config/app_launch_entries.json"`
-
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:16
-
-### ermine_manifest
-
-Build arg that allows overriding the default manifest for Ermine.
-TODO(fxbug.dev/120106): Remove this argument when we have a better way of
-overriding the manifest.
-
-**Current value (from the default):** `"meta/ermine.cml"`
-
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:21
-
-### ermine_start_screensaver
-
-Whether or not to launch screensaver.
-
-**Current value (from the default):** `false`
-
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:24
-
-### ermine_user_feedback_enabled
-
-Whether or not to allow user feedback report from the device.
-
-**Current value (from the default):** `false`
-
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:27
-
 ### escher_test_for_glsl_spirv_mismatch
 
 If true, this enables the |SpirvNotChangedTest| to check if the precompiled
@@ -3345,16 +3302,6 @@ Non-product AOT
 ```
 
 From //build/flutter/config.gni:20
-
-### flutter_driver_enabled
-
-Enables/Disables flutter driver using '--args=flutter_driver_enabled=[true/false]'
-in fx set. (Disabled by default)
-This is effective only on debug builds.
-
-**Current value (from the default):** `false`
-
-From //build/testing/flutter_driver.gni:9
 
 ### flutter_force_aot
 
@@ -8464,14 +8411,6 @@ option in Product Assembly
 **Current value (from the default):** `false`
 
 From //src/connectivity/network/use_netstack3.gni:11
-
-### use_new_account_manager
-
-Whether or not to use the new AccountManager API for enrollment and authentication.
-
-**Current value (from the default):** `false`
-
-From //src/experiences/session_shells/ermine/login/BUILD.gn:16
 
 ### use_null_vulkan_on_host
 
