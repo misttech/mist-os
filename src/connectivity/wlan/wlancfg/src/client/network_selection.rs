@@ -28,6 +28,7 @@ use {
     fuchsia_zircon as zx,
     futures::lock::Mutex,
     std::{
+        cmp::Reverse,
         collections::{HashMap, HashSet},
         sync::Arc,
     },
@@ -221,6 +222,7 @@ impl NetworkSelector {
     async fn select_bss(
         &self,
         allowed_candidate_list: Vec<types::ScannedCandidate>,
+        reason: types::ConnectReason,
     ) -> Option<types::ScannedCandidate> {
         if allowed_candidate_list.is_empty() {
             info!("No BSSs available to select from.");
@@ -233,29 +235,39 @@ impl NetworkSelector {
 
         let mut inspect_node = self.inspect_node_for_network_selections.lock().await;
 
-        let selected = allowed_candidate_list
+        let mut scored_candidates = allowed_candidate_list
             .iter()
             .inspect(|&candidate| {
                 info!("{}", candidate.to_string_without_pii());
             })
             .filter(|&candidate| {
-                // Filter out incompatible BSSs
                 if !candidate.bss.is_compatible() {
                     trace!("BSS is incompatible, filtering: {}", candidate.to_string_without_pii());
-                    return false;
-                };
-                true
+                    false
+                } else {
+                    true
+                }
             })
-            .max_by_key(|&candidate| candidate.score());
+            .map(|candidate| (candidate.clone(), candidate.score()))
+            .collect::<Vec<(types::ScannedCandidate, i16)>>();
+
+        scored_candidates.sort_by_key(|(_, score)| Reverse(*score));
+        let selected_candidate = scored_candidates.first();
 
         // Log the candidates into Inspect
         inspect_log!(
             inspect_node.get_mut(),
             candidates: InspectList(&allowed_candidate_list),
-            selected?: selected
+            selected?: selected_candidate.map(|(candidate, _)| candidate)
         );
 
-        if let Some(candidate) = selected {
+        self.telemetry_sender.send(TelemetryEvent::BssSelectionResult {
+            reason,
+            scored_candidates: scored_candidates.clone(),
+            selected_candidate: selected_candidate.cloned(),
+        });
+
+        if let Some((candidate, _)) = selected_candidate {
             info!("Selected BSS:");
             info!("{}", candidate.to_string_without_pii());
             Some(candidate.clone())
@@ -271,6 +283,7 @@ impl NetworkSelector {
     pub(crate) async fn find_and_select_scanned_candidate(
         &self,
         network: Option<types::NetworkIdentifier>,
+        reason: types::ConnectReason,
     ) -> Option<types::ScannedCandidate> {
         // Scan for BSSs belonging to saved networks.
         let available_candidate_list =
@@ -301,7 +314,7 @@ impl NetworkSelector {
             .collect();
 
         // BSS Selection.
-        let selection = match self.select_bss(allowed_candidate_list).await {
+        let selection = match self.select_bss(allowed_candidate_list, reason).await {
             Some(mut candidate) => {
                 if network.is_some() {
                     // Strip scan observation type, because the candidate was discovered via a
@@ -709,8 +722,9 @@ mod tests {
                 create_inspect_persistence_channel, create_wlan_hasher,
                 fakes::{FakeSavedNetworksManager, FakeScanRequester},
                 generate_channel, generate_random_bss, generate_random_bss_with_compatibility,
-                generate_random_saved_network_data, generate_random_scan_result,
-                generate_random_scanned_candidate, random_connection_data,
+                generate_random_connect_reason, generate_random_saved_network_data,
+                generate_random_scan_result, generate_random_scanned_candidate,
+                random_connection_data,
             },
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -1153,8 +1167,11 @@ mod tests {
         candidates.push(generate_candidate_for_scoring(-20, 30, generate_channel(1)));
 
         // there's a network on 5G, it should get a boost and be selected
+        let reason = generate_random_connect_reason();
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values.network_selector.select_bss(candidates.clone(), reason)
+            ),
             Some(candidates[0].clone())
         );
 
@@ -1167,7 +1184,11 @@ mod tests {
 
         // all networks are 2.4GHz, strongest RSSI network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[2].clone())
         );
     }
@@ -1184,7 +1205,11 @@ mod tests {
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[0].clone()),
         );
 
@@ -1195,7 +1220,11 @@ mod tests {
 
         // weaker network (with no failures) returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[1].clone())
         );
 
@@ -1205,7 +1234,11 @@ mod tests {
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[0].clone())
         );
     }
@@ -1223,7 +1256,11 @@ mod tests {
 
         // The stronger BSS is selected initially.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[0].clone())
         );
 
@@ -1232,7 +1269,11 @@ mod tests {
 
         // The weaker, but still compatible, BSS is selected.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[1].clone())
         );
 
@@ -1243,7 +1284,11 @@ mod tests {
 
         // No BSS is selected.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             None
         );
     }
@@ -1260,7 +1305,11 @@ mod tests {
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            exec.run_singlethreaded(
+                test_values
+                    .network_selector
+                    .select_bss(candidates.clone(), generate_random_connect_reason())
+            ),
             Some(candidates[2].clone())
         );
 
@@ -1308,7 +1357,12 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        assert_eq!(exec.run_singlethreaded(test_values.network_selector.select_bss(vec![])), None);
+        assert_eq!(
+            exec.run_singlethreaded(
+                test_values.network_selector.select_bss(vec![], generate_random_connect_reason())
+            ),
+            None
+        );
 
         // Verify that an empty list of candidates is still logged to inspect.
         assert_data_tree!(test_values.inspector, root: {
@@ -1320,6 +1374,37 @@ mod tests {
                     }
                 }
             },
+        });
+    }
+
+    #[fuchsia::test]
+    fn select_bss_logs_cobalt_metrics() {
+        let mut exec = fasync::TestExecutor::new();
+        let mut test_values = exec.run_singlethreaded(test_setup(true));
+
+        let reason_code = generate_random_connect_reason();
+        let candidates =
+            vec![generate_random_scanned_candidate(), generate_random_scanned_candidate()];
+        assert!(exec
+            .run_singlethreaded(
+                test_values.network_selector.select_bss(candidates.clone(), reason_code)
+            )
+            .is_some());
+
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::BssSelectionResult {
+                reason,
+                scored_candidates,
+                selected_candidate: _,
+            } => {
+                assert_eq!(reason, reason_code);
+                let mut prior_score = i16::MAX;
+                for (candidate, score) in scored_candidates {
+                    assert!(candidates.contains(&candidate));
+                    assert!(prior_score >= score);
+                    prior_score = score;
+                }
+            })
         });
     }
 
@@ -1622,7 +1707,8 @@ mod tests {
         );
 
         // Kick off network selection
-        let network_selection_fut = network_selector.find_and_select_scanned_candidate(None);
+        let network_selection_fut = network_selector
+            .find_and_select_scanned_candidate(None, generate_random_connect_reason());
         pin_mut!(network_selection_fut);
         // Check that nothing is returned
         assert_variant!(exec.run_until_stalled(&mut network_selection_fut), Poll::Ready(None));
@@ -1653,6 +1739,10 @@ mod tests {
                 selected_count: 0,
             });
         });
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::BssSelectionResult { selected_candidate: None, .. }))
+        );
     }
 
     #[fuchsia::test]
@@ -1777,7 +1867,8 @@ mod tests {
         ])));
 
         // Check that we pick a network
-        let network_selection_fut = network_selector.find_and_select_scanned_candidate(None);
+        let network_selection_fut = network_selector
+            .find_and_select_scanned_candidate(None, generate_random_connect_reason());
         pin_mut!(network_selection_fut);
         let results =
             exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
@@ -1849,6 +1940,10 @@ mod tests {
                 selected_count: 2,
             });
         });
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+        );
     }
 
     #[fuchsia::test]
@@ -1900,8 +1995,10 @@ mod tests {
         ])));
 
         // Run network selection
-        let network_selection_fut =
-            network_selector.find_and_select_scanned_candidate(Some(test_id_1.clone()));
+        let network_selection_fut = network_selector.find_and_select_scanned_candidate(
+            Some(test_id_1.clone()),
+            generate_random_connect_reason(),
+        );
         pin_mut!(network_selection_fut);
         let results =
             exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
@@ -1915,7 +2012,6 @@ mod tests {
             *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
             vec![(ScanReason::BssSelection, vec![test_id_1.ssid.clone()], vec![])]
         );
-
         // Verify that NetworkSelectionDecision telemetry event is sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
@@ -1924,6 +2020,10 @@ mod tests {
                 selected_count: 1,
             });
         });
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+        );
     }
 
     #[fuchsia::test]
@@ -1977,8 +2077,10 @@ mod tests {
         );
 
         // Kick off network selection
-        let network_selection_fut =
-            network_selector.find_and_select_scanned_candidate(Some(test_id_1.clone()));
+        let network_selection_fut = network_selector.find_and_select_scanned_candidate(
+            Some(test_id_1.clone()),
+            generate_random_connect_reason(),
+        );
         pin_mut!(network_selection_fut);
 
         // Check that nothing is returned
@@ -1999,6 +2101,11 @@ mod tests {
                 selected_count: 1,
             });
         });
+
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+        );
     }
 
     #[fuchsia::test]

@@ -40,7 +40,7 @@ use {
     parking_lot::Mutex,
     static_assertions::const_assert_eq,
     std::{
-        cmp::{max, min},
+        cmp::{max, min, Reverse},
         collections::{HashMap, HashSet},
         ops::Add,
         sync::{
@@ -272,6 +272,12 @@ pub enum TelemetryEvent {
     ScanQueueStatistics {
         fulfilled_requests: usize,
         remaining_requests: usize,
+    },
+    // Record the results of a completed BSS selection
+    BssSelectionResult {
+        reason: client::types::ConnectReason,
+        scored_candidates: Vec<(client::types::ScannedCandidate, i16)>,
+        selected_candidate: Option<(client::types::ScannedCandidate, i16)>,
     },
 }
 
@@ -1236,6 +1242,15 @@ impl Telemetry {
             TelemetryEvent::ScanQueueStatistics { fulfilled_requests, remaining_requests } => {
                 self.stats_logger
                     .log_scan_queue_statistics(fulfilled_requests, remaining_requests)
+                    .await;
+            }
+            TelemetryEvent::BssSelectionResult {
+                reason,
+                scored_candidates,
+                selected_candidate,
+            } => {
+                self.stats_logger
+                    .log_bss_selection_metrics(reason, scored_candidates, selected_candidate)
                     .await;
             }
         }
@@ -2958,8 +2973,122 @@ impl StatsLogger {
             "log_network_selection_metrics",
         );
     }
-}
 
+    async fn log_bss_selection_metrics(
+        &mut self,
+        reason: client::types::ConnectReason,
+        mut scored_candidates: Vec<(client::types::ScannedCandidate, i16)>,
+        selected_candidate: Option<(client::types::ScannedCandidate, i16)>,
+    ) {
+        let mut metric_events = vec![];
+
+        // Record dimensionless BSS selection count
+        metric_events.push(MetricEvent {
+            metric_id: metrics::BSS_SELECTION_COUNT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        // Record detailed BSS selection count
+        metric_events.push(MetricEvent {
+            metric_id: metrics::BSS_SELECTION_COUNT_DETAILED_METRIC_ID,
+            event_codes: vec![reason as u32],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        // Record dimensionless number of BSS candidates
+        metric_events.push(MetricEvent {
+            metric_id: metrics::NUM_BSS_CONSIDERED_IN_SELECTION_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::IntegerValue(scored_candidates.len() as i64),
+        });
+        // Record detailed number of BSS candidates
+        metric_events.push(MetricEvent {
+            metric_id: metrics::NUM_BSS_CONSIDERED_IN_SELECTION_DETAILED_METRIC_ID,
+            event_codes: vec![reason as u32],
+            payload: MetricEventPayload::IntegerValue(scored_candidates.len() as i64),
+        });
+
+        if !scored_candidates.is_empty() {
+            let (mut best_score_2g, mut best_score_5g) = (None, None);
+            let mut unique_networks = HashSet::new();
+
+            for (candidate, score) in &scored_candidates {
+                // Record candidate's score
+                metric_events.push(MetricEvent {
+                    metric_id: metrics::BSS_CANDIDATE_SCORE_METRIC_ID,
+                    event_codes: vec![],
+                    payload: MetricEventPayload::IntegerValue(*score as i64),
+                });
+
+                let _ = unique_networks.insert(&candidate.network);
+
+                if candidate.bss.channel.is_2ghz() {
+                    best_score_2g = best_score_2g.or(Some(*score)).map(|s| max(s, *score));
+                } else {
+                    best_score_5g = best_score_5g.or(Some(*score)).map(|s| max(s, *score));
+                }
+            }
+
+            // Record number of unique networks in bss selection. This differs from number of
+            // networks selected, since some actions may bypass network selection (e.g. proactive
+            // roaming)
+            metric_events.push(MetricEvent {
+                metric_id: metrics::NUM_NETWORKS_REPRESENTED_IN_BSS_SELECTION_METRIC_ID,
+                event_codes: vec![reason as u32],
+                payload: MetricEventPayload::IntegerValue(unique_networks.len() as i64),
+            });
+
+            if let Some((_, score)) = selected_candidate {
+                // Record selected candidate's score
+                metric_events.push(MetricEvent {
+                    metric_id: metrics::SELECTED_BSS_SCORE_METRIC_ID,
+                    event_codes: vec![],
+                    payload: MetricEventPayload::IntegerValue(score as i64),
+                });
+
+                // Record runner-up candidate's score, iff there were multiple candidates and the
+                // selected candidate is the top scoring candidate (or tied in score)
+                scored_candidates.sort_by_key(|(_, score)| Reverse(*score));
+                if scored_candidates.len() > 1 && score == scored_candidates[0].1 {
+                    let delta = score - scored_candidates[1].1;
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::IntegerValue(delta as i64),
+                    });
+                }
+            }
+
+            let ghz_event_code =
+                if let (Some(score_2g), Some(score_5g)) = (best_score_2g, best_score_5g) {
+                    // Record delta between best 5GHz and best 2.4GHz candidates
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::BEST_CANDIDATES_GHZ_SCORE_DELTA_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::IntegerValue((score_5g - score_2g) as i64),
+                    });
+                    metrics::ConnectivityWlanMetricDimensionBands::MultiBand
+                } else if best_score_2g.is_some() {
+                    metrics::ConnectivityWlanMetricDimensionBands::Band2Dot4Ghz
+                } else {
+                    metrics::ConnectivityWlanMetricDimensionBands::Band5Ghz
+                };
+
+            metric_events.push(MetricEvent {
+                metric_id: metrics::GHZ_BANDS_AVAILABLE_IN_BSS_SELECTION_METRIC_ID,
+                event_codes: vec![ghz_event_code as u32],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
+
+        log_cobalt_1dot1_batch!(
+            self.cobalt_1dot1_proxy,
+            &metric_events,
+            "log_bss_selection_cobalt_metrics",
+        );
+    }
+}
 fn append_device_connected_channel_cobalt_metrics(
     metric_events: &mut Vec<MetricEvent>,
     primary_channel: u8,
@@ -3203,7 +3332,8 @@ mod tests {
     use {
         super::*,
         crate::util::testing::{
-            create_inspect_persistence_channel, create_wlan_hasher, generate_random_channel,
+            create_inspect_persistence_channel, create_wlan_hasher, generate_random_bss,
+            generate_random_channel, generate_random_scanned_candidate,
         },
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
@@ -6841,6 +6971,183 @@ mod tests {
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::NUM_NETWORKS_SELECTED_METRIC_ID);
         assert_eq!(logged_metrics.len(), 1);
+    }
+
+    #[fuchsia::test]
+    fn test_log_bss_selection_metrics() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send BSS selection result event with 3 candidate, multi-bss, one selected
+        let selected_candidate_2g = client::types::ScannedCandidate {
+            bss: client::types::Bss {
+                channel: client::types::WlanChan::new(1, wlan_common::channel::Cbw::Cbw20),
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        };
+        let candidate_2g = client::types::ScannedCandidate {
+            bss: client::types::Bss {
+                channel: client::types::WlanChan::new(1, wlan_common::channel::Cbw::Cbw20),
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        };
+        let candidate_5g = client::types::ScannedCandidate {
+            bss: client::types::Bss {
+                channel: client::types::WlanChan::new(36, wlan_common::channel::Cbw::Cbw40),
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        };
+        let scored_candidates =
+            vec![(selected_candidate_2g.clone(), 70), (candidate_2g, 60), (candidate_5g, 50)];
+
+        test_helper.telemetry_sender.send(TelemetryEvent::BssSelectionResult {
+            reason: client::types::ConnectReason::FidlConnectRequest,
+            scored_candidates: scored_candidates.clone(),
+            selected_candidate: Some((selected_candidate_2g, 70)),
+        });
+
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let fidl_connect_event_code = vec![
+            metrics::PolicyConnectionAttemptMigratedMetricDimensionReason::FidlConnectRequest
+                as u32,
+        ];
+        // Check that the BSS selection occurrence metrics are logged
+        let logged_metrics = test_helper.get_logged_metrics(metrics::BSS_SELECTION_COUNT_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, Vec::<u32>::new());
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::Count(1));
+
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::BSS_SELECTION_COUNT_DETAILED_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, fidl_connect_event_code);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Check that the candidate count metrics are logged
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::NUM_BSS_CONSIDERED_IN_SELECTION_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, Vec::<u32>::new());
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(3));
+
+        let logged_metrics = test_helper
+            .get_logged_metrics(metrics::NUM_BSS_CONSIDERED_IN_SELECTION_DETAILED_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, fidl_connect_event_code);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(3));
+
+        // Check that all candidate scores are logged
+        let logged_metrics = test_helper.get_logged_metrics(metrics::BSS_CANDIDATE_SCORE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 3);
+        for i in 0..3 {
+            assert_eq!(
+                logged_metrics[i].payload,
+                MetricEventPayload::IntegerValue(scored_candidates[i].1 as i64)
+            )
+        }
+
+        // Check that unique network count is logged
+        let logged_metrics = test_helper
+            .get_logged_metrics(metrics::NUM_NETWORKS_REPRESENTED_IN_BSS_SELECTION_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, fidl_connect_event_code);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(3));
+
+        // Check that selected candidate score is logged
+        let logged_metrics = test_helper.get_logged_metrics(metrics::SELECTED_BSS_SCORE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(70));
+
+        // Check that runner-up score delta is logged
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(10));
+
+        // Check that GHz score delta is logged
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::BEST_CANDIDATES_GHZ_SCORE_DELTA_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(-20));
+
+        // Check that GHz bands present in selection is logged
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::GHZ_BANDS_AVAILABLE_IN_BSS_SELECTION_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![metrics::GhzBandsAvailableInBssSelectionMetricDimensionBands::MultiBand as u32]
+        );
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::Count(1));
+    }
+
+    #[fuchsia::test]
+    fn test_log_bss_selection_metrics_none_selected() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        test_helper.telemetry_sender.send(TelemetryEvent::BssSelectionResult {
+            reason: client::types::ConnectReason::FidlConnectRequest,
+            scored_candidates: vec![],
+            selected_candidate: None,
+        });
+
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        // Check that only the BSS selection occurrence and candidate count metrics are recorded
+        assert!(!test_helper.get_logged_metrics(metrics::BSS_SELECTION_COUNT_METRIC_ID).is_empty());
+        assert!(!test_helper
+            .get_logged_metrics(metrics::BSS_SELECTION_COUNT_DETAILED_METRIC_ID)
+            .is_empty());
+        assert!(!test_helper
+            .get_logged_metrics(metrics::NUM_BSS_CONSIDERED_IN_SELECTION_METRIC_ID)
+            .is_empty());
+        assert!(!test_helper
+            .get_logged_metrics(metrics::NUM_BSS_CONSIDERED_IN_SELECTION_DETAILED_METRIC_ID)
+            .is_empty());
+        assert!(test_helper.get_logged_metrics(metrics::BSS_CANDIDATE_SCORE_METRIC_ID).is_empty());
+        assert!(test_helper
+            .get_logged_metrics(metrics::NUM_NETWORKS_REPRESENTED_IN_BSS_SELECTION_METRIC_ID)
+            .is_empty());
+        assert!(test_helper
+            .get_logged_metrics(metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID)
+            .is_empty());
+        assert!(test_helper
+            .get_logged_metrics(metrics::NUM_NETWORKS_REPRESENTED_IN_BSS_SELECTION_METRIC_ID)
+            .is_empty());
+        assert!(test_helper
+            .get_logged_metrics(metrics::BEST_CANDIDATES_GHZ_SCORE_DELTA_METRIC_ID)
+            .is_empty());
+        assert!(test_helper
+            .get_logged_metrics(metrics::GHZ_BANDS_AVAILABLE_IN_BSS_SELECTION_METRIC_ID)
+            .is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_log_bss_selection_metrics_runner_up_delta_not_recorded() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let scored_candidates = vec![
+            (generate_random_scanned_candidate(), 90),
+            (generate_random_scanned_candidate(), 60),
+            (generate_random_scanned_candidate(), 50),
+        ];
+
+        test_helper.telemetry_sender.send(TelemetryEvent::BssSelectionResult {
+            reason: client::types::ConnectReason::FidlConnectRequest,
+            scored_candidates: scored_candidates,
+            // Report that the selected candidate was not the highest scoring candidate.
+            selected_candidate: Some((generate_random_scanned_candidate(), 60)),
+        });
+
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        // No delta metric should be recorded
+        assert!(test_helper
+            .get_logged_metrics(metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID)
+            .is_empty());
     }
 
     struct TestHelper {

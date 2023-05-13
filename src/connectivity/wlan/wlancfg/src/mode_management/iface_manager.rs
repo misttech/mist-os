@@ -955,7 +955,14 @@ async fn initiate_network_selection(
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
         info!("Initiating network selection for idle client interface.");
-        let fut = async move { network_selector.find_and_select_scanned_candidate(None).await };
+        let fut = async move {
+            network_selector
+                .find_and_select_scanned_candidate(
+                    None,
+                    client_types::ConnectReason::IdleInterfaceAutoconnect,
+                )
+                .await
+        };
         iface_manager.network_selection_futures.push(fut.boxed());
     }
 }
@@ -969,7 +976,12 @@ async fn initiate_bss_selection_for_connect_request(
     let fut = async move {
         BssSelectionOperation::FulfillConnectRequest(
             connect_request.clone(),
-            network_selector.find_and_select_scanned_candidate(Some(connect_request.network)).await,
+            network_selector
+                .find_and_select_scanned_candidate(
+                    Some(connect_request.network),
+                    connect_request.reason,
+                )
+                .await,
         )
     };
 
