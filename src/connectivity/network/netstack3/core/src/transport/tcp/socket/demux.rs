@@ -7,11 +7,11 @@
 
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
-use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16};
+use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16, ops::ControlFlow};
 use tracing::trace;
 
 use net_types::{
-    ip::{IpAddress, IpVersionMarker},
+    ip::{Ip, IpAddress, IpVersionMarker},
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, Serializer};
@@ -44,7 +44,7 @@ use crate::{
             MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext, Sockets,
             SyncContext, TcpIpTransportContext, TimerId,
         },
-        state::{BufferProvider, Closed, Initial, State},
+        state::{BufferProvider, Closed, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
     },
 };
@@ -161,11 +161,14 @@ fn handle_incoming_packet<I, B, C, SC>(
         >,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
 {
-    let any_usable_conn = addrs_to_search.any(|addr| {
+    let any_usable_conn = match addrs_to_search.try_fold(None, |tw_reuse, addr| {
         match addr {
             // Connections are always searched before listeners because they
             // are more specific.
             AddrVec::Conn(conn_addr) => {
+                // It is not possible to have two same connections that share
+                // the same local and remote IPs and ports.
+                assert_eq!(tw_reuse, None);
                 if let Some(conn_addr_state) = sockets.socketmap.conns().get_by_addr(&conn_addr) {
                     let conn_id = conn_addr_state.id();
                     match try_handle_incoming_for_connection::<I, SC, C, B>(
@@ -177,11 +180,13 @@ fn handle_incoming_packet<I, B, C, SC>(
                         incoming,
                         now,
                     ) {
-                        HandleIncomingSegmentDisposition::FoundSocket => true,
-                        HandleIncomingSegmentDisposition::NoMatchingSocket => false,
+                        ConnectionIncomingSegmentDisposition::FoundSocket => ControlFlow::Break(()),
+                        ConnectionIncomingSegmentDisposition::ReuseCandidateForListener(reuse) => {
+                            ControlFlow::Continue(Some(reuse))
+                        }
                     }
                 } else {
-                    return false;
+                    ControlFlow::Continue(None)
                 }
             }
             AddrVec::Listen(listener_addr) => {
@@ -197,7 +202,9 @@ fn handle_incoming_packet<I, B, C, SC>(
                             id.clone().into()
                         }
                         ListenerAddrState::ExclusiveBound(_)
-                        | ListenerAddrState::Shared { listener: None, bound: _ } => return false,
+                        | ListenerAddrState::Shared { listener: None, bound: _ } => {
+                            return ControlFlow::Continue(None)
+                        }
                     };
 
                     match try_handle_incoming_for_listener::<I, SC, C, B>(
@@ -209,17 +216,23 @@ fn handle_incoming_packet<I, B, C, SC>(
                         incoming,
                         conn_addr,
                         incoming_device,
+                        tw_reuse,
                         now,
                     ) {
-                        HandleIncomingSegmentDisposition::FoundSocket => true,
-                        HandleIncomingSegmentDisposition::NoMatchingSocket => false,
+                        ListenerIncomingSegmentDisposition::FoundSocket => ControlFlow::Break(()),
+                        ListenerIncomingSegmentDisposition::NoMatchingSocket => {
+                            ControlFlow::Continue(tw_reuse)
+                        }
                     }
                 } else {
-                    return false;
+                    ControlFlow::Continue(tw_reuse)
                 }
             }
         }
-    });
+    }) {
+        ControlFlow::Continue(None | Some(_)) => false,
+        ControlFlow::Break(()) => true,
+    };
 
     let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
     if !any_usable_conn {
@@ -257,15 +270,22 @@ fn handle_incoming_packet<I, B, C, SC>(
     }
 }
 
-enum HandleIncomingSegmentDisposition {
+enum ConnectionIncomingSegmentDisposition<I: Ip> {
+    FoundSocket,
+    ReuseCandidateForListener(MaybeClosedConnectionId<I>),
+}
+
+enum ListenerIncomingSegmentDisposition {
     FoundSocket,
     NoMatchingSocket,
 }
 
 /// Tries to handle the incoming segment by providing it to a connected socket.
 ///
-/// Returns `true` if the segment was handled, `false` if a different socket
-/// should be tried.
+/// Returns `FoundSocket` if the segment was handled; Otherwise,
+/// `ReuseCandidateForListener` will be returned if there is a defunct socket
+/// that is currently in TIME_WAIT, which is ready to be reused if there is an
+/// active listener listening on the port.
 fn try_handle_incoming_for_connection<I, SC, C, B>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
@@ -274,7 +294,7 @@ fn try_handle_incoming_for_connection<I, SC, C, B>(
     conn_id: MaybeClosedConnectionId<I>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
-) -> HandleIncomingSegmentDisposition
+) -> ConnectionIncomingSegmentDisposition<I>
 where
     I: IpLayerIpExt,
     B: BufferMut,
@@ -294,6 +314,25 @@ where
         .expect("inconsistent state: invalid connection id");
 
     let Connection { acceptor, state, ip_sock, defunct, socket_options, soft_error: _ } = conn;
+
+    // Per RFC 9293 Section 3.6.1:
+    //   When a connection is closed actively, it MUST linger in the TIME-WAIT
+    //   state for a time 2xMSL (Maximum Segment Lifetime) (MUST-13). However,
+    //   it MAY accept a new SYN from the remote TCP endpoint to reopen the
+    //   connection directly from TIME-WAIT state (MAY-2), if it:
+    //
+    //   (1) assigns its initial sequence number for the new connection to be
+    //       larger than the largest sequence number it used on the previous
+    //       connection incarnation, and
+    //   (2) returns to TIME-WAIT state if the SYN turns out to be an old
+    //       duplicate.
+    if *defunct && incoming.contents.control() == Some(Control::SYN) && incoming.ack.is_none() {
+        if let State::TimeWait(TimeWait { last_seq, last_ack: _, last_wnd: _, expiry: _ }) = state {
+            if incoming.seq.after(*last_seq) {
+                return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener(conn_id);
+            }
+        }
+    }
 
     #[derive(Debug)]
     enum StateCategory {
@@ -336,7 +375,7 @@ where
                 // connection from the socketmap.
                 assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
-                return HandleIncomingSegmentDisposition::FoundSocket;
+                return ConnectionIncomingSegmentDisposition::FoundSocket;
             }
 
             // If the socket does have an acceptor, it hasn't been pulled from
@@ -420,12 +459,12 @@ where
     }
 
     // We found a valid connection for the segment.
-    HandleIncomingSegmentDisposition::FoundSocket
+    ConnectionIncomingSegmentDisposition::FoundSocket
 }
 
 /// Tries to handle an incoming segment by passing it to a listening socket.
 ///
-/// Returns `true` if the segment was handled, otherwise `false`.
+/// Returns `FoundSocket` if the segment was handled, otherwise `NoMatchingSocket`.
 fn try_handle_incoming_for_listener<I, SC, C, B>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
@@ -435,8 +474,9 @@ fn try_handle_incoming_for_listener<I, SC, C, B>(
     incoming: Segment<&[u8]>,
     incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &SC::DeviceId,
+    tw_reuse: Option<MaybeClosedConnectionId<I>>,
     now: C::Instant,
-) -> HandleIncomingSegmentDisposition
+) -> ListenerIncomingSegmentDisposition
 where
     I: IpLayerIpExt,
     B: BufferMut,
@@ -459,15 +499,18 @@ where
     let Listener { pending, backlog, buffer_sizes, ready, socket_options } = match maybe_listener {
         MaybeListener::Bound(_bound) => {
             // If the socket is only bound, but not listening.
-            return HandleIncomingSegmentDisposition::NoMatchingSocket;
+            return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
         MaybeListener::Listener(listener) => listener,
     };
 
+    // Note that this checks happens at the very beginning, before we try to
+    // reuse the connection in TIME-WAIT, this is because we need to store the
+    // reused connection in the accept queue so we have to respect its limit.
     if pending.len() + ready.len() == backlog.get() {
         // TODO(https://fxbug.dev/101993): Increment the counter.
         trace!("incoming SYN dropped because of the full backlog of the listener");
-        return HandleIncomingSegmentDisposition::FoundSocket;
+        return ListenerIncomingSegmentDisposition::FoundSocket;
     }
 
     let ListenerAddr { ip: _, device: bound_device } = listener_addr;
@@ -493,7 +536,7 @@ where
         Err(err) => {
             // TODO(https://fxbug.dev/101993): Increment the counter.
             trace!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
-            return HandleIncomingSegmentDisposition::NoMatchingSocket;
+            return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
     };
 
@@ -511,13 +554,13 @@ where
             tracing::error!("Cannot find a device with large enough MTU for the connection");
             match err {
                 MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
-                    return HandleIncomingSegmentDisposition::FoundSocket
+                    return ListenerIncomingSegmentDisposition::FoundSocket;
                 }
             }
         }
     };
     let Some(device_mss) = Mss::from_mms::<I>(device_mms) else {
-        return HandleIncomingSegmentDisposition::FoundSocket
+        return ListenerIncomingSegmentDisposition::FoundSocket;
     };
 
     let mut state = State::Listen(Closed::<Initial>::listen(
@@ -548,6 +591,16 @@ where
         let ListenerSharingState { sharing, listening: _ } = *sharing;
         let bound_device = bound_device.map(|d| d.as_weak_ref(ip_transport_ctx).into_owned());
         let MaybeListenerId(listener_index, _marker) = listener_id;
+        // We could just reuse the old allocation for the new connection but
+        // because of the restrictions on the socket map data structure (for
+        // good reasons), we can't update the sharing info unconditionally. So
+        // here we just remove the old connection and create a new one. Also
+        // this approach has the benefit of not accidentally persisting the old
+        // state that we don't want.
+        if let Some(tw_reuse) = tw_reuse {
+            assert_matches!(socketmap.conns_mut().remove(&tw_reuse), Some(_));
+            assert_matches!(ctx.cancel_timer(TimerId::new::<I>(tw_reuse)), Some(_));
+        }
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
@@ -595,7 +648,7 @@ where
     }
 
     // We found a valid listener for the segment.
-    HandleIncomingSegmentDisposition::FoundSocket
+    ListenerIncomingSegmentDisposition::FoundSocket
 }
 
 #[derive(Error, Debug)]

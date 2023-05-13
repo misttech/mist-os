@@ -3662,6 +3662,14 @@ mod tests {
         )
     }
 
+    /// How to bind the client socket in `bind_listen_connect_accept_inner`.
+    struct BindConfig {
+        /// Whether to bind the client.
+        bind_client: bool,
+        /// Whether to set REUSE_ADDR for the client.
+        client_reuse_addr: bool,
+    }
+
     /// The following test sets up two connected testing context - one as the
     /// server and the other as the client. Tests if a connection can be
     /// established using `bind`, `listen`, `connect` and `accept`.
@@ -3669,7 +3677,7 @@ mod tests {
     /// # Arguments
     ///
     /// * `listen_addr` - The address to listen on.
-    /// * `bind_client` - Whether to bind the client before connecting.
+    /// * `bind_config` - Specifics about how to bind the client socket.
     ///
     /// # Returns
     ///
@@ -3680,7 +3688,7 @@ mod tests {
     ///   - the accepted socket from remote.
     fn bind_listen_connect_accept_inner<I: Ip + TcpTestIpExt>(
         listen_addr: I::Addr,
-        bind_client: bool,
+        BindConfig { bind_client, client_reuse_addr }: BindConfig,
         seed: u128,
         drop_rate: f64,
     ) -> (TcpTestNetwork<I>, ConnectionId<I>, Rc<RefCell<Vec<u8>>>, ConnectionId<I>) {
@@ -3714,6 +3722,9 @@ mod tests {
         let client_ends = WriteBackClientBuffers::default();
         let client = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            if client_reuse_addr {
+                SocketHandler::set_reuseaddr_unbound(sync_ctx, conn, true);
+            }
             if bind_client {
                 let conn = SocketHandler::bind(
                     sync_ctx,
@@ -3856,14 +3867,21 @@ mod tests {
     }
 
     #[ip_test]
-    fn bind_listen_connect_accept<I: Ip + TcpTestIpExt>() {
+    #[test_case(BindConfig { bind_client: false, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { bind_client: true, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { bind_client: false, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { bind_client: true, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { bind_client: false, client_reuse_addr: false }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
+    #[test_case(BindConfig { bind_client: true, client_reuse_addr: false }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
+    #[test_case(BindConfig { bind_client: false, client_reuse_addr: true }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
+    #[test_case(BindConfig { bind_client: true, client_reuse_addr: true }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
+    fn bind_listen_connect_accept<I: Ip + TcpTestIpExt>(
+        bind_config: BindConfig,
+        listen_addr: I::Addr,
+    ) {
         set_logger_for_test();
-        for bind_client in [true, false] {
-            for listen_addr in [I::UNSPECIFIED_ADDRESS, *I::FAKE_CONFIG.remote_ip] {
-                let (_net, _client, _client_snd_end, _accepted) =
-                    bind_listen_connect_accept_inner::<I>(listen_addr, bind_client, 0, 0.0);
-            }
-        }
+        let (_net, _client, _client_snd_end, _accepted) =
+            bind_listen_connect_accept_inner::<I>(listen_addr, bind_config, 0, 0.0);
     }
 
     #[ip_test]
@@ -4102,8 +4120,12 @@ mod tests {
     fn retransmission<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
         run_with_many_seeds(|seed| {
-            let (_net, _client, _client_snd_end, _accepted) =
-                bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, seed, 0.2);
+            let (_net, _client, _client_snd_end, _accepted) = bind_listen_connect_accept_inner::<I>(
+                I::UNSPECIFIED_ADDRESS,
+                BindConfig { bind_client: false, client_reuse_addr: false },
+                seed,
+                0.2,
+            );
         });
     }
 
@@ -4464,8 +4486,12 @@ mod tests {
         expected_time_to_close: Duration,
     ) {
         set_logger_for_test();
-        let (mut net, local, _local_snd_end, remote) =
-            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: false, client_reuse_addr: false },
+            0,
+            0.0,
+        );
         let close_called = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
             non_sync_ctx.now()
@@ -4510,8 +4536,12 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
-        let (mut net, local, _local_snd_end, _remote) =
-            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        let (mut net, local, _local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: false, client_reuse_addr: false },
+            0,
+            0.0,
+        );
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local), Ok(()));
         });
@@ -4545,8 +4575,12 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
-        let (mut net, local, _local_snd_end, remote) =
-            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: false, client_reuse_addr: false },
+            0,
+            0.0,
+        );
 
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
             net.with_context(name, |TcpCtx { sync_ctx, non_sync_ctx }| {
@@ -5409,8 +5443,12 @@ mod tests {
     fn icmp_destination_unreachable_established_inner<I: TcpTestIpExt + IcmpIpExt>(
         icmp_error: I::ErrorCode,
     ) -> ConnectionError {
-        let (mut net, local, local_snd_end, _remote) =
-            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        let (mut net, local, local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: false, client_reuse_addr: false },
+            0,
+            0.0,
+        );
         local_snd_end.borrow_mut().extend_from_slice(b"Hello");
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::do_send(sync_ctx, non_sync_ctx, local.into());
@@ -5507,6 +5545,149 @@ mod tests {
                 assert_eq!(listener.pending.len(), 0);
                 assert_eq!(listener.ready.len(), 0);
             });
+        });
+    }
+
+    #[ip_test]
+    fn time_wait_reuse<I: Ip + TcpTestIpExt>() {
+        set_logger_for_test();
+        let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { bind_client: true, client_reuse_addr: true },
+            0,
+            0.0,
+        );
+        // Locally, we create a connection with a full accept queue.
+        let listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            let bound = SocketHandler::bind(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                Some(PORT_1),
+            )
+            .expect("failed to bind");
+            SocketHandler::listen(sync_ctx, non_sync_ctx, bound, NonZeroUsize::new(1).unwrap())
+                .expect("failed to listen")
+        });
+        // This connection is never used, just to keep accept queue full.
+        let extra_conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
+                Default::default(),
+            )
+            .expect("failed to connect")
+        });
+        net.run_until_idle(handle_frame, handle_timer);
+
+        // Assert the events.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ListenerConnectionCount(listener.into(), 1)]
+            );
+        });
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    extra_conn.into(),
+                    ConnectionStatusUpdate::Connected
+                )]
+            );
+        });
+
+        // Now we shutdown the sockets and try to bring the local socket to
+        // TIME-WAIT.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
+        });
+        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            SocketHandler::close_conn(sync_ctx, non_sync_ctx, remote);
+        });
+        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        // The connection should go to TIME-WAIT.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            sync_ctx.with_tcp_sockets(|Sockets { inactive: _, port_alloc: _, socketmap }| {
+                let (conn, _sharing, _addr) =
+                    socketmap.conns().get_by_id(&local.into()).expect("failed to get connection");
+                assert_matches!(conn.state, State::TimeWait(_));
+            });
+        });
+
+        // Try to initiate a connection from the remote since we have an active
+        // listener locally.
+        let conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
+                Default::default(),
+            )
+            .expect("failed to connect")
+        });
+        net.run_until_idle(handle_frame, handle_timer);
+        // This attempt should fail due the full accept queue at the listener.
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            sync_ctx.with_tcp_sockets(|Sockets { inactive: _, port_alloc: _, socketmap }| {
+                let (conn, _sharing, _addr) =
+                    socketmap.conns().get_by_id(&conn.into()).expect("invalid connection ID");
+                assert_matches!(
+                    conn.state,
+                    State::Closed(Closed { reason: Some(ConnectionError::TimedOut) })
+                );
+            });
+        });
+        // Now free up the accept queue by accepting the connection.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let _accepted = SocketHandler::accept(sync_ctx, non_sync_ctx, listener)
+                .expect("failed to accept a new connection");
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ListenerConnectionCount(listener.into(), 0)]
+            );
+        });
+        let conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
+                Default::default(),
+            )
+            .expect("failed to connect")
+        });
+        // The TIME-WAIT socket should be reused to establish the connection.
+        net.run_until_idle(handle_frame, handle_timer);
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    conn.into(),
+                    ConnectionStatusUpdate::Connected
+                )]
+            );
+        });
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ListenerConnectionCount(listener.into(), 1)]
+            );
         });
     }
 }

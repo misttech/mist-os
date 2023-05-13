@@ -1306,10 +1306,10 @@ pub(crate) struct Closing<I, S> {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct TimeWait<I> {
-    last_seq: SeqNum,
-    last_ack: SeqNum,
-    last_wnd: WindowSize,
-    expiry: I,
+    pub(super) last_seq: SeqNum,
+    pub(super) last_ack: SeqNum,
+    pub(super) last_wnd: WindowSize,
+    pub(super) expiry: I,
 }
 
 fn new_time_wait_expiry<I: Instant>(now: I) -> I {
