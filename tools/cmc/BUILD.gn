@@ -83,7 +83,9 @@ rustc_test("cmc_integration_test_bin") {
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:difference",
   ]
 
   sources = [ "tests/integration_test.rs" ]
