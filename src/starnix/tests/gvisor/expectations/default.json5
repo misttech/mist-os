@@ -555,7 +555,6 @@
                 "ProcTask.CommCanSetPeerThreadName",
                 "ProcTask.CommCannotSetAnotherProcessThreadName",
                 "ProcTask.TaskDirHasCorrectMetadata",
-                "ProcTask.VerifyTaskDir",
                 "ProcTask.VerifyTaskDirNlinks",
                 "ProcSysKernelHostname.Exists",
                 "ProcSysKernelHostname.MatchesUname",

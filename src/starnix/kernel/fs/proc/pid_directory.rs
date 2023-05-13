@@ -40,6 +40,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"exe", ExeSymlink::new(task), mode!(IFLNK, 0o777));
     dir.entry(b"fd", FdDirectory::new(task), mode!(IFDIR, 0o777));
     dir.entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777));
+    dir.entry(b"io", IoFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"limits", LimitsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
@@ -441,6 +442,28 @@ impl DynamicFileSource for CommFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         sink.write(self.0.command().as_bytes());
         sink.write(b"\n");
+        Ok(())
+    }
+}
+
+/// `IoFile` implements `proc/<pid>/io` file.
+#[derive(Clone)]
+pub struct IoFile(Arc<Task>);
+impl IoFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for IoFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        // TODO: Keep track of these stats and report them in this file.
+        sink.write(b"rchar: 0\n");
+        sink.write(b"wchar: 0\n");
+        sink.write(b"syscr: 0\n");
+        sink.write(b"syscw: 0\n");
+        sink.write(b"read_bytes: 0\n");
+        sink.write(b"write_bytes: 0\n");
+        sink.write(b"cancelled_write_bytes: 0\n");
         Ok(())
     }
 }
