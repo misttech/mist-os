@@ -41,9 +41,9 @@ restricted_return:
   pop  %rbx
 
   // pop the reason code pointer from the stack and write the reason
-  // code from rdx.
+  // code from rsi.
   pop  %rdx
-  mov  %rax,(%rdx)
+  mov  %rsi,(%rdx)
 
   // Zero out rax (return ZX_OK).
   xor %eax, %eax
