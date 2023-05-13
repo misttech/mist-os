@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryInto;
@@ -29,6 +30,7 @@ bitflags! {
       const ANONYMOUS = 2;
       const LOWER_32BIT = 4;
       const GROWSDOWN = 8;
+      const ELF_BINARY = 16;
     }
 }
 
@@ -1669,6 +1671,47 @@ impl MemoryManager {
     ) -> Result<bool, Error> {
         self.state.write().extend_growsdown_mapping_to_address(addr, is_write)
     }
+
+    pub fn get_stats(&self) -> Result<MemoryStats, Errno> {
+        let mut result = MemoryStats::default();
+        let state = self.state.read();
+        for (range, mapping) in state.mappings.iter() {
+            let size = range.end.ptr() - range.start.ptr();
+            result.vm_size += size;
+
+            let vmo_info = mapping.vmo.info().map_err(|_| errno!(EIO))?;
+            let committed_bytes = vmo_info.committed_bytes as usize;
+            result.vm_rss += committed_bytes;
+
+            if mapping.options.contains(MappingOptions::ANONYMOUS)
+                && !mapping.options.contains(MappingOptions::SHARED)
+            {
+                result.rss_anonymous += committed_bytes;
+            }
+
+            if vmo_info.share_count > 1 {
+                result.rss_shared += committed_bytes;
+            }
+
+            if let MappingName::File(_) = mapping.name {
+                result.rss_file += committed_bytes;
+            }
+
+            if mapping.options.contains(MappingOptions::ELF_BINARY)
+                && mapping.prot_flags.contains(ProtectionFlags::WRITE)
+            {
+                result.vm_data += size;
+            }
+
+            if mapping.options.contains(MappingOptions::ELF_BINARY)
+                && mapping.prot_flags.contains(ProtectionFlags::EXEC)
+            {
+                result.vm_exe += size;
+            }
+        }
+        result.vm_stack = state.stack_size;
+        Ok(result)
+    }
 }
 
 /// A VMO and the userspace address at which it was mapped.
@@ -1749,6 +1792,18 @@ fn write_map(
     Ok(())
 }
 
+#[derive(Default)]
+pub struct MemoryStats {
+    vm_size: usize,
+    vm_rss: usize,
+    rss_anonymous: usize,
+    rss_file: usize,
+    rss_shared: usize,
+    vm_data: usize,
+    vm_stack: usize,
+    vm_exe: usize,
+}
+
 #[derive(Clone)]
 pub struct ProcMapsFile(Arc<Task>);
 impl ProcMapsFile {
@@ -1799,45 +1854,37 @@ impl SequenceFileSource for ProcSmapsFile {
         if let Some((range, map)) = iter.next() {
             write_map(task, sink, range, map)?;
 
-            let vmo_info = map.vmo.info().map_err(MemoryManager::get_errno_for_map_err)?;
+            let vmo_info = map.vmo.info().map_err(|_| errno!(EIO))?;
             let size_kb = vmo_info.size_bytes / 1024;
             writeln!(sink, "Size:\t{size_kb} kB",)?;
-            writeln!(sink, "Rss:\t{size_kb} kB")?;
+            let rss_kb = vmo_info.committed_bytes / 1024;
+            writeln!(sink, "Rss:\t{rss_kb} kB")?;
             writeln!(
                 sink,
                 "Pss:\t{} kB",
                 if map.options.contains(MappingOptions::SHARED) {
-                    size_kb / vmo_info.share_count as u64
+                    rss_kb / vmo_info.share_count as u64
                 } else {
-                    size_kb
+                    rss_kb
                 }
             )?;
 
-            let mut shared_clean_kb = 0;
-            let mut shared_dirty_kb = 0;
-            if vmo_info.share_count > 1 {
-                shared_dirty_kb = vmo_info.committed_bytes / 1024;
-                shared_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
-            }
+            let is_shared = vmo_info.share_count > 1;
+            let shared_clean_kb = if is_shared { rss_kb } else { 0 };
+            // TODO: Report dirty pages for paged VMOs.
+            let shared_dirty_kb = 0;
             writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
             writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
 
-            let mut private_clean_kb = 0;
-            let mut private_dirty_kb = 0;
-            if vmo_info.share_count == 1 {
-                private_dirty_kb = vmo_info.committed_bytes / 1024;
-                private_clean_kb = (vmo_info.size_bytes - vmo_info.committed_bytes) / 1024;
-            }
+            let private_clean_kb = if is_shared { 0 } else { rss_kb };
+            // TODO: Report dirty pages for paged VMOs.
+            let private_dirty_kb = 0;
             writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
             writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
 
-            let anonymous_kb = if map.options.contains(MappingOptions::ANONYMOUS)
-                && !map.options.contains(MappingOptions::SHARED)
-            {
-                size_kb
-            } else {
-                0
-            };
+            let is_anonymous = map.options.contains(MappingOptions::ANONYMOUS)
+                && !map.options.contains(MappingOptions::SHARED);
+            let anonymous_kb = if is_anonymous { rss_kb } else { 0 };
             writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
             writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
             writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
@@ -1860,20 +1907,65 @@ impl DynamicFileSource for ProcStatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let command = self.0.command();
         let command = command.as_c_str().to_str().unwrap_or("unknown");
-        let mut stats = [0u64; 49];
+        let mut stats = [0u64; 48];
         {
             let thread_group = self.0.thread_group.read();
             stats[0] = thread_group.get_ppid() as u64;
             stats[1] = thread_group.process_group.leader as u64;
             stats[2] = thread_group.process_group.session.leader as u64;
-            stats[19] = thread_group.tasks.len() as u64;
+            stats[16] = thread_group.tasks.len() as u64;
+            stats[21] = thread_group.limits.get(Resource::RSS).rlim_max;
         }
+
+        let info = self.0.thread_group.process.info().map_err(|_| errno!(EIO))?;
+        stats[18] =
+            duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
+                as u64;
+
+        let mem_stats = self.0.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let page_size = *PAGE_SIZE as usize;
+        stats[19] = mem_stats.vm_size as u64;
+        stats[20] = (mem_stats.vm_rss / page_size) as u64;
+
         {
             let mm_state = self.0.mm.state.read();
             stats[24] = mm_state.stack_start.ptr() as u64;
+            stats[44] = mm_state.argv_start.ptr() as u64;
+            stats[45] = mm_state.argv_end.ptr() as u64;
+            stats[46] = mm_state.environ_start.ptr() as u64;
+            stats[47] = mm_state.environ_end.ptr() as u64;
         }
         let stat_str = stats.map(|n| n.to_string()).join(" ");
+
+        // TODO: report correct state.
         writeln!(sink, "{} ({}) R {}", self.0.get_pid(), command, stat_str)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct ProcStatmFile(Arc<Task>);
+impl ProcStatmFile {
+    pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task.clone()))
+    }
+}
+impl DynamicFileSource for ProcStatmFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let mem_stats = self.0.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let page_size = *PAGE_SIZE as usize;
+
+        // 5th and 7th fields are deprecated and should be set to 0.
+        writeln!(
+            sink,
+            "{} {} {} {} 0 {} 0",
+            mem_stats.vm_size / page_size,
+            mem_stats.vm_rss / page_size,
+            mem_stats.rss_shared / page_size,
+            mem_stats.vm_exe / page_size,
+            (mem_stats.vm_data + mem_stats.vm_stack) / page_size
+        )?;
         Ok(())
     }
 }
@@ -1887,9 +1979,42 @@ impl ProcStatusFile {
 }
 impl DynamicFileSource for ProcStatusFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let creds = self.0.creds();
+        let task = &self.0;
+
+        write!(sink, "Name:\t")?;
+        sink.write(task.command().as_bytes());
+        writeln!(sink)?;
+
+        // TODO: report task state.
+        writeln!(sink, "State:\tR (running)")?;
+
+        writeln!(sink, "Tgid:\t{}", task.get_pid())?;
+        writeln!(sink, "Pid:\t{}", task.id)?;
+        let (ppid, threads) = {
+            let task_group = task.thread_group.read();
+            (task_group.get_ppid(), task_group.tasks.len())
+        };
+        writeln!(sink, "PPid:\t{}", ppid)?;
+
         // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
-        writeln!(sink, "Uid:\t{} {} {} {}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
+        let creds = task.creds();
+        writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
+        writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
+        writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
+
+        let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
+        writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
+        writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
+        writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
+        writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;
+        writeln!(sink, "RssShmem:\t{} kB", mem_stats.rss_shared / 1024)?;
+        writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
+        writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
+        writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
+
+        // There should be at least on thread in Zombie processes.
+        writeln!(sink, "Threads:\t{}", std::cmp::max(1, threads))?;
+
         Ok(())
     }
 }

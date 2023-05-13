@@ -161,7 +161,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 length,
                 ProtectionFlags::from_vmar_flags(vmar_flags),
                 vmar_flags,
-                MappingOptions::empty(),
+                MappingOptions::ELF_BINARY,
                 MappingName::File(self.file.name.clone()),
             )
             .map_err(|e| {

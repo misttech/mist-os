@@ -128,7 +128,7 @@ pub fn sys_mmap(
         )?
     };
 
-    if flags & MAP_POPULATE != 0 {
+    if flags & MAP_POPULATE != 0 && prot & (PROT_READ | PROT_WRITE) != 0 {
         let _result = vmo.op_range(zx::VmoOp::COMMIT, vmo_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }

@@ -7,7 +7,9 @@ use regex::Regex;
 use std::sync::Arc;
 
 use crate::fs::*;
-use crate::mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatusFile};
+use crate::mm::{
+    MemoryAccessor, ProcMapsFile, ProcSmapsFile, ProcStatFile, ProcStatmFile, ProcStatusFile,
+};
 use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, ThreadGroup};
 use crate::types::*;
@@ -45,6 +47,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"smaps", ProcSmapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"statm", ProcStatmFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"environ", EnvironFile::new_node(task), mode!(IFREG, 0o444));
