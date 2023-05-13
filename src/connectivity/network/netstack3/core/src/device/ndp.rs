@@ -81,8 +81,8 @@ mod tests {
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
                 slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
                 state::{
-                    AddrConfig, Ipv6AddressEntry, Ipv6DadState, Lifetime, SlaacConfig,
-                    TemporarySlaacConfig,
+                    AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6DadState, Lifetime,
+                    SlaacConfig, TemporarySlaacConfig,
                 },
                 testutil::{get_global_ipv6_addrs, with_assigned_ipv6_addr_subnets},
                 IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
@@ -2267,7 +2267,7 @@ mod tests {
             config: AddrConfig::Slaac(SlaacConfig::Static {
                 valid_until: Lifetime::Finite(FakeInstant::from(valid_until)),
             }),
-            deprecated: false,
+            flags: Ipv6AddressFlags { deprecated: false, assigned: false },
         };
         assert_eq!(get_global_ipv6_addrs(&sync_ctx, &device), [expected_address_entry]);
 
@@ -2290,7 +2290,10 @@ mod tests {
         );
         assert_eq!(
             get_global_ipv6_addrs(&sync_ctx, &device),
-            [Ipv6AddressEntry { deprecated: true, ..expected_address_entry }]
+            [Ipv6AddressEntry {
+                flags: Ipv6AddressFlags { deprecated: true, ..expected_address_entry.flags },
+                ..expected_address_entry
+            }]
         );
     }
 
@@ -3124,7 +3127,7 @@ mod tests {
                 .addr_sub()
                 .subnet()
                 == subnet
-                && !entry.deprecated
+                && !entry.flags.deprecated
                 && match entry.config {
                     AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
                     AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
@@ -3578,7 +3581,7 @@ mod tests {
             config: AddrConfig::Slaac(SlaacConfig::Static {
                 valid_until: Lifetime::Finite(FakeInstant::from(valid_until)),
             }),
-            deprecated: false,
+            flags: Ipv6AddressFlags { deprecated: false, assigned: true },
         };
         assert_eq!(get_global_ipv6_addrs(&sync_ctx, &device), [expected_address_entry]);
         // Make sure deprecate and invalidation timers are set.

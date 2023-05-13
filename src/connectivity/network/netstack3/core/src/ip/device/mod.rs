@@ -849,7 +849,7 @@ impl<
     ) -> Option<Ipv6DadState> {
         let address_state = self.with_ip_device_addresses(device_id, |addrs| {
             addrs.iter().find_map(
-                |Ipv6AddressEntry { addr_sub, state: address_state, config: _, deprecated: _ }| {
+                |Ipv6AddressEntry { addr_sub, state: address_state, config: _, flags: _ }| {
                     (addr_sub.addr() == addr).then(|| *address_state)
                 },
             )
@@ -968,7 +968,7 @@ fn enable_ipv6_device_with_config<
         .with_ip_device_addresses(device_id, |addrs| {
             addrs
                 .iter()
-                .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, flags: _ }| {
                     addr_sub.ipv6_unicast_addr()
                 })
                 .collect::<Vec<_>>()
@@ -1054,7 +1054,7 @@ fn disable_ipv6_device_with_config<
         .with_ip_device_addresses(device_id, |addrs| {
             addrs
                 .iter()
-                .map(|Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| {
+                .map(|Ipv6AddressEntry { addr_sub, state: _, config, flags: _ }| {
                     (addr_sub.ipv6_unicast_addr(), *config)
                 })
                 .collect::<Vec<_>>()
@@ -1514,7 +1514,7 @@ fn del_ipv6_addr_with_reason_with_config<
     config: &Ipv6DeviceConfiguration,
 ) -> Result<(), NotFoundError> {
     del_ipv6_addr_with_config(sync_ctx, ctx, device_id, addr, reason.into(), config).map(
-        |Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| match config {
+        |Ipv6AddressEntry { addr_sub, state: _, config, flags: _ }| match config {
             AddrConfig::Slaac(s) => {
                 SlaacHandler::on_address_removed(sync_ctx, ctx, device_id, addr_sub, s, reason)
             }
@@ -2256,7 +2256,7 @@ mod tests {
                 |addrs| {
                     addrs
                         .iter()
-                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, flags: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
                         .collect::<HashSet<_>>()
@@ -2417,7 +2417,7 @@ mod tests {
                 |addrs| {
                     addrs
                         .iter()
-                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, flags: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
                         .collect::<HashSet<_>>()
@@ -2477,7 +2477,7 @@ mod tests {
                 |addrs| {
                     addrs
                         .iter()
-                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, flags: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
                         .collect::<HashSet<_>>()
@@ -2610,7 +2610,7 @@ mod tests {
                 |addrs| {
                     addrs
                         .iter()
-                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, flags: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
                         .collect::<HashSet<_>>()

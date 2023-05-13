@@ -590,7 +590,7 @@ pub(crate) mod ipv6_source_address_selection {
         addresses
             // Tentative addresses are not considered available to the source
             // selection algorithm.
-            .filter(|(a, _)| !a.state.is_tentative())
+            .filter(|(a, _)| a.flags.assigned)
             .max_by(|(a, a_device), (b, b_device)| {
                 select_ipv6_source_address_cmp(remote_ip, outbound_device, a, a_device, b, b_device)
             })
@@ -618,13 +618,13 @@ pub(crate) mod ipv6_source_address_selection {
             debug_assert!(!(a_addr == remote_ip && b_addr == remote_ip));
         }
 
-        // Tentative addresses are not valid source addresses since they are
-        // not considered assigned.
-        debug_assert!(!a.state.is_tentative());
-        debug_assert!(!b.state.is_tentative());
+        // Addresses that are not considered assigned are not valid source
+        // addresses.
+        debug_assert!(a.flags.assigned);
+        debug_assert!(b.flags.assigned);
 
         rule_1(remote_ip, a_addr, b_addr)
-            .then_with(|| rule_3(a.deprecated, b.deprecated))
+            .then_with(|| rule_3(a.flags.deprecated, b.flags.deprecated))
             .then_with(|| rule_5(outbound_device, a_device, b_device))
             .then_with(|| rule_8(remote_ip, a, b))
     }
@@ -845,7 +845,7 @@ pub(crate) mod ipv6_source_address_selection {
                     Ipv6DadState::Assigned,
                     AddrConfig::Manual,
                 );
-                entry.deprecated = deprecated;
+                entry.flags.deprecated = deprecated;
                 entry
             };
 

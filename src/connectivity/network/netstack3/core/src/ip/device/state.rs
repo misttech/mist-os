@@ -83,7 +83,7 @@ impl IpDeviceStateIpExt for Ipv6 {
         // device) and deprecated IP addresses (addresses which have been
         // assigned but should no longer be used for new connections) will not
         // be returned.
-        addr.state.is_assigned().then_some((*addr.addr_sub()).to_witness())
+        addr.flags.assigned.then_some((*addr.addr_sub()).to_witness())
     }
 }
 
@@ -565,22 +565,6 @@ pub(crate) enum Ipv6DadState {
     Uninitialized,
 }
 
-impl Ipv6DadState {
-    /// Is this address assigned?
-    pub(crate) fn is_assigned(self) -> bool {
-        self == Ipv6DadState::Assigned
-    }
-
-    /// Is this address tentative?
-    pub(crate) fn is_tentative(self) -> bool {
-        match self {
-            Ipv6DadState::Assigned => false,
-            Ipv6DadState::Uninitialized
-            | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => true,
-        }
-    }
-}
-
 /// Configuration for a temporary IPv6 address assigned via SLAAC.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct TemporarySlaacConfig<Instant> {
@@ -638,6 +622,12 @@ impl<Instant> AddrConfig<Instant> {
         Self::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite });
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Ipv6AddressFlags {
+    pub(crate) deprecated: bool,
+    pub(crate) assigned: bool,
+}
+
 /// Data associated with an IPv6 address on an interface.
 // TODO(https://fxbug.dev/91753): Should this be generalized for loopback?
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -645,7 +635,7 @@ pub(crate) struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
     pub(crate) state: Ipv6DadState,
     pub(crate) config: AddrConfig<Instant>,
-    pub(crate) deprecated: bool,
+    pub(crate) flags: Ipv6AddressFlags,
 }
 
 impl<Instant> Ipv6AddressEntry<Instant> {
@@ -654,7 +644,13 @@ impl<Instant> Ipv6AddressEntry<Instant> {
         state: Ipv6DadState,
         config: AddrConfig<Instant>,
     ) -> Self {
-        Self { addr_sub, state, config, deprecated: false }
+        let assigned = match state {
+            Ipv6DadState::Assigned => true,
+            Ipv6DadState::Tentative { dad_transmits_remaining: _ }
+            | Ipv6DadState::Uninitialized => false,
+        };
+
+        Self { addr_sub, state, config, flags: Ipv6AddressFlags { deprecated: false, assigned } }
     }
 
     pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {

@@ -29,7 +29,7 @@ use crate::{
         self,
         device::{
             self, add_ipv6_addr_subnet_with_config,
-            dad::{DadContext, DadHandler, DadStateRef},
+            dad::{DadAddressStateRef, DadContext, DadHandler, DadStateRef},
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_forwarding_enabled,
             nud::NudIpHandler,
@@ -45,7 +45,8 @@ use crate::{
             },
             state::{
                 AddrConfig, IpDeviceAddresses, IpDeviceConfiguration, Ipv4DeviceConfiguration,
-                Ipv6AddressEntry, Ipv6DadState, Ipv6DeviceConfiguration, SlaacConfig,
+                Ipv6AddressEntry, Ipv6AddressFlags, Ipv6DadState, Ipv6DeviceConfiguration,
+                SlaacConfig,
             },
             IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext, RemovedReason,
         },
@@ -86,7 +87,12 @@ fn with_iter_slaac_addrs_mut<
 ) -> O {
     SC::with_ip_device_addresses_mut(sync_ctx, device_id, |addrs| {
         cb(Box::new(addrs.iter_mut().filter_map(
-            |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
+            |Ipv6AddressEntry {
+                 addr_sub,
+                 state: _,
+                 config,
+                 flags: Ipv6AddressFlags { deprecated, assigned: _ },
+             }| match config {
                 AddrConfig::Slaac(config) => {
                     Some(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
                 }
@@ -121,11 +127,18 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             device_id,
             |addrs| {
                 cb(Box::new(addrs.iter().cloned().filter_map(
-                    |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
-                        AddrConfig::Slaac(config) => {
-                            Some(SlaacAddressEntry { addr_sub, config, deprecated })
+                    |Ipv6AddressEntry {
+                         addr_sub,
+                         state: _,
+                         config,
+                         flags: Ipv6AddressFlags { deprecated, assigned: _ },
+                     }| {
+                        match config {
+                            AddrConfig::Slaac(config) => {
+                                Some(SlaacAddressEntry { addr_sub, config, deprecated })
+                            }
+                            AddrConfig::Manual => None,
                         }
-                        AddrConfig::Manual => None,
                     },
                 )))
             },
@@ -178,7 +191,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
             RemovedReason::Manual,
             config,
         )
-        .map(|Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| {
+        .map(|Ipv6AddressEntry { addr_sub, state: _, config, flags: _ }| {
             assert_eq!(&addr_sub.addr(), addr);
             match config {
                 AddrConfig::Slaac(s) => (addr_sub, s),
@@ -646,8 +659,16 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> DadContext<
             device_id,
             |addrs| {
                 cb(DadStateRef {
-                    address_state: addrs.find_mut(&addr).map(
-                        |Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state,
+                    state: addrs.find_mut(&addr).map(
+                        |Ipv6AddressEntry {
+                             addr_sub: _,
+                             state,
+                             config: _,
+                             flags: Ipv6AddressFlags { deprecated: _, assigned },
+                         }| DadAddressStateRef {
+                            dad_state: state,
+                            assigned,
+                        },
                     ),
                     retrans_timer: &retrans_timer,
                     max_dad_transmits: &Borrow::borrow(&*config).dad_transmits,
@@ -1038,7 +1059,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> MldContext<
             device,
             |addrs| {
                 addrs.iter().find_map(|a| {
-                    if a.state.is_assigned() {
+                    if a.flags.assigned {
                         LinkLocalUnicastAddr::new(a.addr_sub().addr())
                     } else {
                         None
